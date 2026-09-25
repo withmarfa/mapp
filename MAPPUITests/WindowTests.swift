@@ -132,4 +132,77 @@ final class WindowTests: XCTestCase {
         XCTAssertFalse((editor.value as? String ?? "").hasPrefix(first.prefix(20)), "the page still shows the moved note")
         XCTAssertTrue(editor.exists)
     }
+
+    // MARK: Keyboard, menus and windows
+
+    func testReturnEntersThePageAndEscapeGoesBackToTheList() {
+        row(titled: "Garden ideas").click()
+        app.typeKey(.return, modifierFlags: [])
+        app.typeText("Draft ")
+        XCTAssertTrue((editor.value as? String ?? "").contains("Draft "), "typing after Return goes into the page")
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        let predicate = NSPredicate(format: "NOT (value CONTAINS %@)", "Draft ")
+        let moved = expectation(for: predicate, evaluatedWith: editor)
+        wait(for: [moved], timeout: 2)
+    }
+
+    func testCommandNMakesANoteReadyForTyping() {
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        app.typeText("# Shopping")
+        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 2))
+    }
+
+    func testTheDeleteKeyDeletesTheSelectedNote() {
+        sidebarItem("Personal").click()
+        row(titled: "Bike service").click()
+        app.typeKey(.delete, modifierFlags: [])
+        XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(editor.exists, "the next note is selected")
+    }
+
+    func testDoubleClickingANoteOpensItInItsOwnWindow() {
+        row(titled: "Garden ideas").doubleClick()
+        let twoWindows = expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: app.windows)
+        wait(for: [twoWindows], timeout: 3)
+    }
+
+    func testSortingByTitleFromTheViewMenuDropsTheDateSections() {
+        XCTAssertTrue(list.staticTexts["Today"].exists)
+        sortBy("Title")
+        XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
+        sortBy("Date Edited")
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
+    }
+
+    private func sortBy(_ order: String) {
+        app.menuBars.menuBarItems["View"].click()
+        app.menuBars.menuItems["Sort By"].hover()
+        app.menuBars.menuItems[order].click()
+    }
+
+    func testTheMainWindowPassesTheAccessibilityAudit() throws {
+        // Some findings belong to the system rather than the app: List reports its section headers outside
+        // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes
+        // through, and the system dims the sidebar's counts and a selected row's secondary text as Mail and
+        // Notes do; a toolbar menu offers Show Menu rather than Press. Controls and text are still audited
+        // everywhere else.
+        let windowFrame = window.frame
+        let sidebarFrame = sidebar.frame
+        let selectedRowFrame = list.outlineRows.matching(NSPredicate(format: "selected == true")).firstMatch.frame
+        try app.performAccessibilityAudit { issue in
+            guard let element = issue.element else { return false }
+            // The audit is of the window; the menu bar above it is the system's to draw.
+            if !windowFrame.intersects(element.frame) { return true }
+            switch issue.auditType {
+            case .parentChild: return true
+            case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
+            case .contrast: return sidebarFrame.contains(element.frame) || selectedRowFrame.contains(element.frame)
+            case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
+            default: return false
+            }
+        }
+    }
 }
+

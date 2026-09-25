@@ -3,8 +3,11 @@ import SwiftUI
 /// The actions for a set of notes, shared by the list's context menu and the menu bar.
 struct NoteActions: View {
     @Environment(NoteLibrary.self) private var library
-    @Environment(\.undoManager) private var undoManager
     let ids: Set<Note.ID>
+    /// Passed in, since the menu bar has no window of its own to read one from.
+    let undoManager: UndoManager?
+    /// The menu bar names what its items act on, since nothing has been clicked to say so.
+    var inMenuBar = false
 
     private var notes: [Note] { ids.compactMap { library.note($0) } }
 
@@ -13,30 +16,41 @@ struct NoteActions: View {
         if notes.isEmpty {
             EmptyView()
         } else if notes.allSatisfy(\.isDeleted) {
-            Button("Recover") { library.recover(ids, undoManager: undoManager) }
+            Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             moveMenu(notes)
             Divider()
-            Button("Delete Immediately", role: .destructive) {
+            Button(inMenuBar ? "Delete Note Immediately" : "Delete Immediately", systemImage: "trash", role: .destructive) {
                 library.deletePermanently(ids, undoManager: undoManager)
             }
         } else {
             let allPinned = notes.allSatisfy(\.isPinned)
-            Button(allPinned ? "Unpin" : "Pin") {
+            Button(pinTitle(allPinned), systemImage: allPinned ? "pin.slash" : "pin") {
                 library.setPinned(ids, !allPinned, undoManager: undoManager)
             }
             moveMenu(notes)
             Divider()
-            Button("Delete", role: .destructive) { library.delete(ids, undoManager: undoManager) }
+            Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
+                library.delete(ids, undoManager: undoManager)
+            }
+        }
+    }
+
+    private func pinTitle(_ allPinned: Bool) -> LocalizedStringKey {
+        switch (allPinned, inMenuBar) {
+        case (true, true): "Unpin Note"
+        case (true, false): "Unpin"
+        case (false, true): "Pin Note"
+        case (false, false): "Pin"
         }
     }
 
     private func moveMenu(_ notes: [Note]) -> some View {
-        Menu("Move To") {
-            Button("Inbox") { library.move(ids, to: nil, undoManager: undoManager) }
+        Menu("Move To", systemImage: "folder") {
+            Button("Inbox", systemImage: "tray") { library.move(ids, to: nil, undoManager: undoManager) }
                 .disabled(notes.allSatisfy { $0.folderID == nil && !$0.isDeleted })
             Divider()
             ForEach(library.folders) { folder in
-                Button(folder.name) { library.move(ids, to: folder.id, undoManager: undoManager) }
+                Button(folder.name, systemImage: "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
                     .disabled(notes.allSatisfy { $0.folderID == folder.id && !$0.isDeleted })
             }
         }

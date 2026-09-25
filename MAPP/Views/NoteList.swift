@@ -2,23 +2,27 @@ import SwiftUI
 
 struct NoteList: View {
     @Environment(NoteLibrary.self) private var library
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
-    let sort: NoteSort
+    let order: NoteOrder
+    var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
 
     var body: some View {
         // Reading the counter ties the dates and sections to the day changing, so "Today" moves at midnight.
         let _ = daysSeen
         let now = library.now()
-        let sections = browser.sections(in: library, sort: sort, now: now)
+        let sections = browser.sections(in: library, order: order, now: now)
         let ids = sections.flatMap { $0.notes.map(\.id) }
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         List(selection: $browser.selection) {
             ForEach(sections) { section in
                 Section {
                     ForEach(section.notes) { note in
                         NoteRow(
                             note: note,
-                            dateLabel: NoteDate.listLabel(for: sort.date(of: note), now: now),
+                            dateLabel: NoteDate.listLabel(for: order.sort.date(of: note), now: now),
                             folderName: browser.showsFolders ? folderName(for: note) : nil
                         )
                         .draggable(containerItemID: note.id)
@@ -34,6 +38,30 @@ struct NoteList: View {
         }
         .listStyle(.inset)
         .accessibilityIdentifier("NoteList")
+        .accessibilityLabel(title)
+        .focused(pane, equals: .list)
+        .onDeleteCommand {
+            browser.delete(browser.selection, in: library, undoManager: undoManager)
+        }
+        // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
+        .onKeyPress(.delete, phases: .down) { press in
+            guard press.modifiers == .command, !browser.selection.isEmpty else { return .ignored }
+            browser.delete(browser.selection, in: library, undoManager: undoManager)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard browser.selection.count == 1 else { return .ignored }
+            pane.wrappedValue = .page
+            return .handled
+        }
+        .toolbar {
+            ToolbarItem {
+                Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                    OrderOptions()
+                }
+                .menuIndicator(.hidden)
+            }
+        }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1
@@ -47,7 +75,9 @@ struct NoteList: View {
             browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
         }
         .contextMenu(forSelectionType: Note.ID.self) { ids in
-            NoteActions(ids: ids)
+            NoteActions(ids: ids, undoManager: undoManager)
+        } primaryAction: { ids in
+            for id in ids { openWindow(value: id) }
         }
         .overlay {
             if ids.isEmpty {
@@ -58,7 +88,7 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(browser.isSearching ? String(localized: "Search") : library.name(of: browser.item))
+        .navigationTitle(title)
         .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) note](inflect: true)"))

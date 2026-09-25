@@ -7,6 +7,12 @@
     "All Notes" : {
 
     },
+    "Date Created" : {
+
+    },
+    "Date Edited" : {
+
+    },
     "Delete" : {
 
     },
@@ -19,6 +25,9 @@
     "Delete Note" : {
 
     },
+    "Delete Note Immediately" : {
+
+    },
     "Delete Notes" : {
 
     },
@@ -29,6 +38,9 @@
 
     },
     "Folders" : {
+
+    },
+    "Group by Date" : {
 
     },
     "Inbox" : {
@@ -58,6 +70,12 @@
     "New Note" : {
 
     },
+    "New Window" : {
+
+    },
+    "No Note" : {
+
+    },
     "No Note Selected" : {
 
     },
@@ -67,7 +85,16 @@
     "No additional text" : {
 
     },
+    "Note" : {
+
+    },
+    "Open in New Window" : {
+
+    },
     "Pin" : {
+
+    },
+    "Pin Note" : {
 
     },
     "Pinned" : {
@@ -94,10 +121,25 @@
     "Search" : {
 
     },
+    "Sort" : {
+
+    },
+    "Sort By" : {
+
+    },
+    "This note has been deleted." : {
+
+    },
+    "Title" : {
+
+    },
     "Today" : {
 
     },
     "Unpin" : {
+
+    },
+    "Unpin Note" : {
 
     },
     "Yesterday" : {

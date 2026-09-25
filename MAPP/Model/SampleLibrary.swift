@@ -3,10 +3,16 @@ import Foundation
 /// The notes the app starts with until it has storage.
 extension NoteLibrary {
     static func sample(now: @escaping () -> Date = Date.init) -> NoteLibrary {
-        let work = Folder(name: "Work")
-        let home = Folder(name: "Home")
-        let personal = Folder(name: "Personal")
-        let reading = Folder(name: "Reading")
+        // Fixed identifiers, so a window restored at launch finds the folder and note it last showed.
+        var serial = 0
+        func nextID() -> UUID {
+            serial += 1
+            return UUID(uuidString: String(format: "5A3B1E00-0000-4000-8000-%012d", serial))!
+        }
+        let work = Folder(id: nextID(), name: "Work")
+        let home = Folder(id: nextID(), name: "Home")
+        let personal = Folder(id: nextID(), name: "Personal")
+        let reading = Folder(id: nextID(), name: "Reading")
         let reference = now()
         let calendar = Calendar.current
 
@@ -28,6 +34,7 @@ extension NoteLibrary {
             deleted: Bool = false
         ) -> Note {
             Note(
+                id: nextID(),
                 body: body,
                 created: date(daysAgo: daysAgo, hour: hour, minute: minute),
                 modified: editedDaysAgo.map { date(daysAgo: $0, hour: hour + 1, minute: minute) },

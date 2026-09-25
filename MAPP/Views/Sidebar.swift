@@ -4,7 +4,7 @@ struct Sidebar: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
-    let sort: NoteSort
+    let order: NoteOrder
     @State private var folderToDelete: Folder?
     @State private var isConfirmingDelete = false
     @State private var takenName: String?
@@ -16,7 +16,7 @@ struct Sidebar: View {
             browser.sidebarItem
         } set: { item in
             guard let item, item != browser.sidebarItem else { return }
-            browser.show(item, in: library, sort: sort)
+            browser.show(item, in: library, order: order)
         }
     }
 
@@ -47,7 +47,7 @@ struct Sidebar: View {
         .accessibilityIdentifier("Sidebar")
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button("New Folder", systemImage: "plus.circle") {
-                browser.newFolder(in: library, sort: sort, undoManager: undoManager)
+                browser.newFolder(in: library, order: order, undoManager: undoManager)
             }
                 .buttonStyle(.borderless)
                 .frame(maxWidth: .infinity, alignment: .leading)
