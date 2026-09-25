@@ -43,11 +43,12 @@ nonisolated enum NoteGroup: Hashable {
     }
 
     /// Sorts the notes and splits them into sections. Pinned notes lead unless `pinnedFirst` is off, and date
-    /// sections follow only when the list is sorted by a date.
+    /// sections follow only when grouping by date and the list is sorted by a date.
     static func sections(
         of notes: [Note],
         sort: NoteSort,
         pinnedFirst: Bool,
+        groupsByDate: Bool,
         now: Date,
         calendar: Calendar = .current
     ) -> [NoteSection] {
@@ -59,7 +60,7 @@ nonisolated enum NoteGroup: Hashable {
             if !pinned.isEmpty { sections.append(NoteSection(group: .pinned, notes: pinned)) }
             rest = notes.filter { !$0.isPinned }
         }
-        guard sort != .title else {
+        guard groupsByDate, sort != .title else {
             if !rest.isEmpty { sections.append(NoteSection(group: nil, notes: rest)) }
             return sections
         }

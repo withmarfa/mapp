@@ -1,9 +1,23 @@
 import Foundation
 
+/// How the list is ordered: by which date or by title, and whether dated notes fall into sections by day.
+nonisolated struct NoteOrder: Equatable {
+    var sort: NoteSort = .dateEdited
+    var groupsByDate = true
+}
+
 nonisolated enum NoteSort: String, CaseIterable {
     case dateEdited
     case dateCreated
     case title
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .dateEdited: "Date Edited"
+        case .dateCreated: "Date Created"
+        case .title: "Title"
+        }
+    }
 
     func date(of note: Note) -> Date {
         switch self {

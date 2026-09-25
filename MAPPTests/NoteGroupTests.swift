@@ -53,7 +53,7 @@ struct NoteGroupTests {
         let yesterday = Note(body: "Yesterday", created: date(2026, 9, 24))
         let alsoToday = Note(body: "Also today", created: date(2026, 9, 25, hour: 10))
         let sections = NoteGroup.sections(
-            of: [today, yesterday, alsoToday], sort: .dateEdited, pinnedFirst: true, now: now, calendar: calendar
+            of: [today, yesterday, alsoToday], sort: .dateEdited, pinnedFirst: true, groupsByDate: true, now: now, calendar: calendar
         )
         #expect(sections.map(\.group) == [.today, .yesterday])
         #expect(sections[0].notes == [alsoToday, today])
@@ -61,8 +61,8 @@ struct NoteGroupTests {
 
     @Test func sortingByDateCreatedGroupsByCreation() {
         let note = Note(body: "Old", created: date(2026, 9, 1), modified: date(2026, 9, 25, hour: 9))
-        let byCreated = NoteGroup.sections(of: [note], sort: .dateCreated, pinnedFirst: true, now: now, calendar: calendar)
-        let byEdited = NoteGroup.sections(of: [note], sort: .dateEdited, pinnedFirst: true, now: now, calendar: calendar)
+        let byCreated = NoteGroup.sections(of: [note], sort: .dateCreated, pinnedFirst: true, groupsByDate: true, now: now, calendar: calendar)
+        let byEdited = NoteGroup.sections(of: [note], sort: .dateEdited, pinnedFirst: true, groupsByDate: true, now: now, calendar: calendar)
         #expect(byCreated.map(\.group) == [.previous30Days])
         #expect(byEdited.map(\.group) == [.today])
     }
@@ -72,7 +72,7 @@ struct NoteGroupTests {
         let today = Note(body: "Today", created: date(2026, 9, 25, hour: 9))
         let yesterday = Note(body: "Yesterday", created: date(2026, 9, 24))
         let sections = NoteGroup.sections(
-            of: [today, yesterday, pinnedOld], sort: .dateEdited, pinnedFirst: true, now: now, calendar: calendar
+            of: [today, yesterday, pinnedOld], sort: .dateEdited, pinnedFirst: true, groupsByDate: true, now: now, calendar: calendar
         )
         #expect(sections.map(\.group) == [.pinned, .today, .yesterday])
         #expect(sections[0].notes == [pinnedOld])
@@ -80,14 +80,14 @@ struct NoteGroupTests {
 
     @Test func withoutPinnedFirstPinnedNotesStayInTheirDateSection() {
         let pinned = Note(body: "Pinned", created: date(2026, 9, 25, hour: 9), isPinned: true)
-        let sections = NoteGroup.sections(of: [pinned], sort: .dateEdited, pinnedFirst: false, now: now, calendar: calendar)
+        let sections = NoteGroup.sections(of: [pinned], sort: .dateEdited, pinnedFirst: false, groupsByDate: true, now: now, calendar: calendar)
         #expect(sections.map(\.group) == [.today])
     }
 
     @Test func sortingByTitleListsNotesWithoutDateSections() {
         let a = Note(body: "Apples", created: date(2026, 9, 25))
         let b = Note(body: "Bread", created: date(2025, 1, 1))
-        let sections = NoteGroup.sections(of: [a, b], sort: .title, pinnedFirst: true, now: now, calendar: calendar)
+        let sections = NoteGroup.sections(of: [a, b], sort: .title, pinnedFirst: true, groupsByDate: true, now: now, calendar: calendar)
         #expect(sections.count == 1)
         #expect(sections[0].group == nil)
         #expect(sections[0].notes == [a, b])

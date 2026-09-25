@@ -10,8 +10,22 @@ final class Browser {
     var searchText = ""
     /// The folder whose name is being edited in the sidebar.
     var renamingFolder: Folder.ID?
+    /// The folder whose deletion awaits confirmation.
+    var folderToDelete: Folder.ID?
+    /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
+    /// can take it grants it once, when it is able to, and clears it.
+    var focusRequest: Pane?
+
+    nonisolated enum Pane: Hashable {
+        case sidebar, list, page, search
+    }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
+
+    /// The folder the sidebar has selected, which the folder commands act on.
+    var selectedFolder: Folder.ID? {
+        if case .folder(let id) = item { id } else { nil }
+    }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -27,11 +41,12 @@ final class Browser {
 
     /// The list's sections. Pinned notes lead wherever pins mean something: not in Pinned itself, where every
     /// note is pinned, nor in Recently Deleted or search results.
-    func sections(in library: NoteLibrary, sort: NoteSort, now: Date) -> [NoteSection] {
+    func sections(in library: NoteLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
             of: notes(in: library),
-            sort: sort,
+            sort: order.sort,
             pinnedFirst: !isSearching && item != .pinned && item != .recentlyDeleted,
+            groupsByDate: order.groupsByDate,
             now: now
         )
     }
@@ -42,14 +57,14 @@ final class Browser {
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
-    func show(_ item: SidebarItem, in library: NoteLibrary, sort: NoteSort) {
+    func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
         searchText = ""
         sidebarItem = item
-        selectFirstNote(in: library, sort: sort)
+        selectFirstNote(in: library, order: order)
     }
 
-    func selectFirstNote(in library: NoteLibrary, sort: NoteSort) {
-        let first = sections(in: library, sort: sort, now: library.now()).first?.notes.first
+    func selectFirstNote(in library: NoteLibrary, order: NoteOrder) {
+        let first = sections(in: library, order: order, now: library.now()).first?.notes.first
         selection = first.map { [$0.id] } ?? []
     }
 
@@ -60,21 +75,32 @@ final class Browser {
         searchText = ""
         let note = library.newNote(in: item, undoManager: undoManager)
         selection = [note.id]
+        focusRequest = .page
     }
 
-    func newFolder(in library: NoteLibrary, sort: NoteSort, undoManager: UndoManager?) {
+    func newFolder(in library: NoteLibrary, order: NoteOrder, undoManager: UndoManager?) {
         let folder = library.newFolder(undoManager: undoManager)
-        show(.folder(folder.id), in: library, sort: sort)
+        show(.folder(folder.id), in: library, order: order)
         renamingFolder = folder.id
     }
 
+    /// Notes in the list go to Recently Deleted; notes already there are deleted for good. Both undo.
+    static func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
+        let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
+        library.deletePermanently(alreadyDeleted, undoManager: undoManager)
+        library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
+    }
+
     /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
-    func folderRemoved(in library: NoteLibrary, sort: NoteSort) {
+    func folderRemoved(in library: NoteLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
-            show(.allNotes, in: library, sort: sort)
+            show(.allNotes, in: library, order: order)
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
+        }
+        if let folderToDelete, library.folder(folderToDelete) == nil {
+            self.folderToDelete = nil
         }
     }
 
@@ -89,5 +115,27 @@ final class Browser {
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }
         let candidates = old[first...].dropFirst() + old[..<first].reversed()
         return candidates.first { visible.contains($0) && !selection.contains($0) }.map { [$0] } ?? []
+    }
+
+    // MARK: Restoring a window
+
+    /// What a window brings back when the app opens again.
+    struct Snapshot: Codable, Equatable {
+        var sidebarItem: SidebarItem?
+        var selection: Set<Note.ID>
+    }
+
+    var snapshot: Snapshot { Snapshot(sidebarItem: sidebarItem, selection: selection) }
+
+    /// Restores what still exists: a folder deleted since gives way to All Notes, and notes no longer in the
+    /// list are dropped, leaving the top row selected if none remain.
+    func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
+        if case .folder(let id) = snapshot.sidebarItem, library.folder(id) == nil {
+            sidebarItem = .allNotes
+        } else {
+            sidebarItem = snapshot.sidebarItem ?? .allNotes
+        }
+        selection = snapshot.selection.intersection(notes(in: library).map(\.id))
+        if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }

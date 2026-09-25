@@ -4,9 +4,9 @@ struct Sidebar: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
-    let sort: NoteSort
+    let order: NoteOrder
+    /// Kept after the dialog closes, so its title does not empty while it animates away.
     @State private var folderToDelete: Folder?
-    @State private var isConfirmingDelete = false
     @State private var takenName: String?
 
     /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
@@ -16,7 +16,7 @@ struct Sidebar: View {
             browser.sidebarItem
         } set: { item in
             guard let item, item != browser.sidebarItem else { return }
-            browser.show(item, in: library, sort: sort)
+            browser.show(item, in: library, order: order)
         }
     }
 
@@ -45,9 +45,15 @@ struct Sidebar: View {
         }
         .listStyle(.sidebar)
         .accessibilityIdentifier("Sidebar")
+        .onDeleteCommand {
+            browser.folderToDelete = browser.selectedFolder
+        }
+        .onChange(of: browser.folderToDelete) {
+            if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button("New Folder", systemImage: "plus.circle") {
-                browser.newFolder(in: library, sort: sort, undoManager: undoManager)
+                browser.newFolder(in: library, order: order, undoManager: undoManager)
             }
                 .buttonStyle(.borderless)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,7 +62,7 @@ struct Sidebar: View {
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
-            isPresented: $isConfirmingDelete,
+            isPresented: Binding { browser.folderToDelete != nil } set: { if !$0 { browser.folderToDelete = nil } },
             presenting: folderToDelete
         ) { folder in
             Button("Delete Folder", role: .destructive) {
@@ -98,8 +104,7 @@ struct Sidebar: View {
         .contextMenu {
             Button("Rename Folder") { browser.renamingFolder = folder.id }
             Button("Delete Folder", role: .destructive) {
-                folderToDelete = folder
-                isConfirmingDelete = true
+                browser.folderToDelete = folder.id
             }
         }
     }

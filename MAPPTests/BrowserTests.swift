@@ -42,17 +42,17 @@ struct BrowserTests {
         let (library, _, newer, pinned) = makeLibrary()
         let browser = Browser()
         browser.searchText = "Older"
-        browser.show(.allNotes, in: library, sort: .dateEdited)
+        browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.searchText.isEmpty)
         #expect(browser.selection == [pinned.id])
-        browser.show(.inbox, in: library, sort: .dateEdited)
+        browser.show(.inbox, in: library, order: NoteOrder())
         #expect(browser.selection == [newer.id])
     }
 
     @Test func aNewNoteFromRecentlyDeletedGoesToTheInboxAndStaysSelected() {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
-        browser.show(.recentlyDeleted, in: library, sort: .dateEdited)
+        browser.show(.recentlyDeleted, in: library, order: NoteOrder())
         browser.searchText = "Pinned"
         browser.newNote(in: library, undoManager: nil)
         #expect(browser.item == .inbox)
@@ -69,11 +69,11 @@ struct BrowserTests {
     @Test func aRemovedFolderGivesWayToAllNotes() {
         let (library, _, _, pinned) = makeLibrary()
         let browser = Browser()
-        browser.newFolder(in: library, sort: .dateEdited, undoManager: nil)
+        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
         guard case .folder(let id) = browser.item else { return #expect(Bool(false)) }
         #expect(browser.renamingFolder == id)
         library.deleteFolder(id)
-        browser.folderRemoved(in: library, sort: .dateEdited)
+        browser.folderRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
         #expect(browser.renamingFolder == nil)
         #expect(browser.selection == [pinned.id])
@@ -82,9 +82,60 @@ struct BrowserTests {
     @Test func pinnedNotesLeadOnlyWherePinsMeanSomething() {
         let (library, _, newer, _) = makeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, sort: .dateEdited)
-        #expect(browser.sections(in: library, sort: .dateEdited, now: start).first?.group == .pinned)
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.group == .pinned)
         browser.searchText = "e"
-        #expect(browser.sections(in: library, sort: .dateEdited, now: start).first?.notes.first?.id == newer.id)
+        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.notes.first?.id == newer.id)
+    }
+
+    @Test func deletingMovesLiveNotesAwayAndDeletedNotesForGood() {
+        let (library, older, _, _) = makeLibrary()
+        Browser.delete([older.id], in: library, undoManager: nil)
+        #expect(library.note(older.id)?.isDeleted == true)
+        Browser.delete([older.id], in: library, undoManager: nil)
+        #expect(library.note(older.id) == nil)
+    }
+
+    @Test func aNewNoteAsksForThePage() {
+        let (library, _, _, _) = makeLibrary()
+        let browser = Browser()
+        browser.newNote(in: library, undoManager: nil)
+        #expect(browser.focusRequest == .page)
+    }
+
+    // MARK: Restoring
+
+    @Test func aRestoredWindowShowsWhatItShowedBefore() {
+        let (library, older, _, _) = makeLibrary()
+        let saved = Browser()
+        saved.show(.inbox, in: library, order: NoteOrder())
+        saved.selection = [older.id]
+        let restored = Browser()
+        restored.restore(saved.snapshot, in: library, order: NoteOrder())
+        #expect(restored.item == .inbox)
+        #expect(restored.selection == [older.id])
+    }
+
+    @Test func aRestoredWindowDropsWhatNoLongerExists() {
+        let (library, _, _, pinned) = makeLibrary()
+        let snapshot = Browser.Snapshot(sidebarItem: .folder(UUID()), selection: [UUID()])
+        let browser = Browser()
+        browser.restore(snapshot, in: library, order: NoteOrder())
+        #expect(browser.item == .allNotes)
+        #expect(browser.selection == [pinned.id])
+    }
+
+    @Test func snapshotsSurviveEncoding() throws {
+        let snapshot = Browser.Snapshot(sidebarItem: .folder(work.id), selection: [UUID()])
+        let data = try JSONEncoder().encode(snapshot)
+        #expect(try JSONDecoder().decode(Browser.Snapshot.self, from: data) == snapshot)
+    }
+
+    @Test func turningOffDateGroupingListsNotesUnderOneHeadingAfterThePinned() {
+        let (library, _, _, _) = makeLibrary()
+        let browser = Browser()
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        let sections = browser.sections(in: library, order: NoteOrder(sort: .dateEdited, groupsByDate: false), now: start)
+        #expect(sections.map(\.group) == [.pinned, nil])
     }
 }

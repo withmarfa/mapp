@@ -2,18 +2,30 @@ import SwiftUI
 
 struct NoteDetail: View {
     @Environment(NoteLibrary.self) private var library
-    let selection: Set<Note.ID>
+    let browser: Browser
+    var pane: FocusState<Browser.Pane?>.Binding
 
     var body: some View {
-        let notes = selection.compactMap { library.note($0) }
+        let notes = browser.selection.compactMap { library.note($0) }
         if notes.count > 1 {
             ContentUnavailableView("^[\(notes.count) note](inflect: true) selected", systemImage: "note.text")
         } else if let note = notes.first {
             NotePage(note: note)
+                .focused(pane, equals: .page)
+                // Escape hands the keyboard back to the list, as in Mail.
+                .onExitCommand { pane.wrappedValue = .list }
+                .onAppear(perform: grantFocusRequest)
+                .onChange(of: browser.focusRequest, grantFocusRequest)
                 .id(note.id)
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text")
         }
+    }
+
+    private func grantFocusRequest() {
+        guard browser.focusRequest == .page else { return }
+        pane.wrappedValue = .page
+        browser.focusRequest = nil
     }
 }
 
