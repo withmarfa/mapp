@@ -162,6 +162,28 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(editor.exists, "the next note is selected")
     }
 
+    func testOptionCommandFSearchesNotes() {
+        app.typeKey("f", modifierFlags: [.command, .option])
+        app.typeText("ragu")
+        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
+    }
+
+    func testAFolderIsRenamedFromTheMenuAndDeletedWithTheDeleteKey() {
+        sidebarItem("Reading").click()
+        app.menuBars.menuBarItems["File"].click()
+        app.menuBars.menuItems["Rename Folder"].click()
+        let field = sidebar.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("Books\r")
+        XCTAssertTrue(sidebarItem("Books").waitForExistence(timeout: 2))
+        app.typeKey(.delete, modifierFlags: [])
+        let confirm = app.sheets.buttons["Delete Folder"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 2))
+        confirm.click()
+        XCTAssertTrue(sidebarItem("Books").waitForNonExistence(timeout: 2))
+    }
+
     func testDoubleClickingANoteOpensItInItsOwnWindow() {
         row(titled: "Garden ideas").doubleClick()
         let twoWindows = expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: app.windows)

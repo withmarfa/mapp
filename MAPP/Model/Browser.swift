@@ -10,15 +10,22 @@ final class Browser {
     var searchText = ""
     /// The folder whose name is being edited in the sidebar.
     var renamingFolder: Folder.ID?
-    /// A pane that should take the keyboard, asked for by an action such as New Note. The window grants it
-    /// once and clears it.
+    /// The folder whose deletion awaits confirmation.
+    var folderToDelete: Folder.ID?
+    /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
+    /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
 
     nonisolated enum Pane: Hashable {
-        case sidebar, list, page
+        case sidebar, list, page, search
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
+
+    /// The folder the sidebar has selected, which the folder commands act on.
+    var selectedFolder: Folder.ID? {
+        if case .folder(let id) = item { id } else { nil }
+    }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -78,7 +85,7 @@ final class Browser {
     }
 
     /// Notes in the list go to Recently Deleted; notes already there are deleted for good. Both undo.
-    func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
+    static func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
         library.deletePermanently(alreadyDeleted, undoManager: undoManager)
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
@@ -91,6 +98,9 @@ final class Browser {
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
+        }
+        if let folderToDelete, library.folder(folderToDelete) == nil {
+            self.folderToDelete = nil
         }
     }
 

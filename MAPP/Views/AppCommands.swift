@@ -28,7 +28,7 @@ struct AppCommands: Commands {
             .keyboardShortcut("n", modifiers: [.command, .option])
         }
 
-        // The File menu has no save group without documents, so the note's own commands follow Open.
+        // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
             let ids = notes?.ids ?? []
             let shown = ids.compactMap { library.note($0) }
@@ -41,6 +41,23 @@ struct AppCommands: Commands {
             NoteShareLink(note: shown.count == 1 ? shown.first : nil)
             NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                 .environment(library)
+            Divider()
+            Button("Rename Folder", systemImage: "pencil") {
+                browser?.renamingFolder = browser?.selectedFolder
+            }
+            .disabled(browser?.selectedFolder == nil)
+            Button("Delete Folder…", systemImage: "folder.badge.minus") {
+                browser?.folderToDelete = browser?.selectedFolder
+            }
+            .disabled(browser?.selectedFolder == nil)
+        }
+
+        CommandGroup(after: .textEditing) {
+            Button("Search Notes", systemImage: "magnifyingglass") {
+                browser?.focusRequest = .search
+            }
+            .keyboardShortcut("f", modifiers: [.command, .option])
+            .disabled(browser == nil)
         }
 
         CommandGroup(before: .sidebar) {

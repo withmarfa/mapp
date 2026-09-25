@@ -19,6 +19,9 @@
     "Delete Folder" : {
 
     },
+    "Delete Folder…" : {
+
+    },
     "Delete Immediately" : {
 
     },
@@ -73,9 +76,6 @@
     "New Window" : {
 
     },
-    "No Note" : {
-
-    },
     "No Note Selected" : {
 
     },
@@ -121,13 +121,13 @@
     "Search" : {
 
     },
+    "Search Notes" : {
+
+    },
     "Sort" : {
 
     },
     "Sort By" : {
-
-    },
-    "This note has been deleted." : {
 
     },
     "Title" : {

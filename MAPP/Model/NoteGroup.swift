@@ -48,7 +48,7 @@ nonisolated enum NoteGroup: Hashable {
         of notes: [Note],
         sort: NoteSort,
         pinnedFirst: Bool,
-        groupsByDate: Bool = true,
+        groupsByDate: Bool,
         now: Date,
         calendar: Calendar = .current
     ) -> [NoteSection] {

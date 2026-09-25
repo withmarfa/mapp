@@ -90,10 +90,9 @@ struct BrowserTests {
 
     @Test func deletingMovesLiveNotesAwayAndDeletedNotesForGood() {
         let (library, older, _, _) = makeLibrary()
-        let browser = Browser()
-        browser.delete([older.id], in: library, undoManager: nil)
+        Browser.delete([older.id], in: library, undoManager: nil)
         #expect(library.note(older.id)?.isDeleted == true)
-        browser.delete([older.id], in: library, undoManager: nil)
+        Browser.delete([older.id], in: library, undoManager: nil)
         #expect(library.note(older.id) == nil)
     }
 

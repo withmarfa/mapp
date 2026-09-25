@@ -13,9 +13,9 @@ struct NoteActions: View {
 
     var body: some View {
         let notes = notes
-        if notes.isEmpty {
+        if notes.isEmpty && !inMenuBar {
             EmptyView()
-        } else if notes.allSatisfy(\.isDeleted) {
+        } else if !notes.isEmpty && notes.allSatisfy(\.isDeleted) {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             moveMenu(notes)
             Divider()
@@ -23,15 +23,19 @@ struct NoteActions: View {
                 library.deletePermanently(ids, undoManager: undoManager)
             }
         } else {
-            let allPinned = notes.allSatisfy(\.isPinned)
-            Button(pinTitle(allPinned), systemImage: allPinned ? "pin.slash" : "pin") {
-                library.setPinned(ids, !allPinned, undoManager: undoManager)
+            let allPinned = !notes.isEmpty && notes.allSatisfy(\.isPinned)
+            // The menu bar keeps these in place, dimmed, when nothing is selected.
+            Group {
+                Button(pinTitle(allPinned), systemImage: allPinned ? "pin.slash" : "pin") {
+                    library.setPinned(ids, !allPinned, undoManager: undoManager)
+                }
+                moveMenu(notes)
+                Divider()
+                Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
+                    library.delete(ids, undoManager: undoManager)
+                }
             }
-            moveMenu(notes)
-            Divider()
-            Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
-                library.delete(ids, undoManager: undoManager)
-            }
+            .disabled(notes.isEmpty)
         }
     }
 

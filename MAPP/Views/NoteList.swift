@@ -41,23 +41,27 @@ struct NoteList: View {
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
         .onDeleteCommand {
-            browser.delete(browser.selection, in: library, undoManager: undoManager)
+            Browser.delete(browser.selection, in: library, undoManager: undoManager)
         }
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
         .onKeyPress(.delete, phases: .down) { press in
-            guard press.modifiers == .command, !browser.selection.isEmpty else { return .ignored }
-            browser.delete(browser.selection, in: library, undoManager: undoManager)
+            guard press.modifiers.contains(.command), !browser.selection.isEmpty else { return .ignored }
+            Browser.delete(browser.selection, in: library, undoManager: undoManager)
             return .handled
         }
-        .onKeyPress(.return) {
-            guard browser.selection.count == 1 else { return .ignored }
-            pane.wrappedValue = .page
+        // Return opens the note for writing; a deleted note cannot be written in, so it stays in the list.
+        .onKeyPress(.return, phases: .down) { press in
+            guard press.modifiers.isEmpty, browser.selection.count == 1,
+                  browser.selectedNotes(in: library).first?.isDeleted == false
+            else { return .ignored }
+            browser.focusRequest = .page
             return .handled
         }
         .toolbar {
             ToolbarItem {
                 Menu("Sort", systemImage: "arrow.up.arrow.down") {
                     OrderOptions()
+                        .pickerStyle(.inline)
                 }
                 .menuIndicator(.hidden)
             }

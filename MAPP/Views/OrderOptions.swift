@@ -1,9 +1,15 @@
 import SwiftUI
 
+/// Where the list's order is kept, shared by every view that reads or sets it.
+enum OrderKey {
+    static let sort = "noteSort"
+    static let groupsByDate = "groupsByDate"
+}
+
 /// The list's sort and grouping, offered alike by the View menu, the list's toolbar and Settings.
 struct OrderOptions: View {
-    @AppStorage("noteSort") private var sort: NoteSort = .dateEdited
-    @AppStorage("groupsByDate") private var groupsByDate = true
+    @AppStorage(OrderKey.sort) private var sort: NoteSort = .dateEdited
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = true
 
     var body: some View {
         Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: $sort) {
@@ -20,8 +26,8 @@ struct OrderOptions: View {
 /// Reads the stored order, for views that lay the list out rather than change it.
 @propertyWrapper
 struct StoredOrder: DynamicProperty {
-    @AppStorage("noteSort") private var sort: NoteSort = .dateEdited
-    @AppStorage("groupsByDate") private var groupsByDate = true
+    @AppStorage(OrderKey.sort) private var sort: NoteSort = .dateEdited
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = true
 
     init() {}
 
