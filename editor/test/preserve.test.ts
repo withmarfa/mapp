@@ -119,3 +119,116 @@ test('a table made in the editor is written with plain delimiters among blocks k
     expect(saved).toContain('| --- | --- | --- |')
   })
 })
+
+/** Types `insert` straight after the first `after` in the note's text, and returns what the note would save. */
+function typeAfter(editor: NoteEditor, ctx: Ctx, after: string, insert: string): string | null {
+  const view = ctx.get(editorViewCtx)
+  let at = -1
+  view.state.doc.descendants((node, pos) => {
+    if (at < 0 && node.isText && node.text?.includes(after))
+      at = pos + node.text.indexOf(after) + after.length
+  })
+  expect(at).toBeGreaterThan(0)
+  view.dispatch(view.state.tr.insertText(insert, at))
+  return editor.markdown()
+}
+
+function append(ctx: Ctx, text: string): void {
+  const view = ctx.get(editorViewCtx)
+  const { schema } = view.state
+  view.dispatch(
+    view.state.tr.insert(
+      view.state.doc.content.size,
+      schema.nodes.paragraph!.create(null, schema.text(text)),
+    ),
+  )
+}
+
+describe('what the editor does not show is kept', () => {
+  test('a link definition after the last block survives a block added after it', async () => {
+    await withLoaded('See [x][ref].\n\nLast\n\n[ref]: https://e.com\n', (editor, ctx) => {
+      append(ctx, 'New')
+      expect(editor.markdown()).toBe('See [x][ref].\n\nLast\n\nNew\n\n[ref]: https://e.com\n')
+    })
+  })
+
+  test('a definition no link uses is kept when the blocks around it change', async () => {
+    await withLoaded('Para\n\n[unused]: https://e.com\n\nLast\n', (editor, ctx) => {
+      const saved = typeAfter(editor, ctx, 'Last', '!')!
+      expect(saved).toContain('[unused]: https://e.com')
+    })
+  })
+
+  test('a definition is written once however many blocks change', async () => {
+    await withLoaded('A\n\n[d]: /x\n\nB\n\nC\n', (editor, ctx) => {
+      typeAfter(editor, ctx, 'A', '!')
+      typeAfter(editor, ctx, 'B', '!')
+      append(ctx, 'N')
+      const saved = editor.markdown()!
+      expect(saved.split('[d]: /x').length - 1).toBe(1)
+    })
+  })
+
+  test('a definition inside a quote still gives other blocks their meaning', async () => {
+    const source = '> [q]: https://q.com\n\nSee [x][q].\n\nOther EDIT\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+
+  test('front matter is kept as written and not shown', async () => {
+    const source = '---\ntitle: A note\ntags:\n  - a\n  - b\n---\n\nBody EDIT\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(ctx.get(editorViewCtx).state.doc.textContent).toBe('Body EDIT')
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+
+  test('Windows line endings stay Windows line endings, in new text too', async () => {
+    const source = 'Alpha\r\n\r\nBeta EDIT\r\nsecond line\r\n\r\n- a\r\n- b\r\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+      append(ctx, 'New')
+      expect(editor.markdown()).toBe(`${source.replace('EDIT', 'EDIT!')}\r\nNew\r\n`)
+    })
+  })
+
+  test('a byte-order mark stays and does not shift the blocks', async () => {
+    const source = '﻿First\n\nB EDIT\n\nC\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+})
+
+describe('blocks keep their own shape', () => {
+  test('an indented list keeps the indent of its first line', async () => {
+    const source = 'Para EDIT\n\n  - a\n  - b\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+
+  test('an indented fence keeps its indent', async () => {
+    const source = 'Para EDIT\n\n  ```\n  code\n  ```\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+
+  test('a fence left open at the end of the note is kept open', async () => {
+    const source = 'Para EDIT\n\n```\ncode\n'
+    await withLoaded(source, (editor, ctx) => {
+      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
+    })
+  })
+
+  test('blank lines around blocks further on are not moved by edits before them', async () => {
+    const source = 'A\n\n\n\n\nB\n\nC\n\nD\n'
+    await withLoaded(source, (editor, ctx) => {
+      typeAfter(editor, ctx, 'A', '!')
+      typeAfter(editor, ctx, 'C', '!')
+      expect(editor.markdown()).toBe('A!\n\n\n\n\nB\n\nC!\n\nD\n')
+    })
+  })
+})

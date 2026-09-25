@@ -1,6 +1,7 @@
 import { parserCtx, remarkCtx } from '@milkdown/kit/core'
 import type { Ctx } from '@milkdown/kit/ctx'
 import type { Node as ProseNode } from '@milkdown/kit/prose/model'
+import type { Nodes, Root } from 'mdast'
 import { serialize } from './dialect'
 
 /** A top-level block of the note as it was written: its text, and the form the editor would write it in. */
@@ -11,10 +12,43 @@ interface SourceBlock {
   end: number
 }
 
-/** The note as loaded, split into its blocks, so an edit rewrites only the blocks it touched. */
+/** A top-level link definition. The page shows nothing for it, so it is kept by its place in the text. */
+interface Definition {
+  text: string
+  start: number
+  end: number
+}
+
+/** The note as loaded. What the editor cannot show (a byte-order mark, Windows line endings, front matter)
+ *  is held here and put back as it was; the rest is the body the editor shows, split into blocks when it is
+ *  first edited. */
 export interface Source {
   markdown: string
-  blocks: SourceBlock[]
+  body: string
+  bom: boolean
+  crlf: boolean
+  frontMatter: string
+  blocks?: SourceBlock[]
+  definitions?: Definition[]
+}
+
+// YAML front matter: a first line of three dashes, and another closing it.
+const frontMatter = /^---\n(?:[\s\S]*?\n)?---[ \t]*(?:\n|$)/
+
+export function readSource(markdown: string): Source {
+  const bom = markdown.startsWith('﻿')
+  let text = bom ? markdown.slice(1) : markdown
+  // Windows line endings throughout are kept; a mixture is read, and written back, as plain newlines.
+  const crlf = text.includes('\r\n') && !/(^|[^\r])\n/.test(text)
+  if (crlf) text = text.replaceAll('\r\n', '\n')
+  const matter = frontMatter.exec(text)?.[0] ?? ''
+  return { markdown, body: text.slice(matter.length), bom, crlf, frontMatter: matter }
+}
+
+/** The note as saved from a body: the byte-order mark, front matter and line endings put back. */
+export function withEnvelope(source: Source, body: string): string {
+  const text = source.frontMatter + body
+  return (source.bom ? '﻿' : '') + (source.crlf ? text.replaceAll('\n', '\r\n') : text)
 }
 
 // The editor writes a block with a trailing newline; blocks are compared and joined without it.
@@ -22,53 +56,91 @@ function trimmed(markdown: string): string {
   return markdown.replace(/\n+$/, '')
 }
 
-/** One block alone in its canonical form. A block that shows nothing, such as a link definition, is empty. */
-function canonicalOf(ctx: Ctx, node: ProseNode): string {
-  return trimmed(serialize(ctx, node.type.schema.topNodeType.create(null, [node])))
+function definitionsIn(tree: Root): Nodes[] {
+  const found: Nodes[] = []
+  const visit = (node: Nodes) => {
+    if (node.type === 'definition') found.push(node)
+    if ('children' in node) for (const child of node.children) visit(child)
+  }
+  visit(tree)
+  return found
 }
 
-/** Splits the note into its top-level blocks by where the parser found them. What lies between two blocks,
- *  blank lines or a block the editor does not show, stays with the gap between them. */
-export function readSource(ctx: Ctx, markdown: string): Source {
-  const tree = ctx.get(remarkCtx).parse(markdown)
+/** Splits the body into its top-level blocks by where the parser found them, each from the start of its
+ *  first line so an indented block keeps its indent. */
+function split(ctx: Ctx, source: Source): void {
+  const body = source.body
+  const tree = ctx.get(remarkCtx).parse(body) as Root
   const parse = ctx.get(parserCtx)
-  const text = (node: (typeof tree.children)[number]) =>
-    markdown.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0)
-  // A block is read with the note's link definitions, so `[text][ref]` means what it means in the note.
-  const definitions = tree.children
-    .filter((node) => node.type === 'definition')
-    .map(text)
-    .join('\n')
-  const blocks: SourceBlock[] = []
+  const slice = (node: Nodes) => body.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0)
+  // A block is read after the note's link definitions, so `[text][ref]` means what it means in the note.
+  const definitions = definitionsIn(tree).map(slice).join('\n')
+  source.blocks = []
+  source.definitions = []
   for (const child of tree.children) {
-    const start = child.position?.start.offset
+    let start = child.position?.start.offset
     const end = child.position?.end.offset
     if (start == null || end == null) continue
-    const canonical = trimmed(serialize(ctx, parse(`${text(child)}\n\n${definitions}`)))
-    if (canonical) blocks.push({ text: text(child), canonical, start, end })
+    const lineStart = body.lastIndexOf('\n', start - 1) + 1
+    if (/^[ \t]*$/.test(body.slice(lineStart, start))) start = lineStart
+    const text = body.slice(start, end)
+    if (child.type === 'definition') {
+      source.definitions.push({ text, start, end })
+      continue
+    }
+    const canonical = trimmed(serialize(ctx, parse(definitions ? `${definitions}\n\n${text}` : text)))
+    if (canonical) source.blocks.push({ text, canonical, start, end })
   }
-  return { markdown, blocks }
 }
 
-/** The pairs of equal items, in order, that the longest common subsequence of two lists aligns. */
+// A block the document still holds unchanged is the same node, so its canonical form is worked out once.
+const canonicalForms = new WeakMap<ProseNode, string>()
+
+function canonicalOf(ctx: Ctx, node: ProseNode): string {
+  let form = canonicalForms.get(node)
+  if (form == null) {
+    form = trimmed(serialize(ctx, node.type.schema.topNodeType.create(null, [node])))
+    canonicalForms.set(node, form)
+  }
+  return form
+}
+
+/** The pairs of equal items that the longest common subsequence aligns, from positions in `b` to `a`. The
+ *  common start and end are paired first, so an edit in a long note compares only the part around it. */
 function align(a: string[], b: string[]): Map<number, number> {
-  const lengths = Array.from({ length: a.length + 1 }, () =>
-    new Array<number>(b.length + 1).fill(0),
+  const pairs = new Map<number, number>()
+  let head = 0
+  while (head < a.length && head < b.length && a[head] === b[head]) {
+    pairs.set(head, head)
+    head++
+  }
+  let tail = 0
+  while (
+    tail < a.length - head &&
+    tail < b.length - head &&
+    a[a.length - 1 - tail] === b[b.length - 1 - tail]
+  ) {
+    pairs.set(b.length - 1 - tail, a.length - 1 - tail)
+    tail++
+  }
+  const midA = a.slice(head, a.length - tail)
+  const midB = b.slice(head, b.length - tail)
+  const lengths = Array.from({ length: midA.length + 1 }, () =>
+    new Array<number>(midB.length + 1).fill(0),
   )
-  for (let i = a.length - 1; i >= 0; i--) {
-    for (let j = b.length - 1; j >= 0; j--) {
+  for (let i = midA.length - 1; i >= 0; i--) {
+    for (let j = midB.length - 1; j >= 0; j--) {
       lengths[i]![j] =
-        a[i] === b[j]
+        midA[i] === midB[j]
           ? lengths[i + 1]![j + 1]! + 1
           : Math.max(lengths[i + 1]![j]!, lengths[i]![j + 1]!)
     }
   }
-  const pairs = new Map<number, number>()
   let i = 0
   let j = 0
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      pairs.set(j, i)
+  while (i < midA.length && j < midB.length) {
+    if (midA[i] === midB[j]) {
+      pairs.set(head + j, head + i)
       i++
       j++
     } else if (lengths[i + 1]![j]! >= lengths[i]![j + 1]!) {
@@ -80,48 +152,66 @@ function align(a: string[], b: string[]): Map<number, number> {
   return pairs
 }
 
-/** The document as markdown, keeping the source's own text for every block the edit left alone, and the gaps
- *  between blocks that are still neighbours. An edited or new block is written in the canonical form. If the
- *  result would read back differently from the document, as when two kept lists would run together, the
- *  whole document is written canonically instead. */
-export function preserve(ctx: Ctx, source: Source, doc: ProseNode): string {
-  const canonical = serialize(ctx, doc)
+/** The body as markdown, keeping the source's own text for every block the edit left alone, and the gaps
+ *  between blocks that are still neighbours. An edited or new block is written in the canonical form, and
+ *  an edited block standing where a source block stood keeps that block's surrounding blank lines. Link
+ *  definitions are never dropped. If the result would read back differently from the document, as when two
+ *  kept lists would run together, the whole body is written canonically instead. */
+export function preserve(ctx: Ctx, source: Source, doc: ProseNode, canonical: string): string {
+  if (!source.blocks || !source.definitions) split(ctx, source)
+  const blocks = source.blocks!
+  const definitions = source.definitions!
+  const body = source.body
   const current: string[] = []
   doc.forEach((node) => {
     const text = canonicalOf(ctx, node)
     if (text) current.push(text)
   })
-  const { blocks, markdown } = source
   if (blocks.length === 0 || current.length === 0) return canonical
   const pairs = align(
     blocks.map((block) => block.canonical),
     current,
   )
-
-  // An edited block that stands where a source block stood, with nothing matching that source block, takes
-  // its place: the blank lines around it stay as they were, though its own text is written anew.
   const used = new Set(pairs.values())
+
+  // The source text written out, by range, so a definition that went with none of it can be put back.
+  const kept: [number, number][] = []
   let out = ''
+  const keep = (start: number, end: number) => {
+    out += body.slice(start, end)
+    kept.push([start, end])
+  }
+
+  // Positions only move forward, so no stretch of the source is written twice.
+  let cursor = -1
   let previous: number | undefined
   current.forEach((text, index) => {
     const matched = pairs.get(index)
-    const next = previous == null ? 0 : previous + 1
+    const next = cursor + 1
     const standsIn = matched == null && next < blocks.length && !used.has(next) ? next : undefined
+    if (standsIn != null) used.add(standsIn)
     const position = matched ?? standsIn
     const block = position == null ? undefined : blocks[position]
     if (index === 0) {
-      if (position === 0 && block) out += markdown.slice(0, block.start)
+      if (position === 0 && block) keep(0, block.start)
     } else if (position != null && previous != null && position === previous + 1 && block) {
-      out += markdown.slice(blocks[previous]!.end, block.start)
+      keep(blocks[previous]!.end, block.start)
     } else {
       out += '\n\n'
     }
-    out += matched != null && block ? block.text : text
+    if (matched != null && block) keep(block.start, block.end)
+    else out += text
+    if (position != null) cursor = Math.max(cursor, position)
     previous = position
   })
   const last = blocks[blocks.length - 1]!
-  out += previous === blocks.length - 1 ? markdown.slice(last.end) : '\n'
+  if (previous === blocks.length - 1) keep(last.end, body.length)
+  else out += '\n'
 
-  const parse = ctx.get(parserCtx)
-  return serialize(ctx, parse(out)) === canonical ? out : canonical
+  const lost = definitions.filter(
+    (definition) => !kept.some(([start, end]) => start <= definition.start && definition.end <= end),
+  )
+  if (lost.length > 0) out = `${trimmed(out)}\n\n${lost.map((definition) => definition.text).join('\n')}\n`
+
+  return serialize(ctx, ctx.get(parserCtx)(out)) === canonical ? out : canonical
 }

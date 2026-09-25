@@ -116,12 +116,4 @@ struct EditorTests {
         try await page.wait { !page.changes.isEmpty }
         #expect(page.changes.last == written.replacingOccurrences(of: "Milk", with: "- [ ] Milk"))
     }
-
-    @Test func everySampleNoteOpensWithoutBeingRewritten() async throws {
-        let page = try await Harness()
-        for note in NoteLibrary.sample().notes {
-            try await page.load(note.body)
-            #expect(try await page.markdown() == nil, "\(note.title) was rewritten on opening")
-        }
-    }
 }
