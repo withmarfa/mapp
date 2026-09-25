@@ -1,6 +1,7 @@
 import { Plugin, PluginKey, type EditorState } from '@milkdown/kit/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
 import { $prose } from '@milkdown/kit/utils'
+import { labels } from './labels'
 
 const copyIcon =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>'
@@ -13,7 +14,7 @@ function copyButton(onCopy: (text: string) => void): HTMLElement {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'copy'
-  button.setAttribute('aria-label', 'Copy')
+  button.setAttribute('aria-label', labels.copy)
   button.innerHTML = copyIcon
   button.addEventListener('mousedown', (event) => event.preventDefault())
   button.addEventListener('click', () => {

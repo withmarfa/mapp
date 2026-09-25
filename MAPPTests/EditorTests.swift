@@ -56,6 +56,8 @@ struct EditorTests {
         let page = try await Harness()
         try await page.load(kitchen)
         #expect(try await page.markdown() == nil)
+        // Longer than the pause after which the page reports an edit.
+        try await Task.sleep(for: .milliseconds(400))
         #expect(page.changes.isEmpty)
     }
 
@@ -90,7 +92,19 @@ struct EditorTests {
     @Test func aDeletedNoteCannotBeEdited() async throws {
         let page = try await Harness()
         try await page.load("Old list\n", deleted: true)
+        #expect(!page.editor.isEditable)
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'x')")
+        page.editor.format(.checklist)
+        page.editor.format(.table)
         #expect(try await page.markdown() == nil)
+    }
+
+    @Test func anEditNotYetReportedIsHandedOverOnFlush() async throws {
+        let page = try await Harness()
+        try await page.load("Draft\n")
+        page.editor.format(.title)
+        page.editor.flush()
+        try await page.wait { !page.changes.isEmpty }
+        #expect(page.changes == ["# Draft\n"])
     }
 }

@@ -189,7 +189,7 @@ export const dialect: MilkdownPlugin[] = [
   imageView,
 ].flat()
 
-// One output form, so a memo written back unchanged is byte-stable.
+// One output form, so a note written back unchanged is byte-stable.
 export const stringifyOptions: StringifyOptions = {
   bullet: '-',
   emphasis: '*',

@@ -31,5 +31,6 @@ struct NoteWindow: View {
             if note == nil { dismiss() }
         }
         .onChange(of: note == nil) { if note == nil { dismiss() } }
+        .onDisappear { editor.flush() }
     }
 }

@@ -14,7 +14,7 @@ test('the dialect fixture is written back byte for byte', async () => {
   expect(await roundTrip(fixture)).toBe(fixture)
 })
 
-test('a memo written back is stable on a second pass', async () => {
+test('a note written back is stable on a second pass', async () => {
   const once = await roundTrip(fixture)
   expect(await roundTrip(once)).toBe(once)
 })
@@ -55,7 +55,7 @@ test('an empty paragraph is left out rather than written as html', async () => {
   expect(out).toBe('a\n\nb\n')
 })
 
-test('a memo that is only an empty paragraph is written as nothing', async () => {
+test('a note that is only an empty paragraph is written as nothing', async () => {
   expect(await roundTrip('')).toBe('')
 })
 

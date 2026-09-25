@@ -71,11 +71,11 @@ import {
 } from '@milkdown/kit/prose/state'
 import { $prose, callCommand, replaceAll, type $UserKeymap } from '@milkdown/kit/utils'
 import { codeCopyPlugin, headingMarkPlugin } from './decorations'
+import { labels } from './labels'
 import { dialect, serialize, stringifyOptions } from './dialect'
 import { highlightPlugin } from './highlight'
 import { pastePlugin } from './paste'
 import { selectionPlugin } from './selection'
-import { search, SearchQuery, getSearchState, setSearchState } from 'prosemirror-search'
 import { tableInterface } from './tables'
 import { taskListPlugin, toggleTaskList } from './tasks'
 
@@ -131,8 +131,6 @@ export interface EditorEvents {
   stateChanged(state: CaretState): void
   openLink(href: string): void
   copy(text: string): void
-  /** Escape, which nothing in the page uses, hands the keyboard back to the app. */
-  escape(): void
 }
 
 const markNames: Record<string, Mark> = {
@@ -276,7 +274,7 @@ const liftItem: Command = (state, dispatch) => {
   return true
 }
 
-const listItemShiftTab = $prose(() => keymap({ 'Shift-Tab': liftItem }))
+const listItemShiftTab = $prose(() => keymap({ 'Shift-Tab': liftItem, 'Mod-[': liftItem }))
 
 // A control chord that nothing handles reaches the page as its ASCII control character
 // (Control-N as U+000E), which the web view would insert as text.
@@ -333,7 +331,7 @@ function isList(node: ProseNode): boolean {
 }
 
 // Two lists of one kind side by side are written with a changed marker to keep them apart, and the
-// memo shows a gap between them, so an edit that leaves them so joins them.
+// note shows a gap between them, so an edit that leaves them so joins them.
 function joinLists(tr: Transaction, start: number, index: number): void {
   const $start = tr.doc.resolve(start)
   const before = $start.parent.maybeChild(index - 1)
@@ -348,9 +346,16 @@ export class NoteEditor {
   private baseline = ''
   private generation = 0
   private keys: (view: EditorView, event: KeyboardEvent) => boolean = () => false
+  /** A deleted note is read, not changed: no edit reaches its document, whether typed, formatted, clicked or
+   *  undone. Loading replaces the state outright, so it is not an edit. */
+  private readOnlyPlugin = $prose(
+    () =>
+      new Plugin({
+        key: new PluginKey('readOnly'),
+        filterTransaction: (tr) => this.editable || !tr.docChanged,
+      }),
+  )
   private editable = true
-  /** The range the last search selected, so clearing the search lets go of that and not of the reader's own. */
-  private found: { from: number; to: number } | null = null
 
   private constructor(private readonly events: EditorEvents) {}
 
@@ -370,11 +375,10 @@ export class NoteEditor {
         ctx.set(rootCtx, root)
         ctx.set(defaultValueCtx, '')
         ctx.set(remarkStringifyOptionsCtx, stringifyOptions)
-        // The preset also binds Mod-[ and Mod-] here; the app uses those for back and forward.
-        // Shift-Tab is bound to liftItem instead.
+        // Tab and Command-] indent a list item, as in Notes; Shift-Tab and Command-[ are bound to liftItem.
         ctx.update(listItemKeymap.key, (keys) => ({
           ...keys,
-          SinkListItem: { shortcuts: 'Tab' },
+          SinkListItem: { shortcuts: ['Tab', 'Mod-]'] },
           LiftListItem: { shortcuts: [] },
         }))
         // Formatting keys are the app's to set, through setKeymap; the presets' own go.
@@ -399,22 +403,14 @@ export class NoteEditor {
         ctx.update(editorViewOptionsCtx, (options) => ({
           ...options,
           editable: () => instance.editable,
-          handleKeyDown: (_view, event) => {
-            if (event.key !== 'Escape' || event.metaKey || event.ctrlKey || event.altKey) return false
-            events.escape()
-            return true
-          },
+          attributes: () => ({ 'aria-label': labels.note }),
           scrollThreshold: 24,
           scrollMargin: 24,
         }))
-        ctx.get(listenerCtx).updated((ctx, doc) => {
-          const markdown = serialize(ctx, doc)
-          if (markdown === instance.lastMarkdown) return
-          instance.lastMarkdown = markdown
-          events.changed(markdown, instance.generation)
-        })
+        ctx.get(listenerCtx).updated((_ctx, doc) => instance.report(doc))
       })
       .use(caretStatePlugin(events))
+      .use(instance.readOnlyPlugin)
       .use(pastePlugin)
       .use(instance.keymapPlugin)
       .use(dialect)
@@ -432,7 +428,6 @@ export class NoteEditor {
       .use(headingMarkPlugin)
       .use(highlightPlugin)
       .use(selectionPlugin)
-      .use($prose(() => search()))
       .create()
     root.addEventListener('click', (event) => {
       const anchor = (event.target as HTMLElement).closest('a[href]')
@@ -444,76 +439,67 @@ export class NoteEditor {
     return instance
   }
 
-  load(markdown: string, generation: number): void {
-    // A loaded document only counts as changed once it is edited, so its
-    // canonical form is the baseline, not the text as stored.
+  /** The note as it would be saved. */
+  private saved(doc: ProseNode = this.editor.ctx.get(editorViewCtx).state.doc): string {
+    return serialize(this.editor.ctx, doc)
+  }
+
+  /** Tells the app of an edit it has not heard about. Edits are reported after a pause in typing, and loading
+   *  another note would cancel the pause, so one still waiting is reported first, against its own note. */
+  private report(doc?: ProseNode): void {
+    const markdown = this.saved(doc)
+    if (markdown === this.lastMarkdown) return
+    this.lastMarkdown = markdown
+    this.events.changed(markdown, this.generation)
+  }
+
+  private replace(markdown: string, generation: number): void {
+    this.report()
     this.generation = generation
     this.editor.action(replaceAll(markdown, true))
     this.baseline = serialize(this.editor.ctx)
     this.lastMarkdown = this.baseline
+  }
+
+  load(markdown: string, generation: number): void {
+    this.replace(markdown, generation)
     const view = this.editor.ctx.get(editorViewCtx)
     // A caret at the end, where writing carries on; at the start it would sit in a first-line heading and
     // show its marks. The last place text can go, so a document ending in a rule takes a caret above it
     // rather than selecting the rule itself.
     const { doc } = view.state
     const end = Selection.findFrom(doc.resolve(doc.content.size), -1, true) ?? Selection.atEnd(doc)
-    this.found = null
-    view.dispatch(
-      setSearchState(
-        view.state.tr.setSelection(end).scrollIntoView(),
-        new SearchQuery({ search: '' }),
-      ),
-    )
+    view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
     this.events.stateChanged(caretState(view.state))
   }
 
-  /** The same memo, written from outside while it was open: the text is replaced under the caret. */
+  /** The same note, changed from outside while it was open, as in another window: the text is replaced under
+   *  the caret and the scroll stays where it was. */
   reload(markdown: string, generation: number): void {
     const view = this.editor.ctx.get(editorViewCtx)
     const at = view.state.selection.from
-    const scroller = view.dom.parentElement
-    const scrollTop = scroller?.scrollTop ?? 0
-    this.generation = generation
-    this.editor.action(replaceAll(markdown, true))
-    this.baseline = serialize(this.editor.ctx)
-    this.lastMarkdown = this.baseline
+    const scroll = window.scrollY
+    this.replace(markdown, generation)
     const { doc } = view.state
     const $at = doc.resolve(Math.min(at, doc.content.size))
     const selection = Selection.findFrom($at, -1, true) ?? Selection.atEnd(doc)
     view.dispatch(view.state.tr.setSelection(selection))
-    if (scroller) scroller.scrollTop = scrollTop
+    window.scrollTo(0, scroll)
     this.events.stateChanged(caretState(view.state))
   }
 
-  canonicalMarkdown(): string {
-    return serialize(this.editor.ctx)
-  }
-
-  /** The document as markdown, or null while it is still what was loaded. */
+  /** The note as it would be saved, or null while it is still what was loaded. */
   markdown(): string | null {
-    const markdown = serialize(this.editor.ctx)
+    const markdown = this.saved()
     return markdown === this.baseline ? null : markdown
   }
 
-  find(text: string): void {
-    const view = this.editor.ctx.get(editorViewCtx)
-    const { selection } = view.state
-    const previous = getSearchState(view.state)?.query.search
-    const query = new SearchQuery({ search: text, literal: true })
-    const selectedBySearch = this.found?.from === selection.from && this.found?.to === selection.to
-    let tr = setSearchState(view.state.tr, query)
-    const match = text
-      ? (query.findNext(view.state, previous === text ? selection.to : selection.from) ??
-        query.findNext(view.state, 0))
-      : null
-    if (match) {
-      tr = tr.setSelection(TextSelection.create(tr.doc, match.from, match.to)).scrollIntoView()
-      this.found = { from: match.from, to: match.to }
-    } else {
-      if (selectedBySearch) tr = tr.setSelection(Selection.near(selection.$to))
-      this.found = null
-    }
-    view.dispatch(tr)
+  /** An edit not yet reported, handed over at once, as when the window closes; null when there is none. */
+  flush(): string | null {
+    const markdown = this.saved()
+    if (markdown === this.lastMarkdown) return null
+    this.lastMarkdown = markdown
+    return markdown
   }
 
   focus(): void {
@@ -668,9 +654,7 @@ export class NoteEditor {
     if (!(view.state.selection instanceof CellSelection)) {
       const rect = selectedRect(view.state)
       const select = line === 'row' ? selectRowCommand : selectColCommand
-      this.editor.action(
-        callCommand(select.key, { index: line === 'row' ? rect.top : rect.left }),
-      )
+      this.editor.action(callCommand(select.key, { index: line === 'row' ? rect.top : rect.left }))
     }
     this.editor.action(callCommand(deleteSelectedCellsCommand.key))
   }

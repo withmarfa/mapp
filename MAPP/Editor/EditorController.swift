@@ -13,6 +13,8 @@ final class EditorController: NSObject {
     private(set) var isReady = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
+    /// Whether the note on the page can be changed; a deleted note cannot.
+    private(set) var isEditable = true
 
     /// An edit to a note, with the markdown the note now holds.
     @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
@@ -24,13 +26,13 @@ final class EditorController: NSObject {
     /// The note on the page, and the markdown the page holds for it as far as the app knows.
     @ObservationIgnored private(set) var noteID: Note.ID?
     @ObservationIgnored private var markdown = ""
-    @ObservationIgnored private var editable = true
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// note still reaches that note rather than the one now showing.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var notesByGeneration: [Int: Note.ID] = [:]
     @ObservationIgnored private var wantsFocus = false
     @ObservationIgnored private var pageURL: URL?
+    @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -60,6 +62,10 @@ final class EditorController: NSObject {
         NotificationCenter.default.addObserver(
             self, selector: #selector(systemColorsDidChange), name: NSColor.systemColorsDidChangeNotification, object: nil
         )
+        // The accent resolves differently in light and dark, so it is sent again when the appearance changes.
+        appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.applyAccent() }
+        }
         guard let url = Bundle.main.url(forResource: "editor", withExtension: "html") else {
             preconditionFailure("editor.html missing from the bundle")
         }
@@ -71,21 +77,38 @@ final class EditorController: NSObject {
 
     /// Shows a note, with the caret at its end. A deleted note is shown read-only.
     func load(_ note: Note) {
-        noteID = note.id
-        markdown = note.body
-        editable = !note.isDeleted
-        guard isReady else { return }
-        generation += 1
-        notesByGeneration[generation] = note.id
-        call("load", json(note.body), String(generation), String(editable))
+        show(note, as: "load")
     }
 
-    /// The note changed from elsewhere, another window say, so the page takes the new text where the caret is.
+    /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
+    /// text where the caret is.
     func noteChanged(_ note: Note) {
         guard note.id == noteID else { return load(note) }
-        let editable = !note.isDeleted
-        guard note.body != markdown || editable != self.editable else { return }
-        load(note)
+        guard note.body != markdown || note.isDeleted == isEditable else { return }
+        show(note, as: "reload")
+    }
+
+    private func show(_ note: Note, as function: String) {
+        noteID = note.id
+        markdown = note.body
+        isEditable = !note.isDeleted
+        guard isReady else { return }
+        generation += 1
+        // A late report can only belong to the load before this one.
+        notesByGeneration = notesByGeneration.filter { $0.key >= generation - 1 }
+        notesByGeneration[generation] = note.id
+        call(function, json(note.body), String(generation), String(isEditable))
+    }
+
+    /// Hands over an edit the page has not yet reported, as when the window closes. The reply keeps this
+    /// controller alive until it arrives.
+    func flush() {
+        guard isReady, let noteID else { return }
+        webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
+            guard let markdown = result as? String else { return }
+            if noteID == self.noteID { self.markdown = markdown }
+            onChange(noteID, markdown)
+        }
     }
 
     /// Gives the page the keyboard: now if it is ready, otherwise once it is. One request, never repeated.
@@ -137,11 +160,30 @@ final class EditorController: NSObject {
         var hex: String?
         NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
             hex = NSColor.controlAccentColor.usingColorSpace(.sRGB).map {
-                String(format: "#%02X%02X%02X", Int($0.redComponent * 255), Int($0.greenComponent * 255), Int($0.blueComponent * 255))
+                String(format: "#%02X%02X%02X", Int(($0.redComponent * 255).rounded()),
+                       Int(($0.greenComponent * 255).rounded()), Int(($0.blueComponent * 255).rounded()))
             }
         }
         guard let hex else { return }
         webView.evaluateJavaScript("document.documentElement.style.setProperty('--accent', \(json(hex)))")
+    }
+
+    /// The page's own words, from the String Catalog.
+    private func applyLabels() {
+        let labels = [
+            "note": String(localized: "Note"),
+            "copy": String(localized: "Copy"),
+            "addRow": String(localized: "Add Row"),
+            "addColumn": String(localized: "Add Column"),
+            "deleteRow": String(localized: "Delete Row"),
+            "deleteColumn": String(localized: "Delete Column"),
+            "alignLeft": String(localized: "Align Left"),
+            "alignCenter": String(localized: "Align Center"),
+            "alignRight": String(localized: "Align Right"),
+            "row": String(localized: "Row"),
+            "column": String(localized: "Column"),
+        ]
+        call("setLabels", json(labels))
     }
 
     private func applyKeymap() {
@@ -161,11 +203,12 @@ final class EditorController: NSObject {
         case .ready:
             isReady = true
             applyAccent()
+            applyLabels()
             applyKeymap()
             if let noteID {
                 generation += 1
                 notesByGeneration[generation] = noteID
-                call("load", json(markdown), String(generation), String(editable))
+                call("load", json(markdown), String(generation), String(isEditable))
             }
             if wantsFocus { focus() }
         case .changed(let markdown, let generation):

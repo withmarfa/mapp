@@ -47,6 +47,7 @@ struct MainView: View {
         .onChange(of: browser.snapshot) {
             storedBrowser = try? JSONEncoder().encode(browser.snapshot)
         }
+        .onDisappear { editor.flush() }
         .onAppear {
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }

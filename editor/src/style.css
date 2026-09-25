@@ -3,8 +3,9 @@
 @import '@milkdown/kit/prose/tables/style/tables.css';
 
 :root {
-  /* The note's text size; the metrics below are in rem or em so they scale with it. */
-  font-size: 14px;
+  /* The note's text size, the system's 13-point body text; the metrics below are in rem or em so they
+     scale with it. */
+  font-size: 13px;
   /* The app's own accent until the app sets the system's, which it does before the first note shows. */
   --accent: #0088ff;
   --text: CanvasText;
@@ -53,6 +54,10 @@ body {
 
 ::highlight(selection) {
   background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.inactive ::highlight(selection) {
+  background-color: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 .ProseMirror > :first-child {
@@ -394,13 +399,6 @@ body {
 
 [hidden] {
   display: none !important;
-}
-.ProseMirror-search-match {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
-}
-
-.ProseMirror-active-search-match {
-  background: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 /* Tables, drawn with hairlines as Notes draws them. */

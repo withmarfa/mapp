@@ -1,4 +1,3 @@
-import { getMatchHighlights } from 'prosemirror-search'
 import { expect, test } from 'vitest'
 import { editorViewCtx } from '@milkdown/kit/core'
 import type { Ctx } from '@milkdown/kit/ctx'
@@ -21,7 +20,6 @@ async function withNoteEditor<T>(
     },
     openLink() {},
     copy() {},
-    escape() {},
   })
   editor.load(markdown, 1)
   try {
@@ -40,19 +38,19 @@ function placeCaret(editor: NoteEditor, pos: number) {
   view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)))
 }
 
-test('a loaded memo opens with the caret at its end', async () =>
+test('a loaded note opens with the caret at its end', async () =>
   withNoteEditor('# Heading\n\nA line.\n', (editor) => {
     const { doc, selection } = ctxOf(editor).get(editorViewCtx).state
     expect(selection.empty).toBe(true)
     expect(selection.from).toBe(doc.content.size - 1)
   }))
 
-test('a memo ending in a rule still opens with a caret', async () =>
+test('a note ending in a rule still opens with a caret', async () =>
   withNoteEditor('A line.\n\n---\n', (editor) => {
     expect(ctxOf(editor).get(editorViewCtx).state.selection.empty).toBe(true)
   }))
 
-test('a loaded memo is not yet changed, and an edit is, told once with its generation', async () => {
+test('a loaded note is not yet changed, and an edit is, told once with its generation', async () => {
   const told: [string, number][] = []
   const root = document.createElement('div')
   document.body.append(root)
@@ -63,7 +61,6 @@ test('a loaded memo is not yet changed, and an edit is, told once with its gener
     stateChanged() {},
     openLink() {},
     copy() {},
-    escape() {},
   })
   try {
     editor.load('# Heading\n\nA line.\n', 7)
@@ -290,7 +287,7 @@ test('a fenced block with a known language is colored, one without stays plain',
   })
 })
 
-test('control characters typed into the memo are dropped', async () => {
+test('control characters typed into the note are dropped', async () => {
   await withNoteEditor('Plan\n', (editor) => {
     const view = ctxOf(editor).get(editorViewCtx)
     placeCaret(editor, 1)
@@ -305,18 +302,77 @@ test('control characters typed into the memo are dropped', async () => {
   })
 })
 
-test('list items indent with Tab alone, leaving Mod-[ and Mod-] to the app', async () => {
+test('list items indent with Tab or Command-] and outdent with Shift-Tab or Command-[, as in Notes', async () => {
   await withNoteEditor('- one\n- two\n', (editor) => {
     placeCaret(editor, 9)
     const view = ctxOf(editor).get(editorViewCtx)
     const press = (key: string, init: KeyboardEventInit = {}) =>
       view.someProp('handleKeyDown', (f) => f(view, new KeyboardEvent('keydown', { key, ...init })))
-    expect(press(']', { metaKey: true })).toBeFalsy()
     expect(press('Tab')).toBe(true)
     expect(serialize(ctxOf(editor))).toBe('- one\n  - two\n')
-    expect(press('[', { metaKey: true })).toBeFalsy()
     expect(press('Tab', { shiftKey: true })).toBe(true)
     expect(serialize(ctxOf(editor))).toBe('- one\n- two\n')
+    expect(press(']', { metaKey: true })).toBe(true)
+    expect(serialize(ctxOf(editor))).toBe('- one\n  - two\n')
+    expect(press('[', { metaKey: true })).toBe(true)
+    expect(serialize(ctxOf(editor))).toBe('- one\n- two\n')
+  })
+})
+
+test('a deleted note takes no edit, whether formatted, toggled or undone', async () => {
+  await withNoteEditor('- [ ] Old list\n', (editor) => {
+    editor.setEditable(false)
+    editor.load('- [ ] Old list\n', 2)
+    editor.format('bold')
+    editor.format('heading', 1)
+    const view = ctxOf(editor).get(editorViewCtx)
+    const item = view.dom.querySelector('li[data-item-type="task"]') as HTMLElement
+    view.someProp('handleClickOn', (f) =>
+      f(
+        view,
+        1,
+        view.state.doc.child(0).child(0),
+        1,
+        { target: item } as unknown as MouseEvent,
+        true,
+      ),
+    )
+    editor.undo()
+    expect(editor.markdown()).toBe(null)
+  })
+})
+
+test('an edit still waiting to be reported goes to its own note when another loads', async () => {
+  const told: [string, number][] = []
+  const root = document.createElement('div')
+  document.body.append(root)
+  const editor = await NoteEditor.mount(root, {
+    changed(markdown, generation) {
+      told.push([markdown, generation])
+    },
+    stateChanged() {},
+    openLink() {},
+    copy() {},
+  })
+  try {
+    editor.load('First\n', 1)
+    const view = ctxOf(editor).get(editorViewCtx)
+    view.dispatch(view.state.tr.insertText(' edited', view.state.doc.content.size - 1))
+    editor.load('Second\n', 2)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(told).toEqual([['First edited\n', 1]])
+  } finally {
+    root.remove()
+  }
+})
+
+test('flushing hands over an edit not yet reported, once', async () => {
+  await withNoteEditor('Draft\n', (editor) => {
+    expect(editor.flush()).toBe(null)
+    const view = ctxOf(editor).get(editorViewCtx)
+    view.dispatch(view.state.tr.insertText('!', view.state.doc.content.size - 1))
+    expect(editor.flush()).toBe('Draft!\n')
+    expect(editor.flush()).toBe(null)
   })
 })
 
@@ -412,51 +468,3 @@ test('an image from the web is shown as its alt text, never fetched', async () =
     expect(dom.querySelector('.image-absent')?.textContent).toBe('Somewhere else')
   })
 })
-
-test('clearing find collapses the selection without editing the text', async () =>
-  withNoteEditor('A searchable line.\n', (editor) => {
-    const view = ctxOf(editor).get(editorViewCtx)
-    editor.find('searchable')
-    expect(getMatchHighlights(view.state).find().length).toBe(1)
-    editor.find('')
-    expect(getMatchHighlights(view.state).find()).toHaveLength(0)
-    expect(view.state.selection.empty).toBe(true)
-    expect(view.state.selection.from).toBe(13)
-    expect(editor.markdown()).toBeNull()
-  }))
-
-test('clearing find leaves a selection the reader made after it', async () =>
-  withNoteEditor('A searchable line.\n', (editor) => {
-    const view = ctxOf(editor).get(editorViewCtx)
-    editor.find('searchable')
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)))
-    editor.find('')
-    expect(getMatchHighlights(view.state).find()).toHaveLength(0)
-    expect([view.state.selection.from, view.state.selection.to]).toEqual([1, 5])
-  }))
-
-test('find matches styled text, advances, wraps and clears a missing query', async () =>
-  withNoteEditor('A **searchable** line. Another searchable line.\n', (editor) => {
-    const view = ctxOf(editor).get(editorViewCtx)
-    editor.find('SEARCHABLE')
-    const first = view.state.selection.from
-    expect(view.state.doc.textBetween(view.state.selection.from, view.state.selection.to)).toBe(
-      'searchable',
-    )
-    expect(getMatchHighlights(view.state).find()).toHaveLength(2)
-    editor.find('SEARCHABLE')
-    expect(view.state.selection.from).toBeGreaterThan(first)
-    editor.find('SEARCHABLE')
-    expect(view.state.selection.from).toBe(first)
-    editor.find('missing')
-    expect(getMatchHighlights(view.state).find()).toHaveLength(0)
-    expect(view.state.selection.empty).toBe(true)
-    expect(editor.markdown()).toBeNull()
-  }))
-
-test('loading another memo clears previous search highlights', async () =>
-  withNoteEditor('A line.\n', (editor) => {
-    editor.find('line')
-    editor.load('Another line.\n', 2)
-    expect(getMatchHighlights(ctxOf(editor).get(editorViewCtx).state).find()).toHaveLength(0)
-  }))

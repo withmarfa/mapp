@@ -80,7 +80,9 @@ final class WindowTests: XCTestCase {
         sidebarItem("Inbox").click()
         window.toolbars.buttons["New Note"].click()
         XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
-        XCTAssertTrue(waitForText("==", ""))
+        // An empty page holds nothing but the line the caret sits on.
+        let empty = expectation(for: NSPredicate(format: "value == nil OR value MATCHES %@", "\\s*"), evaluatedWith: editor)
+        wait(for: [empty], timeout: 3)
         XCTAssertEqual(count(of: "Inbox"), before + 1)
     }
 
@@ -98,10 +100,12 @@ final class WindowTests: XCTestCase {
     func testRecentlyDeletedNotesCanBeRecoveredButNotEdited() {
         sidebarItem("Recently Deleted").click()
         row(titled: "Old packing list").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Old packing list"))
-        editor.click()
+        // A read-only page is text to read, not a text view.
+        XCTAssertTrue(page.staticTexts["Old packing list"].waitForExistence(timeout: 3))
+        page.staticTexts["Old packing list"].click()
         app.typeText("zzz")
-        XCTAssertFalse(text.contains("zzz"), "a deleted note takes no typing")
+        let typed = page.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "zzz"))
+        XCTAssertEqual(typed.count, 0, "a deleted note takes no typing")
         window.buttons["Recover"].click()
         XCTAssertTrue(row(titled: "Old packing list").waitForNonExistence(timeout: 2))
         sidebarItem("Personal").click()
@@ -216,6 +220,15 @@ final class WindowTests: XCTestCase {
         app.menuBars.menuBarItems["Edit"].click()
         app.menuBars.menuItems["Undo"].click()
         XCTAssertTrue(waitForText("!=", "Groceries"))
+    }
+
+    func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
+        let before = count(of: "All Notes")
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForNonExistence(timeout: 2))
+        XCTAssertEqual(count(of: "All Notes"), before)
     }
 
     func testATableIsInsertedFromTheFormatMenu() {

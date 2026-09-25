@@ -4,10 +4,16 @@
     "A folder named “%@” already exists. Please choose a different name." : {
 
     },
+    "Add Column" : {
+
+    },
     "Add Column After" : {
 
     },
     "Add Column Before" : {
+
+    },
+    "Add Row" : {
 
     },
     "Add Row Above" : {
@@ -47,6 +53,12 @@
 
     },
     "Code Block" : {
+
+    },
+    "Column" : {
+
+    },
+    "Copy" : {
 
     },
     "Date Created" : {
@@ -178,7 +190,13 @@
     "Recover" : {
 
     },
+    "Redo" : {
+
+    },
     "Rename Folder" : {
+
+    },
+    "Row" : {
 
     },
     "Search" : {
@@ -206,6 +224,9 @@
 
     },
     "Today" : {
+
+    },
+    "Undo" : {
 
     },
     "Unpin" : {
