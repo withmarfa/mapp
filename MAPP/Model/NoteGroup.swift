@@ -19,8 +19,10 @@ nonisolated enum NoteGroup: Hashable {
         case .previous30Days: String(localized: "Previous 30 Days")
         case .month(let year, let month):
             calendar.date(from: DateComponents(year: year, month: month))?
-                .formatted(Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone).month(.wide)) ?? ""
-        case .year(let year): String(year)
+                .formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).month(.wide)) ?? ""
+        case .year(let year):
+            calendar.date(from: DateComponents(year: year))?
+                .formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).year()) ?? ""
         }
     }
 

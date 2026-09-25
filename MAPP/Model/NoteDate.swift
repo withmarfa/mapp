@@ -2,7 +2,7 @@ import Foundation
 
 /// How a note's date reads in the list, as Mail writes it: the time today, "Yesterday", the weekday within
 /// the week, and the date before that.
-enum NoteDate {
+nonisolated enum NoteDate {
     static func listLabel(for date: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)

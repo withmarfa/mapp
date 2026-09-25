@@ -5,6 +5,7 @@ import Testing
 struct NoteGroupTests {
     let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_GB")
         calendar.timeZone = TimeZone(identifier: "Europe/London")!
         return calendar
     }()

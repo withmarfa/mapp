@@ -227,11 +227,34 @@ struct NoteLibraryTests {
     @Test func reorderingFoldersUndoes() {
         let (library, _, _, _, _) = makeLibrary()
         let manager = undoManager()
-        undoably(manager) { library.moveFolders(from: [1], to: 0, undoManager: manager) }
+        undoably(manager) { library.moveFolders([home.id], before: work.id, undoManager: manager) }
         #expect(library.folders == [home, work])
         #expect(manager.undoActionName == "Move Folder")
         manager.undo()
         #expect(library.folders == [work, home])
+        library.moveFolders([work.id], before: nil)
+        #expect(library.folders == [home, work])
+    }
+
+    @Test func newFolderNamesAvoidTakenNamesWhateverTheirCase() {
+        let library = NoteLibrary(folders: [Folder(name: "new folder")])
+        #expect(library.newFolder().name == "New Folder 2")
+    }
+
+    @Test func aFolderThatIsGoneTakesNoNotes() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let gone = UUID()
+        library.move([inbox.id], to: gone)
+        #expect(library.note(inbox.id)?.folderID == nil)
+        #expect(library.newNote(in: .folder(gone)).folderID == nil)
+    }
+
+    @Test func pinningLeavesDeletedNotesAlone() {
+        let (library, _, _, _, deleted) = makeLibrary()
+        let manager = undoManager()
+        undoably(manager) { library.setPinned([deleted.id], true, undoManager: manager) }
+        #expect(library.note(deleted.id)?.isPinned == false)
+        #expect(manager.undoActionName == "")
     }
 
     @Test func actionsThatChangeNothingRegisterNoUndo() {
