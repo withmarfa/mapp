@@ -12,6 +12,7 @@ struct MAPPApp: App {
         .defaultSize(width: 1100, height: 720)
         .commands {
             AppCommands(library: library)
+            FormatCommands()
         }
 
         WindowGroup("Note", for: Note.ID.self) { $id in

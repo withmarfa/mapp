@@ -4,7 +4,49 @@
     "A folder named “%@” already exists. Please choose a different name." : {
 
     },
+    "Add Column After" : {
+
+    },
+    "Add Column Before" : {
+
+    },
+    "Add Row Above" : {
+
+    },
+    "Add Row Below" : {
+
+    },
+    "Align Center" : {
+
+    },
+    "Align Left" : {
+
+    },
+    "Align Right" : {
+
+    },
     "All Notes" : {
+
+    },
+    "Block Quote" : {
+
+    },
+    "Body" : {
+
+    },
+    "Bold" : {
+
+    },
+    "Bulleted List" : {
+
+    },
+    "Checklist" : {
+
+    },
+    "Code" : {
+
+    },
+    "Code Block" : {
 
     },
     "Date Created" : {
@@ -14,6 +56,9 @@
 
     },
     "Delete" : {
+
+    },
+    "Delete Column" : {
 
     },
     "Delete Folder" : {
@@ -34,6 +79,9 @@
     "Delete Notes" : {
 
     },
+    "Delete Row" : {
+
+    },
     "Delete the folder “%@”?" : {
 
     },
@@ -43,10 +91,22 @@
     "Folders" : {
 
     },
+    "Format" : {
+
+    },
     "Group by Date" : {
 
     },
+    "Heading" : {
+
+    },
     "Inbox" : {
+
+    },
+    "Insert Table" : {
+
+    },
+    "Italic" : {
 
     },
     "Its notes will be moved to Recently Deleted." : {
@@ -86,6 +146,9 @@
 
     },
     "Note" : {
+
+    },
+    "Numbered List" : {
 
     },
     "Open in New Window" : {
@@ -128,6 +191,15 @@
 
     },
     "Sort By" : {
+
+    },
+    "Strikethrough" : {
+
+    },
+    "Subheading" : {
+
+    },
+    "Table" : {
 
     },
     "Title" : {

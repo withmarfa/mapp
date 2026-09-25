@@ -3,53 +3,48 @@ import SwiftUI
 struct NoteDetail: View {
     @Environment(NoteLibrary.self) private var library
     let browser: Browser
-    var pane: FocusState<Browser.Pane?>.Binding
+    let editor: EditorController
 
     var body: some View {
         let notes = browser.selection.compactMap { library.note($0) }
         if notes.count > 1 {
             ContentUnavailableView("^[\(notes.count) note](inflect: true) selected", systemImage: "note.text")
         } else if let note = notes.first {
-            NotePage(note: note)
-                .focused(pane, equals: .page)
-                // Escape hands the keyboard back to the list, as in Mail.
-                .onExitCommand { pane.wrappedValue = .list }
+            NotePage(note: note, editor: editor)
                 .onAppear(perform: grantFocusRequest)
                 .onChange(of: browser.focusRequest, grantFocusRequest)
-                .id(note.id)
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text")
         }
     }
 
+    /// The page takes the keyboard when asked, once it shows; the editor holds the request until its page is ready.
     private func grantFocusRequest() {
         guard browser.focusRequest == .page else { return }
-        pane.wrappedValue = .page
         browser.focusRequest = nil
+        editor.focus()
     }
 }
 
-/// One note as a page. Until the formatted editor arrives, the markdown is edited as plain text.
+/// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
+/// text into a page that is already running.
 struct NotePage: View {
-    @Environment(NoteLibrary.self) private var library
     let note: Note
+    let editor: EditorController
 
     var body: some View {
-        TextEditor(text: Binding(
-            get: { library.note(note.id)?.body ?? "" },
-            set: { library.updateBody(of: note.id, to: $0) }
-        ))
-        .font(.body)
-        .accessibilityIdentifier("NoteEditor")
-        .scrollContentBackground(.hidden)
-        .padding(.horizontal, 24)
-        .padding(.top, 8)
-        .disabled(note.isDeleted)
+        GeometryReader { proxy in
+            NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
+                .ignoresSafeArea(.container, edges: .top)
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if note.isDeleted {
                 DeletedNoteBanner(id: note.id)
             }
         }
+        .onChange(of: note.id, initial: true) { editor.load(note) }
+        .onChange(of: note.body) { editor.noteChanged(note) }
+        .onChange(of: note.isDeleted) { editor.noteChanged(note) }
     }
 }
 

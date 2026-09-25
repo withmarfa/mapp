@@ -10,4 +10,6 @@ extension FocusedValues {
     /// The main window in front, for commands that change what it shows.
     @Entry var browser: Browser?
     @Entry var focusedNotes: FocusedNotes?
+    /// The editor of the window in front, for the Format menu.
+    @Entry var editor: EditorController?
 }
