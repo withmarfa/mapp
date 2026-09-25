@@ -61,12 +61,12 @@ final class NoteLibrary {
     // MARK: Notes
 
     /// A new, empty note placed where it will show in `item`: in that folder, pinned when made from Pinned,
-    /// and in the Inbox otherwise.
+    /// and in the Inbox otherwise, including when the folder no longer exists.
     @discardableResult
     func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
         var note = Note(body: "", created: now())
         switch item {
-        case .folder(let id): note.placement.folderID = id
+        case .folder(let id): note.placement.folderID = folder(id)?.id
         case .pinned: note.placement.isPinned = true
         case .inbox, .allNotes, .recentlyDeleted: break
         }
@@ -94,33 +94,43 @@ final class NoteLibrary {
         remove(ids, undoManager: undoManager, name: deleteName(ids.count))
     }
 
-    /// Moving a note into a folder, or back to the Inbox with `nil`, also recovers it if it was deleted.
+    /// Moving a note into a folder, or back to the Inbox with `nil`, also recovers it if it was deleted. A folder
+    /// that no longer exists takes nothing.
     func move(_ ids: Set<Note.ID>, to folderID: Folder.ID?, undoManager: UndoManager? = nil) {
+        guard folderID.map({ folder($0) != nil }) ?? true else { return }
         place(ids, undoManager: undoManager, name: String(localized: "Move")) {
             $0.folderID = folderID
             $0.deleted = nil
         }
     }
 
+    /// Deleted notes keep their pin as it was, since Recently Deleted shows no pins.
     func setPinned(_ ids: Set<Note.ID>, _ pinned: Bool, undoManager: UndoManager? = nil) {
         let name = pinned ? String(localized: "Pin") : String(localized: "Unpin")
-        place(ids, undoManager: undoManager, name: name) { $0.isPinned = pinned }
+        let live = Set(notes.filter { ids.contains($0.id) && !$0.isDeleted }.map(\.id))
+        place(live, undoManager: undoManager, name: name) { $0.isPinned = pinned }
     }
 
     // MARK: Folders
 
     @discardableResult
     func newFolder(undoManager: UndoManager? = nil) -> Folder {
-        let folder = Folder(name: uniqueFolderName(String(localized: "New Folder")))
+        let folder = Folder(name: newFolderName())
         setFolders(folders + [folder], undoManager: undoManager, name: String(localized: "New Folder"))
         return folder
     }
 
-    /// Names are trimmed, and a name another folder already has is refused.
+    /// Whether another folder already has the name, ignoring case, as the Finder does.
+    func isFolderNameTaken(_ name: String, except id: Folder.ID? = nil) -> Bool {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return folders.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Names are trimmed. An empty name, or one another folder already has, is refused and leaves the name as it was.
     func rename(_ id: Folder.ID, to name: String, undoManager: UndoManager? = nil) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let index = folders.firstIndex(where: { $0.id == id }), !name.isEmpty,
-              !folders.contains(where: { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame })
+              !isFolderNameTaken(name, except: id)
         else { return }
         var order = folders
         order[index].name = name
@@ -141,9 +151,12 @@ final class NoteLibrary {
         undoManager?.endUndoGrouping()
     }
 
-    func moveFolders(from source: IndexSet, to destination: Int, undoManager: UndoManager? = nil) {
-        var order = folders
-        order.moveSubranges(RangeSet(source.rangeView.map { $0.lowerBound..<$0.upperBound }), to: destination)
+    /// Moves the folders, in the order given, to sit before `target`, or at the end when it is `nil`.
+    func moveFolders(_ ids: [Folder.ID], before target: Folder.ID?, undoManager: UndoManager? = nil) {
+        let moving = ids.compactMap { folder($0) }
+        var order = folders.filter { !ids.contains($0.id) }
+        let index = target.flatMap { target in order.firstIndex { $0.id == target } } ?? order.endIndex
+        order.insert(contentsOf: moving, at: index)
         setFolders(order, undoManager: undoManager, name: String(localized: "Move Folder"))
     }
 
@@ -208,12 +221,14 @@ final class NoteLibrary {
         undoManager.setActionName(name)
     }
 
-    private func uniqueFolderName(_ base: String) -> String {
-        let names = Set(folders.map(\.name))
-        guard names.contains(base) else { return base }
+    private func newFolderName() -> String {
+        var name = String(localized: "New Folder")
         var number = 2
-        while names.contains("\(base) \(number)") { number += 1 }
-        return "\(base) \(number)"
+        while isFolderNameTaken(name) {
+            name = String(localized: "New Folder \(number)")
+            number += 1
+        }
+        return name
     }
 
     private func deleteName(_ count: Int) -> String {

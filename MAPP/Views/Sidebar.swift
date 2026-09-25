@@ -3,12 +3,25 @@ import SwiftUI
 struct Sidebar: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
-    @Binding var selection: SidebarItem?
-    @State private var renaming: Folder.ID?
+    let browser: Browser
+    let sort: NoteSort
     @State private var folderToDelete: Folder?
+    @State private var isConfirmingDelete = false
+    @State private var takenName: String?
+
+    /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
+    /// cannot show, so that is ignored.
+    private var selection: Binding<SidebarItem?> {
+        Binding {
+            browser.sidebarItem
+        } set: { item in
+            guard let item, item != browser.sidebarItem else { return }
+            browser.show(item, in: library, sort: sort)
+        }
+    }
 
     var body: some View {
-        List(selection: $selection) {
+        List(selection: selection) {
             Section {
                 row(.inbox, systemImage: "tray")
                 row(.allNotes, systemImage: "note.text")
@@ -20,7 +33,9 @@ struct Sidebar: View {
                     folderRow(folder)
                 }
                 .onMove { source, destination in
-                    library.moveFolders(from: source, to: destination, undoManager: undoManager)
+                    let ids = source.map { library.folders[$0].id }
+                    let target = destination < library.folders.count ? library.folders[destination].id : nil
+                    library.moveFolders(ids, before: target, undoManager: undoManager)
                 }
             }
 
@@ -29,8 +44,11 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .accessibilityIdentifier("Sidebar")
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button("New Folder", systemImage: "plus.circle", action: newFolder)
+            Button("New Folder", systemImage: "plus.circle") {
+                browser.newFolder(in: library, sort: sort, undoManager: undoManager)
+            }
                 .buttonStyle(.borderless)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
@@ -38,12 +56,18 @@ struct Sidebar: View {
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
-            isPresented: Binding(get: { folderToDelete != nil }, set: { if !$0 { folderToDelete = nil } }),
+            isPresented: $isConfirmingDelete,
             presenting: folderToDelete
         ) { folder in
-            Button("Delete Folder", role: .destructive) { deleteFolder(folder) }
+            Button("Delete Folder", role: .destructive) {
+                library.deleteFolder(folder.id, undoManager: undoManager)
+            }
         } message: { _ in
             Text("Its notes will be moved to Recently Deleted.")
+        }
+        .alert("Name Taken", isPresented: Binding { takenName != nil } set: { if !$0 { takenName = nil } }) {
+        } message: {
+            Text("A folder named “\(takenName ?? "")” already exists. Please choose a different name.")
         }
     }
 
@@ -51,17 +75,16 @@ struct Sidebar: View {
         Label(library.name(of: item), systemImage: systemImage)
             .badge(library.count(in: item))
             .tag(item)
-            .dropDestination(for: NoteReference.self) { notes, _ in
+            .dropDestination(for: NoteReference.self, isEnabled: item != .allNotes) { notes, _ in
                 drop(notes, on: item)
             }
     }
 
     private func folderRow(_ folder: Folder) -> some View {
         Group {
-            if renaming == folder.id {
+            if browser.renamingFolder == folder.id {
                 FolderNameField(folder: folder) { name in
-                    library.rename(folder.id, to: name, undoManager: undoManager)
-                    renaming = nil
+                    rename(folder, to: name)
                 }
             } else {
                 Label(folder.name, systemImage: "folder")
@@ -73,8 +96,11 @@ struct Sidebar: View {
             drop(notes, on: .folder(folder.id))
         }
         .contextMenu {
-            Button("Rename Folder") { renaming = folder.id }
-            Button("Delete Folder", role: .destructive) { folderToDelete = folder }
+            Button("Rename Folder") { browser.renamingFolder = folder.id }
+            Button("Delete Folder", role: .destructive) {
+                folderToDelete = folder
+                isConfirmingDelete = true
+            }
         }
     }
 
@@ -89,29 +115,30 @@ struct Sidebar: View {
         }
     }
 
-    private func newFolder() {
-        let folder = library.newFolder(undoManager: undoManager)
-        selection = .folder(folder.id)
-        renaming = folder.id
-    }
-
-    private func deleteFolder(_ folder: Folder) {
-        if selection == .folder(folder.id) { selection = .allNotes }
-        library.deleteFolder(folder.id, undoManager: undoManager)
+    /// A name another folder has is refused with an alert, as the Finder does, and the old name stays.
+    private func rename(_ folder: Folder, to name: String) {
+        browser.renamingFolder = nil
+        if library.isFolderNameTaken(name, except: folder.id) {
+            takenName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            library.rename(folder.id, to: name, undoManager: undoManager)
+        }
     }
 }
 
 /// The folder's name as an editable field, focused when it appears. Return or leaving the field commits and
-/// Escape cancels. The draft is seeded once from the folder's name.
+/// Escape cancels. The draft is seeded once from the folder's name. Return also takes the focus away, so the
+/// field commits only the first time.
 private struct FolderNameField: View {
     let folder: Folder
-    let commit: (String) -> Void
+    let onCommit: (String) -> Void
     @State private var name: String
+    @State private var isCommitted = false
     @FocusState private var isFocused: Bool
 
-    init(folder: Folder, commit: @escaping (String) -> Void) {
+    init(folder: Folder, onCommit: @escaping (String) -> Void) {
         self.folder = folder
-        self.commit = commit
+        self.onCommit = onCommit
         _name = State(initialValue: folder.name)
     }
 
@@ -126,5 +153,11 @@ private struct FolderNameField: View {
             Image(systemName: "folder")
         }
         .onAppear { isFocused = true }
+    }
+
+    private func commit(_ name: String) {
+        guard !isCommitted else { return }
+        isCommitted = true
+        onCommit(name)
     }
 }

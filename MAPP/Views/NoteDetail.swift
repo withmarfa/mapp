@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// The page: the selected note, or a word on why there is none.
 struct NoteDetail: View {
     @Environment(NoteLibrary.self) private var library
     let selection: Set<Note.ID>
 
     var body: some View {
-        if selection.count > 1 {
-            ContentUnavailableView("^[\(selection.count) note](inflect: true) selected", systemImage: "note.text")
-        } else if let id = selection.first, let note = library.note(id) {
+        let notes = selection.compactMap { library.note($0) }
+        if notes.count > 1 {
+            ContentUnavailableView("^[\(notes.count) note](inflect: true) selected", systemImage: "note.text")
+        } else if let note = notes.first {
             NotePage(note: note)
                 .id(note.id)
         } else {
@@ -33,7 +33,6 @@ struct NotePage: View {
         .padding(.horizontal, 24)
         .padding(.top, 8)
         .disabled(note.isDeleted)
-        .navigationTitle(note.title)
         .safeAreaInset(edge: .top, spacing: 0) {
             if note.isDeleted {
                 DeletedNoteBanner(id: note.id)

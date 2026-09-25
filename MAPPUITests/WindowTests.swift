@@ -47,9 +47,8 @@ final class WindowTests: XCTestCase {
 
     func testSelectingAFolderShowsOnlyItsNotes() {
         sidebarItem("Work").click()
-        XCTAssertTrue(window.staticTexts["Work"].waitForExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Weekly review").exists)
-        XCTAssertFalse(row(titled: "Kitchen quotes").exists)
     }
 
     func testSelectingANoteShowsIt() {
@@ -79,7 +78,7 @@ final class WindowTests: XCTestCase {
         let deletedBefore = count(of: "Recently Deleted")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
-        XCTAssertFalse(row(titled: "Bike service").exists)
+        XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
         XCTAssertEqual(count(of: "Recently Deleted"), deletedBefore + 1)
         app.typeKey("z", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
@@ -91,7 +90,7 @@ final class WindowTests: XCTestCase {
         row(titled: "Old packing list").click()
         XCTAssertFalse(editor.isEnabled)
         window.buttons["Recover"].click()
-        XCTAssertFalse(row(titled: "Old packing list").exists)
+        XCTAssertTrue(row(titled: "Old packing list").waitForNonExistence(timeout: 2))
         sidebarItem("Personal").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
@@ -110,6 +109,27 @@ final class WindowTests: XCTestCase {
         search.click()
         search.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
-        XCTAssertFalse(row(titled: "Kitchen quotes").exists)
+        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
+        XCTAssertTrue((editor.value as? String ?? "").hasPrefix("# Recipes to try"), "the page follows the results")
+    }
+
+    func testPinningFromTheContextMenuAddsToPinned() {
+        let before = count(of: "Pinned")
+        row(titled: "Garden ideas").rightClick()
+        window.menuItems["Pin"].click()
+        XCTAssertEqual(count(of: "Pinned"), before + 1)
+    }
+
+    func testMovingTheSelectedNoteAwaySelectsTheNextOne() {
+        sidebarItem("Work").click()
+        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
+        let first = editor.value as? String ?? ""
+        let title = String(first.prefix { $0 != "\n" }.dropFirst(2))
+        row(titled: title).rightClick()
+        window.menuItems["Move To"].click()
+        window.menuItems["Home"].click()
+        XCTAssertTrue(row(titled: title).waitForNonExistence(timeout: 2))
+        XCTAssertFalse((editor.value as? String ?? "").hasPrefix(first.prefix(20)), "the page still shows the moved note")
+        XCTAssertTrue(editor.exists)
     }
 }

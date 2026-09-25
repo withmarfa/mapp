@@ -9,5 +9,6 @@ struct MAPPApp: App {
             MainView()
                 .environment(library)
         }
+        .defaultSize(width: 1100, height: 720)
     }
 }
