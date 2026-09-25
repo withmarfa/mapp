@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A folder named “%@” already exists. Please choose a different name." : {
+
+    },
     "All Notes" : {
 
     },
@@ -43,7 +46,13 @@
     "Move To" : {
 
     },
+    "Name Taken" : {
+
+    },
     "New Folder" : {
+
+    },
+    "New Folder %lld" : {
 
     },
     "New Note" : {
