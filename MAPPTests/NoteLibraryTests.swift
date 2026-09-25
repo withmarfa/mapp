@@ -109,10 +109,31 @@ struct NoteLibraryTests {
         #expect(library.note(inbox.id)?.isDeleted == true)
     }
 
-    @Test func recoveringReturnsANoteToWhereItWas() {
+    @Test func recoveringReturnsANoteToWhereItWasAndUndoes() {
         let (library, _, _, _, deleted) = makeLibrary()
-        library.restore([deleted.id])
+        let manager = undoManager()
+        undoably(manager) { library.recover([deleted.id], undoManager: manager) }
         #expect(library.notes(in: .folder(work.id)).map(\.id).contains(deleted.id))
+        #expect(manager.undoActionName == "Recover")
+        manager.undo()
+        #expect(library.note(deleted.id) == deleted)
+        #expect(manager.redoActionName == "Recover")
+    }
+
+    @Test func undoingAMoveKeepsTextTypedSince() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let manager = undoManager()
+        undoably(manager) { library.move([inbox.id], to: work.id, undoManager: manager) }
+        library.updateBody(of: inbox.id, to: "# Inbox note\n\nTyped after the move")
+        manager.undo()
+        #expect(library.note(inbox.id)?.folderID == nil)
+        #expect(library.note(inbox.id)?.body == "# Inbox note\n\nTyped after the move")
+    }
+
+    @Test func deletingAgainKeepsTheFirstDeletedDate() {
+        let (library, _, _, _, deleted) = makeLibrary()
+        library.delete([deleted.id])
+        #expect(library.note(deleted.id)?.deleted == start)
     }
 
     @Test func deletingPermanentlyRemovesAndUndoes() {
@@ -166,6 +187,7 @@ struct NoteLibraryTests {
         undoably(manager) { second = library.newFolder(undoManager: manager) }
         #expect(first.name == "New Folder")
         #expect(second?.name == "New Folder 2")
+        #expect(manager.undoActionName == "New Folder")
         manager.undo()
         #expect(library.folders.map(\.name) == ["Work", "Home", "New Folder"])
     }
@@ -175,7 +197,9 @@ struct NoteLibraryTests {
         let manager = undoManager()
         undoably(manager) { library.rename(work.id, to: "  Office ", undoManager: manager) }
         #expect(library.folder(work.id)?.name == "Office")
+        #expect(manager.undoActionName == "Rename Folder")
         library.rename(work.id, to: "   ")
+        library.rename(work.id, to: "home")
         #expect(library.folder(work.id)?.name == "Office")
         manager.undo()
         #expect(library.folder(work.id)?.name == "Work")
@@ -186,7 +210,7 @@ struct NoteLibraryTests {
     @Test func deletingAFolderDeletesItsNotesAndUndoesAsOneStep() {
         let (library, _, filed, _, deleted) = makeLibrary()
         let manager = undoManager()
-        undoably(manager) { library.deleteFolder(work.id, undoManager: manager) }
+        library.deleteFolder(work.id, undoManager: manager)
         #expect(library.folder(work.id) == nil)
         #expect(library.note(filed.id)?.isDeleted == true)
         #expect(library.note(deleted.id)?.deleted == start)
@@ -205,15 +229,19 @@ struct NoteLibraryTests {
         let manager = undoManager()
         undoably(manager) { library.moveFolders(from: [1], to: 0, undoManager: manager) }
         #expect(library.folders == [home, work])
+        #expect(manager.undoActionName == "Move Folder")
         manager.undo()
         #expect(library.folders == [work, home])
     }
 
-    @Test func actionsOnMissingNotesChangeNothingAndNameNoUndo() {
-        let (library, inbox, _, _, _) = makeLibrary()
+    @Test func actionsThatChangeNothingRegisterNoUndo() {
+        let (library, inbox, filed, pinned, _) = makeLibrary()
         let manager = undoManager()
         let before = library.notes
         undoably(manager) { library.delete([UUID()], undoManager: manager) }
+        undoably(manager) { library.setPinned([pinned.id], true, undoManager: manager) }
+        undoably(manager) { library.recover([inbox.id], undoManager: manager) }
+        undoably(manager) { library.move([filed.id], to: work.id, undoManager: manager) }
         #expect(library.notes == before)
         #expect(manager.undoActionName == "")
         undoably(manager) { library.delete([inbox.id], undoManager: manager) }

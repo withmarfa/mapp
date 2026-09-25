@@ -29,9 +29,41 @@ struct NoteGroupTests {
     }
 
     @Test func olderNotesThisYearGroupByMonthAndEarlierYearsByYear() {
-        #expect(group(date(2026, 8, 25)) == .month(DateComponents(year: 2026, month: 8)))
-        #expect(group(date(2026, 1, 3)) == .month(DateComponents(year: 2026, month: 1)))
+        #expect(group(date(2026, 8, 25)) == .month(year: 2026, month: 8))
+        #expect(group(date(2026, 1, 3)) == .month(year: 2026, month: 1))
         #expect(group(date(2025, 12, 31)) == .year(2025))
+    }
+
+    @Test func monthAndYearSectionsAreTitledByName() {
+        #expect(NoteGroup.month(year: 2026, month: 8).title(calendar: calendar).contains("August"))
+        #expect(NoteGroup.year(2025).title(calendar: calendar) == "2025")
+    }
+
+    @Test func daysAreCountedByTheCalendarAcrossAClockChange() {
+        let afterClocksGoBack = calendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 0, minute: 30))!
+        let beforeClocksGoBack = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 23, minute: 30))!
+        #expect(NoteGroup.group(for: beforeClocksGoBack, now: afterClocksGoBack, calendar: calendar) == .previous7Days)
+        let lateYesterday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 25, hour: 23))!
+        #expect(NoteGroup.group(for: lateYesterday, now: afterClocksGoBack, calendar: calendar) == .yesterday)
+    }
+
+    @Test func sectionsSortTheirInputSoNoGroupRepeats() {
+        let today = Note(body: "Today", created: date(2026, 9, 25, hour: 9))
+        let yesterday = Note(body: "Yesterday", created: date(2026, 9, 24))
+        let alsoToday = Note(body: "Also today", created: date(2026, 9, 25, hour: 10))
+        let sections = NoteGroup.sections(
+            of: [today, yesterday, alsoToday], sort: .dateEdited, pinnedFirst: true, now: now, calendar: calendar
+        )
+        #expect(sections.map(\.group) == [.today, .yesterday])
+        #expect(sections[0].notes == [alsoToday, today])
+    }
+
+    @Test func sortingByDateCreatedGroupsByCreation() {
+        let note = Note(body: "Old", created: date(2026, 9, 1), modified: date(2026, 9, 25, hour: 9))
+        let byCreated = NoteGroup.sections(of: [note], sort: .dateCreated, pinnedFirst: true, now: now, calendar: calendar)
+        let byEdited = NoteGroup.sections(of: [note], sort: .dateEdited, pinnedFirst: true, now: now, calendar: calendar)
+        #expect(byCreated.map(\.group) == [.previous30Days])
+        #expect(byEdited.map(\.group) == [.today])
     }
 
     @Test func pinnedNotesLeadAndTheRestFollowInDateSections() {

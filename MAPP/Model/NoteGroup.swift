@@ -1,24 +1,25 @@
 import Foundation
 
 /// The sections of the note list, as Notes groups them.
-enum NoteGroup: Hashable {
+nonisolated enum NoteGroup: Hashable {
     case pinned
     case today
     case yesterday
     case previous7Days
     case previous30Days
-    case month(DateComponents)
+    case month(year: Int, month: Int)
     case year(Int)
 
-    var title: String {
+    func title(calendar: Calendar = .current) -> String {
         switch self {
         case .pinned: String(localized: "Pinned")
         case .today: String(localized: "Today")
         case .yesterday: String(localized: "Yesterday")
         case .previous7Days: String(localized: "Previous 7 Days")
         case .previous30Days: String(localized: "Previous 30 Days")
-        case .month(let components):
-            Calendar.current.date(from: components)?.formatted(.dateTime.month(.wide)) ?? ""
+        case .month(let year, let month):
+            calendar.date(from: DateComponents(year: year, month: month))?
+                .formatted(Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone).month(.wide)) ?? ""
         case .year(let year): String(year)
         }
     }
@@ -35,12 +36,12 @@ enum NoteGroup: Hashable {
         default:
             let year = calendar.component(.year, from: date)
             guard year == calendar.component(.year, from: now) else { return .year(year) }
-            return .month(DateComponents(year: year, month: calendar.component(.month, from: date)))
+            return .month(year: year, month: calendar.component(.month, from: date))
         }
     }
 
-    /// Splits notes already in display order into sections. Pinned notes lead unless `pinnedFirst` is off,
-    /// and date sections follow only when the list is sorted by a date.
+    /// Sorts the notes and splits them into sections. Pinned notes lead unless `pinnedFirst` is off, and date
+    /// sections follow only when the list is sorted by a date.
     static func sections(
         of notes: [Note],
         sort: NoteSort,
@@ -48,6 +49,7 @@ enum NoteGroup: Hashable {
         now: Date,
         calendar: Calendar = .current
     ) -> [NoteSection] {
+        let notes = sort.sorted(notes)
         var sections: [NoteSection] = []
         var rest = notes
         if pinnedFirst {
@@ -71,10 +73,10 @@ enum NoteGroup: Hashable {
     }
 }
 
-struct NoteSection: Identifiable, Hashable {
+nonisolated struct NoteSection: Identifiable, Hashable {
     /// No group means the notes are listed without a heading.
     var group: NoteGroup?
     var notes: [Note]
 
-    var id: String { group.map { "\($0)" } ?? "all" }
+    var id: NoteGroup? { group }
 }

@@ -10,9 +10,11 @@ extension NoteLibrary {
         let reference = now()
         let calendar = Calendar.current
 
+        /// Never later than now, so a note written "this morning" is not in the future before breakfast.
         func date(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
             let day = calendar.date(byAdding: .day, value: -daysAgo, to: reference) ?? reference
-            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
+            let date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
+            return min(date, reference)
         }
 
         func note(
@@ -21,13 +23,14 @@ extension NoteLibrary {
             daysAgo: Int,
             hour: Int,
             minute: Int = 0,
+            editedDaysAgo: Int? = nil,
             pinned: Bool = false,
             deleted: Bool = false
         ) -> Note {
-            let created = date(daysAgo: daysAgo, hour: hour, minute: minute)
-            return Note(
+            Note(
                 body: body,
-                created: created,
+                created: date(daysAgo: daysAgo, hour: hour, minute: minute),
+                modified: editedDaysAgo.map { date(daysAgo: $0, hour: hour + 1, minute: minute) },
                 folderID: folder?.id,
                 isPinned: pinned,
                 deleted: deleted ? date(daysAgo: 2, hour: 10) : nil
@@ -45,12 +48,12 @@ extension NoteLibrary {
             note(designReview, work, daysAgo: 4, hour: 11),
             note(recipes, home, daysAgo: 5, hour: 18, minute: 30),
             note(bikeService, personal, daysAgo: 6, hour: 8, minute: 45),
-            note(hiringLoop, work, daysAgo: 9, hour: 14),
+            note(hiringLoop, work, daysAgo: 9, hour: 14, editedDaysAgo: 4),
             note(usefulCommands, work, daysAgo: 12, hour: 10, minute: 15),
             note(boilerManual, home, daysAgo: 18, hour: 20),
-            note(designOfEverydayThings, reading, daysAgo: 24, hour: 22, minute: 10),
+            note(designOfEverydayThings, reading, daysAgo: 24, hour: 21, minute: 10, editedDaysAgo: 2),
             note(giftIdeas, personal, daysAgo: 40, hour: 13),
-            note(quarterlyPlanning, work, daysAgo: 55, hour: 9, minute: 30),
+            note(quarterlyPlanning, work, daysAgo: 55, hour: 9, minute: 30, editedDaysAgo: 1),
             note(runningPlan, personal, daysAgo: 80, hour: 7),
             note(patternLanguage, reading, daysAgo: 200, hour: 21),
             note(movingChecklist, home, daysAgo: 420, hour: 10),

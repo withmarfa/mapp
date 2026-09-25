@@ -1,22 +1,36 @@
+import Foundation
 import Testing
 @testable import MAPP
 
 struct NoteTextTests {
+    func title(_ body: String) -> String { NoteText.titleAndPreview(of: body).title }
+    func preview(_ body: String) -> String { NoteText.titleAndPreview(of: body).preview }
+
     @Test func titleIsTheFirstHeadingWithoutItsMarker() {
-        #expect(NoteText.title(of: "# Kitchen quotes\n\nThree quotes.") == "Kitchen quotes")
+        #expect(title("# Kitchen quotes\n\nThree quotes.") == "Kitchen quotes")
     }
 
     @Test func titleSkipsBlankLinesAndStructuralLines() {
-        #expect(NoteText.title(of: "\n\n---\n## Plan **for** the week") == "Plan for the week")
+        #expect(title("\n\n---\n## Plan **for** the week") == "Plan for the week")
     }
 
     @Test func titleOfAnEmptyNoteIsNewNote() {
-        #expect(NoteText.title(of: "") == "New Note")
-        #expect(NoteText.title(of: "  \n\n") == "New Note")
+        #expect(title("") == "New Note")
+        #expect(title("  \n\n") == "New Note")
+        #expect(title("# ") == "New Note")
+        #expect(title("- [ ]") == "New Note")
     }
 
     @Test func titleOfAPlainFirstLineIsThatLine() {
-        #expect(NoteText.title(of: "Podcast idea: short episodes") == "Podcast idea: short episodes")
+        #expect(title("Podcast idea: short episodes") == "Podcast idea: short episodes")
+    }
+
+    @Test func noteKeepsItsTitleAndPreviewInStepWithItsBody() {
+        var note = Note(body: "# First", created: .now)
+        #expect(note.title == "First")
+        note.body = "# Second\nMore"
+        #expect(note.title == "Second")
+        #expect(note.preview == "More")
     }
 
     @Test func previewJoinsTheLinesAfterTheTitleAsPlainText() {
@@ -28,7 +42,7 @@ struct NoteTextTests {
         - [ ] Adapter
         - [x] Walking shoes
         """
-        #expect(NoteText.preview(of: body) == "Three days in October. Adapter Walking shoes")
+        #expect(preview(body) == "Three days in October. Adapter Walking shoes")
     }
 
     @Test func previewReadsTablesWithoutPipesOrDelimiterRows() {
@@ -38,27 +52,41 @@ struct NoteTextTests {
         | --- | ---: |
         | Oak & Iron | £11,850 |
         """
-        #expect(NoteText.preview(of: body) == "Supplier  Quote Oak & Iron  £11,850")
+        #expect(preview(body) == "Supplier  Quote Oak & Iron  £11,850")
+    }
+
+    @Test func previewKeepsCodeInsideFencesAsWritten() {
+        let body = """
+        # Commands
+        ```sh
+        ls *.swift
+        ```
+        """
+        #expect(preview(body) == "ls *.swift")
     }
 
     @Test func previewOfATitleOnlyNoteSaysSo() {
-        #expect(NoteText.preview(of: "# Just a title") == "No additional text")
+        #expect(preview("# Just a title") == "No additional text")
     }
 
     @Test func previewIsCappedAtTheLimit() {
         let body = "Title\n" + String(repeating: "word ", count: 200)
-        #expect(NoteText.preview(of: body, limit: 50).count == 50)
+        #expect(preview(body).count == NoteText.previewLimit)
     }
 
     @Test(arguments: [
         ("[the revised edition](https://example.com)", "the revised edition"),
+        ("[Swift](https://en.wikipedia.org/wiki/Swift_(programming_language)) is nice", "Swift is nice"),
         ("![A diagram](image.png) below", "A diagram below"),
         ("Use `git restore` here", "Use git restore here"),
+        ("Use `**` for bold", "Use ** for bold"),
         ("> - quoted item", "quoted item"),
         ("1. First step", "First step"),
+        ("## 3. Results", "3. Results"),
         ("keep snake_case intact", "keep snake_case intact"),
-        ("~~struck~~ and __strong__", "struck and strong"),
-        ("```sh", ""),
+        ("ls *.swift and *.md", "ls *.swift and *.md"),
+        ("~~struck~~ and **strong** and _light_", "struck and strong and light"),
+        ("===", ""),
         ("| --- | :---: |", ""),
     ])
     func plainTextOfOneLine(line: String, expected: String) {

@@ -29,10 +29,11 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 ## Layout
 
-- `MAPP.xcodeproj` is a native Xcode project whose `MAPP/` and `MAPPTests/` groups follow the folders on disk; add files by creating them, not by editing the project file. The bundle identifier and display name live in the target's build settings.
-- `MAPP/` holds the app; `MAPP/AppIcon.icon` is the Icon Composer app icon. `MAPPTests/` holds the Swift Testing target, hosted in the app. `Design/` holds artwork that is not built into the app.
+- `MAPP.xcodeproj` is a native Xcode project whose `MAPP/`, `MAPPTests/` and `MAPPUITests/` groups follow the folders on disk; add files by creating them, not by editing the project file. The bundle identifier and display name live in the target's build settings. `MAPP/Info.plist` holds only what build settings cannot express (the note drag type) and is excluded from the app's resources.
+- `MAPP/Model/` holds the notes model, free of SwiftUI; `MAPP/Views/` the windows and panes; `MAPP/AppIcon.icon` is the Icon Composer app icon. `MAPPTests/` holds the Swift Testing unit tests, hosted in the app; `MAPPUITests/` the XCTest UI tests that drive the running app through its accessibility tree. `Design/` holds artwork that is not built into the app.
+- `MAPP/Localizable.xcstrings` is kept in sync by building in Xcode; `xcodebuild` alone does not update it.
 
 ## Commands
 
-- `xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test` builds and runs the tests.
+- `xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test` builds and runs every test. The UI tests take control of the keyboard and mouse; add `-only-testing:MAPPTests` for the unit tests alone.
 - The built app is `build/Build/Products/Debug/MAPP.app`.

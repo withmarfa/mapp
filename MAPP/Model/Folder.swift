@@ -1,6 +1,6 @@
 import Foundation
 
-struct Folder: Identifiable, Hashable {
+nonisolated struct Folder: Identifiable, Hashable {
     let id: UUID
     var name: String
 

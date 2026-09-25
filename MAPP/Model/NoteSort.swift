@@ -1,6 +1,6 @@
 import Foundation
 
-enum NoteSort: String, CaseIterable, Codable {
+nonisolated enum NoteSort: String, CaseIterable, Codable {
     case dateEdited
     case dateCreated
     case title

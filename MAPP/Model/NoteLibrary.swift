@@ -7,7 +7,7 @@ import Observation
 final class NoteLibrary {
     private(set) var notes: [Note]
     private(set) var folders: [Folder]
-    @ObservationIgnored let now: () -> Date
+    let now: () -> Date
 
     init(notes: [Note] = [], folders: [Folder] = [], now: @escaping () -> Date = Date.init) {
         self.notes = notes
@@ -66,14 +66,15 @@ final class NoteLibrary {
     func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
         var note = Note(body: "", created: now())
         switch item {
-        case .folder(let id): note.folderID = id
-        case .pinned: note.isPinned = true
+        case .folder(let id): note.placement.folderID = id
+        case .pinned: note.placement.isPinned = true
         case .inbox, .allNotes, .recentlyDeleted: break
         }
         insert([note], undoManager: undoManager, name: String(localized: "New Note"))
         return note
     }
 
+    /// Typing is undone by the text view that holds it, so this registers nothing.
     func updateBody(of id: Note.ID, to body: String) {
         guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body else { return }
         notes[index].body = body
@@ -82,11 +83,11 @@ final class NoteLibrary {
 
     func delete(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
         let date = now()
-        edit(ids, undoManager: undoManager, name: deleteName(ids.count)) { $0.deleted = date }
+        place(ids, undoManager: undoManager, name: deleteName(ids.count)) { $0.deleted = $0.deleted ?? date }
     }
 
-    func restore(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
-        edit(ids, undoManager: undoManager, name: String(localized: "Recover")) { $0.deleted = nil }
+    func recover(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
+        place(ids, undoManager: undoManager, name: String(localized: "Recover")) { $0.deleted = nil }
     }
 
     func deletePermanently(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
@@ -95,7 +96,7 @@ final class NoteLibrary {
 
     /// Moving a note into a folder, or back to the Inbox with `nil`, also recovers it if it was deleted.
     func move(_ ids: Set<Note.ID>, to folderID: Folder.ID?, undoManager: UndoManager? = nil) {
-        edit(ids, undoManager: undoManager, name: String(localized: "Move")) {
+        place(ids, undoManager: undoManager, name: String(localized: "Move")) {
             $0.folderID = folderID
             $0.deleted = nil
         }
@@ -103,7 +104,7 @@ final class NoteLibrary {
 
     func setPinned(_ ids: Set<Note.ID>, _ pinned: Bool, undoManager: UndoManager? = nil) {
         let name = pinned ? String(localized: "Pin") : String(localized: "Unpin")
-        edit(ids, undoManager: undoManager, name: name) { $0.isPinned = pinned }
+        place(ids, undoManager: undoManager, name: name) { $0.isPinned = pinned }
     }
 
     // MARK: Folders
@@ -111,28 +112,28 @@ final class NoteLibrary {
     @discardableResult
     func newFolder(undoManager: UndoManager? = nil) -> Folder {
         let folder = Folder(name: uniqueFolderName(String(localized: "New Folder")))
-        var order = folders
-        order.append(folder)
-        setFolders(order, undoManager: undoManager, name: String(localized: "New Folder"))
+        setFolders(folders + [folder], undoManager: undoManager, name: String(localized: "New Folder"))
         return folder
     }
 
+    /// Names are trimmed, and a name another folder already has is refused.
     func rename(_ id: Folder.ID, to name: String, undoManager: UndoManager? = nil) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let index = folders.firstIndex(where: { $0.id == id }),
-              !name.isEmpty, folders[index].name != name else { return }
+        guard let index = folders.firstIndex(where: { $0.id == id }), !name.isEmpty,
+              !folders.contains(where: { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame })
+        else { return }
         var order = folders
         order[index].name = name
         setFolders(order, undoManager: undoManager, name: String(localized: "Rename Folder"))
     }
 
-    /// Deleting a folder moves its notes to Recently Deleted, as Notes does.
+    /// Deleting a folder moves its notes to Recently Deleted, as Notes does. Undo brings both back in one step.
     func deleteFolder(_ id: Folder.ID, undoManager: UndoManager? = nil) {
         guard folder(id) != nil else { return }
         let name = String(localized: "Delete Folder")
-        undoManager?.beginUndoGrouping()
         let date = now()
-        edit(Set(notes.filter { $0.folderID == id }.map(\.id)), undoManager: undoManager, name: name) {
+        undoManager?.beginUndoGrouping()
+        place(Set(notes.filter { $0.folderID == id }.map(\.id)), undoManager: undoManager, name: name) {
             $0.folderID = nil
             $0.deleted = $0.deleted ?? date
         }
@@ -149,46 +150,56 @@ final class NoteLibrary {
     // MARK: Undoable primitives
     //
     // Each primitive registers its own inverse, so undoing registers the redo without extra bookkeeping.
+    // A primitive that would change nothing registers nothing.
 
-    private func edit(_ ids: Set<Note.ID>, undoManager: UndoManager?, name: String, _ change: (inout Note) -> Void) {
-        let edited = notes.filter { ids.contains($0.id) }.map { note in
-            var note = note
-            change(&note)
-            return note
+    private func place(_ ids: Set<Note.ID>, undoManager: UndoManager?, name: String, _ change: (inout Placement) -> Void) {
+        var placements: [Note.ID: Placement] = [:]
+        for note in notes where ids.contains(note.id) {
+            var placement = note.placement
+            change(&placement)
+            if placement != note.placement { placements[note.id] = placement }
         }
-        replace(with: edited, undoManager: undoManager, name: name)
+        apply(placements, undoManager: undoManager, name: name)
     }
 
-    private func replace(with replacements: [Note], undoManager: UndoManager?, name: String) {
-        guard !replacements.isEmpty else { return }
-        var previous: [Note] = []
-        for replacement in replacements {
-            guard let index = notes.firstIndex(where: { $0.id == replacement.id }) else { continue }
-            previous.append(notes[index])
-            notes[index] = replacement
+    private func apply(_ placements: [Note.ID: Placement], undoManager: UndoManager?, name: String) {
+        guard !placements.isEmpty else { return }
+        var previous: [Note.ID: Placement] = [:]
+        for index in notes.indices {
+            guard let placement = placements[notes[index].id] else { continue }
+            previous[notes[index].id] = notes[index].placement
+            notes[index].placement = placement
         }
-        registerUndo(undoManager, name: name) { $0.replace(with: previous, undoManager: undoManager, name: name) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.apply(previous, undoManager: undoManager, name: name)
+        }
     }
 
     private func insert(_ inserted: [Note], undoManager: UndoManager?, name: String) {
         guard !inserted.isEmpty else { return }
         notes.append(contentsOf: inserted)
         let ids = Set(inserted.map(\.id))
-        registerUndo(undoManager, name: name) { $0.remove(ids, undoManager: undoManager, name: name) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.remove(ids, undoManager: undoManager, name: name)
+        }
     }
 
     private func remove(_ ids: Set<Note.ID>, undoManager: UndoManager?, name: String) {
         let removed = notes.filter { ids.contains($0.id) }
         guard !removed.isEmpty else { return }
         notes.removeAll { ids.contains($0.id) }
-        registerUndo(undoManager, name: name) { $0.insert(removed, undoManager: undoManager, name: name) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.insert(removed, undoManager: undoManager, name: name)
+        }
     }
 
     private func setFolders(_ order: [Folder], undoManager: UndoManager?, name: String) {
         guard order != folders else { return }
         let previous = folders
         folders = order
-        registerUndo(undoManager, name: name) { $0.setFolders(previous, undoManager: undoManager, name: name) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.setFolders(previous, undoManager: undoManager, name: name)
+        }
     }
 
     private func registerUndo(_ undoManager: UndoManager?, name: String, _ handler: @escaping (NoteLibrary) -> Void) {

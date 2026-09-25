@@ -1,7 +1,108 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "All Notes" : {
 
+    },
+    "Delete" : {
+
+    },
+    "Delete Folder" : {
+
+    },
+    "Delete Immediately" : {
+
+    },
+    "Delete Note" : {
+
+    },
+    "Delete Notes" : {
+
+    },
+    "Delete the folder “%@”?" : {
+
+    },
+    "Folder Name" : {
+
+    },
+    "Folders" : {
+
+    },
+    "Inbox" : {
+
+    },
+    "Its notes will be moved to Recently Deleted." : {
+
+    },
+    "Move" : {
+
+    },
+    "Move Folder" : {
+
+    },
+    "Move To" : {
+
+    },
+    "New Folder" : {
+
+    },
+    "New Note" : {
+
+    },
+    "No Note Selected" : {
+
+    },
+    "No Notes" : {
+
+    },
+    "No additional text" : {
+
+    },
+    "Pin" : {
+
+    },
+    "Pinned" : {
+
+    },
+    "Previous 30 Days" : {
+
+    },
+    "Previous 7 Days" : {
+
+    },
+    "Recently Deleted" : {
+
+    },
+    "Recently deleted notes can’t be edited." : {
+
+    },
+    "Recover" : {
+
+    },
+    "Rename Folder" : {
+
+    },
+    "Search" : {
+
+    },
+    "Today" : {
+
+    },
+    "Unpin" : {
+
+    },
+    "Yesterday" : {
+
+    },
+    "^[%lld note](inflect: true)" : {
+
+    },
+    "^[%lld note](inflect: true) selected" : {
+
+    },
+    "^[%lld result](inflect: true)" : {
+
+    }
   },
   "version" : "1.1"
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-enum SidebarItem: Hashable, Codable {
+nonisolated enum SidebarItem: Hashable, Codable {
     case inbox
     case allNotes
     case pinned

@@ -14,22 +14,48 @@
 			remoteGlobalIDString = 3303FCF83066ED46005D07A2;
 			remoteInfo = MAPP;
 		};
+		3303FE373066ED47005D07A2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3303FCF13066ED46005D07A2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3303FCF83066ED46005D07A2;
+			remoteInfo = MAPP;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		3303FCF93066ED46005D07A2 /* MAPP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MAPP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3303FE003066ED47005D07A2 /* MAPPTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MAPPTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3303FE303066ED47005D07A2 /* MAPPUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MAPPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3303FE203066ED47005D07A2 /* Exceptions for "MAPP" folder in "MAPP" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3303FCF83066ED46005D07A2 /* MAPP */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3303FCFB3066ED46005D07A2 /* MAPP */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3303FE203066ED47005D07A2 /* Exceptions for "MAPP" folder in "MAPP" target */,
+			);
 			path = MAPP;
 			sourceTree = "<group>";
 		};
 		3303FE013066ED47005D07A2 /* MAPPTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = MAPPTests;
+			sourceTree = "<group>";
+		};
+		3303FE313066ED47005D07A2 /* MAPPUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MAPPUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -45,6 +71,11 @@
 			files = (
 			);
 		};
+		3303FE343066ED47005D07A2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -53,6 +84,7 @@
 			children = (
 				3303FCFB3066ED46005D07A2 /* MAPP */,
 				3303FE013066ED47005D07A2 /* MAPPTests */,
+				3303FE313066ED47005D07A2 /* MAPPUITests */,
 				3303FCFA3066ED46005D07A2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,6 +94,7 @@
 			children = (
 				3303FCF93066ED46005D07A2 /* MAPP.app */,
 				3303FE003066ED47005D07A2 /* MAPPTests.xctest */,
+				3303FE303066ED47005D07A2 /* MAPPUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +141,27 @@
 			productReference = 3303FE003066ED47005D07A2 /* MAPPTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		3303FE323066ED47005D07A2 /* MAPPUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3303FE383066ED47005D07A2 /* Build configuration list for PBXNativeTarget "MAPPUITests" */;
+			buildPhases = (
+				3303FE333066ED47005D07A2 /* Sources */,
+				3303FE343066ED47005D07A2 /* Frameworks */,
+				3303FE353066ED47005D07A2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3303FE363066ED47005D07A2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3303FE313066ED47005D07A2 /* MAPPUITests */,
+			);
+			name = MAPPUITests;
+			productName = MAPPUITests;
+			productReference = 3303FE303066ED47005D07A2 /* MAPPUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -122,6 +176,10 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					3303FE023066ED47005D07A2 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 3303FCF83066ED46005D07A2;
+					};
+					3303FE323066ED47005D07A2 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 3303FCF83066ED46005D07A2;
 					};
@@ -143,6 +201,7 @@
 			targets = (
 				3303FCF83066ED46005D07A2 /* MAPP */,
 				3303FE023066ED47005D07A2 /* MAPPTests */,
+				3303FE323066ED47005D07A2 /* MAPPUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -154,6 +213,11 @@
 			);
 		};
 		3303FE053066ED47005D07A2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		3303FE353066ED47005D07A2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -171,6 +235,11 @@
 			files = (
 			);
 		};
+		3303FE333066ED47005D07A2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -178,6 +247,11 @@
 			isa = PBXTargetDependency;
 			target = 3303FCF83066ED46005D07A2 /* MAPP */;
 			targetProxy = 3303FE073066ED47005D07A2 /* PBXContainerItemProxy */;
+		};
+		3303FE363066ED47005D07A2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3303FCF83066ED46005D07A2 /* MAPP */;
+			targetProxy = 3303FE373066ED47005D07A2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -312,6 +386,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MAPP/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MAPP;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -342,6 +417,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MAPP/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MAPP;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -396,6 +472,38 @@
 			};
 			name = Release;
 		};
+		3303FE393066ED47005D07A2 /* Debug configuration for PBXNativeTarget "MAPPUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.withmarfa.mapp.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = MAPP;
+			};
+			name = Debug;
+		};
+		3303FE3A3066ED47005D07A2 /* Release configuration for PBXNativeTarget "MAPPUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.withmarfa.mapp.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = MAPP;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -420,6 +528,14 @@
 			buildConfigurations = (
 				3303FE093066ED47005D07A2 /* Debug configuration for PBXNativeTarget "MAPPTests" */,
 				3303FE0A3066ED47005D07A2 /* Release configuration for PBXNativeTarget "MAPPTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		3303FE383066ED47005D07A2 /* Build configuration list for PBXNativeTarget "MAPPUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3303FE393066ED47005D07A2 /* Debug configuration for PBXNativeTarget "MAPPUITests" */,
+				3303FE3A3066ED47005D07A2 /* Release configuration for PBXNativeTarget "MAPPUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

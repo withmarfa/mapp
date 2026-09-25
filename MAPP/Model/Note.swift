@@ -1,14 +1,16 @@
 import Foundation
 
-struct Note: Identifiable, Hashable {
+nonisolated struct Note: Identifiable, Hashable {
     let id: UUID
-    var body: String
+    var body: String {
+        didSet { (title, preview) = NoteText.titleAndPreview(of: body) }
+    }
+    /// Read out of the body whenever it changes, so lists and sorting never parse markdown.
+    private(set) var title: String
+    private(set) var preview: String
     var created: Date
     var modified: Date
-    /// A note with no folder is in the Inbox.
-    var folderID: Folder.ID?
-    var isPinned: Bool
-    var deleted: Date?
+    var placement: Placement
 
     init(
         id: UUID = UUID(),
@@ -21,14 +23,23 @@ struct Note: Identifiable, Hashable {
     ) {
         self.id = id
         self.body = body
+        (title, preview) = NoteText.titleAndPreview(of: body)
         self.created = created
         self.modified = modified ?? created
-        self.folderID = folderID
-        self.isPinned = isPinned
-        self.deleted = deleted
+        placement = Placement(folderID: folderID, isPinned: isPinned, deleted: deleted)
     }
 
+    /// A note with no folder is in the Inbox.
+    var folderID: Folder.ID? { placement.folderID }
+    var isPinned: Bool { placement.isPinned }
+    var deleted: Date? { placement.deleted }
     var isDeleted: Bool { deleted != nil }
-    var title: String { NoteText.title(of: body) }
-    var preview: String { NoteText.preview(of: body) }
+}
+
+/// Where a note sits, apart from its text. Moving, pinning and deleting change only this, so undoing them
+/// never touches what was typed since.
+nonisolated struct Placement: Hashable {
+    var folderID: Folder.ID?
+    var isPinned: Bool
+    var deleted: Date?
 }
