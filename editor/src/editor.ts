@@ -75,6 +75,7 @@ import { labels } from './labels'
 import { dialect, serialize, stringifyOptions } from './dialect'
 import { highlightPlugin } from './highlight'
 import { pastePlugin } from './paste'
+import { preserve, readSource, withEnvelope, type Source } from './preserve'
 import { selectionPlugin } from './selection'
 import { tableInterface } from './tables'
 import { taskListPlugin, toggleTaskList } from './tasks'
@@ -342,8 +343,12 @@ function joinLists(tr: Transaction, start: number, index: number): void {
 
 export class NoteEditor {
   private editor!: Editor
+  /** The markdown last reported to the app. */
   private lastMarkdown = ''
+  /** The canonical form of the note as loaded, which tells an edit from none. */
   private baseline = ''
+  /** The note as loaded, block by block, whose text an edit keeps wherever it did not reach. */
+  private source: Source = readSource('')
   private generation = 0
   private keys: (view: EditorView, event: KeyboardEvent) => boolean = () => false
   /** A deleted note is read, not changed: no edit reaches its document, whether typed, formatted, clicked or
@@ -439,9 +444,13 @@ export class NoteEditor {
     return instance
   }
 
-  /** The note as it would be saved. */
+  /** The note as it would be saved: the text as loaded while the edits come to nothing, and otherwise that
+   *  text with only the edited blocks written anew, so a note written elsewhere keeps its own formatting. */
   private saved(doc: ProseNode = this.editor.ctx.get(editorViewCtx).state.doc): string {
-    return serialize(this.editor.ctx, doc)
+    const ctx = this.editor.ctx
+    const canonical = serialize(ctx, doc)
+    if (canonical === this.baseline) return this.source.markdown
+    return withEnvelope(this.source, preserve(ctx, this.source, doc, canonical))
   }
 
   /** Tells the app of an edit it has not heard about. Edits are reported after a pause in typing, and loading
@@ -456,9 +465,10 @@ export class NoteEditor {
   private replace(markdown: string, generation: number): void {
     this.report()
     this.generation = generation
-    this.editor.action(replaceAll(markdown, true))
+    this.source = readSource(markdown)
+    this.editor.action(replaceAll(this.source.body, true))
     this.baseline = serialize(this.editor.ctx)
-    this.lastMarkdown = this.baseline
+    this.lastMarkdown = markdown
   }
 
   load(markdown: string, generation: number): void {
@@ -491,7 +501,7 @@ export class NoteEditor {
   /** The note as it would be saved, or null while it is still what was loaded. */
   markdown(): string | null {
     const markdown = this.saved()
-    return markdown === this.baseline ? null : markdown
+    return markdown === this.source.markdown ? null : markdown
   }
 
   /** An edit not yet reported, handed over at once, as when the window closes; null when there is none. */

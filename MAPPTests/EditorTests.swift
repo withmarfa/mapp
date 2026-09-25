@@ -107,4 +107,13 @@ struct EditorTests {
         try await page.wait { !page.changes.isEmpty }
         #expect(page.changes == ["# Draft\n"])
     }
+
+    @Test func anEditRewritesOnlyTheBlockItTouched() async throws {
+        let page = try await Harness()
+        let written = "Title\n=====\n\n* star bullet\n* another\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n\n\n\nMilk\n"
+        try await page.load(written)
+        page.editor.format(.checklist)
+        try await page.wait { !page.changes.isEmpty }
+        #expect(page.changes.last == written.replacingOccurrences(of: "Milk", with: "- [ ] Milk"))
+    }
 }
