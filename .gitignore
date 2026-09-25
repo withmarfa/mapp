@@ -3,3 +3,5 @@ xcuserdata/
 build/
 DerivedData/
 *.xcresult
+editor/node_modules/
+editor/dist/

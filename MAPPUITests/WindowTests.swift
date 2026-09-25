@@ -7,7 +7,16 @@ final class WindowTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var editor: XCUIElement { window.textViews["NoteEditor"] }
+    private var page: XCUIElement { window.webViews.firstMatch }
+    /// The note's text as the page shows it: formatted, so without markdown's marks.
+    private var editor: XCUIElement { page.textViews.firstMatch }
+    private var text: String { editor.value as? String ?? "" }
+
+    private func waitForText(_ predicate: String, _ argument: String) -> Bool {
+        let format = predicate.hasPrefix("NOT ") ? "NOT (value \(predicate.dropFirst(4)) %@)" : "value \(predicate) %@"
+        let expectation = expectation(for: NSPredicate(format: format, argument), evaluatedWith: editor)
+        return XCTWaiter.wait(for: [expectation], timeout: 3) == .completed
+    }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -41,8 +50,8 @@ final class WindowTests: XCTestCase {
     }
 
     func testTheFirstNoteIsSelectedAndShownInThePage() {
-        XCTAssertTrue(editor.exists)
-        XCTAssertTrue((editor.value as? String ?? "").hasPrefix("# Kitchen quotes"))
+        XCTAssertTrue(page.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
     }
 
     func testSelectingAFolderShowsOnlyItsNotes() {
@@ -53,11 +62,12 @@ final class WindowTests: XCTestCase {
 
     func testSelectingANoteShowsIt() {
         row(titled: "Trip to Lisbon").click()
-        XCTAssertTrue((editor.value as? String ?? "").hasPrefix("# Trip to Lisbon"))
+        XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
     func testEditingANoteRetitlesItInTheList() {
         row(titled: "Garden ideas").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
         editor.click()
         editor.typeKey(.upArrow, modifierFlags: .command)
         editor.typeKey(.rightArrow, modifierFlags: .command)
@@ -70,7 +80,9 @@ final class WindowTests: XCTestCase {
         sidebarItem("Inbox").click()
         window.toolbars.buttons["New Note"].click()
         XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
-        XCTAssertEqual(editor.value as? String, "")
+        // An empty page holds nothing but the line the caret sits on.
+        let empty = expectation(for: NSPredicate(format: "value == nil OR value MATCHES %@", "\\s*"), evaluatedWith: editor)
+        wait(for: [empty], timeout: 3)
         XCTAssertEqual(count(of: "Inbox"), before + 1)
     }
 
@@ -88,7 +100,12 @@ final class WindowTests: XCTestCase {
     func testRecentlyDeletedNotesCanBeRecoveredButNotEdited() {
         sidebarItem("Recently Deleted").click()
         row(titled: "Old packing list").click()
-        XCTAssertFalse(editor.isEnabled)
+        // A read-only page is text to read, not a text view.
+        XCTAssertTrue(page.staticTexts["Old packing list"].waitForExistence(timeout: 3))
+        page.staticTexts["Old packing list"].click()
+        app.typeText("zzz")
+        let typed = page.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "zzz"))
+        XCTAssertEqual(typed.count, 0, "a deleted note takes no typing")
         window.buttons["Recover"].click()
         XCTAssertTrue(row(titled: "Old packing list").waitForNonExistence(timeout: 2))
         sidebarItem("Personal").click()
@@ -110,7 +127,7 @@ final class WindowTests: XCTestCase {
         search.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertTrue((editor.value as? String ?? "").hasPrefix("# Recipes to try"), "the page follows the results")
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"), "the page follows the results")
     }
 
     func testPinningFromTheContextMenuAddsToPinned() {
@@ -123,28 +140,25 @@ final class WindowTests: XCTestCase {
     func testMovingTheSelectedNoteAwaySelectsTheNextOne() {
         sidebarItem("Work").click()
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        let first = editor.value as? String ?? ""
-        let title = String(first.prefix { $0 != "\n" }.dropFirst(2))
-        row(titled: title).rightClick()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Weekly review"))
+        row(titled: "Weekly review").rightClick()
         window.menuItems["Move To"].click()
         window.menuItems["Home"].click()
-        XCTAssertTrue(row(titled: title).waitForNonExistence(timeout: 2))
-        XCTAssertFalse((editor.value as? String ?? "").hasPrefix(first.prefix(20)), "the page still shows the moved note")
-        XCTAssertTrue(editor.exists)
+        XCTAssertTrue(row(titled: "Weekly review").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(waitForText("NOT BEGINSWITH", "Weekly review"), "the page still shows the moved note")
     }
 
     // MARK: Keyboard, menus and windows
 
     func testReturnEntersThePageAndEscapeGoesBackToTheList() {
         row(titled: "Garden ideas").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
         app.typeKey(.return, modifierFlags: [])
-        app.typeText("Draft ")
-        XCTAssertTrue((editor.value as? String ?? "").contains("Draft "), "typing after Return goes into the page")
+        app.typeText("Draft")
+        XCTAssertTrue(waitForText("CONTAINS", "Draft"), "typing after Return goes into the page")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.downArrow, modifierFlags: [])
-        let predicate = NSPredicate(format: "NOT (value CONTAINS %@)", "Draft ")
-        let moved = expectation(for: predicate, evaluatedWith: editor)
-        wait(for: [moved], timeout: 2)
+        XCTAssertTrue(waitForText("NOT CONTAINS", "Draft"), "Escape handed the arrows back to the list")
     }
 
     func testCommandNMakesANoteReadyForTyping() {
@@ -198,10 +212,39 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
     }
 
+    func testUndoInTheEditMenuUndoesTypingInThePage() {
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        app.typeText("Groceries")
+        XCTAssertTrue(waitForText("==", "Groceries"))
+        app.menuBars.menuBarItems["Edit"].click()
+        app.menuBars.menuItems["Undo"].click()
+        XCTAssertTrue(waitForText("!=", "Groceries"))
+    }
+
+    func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
+        let before = count(of: "All Notes")
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForNonExistence(timeout: 2))
+        XCTAssertEqual(count(of: "All Notes"), before)
+    }
+
+    func testATableIsInsertedFromTheFormatMenu() {
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        app.typeText("Quotes")
+        app.typeKey("t", modifierFlags: [.command, .option])
+        let table = page.tables.firstMatch
+        XCTAssertTrue(table.waitForExistence(timeout: 3))
+    }
+
     private func sortBy(_ order: String) {
         app.menuBars.menuBarItems["View"].click()
-        app.menuBars.menuItems["Sort By"].hover()
-        app.menuBars.menuItems[order].click()
+        let sortBy = app.menuBars.menuItems["Sort By"]
+        sortBy.hover()
+        sortBy.menuItems[order].click()
     }
 
     func testTheMainWindowPassesTheAccessibilityAudit() throws {

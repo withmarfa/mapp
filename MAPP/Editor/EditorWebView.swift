@@ -1,0 +1,138 @@
+import AppKit
+import WebKit
+
+/// The web view behaving as a Mac text view: Undo and Redo in the Edit menu drive the page's own history, the
+/// context menu offers only what applies to a note, and the page scrolls under the toolbar.
+final class EditorWebView: WKWebView {
+    weak var controller: EditorController?
+
+    /// How far the window's toolbar and anything else above the note overlap the page.
+    var topInset: CGFloat = 0 {
+        didSet { if topInset != oldValue { needsLayout = true } }
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { controller?.isFocused = true }
+        return became
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { controller?.isFocused = false }
+        return resigned
+    }
+
+    override func layout() {
+        super.layout()
+        let insets = NSEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
+        if obscuredContentInsets.top != insets.top { obscuredContentInsets = insets }
+    }
+
+    // MARK: Undo
+
+    /// WebKit records its own steps for what is typed on the undo manager it is given. The page keeps its own
+    /// history instead, so WebKit gets one of its own, and the window's stays for the app's actions.
+    private let pageUndoManager = UndoManager()
+
+    override var undoManager: UndoManager? { pageUndoManager }
+
+    /// The window's undo manager, which holds the app's actions such as New Note and Delete.
+    private var windowUndoManager: UndoManager? { window?.undoManager }
+
+    // The page's history comes first, as a text view's does; once it is spent, Undo reaches the window's.
+    @objc func undo(_ sender: Any?) {
+        if controller?.caret.canUndo == true {
+            controller?.undo()
+        } else {
+            windowUndoManager?.undo()
+        }
+    }
+
+    @objc func redo(_ sender: Any?) {
+        if controller?.caret.canRedo == true {
+            controller?.redo()
+        } else {
+            windowUndoManager?.redo()
+        }
+    }
+
+    // WebKit answers Command-Z itself, from its own undo manager, before the Edit menu sees the key, so the key
+    // comes here, where the page's history and then the window's are asked in turn.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        guard event.charactersIgnoringModifiers?.lowercased() == "z" else { return super.performKeyEquivalent(with: event) }
+        switch modifiers {
+        case .command:
+            undo(nil)
+            return true
+        case [.command, .shift]:
+            redo(nil)
+            return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        let caret = controller?.caret ?? CaretState()
+        switch item.action {
+        case #selector(undo(_:)):
+            let title = caret.canUndo ? String(localized: "Undo") : windowUndoManager?.undoMenuItemTitle
+            (item as? NSMenuItem)?.title = title ?? String(localized: "Undo")
+            return caret.canUndo || windowUndoManager?.canUndo == true
+        case #selector(redo(_:)):
+            let title = caret.canRedo ? String(localized: "Redo") : windowUndoManager?.redoMenuItemTitle
+            (item as? NSMenuItem)?.title = title ?? String(localized: "Redo")
+            return caret.canRedo || windowUndoManager?.canRedo == true
+        default:
+            return super.validateUserInterfaceItem(item)
+        }
+    }
+
+    // MARK: Context menu
+
+    /// WebKit's own items that mean nothing in a note: page navigation, and opening or saving what links and
+    /// images point at, which the page never does (a link opens with Command-click). WebKit names them only in
+    /// a private header, so were it to rename one, that item would simply stay.
+    private static let unwantedItems: Set<String> = [
+        "WKMenuItemIdentifierOpenLink",
+        "WKMenuItemIdentifierReload",
+        "WKMenuItemIdentifierGoBack",
+        "WKMenuItemIdentifierGoForward",
+        "WKMenuItemIdentifierOpenLinkInNewWindow",
+        "WKMenuItemIdentifierDownloadLinkedFile",
+        "WKMenuItemIdentifierOpenImageInNewWindow",
+        "WKMenuItemIdentifierDownloadImage",
+        "WKMenuItemIdentifierOpenFrameInNewWindow",
+        "WKMenuItemIdentifierOpenMediaInNewWindow",
+        "WKMenuItemIdentifierDownloadMedia",
+    ]
+
+    /// Submenus for rich text, identified by what their items do: a note is markdown, which has no fonts,
+    /// colours or vertical layout.
+    private static let richTextActions: Set<Selector> = [
+        #selector(NSFontManager.orderFrontFontPanel(_:)),
+        #selector(NSTextView.changeLayoutOrientation(_:)),
+    ]
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        for item in menu.items {
+            let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")
+            let isRichText = item.submenu?.items.contains { $0.action.map(Self.richTextActions.contains) ?? false } ?? false
+            if isUnwanted || isRichText { menu.removeItem(item) }
+        }
+        // Removing items can leave two separators together, or one at an end.
+        while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
+        while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.numberOfItems - 1) }
+        var index = 1
+        while index < menu.numberOfItems {
+            if menu.items[index].isSeparatorItem, menu.items[index - 1].isSeparatorItem {
+                menu.removeItem(at: index)
+            } else {
+                index += 1
+            }
+        }
+    }
+}

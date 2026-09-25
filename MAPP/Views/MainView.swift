@@ -4,6 +4,7 @@ struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
+    @State private var editor = EditorController()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
@@ -19,7 +20,7 @@ struct MainView: View {
             NoteList(browser: browser, order: order, pane: $pane)
                 .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
         } detail: {
-            NoteDetail(browser: browser, pane: $pane)
+            NoteDetail(browser: browser, editor: editor)
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         NoteToolbar(browser: browser)
@@ -29,6 +30,7 @@ struct MainView: View {
         .searchable(text: $browser.searchText, placement: .toolbar)
         .searchFocused($isSearchFocused)
         .focusedSceneValue(\.browser, browser)
+        .focusedSceneValue(\.editor, editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
@@ -45,7 +47,12 @@ struct MainView: View {
         .onChange(of: browser.snapshot) {
             storedBrowser = try? JSONEncoder().encode(browser.snapshot)
         }
-        .onAppear(perform: restore)
+        .onDisappear { editor.flush() }
+        .onAppear {
+            editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onEscape = { [browser] in browser.focusRequest = .list }
+            restore()
+        }
     }
 
     private func restore() {
