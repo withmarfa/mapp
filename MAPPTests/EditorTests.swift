@@ -108,6 +108,28 @@ struct EditorTests {
         #expect(page.changes == ["# Draft\n"])
     }
 
+    @Test func anEditOverlappingAnOutsideChangeWinsOnThePageAsInTheFile() async throws {
+        let note = Note(body: "Milk\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: RecordingStore())
+        let page = try await Harness()
+        page.editor.library = library
+        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
+        page.editor.load(note)
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        // The person's edit is still waiting to be reported when another app's change is taken in.
+        page.editor.format(.checklist)
+        library.updateBody(of: note.id, to: "Outside\n")
+        page.editor.noteChanged(try #require(library.note(note.id)))
+        try await page.wait { library.note(note.id)?.body == "- [ ] Milk\n" }
+        var shown = ""
+        for _ in 0..<40 {
+            shown = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
+            if shown == "Milk" { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(shown == "Milk")
+    }
+
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {
         let page = try await Harness()
         let written = "Title\n=====\n\n* star bullet\n* another\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n\n\n\nMilk\n"

@@ -20,6 +20,8 @@ final class EditorController: NSObject {
     @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
     @ObservationIgnored var onLeave: (Note.ID) -> Void = { _ in }
+    /// The library the notes come from.
+    @ObservationIgnored weak var library: NoteLibrary?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -262,8 +264,11 @@ final class EditorController: NSObject {
             if wantsFocus { focus() }
         case .changed(let markdown, let generation):
             guard let id = notesByGeneration[generation] else { return }
-            if id == noteID { self.markdown = markdown }
+            if id == noteID, generation == self.generation { self.markdown = markdown }
             onChange(id, markdown)
+            // An edit made before the note on the page was reloaded from outside lands after the reload. The
+            // person's text wins, so the page takes it back, as the library now holds it.
+            if id == noteID, generation != self.generation, let note = library?.note(id) { noteChanged(note) }
         case .state(let state):
             if state != caret { caret = state }
         case .openLink(let href):

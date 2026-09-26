@@ -51,6 +51,7 @@ struct MainView: View {
         }
         .onDisappear { editor.flush() }
         .onAppear {
+            editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
@@ -80,7 +81,7 @@ struct MainView: View {
             noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
         }
         .alert(
-            "Couldn’t Save “\(library.failure.map { ($0.path as NSString).lastPathComponent } ?? "")”",
+            library.failure?.title ?? "",
             isPresented: Binding { library.failure != nil } set: { if !$0 { library.failure = nil } }
         ) {
         } message: {

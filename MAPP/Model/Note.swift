@@ -20,6 +20,8 @@ nonisolated struct Note: Identifiable, Hashable {
     /// When the note went to Recently Deleted, and its place in the bin there.
     var deleted: Date?
     var binID: UUID?
+    /// The file's identity when last read, to know it again if another app renames it.
+    var fileID: UInt64?
 
     init(
         id: UUID = UUID(),

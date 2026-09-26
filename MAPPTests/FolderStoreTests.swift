@@ -65,6 +65,18 @@ struct FolderStoreTests {
         #expect(try store.load().trash.first?.note.text == "Mine, edited")
     }
 
+    @Test func onceTheLibraryKnowsOfARelocationTheOldPathIsItsOwnAgain() throws {
+        try root.write("Someone else's", to: "Ideas.md")
+        store.perform(.create(path: "Ideas.md", text: "Mine"))
+        store.drain()
+        store.acknowledgeRelocation(of: "Ideas.md")
+        store.perform(.write(path: "Ideas 2.md", text: "Mine, edited"))
+        store.perform(.write(path: "Ideas.md", text: "Theirs, edited in MAPP"))
+        store.drain()
+        #expect(root.read("Ideas 2.md") == "Mine, edited")
+        #expect(root.read("Ideas.md") == "Theirs, edited in MAPP")
+    }
+
     @Test func aNoteRenamedOnlyInCaseKeepsItsFile() throws {
         try root.write("Text", to: "note.md")
         store.perform(.move(from: "note.md", to: "Note.md"))

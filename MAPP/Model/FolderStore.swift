@@ -20,9 +20,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
-    /// Paths the library gave that were taken, and the paths used instead. Read and written on the queue only, so
-    /// a change the library queued before it heard of the new path still reaches the right file.
-    private var aliases: [String: String] = [:]
+    /// Paths the library gave that were taken, and the paths used instead, for the changes the library queued
+    /// before it heard of the new path; once it has, the old path is its own again. Read and written on the
+    /// queue only.
+    private var aliases: [String: (path: String, before: Int?)] = [:]
+    /// The number of each change as it is queued, and the one being made.
+    private let queued = OSAllocatedUnfairLock(initialState: 0)
+    private var making = 0
 
     init(root: URL, bin: URL) {
         self.root = root
@@ -63,12 +67,16 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func read(_ url: URL, path: String) -> StoredNote? {
-        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey]),
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey, .documentIdentifierKey, .fileIdentifierKey]),
               values.isDirectory != true,
               let text = try? String(contentsOf: url, encoding: .utf8)
         else { return nil }
         let modified = values.contentModificationDate ?? .now
-        return StoredNote(path: path, text: text, created: values.creationDate ?? modified, modified: modified)
+        return StoredNote(
+            path: path, text: text, created: values.creationDate ?? modified, modified: modified,
+            // A document identifier outlasts a safe save, and a file identifier stands in where there is none.
+            fileID: values.documentIdentifier.map { UInt64(truncatingIfNeeded: $0) } ?? values.fileIdentifier
+        )
     }
 
     private func relativePath(of url: URL) -> String {
@@ -80,7 +88,12 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     // MARK: Changing
 
     func perform(_ change: StoreChange) {
+        let number = queued.withLock { count in
+            count += 1
+            return count
+        }
         queue.async { [self] in
+            making = number
             do {
                 try make(change)
             } catch {
@@ -97,8 +110,24 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         queue.sync {}
     }
 
+    /// The path a change queued now means: the path used instead, while the change was queued before the
+    /// library heard of it.
+    private func resolved(_ path: String) -> String {
+        guard let alias = aliases[path] else { return path }
+        if let before = alias.before, making >= before {
+            aliases[path] = nil
+            return path
+        }
+        return alias.path
+    }
+
+    func acknowledgeRelocation(of path: String) {
+        let last = queued.withLock { $0 }
+        queue.async { [self] in aliases[path]?.before = last + 1 }
+    }
+
     private func url(_ path: String) -> URL {
-        root.appending(path: aliases[path] ?? path, directoryHint: .notDirectory)
+        root.appending(path: resolved(path), directoryHint: .notDirectory)
     }
 
     private func make(_ change: StoreChange) throws {
@@ -168,7 +197,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private func report(_ path: String, _ target: URL) {
         let actual = relativePath(of: target)
         guard actual != path else { return }
-        aliases[path] = actual
+        aliases[path] = (actual, nil)
         let relocated = relocated
         Task { @MainActor in relocated(path, actual) }
     }
