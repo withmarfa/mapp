@@ -1,0 +1,4 @@
+// A checkout builds and signs to run locally without a developer account. The team comes from the
+// ignored Local.xcconfig, rendered from Infisical by scripts/render-local-signing.sh.
+DEVELOPMENT_TEAM =
+#include? "Local.xcconfig"

@@ -5,3 +5,5 @@ DerivedData/
 *.xcresult
 editor/node_modules/
 editor/dist/
+Config/Local.xcconfig
+Config/Local.xcconfig.*
