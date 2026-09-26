@@ -63,12 +63,14 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func read(_ url: URL, path: String) -> StoredNote? {
-        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey]),
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey, .fileIdentifierKey]),
               values.isDirectory != true,
               let text = try? String(contentsOf: url, encoding: .utf8)
         else { return nil }
         let modified = values.contentModificationDate ?? .now
-        return StoredNote(path: path, text: text, created: values.creationDate ?? modified, modified: modified)
+        return StoredNote(
+            path: path, text: text, created: values.creationDate ?? modified, modified: modified, fileID: values.fileIdentifier
+        )
     }
 
     private func relativePath(of url: URL) -> String {

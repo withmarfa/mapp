@@ -12,6 +12,7 @@ final class NotesFolder {
     private(set) var library: NoteLibrary?
 
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var watcher: FolderWatcher?
     private static let bookmarkKey = "notesFolder"
 
     init(defaults: UserDefaults = .standard) {
@@ -46,9 +47,19 @@ final class NotesFolder {
         _ = url.startAccessingSecurityScopedResource()
         self.url = url
         let store = FolderStore(root: url, bin: Self.bin(for: url))
-        let library = NoteLibrary(loadingFrom: store, defaults: defaults)
+        start(NoteLibrary(loadingFrom: store, defaults: defaults), watching: url)
+    }
+
+    /// Reads the folder, then keeps reading it whenever anything in it changes.
+    private func start(_ library: NoteLibrary, watching url: URL) {
         self.library = library
-        Task { await library.load() }
+        watcher = nil
+        Task { [weak self] in
+            await library.load()
+            // A folder changed meanwhile has its own watcher.
+            guard let self, self.library === library else { return }
+            watcher = FolderWatcher(url) { library.refresh() }
+        }
     }
 
     private func remember(_ url: URL) {
@@ -78,9 +89,7 @@ final class NotesFolder {
             log.error("the sample folder could not be written: \(error.localizedDescription, privacy: .public)")
         }
         url = root
-        let library = NoteLibrary(loadingFrom: FolderStore(root: root, bin: bin), defaults: nil)
-        self.library = library
-        Task { await library.load() }
+        start(NoteLibrary(loadingFrom: FolderStore(root: root, bin: bin), defaults: nil), watching: root)
     }
     #endif
 }

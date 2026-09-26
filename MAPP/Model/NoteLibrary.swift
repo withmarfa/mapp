@@ -17,6 +17,10 @@ final class NoteLibrary {
 
     @ObservationIgnored let store: NoteStore?
     @ObservationIgnored private let defaults: UserDefaults?
+    /// How many changes have been handed to the store, so a reading of the folder can tell whether it saw them all.
+    @ObservationIgnored private var queued = 0
+    @ObservationIgnored private var isRefreshing = false
+    @ObservationIgnored private var needsRefresh = false
 
     /// How long a note stays in Recently Deleted.
     static let trashDays = 30
@@ -78,14 +82,16 @@ final class NoteLibrary {
             return ids.insert(id).inserted ? id : UUID()
         }
         for stored in stored.notes {
-            loaded.append(Note(
+            var note = Note(
                 id: id(for: stored.path),
                 path: stored.path,
                 text: stored.text,
                 created: stored.created,
                 modified: stored.modified,
                 folderID: folderID(forPath: stored.path)
-            ))
+            )
+            note.fileID = stored.fileID
+            loaded.append(note)
         }
         for trashed in stored.trash where trashed.trashed >= expiry {
             loaded.append(Note(
@@ -102,6 +108,92 @@ final class NoteLibrary {
         // Notes begun while the folder was being read are kept.
         notes = loaded + notes.filter(\.isDraft)
         isLoaded = true
+    }
+
+    // MARK: Changes made outside
+
+    /// Reads the folder again after something changed in it, and brings the library into line with what is
+    /// there. The store reads only once the changes handed to it are made; a reading taken while more were
+    /// handed over is set aside and taken again, so the library never mistakes its own changes for another's.
+    func refresh() {
+        guard !isRefreshing else {
+            needsRefresh = true
+            return
+        }
+        Task { await reread() }
+    }
+
+    func reread() async {
+        guard let store, isLoaded else { return }
+        isRefreshing = true
+        repeat {
+            needsRefresh = false
+            let generation = queued
+            let stored = await Task.detached { try? store.load() }.value
+            guard let stored else { break }
+            if generation == queued { reconcile(stored) } else { needsRefresh = true }
+        } while needsRefresh
+        isRefreshing = false
+    }
+
+    /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added or
+    /// taken away. A file renamed or moved is known by its identity and stays the same note. None of this is
+    /// undoable here, since it was not done here.
+    private func reconcile(_ stored: StoredLibrary) {
+        let names = Set(stored.folders)
+        var order = folders.filter { names.contains($0.name) }
+        for name in stored.folders where !order.contains(where: { $0.name == name }) {
+            let stable = UUID(stableFrom: "folder:" + name)
+            order.append(Folder(id: order.contains { $0.id == stable } ? UUID() : stable, name: name))
+        }
+        if order != folders { folders = order }
+
+        var updated = notes
+        var onDisk = Dictionary(stored.notes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen: Set<Note.ID> = []
+        func take(_ disk: StoredNote, at index: Int) {
+            seen.insert(updated[index].id)
+            updated[index].fileID = disk.fileID
+            if updated[index].path != disk.path {
+                updated[index].path = disk.path
+                updated[index].folderID = folderID(forPath: disk.path)
+            }
+            if updated[index].file.text != disk.text {
+                updated[index].file = NoteFile(text: disk.text)
+                updated[index].modified = disk.modified
+            }
+        }
+        for index in updated.indices where !updated[index].isDeleted {
+            guard let path = updated[index].path, let disk = onDisk.removeValue(forKey: path) else { continue }
+            take(disk, at: index)
+        }
+        let ids = Set(updated.map(\.id))
+        for disk in onDisk.values.sorted(by: { $0.path < $1.path }) {
+            let renamed = disk.fileID.flatMap { fileID in
+                updated.indices.first {
+                    !seen.contains(updated[$0].id) && !updated[$0].isDeleted && !updated[$0].isDraft && updated[$0].fileID == fileID
+                }
+            }
+            if let renamed {
+                take(disk, at: renamed)
+            } else {
+                let stable = UUID(stableFrom: "note:" + disk.path)
+                var note = Note(
+                    id: ids.contains(stable) ? UUID() : stable,
+                    path: disk.path,
+                    text: disk.text,
+                    created: disk.created,
+                    modified: disk.modified,
+                    folderID: folderID(forPath: disk.path)
+                )
+                note.fileID = disk.fileID
+                updated.append(note)
+                seen.insert(note.id)
+            }
+        }
+        // A written note whose file has gone was deleted by another app, and goes with it.
+        updated.removeAll { !$0.isDeleted && !$0.isDraft && !seen.contains($0.id) }
+        if updated != notes { notes = updated }
     }
 
     // MARK: Reading
@@ -467,6 +559,7 @@ final class NoteLibrary {
     }
 
     private func perform(_ change: StoreChange) {
+        queued += 1
         store?.perform(change)
     }
 

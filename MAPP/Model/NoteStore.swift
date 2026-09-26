@@ -29,6 +29,8 @@ nonisolated struct StoredNote: Sendable {
     var text: String
     var created: Date
     var modified: Date
+    /// The file's own identity, which a rename keeps, so a note moved by another app is still the same note.
+    var fileID: UInt64? = nil
 }
 
 nonisolated struct TrashedNote: Sendable {
