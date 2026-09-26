@@ -1,4 +1,4 @@
-import type { CaretState } from './editor'
+import type { CaretState, FindState } from './editor'
 
 export type EditorMessage =
   | { type: 'ready' }
@@ -8,6 +8,7 @@ export type EditorMessage =
   | { type: 'copy'; text: string }
   | { type: 'escape' }
   | { type: 'pasteImages' }
+  | ({ type: 'find' } & FindState)
 
 declare global {
   interface Window {

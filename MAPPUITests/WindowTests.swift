@@ -246,6 +246,20 @@ final class WindowTests: XCTestCase {
         sortBy.menuItems[order].click()
     }
 
+    func testCommandFOpensTheSystemFindBarInThePage() {
+        row(titled: "Kitchen quotes").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        editor.click()
+        let fields = window.searchFields.count
+        window.typeKey("f", modifierFlags: .command)
+        let findField = window.searchFields.element(boundBy: fields)
+        XCTAssertTrue(findField.waitForExistence(timeout: 2), "the find bar shows its search field")
+        findField.typeText("quote")
+        XCTAssertTrue(window.staticTexts["3"].waitForExistence(timeout: 2), "the find bar counts the matches")
+        findField.typeKey(.escape, modifierFlags: [])
+        wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
+    }
+
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
         // Some findings belong to the system rather than the app: List reports its section headers outside
         // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes

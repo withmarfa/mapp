@@ -33,6 +33,7 @@ nonisolated enum EditorMessage: Sendable {
     case copy(String)
     case escape
     case pasteImages
+    case find(FindState)
     case error(String)
 
     init?(body: Any) {
@@ -64,6 +65,19 @@ nonisolated enum EditorMessage: Sendable {
             self = .escape
         case "pasteImages":
             self = .pasteImages
+        case "find":
+            guard let text = dict["text"] as? String,
+                  let selection = dict["selection"] as? [Int], selection.count == 2,
+                  let visible = dict["visible"] as? [Int], visible.count == 2
+            else { return nil }
+            self = .find(FindState(
+                text: text,
+                selection: NSRange(location: selection[0], length: selection[1] - selection[0]),
+                visible: NSRange(location: visible[0], length: visible[1] - visible[0]),
+                boxes: (dict["boxes"] as? [NSNumber] ?? []).map(\.doubleValue),
+                scrollY: (dict["scrollY"] as? NSNumber)?.doubleValue ?? 0,
+                viewportHeight: (dict["viewportHeight"] as? NSNumber)?.doubleValue ?? 0
+            ))
         case "error":
             self = .error(dict["message"] as? String ?? "")
         default:

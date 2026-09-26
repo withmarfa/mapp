@@ -17,6 +17,7 @@ async function withLoaded<T>(
   const root = document.createElement('div')
   document.body.append(root)
   const editor = await NoteEditor.mount(root, {
+    find() {},
     changed() {},
     stateChanged() {},
     openLink() {},

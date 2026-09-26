@@ -71,6 +71,16 @@ import {
 } from '@milkdown/kit/prose/state'
 import { $prose, callCommand, replaceAll, type $UserKeymap } from '@milkdown/kit/utils'
 import { codeCopyPlugin, headingMarkPlugin } from './decorations'
+import {
+  characterBoxes,
+  offsetAt,
+  positionAt,
+  scrollToText,
+  selectText,
+  textModel,
+  visibleRange,
+  type TextModel,
+} from './find'
 import { labels } from './labels'
 import { dialect, serialize, stringifyOptions } from './dialect'
 import { highlightPlugin } from './highlight'
@@ -127,7 +137,21 @@ export type FormatCommand =
  *  owns them, since its Format menu shows the same shortcuts. */
 export type Keymap = Record<string, [FormatCommand, string?]>
 
+/** What the system find bar needs from the page, sent while it is open, since it asks for it synchronously:
+ *  the note's text, the selection and the visible stretch as offsets into it, and the visible characters'
+ *  boxes. */
+export interface FindState {
+  text: string
+  selection: [number, number]
+  visible: [number, number]
+  boxes: number[]
+  scrollY: number
+  /** The height of the page's window, which is less than the web view's where something covers its top. */
+  viewportHeight: number
+}
+
 export interface EditorEvents {
+  find(state: FindState): void
   changed(markdown: string, generation: number): void
   stateChanged(state: CaretState): void
   openLink(href: string): void
@@ -361,6 +385,9 @@ export class NoteEditor {
       }),
   )
   private editable = true
+  private finding = false
+  private findModel?: TextModel
+  private findPending = 0
 
   private constructor(private readonly events: EditorEvents) {}
 
@@ -433,7 +460,18 @@ export class NoteEditor {
       .use(headingMarkPlugin)
       .use(highlightPlugin)
       .use(selectionPlugin)
+      .use(
+        $prose(
+          () =>
+            new Plugin({
+              key: new PluginKey('find'),
+              view: () => ({ update: () => instance.findChanged() }),
+            }),
+        ),
+      )
       .create()
+    window.addEventListener('scroll', () => instance.findChanged(), { passive: true })
+    window.addEventListener('resize', () => instance.findChanged())
     root.addEventListener('click', (event) => {
       const anchor = (event.target as HTMLElement).closest('a[href]')
       if (anchor && event.metaKey) {
@@ -537,6 +575,60 @@ export class NoteEditor {
 
   private get view(): EditorView {
     return this.editor.ctx.get(editorViewCtx)
+  }
+
+  // MARK: Find
+
+  /** Whether the find bar is open, and so wants to hear of every change. */
+  setFinding(finding: boolean): void {
+    this.finding = finding
+    this.findModel = undefined
+    if (finding) this.sendFind()
+  }
+
+  private findChanged(): void {
+    if (!this.finding) return
+    this.findModel = undefined
+    cancelAnimationFrame(this.findPending)
+    this.findPending = requestAnimationFrame(() => this.sendFind())
+  }
+
+  private model(): TextModel {
+    this.findModel ??= textModel(this.view.state.doc)
+    return this.findModel
+  }
+
+  private sendFind(): void {
+    const view = this.view
+    const model = this.model()
+    const visible = visibleRange(view, model)
+    const { from, to } = view.state.selection
+    this.events.find({
+      text: model.text,
+      selection: [offsetAt(model, from), offsetAt(model, to)],
+      visible,
+      boxes: characterBoxes(view, model, visible[0], visible[1]),
+      scrollY: window.scrollY,
+      viewportHeight: window.innerHeight,
+    })
+  }
+
+  findSelect(from: number, to: number): void {
+    selectText(this.view, this.model(), from, to)
+  }
+
+  findScroll(from: number): void {
+    scrollToText(this.view, this.model(), from)
+  }
+
+  /** Replaces text the find bar found, one stretch at a time, as its Replace and Replace All do. */
+  findReplace(from: number, to: number, text: string): void {
+    if (!this.editable) return
+    const view = this.view
+    const model = this.model()
+    const start = positionAt(model, from)
+    const end = positionAt(model, to)
+    view.dispatch(text ? view.state.tr.insertText(text, start, end) : view.state.tr.delete(start, end))
   }
 
   /** Puts images where they were dropped, or at the caret: each on a line of its own when the caret is on an

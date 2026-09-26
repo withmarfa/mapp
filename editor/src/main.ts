@@ -16,6 +16,10 @@ declare global {
       undo(): void
       redo(): void
       setImageBase(directory: string): void
+      setFinding(finding: boolean): void
+      findSelect(from: number, to: number): void
+      findScroll(from: number): void
+      findReplace(from: number, to: number, text: string): void
       insertImages(images: { src: string; alt: string }[], x?: number, y?: number, height?: number): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
@@ -27,6 +31,9 @@ const root = document.getElementById('editor')
 if (!root) throw new Error('editor root missing')
 
 const editor = await NoteEditor.mount(root, {
+  find(state) {
+    postToHost({ type: 'find', ...state })
+  },
   changed(markdown, generation) {
     postToHost({ type: 'changed', markdown, generation })
   },
@@ -97,6 +104,10 @@ window.editor = {
   undo: () => editor.undo(),
   redo: () => editor.redo(),
   setImageBase: (directory) => setImageBase(directory),
+  setFinding: (finding) => editor.setFinding(finding),
+  findSelect: (from, to) => editor.findSelect(from, to),
+  findScroll: (from) => editor.findScroll(from),
+  findReplace: (from, to, text) => editor.findReplace(from, to, text),
   // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
   insertImages: (images, x, y, height) =>
     editor.insertImages(images, x, y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight)),
