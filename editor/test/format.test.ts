@@ -14,6 +14,7 @@ async function withNoteEditor<T>(
   document.body.append(root)
   const states: CaretState[] = []
   const editor = await NoteEditor.mount(root, {
+    find() {},
     changed() {},
     stateChanged(state) {
       states.push(state)
@@ -55,6 +56,7 @@ test('a loaded note is not yet changed, and an edit is, told once with its gener
   const root = document.createElement('div')
   document.body.append(root)
   const editor = await NoteEditor.mount(root, {
+    find() {},
     changed(markdown, generation) {
       told.push([markdown, generation])
     },
@@ -347,6 +349,7 @@ test('an edit still waiting to be reported goes to its own note when another loa
   const root = document.createElement('div')
   document.body.append(root)
   const editor = await NoteEditor.mount(root, {
+    find() {},
     changed(markdown, generation) {
       told.push([markdown, generation])
     },

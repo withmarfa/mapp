@@ -27,6 +27,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var onEscape: () -> Void = {}
 
     @ObservationIgnored let webView: EditorWebView
+    /// The page with the system find bar above it, which is what the window shows.
+    @ObservationIgnored let container: EditorContainer
+    @ObservationIgnored private var pageFinder: PageFinder!
 
     /// The note on the page, and the markdown the page holds for it as far as the app knows.
     @ObservationIgnored private(set) var noteID: Note.ID?
@@ -46,7 +49,14 @@ final class EditorController: NSObject {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         webView = EditorWebView(frame: .zero, configuration: configuration)
+        container = EditorContainer(webView: webView)
         super.init()
+        pageFinder = PageFinder(controller: self)
+        pageFinder.finder.findBarContainer = container
+        container.finder = pageFinder.finder
+        container.onFindBarVisibilityChange = { [weak self] visible in
+            self?.call("setFinding", String(visible))
+        }
         Self.open.add(self)
         webView.controller = self
         files.root = { [weak self] in (self?.library?.store as? FolderStore)?.root }
@@ -187,6 +197,20 @@ final class EditorController: NSObject {
         }
     }
 
+    // MARK: Find
+
+    func findSelect(_ range: NSRange) {
+        call("findSelect", String(range.location), String(NSMaxRange(range)))
+    }
+
+    func findScroll(_ range: NSRange) {
+        call("findScroll", String(range.location))
+    }
+
+    func findReplace(_ range: NSRange, with text: String) {
+        call("findReplace", String(range.location), String(NSMaxRange(range)), json(text))
+    }
+
     /// Puts images from a pasteboard into the note: into the attachments folder, and linked where they were
     /// dropped, given in the page's own coordinates, or at the caret. Whether there were images to take.
     func insertImages(from pasteboard: NSPasteboard, at point: CGPoint? = nil) -> Bool {
@@ -303,6 +327,8 @@ final class EditorController: NSObject {
             onEscape()
         case .pasteImages:
             _ = insertImages(from: .general)
+        case .find(let state):
+            pageFinder.update(state)
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
         }

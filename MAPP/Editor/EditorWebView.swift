@@ -56,6 +56,17 @@ final class EditorWebView: WKWebView {
         ])
     }
 
+    // MARK: Find
+
+    // The Edit menu's Find items come to the web view, which has the keyboard, and go to the find bar above it.
+    override func performTextFinderAction(_ sender: Any?) {
+        (superview as? EditorContainer)?.performTextFinderAction(sender)
+    }
+
+    @objc func performFindPanelAction(_ sender: Any?) {
+        performTextFinderAction(sender)
+    }
+
     // MARK: Undo
 
     /// WebKit records its own steps for what is typed on the undo manager it is given. The page keeps its own
@@ -112,6 +123,8 @@ final class EditorWebView: WKWebView {
             let title = caret.canRedo ? String(localized: "Redo") : windowUndoManager?.redoMenuItemTitle
             (item as? NSMenuItem)?.title = title ?? String(localized: "Redo")
             return caret.canRedo || windowUndoManager?.canRedo == true
+        case #selector(performTextFinderAction(_:)), #selector(performFindPanelAction(_:)):
+            return (superview as? EditorContainer)?.validateFind(item) ?? false
         default:
             return super.validateUserInterfaceItem(item)
         }
