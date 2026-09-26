@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import os
 
 nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: "store")
 
@@ -27,6 +28,8 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     /// The number of each change as it is queued, and the one being made.
     private let queued = OSAllocatedUnfairLock(initialState: 0)
     private var making = 0
+    /// Attachment paths handed out and not yet written, so two taken in a row are never the same.
+    private let reservations = OSAllocatedUnfairLock(initialState: Set<String>())
 
     init(root: URL, bin: URL) {
         self.root = root
@@ -126,6 +129,25 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         queue.async { [self] in aliases[path]?.before = last + 1 }
     }
 
+    func freeAttachmentPath(named name: String) -> String {
+        let name = (name as NSString).lastPathComponent
+        let stem = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        return reservations.withLock { reserved in
+            var number = 1
+            while true {
+                let file = number == 1 ? name : ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)"
+                let path = "\(Self.attachments)/\(file)"
+                // Names differing only in case are the same file on the usual Mac file system.
+                if !reserved.contains(path.lowercased()), !files.fileExists(atPath: root.appending(path: path).path) {
+                    reserved.insert(path.lowercased())
+                    return path
+                }
+                number += 1
+            }
+        }
+    }
+
     private func url(_ path: String) -> URL {
         root.appending(path: resolved(path), directoryHint: .notDirectory)
     }
@@ -164,6 +186,9 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try move(binURL(id), to: target)
             try writeManifest(readManifest().filter { $0.id != id })
             report(path, target)
+        case .attach(let path, let data):
+            defer { reservations.withLock { _ = $0.remove(path.lowercased()) } }
+            try writeNew(data, to: root.appending(path: path))
         case .purge(let id):
             try? files.removeItem(at: binURL(id))
             try writeManifest(readManifest().filter { $0.id != id })

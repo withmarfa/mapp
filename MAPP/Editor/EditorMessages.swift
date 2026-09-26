@@ -32,6 +32,7 @@ nonisolated enum EditorMessage: Sendable {
     case openLink(String)
     case copy(String)
     case escape
+    case pasteImages
     case error(String)
 
     init?(body: Any) {
@@ -61,6 +62,8 @@ nonisolated enum EditorMessage: Sendable {
             self = .copy(text)
         case "escape":
             self = .escape
+        case "pasteImages":
+            self = .pasteImages
         case "error":
             self = .error(dict["message"] as? String ?? "")
         default:

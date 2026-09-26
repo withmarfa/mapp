@@ -535,6 +535,35 @@ export class NoteEditor {
     view.setProps({ editable: () => this.editable })
   }
 
+  private get view(): EditorView {
+    return this.editor.ctx.get(editorViewCtx)
+  }
+
+  /** Puts images where they were dropped, or at the caret: each on a line of its own when the caret is on an
+   *  empty line, and inline otherwise, as markdown writes an image. */
+  insertImages(images: { src: string; alt: string }[], x?: number, y?: number): void {
+    if (!this.editable) return
+    const view = this.view
+    const { schema } = view.state
+    const type = schema.nodes.image
+    if (!type || images.length === 0) return
+    let tr = view.state.tr
+    if (x != null && y != null) {
+      const at = view.posAtCoords({ left: x, top: y })
+      if (at) tr = tr.setSelection(TextSelection.create(tr.doc, at.pos))
+    }
+    const nodes = images.map((image) => type.create({ src: image.src, alt: image.alt, title: '' }))
+    const { $from } = tr.selection
+    if ($from.parent.isTextblock && $from.parent.content.size === 0 && $from.parent.type.name === 'paragraph') {
+      const paragraphs = nodes.map((node) => schema.nodes.paragraph!.create(null, node))
+      tr = tr.replaceWith($from.before(), $from.after(), paragraphs)
+    } else {
+      for (const node of nodes) tr = tr.replaceSelectionWith(node, false)
+    }
+    view.dispatch(tr.scrollIntoView())
+    view.focus()
+  }
+
   undo(): void {
     this.editor.action(callCommand(undoCommand.key))
   }

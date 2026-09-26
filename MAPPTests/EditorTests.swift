@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -128,6 +129,40 @@ struct EditorTests {
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(shown == "Milk")
+    }
+
+    @Test func anImageInTheNotesFolderShowsAndOneLinkedFromOutsideDoesNot() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let outside = try TemporaryFolder()
+        let png = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+            isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )?.representation(using: .png, properties: [:]))
+        try FileManager.default.createDirectory(at: root.url.appending(path: "Attachments"), withIntermediateDirectories: true)
+        try png.write(to: root.url.appending(path: "Attachments/Photo 1.png"))
+        try png.write(to: outside.url.appending(path: "secret.png"))
+        try FileManager.default.createSymbolicLink(
+            at: root.url.appending(path: "Attachments/link.png"), withDestinationURL: outside.url.appending(path: "secret.png")
+        )
+        let note = Note(body: "![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
+        let page = try await Harness()
+        page.editor.library = library
+        page.editor.load(note)
+        var widths: [Int] = []
+        for _ in 0..<40 {
+            widths = try await page.editor.webView.evaluateJavaScript(
+                "[...document.querySelectorAll('.image img')].map((image) => image.naturalWidth)"
+            ) as? [Int] ?? []
+            if widths == [4] { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(widths == [4])
+        let absent = try await page.editor.webView.evaluateJavaScript(
+            "[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)"
+        ) as? [String]
+        #expect(absent == ["b"])
     }
 
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {

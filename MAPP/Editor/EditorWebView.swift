@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
 
 /// The web view behaving as a Mac text view: Undo and Redo in the Edit menu drive the page's own history, the
@@ -27,6 +28,32 @@ final class EditorWebView: WKWebView {
         super.layout()
         let insets = NSEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
         if obscuredContentInsets.top != insets.top { obscuredContentInsets = insets }
+    }
+
+    // MARK: Images
+
+    // Images dropped become files of the notes folder, linked from the note; everything else is the page's to
+    // take. Pasted images reach the app from the page, which hears the paste.
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        carriesImages(sender) ? .copy : super.draggingEntered(sender)
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        carriesImages(sender) ? .copy : super.draggingUpdated(sender)
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let location = convert(sender.draggingLocation, from: nil)
+        let point = CGPoint(x: location.x, y: isFlipped ? location.y : bounds.height - location.y)
+        if carriesImages(sender), controller?.insertImages(from: sender.draggingPasteboard, at: point) == true { return true }
+        return super.performDragOperation(sender)
+    }
+
+    private func carriesImages(_ sender: any NSDraggingInfo) -> Bool {
+        controller?.isEditable == true && sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true,
+            .urlReadingContentsConformToTypes: [UTType.image.identifier],
+        ])
     }
 
     // MARK: Undo

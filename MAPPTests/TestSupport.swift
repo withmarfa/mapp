@@ -37,6 +37,7 @@ final class RecordingStore: NoteStore, @unchecked Sendable {
     func perform(_ change: StoreChange) { changes.append(change) }
     func drain() {}
     func acknowledgeRelocation(of path: String) {}
+    func freeAttachmentPath(named name: String) -> String { "Attachments/\(name)" }
 }
 
 /// A folder of its own in the temporary directory, removed when the test ends.

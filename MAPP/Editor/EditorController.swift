@@ -20,8 +20,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
     @ObservationIgnored var onLeave: (Note.ID) -> Void = { _ in }
-    /// The library the notes come from.
+    /// The library the notes come from, for the files a note points at.
     @ObservationIgnored weak var library: NoteLibrary?
+    @ObservationIgnored private let files = NoteFiles()
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -48,6 +49,8 @@ final class EditorController: NSObject {
         super.init()
         Self.open.add(self)
         webView.controller = self
+        files.root = { [weak self] in (self?.library?.store as? FolderStore)?.root }
+        configuration.userContentController.addScriptMessageHandler(files, contentWorld: .page, name: "files")
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -103,6 +106,7 @@ final class EditorController: NSObject {
         markdown = note.body
         isEditable = !note.isDeleted
         guard isReady else { return }
+        call("setImageBase", json(library?.directory(of: note) ?? note.directory))
         generation += 1
         // A late report can only belong to the load before this one.
         notesByGeneration = notesByGeneration.filter { $0.key >= generation - 1 }
@@ -183,6 +187,22 @@ final class EditorController: NSObject {
         }
     }
 
+    /// Puts images from a pasteboard into the note: into the attachments folder, and linked where they were
+    /// dropped, given in the page's own coordinates, or at the caret. Whether there were images to take.
+    func insertImages(from pasteboard: NSPasteboard, at point: CGPoint? = nil) -> Bool {
+        guard isEditable, let noteID, let library else { return false }
+        let files = PastedImages.files(on: pasteboard)
+        guard !files.isEmpty else { return false }
+        let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
+        guard !images.isEmpty else { return false }
+        if let point {
+            call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(webView.bounds.height)))
+        } else {
+            call("insertImages", json(images))
+        }
+        return true
+    }
+
     func undo() { call("undo") }
     func redo() { call("redo") }
 
@@ -257,6 +277,7 @@ final class EditorController: NSObject {
             applyLabels()
             applyKeymap()
             if let noteID {
+                if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? "")) }
                 generation += 1
                 notesByGeneration[generation] = noteID
                 call("load", json(markdown), String(generation), String(isEditable))
@@ -280,6 +301,8 @@ final class EditorController: NSObject {
             NSPasteboard.general.setString(text, forType: .string)
         case .escape:
             onEscape()
+        case .pasteImages:
+            _ = insertImages(from: .general)
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
         }

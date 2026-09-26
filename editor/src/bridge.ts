@@ -7,10 +7,17 @@ export type EditorMessage =
   | { type: 'openLink'; href: string }
   | { type: 'copy'; text: string }
   | { type: 'escape' }
+  | { type: 'pasteImages' }
 
 declare global {
   interface Window {
-    webkit?: { messageHandlers?: { host?: { postMessage(message: EditorMessage): void } } }
+    webkit?: {
+      messageHandlers?: {
+        host?: { postMessage(message: EditorMessage): void }
+        /** Answers with a file of the notes folder, by its path there, as a data URL, or null. */
+        files?: { postMessage(path: string): Promise<string | null> }
+      }
+    }
   }
 }
 

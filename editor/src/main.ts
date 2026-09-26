@@ -1,5 +1,6 @@
 import { postToHost } from './bridge'
 import { NoteEditor, type FormatCommand, type Keymap } from './editor'
+import { setImageBase } from './images'
 import { setLabels, type Labels } from './labels'
 import './style.css'
 
@@ -14,6 +15,8 @@ declare global {
       focus(): void
       undo(): void
       redo(): void
+      setImageBase(directory: string): void
+      insertImages(images: { src: string; alt: string }[], x?: number, y?: number, height?: number): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
     }
@@ -47,6 +50,24 @@ window.addEventListener('keydown', (event) => {
   postToHost({ type: 'escape' })
 })
 
+// An image pasted on its own, a screenshot or an image file copied in the Finder, becomes a file of the notes
+// folder, which the app takes from the pasteboard itself; a copied web page, images and all, is the page's.
+window.addEventListener(
+  'paste',
+  (event) => {
+    const data = event.clipboardData
+    if (!data || data.types.includes('text/html')) return
+    const files = [...data.items].filter((item) => item.kind === 'file')
+    if (files.length === 0 || !files.every((item) => item.type.startsWith('image/'))) return
+    // Text beside the image is kept for the page, unless it only names a file copied in the Finder.
+    if (data.types.includes('text/plain') && !data.types.includes('text/uri-list')) return
+    event.preventDefault()
+    event.stopPropagation()
+    postToHost({ type: 'pasteImages' })
+  },
+  { capture: true },
+)
+
 // Links open on ⌘-click, so the pointer says so only while ⌘ is down.
 for (const name of ['keydown', 'keyup'] as const) {
   window.addEventListener(name, (event) =>
@@ -75,6 +96,10 @@ window.editor = {
   focus: () => editor.focus(),
   undo: () => editor.undo(),
   redo: () => editor.redo(),
+  setImageBase: (directory) => setImageBase(directory),
+  // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
+  insertImages: (images, x, y, height) =>
+    editor.insertImages(images, x, y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight)),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
 }

@@ -140,6 +140,20 @@ struct FolderStoreTests {
         #expect(!root.exists("Empty"))
     }
 
+    @Test func attachmentsGoInTheirFolderUnderNamesNothingElseHas() throws {
+        try root.write("Taken", to: "Attachments/Photo.png")
+        let first = store.freeAttachmentPath(named: "Photo.png")
+        let second = store.freeAttachmentPath(named: "Photo.png")
+        #expect(first == "Attachments/Photo 2.png")
+        #expect(second == "Attachments/Photo 3.png", "a name handed out is not handed out again before it is written")
+        #expect(store.freeAttachmentPath(named: "PHOTO 2.png") == "Attachments/PHOTO 2 2.png", "names differing in case are one file")
+        store.perform(.attach(path: first, data: Data("image".utf8)))
+        store.drain()
+        #expect(root.read(first) == "image")
+        #expect(try store.load().notes.isEmpty, "an attachment is not a note")
+        #expect(try store.load().folders.isEmpty, "the attachments folder is not a note folder")
+    }
+
     @Test func movesAndFolderRenamesMoveTheFiles() throws {
         try root.write("Text", to: "Note.md")
         store.perform(.createFolder(path: "Work"))
