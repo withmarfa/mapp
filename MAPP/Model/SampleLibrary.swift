@@ -1,77 +1,79 @@
 import Foundation
 
-/// The notes the app starts with until it has storage.
-extension NoteLibrary {
-    static func sample(now: @escaping () -> Date = Date.init) -> NoteLibrary {
-        // Fixed identifiers, so a window restored at launch finds the folder and note it last showed.
-        var serial = 0
-        func nextID() -> UUID {
-            serial += 1
-            return UUID(uuidString: String(format: "5A3B1E00-0000-4000-8000-%012d", serial))!
-        }
-        let work = Folder(id: nextID(), name: "Work")
-        let home = Folder(id: nextID(), name: "Home")
-        let personal = Folder(id: nextID(), name: "Personal")
-        let reading = Folder(id: nextID(), name: "Reading")
-        let reference = now()
+/// Notes to try the app with, written as files into a folder of the app's own, for the UI tests and screenshots.
+/// Nothing ships with them.
+nonisolated enum SampleLibrary {
+    /// Writes the sample notes into an empty folder: each note as a file named after its first line, in its
+    /// folder, pinned in its front matter, with the dates it was written and edited. Two are then trashed.
+    static func write(to root: URL, bin: URL, now: Date = .now) throws {
+        let files = FileManager()
+        try? files.removeItem(at: root)
+        try? files.removeItem(at: bin)
+        try files.createDirectory(at: root, withIntermediateDirectories: true)
         let calendar = Calendar.current
 
         /// Never later than now, so a note written "this morning" is not in the future before breakfast.
         func date(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
-            let day = calendar.date(byAdding: .day, value: -daysAgo, to: reference) ?? reference
+            let day = calendar.date(byAdding: .day, value: -daysAgo, to: now) ?? now
             let date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
-            return min(date, reference)
+            return min(date, now)
         }
 
+        var trashed: [String] = []
         func note(
             _ body: String,
-            _ folder: Folder? = nil,
+            _ folder: String? = nil,
             daysAgo: Int,
             hour: Int,
             minute: Int = 0,
             editedDaysAgo: Int? = nil,
             pinned: Bool = false,
             deleted: Bool = false
-        ) -> Note {
-            Note(
-                id: nextID(),
-                body: body,
-                created: date(daysAgo: daysAgo, hour: hour, minute: minute),
-                modified: editedDaysAgo.map { date(daysAgo: $0, hour: hour + 1, minute: minute) },
-                folderID: folder?.id,
-                isPinned: pinned,
-                deleted: deleted ? date(daysAgo: 2, hour: 10) : nil
-            )
+        ) throws {
+            var file = NoteFile(text: body + "\n")
+            if pinned { file.setProperty("pinned", "true") }
+            let name = NoteText.fileName(for: body)
+            let path = folder.map { "\($0)/\(name).md" } ?? "\(name).md"
+            let url = root.appending(path: path)
+            try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(file.text.utf8).write(to: url)
+            let created = date(daysAgo: daysAgo, hour: hour, minute: minute)
+            let modified = editedDaysAgo.map { date(daysAgo: $0, hour: hour + 1, minute: minute) } ?? created
+            try files.setAttributes([.creationDate: created, .modificationDate: modified], ofItemAtPath: url.path)
+            if deleted { trashed.append(path) }
         }
 
-        let notes = [
-            note(kitchenQuotes, home, daysAgo: 0, hour: 9, minute: 12, pinned: true),
-            note(gardenIdeas, daysAgo: 0, hour: 7, minute: 55),
-            note(weeklyReview, work, daysAgo: 0, hour: 8, minute: 30),
-            note(accountant, daysAgo: 1, hour: 16, minute: 40),
-            note(readingList, reading, daysAgo: 1, hour: 21, minute: 5, pinned: true),
-            note(podcastIdea, daysAgo: 1, hour: 12, minute: 20),
-            note(lisbon, personal, daysAgo: 3, hour: 19, minute: 20),
-            note(designReview, work, daysAgo: 4, hour: 11),
-            note(recipes, home, daysAgo: 5, hour: 18, minute: 30),
-            note(bikeService, personal, daysAgo: 6, hour: 8, minute: 45),
-            note(hiringLoop, work, daysAgo: 9, hour: 14, editedDaysAgo: 4),
-            note(usefulCommands, work, daysAgo: 12, hour: 10, minute: 15),
-            note(boilerManual, home, daysAgo: 18, hour: 20),
-            note(designOfEverydayThings, reading, daysAgo: 24, hour: 21, minute: 10, editedDaysAgo: 2),
-            note(giftIdeas, personal, daysAgo: 40, hour: 13),
-            note(quarterlyPlanning, work, daysAgo: 55, hour: 9, minute: 30, editedDaysAgo: 1),
-            note(runningPlan, personal, daysAgo: 80, hour: 7),
-            note(patternLanguage, reading, daysAgo: 200, hour: 21),
-            note(movingChecklist, home, daysAgo: 420, hour: 10),
-            note(oldPackingList, personal, daysAgo: 30, hour: 9, deleted: true),
-            note(draftAgenda, work, daysAgo: 15, hour: 17, deleted: true),
-        ]
-        return NoteLibrary(notes: notes, folders: [work, home, personal, reading], now: now)
+        try note(kitchenQuotes, "Home", daysAgo: 0, hour: 9, minute: 12, pinned: true)
+        try note(gardenIdeas, daysAgo: 0, hour: 7, minute: 55)
+        try note(weeklyReview, "Work", daysAgo: 0, hour: 8, minute: 30)
+        try note(accountant, daysAgo: 1, hour: 16, minute: 40)
+        try note(readingList, "Reading", daysAgo: 1, hour: 21, minute: 5, pinned: true)
+        try note(podcastIdea, daysAgo: 1, hour: 12, minute: 20)
+        try note(lisbon, "Personal", daysAgo: 3, hour: 19, minute: 20)
+        try note(designReview, "Work", daysAgo: 4, hour: 11)
+        try note(recipes, "Home", daysAgo: 5, hour: 18, minute: 30)
+        try note(bikeService, "Personal", daysAgo: 6, hour: 8, minute: 45)
+        try note(hiringLoop, "Work", daysAgo: 9, hour: 14, editedDaysAgo: 4)
+        try note(usefulCommands, "Work", daysAgo: 12, hour: 10, minute: 15)
+        try note(boilerManual, "Home", daysAgo: 18, hour: 20)
+        try note(designOfEverydayThings, "Reading", daysAgo: 24, hour: 21, minute: 10, editedDaysAgo: 2)
+        try note(giftIdeas, "Personal", daysAgo: 40, hour: 13)
+        try note(quarterlyPlanning, "Work", daysAgo: 55, hour: 9, minute: 30, editedDaysAgo: 1)
+        try note(runningPlan, "Personal", daysAgo: 80, hour: 7)
+        try note(patternLanguage, "Reading", daysAgo: 200, hour: 21)
+        try note(movingChecklist, "Home", daysAgo: 420, hour: 10)
+        try note(oldPackingList, "Personal", daysAgo: 30, hour: 9, deleted: true)
+        try note(draftAgenda, "Work", daysAgo: 15, hour: 17, deleted: true)
+
+        let store = FolderStore(root: root, bin: bin)
+        for path in trashed {
+            store.perform(.trash(path: path, id: UUID(), date: date(daysAgo: 2, hour: 10)))
+        }
+        store.drain()
     }
 }
 
-private let kitchenQuotes = """
+nonisolated private let kitchenQuotes = """
 # Kitchen quotes
 
 Three quotes in so far. Waiting on the fourth before deciding.
@@ -91,7 +93,7 @@ Three quotes in so far. Waiting on the fourth before deciding.
 > Whatever we choose, the sink stays under the window.
 """
 
-private let gardenIdeas = """
+nonisolated private let gardenIdeas = """
 # Garden ideas
 
 Raised beds along the south fence, and somewhere to sit in the evening sun.
@@ -101,7 +103,7 @@ Raised beds along the south fence, and somewhere to sit in the evening sun.
 - Climbing roses on the back wall
 """
 
-private let weeklyReview = """
+nonisolated private let weeklyReview = """
 # Weekly review
 
 What moved, what is stuck, what to drop.
@@ -120,7 +122,7 @@ What moved, what is stuck, what to drop.
 - The second analytics dashboard
 """
 
-private let accountant = """
+nonisolated private let accountant = """
 # Call with the accountant
 
 Questions to raise before the end of the quarter.
@@ -130,7 +132,7 @@ Questions to raise before the end of the quarter.
 - [ ] Ask about the pension contribution
 """
 
-private let readingList = """
+nonisolated private let readingList = """
 # Reading list
 
 - [x] The Design of Everyday Things
@@ -139,11 +141,11 @@ private let readingList = """
 - [ ] The Mythical Man-Month
 """
 
-private let podcastIdea = """
+nonisolated private let podcastIdea = """
 Podcast idea: short episodes on the history of everyday objects. The paperclip, the zip, the pencil.
 """
 
-private let lisbon = """
+nonisolated private let lisbon = """
 # Trip to Lisbon
 
 Three days in October. Flights booked, hotel still to choose.
@@ -161,7 +163,7 @@ Three days in October. Flights booked, hotel still to choose.
 - [ ] Rain jacket
 """
 
-private let designReview = """
+nonisolated private let designReview = """
 # Design review
 
 Keep the list pane calm. Fewer badges, clearer dates.
@@ -173,7 +175,7 @@ Keep the list pane calm. Fewer badges, clearer dates.
 > If it needs explaining, it is not finished.
 """
 
-private let recipes = """
+nonisolated private let recipes = """
 # Recipes to try
 
 - Slow-roast tomatoes
@@ -183,13 +185,13 @@ private let recipes = """
     - Serve with greens
 """
 
-private let bikeService = """
+nonisolated private let bikeService = """
 # Bike service
 
 Booked for Saturday morning. Ask them to check the rear brake and replace the chain if it has stretched.
 """
 
-private let hiringLoop = """
+nonisolated private let hiringLoop = """
 # Hiring loop
 
 Four stages, one week end to end.
@@ -204,7 +206,7 @@ Four stages, one week end to end.
 Keep the work sample close to the real job. No puzzles.
 """
 
-private let usefulCommands = """
+nonisolated private let usefulCommands = """
 # Useful commands
 
 Short commands worth keeping to hand.
@@ -217,7 +219,7 @@ git switch -c feature/name
 Use `git restore` rather than `git checkout` for files.
 """
 
-private let boilerManual = """
+nonisolated private let boilerManual = """
 # Boiler
 
 Model and settings, so nobody has to find the manual again.
@@ -227,7 +229,7 @@ Model and settings, so nobody has to find the manual again.
 - Reset button is behind the flap, bottom left
 """
 
-private let designOfEverydayThings = """
+nonisolated private let designOfEverydayThings = """
 # The Design of Everyday Things
 
 Notes as I read.
@@ -239,7 +241,7 @@ Notes as I read.
 See also [the revised edition](https://en.wikipedia.org/wiki/The_Design_of_Everyday_Things).
 """
 
-private let giftIdeas = """
+nonisolated private let giftIdeas = """
 # Gift ideas
 
 - A good bread knife
@@ -247,7 +249,7 @@ private let giftIdeas = """
 - A print from the market stall by the station
 """
 
-private let quarterlyPlanning = """
+nonisolated private let quarterlyPlanning = """
 # Quarterly planning
 
 Three outcomes, not ten.
@@ -261,7 +263,7 @@ Three outcomes, not ten.
 Everything else is a maybe.
 """
 
-private let runningPlan = """
+nonisolated private let runningPlan = """
 # Running plan
 
 | Week | Tuesday | Thursday | Sunday |
@@ -271,13 +273,13 @@ private let runningPlan = """
 | 3 | 6 km easy | Tempo 20 min | 12 km |
 """
 
-private let patternLanguage = """
+nonisolated private let patternLanguage = """
 # A Pattern Language
 
 Pattern 159, light on two sides of every room. Worth remembering for the kitchen.
 """
 
-private let movingChecklist = """
+nonisolated private let movingChecklist = """
 # Moving checklist
 
 - [x] Redirect post
@@ -286,13 +288,13 @@ private let movingChecklist = """
 - [x] Meter readings on the day
 """
 
-private let oldPackingList = """
+nonisolated private let oldPackingList = """
 # Old packing list
 
 Superseded by the Lisbon note.
 """
 
-private let draftAgenda = """
+nonisolated private let draftAgenda = """
 # Draft agenda
 
 An earlier version of the planning agenda.

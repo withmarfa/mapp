@@ -26,9 +26,9 @@ struct NoteTextTests {
     }
 
     @Test func noteKeepsItsTitleAndPreviewInStepWithItsBody() {
-        var note = Note(body: "# First", created: .now)
+        var note = Note(text: "# First", created: .now)
         #expect(note.title == "First")
-        note.body = "# Second\nMore"
+        note.file.body = "# Second\nMore"
         #expect(note.title == "Second")
         #expect(note.preview == "More")
     }

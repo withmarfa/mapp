@@ -18,6 +18,8 @@ final class EditorController: NSObject {
 
     /// An edit to a note, with the markdown the note now holds.
     @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
+    /// A note the page has moved on from, once any edit to it has been handed over.
+    @ObservationIgnored var onLeave: (Note.ID) -> Void = { _ in }
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -75,8 +77,10 @@ final class EditorController: NSObject {
 
     // MARK: Driving the page
 
-    /// Shows a note, with the caret at its end. A deleted note is shown read-only.
+    /// Shows a note, with the caret at its end. A deleted note is shown read-only. The note shown before is
+    /// left once its last edit is in.
     func load(_ note: Note) {
+        if noteID != nil, noteID != note.id { flush() }
         show(note, as: "load")
     }
 
@@ -100,14 +104,18 @@ final class EditorController: NSObject {
         call(function, json(note.body), String(generation), String(isEditable))
     }
 
-    /// Hands over an edit the page has not yet reported, as when the window closes. The reply keeps this
-    /// controller alive until it arrives.
+    /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
+    /// and then leaves the note. The page answers in order, so this lands before anything asked of it later.
+    /// The reply keeps this controller alive until it arrives.
     func flush() {
-        guard isReady, let noteID else { return }
+        guard let noteID else { return }
+        guard isReady else { return onLeave(noteID) }
         webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
-            guard let markdown = result as? String else { return }
-            if noteID == self.noteID { self.markdown = markdown }
-            onChange(noteID, markdown)
+            if let markdown = result as? String {
+                if noteID == self.noteID { self.markdown = markdown }
+                onChange(noteID, markdown)
+            }
+            onLeave(noteID)
         }
     }
 

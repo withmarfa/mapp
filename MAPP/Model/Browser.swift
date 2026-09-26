@@ -8,6 +8,8 @@ final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
     var selection: Set<Note.ID> = []
     var searchText = ""
+    /// The note whose file name is being asked for.
+    var renamingNote: Note.ID?
     /// The folder whose name is being edited in the sidebar.
     var renamingFolder: Folder.ID?
     /// The folder whose deletion awaits confirmation.
@@ -84,10 +86,11 @@ final class Browser {
         renamingFolder = folder.id
     }
 
-    /// Notes in the list go to Recently Deleted; notes already there are deleted for good. Both undo.
+    /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
+    /// person confirms, since that cannot be undone.
     static func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
-        library.deletePermanently(alreadyDeleted, undoManager: undoManager)
+        if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 

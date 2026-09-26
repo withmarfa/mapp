@@ -21,7 +21,7 @@ final class WindowTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }

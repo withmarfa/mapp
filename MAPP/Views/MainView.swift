@@ -9,6 +9,8 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @FocusState private var isSearchFocused: Bool
+    @State private var noteName = ""
+    @State private var takenNoteName: String?
 
     var body: some View {
         NavigationSplitView {
@@ -50,8 +52,47 @@ struct MainView: View {
         .onDisappear { editor.flush() }
         .onAppear {
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
-            restore()
+        }
+        // A window restores what it showed once the folder has been read, since before then nothing is there.
+        .onChange(of: library.isLoaded, initial: true) {
+            if library.isLoaded { restore() }
+        }
+        .confirmationDialog(
+            library.notesToPurge.count == 1
+                ? "Delete this note immediately?"
+                : "Delete \(library.notesToPurge.count) notes immediately?",
+            isPresented: Binding { !library.notesToPurge.isEmpty } set: { if !$0 { library.notesToPurge = [] } }
+        ) {
+            Button("Delete", role: .destructive) { library.deletePermanently(library.notesToPurge) }
+        } message: {
+            Text("You can’t undo this action.")
+        }
+        .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
+            TextField("Name", text: $noteName)
+            Button("Rename") { renameNote() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The note’s file takes the new name.")
+        }
+        .onChange(of: browser.renamingNote) {
+            noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
+        }
+        .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
+        } message: {
+            Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
+        }
+    }
+
+    /// A name another note in the folder has is refused with an alert, as the Finder does.
+    private func renameNote() {
+        guard let id = browser.renamingNote else { return }
+        let name = NoteLibrary.fileSafe(noteName)
+        if library.isNoteNameTaken(name, for: id) {
+            takenNoteName = name
+        } else {
+            library.renameNote(id, to: name, undoManager: undoManager)
         }
     }
 

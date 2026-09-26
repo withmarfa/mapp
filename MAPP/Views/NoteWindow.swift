@@ -28,6 +28,7 @@ struct NoteWindow: View {
         // A window whose note has gone, deleted for good or not there when the window is restored, closes.
         .onAppear {
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onLeave = { [library] id in library.leave(id) }
             if note == nil { dismiss() }
         }
         .onChange(of: note == nil) { if note == nil { dismiss() } }

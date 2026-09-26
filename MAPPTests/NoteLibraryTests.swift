@@ -7,12 +7,16 @@ struct NoteLibraryTests {
     let work = Folder(name: "Work")
     let home = Folder(name: "Home")
 
+    let store = RecordingStore()
+
     func makeLibrary() -> (NoteLibrary, inbox: Note, filed: Note, pinned: Note, deleted: Note) {
         let inbox = Note(body: "# Inbox note", created: start)
-        let filed = Note(body: "# Filed note", created: start, folderID: work.id)
-        let pinned = Note(body: "# Pinned note", created: start, folderID: home.id, isPinned: true)
-        let deleted = Note(body: "# Deleted note", created: start, folderID: work.id, deleted: start)
-        let library = NoteLibrary(notes: [inbox, filed, pinned, deleted], folders: [work, home], now: { start + 60 })
+        let filed = Note(body: "# Filed note", path: "Work/Filed note.md", created: start, folderID: work.id)
+        let pinned = Note(body: "# Pinned note", path: "Home/Pinned note.md", created: start, folderID: home.id, isPinned: true)
+        let deleted = Note(body: "# Deleted note", path: "Work/Deleted note.md", created: start, folderID: work.id, deleted: start)
+        let library = NoteLibrary(
+            notes: [inbox, filed, pinned, deleted], folders: [work, home], store: store, now: { start + 60 }
+        )
         return (library, inbox, filed, pinned, deleted)
     }
 
@@ -114,9 +118,11 @@ struct NoteLibraryTests {
         let manager = undoManager()
         undoably(manager) { library.recover([deleted.id], undoManager: manager) }
         #expect(library.notes(in: .folder(work.id)).map(\.id).contains(deleted.id))
+        #expect(store.changes == [.restore(id: deleted.binID!, path: "Work/Deleted note.md")])
         #expect(manager.undoActionName == "Recover")
         manager.undo()
-        #expect(library.note(deleted.id) == deleted)
+        #expect(library.note(deleted.id)?.isDeleted == true)
+        #expect(library.note(deleted.id)?.folderID == work.id)
         #expect(manager.redoActionName == "Recover")
     }
 
@@ -136,14 +142,14 @@ struct NoteLibraryTests {
         #expect(library.note(deleted.id)?.deleted == start)
     }
 
-    @Test func deletingPermanentlyRemovesAndUndoes() {
-        let (library, _, _, _, deleted) = makeLibrary()
-        let manager = undoManager()
-        undoably(manager) { library.deletePermanently([deleted.id], undoManager: manager) }
+    @Test func deletingPermanentlyErasesForGoodWithoutUndo() {
+        let (library, inbox, _, _, deleted) = makeLibrary()
+        library.notesToPurge = [deleted.id]
+        library.deletePermanently([deleted.id, inbox.id])
         #expect(library.note(deleted.id) == nil)
-        #expect(manager.undoActionName == "Delete Note")
-        manager.undo()
-        #expect(library.note(deleted.id) == deleted)
+        #expect(library.note(inbox.id) != nil, "a note not in Recently Deleted is not erased")
+        #expect(library.notesToPurge.isEmpty)
+        #expect(store.changes == [.purge(id: deleted.binID!)])
     }
 
     @Test func movingFilesANoteRecoversItAndUndoes() {
@@ -152,10 +158,11 @@ struct NoteLibraryTests {
         undoably(manager) { library.move([inbox.id, deleted.id], to: home.id, undoManager: manager) }
         #expect(library.notes(in: .folder(home.id)).count == 3)
         #expect(library.notes(in: .inbox).isEmpty)
+        #expect(library.note(deleted.id)?.path == "Home/Deleted note.md")
         #expect(manager.undoActionName == "Move")
         manager.undo()
         #expect(library.note(inbox.id) == inbox)
-        #expect(library.note(deleted.id) == deleted)
+        #expect(library.note(deleted.id)?.isDeleted == true)
     }
 
     @Test func movingToNoFolderReturnsToTheInbox() {
@@ -271,10 +278,141 @@ struct NoteLibraryTests {
         #expect(manager.undoActionName == "Delete Note")
     }
 
+    // MARK: Files
+
+    @Test func deletingAndRecoveringMoveTheFileInAndOutOfTheTrash() throws {
+        let (library, inbox, _, _, _) = makeLibrary()
+        library.delete([inbox.id])
+        let binID = try #require(library.note(inbox.id)?.binID)
+        library.recover([inbox.id])
+        #expect(store.changes == [
+            .trash(path: "Inbox note.md", id: binID, date: start + 60),
+            .restore(id: binID, path: "Inbox note.md"),
+        ])
+    }
+
+    @Test func movingANoteMovesItsFileIntoTheFolder() {
+        let (library, inbox, filed, _, _) = makeLibrary()
+        library.move([inbox.id], to: home.id)
+        library.move([filed.id], to: nil)
+        #expect(store.changes == [
+            .move(from: "Inbox note.md", to: "Home/Inbox note.md"),
+            .move(from: "Work/Filed note.md", to: "Filed note.md"),
+        ])
+        #expect(library.note(inbox.id)?.path == "Home/Inbox note.md")
+    }
+
+    @Test func aNameTakenInTheFolderIsNumbered() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let other = Note(body: "# Inbox note", path: "Home/Inbox note.md", created: start, folderID: home.id)
+        let crowded = NoteLibrary(notes: library.notes + [other], folders: [work, home], store: store)
+        crowded.move([inbox.id], to: home.id)
+        #expect(crowded.note(inbox.id)?.path == "Home/Inbox note 2.md")
+    }
+
+    @Test func pinningWritesThePropertyIntoTheFile() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        library.setPinned([inbox.id], true)
+        #expect(store.changes == [.write(path: "Inbox note.md", text: "---\npinned: true\n---\n# Inbox note")])
+        library.setPinned([inbox.id], false)
+        #expect(store.changes.last == .write(path: "Inbox note.md", text: "# Inbox note"))
+    }
+
+    @Test func aNewNoteGetsItsFileOnceItsFirstLineIsFinished() {
+        let (library, _, _, _, _) = makeLibrary()
+        let note = library.newNote(in: .folder(work.id))
+        library.updateBody(of: note.id, to: "Groceries\n")
+        #expect(store.changes.isEmpty, "a single line may still be being typed")
+        library.updateBody(of: note.id, to: "Groceries\n\nMilk\n")
+        #expect(store.changes == [.create(path: "Work/Groceries.md", text: "Groceries\n\nMilk\n")])
+        #expect(library.note(note.id)?.title == "Groceries")
+        library.updateBody(of: note.id, to: "Groceries\n\nMilk, eggs\n")
+        #expect(store.changes.last == .write(path: "Work/Groceries.md", text: "Groceries\n\nMilk, eggs\n"))
+    }
+
+    @Test func leavingANewNoteWritesWhatItHasOrLetsAnEmptyOneGo() {
+        let (library, _, _, _, _) = makeLibrary()
+        let empty = library.newNote(in: .inbox)
+        library.leave(empty.id)
+        #expect(library.note(empty.id) == nil)
+        let short = library.newNote(in: .pinned)
+        library.updateBody(of: short.id, to: "Call the plumber\n")
+        library.leave(short.id)
+        #expect(store.changes == [
+            .create(path: "Call the plumber.md", text: "---\npinned: true\n---\nCall the plumber\n"),
+        ])
+    }
+
+    @Test func undoingANewNoteAlreadyWrittenMovesItToRecentlyDeleted() {
+        let (library, _, _, _, _) = makeLibrary()
+        let manager = undoManager()
+        var note: Note?
+        undoably(manager) { note = library.newNote(in: .inbox, undoManager: manager) }
+        library.updateBody(of: note!.id, to: "Kept\n\nText\n")
+        manager.undo()
+        #expect(library.note(note!.id)?.isDeleted == true)
+    }
+
+    @Test func renamingANoteMovesItsFileAndUndoes() {
+        let (library, _, filed, _, _) = makeLibrary()
+        let manager = undoManager()
+        undoably(manager) { library.renameNote(filed.id, to: " Office / plan ", undoManager: manager) }
+        #expect(library.note(filed.id)?.path == "Work/Office - plan.md")
+        #expect(library.note(filed.id)?.title == "Office - plan")
+        #expect(manager.undoActionName == "Rename Note")
+        manager.undo()
+        #expect(library.note(filed.id)?.path == "Work/Filed note.md")
+        #expect(store.changes == [
+            .move(from: "Work/Filed note.md", to: "Work/Office - plan.md"),
+            .move(from: "Work/Office - plan.md", to: "Work/Filed note.md"),
+        ])
+    }
+
+    @Test func renamingANoteWithATitlePropertyChangesThatToo() {
+        let titled = Note(path: "Old.md", text: "---\ntitle: Old\nmarfa_id: 7\n---\nBody\n", created: start)
+        let library = NoteLibrary(notes: [titled], store: store)
+        library.renameNote(titled.id, to: "New")
+        #expect(library.note(titled.id)?.title == "New")
+        #expect(store.changes.last == .write(path: "New.md", text: "---\ntitle: New\nmarfa_id: 7\n---\nBody\n"))
+    }
+
+    @Test func aNoteCannotTakeANameAnotherNoteInItsFolderHas() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let other = Note(body: "Other", created: start)
+        let crowded = NoteLibrary(notes: library.notes + [other], store: store)
+        #expect(crowded.isNoteNameTaken("inbox NOTE", for: other.id))
+        #expect(!crowded.isNoteNameTaken("Filed note", for: other.id), "that name is in another folder")
+        crowded.renameNote(other.id, to: "Inbox note")
+        #expect(crowded.note(other.id)?.path == "Other.md")
+        _ = inbox
+    }
+
+    @Test func foldersAreDirectories() {
+        let (library, _, _, _, _) = makeLibrary()
+        let folder = library.newFolder()
+        library.rename(work.id, to: "Office")
+        library.deleteFolder(folder.id)
+        #expect(store.changes == [
+            .createFolder(path: "New Folder"),
+            .moveFolder(from: "Work", to: "Office"),
+            .removeFolder(path: "New Folder"),
+        ])
+        #expect(library.notes.compactMap(\.path).contains("Office/Filed note.md"))
+    }
+
+    @Test func theAttachmentsFolderNameIsTaken() {
+        let (library, _, _, _, _) = makeLibrary()
+        #expect(library.isFolderNameTaken("attachments"))
+    }
+
     // MARK: Sample content
 
-    @Test func sampleContentFillsEverySidebarItem() {
-        let library = NoteLibrary.sample()
+    @Test func sampleContentFillsEverySidebarItem() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        try SampleLibrary.write(to: root.url, bin: bin.url)
+        let library = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url), defaults: nil)
+        await library.load()
         #expect(library.folders.count == 4)
         for item in [SidebarItem.inbox, .allNotes, .pinned, .recentlyDeleted] + library.folders.map({ .folder($0.id) }) {
             #expect(library.count(in: item) > 0, "\(item) is empty")

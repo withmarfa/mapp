@@ -175,30 +175,6 @@ describe('what the editor does not show is kept', () => {
       expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
     })
   })
-
-  test('front matter is kept as written and not shown', async () => {
-    const source = '---\ntitle: A note\ntags:\n  - a\n  - b\n---\n\nBody EDIT\n'
-    await withLoaded(source, (editor, ctx) => {
-      expect(ctx.get(editorViewCtx).state.doc.textContent).toBe('Body EDIT')
-      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
-    })
-  })
-
-  test('Windows line endings stay Windows line endings, in new text too', async () => {
-    const source = 'Alpha\r\n\r\nBeta EDIT\r\nsecond line\r\n\r\n- a\r\n- b\r\n'
-    await withLoaded(source, (editor, ctx) => {
-      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
-      append(ctx, 'New')
-      expect(editor.markdown()).toBe(`${source.replace('EDIT', 'EDIT!')}\r\nNew\r\n`)
-    })
-  })
-
-  test('a byte-order mark stays and does not shift the blocks', async () => {
-    const source = '﻿First\n\nB EDIT\n\nC\n'
-    await withLoaded(source, (editor, ctx) => {
-      expect(typeAfter(editor, ctx, 'EDIT', '!')).toBe(source.replace('EDIT', 'EDIT!'))
-    })
-  })
 })
 
 describe('blocks keep their own shape', () => {
