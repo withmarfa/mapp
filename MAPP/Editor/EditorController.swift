@@ -53,7 +53,6 @@ final class EditorController: NSObject {
         super.init()
         pageFinder = PageFinder(controller: self)
         pageFinder.finder.findBarContainer = container
-        container.finder = pageFinder.finder
         container.onFindBarVisibilityChange = { [weak self] visible in
             self?.call("setFinding", String(visible))
         }
@@ -198,6 +197,15 @@ final class EditorController: NSObject {
     }
 
     // MARK: Find
+
+    /// Whether a note is on the page to find in.
+    var hasNote: Bool { isReady && noteID != nil }
+
+    /// Does what an item of Edit > Find asks, through the system find bar above the page.
+    func performFind(_ action: NSTextFinder.Action) {
+        guard hasNote else { return }
+        pageFinder.finder.performAction(action)
+    }
 
     func findSelect(_ range: NSRange) {
         call("findSelect", String(range.location), String(NSMaxRange(range)))

@@ -123,9 +123,8 @@ final class PageFinder: NSObject, NSTextFinderClient {
 }
 
 /// Holds the page and, while it shows, the find bar above it, under the toolbar.
-final class EditorContainer: NSView, NSTextFinderBarContainer, NSUserInterfaceValidations {
+final class EditorContainer: NSView, NSTextFinderBarContainer {
     let webView: EditorWebView
-    weak var finder: NSTextFinder?
     var onFindBarVisibilityChange: (Bool) -> Void = { _ in }
 
     /// How far the window's toolbar overlaps the container.
@@ -180,20 +179,4 @@ final class EditorContainer: NSView, NSTextFinderBarContainer, NSUserInterfaceVa
         webView.topInset = inset
     }
 
-    // The Edit menu's Find items reach the page's container through the responder chain.
-    override func performTextFinderAction(_ sender: Any?) {
-        guard let tag = (sender as? NSValidatedUserInterfaceItem)?.tag,
-              let action = NSTextFinder.Action(rawValue: tag)
-        else { return }
-        finder?.performAction(action)
-    }
-
-    func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        item.action == #selector(performTextFinderAction(_:)) && validateFind(item)
-    }
-
-    func validateFind(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        guard let action = NSTextFinder.Action(rawValue: item.tag) else { return false }
-        return finder?.validateAction(action) ?? false
-    }
 }
