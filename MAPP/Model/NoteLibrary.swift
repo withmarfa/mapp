@@ -11,8 +11,8 @@ final class NoteLibrary {
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
     var notesToPurge: Set<Note.ID> = []
-    /// A change the store could not make, to tell the person: the file it was about and what went wrong.
-    var failure: (path: String, message: String)?
+    /// Something the store could not do, to tell the person: what failed and why.
+    var failure: (title: String, message: String)?
     let now: () -> Date
 
     @ObservationIgnored let store: NoteStore?
@@ -21,6 +21,17 @@ final class NoteLibrary {
     @ObservationIgnored private var queued = 0
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var needsRefresh = false
+    /// Notes whose last change could not be made, which a reading of the folder leaves as they are here, so what
+    /// was typed stays until it can be saved.
+    @ObservationIgnored private var unsaved: Set<String> = []
+    /// When each note was first found missing from the folder. Some apps save by taking a file away and writing
+    /// it again, so a note goes only once it has stayed away a moment.
+    @ObservationIgnored private var missingSince: [Note.ID: Date] = [:]
+    private static let missingGrace: TimeInterval = 2
+
+    private static var unreadable: (title: String, message: String) {
+        (String(localized: "Can’t Read the Notes Folder"), String(localized: "It may have been moved or deleted. Choose it again in Settings."))
+    }
 
     /// How long a note stays in Recently Deleted.
     static let trashDays = 30
@@ -41,7 +52,11 @@ final class NoteLibrary {
         self.now = now
         isLoaded = true
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
-        store?.failed = { [weak self] path, message in self?.failure = (path, message) }
+        store?.failed = { [weak self] path, message in
+            let name = (path as NSString).lastPathComponent
+            self?.failure = (String(localized: "Couldn’t Save “\(name)”"), message)
+            self?.unsaved.insert(path)
+        }
     }
 
     /// A library that reads its notes from the store, which `load()` does.
@@ -56,13 +71,9 @@ final class NoteLibrary {
     func load() async {
         guard let store else { return }
         let expiry = Calendar.current.date(byAdding: .day, value: -Self.trashDays, to: now()) ?? now()
-        let stored = await Task.detached { () -> StoredLibrary? in
-            do {
-                return try store.load()
-            } catch {
-                return nil
-            }
-        }.value ?? StoredLibrary()
+        let read = await Task.detached { () -> StoredLibrary? in try? store.load() }.value
+        if read == nil { failure = Self.unreadable }
+        let stored = read ?? StoredLibrary()
         perform(.purgeTrash(before: expiry))
 
         let saved = defaults?.stringArray(forKey: Self.folderOrderKey) ?? []
@@ -108,6 +119,7 @@ final class NoteLibrary {
         // Notes begun while the folder was being read are kept.
         notes = loaded + notes.filter(\.isDraft)
         isLoaded = true
+        if needsRefresh { refresh() }
     }
 
     // MARK: Changes made outside
@@ -116,7 +128,7 @@ final class NoteLibrary {
     /// there. The store reads only once the changes handed to it are made; a reading taken while more were
     /// handed over is set aside and taken again, so the library never mistakes its own changes for another's.
     func refresh() {
-        guard !isRefreshing else {
+        guard isLoaded, !isRefreshing else {
             needsRefresh = true
             return
         }
@@ -126,14 +138,26 @@ final class NoteLibrary {
     func reread() async {
         guard let store, isLoaded else { return }
         isRefreshing = true
-        repeat {
-            needsRefresh = false
-            let generation = queued
-            let stored = await Task.detached { try? store.load() }.value
-            guard let stored else { break }
-            if generation == queued { reconcile(stored) } else { needsRefresh = true }
-        } while needsRefresh
+        needsRefresh = false
+        let generation = queued
+        let stored = await Task.detached { try? store.load() }.value
         isRefreshing = false
+        guard let stored else {
+            failure = Self.unreadable
+            return
+        }
+        // A reading taken while the library handed the store more changes is set aside and taken again after a
+        // pause, since those changes may not be in it.
+        if generation != queued {
+            try? await Task.sleep(for: .milliseconds(500))
+            return await reread()
+        }
+        reconcile(stored)
+        if !missingSince.isEmpty {
+            try? await Task.sleep(for: .seconds(Self.missingGrace))
+            needsRefresh = true
+        }
+        if needsRefresh { await reread() }
     }
 
     /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added or
@@ -158,7 +182,8 @@ final class NoteLibrary {
                 updated[index].path = disk.path
                 updated[index].folderID = folderID(forPath: disk.path)
             }
-            if updated[index].file.text != disk.text {
+            missingSince[updated[index].id] = nil
+            if updated[index].file.text != disk.text, !unsaved.contains(disk.path) {
                 updated[index].file = NoteFile(text: disk.text)
                 updated[index].modified = disk.modified
             }
@@ -191,8 +216,16 @@ final class NoteLibrary {
                 seen.insert(note.id)
             }
         }
-        // A written note whose file has gone was deleted by another app, and goes with it.
-        updated.removeAll { !$0.isDeleted && !$0.isDraft && !seen.contains($0.id) }
+        // A written note whose file has gone was deleted by another app, and goes with it once it has stayed
+        // away a moment. One whose last change failed stays, since what was typed is only here.
+        let now = now()
+        updated.removeAll { note in
+            guard !note.isDeleted, !note.isDraft, !seen.contains(note.id), !unsaved.contains(note.path ?? "") else { return false }
+            let since = missingSince[note.id] ?? now
+            missingSince[note.id] = since
+            return now.timeIntervalSince(since) >= Self.missingGrace
+        }
+        missingSince = missingSince.filter { id, _ in updated.contains { $0.id == id } }
         if updated != notes { notes = updated }
     }
 
@@ -278,6 +311,7 @@ final class NoteLibrary {
         guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body,
               !notes[index].isDeleted
         else { return }
+        if let path = notes[index].path { unsaved.remove(path) }
         notes[index].file.body = body
         notes[index].modified = now()
         if notes[index].isDraft {
@@ -616,6 +650,7 @@ final class NoteLibrary {
 
     /// The store could not use a path, since something it had not been told of was there, and used another.
     private func relocate(_ from: String, _ to: String) {
+        defer { store?.acknowledgeRelocation(of: from) }
         guard let index = notes.firstIndex(where: { $0.path == from && !$0.isDeleted })
             ?? notes.firstIndex(where: { $0.path == from })
         else { return }

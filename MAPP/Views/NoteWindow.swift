@@ -28,6 +28,7 @@ struct NoteWindow: View {
             }
         }
         .onAppear {
+            editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
         }

@@ -19,6 +19,9 @@ nonisolated protocol NoteStore: AnyObject, Sendable {
     /// the main actor.
     var relocated: @MainActor @Sendable (_ from: String, _ to: String) -> Void { get set }
 
+    /// The library has taken in a relocation, so changes it queues from now on for the old path mean that path.
+    func acknowledgeRelocation(of path: String)
+
     /// Told when a change could not be made, with what went wrong, so the person hears of it. Called on the
     /// main actor.
     var failed: @MainActor @Sendable (_ path: String, _ message: String) -> Void { get set }
@@ -29,7 +32,8 @@ nonisolated struct StoredNote: Sendable {
     var text: String
     var created: Date
     var modified: Date
-    /// The file's own identity, which a rename keeps, so a note moved by another app is still the same note.
+    /// The file's own identity, which a rename and a safe save keep, so a note moved by another app is still the
+    /// same note.
     var fileID: UInt64? = nil
 }
 

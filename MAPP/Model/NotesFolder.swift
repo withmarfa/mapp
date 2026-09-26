@@ -53,13 +53,9 @@ final class NotesFolder {
     /// Reads the folder, then keeps reading it whenever anything in it changes.
     private func start(_ library: NoteLibrary, watching url: URL) {
         self.library = library
-        watcher = nil
-        Task { [weak self] in
-            await library.load()
-            // A folder changed meanwhile has its own watcher.
-            guard let self, self.library === library else { return }
-            watcher = FolderWatcher(url) { library.refresh() }
-        }
+        // Watching starts before the folder is read, so a change made while it is read is taken in after.
+        watcher = FolderWatcher(url) { library.refresh() }
+        Task { await library.load() }
     }
 
     private func remember(_ url: URL) {
