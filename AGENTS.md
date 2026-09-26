@@ -22,6 +22,7 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 - Swift 6 language mode, main-actor isolation by default, Swift Testing.
 - Native containers and controls (`NavigationSplitView`, `List`, toolbars, commands, system materials) so the system supplies the look. Custom chrome needs a reason. Check API and design questions against Apple's documentation and the Human Interface Guidelines, not memory.
 - App Sandbox and hardened runtime stay on. The sandbox allows outgoing connections only because WebKit's page process needs them; the page itself loads nothing. Every user-facing string goes through the String Catalog.
+- A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`, which `aic-infisical-run -- scripts/render-local-signing.sh` writes from Infisical to sign with the team. Never commit a team identifier or edit the rendered file by hand.
 
 ## Versions
 
