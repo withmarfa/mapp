@@ -16,7 +16,7 @@ declare global {
       undo(): void
       redo(): void
       setImageBase(directory: string): void
-      insertImages(images: { src: string; alt: string }[], x?: number, y?: number): void
+      insertImages(images: { src: string; alt: string }[], x?: number, y?: number, height?: number): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
     }
@@ -57,7 +57,10 @@ window.addEventListener(
   (event) => {
     const data = event.clipboardData
     if (!data || data.types.includes('text/html')) return
-    if (![...data.items].some((item) => item.kind === 'file' && item.type.startsWith('image/'))) return
+    const files = [...data.items].filter((item) => item.kind === 'file')
+    if (files.length === 0 || !files.every((item) => item.type.startsWith('image/'))) return
+    // Text beside the image is kept for the page, unless it only names a file copied in the Finder.
+    if (data.types.includes('text/plain') && !data.types.includes('text/uri-list')) return
     event.preventDefault()
     event.stopPropagation()
     postToHost({ type: 'pasteImages' })
@@ -94,7 +97,9 @@ window.editor = {
   undo: () => editor.undo(),
   redo: () => editor.redo(),
   setImageBase: (directory) => setImageBase(directory),
-  insertImages: (images, x, y) => editor.insertImages(images, x, y),
+  // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
+  insertImages: (images, x, y, height) =>
+    editor.insertImages(images, x, y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight)),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
 }

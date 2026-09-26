@@ -9,17 +9,32 @@ final class NoteFiles: NSObject, WKScriptMessageHandlerWithReply {
     /// The notes folder, asked for each time, since the person can change it.
     var root: () -> URL? = { nil }
 
-    /// Replies with the image as a data URL the page can show, or nothing.
+    /// The largest image the page is given, and the largest taken in by a paste or drop.
+    nonisolated static let largestImage = 50 * 1024 * 1024
+
+    /// Replies with the image as a data URL the page can show, or nothing. The file is read away from the main
+    /// thread, and only if it is an ordinary file of a reasonable size.
     func userContentController(
         _ controller: WKUserContentController,
         didReceive message: WKScriptMessage,
         replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void
     ) {
         guard let path = message.body as? String, let file = file(at: path),
-              let type = UTType(filenameExtension: file.pathExtension), type.conforms(to: .image),
-              let data = try? Data(contentsOf: file)
+              let type = UTType(filenameExtension: file.pathExtension), type.conforms(to: .image)
         else { return replyHandler(nil, nil) }
-        replyHandler("data:\(type.preferredMIMEType ?? "image/png");base64,\(data.base64EncodedString())", nil)
+        let mime = type.preferredMIMEType ?? "image/png"
+        Task.detached {
+            let reply = Self.readImage(file).map { "data:\(mime);base64,\($0.base64EncodedString())" }
+            await MainActor.run { replyHandler(reply, nil) }
+        }
+    }
+
+    /// An ordinary file's bytes, when it is no larger than the page is given.
+    nonisolated static func readImage(_ file: URL) -> Data? {
+        guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true, (values.fileSize ?? .max) <= largestImage
+        else { return nil }
+        return try? Data(contentsOf: file)
     }
 
     /// The file at a path in the notes folder, when it is inside the folder and reached without a symbolic link.
@@ -43,7 +58,7 @@ enum PastedImages {
             .urlReadingContentsConformToTypes: [UTType.image.identifier],
         ]) as? [URL] ?? []
         if !urls.isEmpty {
-            return urls.compactMap { url in (try? Data(contentsOf: url)).map { (url.lastPathComponent, $0) } }
+            return urls.compactMap { url in NoteFiles.readImage(url).map { (url.lastPathComponent, $0) } }
         }
         let types = [NSPasteboard.PasteboardType.png, NSPasteboard.PasteboardType(UTType.jpeg.identifier)]
         if let type = pasteboard.availableType(from: types), let data = pasteboard.data(forType: type) {

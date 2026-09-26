@@ -460,6 +460,20 @@ struct NoteLibraryTests {
         ])
     }
 
+    @Test func attachmentNamesKeepTheirExtension() {
+        #expect(NoteLibrary.attachmentName(String(repeating: "議", count: 120) + ".png").hasSuffix(".png"))
+        #expect(NoteLibrary.attachmentName(".png") == "Image.png")
+        #expect(NoteLibrary.attachmentName("a/b:c.jpeg") == "a-b-c.jpeg")
+    }
+
+    @Test func movingANoteRewritesItsAttachmentLinks() {
+        let note = Note(body: "Photo\n\n![p](Attachments/p.png)\n", created: start)
+        let library = NoteLibrary(notes: [note], folders: [work], store: store)
+        library.move([note.id], to: work.id)
+        #expect(library.note(note.id)?.body == "Photo\n\n![p](../Attachments/p.png)\n")
+        #expect(store.changes.last == .write(path: "Work/Photo.md", text: "Photo\n\n![p](../Attachments/p.png)\n"))
+    }
+
     // MARK: Sample content
 
     @Test func sampleContentFillsEverySidebarItem() async throws {

@@ -146,6 +146,7 @@ struct FolderStoreTests {
         let second = store.freeAttachmentPath(named: "Photo.png")
         #expect(first == "Attachments/Photo 2.png")
         #expect(second == "Attachments/Photo 3.png", "a name handed out is not handed out again before it is written")
+        #expect(store.freeAttachmentPath(named: "PHOTO 2.png") == "Attachments/PHOTO 2 2.png", "names differing in case are one file")
         store.perform(.attach(path: first, data: Data("image".utf8)))
         store.drain()
         #expect(root.read(first) == "image")

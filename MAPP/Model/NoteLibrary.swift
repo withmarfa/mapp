@@ -434,18 +434,25 @@ final class NoteLibrary {
         guard let store, let note = note(id), !note.isDeleted else { return [] }
         let depth = directory(of: note).split(separator: "/").count
         return files.map { file in
-            let path = store.freeAttachmentPath(named: Self.fileSafe(file.name))
+            let path = store.freeAttachmentPath(named: Self.attachmentName(file.name))
             perform(.attach(path: path, data: file.data))
             let encoded = path.split(separator: "/").map {
-                $0.addingPercentEncoding(withAllowedCharacters: Self.linkPathAllowed) ?? String($0)
+                $0.addingPercentEncoding(withAllowedCharacters: NoteText.linkPathAllowed) ?? String($0)
             }
             let link = (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
             return (link, ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
         }
     }
 
-    /// What a markdown link's path can hold as it is; spaces and brackets are escaped.
-    private static let linkPathAllowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "()<> "))
+    /// A file's name as the attachments folder can take it, keeping its extension, which says what it is.
+    static func attachmentName(_ name: String) -> String {
+        let ext = (name as NSString).pathExtension
+        let stem = fileSafe((name as NSString).deletingPathExtension)
+        let fitted = NoteText.fitted(stem, room: ext.utf8.count + 1)
+        let base = fitted.isEmpty ? String(localized: "Image") : fitted
+        return ext.isEmpty ? base : "\(base).\(fileSafe(ext))"
+    }
+
 
     // MARK: Folders
 
@@ -570,6 +577,7 @@ final class NoteLibrary {
             let path = uniquePath(fileName, in: directory(for: placement.folderID), except: note.id)
             perform(.move(from: from, to: path))
             notes[index].path = path
+            rebaseLinks(at: index, from: note.directory)
         case (true, true):
             notes[index].folderID = placement.folderID
         }
@@ -630,6 +638,15 @@ final class NoteLibrary {
     }
 
     // MARK: Paths
+
+    /// A note moved to another depth gets its links into the attachments folder written from where it now is.
+    private func rebaseLinks(at index: Int, from old: String) {
+        guard let path = notes[index].path else { return }
+        let body = NoteText.rebasingAttachmentLinks(in: notes[index].body, from: old, to: notes[index].directory)
+        guard body != notes[index].body else { return }
+        notes[index].file.body = body
+        perform(.write(path: path, text: notes[index].file.text))
+    }
 
     private func writeDraft(at index: Int) {
         let note = notes[index]

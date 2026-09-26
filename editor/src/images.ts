@@ -35,21 +35,30 @@ export function folderPath(src: string): string | null {
   }
 }
 
-/** The image as the app hands it over, a data URL, or null when the app has none to give. */
+/** The image as the app hands it over, a data URL, or null when the app has none to give. Only an answer with
+ *  an image is kept, since a file just pasted may not be written yet. */
 function image(path: string): Promise<string | null> {
   let answer = asked.get(path)
   if (!answer) {
     const files = window.webkit?.messageHandlers?.files
-    answer = files ? files.postMessage(path).catch(() => null) : Promise.resolve(null)
+    answer = (files ? files.postMessage(path).catch(() => null) : Promise.resolve(null)).then((data) => {
+      if (!data) asked.delete(path)
+      return data
+    })
     asked.set(path, answer)
   }
   return answer
 }
 
+/** How long to wait before asking again for an image that was not there, as when it is still being written. */
+const retries = [250, 1000]
+
 /** An image the notes folder holds shows as itself; any other shows what it was called, and the markdown keeps
  *  the image as written either way. */
 class ImageView implements NodeView {
   dom: HTMLElement
+  /** The image this view shows or is waiting for, so an answer for one it no longer shows is not painted. */
+  private path: string | null = null
 
   constructor(node: ProseNode) {
     this.dom = document.createElement('span')
@@ -73,9 +82,18 @@ class ImageView implements NodeView {
     // The name shows until the image arrives, and stays when there is none: a file that is not there, not an
     // image, or outside the notes folder.
     this.absent(name)
-    if (!path) return
+    this.path = path
+    if (path) this.show(path, name, 0)
+  }
+
+  private show(path: string, name: string, attempt: number): void {
     void image(path).then((data) => {
-      if (!data || this.dom.textContent !== name) return
+      if (this.path !== path) return
+      if (!data) {
+        const delay = retries[attempt]
+        if (delay != null) setTimeout(() => this.path === path && this.show(path, name, attempt + 1), delay)
+        return
+      }
       const element = document.createElement('img')
       element.src = data
       element.alt = name

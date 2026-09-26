@@ -138,8 +138,9 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             while true {
                 let file = number == 1 ? name : ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)"
                 let path = "\(Self.attachments)/\(file)"
-                if !reserved.contains(path), !files.fileExists(atPath: root.appending(path: path).path) {
-                    reserved.insert(path)
+                // Names differing only in case are the same file on the usual Mac file system.
+                if !reserved.contains(path.lowercased()), !files.fileExists(atPath: root.appending(path: path).path) {
+                    reserved.insert(path.lowercased())
                     return path
                 }
                 number += 1
@@ -186,7 +187,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try writeManifest(readManifest().filter { $0.id != id })
             report(path, target)
         case .attach(let path, let data):
-            defer { reservations.withLock { _ = $0.remove(path) } }
+            defer { reservations.withLock { _ = $0.remove(path.lowercased()) } }
             try writeNew(data, to: root.appending(path: path))
         case .purge(let id):
             try? files.removeItem(at: binURL(id))

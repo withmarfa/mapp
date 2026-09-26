@@ -58,11 +58,51 @@ nonisolated enum NoteText {
     }
 
     /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
-    static func fitted(_ name: String) -> String {
+    static func fitted(_ name: String, room: Int = 0) -> String {
         var name = name
-        while name.utf8.count > 200 { name.removeLast() }
+        while name.utf8.count > 200 - room { name.removeLast() }
         return name
     }
+
+    /// The body with its links into the attachments folder written from a new directory, as when the note moves
+    /// between the Inbox and a folder, so they still reach their files. Other links are left as written.
+    static func rebasingAttachmentLinks(in body: String, from old: String, to new: String) -> String {
+        guard old != new else { return body }
+        return body.replacing(markdownLink) { match in
+            let (whole, opening, destination) = match.output
+            let bracketed = destination.hasPrefix("<") && destination.hasSuffix(">")
+            let raw = bracketed ? String(destination.dropFirst().dropLast()) : String(destination)
+            guard let target = attachmentPath(raw, from: old) else { return String(whole) }
+            let depth = new.split(separator: "/").count
+            let encoded = target.split(separator: "/").map {
+                $0.addingPercentEncoding(withAllowedCharacters: linkPathAllowed) ?? String($0)
+            }
+            return String(opening) + (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
+        }
+    }
+
+    /// Where a relative link from the directory leads, when it leads into the attachments folder.
+    private static func attachmentPath(_ link: String, from directory: String) -> String? {
+        guard !link.isEmpty, link.firstMatch(of: /^[a-zA-Z][a-zA-Z0-9+.-]*:|^\/|^#/) == nil,
+              let decoded = link.removingPercentEncoding
+        else { return nil }
+        var components = directory.split(separator: "/").map(String.init)
+        for part in decoded.split(separator: "/").map(String.init) {
+            switch part {
+            case ".": continue
+            case "..": if components.popLast() == nil { return nil }
+            default: components.append(part)
+            }
+        }
+        guard components.count > 1, components.first == FolderStore.attachments else { return nil }
+        return components.joined(separator: "/")
+    }
+
+    /// What a markdown link's path can hold as it is; spaces and brackets are escaped.
+    static let linkPathAllowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "()<> "))
+
+    /// A markdown link or image up to the end of its destination: `[text](` and the destination.
+    private nonisolated(unsafe) static let markdownLink = /(!?\[(?:[^\]\\]|\\.)*\]\()(<[^>\n]*>|[^)\s]+)/
 
     /// The body's lines as they read on screen, blank lines dropped. Code inside fences is kept as written.
     static func readableLines(of body: String) -> [String] {

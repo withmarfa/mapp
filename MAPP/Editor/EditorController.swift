@@ -196,7 +196,7 @@ final class EditorController: NSObject {
         let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
         guard !images.isEmpty else { return false }
         if let point {
-            call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)))
+            call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(webView.bounds.height)))
         } else {
             call("insertImages", json(images))
         }

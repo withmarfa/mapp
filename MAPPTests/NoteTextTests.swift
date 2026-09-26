@@ -92,4 +92,11 @@ struct NoteTextTests {
     func plainTextOfOneLine(line: String, expected: String) {
         #expect(NoteText.plainText(of: line[...]) == expected)
     }
+
+    @Test func attachmentLinksFollowANoteToAnotherDepthAndOtherLinksStay() {
+        let body = "![a](Attachments/Photo%201.png) [site](https://e.com) ![b](<Attachments/b c.png>) ![x](Other/x.png)"
+        let moved = NoteText.rebasingAttachmentLinks(in: body, from: "", to: "Work")
+        #expect(moved == "![a](../Attachments/Photo%201.png) [site](https://e.com) ![b](../Attachments/b%20c.png) ![x](Other/x.png)")
+        #expect(NoteText.rebasingAttachmentLinks(in: moved, from: "Work", to: "") == "![a](Attachments/Photo%201.png) [site](https://e.com) ![b](Attachments/b%20c.png) ![x](Other/x.png)")
+    }
 }
