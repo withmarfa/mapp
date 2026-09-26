@@ -421,6 +421,32 @@ final class NoteLibrary {
         }
     }
 
+    // MARK: Attachments
+
+    /// The directory a note's file is in, or will be in once it is written.
+    func directory(of note: Note) -> String {
+        note.path == nil ? directory(for: note.folderID) : note.directory
+    }
+
+    /// Writes files a note points at, such as images pasted into it, into the attachments folder, and gives the
+    /// links to them from where the note is, as standard markdown writes a relative link.
+    func attach(_ files: [(name: String, data: Data)], to id: Note.ID) -> [(link: String, name: String)] {
+        guard let store, let note = note(id), !note.isDeleted else { return [] }
+        let depth = directory(of: note).split(separator: "/").count
+        return files.map { file in
+            let path = store.freeAttachmentPath(named: Self.fileSafe(file.name))
+            perform(.attach(path: path, data: file.data))
+            let encoded = path.split(separator: "/").map {
+                $0.addingPercentEncoding(withAllowedCharacters: Self.linkPathAllowed) ?? String($0)
+            }
+            let link = (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
+            return (link, ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+        }
+    }
+
+    /// What a markdown link's path can hold as it is; spaces and brackets are escaped.
+    private static let linkPathAllowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "()<> "))
+
     // MARK: Folders
 
     @discardableResult

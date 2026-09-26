@@ -1,5 +1,6 @@
 import { postToHost } from './bridge'
 import { NoteEditor, type FormatCommand, type Keymap } from './editor'
+import { setImageBase } from './images'
 import { setLabels, type Labels } from './labels'
 import './style.css'
 
@@ -14,6 +15,8 @@ declare global {
       focus(): void
       undo(): void
       redo(): void
+      setImageBase(directory: string): void
+      insertImages(images: { src: string; alt: string }[], x?: number, y?: number): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
     }
@@ -47,6 +50,21 @@ window.addEventListener('keydown', (event) => {
   postToHost({ type: 'escape' })
 })
 
+// An image pasted on its own, a screenshot or an image file copied in the Finder, becomes a file of the notes
+// folder, which the app takes from the pasteboard itself; a copied web page, images and all, is the page's.
+window.addEventListener(
+  'paste',
+  (event) => {
+    const data = event.clipboardData
+    if (!data || data.types.includes('text/html')) return
+    if (![...data.items].some((item) => item.kind === 'file' && item.type.startsWith('image/'))) return
+    event.preventDefault()
+    event.stopPropagation()
+    postToHost({ type: 'pasteImages' })
+  },
+  { capture: true },
+)
+
 // Links open on ⌘-click, so the pointer says so only while ⌘ is down.
 for (const name of ['keydown', 'keyup'] as const) {
   window.addEventListener(name, (event) =>
@@ -75,6 +93,8 @@ window.editor = {
   focus: () => editor.focus(),
   undo: () => editor.undo(),
   redo: () => editor.redo(),
+  setImageBase: (directory) => setImageBase(directory),
+  insertImages: (images, x, y) => editor.insertImages(images, x, y),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
 }

@@ -448,6 +448,18 @@ struct NoteLibraryTests {
         #expect(NoteLibrary.fileSafe(String(repeating: "é", count: 300)).utf8.count <= 200)
     }
 
+    @Test func attachedFilesAreLinkedFromWhereTheNoteIs() {
+        let (library, inbox, filed, _, deleted) = makeLibrary()
+        let image = Data("png".utf8)
+        #expect(library.attach([("Photo 1.png", image)], to: inbox.id).map(\.link) == ["Attachments/Photo%201.png"])
+        #expect(library.attach([("a(b).png", image)], to: filed.id).map(\.link) == ["../Attachments/a%28b%29.png"])
+        #expect(library.attach([("x.png", image)], to: deleted.id).isEmpty, "a deleted note takes nothing")
+        #expect(store.changes == [
+            .attach(path: "Attachments/Photo 1.png", data: image),
+            .attach(path: "Attachments/a(b).png", data: image),
+        ])
+    }
+
     // MARK: Sample content
 
     @Test func sampleContentFillsEverySidebarItem() async throws {

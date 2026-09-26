@@ -14,6 +14,10 @@ nonisolated protocol NoteStore: AnyObject, Sendable {
     /// Waits until every queued change is made, as the app quits.
     func drain()
 
+    /// A path in the attachments folder for a file of this name that nothing has, or will have once the changes
+    /// queued are made, numbered as the Finder numbers a copy.
+    func freeAttachmentPath(named name: String) -> String
+
     /// Told when a change could not use the path it was given, because a file the library does not know of is
     /// there, and used this one instead. Changes queued meanwhile for the first path go to the second. Called on
     /// the main actor.
@@ -61,6 +65,8 @@ nonisolated enum StoreChange: Sendable, Equatable {
     case restore(id: UUID, path: String)
     /// Erases a trashed note for good.
     case purge(id: UUID)
+    /// A file a note points at, such as a pasted image, written into the attachments folder.
+    case attach(path: String, data: Data)
     /// Erases whatever has been in the trash since before the date.
     case purgeTrash(before: Date)
     case createFolder(path: String)
@@ -73,7 +79,7 @@ extension StoreChange {
     /// The note or folder the change is about, to name it when the change fails.
     nonisolated var path: String? {
         switch self {
-        case .create(let path, _), .write(let path, _), .trash(let path, _, _), .restore(_, let path),
+        case .create(let path, _), .write(let path, _), .trash(let path, _, _), .restore(_, let path), .attach(let path, _),
              .createFolder(let path), .removeFolder(let path):
             path
         case .move(_, let to), .moveFolder(_, let to):

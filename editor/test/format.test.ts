@@ -468,3 +468,26 @@ test('an image from the web is shown as its alt text, never fetched', async () =
     expect(dom.querySelector('.image-absent')?.textContent).toBe('Somewhere else')
   })
 })
+
+test('images go on lines of their own from an empty line', async () =>
+  withNoteEditor('', (editor) => {
+    editor.insertImages([
+      { src: 'Attachments/Photo%201.png', alt: 'Photo 1' },
+      { src: 'Attachments/b.png', alt: 'b' },
+    ])
+    expect(editor.markdown()).toBe('![Photo 1](Attachments/Photo%201.png)\n\n![b](Attachments/b.png)\n')
+  }))
+
+test('an image goes inline within text', async () =>
+  withNoteEditor('Before\n', (editor) => {
+    placeCaret(editor, 4)
+    editor.insertImages([{ src: 'Attachments/b.png', alt: 'b' }])
+    expect(editor.markdown()).toBe('Bef![b](Attachments/b.png)ore\n')
+  }))
+
+test('a read-only note takes no images', async () =>
+  withNoteEditor('Old\n', (editor) => {
+    editor.setEditable(false)
+    editor.insertImages([{ src: 'Attachments/a.png', alt: 'a' }])
+    expect(editor.markdown()).toBeNull()
+  }))
