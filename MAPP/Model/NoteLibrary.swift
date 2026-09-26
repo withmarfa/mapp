@@ -446,8 +446,10 @@ final class NoteLibrary {
 
     /// A file's name as the attachments folder can take it, keeping its extension, which says what it is.
     static func attachmentName(_ name: String) -> String {
-        let ext = (name as NSString).pathExtension
-        let stem = fileSafe((name as NSString).deletingPathExtension)
+        // A name such as `.png` is all extension.
+        let bare = name.hasPrefix(".") && !name.dropFirst().contains(".")
+        let ext = bare ? String(name.dropFirst()) : (name as NSString).pathExtension
+        let stem = bare ? "" : fileSafe((name as NSString).deletingPathExtension)
         let fitted = NoteText.fitted(stem, room: ext.utf8.count + 1)
         let base = fitted.isEmpty ? String(localized: "Image") : fitted
         return ext.isEmpty ? base : "\(base).\(fileSafe(ext))"
