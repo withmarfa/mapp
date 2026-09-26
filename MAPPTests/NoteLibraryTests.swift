@@ -96,7 +96,8 @@ struct NoteLibraryTests {
         #expect(library.note(inbox.id)?.modified == start)
         library.updateBody(of: inbox.id, to: "# Inbox note, edited")
         #expect(library.note(inbox.id)?.modified == start + 60)
-        #expect(library.note(inbox.id)?.title == "Inbox note, edited")
+        #expect(library.note(inbox.id)?.title == "Inbox note", "a written note is titled by its file, as Marfa reads it")
+        #expect(store.changes == [.write(path: "Inbox note.md", text: "# Inbox note, edited")])
     }
 
     @Test func deletingMovesToRecentlyDeletedAndUndoes() {

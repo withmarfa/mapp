@@ -88,12 +88,13 @@ struct BrowserTests {
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.notes.first?.id == newer.id)
     }
 
-    @Test func deletingMovesLiveNotesAwayAndDeletedNotesForGood() {
+    @Test func deletingMovesLiveNotesAwayAndAsksBeforeErasingDeletedOnes() {
         let (library, older, _, _) = makeLibrary()
         Browser.delete([older.id], in: library, undoManager: nil)
         #expect(library.note(older.id)?.isDeleted == true)
         Browser.delete([older.id], in: library, undoManager: nil)
-        #expect(library.note(older.id) == nil)
+        #expect(library.note(older.id) != nil)
+        #expect(library.notesToPurge == [older.id])
     }
 
     @Test func aNewNoteAsksForThePage() {
