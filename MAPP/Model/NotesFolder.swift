@@ -45,7 +45,7 @@ final class NotesFolder {
         self.url?.stopAccessingSecurityScopedResource()
         _ = url.startAccessingSecurityScopedResource()
         self.url = url
-        let store = FolderStore(root: url, bin: Self.bin)
+        let store = FolderStore(root: url, bin: Self.bin(for: url))
         let library = NoteLibrary(loadingFrom: store, defaults: defaults)
         self.library = library
         Task { await library.load() }
@@ -60,9 +60,12 @@ final class NotesFolder {
         }
     }
 
-    /// Where trashed notes wait, in the app's own storage, outside any notes folder.
-    private static var bin: URL {
-        URL.applicationSupportDirectory.appending(path: "Trash", directoryHint: .isDirectory)
+    /// Where a folder's trashed notes wait, in the app's own storage, outside any notes folder. Each folder has
+    /// its own, so a note trashed from one never comes back into another.
+    private static func bin(for url: URL) -> URL {
+        URL.applicationSupportDirectory
+            .appending(path: "Trash", directoryHint: .isDirectory)
+            .appending(path: UUID(stableFrom: url.standardizedFileURL.path).uuidString, directoryHint: .isDirectory)
     }
 
     #if DEBUG

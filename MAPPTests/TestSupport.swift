@@ -14,7 +14,7 @@ extension Note {
         deleted: Date? = nil
     ) {
         var file = NoteFile(text: body)
-        if isPinned { file.setProperty("pinned", "true") }
+        if isPinned { file.setFlag("pinned", true) }
         self.init(
             path: path ?? "\(NoteText.fileName(for: body)).md",
             text: file.text,
@@ -31,6 +31,7 @@ extension Note {
 final class RecordingStore: NoteStore, @unchecked Sendable {
     var changes: [StoreChange] = []
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+    var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
 
     func load() throws -> StoredLibrary { StoredLibrary() }
     func perform(_ change: StoreChange) { changes.append(change) }

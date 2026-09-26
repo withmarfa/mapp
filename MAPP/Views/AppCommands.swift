@@ -17,7 +17,7 @@ struct AppCommands: Commands {
                 if let library { browser?.newNote(in: library, undoManager: notes?.undoManager) }
             }
             .keyboardShortcut("n")
-            .disabled(browser == nil || library == nil)
+            .disabled(browser == nil || library?.isLoaded != true)
             Button("New Folder", systemImage: "folder.badge.plus") {
                 if let library { browser?.newFolder(in: library, order: order, undoManager: notes?.undoManager) }
             }
@@ -34,7 +34,7 @@ struct AppCommands: Commands {
             let ids = notes?.ids ?? []
             let shown = ids.compactMap { library?.note($0) }
             Button("Open in New Window", systemImage: "macwindow") {
-                for id in ids { openWindow(value: id) }
+                for path in library?.paths(forWindows: ids) ?? [] { openWindow(value: path) }
             }
             .keyboardShortcut("o")
             .disabled(browser == nil || shown.isEmpty)

@@ -53,8 +53,15 @@ nonisolated enum NoteText {
             .replacing(/[\/\\:\x00-\x1F]/, with: "-")
             .trimmingCharacters(in: .whitespaces)
             .trimmingPrefix { $0 == "." }
-        let name = String(cleaned.prefix(120)).trimmingCharacters(in: .whitespaces)
+        let name = fitted(String(cleaned)).trimmingCharacters(in: .whitespaces)
         return name.isEmpty ? String(localized: "New Note") : name
+    }
+
+    /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
+    static func fitted(_ name: String) -> String {
+        var name = name
+        while name.utf8.count > 200 { name.removeLast() }
+        return name
     }
 
     /// The body's lines as they read on screen, blank lines dropped. Code inside fences is kept as written.

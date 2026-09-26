@@ -19,6 +19,10 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let files = FileManager()
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+    var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+    /// Paths the library gave that were taken, and the paths used instead. Read and written on the queue only, so
+    /// a change the library queued before it heard of the new path still reaches the right file.
+    private var aliases: [String: String] = [:]
 
     init(root: URL, bin: URL) {
         self.root = root
@@ -81,6 +85,10 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
                 try make(change)
             } catch {
                 log.error("\(String(describing: change).prefix(80), privacy: .private): \(error.localizedDescription, privacy: .public)")
+                let failed = failed
+                let path = change.path ?? ""
+                let message = error.localizedDescription
+                Task { @MainActor in failed(path, message) }
             }
         }
     }
@@ -90,12 +98,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func url(_ path: String) -> URL {
-        root.appending(path: path, directoryHint: .notDirectory)
+        root.appending(path: aliases[path] ?? path, directoryHint: .notDirectory)
     }
 
     private func make(_ change: StoreChange) throws {
         switch change {
         case .create(let path, let text):
+            aliases[path] = nil
             let target = available(url(path))
             try writeNew(Data(text.utf8), to: target)
             report(path, target)
@@ -107,7 +116,9 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try replace(target, with: data)
         case .move(let from, let to):
             let source = url(from)
-            let target = available(url(to))
+            aliases[from] = nil
+            aliases[to] = nil
+            let target = available(url(to), besides: source)
             try move(source, to: target)
             report(to, target)
         case .trash(let path, let id, let date):
@@ -119,6 +130,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             manifest.append(BinEntry(id: id, path: path, trashed: date, created: note.created, modified: note.modified))
             try writeManifest(manifest)
         case .restore(let id, let path):
+            aliases[path] = nil
             let target = available(url(path))
             try move(binURL(id), to: target)
             try writeManifest(readManifest().filter { $0.id != id })
@@ -138,17 +150,17 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try move(root.appending(path: from, directoryHint: .isDirectory), to: root.appending(path: to, directoryHint: .isDirectory))
         case .removeFolder(let path):
             let folder = root.appending(path: path, directoryHint: .isDirectory)
-            guard holdsNothingVisible(folder) else { return }
+            guard holdsNothing(folder) else { return }
             try coordinated(writing: folder, options: .forDeleting) { try files.removeItem(at: $0) }
         }
     }
 
-    /// Whether a directory holds no file anyone would miss: nothing but hidden files and empty directories.
-    private func holdsNothingVisible(_ folder: URL) -> Bool {
-        guard let walk = files.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles)
-        else { return true }
-        for case let url as URL in walk where (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
-            return false
+    /// Whether a directory holds nothing anyone would miss: only empty directories and the Finder's own
+    /// `.DS_Store`. A hidden file is someone's, Marfa's or git's, and keeps the directory.
+    private func holdsNothing(_ folder: URL) -> Bool {
+        guard let walk = files.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey]) else { return true }
+        for case let url as URL in walk where url.lastPathComponent != ".DS_Store" {
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true { return false }
         }
         return true
     }
@@ -156,13 +168,16 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private func report(_ path: String, _ target: URL) {
         let actual = relativePath(of: target)
         guard actual != path else { return }
+        aliases[path] = actual
         let relocated = relocated
         Task { @MainActor in relocated(path, actual) }
     }
 
-    /// The URL, or the first free one numbered after it, as the Finder numbers a copy.
-    private func available(_ url: URL) -> URL {
+    /// The URL, or the first free one numbered after it, as the Finder numbers a copy. A file moving onto its own
+    /// name in another case, which the file system takes for the same name, keeps it.
+    private func available(_ url: URL, besides source: URL? = nil) -> URL {
         guard files.fileExists(atPath: url.path) else { return url }
+        if let source, isSameFile(source, url) { return url }
         let directory = url.deletingLastPathComponent()
         let name = url.deletingPathExtension().lastPathComponent
         let ext = url.pathExtension
@@ -172,6 +187,14 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             if !files.fileExists(atPath: candidate.path) { return candidate }
             number += 1
         }
+    }
+
+    private func isSameFile(_ a: URL, _ b: URL) -> Bool {
+        let key = URLResourceKey.fileResourceIdentifierKey
+        guard let first = try? a.resourceValues(forKeys: [key]).fileResourceIdentifier,
+              let second = try? b.resourceValues(forKeys: [key]).fileResourceIdentifier
+        else { return false }
+        return first.isEqual(second)
     }
 
     private func writeNew(_ data: Data, to target: URL) throws {

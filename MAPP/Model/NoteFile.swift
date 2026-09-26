@@ -17,41 +17,54 @@ nonisolated struct NoteFile: Hashable, Sendable {
         if hasByteOrderMark { text.removeFirst() }
         usesCRLF = text.contains("\r\n") && text.firstMatch(of: /(^|[^\r])\n/) == nil
         if usesCRLF { text = text.replacing("\r\n", with: "\n") }
-        let length = Self.frontMatterLength(of: text)
-        frontMatter = String(text.prefix(length))
-        body = String(text.dropFirst(length))
+        let end = text.utf8.index(text.utf8.startIndex, offsetBy: Self.frontMatterLength(of: text))
+        frontMatter = String(text[..<end])
+        body = String(text[end...])
     }
 
     /// The file's text: the byte-order mark, front matter and line endings put back around the body.
     var text: String {
-        var text = frontMatter + body
+        // Front matter closed at the very end of a file has no line break after it, and a body needs one.
+        let separator = !frontMatter.isEmpty && frontMatter.utf8.last != UInt8(ascii: "\n") && !body.isEmpty ? "\n" : ""
+        var text = frontMatter + separator + body
         if usesCRLF { text = text.replacing("\n", with: "\r\n") }
         return (hasByteOrderMark ? "\u{FEFF}" : "") + text
     }
 
-    /// How many characters of the text are front matter, by Marfa's rule: a first line of exactly `---`, not
+    /// How many bytes of the text are front matter, by Marfa's rule: a first line of exactly `---`, not
     /// followed by a blank line, closed by a later line of exactly `---`. A blank line after the opening fence
-    /// makes it a thematic break, and a fence never closed makes the whole text body.
+    /// makes it a thematic break, and a fence never closed makes the whole text body. Lines may end either way.
     static func frontMatterLength(of text: String) -> Int {
-        guard text.hasPrefix("---\n") else { return 0 }
-        var lines = text.dropFirst(4).split(separator: "\n", omittingEmptySubsequences: false)[...]
-        guard let first = lines.first, !first.isEmpty, first != "\r" else { return 0 }
-        var length = 4
-        while let line = lines.popFirst() {
-            let isLast = lines.isEmpty
-            length += line.count + (isLast ? 0 : 1)
-            if line == "---" || line == "---\r" { return length }
+        let bytes = Array(text.utf8)
+        let newline = UInt8(ascii: "\n")
+        let fence = Array("---".utf8)
+        /// The line from `start`, without its line ending, and where the next line starts.
+        func line(at start: Int) -> (content: ArraySlice<UInt8>, next: Int?) {
+            let end = bytes[start...].firstIndex(of: newline) ?? bytes.endIndex
+            var content = bytes[start..<end]
+            if content.last == UInt8(ascii: "\r") { content = content.dropLast() }
+            return (content, end < bytes.endIndex ? end + 1 : nil)
         }
-        return 0
+        let opening = line(at: 0)
+        guard opening.content.elementsEqual(fence), var start = opening.next, start < bytes.endIndex,
+              !line(at: start).content.isEmpty
+        else { return 0 }
+        while true {
+            let current = line(at: start)
+            if current.content.elementsEqual(fence) { return current.next ?? bytes.endIndex }
+            guard let next = current.next, next < bytes.endIndex else { return 0 }
+            start = next
+        }
     }
 
     // MARK: Properties
 
     private var lines: [Substring] {
         guard !frontMatter.isEmpty else { return [] }
-        var inner = frontMatter.dropFirst(4)
-        if inner.hasSuffix("\n") { inner = inner.dropLast() }
-        return Array(inner.split(separator: "\n", omittingEmptySubsequences: false).dropLast())
+        let lines = frontMatter.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        // The fences, and the empty remainder after a closing line break, are not properties.
+        let end = lines.last == "" ? lines.count - 2 : lines.count - 1
+        return end > 1 ? Array(lines[1..<end]) : []
     }
 
     /// A top-level property's value when it is a single scalar, unquoted; nil when absent or not a scalar.
@@ -63,12 +76,21 @@ nonisolated struct NoteFile: Hashable, Sendable {
         return nil
     }
 
-    /// Sets a top-level property to a scalar, or removes it with nil, changing only its own lines. A property
+    /// Sets a top-level property to a string, or removes it with nil, changing only its own lines. A property
     /// added goes last; front matter is made when there is none, and taken away when the last property goes.
     mutating func setProperty(_ key: String, _ value: String?) {
+        setProperty(key, yaml: value.map(Self.yaml))
+    }
+
+    /// Sets a top-level property to true, or removes it, as a flag is written in YAML.
+    mutating func setFlag(_ key: String, _ isOn: Bool) {
+        setProperty(key, yaml: isOn ? "true" : nil)
+    }
+
+    private mutating func setProperty(_ key: String, yaml value: String?) {
         var lines = lines
         let index = lines.firstIndex { Self.value(in: $0, for: key) != nil }
-        let line = value.map { Substring("\(key): \(Self.yaml($0))") }
+        let line = value.map { Substring("\(key): \($0)") }
         if let index {
             // A value written over several lines continues on the lines indented under the key.
             var end = index + 1
@@ -84,7 +106,7 @@ nonisolated struct NoteFile: Hashable, Sendable {
         frontMatter = lines.isEmpty ? "" : "---\n" + lines.joined(separator: "\n") + "\n---\n"
     }
 
-    var isPinned: Bool { property("pinned") == "true" }
+    var isPinned: Bool { property("pinned")?.lowercased() == "true" }
 
     /// The note's own title, which Marfa keeps in the front matter.
     var title: String? {

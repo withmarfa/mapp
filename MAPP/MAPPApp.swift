@@ -2,16 +2,13 @@ import SwiftUI
 
 @main
 struct MAPPApp: App {
-    @State private var folder = NotesFolder()
+    @NSApplicationDelegateAdaptor private var delegate: AppDelegate
+    private var folder: NotesFolder { delegate.folder }
 
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView()
                 .environment(folder)
-                // New notes with something in them get their files before the app goes.
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    folder.library?.finish()
-                }
         }
         .defaultSize(width: 1100, height: 720)
         .commands {
@@ -19,9 +16,9 @@ struct MAPPApp: App {
             FormatCommands()
         }
 
-        WindowGroup("Note", for: Note.ID.self) { $id in
+        WindowGroup("Note", for: String.self) { $path in
             if let library = folder.library {
-                NoteWindow(id: id)
+                NoteWindow(path: $path)
                     .environment(library)
             }
         }
@@ -31,5 +28,19 @@ struct MAPPApp: App {
             SettingsView()
                 .environment(folder)
         }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let folder = NotesFolder()
+
+    /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
+    /// get their files, and the store finishes writing, before the app goes.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        EditorController.flushAll { [folder] in
+            folder.library?.finish()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }

@@ -11,6 +11,8 @@ final class NoteLibrary {
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
     var notesToPurge: Set<Note.ID> = []
+    /// A change the store could not make, to tell the person: the file it was about and what went wrong.
+    var failure: (path: String, message: String)?
     let now: () -> Date
 
     @ObservationIgnored let store: NoteStore?
@@ -35,6 +37,7 @@ final class NoteLibrary {
         self.now = now
         isLoaded = true
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
+        store?.failed = { [weak self] path, message in self?.failure = (path, message) }
     }
 
     /// A library that reads its notes from the store, which `load()` does.
@@ -56,7 +59,7 @@ final class NoteLibrary {
                 return nil
             }
         }.value ?? StoredLibrary()
-        store.perform(.purgeTrash(before: expiry))
+        perform(.purgeTrash(before: expiry))
 
         let saved = defaults?.stringArray(forKey: Self.folderOrderKey) ?? []
         let names = stored.folders.sorted { a, b in
@@ -96,7 +99,8 @@ final class NoteLibrary {
                 binID: trashed.id
             ))
         }
-        notes = loaded
+        // Notes begun while the folder was being read are kept.
+        notes = loaded + notes.filter(\.isDraft)
         isLoaded = true
     }
 
@@ -130,6 +134,20 @@ final class NoteLibrary {
         }
     }
 
+    /// Where each note is, to open it in a window of its own that finds it again at the next launch. A new
+    /// note is written first, so it has somewhere to be.
+    func paths(forWindows ids: some Collection<Note.ID>) -> [String] {
+        ids.compactMap { id in
+            leave(id)
+            return note(id)?.path
+        }
+    }
+
+    /// The note at a path, living before deleted, for a window that remembers where its note was.
+    func note(at path: String) -> Note? {
+        notes.first { $0.path == path && !$0.isDeleted } ?? notes.first { $0.path == path }
+    }
+
     func count(in item: SidebarItem) -> Int {
         notes(in: item).count
     }
@@ -151,7 +169,7 @@ final class NoteLibrary {
     @discardableResult
     func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
         var file = NoteFile(text: "")
-        if item == .pinned { file.setProperty("pinned", "true") }
+        if item == .pinned { file.setFlag("pinned", true) }
         var note = Note(text: file.text, created: now())
         if case .folder(let id) = item { note.folderID = folder(id)?.id }
         notes.append(note)
@@ -173,7 +191,7 @@ final class NoteLibrary {
         if notes[index].isDraft {
             if NoteText.hasCompleteFirstLine(body) { writeDraft(at: index) }
         } else if let path = notes[index].path {
-            store?.perform(.write(path: path, text: notes[index].file.text))
+            perform(.write(path: path, text: notes[index].file.text))
         }
     }
 
@@ -206,7 +224,7 @@ final class NoteLibrary {
     /// views confirm it first.
     func deletePermanently(_ ids: Set<Note.ID>) {
         for note in notes where ids.contains(note.id) && note.isDeleted {
-            if let binID = note.binID { store?.perform(.purge(id: binID)) }
+            if let binID = note.binID { perform(.purge(id: binID)) }
         }
         notes.removeAll { ids.contains($0.id) && $0.isDeleted }
         notesToPurge.subtract(ids)
@@ -228,8 +246,8 @@ final class NoteLibrary {
         let changed = notes.filter { ids.contains($0.id) && !$0.isDeleted && $0.isPinned != pinned }.map(\.id)
         guard !changed.isEmpty else { return }
         for index in notes.indices where changed.contains(notes[index].id) {
-            notes[index].file.setProperty("pinned", pinned ? "true" : nil)
-            if let path = notes[index].path { store?.perform(.write(path: path, text: notes[index].file.text)) }
+            notes[index].file.setFlag("pinned", pinned)
+            if let path = notes[index].path { perform(.write(path: path, text: notes[index].file.text)) }
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.setPinned(Set(changed), !pinned, undoManager: undoManager)
@@ -239,7 +257,7 @@ final class NoteLibrary {
     /// Whether another note in the same folder already has the file name, ignoring case, as the Finder does.
     func isNoteNameTaken(_ name: String, for id: Note.ID) -> Bool {
         guard let note = note(id) else { return false }
-        let directory = directory(for: note.folderID)
+        let directory = note.path.map { _ in note.directory } ?? directory(for: note.folderID)
         let path = directory.isEmpty ? "\(name).md" : "\(directory)/\(name).md"
         return isPathTaken(path, except: id)
     }
@@ -251,23 +269,29 @@ final class NoteLibrary {
         guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted, !name.isEmpty,
               !isNoteNameTaken(name, for: id)
         else { return }
-        let old = notes[index].fileTitle ?? notes[index].title
-        guard name != old else { return }
-        let directory = directory(for: notes[index].folderID)
+        let title = notes[index].file.title.map { _ in name }
+        rename(at: index, to: name, title: title, undoManager: undoManager)
+    }
+
+    private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?) {
+        let id = notes[index].id
+        let oldName = notes[index].fileTitle ?? NoteText.fileName(for: notes[index].body)
+        let oldTitle = notes[index].file.property("title")
+        let directory = notes[index].path.map { _ in notes[index].directory } ?? directory(for: notes[index].folderID)
         let path = directory.isEmpty ? "\(name).md" : "\(directory)/\(name).md"
+        guard path != notes[index].path || title != oldTitle else { return }
+        if title != oldTitle { notes[index].file.setProperty("title", title) }
         if let from = notes[index].path {
-            store?.perform(.move(from: from, to: path))
+            if path != from { perform(.move(from: from, to: path)) }
             notes[index].path = path
-            if notes[index].file.title != nil {
-                notes[index].file.setProperty("title", name)
-                store?.perform(.write(path: path, text: notes[index].file.text))
-            }
+            if title != oldTitle { perform(.write(path: path, text: notes[index].file.text)) }
         } else {
             notes[index].path = path
-            store?.perform(.create(path: path, text: notes[index].file.text))
+            perform(.create(path: path, text: notes[index].file.text))
         }
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
-            library.renameNote(id, to: old, undoManager: undoManager)
+            guard let index = library.notes.firstIndex(where: { $0.id == id }), !library.notes[index].isDeleted else { return }
+            library.rename(at: index, to: oldName, title: oldTitle, undoManager: undoManager)
         }
     }
 
@@ -276,7 +300,7 @@ final class NoteLibrary {
     @discardableResult
     func newFolder(undoManager: UndoManager? = nil) -> Folder {
         let name = newFolderName()
-        let folder = Folder(id: UUID(stableFrom: "folder:" + name), name: name)
+        let folder = Folder(name: name)
         setFolders(folders + [folder], undoManager: undoManager, name: String(localized: "New Folder"))
         return folder
     }
@@ -373,14 +397,18 @@ final class NoteLibrary {
             guard let path = notes[index].path else { return }
             let binID = UUID()
             notes[index].binID = binID
-            store?.perform(.trash(path: path, id: binID, date: notes[index].deleted!))
+            perform(.trash(path: path, id: binID, date: notes[index].deleted!))
         case (true, false):
-            // A note comes back into the folder it is placed in, under the name it had.
-            let path = uniquePath(fileName, in: directory(for: placement.folderID), except: note.id)
+            // A note comes back where it was, or into the folder it is moved to, under the name it had. A folder
+            // that has gone since cannot take it, so it comes back to the Inbox.
+            let folderID = placement.folderID.flatMap { folder($0)?.id }
+            let returning = folderID == note.folderID && note.path.map { self.folderID(forPath: $0) == folderID } == true
+            let directory = returning ? note.directory : directory(for: folderID)
+            let path = uniquePath(fileName, in: directory, except: note.id)
             notes[index].deleted = nil
-            notes[index].folderID = placement.folderID
+            notes[index].folderID = folderID
             if let binID = note.binID {
-                store?.perform(.restore(id: binID, path: path))
+                perform(.restore(id: binID, path: path))
                 notes[index].binID = nil
                 notes[index].path = path
             }
@@ -388,7 +416,7 @@ final class NoteLibrary {
             notes[index].folderID = placement.folderID
             guard let from = note.path else { return }
             let path = uniquePath(fileName, in: directory(for: placement.folderID), except: note.id)
-            store?.perform(.move(from: from, to: path))
+            perform(.move(from: from, to: path))
             notes[index].path = path
         case (true, true):
             notes[index].folderID = placement.folderID
@@ -416,26 +444,30 @@ final class NoteLibrary {
     private func setFolders(_ order: [Folder], undoManager: UndoManager?, name: String) {
         guard order != folders else { return }
         let previous = folders
-        let old = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })
+        let old = Dictionary(previous.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let new = Set(order.map(\.id))
         for folder in order {
             if let before = old[folder.id] {
                 if before.name != folder.name {
-                    store?.perform(.moveFolder(from: before.name, to: folder.name))
+                    perform(.moveFolder(from: before.name, to: folder.name))
                     renamePaths(from: before.name, to: folder.name)
                 }
             } else {
-                store?.perform(.createFolder(path: folder.name))
+                perform(.createFolder(path: folder.name))
             }
         }
         for folder in previous where !new.contains(folder.id) {
-            store?.perform(.removeFolder(path: folder.name))
+            perform(.removeFolder(path: folder.name))
         }
         folders = order
         defaults?.set(order.map(\.name), forKey: Self.folderOrderKey)
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.setFolders(previous, undoManager: undoManager, name: name)
         }
+    }
+
+    private func perform(_ change: StoreChange) {
+        store?.perform(change)
     }
 
     private func registerUndo(_ undoManager: UndoManager?, name: String, _ handler: @escaping (NoteLibrary) -> Void) {
@@ -450,7 +482,7 @@ final class NoteLibrary {
         let note = notes[index]
         let path = uniquePath(NoteText.fileName(for: note.body), in: directory(for: note.folderID), except: note.id)
         notes[index].path = path
-        store?.perform(.create(path: path, text: notes[index].file.text))
+        perform(.create(path: path, text: notes[index].file.text))
     }
 
     /// The directory a folder's notes are in, relative to the notes folder; the Inbox is the notes folder itself.
@@ -458,11 +490,12 @@ final class NoteLibrary {
         folderID.flatMap { folder($0)?.name } ?? ""
     }
 
-    /// The folder a path is in: the directory at the top of the notes folder that holds it, however deep.
+    /// The folder a path is in: the directory at the top of the notes folder that holds it, however deep. A
+    /// trashed note whose folder has gone since is in none.
     private func folderID(forPath path: String) -> Folder.ID? {
         let components = path.split(separator: "/")
         guard components.count > 1, let top = components.first else { return nil }
-        return folders.first { $0.name == top }?.id ?? UUID(stableFrom: "folder:" + top)
+        return folders.first { $0.name == top }?.id
     }
 
     private func isPathTaken(_ path: String, except id: Note.ID?) -> Bool {
@@ -490,16 +523,20 @@ final class NoteLibrary {
 
     /// The store could not use a path, since something it had not been told of was there, and used another.
     private func relocate(_ from: String, _ to: String) {
-        guard let index = notes.firstIndex(where: { $0.path == from && !$0.isDeleted }) else { return }
+        guard let index = notes.firstIndex(where: { $0.path == from && !$0.isDeleted })
+            ?? notes.firstIndex(where: { $0.path == from })
+        else { return }
         notes[index].path = to
     }
 
     /// A name as a file can take it: separators replaced and leading dots dropped, which would hide the file.
     static func fileSafe(_ name: String) -> String {
-        name.replacing(/[\/\\:\x00-\x1F]/, with: "-")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingPrefix { $0 == "." }
-            .trimmingCharacters(in: .whitespaces)
+        NoteText.fitted(
+            name.replacing(/[\/\\:\x00-\x1F]/, with: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingPrefix { $0 == "." }
+                .trimmingCharacters(in: .whitespaces)
+        )
     }
 
     private func newFolderName() -> String {

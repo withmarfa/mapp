@@ -36,11 +36,15 @@ final class EditorController: NSObject {
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
+    /// Every editor open, so their edits can be handed over before the app quits or changes folder.
+    @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
+
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         webView = EditorWebView(frame: .zero, configuration: configuration)
         super.init()
+        Self.open.add(self)
         webView.controller = self
         #if DEBUG
         webView.isInspectable = true
@@ -107,15 +111,52 @@ final class EditorController: NSObject {
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
     /// and then leaves the note. The page answers in order, so this lands before anything asked of it later.
     /// The reply keeps this controller alive until it arrives.
-    func flush() {
-        guard let noteID else { return }
-        guard isReady else { return onLeave(noteID) }
+    func flush(then done: @escaping () -> Void = {}) {
+        guard let noteID else { return done() }
+        guard isReady else {
+            onLeave(noteID)
+            return done()
+        }
         webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
             if let markdown = result as? String {
                 if noteID == self.noteID { self.markdown = markdown }
                 onChange(noteID, markdown)
             }
             onLeave(noteID)
+            done()
+        }
+    }
+
+    /// Hands over every open editor's last edit, then carries on. A page that does not answer within a couple
+    /// of seconds is not waited for.
+    static func flushAll(then done: @escaping () -> Void) {
+        let editors = open.allObjects
+        let gate = Gate(waitingFor: editors.count, then: done)
+        for editor in editors { editor.flush(then: gate.arrive) }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            gate.open()
+        }
+    }
+
+    private final class Gate {
+        private var remaining: Int
+        private var action: (() -> Void)?
+
+        init(waitingFor count: Int, then action: @escaping () -> Void) {
+            remaining = count
+            self.action = action
+            if count == 0 { open() }
+        }
+
+        func arrive() {
+            remaining -= 1
+            if remaining <= 0 { open() }
+        }
+
+        func open() {
+            action?()
+            action = nil
         }
     }
 

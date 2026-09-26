@@ -49,6 +49,12 @@ nonisolated struct Note: Identifiable, Hashable {
     /// A note not yet written to a file.
     var isDraft: Bool { path == nil }
 
+    /// The directory the note's file is in, relative to the notes folder; empty at the top.
+    var directory: String {
+        guard let path, let slash = path.lastIndex(of: "/") else { return "" }
+        return String(path[..<slash])
+    }
+
     /// The file's name without its extension.
     var fileTitle: String? {
         path.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }

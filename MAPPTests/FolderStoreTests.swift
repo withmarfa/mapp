@@ -54,6 +54,33 @@ struct FolderStoreTests {
         #expect(moved?.1 == "Note 2.md")
     }
 
+    @Test func changesQueuedForATakenPathReachTheFileMadeInstead() throws {
+        try root.write("Someone else's", to: "Ideas.md")
+        store.perform(.create(path: "Ideas.md", text: "Mine"))
+        store.perform(.write(path: "Ideas.md", text: "Mine, edited"))
+        store.perform(.trash(path: "Ideas.md", id: UUID(), date: .now))
+        store.drain()
+        #expect(root.read("Ideas.md") == "Someone else's")
+        #expect(!root.exists("Ideas 2.md"))
+        #expect(try store.load().trash.first?.note.text == "Mine, edited")
+    }
+
+    @Test func aNoteRenamedOnlyInCaseKeepsItsFile() throws {
+        try root.write("Text", to: "note.md")
+        store.perform(.move(from: "note.md", to: "Note.md"))
+        store.drain()
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.url.path) == ["Note.md"])
+    }
+
+    @Test func aChangeThatFailsIsReported() async throws {
+        var failure: String?
+        store.failed = { path, _ in failure = path }
+        store.perform(.write(path: String(repeating: "x", count: 300) + ".md", text: "Too long a name"))
+        store.drain()
+        await Task.yield()
+        #expect(failure?.hasSuffix(".md") == true)
+    }
+
     @Test func trashingTakesTheNoteOutOfTheFolderAndRestoringPutsItBack() throws {
         try root.write("Text", to: "Work/Note.md")
         let id = UUID()
@@ -89,13 +116,15 @@ struct FolderStoreTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: bin.url.path) == ["Trash.json"])
     }
 
-    @Test func aFolderIsRemovedOnlyWhenNothingButHiddenFilesAreLeft() throws {
+    @Test func aFolderIsRemovedOnlyWhenNothingIsLeftInIt() throws {
         try root.write("Kept", to: "Kept/photo.png")
+        try root.write("", to: "Hidden/.git/HEAD")
         try root.write("", to: "Empty/.DS_Store")
-        store.perform(.removeFolder(path: "Kept"))
-        store.perform(.removeFolder(path: "Empty"))
+        try FileManager.default.createDirectory(at: root.url.appending(path: "Empty/Sub"), withIntermediateDirectories: true)
+        for folder in ["Kept", "Hidden", "Empty"] { store.perform(.removeFolder(path: folder)) }
         store.drain()
         #expect(root.exists("Kept/photo.png"))
+        #expect(root.exists("Hidden/.git/HEAD"), "a hidden file is someone's")
         #expect(!root.exists("Empty"))
     }
 

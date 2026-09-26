@@ -405,6 +405,48 @@ struct NoteLibraryTests {
         #expect(library.isFolderNameTaken("attachments"))
     }
 
+    @Test func undoingARenameBringsBackTheTitleAsItWas() {
+        let titled = Note(path: "meeting.md", text: "---\ntitle: Weekly Meeting\n---\nBody\n", created: start)
+        let library = NoteLibrary(notes: [titled], store: store)
+        let manager = undoManager()
+        undoably(manager) { library.renameNote(titled.id, to: "Standup", undoManager: manager) }
+        #expect(library.note(titled.id)?.title == "Standup")
+        manager.undo()
+        #expect(library.note(titled.id)?.path == "meeting.md")
+        #expect(library.note(titled.id)?.title == "Weekly Meeting")
+    }
+
+    @Test func aRenameKeepsTheNoteInItsOwnDirectory() {
+        let deep = Note(body: "Deep", path: "Work/Project/Deep.md", created: start, folderID: work.id)
+        let library = NoteLibrary(notes: [deep], folders: [work], store: store)
+        library.renameNote(deep.id, to: "Deeper")
+        #expect(library.note(deep.id)?.path == "Work/Project/Deeper.md")
+    }
+
+    @Test func aNoteRecoveredAfterItsFolderWentComesBackToTheInbox() {
+        let (library, _, filed, _, _) = makeLibrary()
+        library.deleteFolder(work.id)
+        library.recover([filed.id])
+        #expect(library.note(filed.id)?.folderID == nil)
+        #expect(library.note(filed.id)?.path == "Filed note.md")
+        #expect(library.notes(in: .inbox).map(\.id).contains(filed.id))
+    }
+
+    @Test func aNewFolderNeverSharesAnotherFoldersIdentity() {
+        let (library, _, _, _, _) = makeLibrary()
+        let first = library.newFolder()
+        library.rename(first.id, to: "Ideas")
+        let second = library.newFolder()
+        #expect(first.id != second.id)
+        #expect(library.folders.map(\.name) == ["Work", "Home", "Ideas", "New Folder"])
+    }
+
+    @Test func longFirstLinesMakeNamesAnyFileSystemTakes() {
+        let name = NoteText.fileName(for: String(repeating: "議事録", count: 60))
+        #expect(name.utf8.count <= 200)
+        #expect(NoteLibrary.fileSafe(String(repeating: "é", count: 300)).utf8.count <= 200)
+    }
+
     // MARK: Sample content
 
     @Test func sampleContentFillsEverySidebarItem() async throws {

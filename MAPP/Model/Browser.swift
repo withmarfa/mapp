@@ -122,23 +122,45 @@ final class Browser {
 
     // MARK: Restoring a window
 
-    /// What a window brings back when the app opens again.
+    /// What a window brings back when the app opens again, by where things are in the notes folder, since that
+    /// is what lasts from one launch to the next.
     struct Snapshot: Codable, Equatable {
-        var sidebarItem: SidebarItem?
-        var selection: Set<Note.ID>
+        var sidebarItem: Item?
+        var selection: [String]
+
+        enum Item: Codable, Equatable {
+            case inbox, allNotes, pinned, recentlyDeleted
+            case folder(String)
+        }
     }
 
-    var snapshot: Snapshot { Snapshot(sidebarItem: sidebarItem, selection: selection) }
+    func snapshot(in library: NoteLibrary) -> Snapshot {
+        let item: Snapshot.Item? = sidebarItem.map { item in
+            switch item {
+            case .inbox: .inbox
+            case .allNotes: .allNotes
+            case .pinned: .pinned
+            case .recentlyDeleted: .recentlyDeleted
+            case .folder(let id): .folder(library.folder(id)?.name ?? "")
+            }
+        }
+        let paths = selection.compactMap { library.note($0)?.path }.sorted()
+        return Snapshot(sidebarItem: item, selection: paths)
+    }
 
     /// Restores what still exists: a folder deleted since gives way to All Notes, and notes no longer in the
     /// list are dropped, leaving the top row selected if none remain.
     func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
-        if case .folder(let id) = snapshot.sidebarItem, library.folder(id) == nil {
-            sidebarItem = .allNotes
-        } else {
-            sidebarItem = snapshot.sidebarItem ?? .allNotes
+        switch snapshot.sidebarItem {
+        case .inbox: sidebarItem = .inbox
+        case .pinned: sidebarItem = .pinned
+        case .recentlyDeleted: sidebarItem = .recentlyDeleted
+        case .folder(let name):
+            sidebarItem = library.folders.first { $0.name == name }.map { .folder($0.id) } ?? .allNotes
+        case .allNotes, nil: sidebarItem = .allNotes
         }
-        selection = snapshot.selection.intersection(notes(in: library).map(\.id))
+        let paths = Set(snapshot.selection)
+        selection = Set(notes(in: library).filter { $0.path.map(paths.contains) == true }.map(\.id))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }

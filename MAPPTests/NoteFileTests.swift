@@ -38,6 +38,21 @@ struct NoteFileTests {
         #expect(file.text == "\u{FEFF}---\r\ntitle: A\r\n---\r\nOne\r\n\r\nTwo\r\n\r\nThree\r\n")
     }
 
+    @Test func aBodyAddedAfterFrontMatterClosedAtTheEndStartsOnItsOwnLine() {
+        var file = NoteFile(text: "---\ntitle: X\npinned: true\n---")
+        file.body = "Hello\n"
+        #expect(file.text == "---\ntitle: X\npinned: true\n---\nHello\n")
+        #expect(NoteFile(text: file.text).title == "X")
+    }
+
+    @Test func frontMatterFencesMayEndWindowsStyleInAMixedFile() {
+        let text = "---\r\ntitle: A\r\n---\r\nBody\n"
+        let file = NoteFile(text: text)
+        #expect(file.body == "Body\n")
+        #expect(file.title == "A")
+        #expect(file.text == text)
+    }
+
     @Test func aMixtureOfLineEndingsIsLeftAsItStands() {
         let text = "One\r\nTwo\n"
         #expect(NoteFile(text: text).body == text)
@@ -70,18 +85,18 @@ struct NoteFileTests {
         var file = NoteFile(text: "---\nmarfa_id: 1\ntags:\n  - a\n# kept\ntitle: Old\n---\nBody\n")
         file.setProperty("tags", "one")
         file.setProperty("title", "New: one")
-        file.setProperty("pinned", "true")
+        file.setFlag("pinned", true)
         #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\npinned: true\n---\nBody\n")
-        file.setProperty("pinned", nil)
+        file.setFlag("pinned", false)
         file.setProperty("absent", nil)
         #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\n---\nBody\n")
     }
 
     @Test func frontMatterIsMadeForTheFirstPropertyAndGoesWithTheLast() {
         var file = NoteFile(text: "Body\n")
-        file.setProperty("pinned", "true")
+        file.setFlag("pinned", true)
         #expect(file.text == "---\npinned: true\n---\nBody\n")
-        file.setProperty("pinned", nil)
+        file.setFlag("pinned", false)
         #expect(file.text == "Body\n")
     }
 

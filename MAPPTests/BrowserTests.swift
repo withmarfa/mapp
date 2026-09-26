@@ -111,14 +111,14 @@ struct BrowserTests {
         saved.show(.inbox, in: library, order: NoteOrder())
         saved.selection = [older.id]
         let restored = Browser()
-        restored.restore(saved.snapshot, in: library, order: NoteOrder())
+        restored.restore(saved.snapshot(in: library), in: library, order: NoteOrder())
         #expect(restored.item == .inbox)
         #expect(restored.selection == [older.id])
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
         let (library, _, _, pinned) = makeLibrary()
-        let snapshot = Browser.Snapshot(sidebarItem: .folder(UUID()), selection: [UUID()])
+        let snapshot = Browser.Snapshot(sidebarItem: .folder("Gone"), selection: ["Gone.md"])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
@@ -126,7 +126,7 @@ struct BrowserTests {
     }
 
     @Test func snapshotsSurviveEncoding() throws {
-        let snapshot = Browser.Snapshot(sidebarItem: .folder(work.id), selection: [UUID()])
+        let snapshot = Browser.Snapshot(sidebarItem: .folder("Work"), selection: ["Work/Plan.md"])
         let data = try JSONEncoder().encode(snapshot)
         #expect(try JSONDecoder().decode(Browser.Snapshot.self, from: data) == snapshot)
     }

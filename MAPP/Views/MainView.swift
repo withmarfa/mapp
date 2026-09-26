@@ -46,8 +46,8 @@ struct MainView: View {
             }
             browser.focusRequest = nil
         }
-        .onChange(of: browser.snapshot) {
-            storedBrowser = try? JSONEncoder().encode(browser.snapshot)
+        .onChange(of: browser.snapshot(in: library)) { _, snapshot in
+            storedBrowser = try? JSONEncoder().encode(snapshot)
         }
         .onDisappear { editor.flush() }
         .onAppear {
@@ -78,6 +78,13 @@ struct MainView: View {
         }
         .onChange(of: browser.renamingNote) {
             noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
+        }
+        .alert(
+            "Couldn’t Save “\(library.failure.map { ($0.path as NSString).lastPathComponent } ?? "")”",
+            isPresented: Binding { library.failure != nil } set: { if !$0 { library.failure = nil } }
+        ) {
+        } message: {
+            Text(library.failure?.message ?? "")
         }
         .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
         } message: {
@@ -118,6 +125,7 @@ private struct NoteToolbar: View {
         Button("New Note", systemImage: "square.and.pencil") {
             browser.newNote(in: library, undoManager: undoManager)
         }
+        .disabled(!library.isLoaded)
     }
 }
 

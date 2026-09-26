@@ -26,7 +26,8 @@ struct SettingsView: View {
         .frame(width: 420)
         .fixedSize()
         .fileImporter(isPresented: $isChoosing, allowedContentTypes: [.folder]) { result in
-            if case .success(let url) = result { folder.choose(url) }
+            // Open notes hand over their last edits to the folder they came from before it is changed.
+            if case .success(let url) = result { EditorController.flushAll { folder.choose(url) } }
         }
     }
 }

@@ -85,7 +85,7 @@ struct NoteList: View {
             }
             NoteActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            for id in ids { openWindow(value: id) }
+            for path in library.paths(forWindows: ids) { openWindow(value: path) }
         }
         .overlay {
             if ids.isEmpty {
