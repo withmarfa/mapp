@@ -1,0 +1,24 @@
+#!/bin/zsh
+# Xcode Cloud runs this after it clones the repository. The repository carries no signing team and no version:
+# the workflow supplies the team as the secret MAPP_DEVELOPMENT_TEAM, and the version is the maintainer's tag
+# that started the build. Nothing written here is committed.
+set -euo pipefail
+cd "${0:a:h}/.."
+
+if [[ -n "${MAPP_DEVELOPMENT_TEAM:-}" ]]; then
+  [[ "$MAPP_DEVELOPMENT_TEAM" =~ '^[A-Z0-9]{10}$' ]] || {
+    print -u2 -- 'MAPP_DEVELOPMENT_TEAM is not a team identifier.'
+    exit 1
+  }
+  print -- "DEVELOPMENT_TEAM = $MAPP_DEVELOPMENT_TEAM" > Config/Local.xcconfig
+fi
+
+if [[ -n "${CI_TAG:-}" ]]; then
+  version="${CI_TAG#v}"
+  [[ "$version" =~ '^[0-9]+(\.[0-9]+){0,2}$' ]] || {
+    print -u2 -- "The tag $CI_TAG is not a version such as 1.2.3."
+    exit 1
+  }
+  # The version is a build setting of each target; it is set here, in this copy only.
+  sed -i '' "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $version;/" MAPP.xcodeproj/project.pbxproj
+fi

@@ -44,6 +44,11 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 - `NoteLibrary` decides every path and hands the store one change at a time, which the store makes in order off the main thread, coordinated and whole. A new note has no file until its first line is finished or it is left.
 - Debug builds launched with `-MAPPSampleFolder` open a fresh folder of sample notes in the app's own storage; the UI tests use it.
 
+## Releases
+
+- Builds reach TestFlight through Xcode Cloud: a workflow started by the maintainer's tag archives the app and gives it to internal testers. There is no other distribution, so no Sparkle and no notarisation.
+- `ci_scripts/ci_post_clone.sh` runs in the cloud checkout: it writes `Config/Local.xcconfig` from the workflow's secret `MAPP_DEVELOPMENT_TEAM`, and sets `MARKETING_VERSION` from the tag (`1.2.3` or `v1.2.3`) in that copy only. Xcode Cloud numbers the builds. The repository still never holds a team or a version.
+
 ## Commands
 
 - `xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test` builds and runs every test. The UI tests take control of the keyboard and mouse; add `-only-testing:MAPPTests` for the unit tests alone.
