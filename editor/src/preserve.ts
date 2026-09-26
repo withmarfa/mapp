@@ -19,36 +19,16 @@ interface Definition {
   end: number
 }
 
-/** The note as loaded. What the editor cannot show (a byte-order mark, Windows line endings, front matter)
- *  is held here and put back as it was; the rest is the body the editor shows, split into blocks when it is
- *  first edited. */
+/** The note's body as loaded, split into blocks when it is first edited. The app keeps what the page cannot
+ *  show, front matter, a byte-order mark and Windows line endings, and hands the page the body alone. */
 export interface Source {
-  markdown: string
   body: string
-  bom: boolean
-  crlf: boolean
-  frontMatter: string
   blocks?: SourceBlock[]
   definitions?: Definition[]
 }
 
-// YAML front matter: a first line of three dashes, and another closing it.
-const frontMatter = /^---\n(?:[\s\S]*?\n)?---[ \t]*(?:\n|$)/
-
-export function readSource(markdown: string): Source {
-  const bom = markdown.startsWith('﻿')
-  let text = bom ? markdown.slice(1) : markdown
-  // Windows line endings throughout are kept; a mixture is read, and written back, as plain newlines.
-  const crlf = text.includes('\r\n') && !/(^|[^\r])\n/.test(text)
-  if (crlf) text = text.replaceAll('\r\n', '\n')
-  const matter = frontMatter.exec(text)?.[0] ?? ''
-  return { markdown, body: text.slice(matter.length), bom, crlf, frontMatter: matter }
-}
-
-/** The note as saved from a body: the byte-order mark, front matter and line endings put back. */
-export function withEnvelope(source: Source, body: string): string {
-  const text = source.frontMatter + body
-  return (source.bom ? '﻿' : '') + (source.crlf ? text.replaceAll('\n', '\r\n') : text)
+export function readSource(body: string): Source {
+  return { body }
 }
 
 // The editor writes a block with a trailing newline; blocks are compared and joined without it.

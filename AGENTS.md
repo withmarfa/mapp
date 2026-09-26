@@ -4,7 +4,7 @@ This file governs every session that works in this repository.
 
 ## What this repository is
 
-MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in the manner of Notes and Mail. SwiftUI throughout, AppKit only where SwiftUI cannot express something. Content is sample data held in memory; there is no storage yet.
+MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in the manner of Notes and Mail. SwiftUI throughout, AppKit only where SwiftUI cannot express something. Notes are markdown files in a folder the person chooses.
 
 ## Conventions
 
@@ -34,7 +34,15 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 - `MAPP/Model/` holds the notes model, free of SwiftUI; `MAPP/Views/` the windows and panes; `MAPP/AppIcon.icon` is the Icon Composer app icon. `MAPPTests/` holds the Swift Testing unit tests, hosted in the app; `MAPPUITests/` the XCTest UI tests that drive the running app through its accessibility tree. `Design/` holds artwork that is not built into the app.
 - `MAPP/Localizable.xcstrings` is kept in sync by building in Xcode; `xcodebuild` alone does not update it.
 - `editor/` is the note editor: Milkdown on ProseMirror in TypeScript, built by Vite into one self-contained page, `MAPP/Editor/Page/editor.html`, which is committed so the app builds without Node. After changing anything in `editor/`, run `pnpm build` there and commit the page with the change. `MAPP/Editor/` holds the Swift side: the web view, the controller that drives the page, and the bridge's messages. The page fetches nothing and never navigates; images show their names until the app has attachments.
-- Notes are held byte for byte. A note opened and left alone is never rewritten; an edited note keeps the text of every block the edit did not reach, and only edited or new blocks take the editor's canonical form (`editor/src/preserve.ts`). What the editor cannot show, a byte-order mark, Windows line endings, YAML front matter and link definitions, is kept as written. `editor/fixtures/corpus/` holds notes in unusual but valid markdown, each with one paragraph marked for the tests to edit; add a fixture for any form found to be rewritten.
+- Notes are held byte for byte. A note opened and left alone is never rewritten; an edited note keeps the text of every block the edit did not reach, and only edited or new blocks take the editor's canonical form (`editor/src/preserve.ts`). The app keeps each file's envelope, its front matter, byte-order mark and Windows line endings (`MAPP/Model/NoteFile.swift`), and the page only ever sees the body; link definitions are kept by the page. `editor/fixtures/corpus/` holds notes in unusual but valid markdown, each with one paragraph marked for the tests to edit; add a fixture for any form found to be rewritten.
+
+## Storage and Marfa
+
+- Notes are `.md` files in the folder the person picks; each directory at the top of it is a folder, and the files at the top are the Inbox. Anything whose name starts with a dot, such as Marfa's `.marfa`, and the `Attachments` folder are not notes. The folder is remembered as a security-scoped bookmark.
+- The folder is shaped so Marfa's folder device can sync it. Front matter is found by Marfa's rule (`NoteFile.frontMatterLength`); a note's title is its `title` property, otherwise its file name; `pinned: true` is a property; every other property, `marfa_id` among them, is kept as written. Front matter is edited line by line and never re-emitted.
+- `NoteStore` is where notes are kept, in Marfa's words (trash, restore, purge). `FolderStore` keeps them as files and keeps the trash in the app's own storage, since a file moved within the folder reads to Marfa as a rename. A Marfa store is meant to take over the trash, restore and purge; conflicts between writers are Marfa's to settle, not the app's.
+- `NoteLibrary` decides every path and hands the store one change at a time, which the store makes in order off the main thread, coordinated and whole. A new note has no file until its first line is finished or it is left.
+- Debug builds launched with `-MAPPSampleFolder` open a fresh folder of sample notes in the app's own storage; the UI tests use it.
 
 ## Commands
 

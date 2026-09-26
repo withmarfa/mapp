@@ -75,7 +75,7 @@ import { labels } from './labels'
 import { dialect, serialize, stringifyOptions } from './dialect'
 import { highlightPlugin } from './highlight'
 import { pastePlugin } from './paste'
-import { preserve, readSource, withEnvelope, type Source } from './preserve'
+import { preserve, readSource, type Source } from './preserve'
 import { selectionPlugin } from './selection'
 import { tableInterface } from './tables'
 import { taskListPlugin, toggleTaskList } from './tasks'
@@ -449,8 +449,8 @@ export class NoteEditor {
   private saved(doc: ProseNode = this.editor.ctx.get(editorViewCtx).state.doc): string {
     const ctx = this.editor.ctx
     const canonical = serialize(ctx, doc)
-    if (canonical === this.baseline) return this.source.markdown
-    return withEnvelope(this.source, preserve(ctx, this.source, doc, canonical))
+    if (canonical === this.baseline) return this.source.body
+    return preserve(ctx, this.source, doc, canonical)
   }
 
   /** Tells the app of an edit it has not heard about. Edits are reported after a pause in typing, and loading
@@ -501,7 +501,7 @@ export class NoteEditor {
   /** The note as it would be saved, or null while it is still what was loaded. */
   markdown(): string | null {
     const markdown = this.saved()
-    return markdown === this.source.markdown ? null : markdown
+    return markdown === this.source.body ? null : markdown
   }
 
   /** An edit not yet reported, handed over at once, as when the window closes; null when there is none. */

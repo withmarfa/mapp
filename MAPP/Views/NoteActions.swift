@@ -19,8 +19,8 @@ struct NoteActions: View {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             moveMenu(notes)
             Divider()
-            Button(inMenuBar ? "Delete Note Immediately" : "Delete Immediately", systemImage: "trash", role: .destructive) {
-                library.deletePermanently(ids, undoManager: undoManager)
+            Button(inMenuBar ? "Delete Note Immediately…" : "Delete Immediately…", systemImage: "trash", role: .destructive) {
+                library.notesToPurge = ids
             }
         } else {
             let allPinned = !notes.isEmpty && notes.allSatisfy(\.isPinned)

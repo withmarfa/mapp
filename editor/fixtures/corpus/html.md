@@ -1,8 +1,3 @@
----
-title: A note
-tags: [one, two]
----
-
 <!-- a comment the page does not show -->
 
 <details>

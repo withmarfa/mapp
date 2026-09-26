@@ -21,7 +21,7 @@ final class WindowTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
@@ -65,14 +65,13 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
-    func testEditingANoteRetitlesItInTheList() {
-        row(titled: "Garden ideas").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
-        editor.click()
-        editor.typeKey(.upArrow, modifierFlags: .command)
-        editor.typeKey(.rightArrow, modifierFlags: .command)
-        editor.typeText(" for spring")
-        XCTAssertTrue(row(titled: "Garden ideas for spring").waitForExistence(timeout: 2))
+    // A note is titled by its file, as Marfa reads it, and a new note's file is named after its first line.
+    func testANewNoteIsNamedAfterItsFirstLine() {
+        sidebarItem("Inbox").click()
+        window.toolbars.buttons["New Note"].click()
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        editor.typeText("Groceries\nMilk and eggs")
+        XCTAssertTrue(row(titled: "Groceries").waitForExistence(timeout: 3))
     }
 
     func testNewNoteIsCreatedSelectedAndEmpty() {
@@ -250,12 +249,12 @@ final class WindowTests: XCTestCase {
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
         // Some findings belong to the system rather than the app: List reports its section headers outside
         // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes
-        // through, and the system dims the sidebar's counts and a selected row's secondary text as Mail and
-        // Notes do; a toolbar menu offers Show Menu rather than Press. Controls and text are still audited
-        // everywhere else.
+        // through, and the sidebar's counts and the list's previews and dates are the system's secondary
+        // colour, as Mail and Notes draw them, which the audit finds a shade short; a toolbar menu offers Show
+        // Menu rather than Press. Controls and text are still audited everywhere else.
         let windowFrame = window.frame
         let sidebarFrame = sidebar.frame
-        let selectedRowFrame = list.outlineRows.matching(NSPredicate(format: "selected == true")).firstMatch.frame
+        let listFrame = list.frame
         try app.performAccessibilityAudit { issue in
             guard let element = issue.element else { return false }
             // The audit is of the window; the menu bar above it is the system's to draw.
@@ -263,7 +262,7 @@ final class WindowTests: XCTestCase {
             switch issue.auditType {
             case .parentChild: return true
             case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
-            case .contrast: return sidebarFrame.contains(element.frame) || selectedRowFrame.contains(element.frame)
+            case .contrast: return sidebarFrame.contains(element.frame) || listFrame.contains(element.frame)
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }

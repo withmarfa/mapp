@@ -25,6 +25,45 @@ nonisolated enum NoteText {
         )
     }
 
+    /// What follows the title: the body's text, less a first line that only repeats the title.
+    static func preview(of body: String, title: String) -> String {
+        var lines = readableLines(of: body)
+        if let first = lines.first, first.localizedCaseInsensitiveCompare(title) == .orderedSame {
+            lines.removeFirst()
+        }
+        var preview = ""
+        for line in lines {
+            preview += preview.isEmpty ? line : " " + line
+            if preview.count >= previewLimit { break }
+        }
+        return preview.isEmpty ? String(localized: "No additional text") : String(preview.prefix(previewLimit))
+    }
+
+    /// Whether the note's first line is finished, which shows once something is written on a line after it.
+    /// The page writes every note with a closing line break, so one alone says nothing.
+    static func hasCompleteFirstLine(_ body: String) -> Bool {
+        body.trimmingCharacters(in: .whitespacesAndNewlines).contains("\n")
+    }
+
+    /// The name a note's file takes from its first line: the line as it reads, without characters a file name
+    /// cannot hold, and short enough for any file system.
+    static func fileName(for body: String) -> String {
+        let line = readableLines(of: body).first ?? ""
+        let cleaned = line
+            .replacing(/[\/\\:\x00-\x1F]/, with: "-")
+            .trimmingCharacters(in: .whitespaces)
+            .trimmingPrefix { $0 == "." }
+        let name = fitted(String(cleaned)).trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? String(localized: "New Note") : name
+    }
+
+    /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
+    static func fitted(_ name: String) -> String {
+        var name = name
+        while name.utf8.count > 200 { name.removeLast() }
+        return name
+    }
+
     /// The body's lines as they read on screen, blank lines dropped. Code inside fences is kept as written.
     static func readableLines(of body: String) -> [String] {
         var lines: [String] = []
