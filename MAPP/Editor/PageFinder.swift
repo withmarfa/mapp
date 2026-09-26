@@ -9,6 +9,8 @@ nonisolated struct FindState: Sendable {
     /// Four numbers per character of `visible`: x, y, width and height, with the page's scroll added.
     var boxes: [Double] = []
     var scrollY: Double = 0
+    /// The height of the page's window, which starts below whatever covers the web view's top.
+    var viewportHeight: Double = 0
 }
 
 /// The system find bar over the page. The find bar asks its questions synchronously and the page answers
@@ -103,7 +105,8 @@ final class PageFinder: NSObject, NSTextFinderClient {
             guard base + 3 < state.boxes.count else { break }
             let width = state.boxes[base + 2]
             guard width > 0 else { continue }
-            let y = state.boxes[base + 1] - state.scrollY
+            let covered = max(0, webView.bounds.height - state.viewportHeight)
+            let y = state.boxes[base + 1] - state.scrollY + covered
             let height = state.boxes[base + 3]
             let pageRect = NSRect(x: state.boxes[base], y: y, width: width, height: height)
             let rect = webView.isFlipped

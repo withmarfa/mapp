@@ -146,6 +146,8 @@ export interface FindState {
   visible: [number, number]
   boxes: number[]
   scrollY: number
+  /** The height of the page's window, which is less than the web view's where something covers its top. */
+  viewportHeight: number
 }
 
 export interface EditorEvents {
@@ -607,6 +609,7 @@ export class NoteEditor {
       visible,
       boxes: characterBoxes(view, model, visible[0], visible[1]),
       scrollY: window.scrollY,
+      viewportHeight: window.innerHeight,
     })
   }
 

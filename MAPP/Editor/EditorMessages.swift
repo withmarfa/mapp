@@ -75,7 +75,8 @@ nonisolated enum EditorMessage: Sendable {
                 selection: NSRange(location: selection[0], length: selection[1] - selection[0]),
                 visible: NSRange(location: visible[0], length: visible[1] - visible[0]),
                 boxes: (dict["boxes"] as? [NSNumber] ?? []).map(\.doubleValue),
-                scrollY: (dict["scrollY"] as? NSNumber)?.doubleValue ?? 0
+                scrollY: (dict["scrollY"] as? NSNumber)?.doubleValue ?? 0,
+                viewportHeight: (dict["viewportHeight"] as? NSNumber)?.doubleValue ?? 0
             ))
         case "error":
             self = .error(dict["message"] as? String ?? "")
