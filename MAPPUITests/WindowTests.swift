@@ -257,7 +257,7 @@ final class WindowTests: XCTestCase {
         findField.typeText("quote")
         XCTAssertTrue(window.staticTexts["3"].waitForExistence(timeout: 2), "the find bar counts the matches")
         findField.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(NSPredicate(format: "count == %d", fields).evaluate(with: window.searchFields.allElementsBoundByIndex))
+        wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
 
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
