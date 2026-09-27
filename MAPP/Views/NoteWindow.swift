@@ -19,11 +19,8 @@ struct NoteWindow: View {
                     .navigationTitle(note.title)
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [note.id], undoManager: undoManager))
-                    .toolbar {
-                        ToolbarItemGroup(placement: .primaryAction) {
-                            DeleteNotesButton(notes: [note])
-                            NoteShareLink(note: note)
-                        }
+                    .toolbar(id: "note") {
+                        NoteToolbar(browser: nil, notes: [note], editor: editor)
                     }
             }
         }

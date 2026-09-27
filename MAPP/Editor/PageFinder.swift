@@ -132,6 +132,17 @@ final class EditorContainer: NSView, NSTextFinderBarContainer {
         didSet { if topInset != oldValue { needsLayout = true } }
     }
 
+    /// Whether the page runs on under the toolbar, as it does once scrolled. At its top it stops below the
+    /// toolbar, so the toolbar draws no edge over nothing, as Mail's does; WebKit draws that edge whenever the
+    /// page reaches under it. The page keeps its place either way, since its inset moves with it.
+    var runsUnderToolbar = false {
+        didSet {
+            guard runsUnderToolbar != oldValue else { return }
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+        }
+    }
+
     init(webView: EditorWebView) {
         self.webView = webView
         super.init(frame: .zero)
@@ -169,14 +180,20 @@ final class EditorContainer: NSView, NSTextFinderBarContainer {
 
     override func layout() {
         super.layout()
-        webView.frame = bounds
-        var inset = topInset
+        var top = topInset
         if isFindBarVisible, let findBarView {
-            let height = findBarView.fittingSize.height > 0 ? findBarView.frame.height : 28
+            // The finder gives the bar its height; until it has, the bar's own fitting height.
+            let height = findBarView.frame.height > 0 ? findBarView.frame.height : findBarView.fittingSize.height
             findBarView.frame = NSRect(x: 0, y: topInset, width: bounds.width, height: height)
-            inset += height
+            top += height
         }
-        webView.topInset = inset
+        if runsUnderToolbar {
+            webView.frame = bounds
+            webView.topInset = top
+        } else {
+            webView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+            webView.topInset = 0
+        }
     }
 
 }

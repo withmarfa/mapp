@@ -23,10 +23,8 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
         } detail: {
             NoteDetail(browser: browser, editor: editor)
-                .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        NoteToolbar(browser: browser)
-                    }
+                .toolbar(id: "main") {
+                    NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
                 }
         }
         .searchable(text: $browser.searchText, placement: .toolbar)
@@ -109,52 +107,6 @@ struct MainView: View {
             browser.restore(snapshot, in: library, order: order)
         } else {
             browser.selectFirstNote(in: library, order: order)
-        }
-    }
-}
-
-/// Delete, Share and New Note, acting on the window's selection.
-private struct NoteToolbar: View {
-    @Environment(NoteLibrary.self) private var library
-    @Environment(\.undoManager) private var undoManager
-    let browser: Browser
-
-    var body: some View {
-        let notes = browser.selectedNotes(in: library)
-        DeleteNotesButton(notes: notes)
-        NoteShareLink(note: notes.count == 1 ? notes.first : nil)
-        Button("New Note", systemImage: "square.and.pencil") {
-            browser.newNote(in: library, undoManager: undoManager)
-        }
-        .disabled(!library.isLoaded)
-    }
-}
-
-/// Deletes to Recently Deleted, or for good when the notes are already there, and says which.
-struct DeleteNotesButton: View {
-    @Environment(NoteLibrary.self) private var library
-    @Environment(\.undoManager) private var undoManager
-    let notes: [Note]
-
-    var body: some View {
-        let immediately = !notes.isEmpty && notes.allSatisfy(\.isDeleted)
-        Button(immediately ? "Delete Immediately" : "Delete", systemImage: "trash") {
-            Browser.delete(Set(notes.map(\.id)), in: library, undoManager: undoManager)
-        }
-        .disabled(notes.isEmpty)
-    }
-}
-
-/// Shares a note's markdown as text, the form every destination can take.
-struct NoteShareLink: View {
-    let note: Note?
-
-    var body: some View {
-        if let note {
-            ShareLink(item: note.body, subject: Text(note.title), preview: SharePreview(note.title))
-        } else {
-            ShareLink(item: "")
-                .disabled(true)
         }
     }
 }

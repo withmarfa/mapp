@@ -15,6 +15,8 @@ final class EditorController: NSObject {
     var isFocused = false
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
+    /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
+    var isChoosingImages = false
 
     /// An edit to a note, with the markdown the note now holds.
     @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
@@ -187,6 +189,13 @@ final class EditorController: NSObject {
         call("focus")
     }
 
+    /// Formats from outside the page, as the toolbar does: the page takes the keyboard first, so the command
+    /// acts where its caret was and typing carries on there.
+    func apply(_ format: Format) {
+        focus()
+        self.format(format)
+    }
+
     func format(_ format: Format) {
         let (name, argument) = format.command
         if let argument {
@@ -219,18 +228,23 @@ final class EditorController: NSObject {
         call("findReplace", String(range.location), String(NSMaxRange(range)), json(text))
     }
 
-    /// Puts images from a pasteboard into the note: into the attachments folder, and linked where they were
-    /// dropped, given in the page's own coordinates, or at the caret. Whether there were images to take.
-    func insertImages(from pasteboard: NSPasteboard, at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let noteID, let library else { return false }
-        let files = PastedImages.files(on: pasteboard)
-        guard !files.isEmpty else { return false }
-        let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
-        guard !images.isEmpty else { return false }
-        if let point {
-            call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(webView.bounds.height)))
-        } else {
-            call("insertImages", json(images))
+    /// Puts images into the note: into the attachments folder, and linked where they were dropped, given in the
+    /// page's own coordinates, or at the caret. Whether there were images to take; they are read and placed
+    /// once their files have been read, if the note is still the one on the page.
+    @discardableResult
+    func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
+        guard isEditable, let noteID, library != nil, !sources.isEmpty else { return false }
+        let height = webView.bounds.height
+        Task {
+            let files = await PastedImages.read(sources)
+            guard self.noteID == noteID, isEditable, let library else { return }
+            let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
+            guard !images.isEmpty else { return }
+            if let point {
+                call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(height)))
+            } else {
+                call("insertImages", json(images))
+            }
         }
         return true
     }
@@ -334,9 +348,11 @@ final class EditorController: NSObject {
         case .escape:
             onEscape()
         case .pasteImages:
-            _ = insertImages(from: .general)
+            insertImages(PastedImages.sources(on: .general))
         case .find(let state):
             pageFinder.update(state)
+        case .scrolled(let scrolled):
+            container.runsUnderToolbar = scrolled
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
         }

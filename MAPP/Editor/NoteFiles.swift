@@ -49,26 +49,45 @@ final class NoteFiles: NSObject, WKScriptMessageHandlerWithReply {
     }
 }
 
-/// Images on a pasteboard, as files to put in the attachments folder: image files by their own names, and
-/// image data, as a screenshot is copied, under a name of the moment.
+/// Images to put in the attachments folder: image files by their own names, and image data, as a screenshot
+/// is copied, under a name of the moment.
 enum PastedImages {
-    static func files(on pasteboard: NSPasteboard) -> [(name: String, data: Data)] {
+    /// An image to attach: a file still to be read, or bytes already in hand.
+    enum Source: Sendable {
+        case file(URL)
+        case data(name: String, Data)
+    }
+
+    static func sources(on pasteboard: NSPasteboard) -> [Source] {
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [
             .urlReadingFileURLsOnly: true,
             .urlReadingContentsConformToTypes: [UTType.image.identifier],
         ]) as? [URL] ?? []
-        if !urls.isEmpty {
-            return urls.compactMap { url in NoteFiles.readImage(url).map { (url.lastPathComponent, $0) } }
-        }
+        if !urls.isEmpty { return urls.map(Source.file) }
         let types = [NSPasteboard.PasteboardType.png, NSPasteboard.PasteboardType(UTType.jpeg.identifier)]
         if let type = pasteboard.availableType(from: types), let data = pasteboard.data(forType: type) {
-            return [(name(extension: type == .png ? "png" : "jpg"), data)]
+            return [.data(name: name(extension: type == .png ? "png" : "jpg"), data)]
         }
         guard pasteboard.canReadObject(forClasses: [NSImage.self], options: nil),
               let image = NSImage(pasteboard: pasteboard), let tiff = image.tiffRepresentation,
               let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
         else { return [] }
-        return [(name(extension: "png"), png)]
+        return [.data(name: name(extension: "png"), png)]
+    }
+
+    /// The images' names and bytes, read away from the main thread, since a file can be large. A file chosen in
+    /// an open panel is read under its security scope.
+    @concurrent nonisolated static func read(_ sources: [Source]) async -> [(name: String, data: Data)] {
+        sources.compactMap { source in
+            switch source {
+            case .data(let name, let data):
+                return (name, data)
+            case .file(let url):
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                return NoteFiles.readImage(url).map { (url.lastPathComponent, $0) }
+            }
+        }
     }
 
     private static func name(extension ext: String) -> String {
