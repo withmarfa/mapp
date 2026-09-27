@@ -8,8 +8,8 @@ enum OrderKey {
 
 /// The list's sort and grouping, offered alike by the View menu, the list's toolbar and Settings.
 struct OrderOptions: View {
-    @AppStorage(OrderKey.sort) private var sort: NoteSort = .dateEdited
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = true
+    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
 
     var body: some View {
         Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: $sort) {
@@ -26,8 +26,8 @@ struct OrderOptions: View {
 /// Reads the stored order, for views that lay the list out rather than change it.
 @propertyWrapper
 struct StoredOrder: DynamicProperty {
-    @AppStorage(OrderKey.sort) private var sort: NoteSort = .dateEdited
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = true
+    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
 
     init() {}
 

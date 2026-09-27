@@ -16,24 +16,29 @@ struct NoteList: View {
         let sections = browser.sections(in: library, order: order, now: now)
         let ids = sections.flatMap { $0.notes.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        // Headings are rows of their own rather than section headers: a list of sections leaves every row at
+        // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
+        // the list's full width.
         List(selection: $browser.selection) {
-            ForEach(sections) { section in
-                Section {
-                    ForEach(section.notes) { note in
-                        NoteRow(
-                            note: note,
-                            dateLabel: NoteDate.listLabel(for: order.sort.date(of: note), now: now),
-                            folderName: browser.showsFolders ? folderName(for: note) : nil
-                        )
-                        .draggable(containerItemID: note.id)
-                        .listRowSeparator(note.id == section.notes.last?.id ? .hidden : .automatic, edges: .bottom)
-                    }
-                } header: {
-                    if let group = section.group {
-                        Text(group.title())
-                    }
+            ForEach(ListLine.lines(of: sections)) { line in
+                switch line {
+                case .heading(let group, let isFirst):
+                    Text(group.title())
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, isFirst ? 0 : 10)
+                        .accessibilityAddTraits(.isHeader)
+                        .selectionDisabled()
+                        .listRowSeparator(.hidden, edges: .top)
+                case .note(let note, let endsSection):
+                    NoteRow(
+                        note: note,
+                        dateLabel: NoteDate.listLabel(for: order.sort.date(of: note), now: now),
+                        folderName: browser.showsFolders ? folderName(for: note) : nil
+                    )
+                    .draggable(containerItemID: note.id)
+                    .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
                 }
-                .listSectionSeparator(.hidden)
             }
         }
         .listStyle(.inset)
@@ -140,5 +145,31 @@ struct NoteRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A line of the note list: a section's heading, or a note, with where it falls in its section.
+private enum ListLine: Identifiable {
+    case heading(NoteGroup, isFirst: Bool)
+    case note(Note, endsSection: Bool)
+
+    /// A note's line is known by the note, so the list's selection is its notes; a heading takes an identifier
+    /// of its own, never selected.
+    var id: Note.ID {
+        switch self {
+        case .heading(let group, _): UUID(stableFrom: "heading:\(group)")
+        case .note(let note, _): note.id
+        }
+    }
+
+    static func lines(of sections: [NoteSection]) -> [ListLine] {
+        var lines: [ListLine] = []
+        for section in sections {
+            if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty)) }
+            for note in section.notes {
+                lines.append(.note(note, endsSection: note.id == section.notes.last?.id))
+            }
+        }
+        return lines
     }
 }

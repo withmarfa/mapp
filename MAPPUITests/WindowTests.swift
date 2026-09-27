@@ -203,12 +203,17 @@ final class WindowTests: XCTestCase {
         wait(for: [twoWindows], timeout: 3)
     }
 
-    func testSortingByTitleFromTheViewMenuDropsTheDateSections() {
-        XCTAssertTrue(list.staticTexts["Today"].exists)
+    func testGroupingByDateFromTheViewMenuAddsSectionsThatTitleOrderDrops() {
+        XCTAssertFalse(list.staticTexts["Today"].exists)
+        toggleGroupByDate()
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
         sortBy("Title")
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
         sortBy("Date Edited")
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
+        // The setting outlives the app, so the next test starts from the default again.
+        toggleGroupByDate()
+        XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
     }
 
     func testUndoInTheEditMenuUndoesTypingInThePage() {
@@ -237,6 +242,11 @@ final class WindowTests: XCTestCase {
         app.typeKey("t", modifierFlags: [.command, .option])
         let table = page.tables.firstMatch
         XCTAssertTrue(table.waitForExistence(timeout: 3))
+    }
+
+    private func toggleGroupByDate() {
+        app.menuBars.menuBarItems["View"].click()
+        app.menuBars.menuItems["Group by Date"].click()
     }
 
     private func sortBy(_ order: String) {
