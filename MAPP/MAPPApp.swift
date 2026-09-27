@@ -38,11 +38,7 @@ struct MAPPApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let folder: NotesFolder = {
-        let folder = NotesFolder()
-        folder.handOverEdits = { EditorController.flushAll(then: $0) }
-        return folder
-    }()
+    let folder = NotesFolder()
 
     /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
     /// get their files, and the store finishes writing, before the app goes.

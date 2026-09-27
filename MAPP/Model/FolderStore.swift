@@ -14,7 +14,9 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     /// The folder of attachments at the top of the notes folder, which holds files notes point at, not notes.
     static let attachments = "Attachments"
 
-    let root: URL
+    /// Where the notes folder is; it changes only when the folder itself is moved.
+    var root: URL { location.withLock { $0 } }
+    private let location: OSAllocatedUnfairLock<URL>
     private let bin: URL
     private let queue = DispatchQueue(label: "com.withmarfa.mapp.store")
     private let files = FileManager()
@@ -32,8 +34,14 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let reservations = OSAllocatedUnfairLock(initialState: Set<String>())
 
     init(root: URL, bin: URL) {
-        self.root = root
+        location = OSAllocatedUnfairLock(initialState: root)
         self.bin = bin
+    }
+
+    /// The notes folder was moved, in the Finder say: every change from now on, those already queued among them,
+    /// is made where it now is.
+    func move(to root: URL) {
+        location.withLock { $0 = root }
     }
 
     // MARK: Reading
@@ -338,7 +346,8 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             let values = try? url.resourceValues(forKeys: Set(keys))
             let modified = values?.contentModificationDate ?? .now
             let name = NoteText.fileName(for: NoteFile(text: text).body)
-            return BinEntry(id: id, path: "\(name).md", trashed: modified, created: values?.creationDate ?? modified, modified: modified)
+            // When it was trashed went with the list; counting from now keeps it its full time in the bin.
+            return BinEntry(id: id, path: "\(name).md", trashed: .now, created: values?.creationDate ?? modified, modified: modified)
         }
         try? writeManifest(manifest)
         return manifest

@@ -13,9 +13,6 @@ final class NotesFolder {
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var watcher: FolderWatcher?
-    /// Has every open page hand over its last edit, then carries on; the app sets it, since the pages are not
-    /// the model's to know.
-    @ObservationIgnored var handOverEdits: (@escaping () -> Void) -> Void = { $0() }
     private static let bookmarkKey = "notesFolder"
 
     init(defaults: UserDefaults = .standard) {
@@ -61,23 +58,29 @@ final class NotesFolder {
         Task { await library.load() }
     }
 
-    /// The notes folder itself was moved or renamed, in the Finder say. Its bookmark knows where it went, and
-    /// the notes are read from there. A folder deleted leaves the library as it is, which says it cannot read it.
+    /// The notes folder itself was moved or renamed, in the Finder say. Its bookmark knows where it went, and the
+    /// same library carries on there, with nothing typed lost. A folder deleted, or moved to the Trash, is not
+    /// followed; the library then says it cannot read it.
     private func follow() {
-        guard let bookmark = defaults.data(forKey: Self.bookmarkKey) else {
-            library?.refresh()
-            return
-        }
         var isStale = false
-        guard let moved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale),
+        guard let bookmark = defaults.data(forKey: Self.bookmarkKey),
+              let moved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale),
               moved.standardizedFileURL != url?.standardizedFileURL,
-              FileManager.default.fileExists(atPath: moved.path)
+              FileManager.default.fileExists(atPath: moved.path),
+              !moved.pathComponents.contains(".Trash"),
+              let library, let store = library.store as? FolderStore
         else {
             library?.refresh()
             return
         }
         log.info("the notes folder moved")
-        handOverEdits { [self] in choose(moved) }
+        url?.stopAccessingSecurityScopedResource()
+        _ = moved.startAccessingSecurityScopedResource()
+        url = moved
+        store.move(to: moved)
+        remember(moved)
+        watcher = FolderWatcher(moved, changed: { library.refresh() }, rootChanged: { [weak self] in self?.follow() })
+        library.refresh()
     }
 
     private func remember(_ url: URL) {
@@ -90,11 +93,16 @@ final class NotesFolder {
     }
 
     /// Where a folder's trashed notes wait, in the app's own storage, outside any notes folder. Each folder has
-    /// its own, so a note trashed from one never comes back into another.
+    /// its own, so a note trashed from one never comes back into another, known by the folder's identity on its
+    /// volume rather than its path, so the bin stays the folder's when the folder is moved or renamed.
     private static func bin(for url: URL) -> URL {
-        URL.applicationSupportDirectory
+        let values = try? url.resourceValues(forKeys: [.volumeUUIDStringKey, .fileIdentifierKey])
+        let identity = values.flatMap { values in
+            values.volumeUUIDString.flatMap { volume in values.fileIdentifier.map { "\(volume)/\($0)" } }
+        }
+        return URL.applicationSupportDirectory
             .appending(path: "Trash", directoryHint: .isDirectory)
-            .appending(path: UUID(stableFrom: url.standardizedFileURL.path).uuidString, directoryHint: .isDirectory)
+            .appending(path: UUID(stableFrom: identity ?? url.standardizedFileURL.path).uuidString, directoryHint: .isDirectory)
     }
 
     #if DEBUG
