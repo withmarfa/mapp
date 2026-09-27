@@ -96,7 +96,8 @@ struct NoteLibraryTests {
         #expect(library.note(inbox.id)?.modified == start)
         library.updateBody(of: inbox.id, to: "# Inbox note, edited")
         #expect(library.note(inbox.id)?.modified == start + 60)
-        #expect(library.note(inbox.id)?.title == "Inbox note", "a written note is titled by its file, as Marfa reads it")
+        #expect(library.note(inbox.id)?.title == "Inbox note, edited", "a note named after its first line reads as the line is typed")
+        #expect(library.note(inbox.id)?.path == "Inbox note.md", "its file takes the name once the note is left")
         #expect(store.changes == [.write(path: "Inbox note.md", text: "# Inbox note, edited")])
     }
 
@@ -389,6 +390,39 @@ struct NoteLibraryTests {
         #expect(library.note(note.id)?.file.title == "R&D: plan")
         #expect(library.note(note.id)?.title == "R&D: plan")
         #expect(library.note(note.id)?.preview == "Budget")
+    }
+
+    @Test func aNoteKeepsFollowingItsLineWhicheverOutsideChangeArrivesFirst() {
+        var renamedFirst = Note(path: "Plan.md", text: "Plan\n", created: start)
+        renamedFirst.path = "Plan B.md"
+        renamedFirst.reviewNaming()
+        renamedFirst.file = NoteFile(text: "Plan B\n")
+        renamedFirst.reviewNaming()
+        #expect(renamedFirst.namedLine == "Plan B")
+
+        var rewrittenFirst = Note(path: "Plan.md", text: "Plan\n", created: start)
+        rewrittenFirst.file = NoteFile(text: "Plan B\n")
+        rewrittenFirst.reviewNaming()
+        #expect(rewrittenFirst.namedLine == "Plan", "it still carries the name of the line it follows")
+        rewrittenFirst.path = "Plan B.md"
+        rewrittenFirst.reviewNaming()
+        #expect(rewrittenFirst.namedLine == "Plan B")
+
+        rewrittenFirst.file = NoteFile(text: "---\ntitle: Roadmap\n---\nPlan B\n")
+        rewrittenFirst.reviewNaming()
+        #expect(rewrittenFirst.namedLine == nil, "a title given elsewhere is the note's own")
+        #expect(rewrittenFirst.title == "Roadmap")
+    }
+
+    @Test func aNewNoteWithNoWordsYetStillFollowsItsLineOnceItHasOne() {
+        let (library, _, _, _, _) = makeLibrary()
+        let note = library.newNote(in: .inbox)
+        library.updateBody(of: note.id, to: "```\n")
+        library.leave(note.id)
+        #expect(library.note(note.id)?.path == "New Note.md")
+        library.updateBody(of: note.id, to: "Snippets\n\n```\n")
+        library.leave(note.id)
+        #expect(library.note(note.id)?.path == "Snippets.md")
     }
 
     @Test func aOneLineNoteIsWrittenOnceTheTypingPauses() async throws {

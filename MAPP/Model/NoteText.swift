@@ -160,7 +160,11 @@ nonisolated enum NoteText {
                 .filter { !$0.isEmpty }
                 .joined(separator: "  ")
         }
-        return inlineText(text).trimmingCharacters(in: .whitespaces)
+        // A control character reads as a space, and has no place in a title, a name or front matter.
+        let readable = String(String.UnicodeScalarView(inlineText(text).unicodeScalars.map {
+            $0.properties.generalCategory == .control ? " " : $0
+        }))
+        return readable.trimmingCharacters(in: .whitespaces)
     }
 
     /// Code spans keep their contents as written; everything around them loses links and emphasis.
@@ -182,11 +186,13 @@ nonisolated enum NoteText {
         var text = text.replacing(backslashEscape) { String($0.output.1) }
         text.replace(characterReference) { match in
             let (whole, name) = match.output
-            if name.hasPrefix("#x") || name.hasPrefix("#X") {
-                return UInt32(name.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init).map { String($0) } ?? String(whole)
-            }
+            // A reference to a control character stands as written; it has no place in a title or a name.
+            let number = name.hasPrefix("#x") || name.hasPrefix("#X")
+                ? UInt32(name.dropFirst(2), radix: 16) : name.hasPrefix("#") ? UInt32(name.dropFirst()) : nil
             if name.hasPrefix("#") {
-                return UInt32(name.dropFirst()).flatMap(Unicode.Scalar.init).map { String($0) } ?? String(whole)
+                guard let scalar = number.flatMap(Unicode.Scalar.init), scalar.properties.generalCategory != .control
+                else { return String(whole) }
+                return String(scalar)
             }
             return namedReferences[String(name)] ?? String(whole)
         }

@@ -47,11 +47,26 @@ nonisolated struct Note: Identifiable, Hashable {
         self.folderID = folderID
         self.deleted = deleted
         self.binID = binID
-        if let fileTitle, let line = NoteText.firstLine(of: file.body), NoteText.isName(fileTitle, of: line),
-           file.title == nil || file.title == line {
-            namedLine = line
-        }
+        namedLine = derivedNamedLine
         refreshText()
+    }
+
+    /// The line the file's name comes from, when it comes from the first line: the name is that line's and no
+    /// other title has been given. A note with no words yet goes by the empty line, and New Note.
+    private var derivedNamedLine: String? {
+        guard let fileTitle else { return nil }
+        let line = NoteText.firstLine(of: file.body) ?? ""
+        return NoteText.isName(fileTitle, of: line) && (file.title == nil || file.title == line) ? line : nil
+    }
+
+    /// Takes in a change made outside, to the file's name or text. A note still carrying the name of the line
+    /// it follows goes on following it, whichever change arrived first; otherwise it follows its first line
+    /// only if it is named after it, and a `title` given elsewhere always stops it.
+    mutating func reviewNaming() {
+        if let named = namedLine, let fileTitle, NoteText.isName(fileTitle, of: named), file.title == nil || file.title == named {
+            return
+        }
+        namedLine = derivedNamedLine
     }
 
     var body: String { file.body }

@@ -190,15 +190,12 @@ final class NoteLibrary {
                 updated[index].folderID = folderID(forPath: disk.path)
             }
             missingSince[updated[index].id] = nil
-            if updated[index].file.text != disk.text, !unsaved.contains(disk.path) {
+            let rewritten = updated[index].file.text != disk.text && !unsaved.contains(disk.path)
+            if rewritten {
                 updated[index].file = NoteFile(text: disk.text)
                 updated[index].modified = disk.modified
             }
-            // A note renamed in another app goes by the name it was given there, unless that is its first line's.
-            if moved, let fileTitle = updated[index].fileTitle {
-                let line = NoteText.firstLine(of: updated[index].body)
-                updated[index].namedLine = line.flatMap { NoteText.isName(fileTitle, of: $0) ? $0 : nil }
-            }
+            if moved || rewritten { updated[index].reviewNaming() }
         }
         for index in updated.indices where !updated[index].isDeleted {
             guard let path = updated[index].path, let disk = onDisk.removeValue(forKey: path) else { continue }
@@ -435,8 +432,9 @@ final class NoteLibrary {
     /// note has it, and its new `title` where it keeps one or the line has characters a name cannot. Marfa sees
     /// one rename, made as the person leaves the note rather than as they type.
     private func followFirstLine(at index: Int) {
-        guard let named = notes[index].namedLine, let line = NoteText.firstLine(of: notes[index].body), line != named
-        else { return }
+        guard let named = notes[index].namedLine else { return }
+        let line = NoteText.firstLine(of: notes[index].body) ?? ""
+        guard line != named else { return }
         let title = notes[index].file.title != nil || NoteText.needsTitle(line) ? line : nil
         rename(at: index, to: NoteText.name(for: line), title: title, undoManager: nil)
     }
@@ -449,10 +447,8 @@ final class NoteLibrary {
         let path = uniquePath(name, in: directory, except: id)
         defer {
             // A note goes by its first line again once it is given the line's name, whatever gave it.
-            let line = NoteText.firstLine(of: notes[index].body)
-            notes[index].namedLine = line.flatMap { line in
-                notes[index].fileTitle.flatMap { NoteText.isName($0, of: line) ? line : nil }
-            }
+            let line = NoteText.firstLine(of: notes[index].body) ?? ""
+            notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line) ? line : nil }
         }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }
@@ -707,9 +703,9 @@ final class NoteLibrary {
     private func writeDraft(at index: Int) {
         draftSaves.removeValue(forKey: notes[index].id)?.cancel()
         let note = notes[index]
-        let line = NoteText.firstLine(of: note.body)
-        if let line, NoteText.needsTitle(line) { notes[index].file.setProperty("title", line) }
-        let path = uniquePath(NoteText.name(for: line ?? ""), in: directory(for: note.folderID), except: note.id)
+        let line = NoteText.firstLine(of: note.body) ?? ""
+        if NoteText.needsTitle(line) { notes[index].file.setProperty("title", line) }
+        let path = uniquePath(NoteText.name(for: line), in: directory(for: note.folderID), except: note.id)
         notes[index].path = path
         notes[index].namedLine = line
         perform(.create(path: path, text: notes[index].file.text))
