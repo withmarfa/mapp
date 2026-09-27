@@ -12,6 +12,11 @@ final class EditorWebView: WKWebView {
         didSet { if topInset != oldValue { needsLayout = true } }
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        controller?.pageDidMoveToWindow()
+    }
+
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
         if became { controller?.isFocused = true }

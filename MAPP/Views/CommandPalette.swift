@@ -82,7 +82,7 @@ struct CommandPalette: View {
             return .handled
         }
         .onChange(of: query) { highlighted = 0 }
-        .onAppear { returnFocus = editor.isFocused ? .page : .list }
+        .onAppear { returnFocus = editor.isFocused ? .page : browser.showsTypes ? .sidebar : .list }
         // The field takes the keyboard once the palette is in the window; asked any sooner, the list keeps it.
         .defaultFocus($isFieldFocused, true)
         .task {
@@ -207,11 +207,11 @@ struct CommandPalette: View {
     private var places: [Entry] {
         var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.pinned, "pin")]
         items += library.folders.map { (.folder($0.id), "folder") }
-        items.append((.recentlyDeleted, "trash"))
+        items += [(.recentlyDeleted, "trash"), (.marfaTypes, "cube")]
         return items.map { item, systemImage in
             Entry(id: "place:\(item)", title: library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)
-                browser.focusRequest = .list
+                browser.focusRequest = item == .marfaTypes ? .sidebar : .list
             }
         }
     }

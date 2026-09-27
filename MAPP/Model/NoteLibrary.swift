@@ -282,6 +282,7 @@ final class NoteLibrary {
         case .pinned: notes.filter { !$0.isDeleted && $0.isPinned }
         case .folder(let id): notes.filter { !$0.isDeleted && $0.folderID == id }
         case .recentlyDeleted: notes.filter(\.isDeleted)
+        case .marfaTypes: []
         }
     }
 
@@ -321,6 +322,7 @@ final class NoteLibrary {
         case .pinned: String(localized: "Pinned")
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
+        case .marfaTypes: String(localized: "Marfa Types")
         }
     }
 

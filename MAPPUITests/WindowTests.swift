@@ -43,7 +43,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "Pinned", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted"] {
+        for name in ["Inbox", "All Notes", "Pinned", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -312,6 +312,46 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(window.staticTexts["3"].waitForExistence(timeout: 2), "the find bar counts the matches")
         findField.typeKey(.escape, modifierFlags: [])
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
+    }
+
+    // MARK: Marfa Types
+
+    private var typesPage: XCUIElement { window.groups["MarfaTypes"].webViews.firstMatch }
+
+    func testMarfaTypesTakesTheListAndThePageUntilAnotherPlaceIsPicked() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(list.waitForNonExistence(timeout: 2), "the page takes the list's column")
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 2), "and the note's")
+        let person = typesPage.links["Person"].firstMatch
+        XCTAssertTrue(person.waitForExistence(timeout: 5), "the page shows its own navigation")
+        person.click()
+        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2), "the page's links move it on")
+        sidebarItem("Inbox").click()
+        XCTAssertTrue(list.waitForExistence(timeout: 2))
+        XCTAssertTrue(typesPage.waitForNonExistence(timeout: 2))
+    }
+
+    func testSearchNotesFromMarfaTypesGoesToAllNotesAndSearches() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertFalse(window.toolbars.searchFields.firstMatch.exists, "the page has its own search")
+        app.typeKey("p", modifierFlags: .command)
+        XCTAssertTrue(list.waitForExistence(timeout: 2))
+        app.typeText("ragu")
+        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
+        XCTAssertEqual(window.searchFields.firstMatch.value as? String, "ragu")
+    }
+
+    func testANewNoteFromMarfaTypesGoesToTheInbox() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        XCTAssertTrue(window.title.hasPrefix("Inbox"), "the window shows the Inbox, not \(window.title)")
+        app.typeText("# Shopping")
+        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 2))
     }
 
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
