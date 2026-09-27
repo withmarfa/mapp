@@ -448,7 +448,7 @@ struct NoteLibraryTests {
         #expect(library.note(note!.id) != nil, "opening it in a window lets nothing go")
         undoably(manager) { library.delete([note!.id], undoManager: manager) }
         #expect(library.note(note!.id) == nil)
-        #expect(manager.undoActionName == "New Note", "deleting nothing leaves nothing to undo")
+        #expect(manager.undoActionName.isEmpty, "deleting nothing registers nothing to undo")
         #expect(store.changes.isEmpty)
     }
 

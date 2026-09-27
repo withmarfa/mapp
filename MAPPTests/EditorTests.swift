@@ -119,7 +119,7 @@ struct EditorTests {
         page.editor.load(try #require(library.note(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'R&D plan ')")
-        try await page.run("document.execCommand('insertParagraph'); document.execCommand('insertText', false, 'Budget')")
+        // Leaving the note writes it, named after its first line.
         page.editor.flush()
         try await page.wait { library.note(note.id)?.path != nil }
         #expect(library.note(note.id)?.path == "R&D plan.md")
