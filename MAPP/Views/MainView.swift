@@ -27,6 +27,21 @@ struct MainView: View {
                     NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
                 }
         }
+        .overlay(alignment: .top) {
+            if browser.isShowingPalette {
+                ZStack(alignment: .top) {
+                    // A click anywhere else puts the palette away, as it does a menu.
+                    Color.clear
+                        .contentShape(.rect)
+                        .onTapGesture {
+                            browser.isShowingPalette = false
+                            browser.focusRequest = .list
+                        }
+                    CommandPalette(browser: browser, editor: editor)
+                        .padding(.top, 72)
+                }
+            }
+        }
         .searchable(text: $browser.searchText, placement: .toolbar)
         .searchFocused($isSearchFocused)
         .focusedSceneValue(\.browser, browser)
