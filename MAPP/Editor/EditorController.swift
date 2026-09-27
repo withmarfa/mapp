@@ -82,6 +82,7 @@ final class EditorController: NSObject {
         ))
         webView.navigationDelegate = self
         webView.allowsMagnification = false
+        webView.showsWindowBackground()
         webView.allowsBackForwardNavigationGestures = false
         NotificationCenter.default.addObserver(
             self, selector: #selector(systemColorsDidChange), name: NSColor.systemColorsDidChangeNotification, object: nil
@@ -439,8 +440,6 @@ final class EditorController: NSObject {
             insertImages(PastedImages.sources(on: .general))
         case .find(let state):
             pageFinder.update(state)
-        case .scrolled(let scrolled):
-            container.runsUnderToolbar = scrolled
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
         }

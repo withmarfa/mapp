@@ -34,7 +34,6 @@ nonisolated enum EditorMessage: Sendable {
     case escape
     case pasteImages
     case find(FindState)
-    case scrolled(Bool)
     case error(String)
 
     init?(body: Any) {
@@ -79,8 +78,6 @@ nonisolated enum EditorMessage: Sendable {
                 scrollY: (dict["scrollY"] as? NSNumber)?.doubleValue ?? 0,
                 viewportHeight: (dict["viewportHeight"] as? NSNumber)?.doubleValue ?? 0
             ))
-        case "scrolled":
-            self = .scrolled(dict["scrolled"] as? Bool ?? false)
         case "error":
             self = .error(dict["message"] as? String ?? "")
         default:

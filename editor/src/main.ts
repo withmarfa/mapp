@@ -79,18 +79,6 @@ window.addEventListener(
   { capture: true },
 )
 
-// Whether the page is scrolled from its top, told only when it changes, so the app shows the edge under the
-// toolbar only while text is beneath it, as Mail does.
-let scrolled: boolean | undefined
-function reportScroll(): void {
-  const now = window.scrollY > 0
-  if (now === scrolled) return
-  scrolled = now
-  postToHost({ type: 'scrolled', scrolled: now })
-}
-window.addEventListener('scroll', reportScroll, { passive: true })
-reportScroll()
-
 // Links open on ⌘-click, so the pointer says so only while ⌘ is down.
 for (const name of ['keydown', 'keyup'] as const) {
   window.addEventListener(name, (event) =>

@@ -25,12 +25,17 @@
   --page-width: 100%;
 }
 
-/* The document scrolls itself, so the web view's own scroll view can pass under the toolbar. */
+/* The window's own background shows through, so the note and the toolbar above it are one surface, as in Mail.
+   The app sets .window-background only where it can make the web view itself clear; otherwise the page takes
+   the system's text background, as behind a note in Notes. */
 html,
 body {
   margin: 0;
-  /* The system's text background, as behind a note in Notes. */
   background: Canvas;
+}
+html.window-background,
+html.window-background body {
+  background: transparent;
 }
 
 body {

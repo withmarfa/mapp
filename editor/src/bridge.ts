@@ -9,7 +9,6 @@ export type EditorMessage =
   | { type: 'escape' }
   | { type: 'pasteImages' }
   | ({ type: 'find' } & FindState)
-  | { type: 'scrolled'; scrolled: boolean }
 
 declare global {
   interface Window {

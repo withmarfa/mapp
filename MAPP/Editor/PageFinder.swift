@@ -122,26 +122,12 @@ final class PageFinder: NSObject, NSTextFinderClient {
     }
 }
 
-/// Holds the page and, while it shows, the find bar above it, under the toolbar.
+/// Holds the page and, while it shows, the find bar above it. Both stay below the toolbar: WebKit draws a hard
+/// edge under the toolbar over a page that reaches beneath it, and moving the page under it only once scrolled
+/// made the text jump, since WebKit does not keep the text in place as the page moves.
 final class EditorContainer: NSView, NSTextFinderBarContainer {
     let webView: EditorWebView
     var onFindBarVisibilityChange: (Bool) -> Void = { _ in }
-
-    /// How far the window's toolbar overlaps the container.
-    var topInset: CGFloat = 0 {
-        didSet { if topInset != oldValue { needsLayout = true } }
-    }
-
-    /// Whether the page runs on under the toolbar, as it does once scrolled. At its top it stops below the
-    /// toolbar, so the toolbar draws no edge over nothing, as Mail's does; WebKit draws that edge whenever the
-    /// page reaches under it. The page keeps its place either way, since its inset moves with it.
-    var runsUnderToolbar = false {
-        didSet {
-            guard runsUnderToolbar != oldValue else { return }
-            needsLayout = true
-            layoutSubtreeIfNeeded()
-        }
-    }
 
     init(webView: EditorWebView) {
         self.webView = webView
@@ -181,20 +167,14 @@ final class EditorContainer: NSView, NSTextFinderBarContainer {
 
     override func layout() {
         super.layout()
-        var top = topInset
+        var top: CGFloat = 0
         if isFindBarVisible, let findBarView {
             // The finder gives the bar its height; until it has, the bar's own fitting height.
             let height = findBarView.frame.height > 0 ? findBarView.frame.height : findBarView.fittingSize.height
-            findBarView.frame = NSRect(x: 0, y: topInset, width: bounds.width, height: height)
-            top += height
+            findBarView.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
+            top = height
         }
-        if runsUnderToolbar {
-            webView.frame = bounds
-            webView.topInset = top
-        } else {
-            webView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
-            webView.topInset = 0
-        }
+        webView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
     }
 
 }
