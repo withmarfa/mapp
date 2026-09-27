@@ -45,7 +45,7 @@ final class EditorWebView: WKWebView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let location = convert(sender.draggingLocation, from: nil)
         let point = CGPoint(x: location.x, y: isFlipped ? location.y : bounds.height - location.y)
-        if carriesImages(sender), controller?.insertImages(from: sender.draggingPasteboard, at: point) == true { return true }
+        if carriesImages(sender), controller?.insertImages(PastedImages.sources(on: sender.draggingPasteboard), at: point) == true { return true }
         return super.performDragOperation(sender)
     }
 

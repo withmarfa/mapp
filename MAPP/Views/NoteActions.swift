@@ -31,6 +31,9 @@ struct NoteActions: View {
                 }
                 moveMenu(notes)
                 Divider()
+                // Archiving is Marfa's to supply; until then the command keeps its place, dimmed.
+                Button(inMenuBar ? "Archive Note" : "Archive", systemImage: "archivebox") {}
+                    .disabled(true)
                 Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
                     library.delete(ids, undoManager: undoManager)
                 }

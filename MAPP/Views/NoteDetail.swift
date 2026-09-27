@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NoteDetail: View {
     @Environment(NoteLibrary.self) private var library
@@ -33,7 +34,7 @@ struct NoteDetail: View {
 /// text into a page that is already running.
 struct NotePage: View {
     let note: Note
-    let editor: EditorController
+    @Bindable var editor: EditorController
 
     var body: some View {
         GeometryReader { proxy in
@@ -44,6 +45,11 @@ struct NotePage: View {
             if note.isDeleted {
                 DeletedNoteBanner(id: note.id)
             }
+        }
+        .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            editor.focus()
+            editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: note.id, initial: true) { editor.load(note) }
         .onChange(of: note.body) { editor.noteChanged(note) }

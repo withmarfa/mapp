@@ -15,6 +15,7 @@ struct MAPPApp: App {
             AppCommands(library: folder.library)
             FindCommands()
             FormatCommands()
+            ToolbarCommands()
         }
 
         WindowGroup("Note", for: String.self) { $path in
