@@ -774,13 +774,24 @@ final class NoteLibrary {
         }
     }
 
-    /// The store could not use a path, since something it had not been told of was there, and used another.
+    /// The store could not use a path, since something it had not been told of was there, and used another, or
+    /// could not move a file, which stayed where it was.
     private func relocate(_ from: String, _ to: String) {
         defer { store?.acknowledgeRelocation(of: from) }
         guard let index = notes.firstIndex(where: { $0.path == from && !$0.isDeleted })
             ?? notes.firstIndex(where: { $0.path == from })
         else { return }
+        let directory = notes[index].directory
         notes[index].path = to
+        notes[index].folderID = folderID(forPath: to)
+        // A move to another folder that failed leaves the note where it was, with links written from there.
+        if !notes[index].isDeleted { rebaseLinks(at: index, from: directory) }
+        // A note following its first line whose file kept a name the line no longer gives is renamed again when
+        // it is next left, so a rename that failed is tried once more rather than forgotten.
+        if let line = notes[index].namedLine, let name = notes[index].fileTitle, !NoteText.isName(name, of: line) {
+            notes[index].namedLine = name
+            edited.insert(notes[index].id)
+        }
     }
 
     private func newFolderName() -> String {

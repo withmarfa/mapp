@@ -85,6 +85,26 @@ struct FolderStoreTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.url.path) == ["Note.md"])
     }
 
+    @Test func changesQueuedBehindAFailedMoveReachTheFileWhereItStayed() async throws {
+        try root.write("Milk", to: "Groceries.md")
+        let file = root.url.appending(path: "Groceries.md").path
+        defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: file) }
+        // A locked file cannot be renamed.
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: file)
+        var moved: (String, String)?
+        store.relocated = { from, to in moved = (from, to) }
+        store.perform(.move(from: "Groceries.md", to: "Shopping.md"))
+        store.drain()
+        try FileManager.default.setAttributes([.immutable: false], ofItemAtPath: file)
+        store.perform(.write(path: "Shopping.md", text: "Milk, eggs"))
+        store.drain()
+        #expect(root.read("Groceries.md") == "Milk, eggs")
+        #expect(!root.exists("Shopping.md"), "no second note is made under the new name")
+        for _ in 0..<100 where moved == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(moved?.0 == "Shopping.md")
+        #expect(moved?.1 == "Groceries.md")
+    }
+
     @Test func aChangeThatFailsIsReported() async throws {
         var failure: String?
         store.failed = { path, _ in failure = path }

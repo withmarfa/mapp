@@ -19,8 +19,8 @@ nonisolated protocol NoteStore: AnyObject, Sendable {
     func freeAttachmentPath(named name: String) -> String
 
     /// Told when a change could not use the path it was given, because a file the library does not know of is
-    /// there, and used this one instead. Changes queued meanwhile for the first path go to the second. Called on
-    /// the main actor.
+    /// there, and used this one instead, or because a move failed and the file is still where it was. Changes
+    /// queued meanwhile for the first path go to the second. Called on the main actor.
     var relocated: @MainActor @Sendable (_ from: String, _ to: String) -> Void { get set }
 
     /// The library has taken in a relocation, so changes it queues from now on for the old path mean that path.

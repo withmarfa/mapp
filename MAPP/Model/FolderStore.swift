@@ -110,7 +110,8 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             } catch {
                 log.error("\(String(describing: change).prefix(80), privacy: .private): \(error.localizedDescription, privacy: .public)")
                 let failed = failed
-                let path = change.path ?? ""
+                // The path the change was made at, which a failed move leaves as the file's old one.
+                let path = change.path.map(resolved) ?? ""
                 let message = error.localizedDescription
                 Task { @MainActor in failed(path, message) }
             }
@@ -183,7 +184,14 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             aliases[from] = nil
             aliases[to] = nil
             let target = available(url(to), besides: source)
-            try move(source, to: target)
+            do {
+                try move(source, to: target)
+            } catch {
+                // The file stays where it was, so what the library queued for the new path goes there too, rather
+                // than making a second note under the new name; the library hears that the file did not move.
+                report(to, source)
+                throw error
+            }
             report(to, target)
         case .trash(let path, let id, let date):
             let source = url(path)
