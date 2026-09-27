@@ -205,12 +205,22 @@ struct EditorTests {
         let spellcheck = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').getAttribute('spellcheck')") as? String
         #expect(spellcheck == "false")
 
-        let url = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")
-        defer { try? FileManager.default.removeItem(at: url) }
+        let folder = try TemporaryFolder()
+        let url = folder.url.appending(path: "Kitchen quotes.pdf")
         page.editor.exportPDF(to: url)
-        try await page.wait { (try? Data(contentsOf: url))?.isEmpty == false }
+        // The size is watched rather than the file read, and a PDF far larger than one short note's fails at once,
+        // so pagination that runs away cannot fill the disk before the test gives up.
+        var bytes = 0
+        for _ in 0..<50 {
+            try await Task.sleep(for: .milliseconds(100))
+            let now = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+            try #require(now <= 5_000_000, "the PDF has grown to \(now) bytes")
+            if now > 0, now == bytes { break }
+            bytes = now
+        }
+        try #require(bytes > 0, "no PDF was written")
         let document = try #require(PDFDocument(url: url))
-        #expect(document.pageCount >= 1)
+        #expect((1...2).contains(document.pageCount), "a short note prints on a page or two")
         #expect(document.string?.contains("Kitchen quotes") == true)
         #expect(document.string?.contains("Book a site visit") == true)
     }
