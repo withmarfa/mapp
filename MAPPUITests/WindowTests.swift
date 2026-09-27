@@ -201,7 +201,10 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        app.typeText("new folder\r")
+        // New Note leads what "new" finds; the arrow key moves on to New Folder.
+        app.typeText("new")
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(sidebar.textFields.firstMatch.waitForExistence(timeout: 2), "the new folder's name is being edited")
     }
 

@@ -37,6 +37,7 @@ struct CommandPalette: View {
                     .font(.title3)
                     .focused($isFieldFocused)
                     .onSubmit { run(entries) }
+                    .onExitCommand(perform: close)
                     .accessibilityIdentifier("CommandPaletteField")
             }
             .padding(12)
@@ -81,8 +82,11 @@ struct CommandPalette: View {
             return .handled
         }
         .onChange(of: query) { highlighted = 0 }
-        .onAppear {
-            returnFocus = editor.isFocused ? .page : .list
+        .onAppear { returnFocus = editor.isFocused ? .page : .list }
+        // The field takes the keyboard once the palette is in the window; asked any sooner, the list keeps it.
+        .defaultFocus($isFieldFocused, true)
+        .task {
+            try? await Task.sleep(for: .milliseconds(50))
             isFieldFocused = true
         }
         .accessibilityElement(children: .contain)
