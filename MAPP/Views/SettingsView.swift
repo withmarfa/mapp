@@ -19,6 +19,9 @@ struct SettingsView: View {
             Section {
                 OrderOptions()
             }
+            Section {
+                PageWidthOptions()
+            }
         }
         // The menus show these with icons; Settings rows, as in the system's own panes, do not.
         .labelStyle(.titleOnly)

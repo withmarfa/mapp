@@ -41,6 +41,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var notesByGeneration: [Int: Note.ID] = [:]
     @ObservationIgnored private var wantsFocus = false
+    @ObservationIgnored private var fullWidth = false
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
@@ -189,6 +190,12 @@ final class EditorController: NSObject {
         call("focus")
     }
 
+    /// Whether the text runs the page's whole width rather than a measure for reading.
+    func setFullWidth(_ fullWidth: Bool) {
+        self.fullWidth = fullWidth
+        if isReady { call("setFullWidth", String(fullWidth)) }
+    }
+
     /// Formats from outside the page, as the toolbar does: the page takes the keyboard first, so the command
     /// acts where its caret was and typing carries on there.
     func apply(_ format: Format) {
@@ -322,8 +329,9 @@ final class EditorController: NSObject {
             applyAccent()
             applyLabels()
             applyKeymap()
+            call("setFullWidth", String(fullWidth))
             if let noteID {
-                if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? "")) }
+                if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? note.directory)) }
                 generation += 1
                 notesByGeneration[generation] = noteID
                 call("load", json(markdown), String(generation), String(isEditable))

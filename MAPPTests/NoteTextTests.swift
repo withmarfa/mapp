@@ -65,6 +65,10 @@ struct NoteTextTests {
         #expect(preview(body) == "ls *.swift")
     }
 
+    @Test func previewNamesAnImageWithoutTheWidthItWasGiven() {
+        #expect(preview("Title\n\n![Dusk|320](Attachments/Dusk.png) and ![Photo\\|400](a.png)") == "Dusk and Photo")
+    }
+
     @Test func previewOfATitleOnlyNoteSaysSo() {
         #expect(preview("# Just a title") == "No additional text")
     }

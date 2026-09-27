@@ -90,7 +90,7 @@ test('a url that would read differently keeps its angle brackets', async () => {
   expect(await roundTrip('<https://example.com/page.>\n')).toBe('<https://example.com/page.>\n')
 })
 
-test('an image keeps its markdown though the page shows only its name', async () => {
+test('an image keeps its markdown, title and all', async () => {
   const markdown = '![A diagram](diagram.png "Plan")\n'
   expect(await roundTrip(markdown)).toBe(markdown)
 })

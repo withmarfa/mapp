@@ -11,7 +11,7 @@ interface Run {
 }
 
 /** The note as plain text, as the system find bar searches it: each block's text, blocks separated by a line
- *  break, and a line break for a hard break or an image. */
+ *  break, a line break for a hard break, and an object replacement character for an image. */
 export interface TextModel {
   text: string
   runs: Run[]

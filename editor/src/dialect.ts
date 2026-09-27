@@ -33,7 +33,7 @@ import {
 import { $remark } from '@milkdown/kit/utils'
 import { autolinkInputRule } from './autolink'
 import { imageView } from './images'
-import type { Link, Parents, PhrasingContent } from 'mdast'
+import type { Heading, Link, Paragraph, Parents, PhrasingContent } from 'mdast'
 import { defaultHandlers, type Options as StringifyOptions } from 'mdast-util-to-markdown'
 import {
   gfmAutolinkLiteralFromMarkdown,
@@ -101,6 +101,24 @@ const link: (typeof defaultHandlers)['link'] = (node, parent, state, info) =>
 link.peek = (node, parent, state) =>
   writesBare(node, parent) ? node.url[0]! : defaultHandlers.link.peek(node, parent, state)
 
+// Spaces and tabs at the edges of a paragraph or heading are dropped when markdown is read, so writing them would
+// only escape them, as `&#x20;`, into the file and into the note's name; they are left out.
+function trimmed<T extends Paragraph | Heading>(node: T): T {
+  // An empty block reaches the writer with no children at all.
+  if (!Array.isArray(node.children)) return node
+  const children = [...node.children]
+  const first = children[0]
+  if (first?.type === 'text') children[0] = { ...first, value: first.value.replace(/^[ \t]+/, '') }
+  const last = children.at(-1)
+  if (last?.type === 'text') children[children.length - 1] = { ...last, value: last.value.replace(/[ \t]+$/, '') }
+  return { ...node, children }
+}
+
+const paragraph: (typeof defaultHandlers)['paragraph'] = (node, parent, state, info) =>
+  defaultHandlers.paragraph(trimmed(node), parent, state, info)
+const heading: (typeof defaultHandlers)['heading'] = (node, parent, state, info) =>
+  defaultHandlers.heading(trimmed(node), parent, state, info)
+
 // Compact rows, since padding columns out would rewrite a whole table whenever one cell grew; but delimiters of
 // at least three dashes, the form GitHub and most writers use, where the compact form would write one.
 const tableToMarkdown = gfmTableToMarkdown({ tablePipeAlign: false })
@@ -130,7 +148,7 @@ function remarkDialect(this: Processor) {
   add('toMarkdownExtensions', gfmTaskListItemToMarkdown())
   add('toMarkdownExtensions', gfmAutolinkLiteralToMarkdown())
   add('toMarkdownExtensions', tableToMarkdown)
-  add('toMarkdownExtensions', { handlers: { link } })
+  add('toMarkdownExtensions', { handlers: { link, paragraph, heading } })
 }
 
 export const remarkDialectPlugin = $remark('remarkDialect', () => remarkDialect)
