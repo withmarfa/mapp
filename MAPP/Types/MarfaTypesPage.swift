@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import SwiftUI
 import WebKit
 
@@ -7,24 +8,38 @@ import WebKit
 /// search box are hidden and the toolbar's field drives the page's search. That is done here, as the page loads,
 /// so the page stays as generated and is refreshed by replacing it whole. Each window makes its page the first
 /// time Marfa Types is shown and keeps it, so the page is where it was left when the window comes back to it.
+///
+/// The page stops below the toolbar, since WebKit draws a hard edge under the toolbar whenever a page reaches
+/// beneath it. Its list of types is given the page's own background and no divider, so the page reads as one
+/// surface under the toolbar rather than a column that stops short of it.
+@Observable
 final class MarfaTypesPage: NSObject, WKNavigationDelegate {
-    private(set) lazy var webView = makeWebView()
+    @ObservationIgnored private(set) lazy var webView = makeWebView()
     /// The page asks for the toolbar's search, when / is typed as it would have focused its own.
-    var onFind: () -> Void = {}
-    private var isLoaded = false
-    private var query = ""
-    private let pageURL: URL = {
+    @ObservationIgnored var onFind: () -> Void = {}
+    /// Whether Back and Forward have somewhere to go among the types the page has shown.
+    private(set) var canGoBack = false
+    private(set) var canGoForward = false
+    @ObservationIgnored private var isLoaded = false
+    @ObservationIgnored private var query = ""
+    @ObservationIgnored private var historyObservations: [NSKeyValueObservation] = []
+    @ObservationIgnored private let pageURL: URL = {
         guard let url = Bundle.main.url(forResource: "marfa-types", withExtension: "html") else {
             preconditionFailure("marfa-types.html missing from the bundle")
         }
         return url
     }()
 
-    /// Hides the page's heading and search box, which the toolbar stands in for, and passes / and ⌘K to the app:
-    /// / to the toolbar's search, and ⌘K to the menu bar's command palette, which the page would otherwise take.
+    /// Hides the page's heading and search box, which the toolbar stands in for; gives its list of types the
+    /// page's background and no divider; and passes / and ⌘K to the app: / to the toolbar's search, and ⌘K to the
+    /// menu bar's command palette, which the page would otherwise take.
     private static let adaptation = """
         const style = document.createElement('style');
-        style.textContent = '.side-head { display: none; } .nav { padding-top: 14px; }';
+        style.textContent = `
+          .side-head { display: none; }
+          .sidebar { background: var(--bg); border-right: 0; }
+          .nav { padding-top: 14px; }
+        `;
         document.head.append(style);
         window.addEventListener('keydown', (event) => {
           const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? '');
@@ -57,9 +72,21 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         #if DEBUG
         webView.isInspectable = true
         #endif
+        historyObservations = [
+            webView.observe(\.canGoBack) { [weak self] webView, _ in
+                MainActor.assumeIsolated { self?.canGoBack = webView.canGoBack }
+            },
+            webView.observe(\.canGoForward) { [weak self] webView, _ in
+                MainActor.assumeIsolated { self?.canGoForward = webView.canGoForward }
+            },
+        ]
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL)
         return webView
     }
+
+    func goBack() { webView.goBack() }
+    func goForward() { webView.goForward() }
+
 
     /// Searches the page as its own search box would, types, fields and guides alike.
     func search(_ text: String) {
@@ -87,9 +114,9 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        webView.isHidden = false
         guard !isLoaded else { return }
         isLoaded = true
+        webView.isHidden = false
         if !query.isEmpty { search(query) }
     }
 

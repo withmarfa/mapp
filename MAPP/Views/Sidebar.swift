@@ -8,6 +8,7 @@ struct Sidebar: View {
     /// Kept after the dialog closes, so its title does not empty while it animates away.
     @State private var folderToDelete: Folder?
     @State private var takenName: String?
+    @Environment(\.sidebarRowSize) private var rowSize
 
     /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
     /// cannot show, so that is ignored.
@@ -28,7 +29,7 @@ struct Sidebar: View {
                 row(.pinned, systemImage: "pin")
             }
 
-            Section("Folders") {
+            Section {
                 ForEach(library.folders) { folder in
                     folderRow(folder)
                 }
@@ -37,14 +38,11 @@ struct Sidebar: View {
                     let target = destination < library.folders.count ? library.folders[destination].id : nil
                     library.moveFolders(ids, before: target, undoManager: undoManager)
                 }
-            }
-
-            Section {
-                row(.recentlyDeleted, systemImage: "trash")
-            }
-
-            Section {
-                row(.marfaTypes, systemImage: "cube")
+            } header: {
+                FoldersHeader {
+                    browser.newFolder(in: library, order: order, undoManager: undoManager)
+                }
+                .disabled(!library.isLoaded)
             }
         }
         .listStyle(.sidebar)
@@ -56,14 +54,10 @@ struct Sidebar: View {
             if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button("New Folder", systemImage: "plus.circle") {
-                browser.newFolder(in: library, order: order, undoManager: undoManager)
+            VStack(spacing: 0) {
+                places
+                newFolderButton
             }
-                .disabled(!library.isLoaded)
-                .buttonStyle(.borderless)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
@@ -82,6 +76,44 @@ struct Sidebar: View {
         } message: {
             Text("A folder named “\(takenName ?? "")” already exists. Please choose a different name.")
         }
+    }
+
+    /// Marfa Types and Recently Deleted, kept at the foot of the sidebar however many folders there are. They
+    /// are a list of their own, selected as the sidebar's other places are, sized to its two rows.
+    private var places: some View {
+        List(selection: selection) {
+            row(.marfaTypes, systemImage: "cube")
+            row(.recentlyDeleted, systemImage: "trash")
+        }
+        .listStyle(.sidebar)
+        .scrollDisabled(true)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.vertical, 0, for: .scrollContent)
+        .frame(height: 2 * rowHeight)
+        .accessibilityIdentifier("SidebarPlaces")
+        .accessibilityLabel("Places")
+    }
+
+    /// A sidebar row's height at the size chosen in System Settings, which the list of the places at its foot is
+    /// given, since a list takes the height it is offered rather than its rows'.
+    private var rowHeight: CGFloat {
+        switch rowSize {
+        case .small: 26
+        case .large: 40
+        default: 32
+        }
+    }
+
+    private var newFolderButton: some View {
+        Button("New Folder", systemImage: "plus.circle") {
+            browser.newFolder(in: library, order: order, undoManager: undoManager)
+        }
+        .disabled(!library.isLoaded)
+        .buttonStyle(.borderless)
+        .accessibilityIdentifier("NewFolderButton")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     private func row(_ item: SidebarItem, systemImage: String) -> some View {
@@ -135,6 +167,29 @@ struct Sidebar: View {
         } else {
             library.rename(folder.id, to: name, undoManager: undoManager)
         }
+    }
+}
+
+/// The Folders heading, with a button for a new folder that shows while the pointer is over it, as Mail's
+/// headings show theirs. The list reads a heading as one line, so the button is left to the pointer; New Folder
+/// below the sidebar and in the File menu are there for everything else.
+private struct FoldersHeader: View {
+    let newFolder: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack {
+            Text("Folders")
+            Spacer()
+            Button("New Folder", systemImage: "plus", action: newFolder)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("New Folder")
+                .opacity(isHovering ? 1 : 0)
+                .accessibilityHidden(true)
+        }
+        .contentShape(.rect)
+        .onHover { isHovering = $0 }
     }
 }
 

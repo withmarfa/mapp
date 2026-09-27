@@ -58,6 +58,9 @@
     "Attach Image…" : {
 
     },
+    "Back" : {
+
+    },
     "Block Quote" : {
 
     },
@@ -176,6 +179,9 @@
 
     },
     "Format" : {
+
+    },
+    "Forward" : {
 
     },
     "Full Width" : {
@@ -300,6 +306,9 @@
 
     },
     "Pinned" : {
+
+    },
+    "Places" : {
 
     },
     "Previous 30 Days" : {

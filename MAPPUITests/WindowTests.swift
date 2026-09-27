@@ -5,7 +5,9 @@ import XCTest
 final class WindowTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
-    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    private var sidebar: XCUIElement { window.outlines.matching(NSPredicate(format: "identifier == 'Sidebar'")).firstMatch }
+    /// Marfa Types and Recently Deleted, a list of their own at the sidebar's foot.
+    private var places: XCUIElement { window.outlines["SidebarPlaces"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
     private var page: XCUIElement { window.webViews.firstMatch }
     /// The note's text as the page shows it: formatted, so without markdown's marks.
@@ -31,7 +33,7 @@ final class WindowTests: XCTestCase {
     }
 
     private func sidebarItem(_ name: String) -> XCUIElement {
-        sidebar.staticTexts[name]
+        name == "Marfa Types" || name == "Recently Deleted" ? places.staticTexts[name] : sidebar.staticTexts[name]
     }
 
     private func row(titled title: String) -> XCUIElement {
@@ -122,7 +124,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testNewFolderIsNamedInPlace() {
-        window.buttons["New Folder"].click()
+        window.buttons["NewFolderButton"].click()
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.typeKey("a", modifierFlags: .command)
@@ -314,6 +316,29 @@ final class WindowTests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
 
+    func testMarfaTypesAndRecentlyDeletedStayAtTheFootOfTheSidebar() {
+        let lastFolder = sidebarItem("Work").frame
+        let types = sidebarItem("Marfa Types").frame
+        let deleted = sidebarItem("Recently Deleted").frame
+        XCTAssertGreaterThan(types.minY, lastFolder.maxY + 100, "a gap is left below the folders")
+        XCTAssertGreaterThan(deleted.minY, types.maxY - 1, "Recently Deleted comes last")
+        XCTAssertLessThan(window.buttons["NewFolderButton"].frame.minY - deleted.maxY, 30, "just above New Folder")
+        sidebarItem("Recently Deleted").click()
+        XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
+    }
+
+    func testTheFoldersHeadingOffersANewFolderUnderThePointer() {
+        // The button is the pointer's alone, at the heading's end.
+        let heading = sidebar.staticTexts["Folders"]
+        heading.hover()
+        heading.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
+        let field = sidebar.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("Projects\r")
+        XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
+    }
+
     // MARK: Marfa Types
 
     private var typesPage: XCUIElement { window.groups["MarfaTypes"].webViews.firstMatch }
@@ -357,6 +382,19 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(fields.waitForExistence(timeout: 2), "Return opens the match")
     }
 
+    func testBackAndForwardMoveThroughTheTypesShown() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        typesPage.links["Person"].firstMatch.click()
+        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
+        typesPage.links["Place"].firstMatch.click()
+        XCTAssertTrue(typesPage.staticTexts["core.entity.place"].firstMatch.waitForExistence(timeout: 2))
+        app.typeKey("[", modifierFlags: .command)
+        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
+        app.typeKey("]", modifierFlags: .command)
+        XCTAssertTrue(typesPage.staticTexts["core.entity.place"].firstMatch.waitForExistence(timeout: 2))
+    }
+
     func testANewNoteFromMarfaTypesGoesToTheInbox() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
@@ -375,7 +413,7 @@ final class WindowTests: XCTestCase {
         // Menu rather than Press. The list's title and count in the toolbar above it are the system's too.
         // Controls and text are still audited everywhere else.
         let windowFrame = window.frame
-        let sidebarFrame = sidebar.frame
+        let sidebarFrame = sidebar.frame.union(places.frame)
         let listFrame = list.frame
         try app.performAccessibilityAudit { issue in
             guard let element = issue.element else { return false }
