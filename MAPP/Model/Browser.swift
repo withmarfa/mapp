@@ -22,6 +22,8 @@ final class Browser {
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
+        /// The search of Marfa Types, which searches its page rather than the notes.
+        case typesSearch
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }

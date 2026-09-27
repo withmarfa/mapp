@@ -10,6 +10,8 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @FocusState private var isSearchFocused: Bool
+    @FocusState private var isTypesSearchFocused: Bool
+    @State private var typesQuery = ""
     @State private var noteName = ""
     @State private var takenNoteName: String?
 
@@ -25,6 +27,11 @@ struct MainView: View {
                         // The note that was on the page is out of sight, so it is left.
                         .onAppear { editor.close() }
                 }
+                // The page's own search, in the toolbar where the notes' search is everywhere else.
+                .searchable(text: $typesQuery, placement: .toolbar, prompt: Text("Search Types"))
+                .searchFocused($isTypesSearchFocused)
+                .onSubmit(of: .search) { types.openFirstMatch() }
+                .onChange(of: typesQuery) { types.search(typesQuery) }
             } else {
                 NavigationSplitView {
                     sidebar
@@ -75,6 +82,7 @@ struct MainView: View {
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
+            types.onFind = { [browser] in browser.focusRequest = .typesSearch }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
@@ -103,6 +111,7 @@ struct MainView: View {
         case .search:
             if browser.showsTypes { return browser.show(.allNotes, in: library, order: order) }
             isSearchFocused = true
+        case .typesSearch: isTypesSearchFocused = true
         case .sidebar, .list: pane = browser.focusRequest
         case .page, nil: return
         }

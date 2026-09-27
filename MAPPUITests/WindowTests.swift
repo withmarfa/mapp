@@ -335,13 +335,26 @@ final class WindowTests: XCTestCase {
     func testSearchNotesFromMarfaTypesGoesToAllNotesAndSearches() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        XCTAssertFalse(window.toolbars.searchFields.firstMatch.exists, "the page has its own search")
         app.typeKey("p", modifierFlags: .command)
         XCTAssertTrue(list.waitForExistence(timeout: 2))
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
         XCTAssertEqual(window.searchFields.firstMatch.value as? String, "ragu")
+    }
+
+    func testTheToolbarSearchesMarfaTypes() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(typesPage.searchFields.firstMatch.exists, "the toolbar's search stands in for the page's")
+        app.typeKey("f", modifierFlags: .command)
+        app.typeText("calendar")
+        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForNonExistence(timeout: 2), "the page's list narrows")
+        XCTAssertTrue(typesPage.links["Google Calendar Event"].firstMatch.exists)
+        app.typeKey(.return, modifierFlags: [])
+        let fields = typesPage.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Fields'")).firstMatch
+        XCTAssertTrue(fields.waitForExistence(timeout: 2), "Return opens the match")
     }
 
     func testANewNoteFromMarfaTypesGoesToTheInbox() {
