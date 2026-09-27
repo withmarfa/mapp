@@ -15,8 +15,6 @@ final class EditorController: NSObject {
     var isFocused = false
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
-    /// Whether the page is scrolled from its top, so text runs beneath the toolbar.
-    private(set) var isScrolled = false
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
     var isChoosingImages = false
 
@@ -354,7 +352,7 @@ final class EditorController: NSObject {
         case .find(let state):
             pageFinder.update(state)
         case .scrolled(let scrolled):
-            isScrolled = scrolled
+            container.runsUnderToolbar = scrolled
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
         }

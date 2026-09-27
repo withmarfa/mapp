@@ -10,27 +10,29 @@ struct NoteToolbar: CustomizableToolbarContent {
     let editor: EditorController
 
     var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "newNote", placement: .primaryAction) {
+        ToolbarItem(id: "newNote") {
             NewNoteButton(browser: browser)
         }
         .customizationBehavior(.disabled)
         .hidden(browser == nil)
+        ToolbarSpacer(.flexible)
 
-        ToolbarItem(id: "format", placement: .principal) {
+        ToolbarItem(id: "format") {
             FormatMenu(editor: editor, note: editableNote)
         }
-        ToolbarItem(id: "checklist", placement: .principal) {
+        ToolbarItem(id: "checklist") {
             FormatButton(format: .checklist, systemImage: "checklist", editor: editor, note: editableNote)
         }
-        ToolbarItem(id: "table", placement: .principal) {
+        ToolbarItem(id: "table") {
             FormatButton(format: .table, systemImage: "tablecells", editor: editor, note: editableNote)
         }
-        ToolbarItem(id: "attach", placement: .principal) {
+        ToolbarItem(id: "attach") {
             Button("Attach Image", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .help("Attach Image")
                 .disabled(editableNote == nil)
         }
 
+        ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
             NoteShareLink(note: notes.count == 1 ? notes.first : nil)
                 .help("Share")
