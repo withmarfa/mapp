@@ -5,6 +5,7 @@ struct MainView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
     @State private var editor = EditorController()
+    @State private var types = MarfaTypesPage()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
@@ -13,19 +14,33 @@ struct MainView: View {
     @State private var takenNoteName: String?
 
     var body: some View {
-        NavigationSplitView {
-            Sidebar(browser: browser, order: order)
-                // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
-                .focused($pane, equals: .sidebar)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
-        } content: {
-            NoteList(browser: browser, order: order, pane: $pane)
-                .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
-        } detail: {
-            NoteDetail(browser: browser, editor: editor)
-                .toolbar(id: "main") {
-                    NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
+        // Marfa Types has no list, so its page takes the list's column and the note's together.
+        Group {
+            if browser.showsTypes {
+                NavigationSplitView {
+                    sidebar
+                } detail: {
+                    MarfaTypesView(page: types)
+                        .navigationTitle(library.name(of: .marfaTypes))
+                        // The note that was on the page is out of sight, so it is left.
+                        .onAppear { editor.close() }
                 }
+            } else {
+                NavigationSplitView {
+                    sidebar
+                } content: {
+                    NoteList(browser: browser, order: order, pane: $pane)
+                        .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
+                } detail: {
+                    NoteDetail(browser: browser, editor: editor)
+                        .toolbar(id: "main") {
+                            NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
+                        }
+                }
+                // Only the notes are searched here; Marfa Types has a search of its own.
+                .searchable(text: $browser.searchText, placement: .toolbar)
+                .searchFocused($isSearchFocused)
+            }
         }
         .overlay(alignment: .top) {
             if browser.isShowingPalette {
@@ -35,15 +50,13 @@ struct MainView: View {
                         .contentShape(.rect)
                         .onTapGesture {
                             browser.isShowingPalette = false
-                            browser.focusRequest = .list
+                            browser.focusRequest = browser.showsTypes ? .sidebar : .list
                         }
                     CommandPalette(browser: browser, editor: editor)
                         .padding(.top, 72)
                 }
             }
         }
-        .searchable(text: $browser.searchText, placement: .toolbar)
-        .searchFocused($isSearchFocused)
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
@@ -51,14 +64,8 @@ struct MainView: View {
             browser.folderRemoved(in: library, order: order)
         }
         // The page grants its own requests, since it may not exist until the request's selection shows.
-        .onChange(of: browser.focusRequest) {
-            switch browser.focusRequest {
-            case .search: isSearchFocused = true
-            case .sidebar, .list: pane = browser.focusRequest
-            case .page, nil: return
-            }
-            browser.focusRequest = nil
-        }
+        .onChange(of: browser.focusRequest, grantFocusRequest)
+        .onChange(of: browser.showsTypes, grantFocusRequest)
         .onChange(of: browser.snapshot(in: library)) { _, snapshot in
             storedBrowser = try? JSONEncoder().encode(snapshot)
         }
@@ -88,6 +95,25 @@ struct MainView: View {
         } message: {
             Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
         }
+    }
+
+    /// Search Notes from Marfa Types goes to All Notes first, and its search field takes the keyboard once shown.
+    private func grantFocusRequest() {
+        switch browser.focusRequest {
+        case .search:
+            if browser.showsTypes { return browser.show(.allNotes, in: library, order: order) }
+            isSearchFocused = true
+        case .sidebar, .list: pane = browser.focusRequest
+        case .page, nil: return
+        }
+        browser.focusRequest = nil
+    }
+
+    private var sidebar: some View {
+        Sidebar(browser: browser, order: order)
+            // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
+            .focused($pane, equals: .sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
     }
 
     /// A name another note in the folder has is refused with an alert, as the Finder does.

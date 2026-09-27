@@ -35,7 +35,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var pageFinder: PageFinder!
 
     /// The note on the page, and the markdown the page holds for it as far as the app knows.
-    @ObservationIgnored private(set) var noteID: Note.ID?
+    private(set) var noteID: Note.ID?
     @ObservationIgnored private var markdown = ""
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// note still reaches that note rather than the one now showing.
@@ -127,6 +127,13 @@ final class EditorController: NSObject {
         call(function, json(note.body), String(generation), String(isEditable))
     }
 
+    /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
+    /// commands for the note on the page (Print, Find) stop acting on one out of sight.
+    func close() {
+        flush()
+        noteID = nil
+    }
+
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
     /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
@@ -180,16 +187,21 @@ final class EditorController: NSObject {
         }
     }
 
-    /// Gives the page the keyboard: now if it is ready, otherwise once it is. One request, never repeated.
+    /// Gives the page the keyboard: now if it is ready and in a window, otherwise once it is, as when the page
+    /// comes back after Marfa Types. One request, never repeated.
     func focus() {
-        guard isReady else {
+        guard isReady, let window = webView.window else {
             wantsFocus = true
             return
         }
         wantsFocus = false
-        guard let window = webView.window else { return }
         window.makeFirstResponder(webView)
         call("focus")
+    }
+
+    /// The page is in a window again, where a request for the keyboard made while it was out can be granted.
+    func pageDidMoveToWindow() {
+        if wantsFocus, webView.window != nil { focus() }
     }
 
     /// How the page is set out: its width, its text size and whether spelling is checked.

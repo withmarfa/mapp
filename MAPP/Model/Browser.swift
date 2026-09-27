@@ -33,6 +33,9 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    /// Whether the window shows Marfa's types in place of the list and the note.
+    var showsTypes: Bool { item == .marfaTypes }
+
     /// The notes the list shows: the search results while searching, the sidebar item's notes otherwise.
     func notes(in library: NoteLibrary) -> [Note] {
         isSearching ? library.notes(matching: searchText) : library.notes(in: item)
@@ -72,10 +75,10 @@ final class Browser {
         selection = first.map { [$0.id] } ?? []
     }
 
-    /// A new note where the list can show it. Recently Deleted cannot hold one, so it goes to the Inbox, and a
-    /// search is cleared so the note is not hidden by it.
+    /// A new note where the list can show it. Recently Deleted and Marfa Types cannot hold one, so it goes to
+    /// the Inbox, and a search is cleared so the note is not hidden by it.
     func newNote(in library: NoteLibrary, undoManager: UndoManager?) {
-        if item == .recentlyDeleted { sidebarItem = .inbox }
+        if item == .recentlyDeleted || item == .marfaTypes { sidebarItem = .inbox }
         searchText = ""
         let note = library.newNote(in: item, undoManager: undoManager)
         selection = [note.id]
@@ -131,7 +134,7 @@ final class Browser {
         var selection: [String]
 
         enum Item: Codable, Equatable {
-            case inbox, allNotes, pinned, recentlyDeleted
+            case inbox, allNotes, pinned, recentlyDeleted, marfaTypes
             case folder(String)
         }
     }
@@ -143,6 +146,7 @@ final class Browser {
             case .allNotes: .allNotes
             case .pinned: .pinned
             case .recentlyDeleted: .recentlyDeleted
+            case .marfaTypes: .marfaTypes
             case .folder(let id): .folder(library.folder(id)?.name ?? "")
             }
         }
@@ -157,6 +161,7 @@ final class Browser {
         case .inbox: sidebarItem = .inbox
         case .pinned: sidebarItem = .pinned
         case .recentlyDeleted: sidebarItem = .recentlyDeleted
+        case .marfaTypes: sidebarItem = .marfaTypes
         case .folder(let name):
             sidebarItem = library.folders.first { $0.name == name }.map { .folder($0.id) } ?? .allNotes
         case .allNotes, nil: sidebarItem = .allNotes

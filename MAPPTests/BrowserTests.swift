@@ -49,10 +49,11 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
-    @Test func aNewNoteFromRecentlyDeletedGoesToTheInboxAndStaysSelected() {
+    @Test(arguments: [SidebarItem.recentlyDeleted, .marfaTypes])
+    func aNewNoteFromAPlaceWithoutNotesGoesToTheInboxAndStaysSelected(from item: SidebarItem) {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
-        browser.show(.recentlyDeleted, in: library, order: NoteOrder())
+        browser.show(item, in: library, order: NoteOrder())
         browser.searchText = "Pinned"
         browser.newNote(in: library, undoManager: nil)
         #expect(browser.item == .inbox)
@@ -115,6 +116,15 @@ struct BrowserTests {
         restored.restore(saved.snapshot(in: library), in: library, order: NoteOrder())
         #expect(restored.item == .inbox)
         #expect(restored.selection == [older.id])
+    }
+
+    @Test func aRestoredWindowShowsMarfaTypesAgain() {
+        let (library, _, _, _) = makeLibrary()
+        let saved = Browser()
+        saved.show(.marfaTypes, in: library, order: NoteOrder())
+        let restored = Browser()
+        restored.restore(saved.snapshot(in: library), in: library, order: NoteOrder())
+        #expect(restored.showsTypes)
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {

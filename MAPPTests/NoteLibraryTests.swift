@@ -41,6 +41,7 @@ struct NoteLibraryTests {
         #expect(library.notes(in: .pinned) == [pinned])
         #expect(library.notes(in: .folder(work.id)) == [filed])
         #expect(library.notes(in: .recentlyDeleted) == [deleted])
+        #expect(library.notes(in: .marfaTypes).isEmpty)
         #expect(library.count(in: .allNotes) == 3)
     }
 
@@ -58,6 +59,7 @@ struct NoteLibraryTests {
         #expect(library.name(of: .inbox) == "Inbox")
         #expect(library.name(of: .folder(home.id)) == "Home")
         #expect(library.name(of: .recentlyDeleted) == "Recently Deleted")
+        #expect(library.name(of: .marfaTypes) == "Marfa Types")
     }
 
     // MARK: Notes

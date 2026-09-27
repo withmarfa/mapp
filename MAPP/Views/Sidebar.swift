@@ -42,6 +42,10 @@ struct Sidebar: View {
             Section {
                 row(.recentlyDeleted, systemImage: "trash")
             }
+
+            Section {
+                row(.marfaTypes, systemImage: "cube")
+            }
         }
         .listStyle(.sidebar)
         .accessibilityIdentifier("Sidebar")
@@ -84,7 +88,7 @@ struct Sidebar: View {
         Label(library.name(of: item), systemImage: systemImage)
             .badge(library.count(in: item))
             .tag(item)
-            .dropDestination(for: NoteReference.self, isEnabled: item != .allNotes) { notes, _ in
+            .dropDestination(for: NoteReference.self, isEnabled: item != .allNotes && item != .marfaTypes) { notes, _ in
                 drop(notes, on: item)
             }
     }
@@ -119,7 +123,7 @@ struct Sidebar: View {
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .pinned: library.setPinned(ids, true, undoManager: undoManager)
         case .recentlyDeleted: library.delete(ids, undoManager: undoManager)
-        case .allNotes: break
+        case .allNotes, .marfaTypes: break
         }
     }
 

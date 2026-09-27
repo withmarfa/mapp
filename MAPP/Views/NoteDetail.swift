@@ -10,7 +10,7 @@ struct NoteDetail: View {
         let notes = browser.selection.compactMap { library.note($0) }
         if notes.count > 1 {
             ContentUnavailableView("^[\(notes.count) note](inflect: true) selected", systemImage: "note.text")
-                .onAppear { editor.flush() }
+                .onAppear { editor.close() }
         } else if let note = notes.first {
             NotePage(note: note, editor: editor)
                 .onAppear(perform: grantFocusRequest)
@@ -18,7 +18,7 @@ struct NoteDetail: View {
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text")
                 // The page no longer shows the note it had, so that note is left.
-                .onAppear { editor.flush() }
+                .onAppear { editor.close() }
         }
     }
 
