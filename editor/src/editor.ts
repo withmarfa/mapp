@@ -385,6 +385,7 @@ export class NoteEditor {
       }),
   )
   private editable = true
+  private spellcheck = true
   private finding = false
   private findModel?: TextModel
   private findPending = 0
@@ -435,7 +436,7 @@ export class NoteEditor {
         ctx.update(editorViewOptionsCtx, (options) => ({
           ...options,
           editable: () => instance.editable,
-          attributes: () => ({ 'aria-label': labels.note }),
+          attributes: () => ({ 'aria-label': labels.note, spellcheck: String(instance.spellcheck) }),
           scrollThreshold: 24,
           scrollMargin: 24,
         }))
@@ -571,6 +572,13 @@ export class NoteEditor {
     this.editable = editable
     const view = this.editor.ctx.get(editorViewCtx)
     view.setProps({ editable: () => this.editable })
+  }
+
+  /** Whether words are checked as they are typed, as the app's setting says. */
+  setSpellcheck(spellcheck: boolean): void {
+    this.spellcheck = spellcheck
+    // Setting a prop, any prop, has the view read its attributes again.
+    this.view.setProps({ editable: () => this.editable })
   }
 
   private get view(): EditorView {

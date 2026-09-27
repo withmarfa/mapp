@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import PDFKit
 import Testing
 import WebKit
 @testable import MAPP
@@ -189,5 +190,28 @@ struct EditorTests {
         page.editor.format(.checklist)
         try await page.wait { !page.changes.isEmpty }
         #expect(page.changes.last == written.replacingOccurrences(of: "Milk", with: "- [ ] Milk"))
+    }
+
+    @Test func aNoteExportsAsAPDFOfItsTextAndPageStyle() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        defer { window.close() }
+        page.editor.setStyle(PageStyle(textSize: 20, checksSpelling: false))
+        try await page.load(kitchen)
+        let size = try await page.editor.webView.evaluateJavaScript("getComputedStyle(document.documentElement).fontSize") as? String
+        #expect(size == "20px")
+        let spellcheck = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').getAttribute('spellcheck')") as? String
+        #expect(spellcheck == "false")
+
+        let url = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        page.editor.exportPDF(to: url)
+        try await page.wait { (try? Data(contentsOf: url))?.isEmpty == false }
+        let document = try #require(PDFDocument(url: url))
+        #expect(document.pageCount >= 1)
+        #expect(document.string?.contains("Kitchen quotes") == true)
+        #expect(document.string?.contains("Book a site visit") == true)
     }
 }

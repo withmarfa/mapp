@@ -3,8 +3,8 @@
 @import '@milkdown/kit/prose/tables/style/tables.css';
 
 :root {
-  /* The note's text size, the system's 13-point body text; the metrics below are in rem or em so they
-     scale with it. */
+  /* The note's text size, the system's 13-point body text until the app sets the person's; the metrics below
+     are in rem or em so they scale with it. */
   font-size: 13px;
   /* The app's own accent until the app sets the system's, which it does before the first note shows. */
   --accent: #0088ff;
@@ -14,8 +14,9 @@
   --code-bg: color-mix(in srgb, CanvasText 7%, transparent);
   --surface: Canvas;
   --mono: ui-monospace, 'SF Mono', Menlo, monospace;
-  /* How wide the text runs: a comfortable measure, or the whole page when the app asks for full width. */
-  --page-width: 700px;
+  /* How wide the text runs: a comfortable measure, which grows with the text, or the whole page when the app
+     asks for full width. */
+  --page-width: 54rem;
   color-scheme: light dark;
 }
 
@@ -47,7 +48,7 @@ body {
   box-sizing: border-box;
   /* The margins, not a narrower editor, make the measure, so a click beside the text still places the caret.
      The least of them leaves room for a heading's marks, which hang in the leading margin. */
-  padding: 12px max(40px, calc((100% - var(--page-width)) / 2)) 48px;
+  padding: 12px max(3rem, calc((100% - var(--page-width)) / 2)) 48px;
   outline: none;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -654,4 +655,39 @@ body {
 
 .milkdown-table-block.readonly .handle {
   display: none;
+}
+
+/* Printed, or exported as a PDF, a note is its text on paper: the printer's margins replace the page's, the
+   colours are those of light paper whatever the app's appearance, and nothing made for the pointer shows. */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  .ProseMirror {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .ProseMirror .editing::before,
+  .ProseMirror pre .copy,
+  .ProseMirror .image-handle,
+  .milkdown-table-block .handle,
+  .milkdown-table-block .cell-handle,
+  .milkdown-table-block .button-group,
+  .milkdown-table-block .line-handle {
+    display: none;
+  }
+
+  .ProseMirror pre,
+  .ProseMirror img,
+  .ProseMirror tr {
+    break-inside: avoid;
+  }
+
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3 {
+    break-after: avoid;
+  }
 }

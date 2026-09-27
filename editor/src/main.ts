@@ -24,6 +24,8 @@ declare global {
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
       setFullWidth(full: boolean): void
+      setTextSize(points: number): void
+      setSpellcheck(spellcheck: boolean): void
     }
   }
 }
@@ -127,6 +129,11 @@ window.editor = {
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
   setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
+  // Every size and measure on the page is in rem, so the whole note scales with its text.
+  setTextSize: (points) => {
+    document.documentElement.style.fontSize = `${points}px`
+  },
+  setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
 }
 
 postToHost({ type: 'ready' })

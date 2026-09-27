@@ -191,6 +191,15 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
     }
 
+    func testCommandPSearchesNotesFromThePage() {
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        editor.click()
+        app.typeKey("p", modifierFlags: .command)
+        app.typeText("ragu")
+        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
+        XCTAssertFalse(text.contains("ragu"), "the search field took the typing, not the page")
+    }
+
     func testAFolderIsRenamedFromTheMenuAndDeletedWithTheDeleteKey() {
         sidebarItem("Reading").click()
         app.menuBars.menuBarItems["File"].click()

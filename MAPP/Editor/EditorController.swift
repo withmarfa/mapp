@@ -1,6 +1,7 @@
 import AppKit
 import Observation
 import OSLog
+import UniformTypeIdentifiers
 import WebKit
 
 private let log = Logger(subsystem: "com.withmarfa.mapp", category: "editor")
@@ -41,7 +42,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var notesByGeneration: [Int: Note.ID] = [:]
     @ObservationIgnored private var wantsFocus = false
-    @ObservationIgnored private var fullWidth = false
+    @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
@@ -191,10 +192,16 @@ final class EditorController: NSObject {
         call("focus")
     }
 
-    /// Whether the text runs the page's whole width rather than a measure for reading.
-    func setFullWidth(_ fullWidth: Bool) {
-        self.fullWidth = fullWidth
-        if isReady { call("setFullWidth", String(fullWidth)) }
+    /// How the page is set out: its width, its text size and whether spelling is checked.
+    func setStyle(_ style: PageStyle) {
+        self.style = style
+        if isReady { applyStyle() }
+    }
+
+    private func applyStyle() {
+        call("setFullWidth", String(style.fullWidth))
+        call("setTextSize", String(style.textSize))
+        call("setSpellcheck", String(style.checksSpelling))
     }
 
     /// Formats from outside the page, as the toolbar does: the page takes the keyboard first, so the command
@@ -255,6 +262,65 @@ final class EditorController: NSObject {
             }
         }
         return true
+    }
+
+    // MARK: Printing
+
+    /// The note's title, which names a print job and an exported file.
+    private var title: String {
+        noteID.flatMap { library?.note($0)?.title } ?? String(localized: "Note")
+    }
+
+    /// Prints the note as the page shows it, laid out for paper, through the system's print panel.
+    func printNote() {
+        guard hasNote, let window = webView.window else { return }
+        printOperation(Self.printInfo)
+            .runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    /// Asks where to save the note as a PDF, laid out as it prints, and saves it there.
+    func exportPDF() {
+        guard hasNote, let window = webView.window else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = NoteText.fileSafe(title)
+        panel.beginSheetModal(for: window) { [self] response in
+            guard response == .OK, let url = panel.url else { return }
+            exportPDF(to: url)
+        }
+    }
+
+    /// Saves the note as a PDF at the URL, without asking anything.
+    func exportPDF(to url: URL) {
+        guard hasNote, let window = webView.window else { return }
+        let info = Self.printInfo
+        info.jobDisposition = .save
+        info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = url
+        let operation = printOperation(info)
+        operation.showsPrintPanel = false
+        operation.showsProgressPanel = false
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    /// The person's paper and printer, taken fresh for each job.
+    private static var printInfo: NSPrintInfo {
+        NSPrintInfo.shared.copy() as? NSPrintInfo ?? NSPrintInfo()
+    }
+
+    private func printOperation(_ info: NSPrintInfo) -> NSPrintOperation {
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        info.topMargin = 54
+        info.bottomMargin = 54
+        info.leftMargin = 54
+        info.rightMargin = 54
+        let operation = webView.printOperation(with: info)
+        operation.jobTitle = title
+        // WebKit's print view lays the note out for paper only once it has a size to start from.
+        operation.view?.frame = webView.bounds
+        return operation
     }
 
     func undo() { call("undo") }
@@ -330,7 +396,7 @@ final class EditorController: NSObject {
             applyAccent()
             applyLabels()
             applyKeymap()
-            call("setFullWidth", String(fullWidth))
+            applyStyle()
             if let noteID {
                 if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? note.directory)) }
                 generation += 1

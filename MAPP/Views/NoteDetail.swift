@@ -35,7 +35,7 @@ struct NoteDetail: View {
 struct NotePage: View {
     let note: Note
     @Bindable var editor: EditorController
-    @AppStorage(PageKey.fullWidth) private var fullWidth = false
+    @StoredPageStyle private var style
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,7 +52,7 @@ struct NotePage: View {
             editor.focus()
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
-        .onChange(of: fullWidth, initial: true) { editor.setFullWidth(fullWidth) }
+        .onChange(of: style, initial: true) { editor.setStyle(style) }
         .onChange(of: note.id, initial: true) { editor.load(note) }
         .onChange(of: note.body) { editor.noteChanged(note) }
         .onChange(of: note.isDeleted) { editor.noteChanged(note) }
