@@ -49,6 +49,7 @@ struct MainView: View {
                 .searchFocused($isSearchFocused)
             }
         }
+        .background(SearchBesideTrailingItems())
         .overlay(alignment: .top) {
             if browser.isShowingPalette {
                 ZStack(alignment: .top) {

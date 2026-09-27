@@ -38,6 +38,7 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         style.textContent = `
           .side-head { display: none; }
           .sidebar { background: var(--bg); border-right: 0; }
+          html.window-background, html.window-background body, html.window-background .sidebar { background: transparent; }
           .nav { padding-top: 14px; }
         `;
         document.head.append(style);
@@ -65,6 +66,7 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         configuration.userContentController.add(FindProxy(page: self), name: "find")
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
+        webView.showsWindowBackground()
         webView.allowsBackForwardNavigationGestures = true
         webView.setAccessibilityIdentifier("MarfaTypes")
         // Hidden until drawn, so a dark window does not flash white while the page loads.

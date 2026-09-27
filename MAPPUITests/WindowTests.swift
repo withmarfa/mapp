@@ -124,7 +124,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testNewFolderIsNamedInPlace() {
-        window.buttons["NewFolderButton"].click()
+        app.typeKey("n", modifierFlags: [.command, .shift])
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.typeKey("a", modifierFlags: .command)
@@ -322,21 +322,29 @@ final class WindowTests: XCTestCase {
         let deleted = sidebarItem("Recently Deleted").frame
         XCTAssertGreaterThan(types.minY, lastFolder.maxY + 100, "a gap is left below the folders")
         XCTAssertGreaterThan(deleted.minY, types.maxY - 1, "Recently Deleted comes last")
-        XCTAssertLessThan(window.buttons["NewFolderButton"].frame.minY - deleted.maxY, 30, "just above New Folder")
+        XCTAssertLessThan(window.frame.maxY - deleted.maxY, 30, "at the window's foot")
         sidebarItem("Recently Deleted").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
 
     func testTheFoldersHeadingOffersANewFolderUnderThePointer() {
-        // The button is the pointer's alone, at the heading's end.
+        // The button is the pointer's alone, at the heading's end, in line with the rows' counts.
         let heading = sidebar.staticTexts["Folders"]
         heading.hover()
-        heading.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
+        heading.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: heading.frame.width - 21, dy: heading.frame.height / 2)).click()
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.typeKey("a", modifierFlags: .command)
         field.typeText("Projects\r")
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
+    }
+
+    func testShareAndMoreSitBesideSearch() {
+        let more = window.menuButtons["More"]
+        let search = window.searchFields.firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 2))
+        XCTAssertLessThan(search.frame.minX - more.frame.maxX, 24, "More is beside search, not mid-toolbar")
     }
 
     // MARK: Marfa Types

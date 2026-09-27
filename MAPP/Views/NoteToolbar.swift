@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The toolbar over a note, laid out as Notes lays out its own: New Note leading, the formatting tools in the
@@ -60,6 +61,49 @@ private struct NewNoteButton: View {
         }
         .help("New Note")
         .disabled(browser == nil || !library.isLoaded)
+    }
+}
+
+/// Keeps Share and More beside search, as Notes and Mail set them. SwiftUI puts a flexible space of its own before
+/// the search field, which would leave them floating between the formatting tools and search; that space goes,
+/// as a person could take it out in Customize Toolbar. Only a space that follows the note's own trailing items is
+/// taken, so a toolbar with nothing before search, such as Marfa Types', keeps search at its end.
+struct SearchBesideTrailingItems: NSViewRepresentable {
+    func makeNSView(context: Context) -> Watcher { Watcher() }
+    func updateNSView(_ view: Watcher, context: Context) {}
+
+    final class Watcher: NSView {
+        private static let trailingItems: Set<String> = ["share", "more"]
+        private var observer: (any NSObjectProtocol)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            guard window != nil else { return }
+            // SwiftUI fills the toolbar after the window appears and again as the window's panes change.
+            observer = NotificationCenter.default.addObserver(
+                forName: NSToolbar.willAddItemNotification, object: nil, queue: .main
+            ) { [weak self] note in
+                let toolbar = note.object as? NSToolbar
+                MainActor.assumeIsolated {
+                    guard let self, let toolbar, toolbar === self.window?.toolbar else { return }
+                    DispatchQueue.main.async { Self.tidy(toolbar) }
+                }
+            }
+            DispatchQueue.main.async { [weak self] in
+                if let toolbar = self?.window?.toolbar { Self.tidy(toolbar) }
+            }
+        }
+
+        private static func tidy(_ toolbar: NSToolbar) {
+            let items = toolbar.items
+            guard let search = items.firstIndex(where: { $0 is NSSearchToolbarItem }), search >= 2,
+                  items[search - 1].itemIdentifier == .flexibleSpace,
+                  trailingItems.contains(items[search - 2].itemIdentifier.rawValue)
+            else { return }
+            toolbar.removeItem(at: search - 1)
+        }
     }
 }
 

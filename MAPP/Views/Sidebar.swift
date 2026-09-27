@@ -54,10 +54,8 @@ struct Sidebar: View {
             if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                places
-                newFolderButton
-            }
+            places
+                .padding(.bottom, 8)
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
@@ -102,18 +100,6 @@ struct Sidebar: View {
         case .large: 40
         default: 32
         }
-    }
-
-    private var newFolderButton: some View {
-        Button("New Folder", systemImage: "plus.circle") {
-            browser.newFolder(in: library, order: order, undoManager: undoManager)
-        }
-        .disabled(!library.isLoaded)
-        .buttonStyle(.borderless)
-        .accessibilityIdentifier("NewFolderButton")
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 
     private func row(_ item: SidebarItem, systemImage: String) -> some View {
@@ -171,8 +157,8 @@ struct Sidebar: View {
 }
 
 /// The Folders heading, with a button for a new folder that shows while the pointer is over it, as Mail's
-/// headings show theirs. The list reads a heading as one line, so the button is left to the pointer; New Folder
-/// below the sidebar and in the File menu are there for everything else.
+/// headings show theirs, in line with the rows' counts. The list reads a heading as one line, so the button is
+/// left to the pointer; New Folder in the File menu, on ⇧⌘N, is there for everything else.
 private struct FoldersHeader: View {
     let newFolder: () -> Void
     @State private var isHovering = false
@@ -188,6 +174,8 @@ private struct FoldersHeader: View {
                 .opacity(isHovering ? 1 : 0)
                 .accessibilityHidden(true)
         }
+        // A heading runs to the list's edge, past where the rows end their counts.
+        .padding(.trailing, 14)
         .contentShape(.rect)
         .onHover { isHovering = $0 }
     }

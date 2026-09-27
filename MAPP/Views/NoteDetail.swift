@@ -38,15 +38,12 @@ struct NotePage: View {
     @StoredPageStyle private var style
 
     var body: some View {
-        GeometryReader { proxy in
-            NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
-                .ignoresSafeArea(.container, edges: .top)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if note.isDeleted {
-                DeletedNoteBanner(id: note.id)
+        NoteEditor(controller: editor)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if note.isDeleted {
+                    DeletedNoteBanner(id: note.id)
+                }
             }
-        }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             editor.focus()

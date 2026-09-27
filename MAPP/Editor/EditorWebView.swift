@@ -3,14 +3,9 @@ import UniformTypeIdentifiers
 import WebKit
 
 /// The web view behaving as a Mac text view: Undo and Redo in the Edit menu drive the page's own history, the
-/// context menu offers only what applies to a note, and the page scrolls under the toolbar.
+/// context menu offers only what applies to a note.
 final class EditorWebView: WKWebView {
     weak var controller: EditorController?
-
-    /// How far the window's toolbar and anything else above the note overlap the page.
-    var topInset: CGFloat = 0 {
-        didSet { if topInset != oldValue { needsLayout = true } }
-    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -27,12 +22,6 @@ final class EditorWebView: WKWebView {
         let resigned = super.resignFirstResponder()
         if resigned { controller?.isFocused = false }
         return resigned
-    }
-
-    override func layout() {
-        super.layout()
-        let insets = NSEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
-        if obscuredContentInsets.top != insets.top { obscuredContentInsets = insets }
     }
 
     // MARK: Images
