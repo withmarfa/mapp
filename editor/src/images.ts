@@ -1,6 +1,6 @@
 import { imageSchema } from '@milkdown/kit/preset/commonmark'
 import type { Node as ProseNode } from '@milkdown/kit/prose/model'
-import type { NodeView } from '@milkdown/kit/prose/view'
+import type { EditorView, NodeView } from '@milkdown/kit/prose/view'
 import { $view } from '@milkdown/kit/utils'
 
 /** A stand-in origin to resolve a note's relative links against; nothing is fetched from it. */
@@ -53,32 +53,64 @@ function image(path: string): Promise<string | null> {
 /** How long to wait before asking again for an image that was not there, as when it is still being written. */
 const retries = [250, 1000]
 
-/** An image the notes folder holds shows as itself; any other shows what it was called, and the markdown keeps
- *  the image as written either way. */
+/** A width rides in the alt text, as `![a picture|400](../Attachments/….png)`, the form Obsidian reads.
+ *  Anything else reading the note shows the picture and keeps the number, which is what a plain markdown file
+ *  has to do. */
+export function splitAlt(alt: string): { alt: string; width: number | null } {
+  const match = /^([\s\S]*)\|(\d{1,5})$/.exec(alt)
+  if (!match) return { alt, width: null }
+  return { alt: match[1] ?? '', width: Number(match[2]) }
+}
+
+export function joinAlt(alt: string, width: number | null): string {
+  return width == null ? alt : `${alt}|${width}`
+}
+
+const minimumWidth = 48
+
+/** An image the notes folder holds shows as itself, at the width its alt text gives and never wider than the
+ *  page, with a handle on its trailing edge that sizes it. Any other shows what it was called, and the
+ *  markdown keeps the image as written either way. */
 class ImageView implements NodeView {
   dom: HTMLElement
   /** The image this view shows or is waiting for, so an answer for one it no longer shows is not painted. */
   private path: string | null = null
+  private image?: HTMLImageElement
+  private width: number | null = null
 
-  constructor(node: ProseNode) {
+  constructor(
+    private node: ProseNode,
+    private readonly view: EditorView,
+    private readonly getPos: () => number | undefined,
+  ) {
     this.dom = document.createElement('span')
-    this.render(node)
+    this.render()
   }
 
   update(node: ProseNode): boolean {
-    if (node.type.name !== 'image') return false
-    this.render(node)
+    if (node.type !== this.node.type) return false
+    const same = node.attrs.src === this.node.attrs.src && node.attrs.alt === this.node.attrs.alt
+    this.node = node
+    // Most updates are the document changing around the image; redrawing it for those would flash its name.
+    if (!same) this.render()
     return true
+  }
+
+  /** The handle's own events are the view's to handle, not the document's. */
+  stopEvent(event: Event): boolean {
+    return event.target instanceof HTMLElement && event.target.classList.contains('image-handle')
   }
 
   ignoreMutation(): boolean {
     return true
   }
 
-  private render(node: ProseNode): void {
-    const src = String(node.attrs.src || '')
-    const name = String(node.attrs.alt || '') || src
+  private render(): void {
+    const src = String(this.node.attrs.src || '')
+    const { alt, width } = splitAlt(String(this.node.attrs.alt || ''))
+    const name = alt || src
     const path = folderPath(src)
+    this.width = width
     // The name shows until the image arrives, and stays when there is none: a file that is not there, not an
     // image, or outside the notes folder.
     this.absent(name)
@@ -98,15 +130,65 @@ class ImageView implements NodeView {
       element.src = data
       element.alt = name
       element.draggable = false
+      if (this.width != null) element.style.width = `${this.width}px`
+      const handle = document.createElement('span')
+      handle.className = 'image-handle'
+      handle.addEventListener('pointerdown', this.startResize)
+      this.image = element
       this.dom.className = 'image'
-      this.dom.replaceChildren(element)
+      this.dom.replaceChildren(element, handle)
     })
   }
 
   private absent(name: string): void {
+    this.image = undefined
     this.dom.className = 'image-absent'
     this.dom.textContent = name
   }
+
+  private startResize = (event: PointerEvent): void => {
+    const image = this.image
+    if (!image || !this.view.editable) return
+    event.preventDefault()
+    const handle = event.currentTarget as HTMLElement
+    const startX = event.clientX
+    const startWidth = image.getBoundingClientRect().width
+    // The width the text runs to, inside the page's margins.
+    const style = getComputedStyle(this.view.dom)
+    const limit =
+      this.view.dom.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    handle.setPointerCapture?.(event.pointerId)
+    const move = (moved: PointerEvent) => {
+      const next = Math.round(
+        Math.min(limit, Math.max(minimumWidth, startWidth + (moved.clientX - startX))),
+      )
+      this.width = next
+      image.style.width = `${next}px`
+    }
+    const done = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', done)
+      handle.removeEventListener('pointercancel', done)
+      this.commit()
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', done)
+    handle.addEventListener('pointercancel', done)
+  }
+
+  /** One drag is one edit, and so one step to undo. */
+  private commit(): void {
+    const pos = this.getPos()
+    if (pos == null) return
+    const { alt } = splitAlt(String(this.node.attrs.alt ?? ''))
+    const next = joinAlt(alt, this.width)
+    if (next === this.node.attrs.alt) return
+    const { state } = this.view
+    this.view.dispatch(state.tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, alt: next }))
+  }
 }
 
-export const imageView = $view(imageSchema.node, () => (node) => new ImageView(node))
+export const imageView = $view(
+  imageSchema.node,
+  () => (node, view, getPos) => new ImageView(node, view, getPos),
+)

@@ -29,13 +29,23 @@ export const taskListPlugin = $prose(
     }),
 )
 
+/** The items whose own text the selection reaches: for each line selected, the nearest item holding it, so an
+ *  item nested in another changes without the one around it. */
 function listItemsInSelection(view: EditorView): Array<{ pos: number; node: ProseNode }> {
-  const { from, to } = view.state.selection
-  const items: Array<{ pos: number; node: ProseNode }> = []
-  view.state.doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name === 'list_item') items.push({ pos, node })
+  const { doc, selection } = view.state
+  const items = new Map<number, ProseNode>()
+  doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+    if (!node.isTextblock) return true
+    const inside = doc.resolve(pos + 1)
+    for (let depth = inside.depth; depth > 0; depth--) {
+      if (inside.node(depth).type.name === 'list_item') {
+        items.set(inside.before(depth), inside.node(depth))
+        break
+      }
+    }
+    return false
   })
-  return items
+  return [...items].map(([pos, node]) => ({ pos, node }))
 }
 
 export function toggleTaskList(ctx: Ctx): void {

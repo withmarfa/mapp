@@ -70,6 +70,8 @@ struct AppCommands: Commands {
         CommandGroup(before: .sidebar) {
             OrderOptions()
             Divider()
+            PageWidthOptions()
+            Divider()
         }
 
         // There is no help book yet, and a Help item that only says so is not worth showing.

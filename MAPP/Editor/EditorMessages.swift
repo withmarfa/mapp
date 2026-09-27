@@ -17,7 +17,7 @@ nonisolated enum Block: Equatable, Sendable {
 nonisolated struct CaretState: Equatable, Sendable {
     var marks: Set<Mark> = []
     var block: Block = .paragraph
-    /// Inside a quote at any depth; `block` is what sits inside it.
+    /// One quote holds the whole selection; `block` is what sits inside it.
     var quoted = false
     var inTable = false
     var canUndo = false

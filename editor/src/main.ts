@@ -23,6 +23,7 @@ declare global {
       insertImages(images: { src: string; alt: string }[], x?: number, y?: number, height?: number): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
+      setFullWidth(full: boolean): void
     }
   }
 }
@@ -125,6 +126,7 @@ window.editor = {
     editor.insertImages(images, x, y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight)),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
+  setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
 }
 
 postToHost({ type: 'ready' })

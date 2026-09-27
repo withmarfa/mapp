@@ -154,7 +154,8 @@ nonisolated enum NoteText {
 
     private static func stripInline(_ text: String) -> String {
         var text = text
-        text.replace(image) { String($0.output.1) }
+        // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
+        text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
         text.replace(link) { String($0.output.1) }
         text.replace(strongOrStrike) { String($0.output.2) }
         text.replace(emphasis) { String($0.output.1) + String($0.output.2) }

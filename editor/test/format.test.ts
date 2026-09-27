@@ -494,3 +494,64 @@ test('a read-only note takes no images', async () =>
     editor.insertImages([{ src: 'Attachments/a.png', alt: 'a' }])
     expect(editor.markdown()).toBeNull()
   }))
+
+function posOf(editor: NoteEditor, text: string): number {
+  let found = -1
+  ctxOf(editor)
+    .get(editorViewCtx)
+    .state.doc.descendants((node, pos) => {
+      if (found < 0 && node.isText && node.text?.includes(text)) found = pos + node.text.indexOf(text)
+    })
+  return found
+}
+
+test('a checklist made in a nested item leaves the item around it alone', async () =>
+  withNoteEditor('- Outer\n  - Inner\n', (editor) => {
+    placeCaret(editor, posOf(editor, 'Inner') + 1)
+    editor.format('taskList')
+    expect(editor.markdown()).toBe('- Outer\n  - [ ] Inner\n')
+  }))
+
+test('spaces at the edges of a paragraph or heading are not written, so they never become entities', async () =>
+  withNoteEditor('', (editor) => {
+    const view = ctxOf(editor).get(editorViewCtx)
+    view.dispatch(view.state.tr.insertText(' Hello  '))
+    expect(editor.markdown()).toBe('Hello\n')
+    editor.format('heading', 2)
+    expect(editor.markdown()).toBe('## Hello\n')
+  }))
+
+test('an image is drawn at the width in its alt text, and shows its name without it', async () => {
+  const webkit = window.webkit
+  window.webkit = { messageHandlers: { files: { postMessage: async () => 'data:image/png;base64,AAAA' } } }
+  try {
+    await withNoteEditor('![Dusk|320](Attachments/a.png) and ![Far|90](https://example.com/far.png)\n', async (editor) => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const dom = ctxOf(editor).get(editorViewCtx).dom
+      const image = dom.querySelector('.image img') as HTMLImageElement
+      expect(image.alt).toBe('Dusk')
+      expect(image.style.width).toBe('320px')
+      expect(dom.querySelector('.image .image-handle')).not.toBe(null)
+      expect(dom.querySelector('.image-absent')?.textContent).toBe('Far')
+      expect(editor.markdown()).toBe(null)
+    })
+  } finally {
+    window.webkit = webkit
+  }
+})
+
+test('a width in a table cell is escaped where the cell needs it and read back', async () =>
+  withNoteEditor('| A |\n| --- |\n| ![Photo\\|400](Attachments/a.png) |\n', (editor) => {
+    const image = ctxOf(editor).get(editorViewCtx).dom.querySelector('.image-absent, .image')
+    expect(image).not.toBe(null)
+    let alt = ''
+    ctxOf(editor)
+      .get(editorViewCtx)
+      .state.doc.descendants((node) => {
+        if (node.type.name === 'image') alt = String(node.attrs.alt)
+      })
+    expect(alt).toBe('Photo|400')
+    placeCaret(editor, posOf(editor, 'A') + 1)
+    editor.format('alignColumn', 'center')
+    expect(editor.markdown()).toContain('![Photo\\|400](Attachments/a.png)')
+  }))
