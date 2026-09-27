@@ -2,11 +2,17 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// Marfa's types as Marfa's own browser for them shows them: one self-contained page, with its own navigation and
-/// search, that fetches nothing. Each window makes its page the first time Marfa Types is shown and keeps it, so
-/// the page is where it was left when the window comes back to it.
+/// Marfa's types as Marfa's own browser for them shows them: one self-contained page, with its own navigation,
+/// that fetches nothing. The window's toolbar gives it its title and its search, so the page's own heading and
+/// search box are hidden and the toolbar's field drives the page's search. That is done here, as the page loads,
+/// so the page stays as generated and is refreshed by replacing it whole. Each window makes its page the first
+/// time Marfa Types is shown and keeps it, so the page is where it was left when the window comes back to it.
 final class MarfaTypesPage: NSObject, WKNavigationDelegate {
     private(set) lazy var webView = makeWebView()
+    /// The page asks for the toolbar's search, when / is typed as it would have focused its own.
+    var onFind: () -> Void = {}
+    private var isLoaded = false
+    private var query = ""
     private let pageURL: URL = {
         guard let url = Bundle.main.url(forResource: "marfa-types", withExtension: "html") else {
             preconditionFailure("marfa-types.html missing from the bundle")
@@ -14,11 +20,34 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         return url
     }()
 
+    /// Hides the page's heading and search box, which the toolbar stands in for, and passes / and ⌘K to the app:
+    /// / to the toolbar's search, and ⌘K to the menu bar's command palette, which the page would otherwise take.
+    private static let adaptation = """
+        const style = document.createElement('style');
+        style.textContent = '.side-head { display: none; } .nav { padding-top: 14px; }';
+        document.head.append(style);
+        window.addEventListener('keydown', (event) => {
+          const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? '');
+          if (event.key === '/' && !typing) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            webkit.messageHandlers.find.postMessage(null);
+          } else if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
+            event.stopImmediatePropagation();
+          }
+        }, true);
+        """
+
     private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         // The page keeps only which of its groups are closed, and only for as long as the window is open.
         configuration.websiteDataStore = .nonPersistent()
         configuration.preferences.isElementFullscreenEnabled = false
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.adaptation, injectionTime: .atDocumentEnd, forMainFrameOnly: true
+        ))
+        // The content controller retains its handlers, so a proxy keeps the cycle out.
+        configuration.userContentController.add(FindProxy(page: self), name: "find")
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -32,8 +61,36 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         return webView
     }
 
+    /// Searches the page as its own search box would, types, fields and guides alike.
+    func search(_ text: String) {
+        query = text
+        guard isLoaded else { return }
+        // In a block of its own, since each evaluation shares the page's global scope.
+        webView.evaluateJavaScript("""
+            {
+              const search = document.getElementById('search');
+              search.value = \(Self.json(text));
+              search.dispatchEvent(new Event('input'));
+            }
+            """)
+    }
+
+    /// Opens the first match, as Return in the page's own search box does.
+    func openFirstMatch() {
+        webView.evaluateJavaScript("""
+            document.getElementById('search').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+            """)
+    }
+
+    private static func json(_ text: String) -> String {
+        (try? String(decoding: JSONEncoder().encode(text), as: UTF8.self)) ?? "\"\""
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         webView.isHidden = false
+        guard !isLoaded else { return }
+        isLoaded = true
+        if !query.isEmpty { search(query) }
     }
 
     /// The page moves between its own sections by fragment. A web link opens in the browser, since this page
@@ -45,6 +102,18 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
             NSWorkspace.shared.open(url)
         }
         return .cancel
+    }
+}
+
+private final class FindProxy: NSObject, WKScriptMessageHandler {
+    weak var page: MarfaTypesPage?
+
+    init(page: MarfaTypesPage) {
+        self.page = page
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        page?.onFind()
     }
 }
 
