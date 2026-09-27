@@ -201,6 +201,7 @@ final class EditorController: NSObject {
     private func applyStyle() {
         call("setFullWidth", String(style.fullWidth))
         call("setTextSize", String(style.textSize))
+        call("setReadingWidth", String(style.readingWidth))
         call("setSpellcheck", String(style.checksSpelling))
     }
 

@@ -25,6 +25,7 @@ declare global {
       setLabels(labels: Partial<Labels>): void
       setFullWidth(full: boolean): void
       setTextSize(points: number): void
+      setReadingWidth(ems: number): void
       setSpellcheck(spellcheck: boolean): void
     }
   }
@@ -134,6 +135,7 @@ window.editor = {
     document.documentElement.style.fontSize = `${points}px`
   },
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
+  setReadingWidth: (ems) => document.documentElement.style.setProperty('--reading-width', `${ems}rem`),
 }
 
 postToHost({ type: 'ready' })

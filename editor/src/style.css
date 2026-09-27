@@ -14,9 +14,10 @@
   --code-bg: color-mix(in srgb, CanvasText 7%, transparent);
   --surface: Canvas;
   --mono: ui-monospace, 'SF Mono', Menlo, monospace;
-  /* How wide the text runs: a comfortable measure, which grows with the text, or the whole page when the app
-     asks for full width. */
-  --page-width: 54rem;
+  /* How wide the text runs: a comfortable measure, which grows with the text and which the app sets from the
+     person's choice, or the whole page when the app asks for full width. */
+  --reading-width: 54rem;
+  --page-width: var(--reading-width);
   color-scheme: light dark;
 }
 
@@ -48,7 +49,7 @@ body {
   box-sizing: border-box;
   /* The margins, not a narrower editor, make the measure, so a click beside the text still places the caret.
      The least of them leaves room for a heading's marks, which hang in the leading margin. */
-  padding: 12px max(3rem, calc((100% - var(--page-width)) / 2)) 48px;
+  padding: 22px max(3rem, calc((100% - var(--page-width)) / 2)) 48px;
   outline: none;
   white-space: pre-wrap;
   word-wrap: break-word;

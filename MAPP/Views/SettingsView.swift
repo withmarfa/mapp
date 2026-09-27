@@ -28,6 +28,7 @@ struct SettingsView: View {
             }
             Section {
                 PageWidthOptions()
+                ReadingWidthOptions()
                 TextOptions()
             }
             Section {
