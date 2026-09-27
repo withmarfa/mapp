@@ -191,6 +191,31 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
     }
 
+    func testTheCommandPaletteOpensANoteAndRunsACommand() {
+        app.typeKey("k", modifierFlags: .command)
+        let field = window.textFields["CommandPaletteField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        app.typeText("bike serv\r")
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(waitForText("BEGINSWITH", "Bike service"))
+
+        app.typeKey("k", modifierFlags: .command)
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        // New Note leads what "new" finds; the arrow key moves on to New Folder.
+        app.typeText("new")
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(sidebar.textFields.firstMatch.waitForExistence(timeout: 2), "the new folder's name is being edited")
+    }
+
+    func testEscapePutsTheCommandPaletteAway() {
+        app.typeKey("k", modifierFlags: .command)
+        let field = window.textFields["CommandPaletteField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
+    }
+
     func testCommandPSearchesNotesFromThePage() {
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
         editor.click()

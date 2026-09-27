@@ -73,6 +73,11 @@ struct AppCommands: Commands {
         CommandGroup(after: .textEditing) {
             SearchNotesButton()
                 .keyboardShortcut("p")
+            Button("Command Palette", systemImage: "command") {
+                browser?.isShowingPalette.toggle()
+            }
+            .keyboardShortcut("k")
+            .disabled(browser == nil)
         }
 
         CommandGroup(before: .sidebar) {

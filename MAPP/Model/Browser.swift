@@ -17,6 +17,8 @@ final class Browser {
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
+    /// Whether the command palette is out.
+    var isShowingPalette = false
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
