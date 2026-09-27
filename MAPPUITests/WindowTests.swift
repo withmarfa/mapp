@@ -275,7 +275,8 @@ final class WindowTests: XCTestCase {
         // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes
         // through, and the sidebar's counts and the list's previews and dates are the system's secondary
         // colour, as Mail and Notes draw them, which the audit finds a shade short; a toolbar menu offers Show
-        // Menu rather than Press. Controls and text are still audited everywhere else.
+        // Menu rather than Press. The list's title and count in the toolbar above it are the system's too.
+        // Controls and text are still audited everywhere else.
         let windowFrame = window.frame
         let sidebarFrame = sidebar.frame
         let listFrame = list.frame
@@ -286,7 +287,10 @@ final class WindowTests: XCTestCase {
             switch issue.auditType {
             case .parentChild: return true
             case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
-            case .contrast: return sidebarFrame.contains(element.frame) || listFrame.contains(element.frame)
+            case .contrast:
+                let isListTitle = element.frame.minY < listFrame.minY
+                    && element.frame.minX >= listFrame.minX && element.frame.maxX <= listFrame.maxX
+                return sidebarFrame.contains(element.frame) || listFrame.contains(element.frame) || isListTitle
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }
