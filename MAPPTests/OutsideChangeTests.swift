@@ -72,4 +72,30 @@ struct OutsideChangeTests {
         #expect(after.path == "Plan.md")
         #expect(root.read("Plan.md") == "---\npinned: true\n---\n# Plan\n\nMine\n")
     }
+
+    @Test func aRenameThatFailsLeavesOneNoteAndIsTriedAgain() async throws {
+        let shopping = try #require(note(at: "Shopping.md"))
+        let file = root.url.appending(path: "Shopping.md").path
+        defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: file) }
+        library.updateBody(of: shopping.id, to: "Groceries\n")
+        library.store?.drain()
+        // A locked file cannot be renamed.
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: file)
+        library.leave(shopping.id)
+        #expect(library.note(shopping.id)?.path == "Groceries.md")
+        library.store?.drain()
+        for _ in 0..<100 where library.note(shopping.id)?.path != "Shopping.md" || library.failure == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(library.note(shopping.id)?.path == "Shopping.md", "the note is where its file stayed")
+        #expect(library.note(shopping.id)?.title == "Groceries", "and still goes by its first line")
+        #expect(library.failure != nil)
+
+        try FileManager.default.setAttributes([.immutable: false], ofItemAtPath: file)
+        library.leave(shopping.id)
+        library.store?.drain()
+        #expect(library.note(shopping.id)?.path == "Groceries.md")
+        #expect(root.read("Groceries.md") == "Groceries\n")
+        #expect(!root.exists("Shopping.md"))
+    }
 }

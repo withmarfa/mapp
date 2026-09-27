@@ -183,7 +183,14 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             aliases[from] = nil
             aliases[to] = nil
             let target = available(url(to), besides: source)
-            try move(source, to: target)
+            do {
+                try move(source, to: target)
+            } catch {
+                // The file stays where it was, so what the library queued for the new path goes there too, rather
+                // than making a second note under the new name; the library hears that the file did not move.
+                report(to, source)
+                throw error
+            }
             report(to, target)
         case .trash(let path, let id, let date):
             let source = url(path)
