@@ -65,13 +65,23 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
-    // A note is titled by its file, as Marfa reads it, and a new note's file is named after its first line.
-    func testANewNoteIsNamedAfterItsFirstLine() {
+    // A note is titled by its file, as Marfa reads it, and a note's file is named after its first line for as
+    // long as the note goes by it, taking a changed line's name once the note is left.
+    func testANewNoteIsNamedAfterItsFirstLineAndFollowsIt() {
         sidebarItem("Inbox").click()
         window.toolbars.buttons["New Note"].click()
         XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
         editor.typeText("Groceries\nMilk and eggs")
         XCTAssertTrue(row(titled: "Groceries").waitForExistence(timeout: 3))
+        row(titled: "Garden ideas").click()
+        row(titled: "Groceries").click()
+        editor.click()
+        editor.typeKey(.upArrow, modifierFlags: .command)
+        editor.typeText("Weekly ")
+        XCTAssertTrue(row(titled: "Weekly Groceries").waitForExistence(timeout: 3))
+        row(titled: "Garden ideas").click()
+        row(titled: "Weekly Groceries").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Weekly Groceries"))
     }
 
     func testNewNoteIsCreatedSelectedAndEmpty() {

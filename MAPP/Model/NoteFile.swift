@@ -156,7 +156,8 @@ nonisolated struct NoteFile: Hashable, Sendable {
         let plain = !value.isEmpty
             && value.trimmingCharacters(in: .whitespaces) == value
             && value.unicodeScalars.first.map { !special.contains($0) } ?? false
-            && !value.contains(": ") && !value.contains(" #") && !value.contains("\n")
+            && !value.contains(": ") && !value.hasSuffix(":") && !value.contains(" #")
+            && !value.unicodeScalars.contains { $0.properties.generalCategory == .control }
             && !["true", "false", "yes", "no", "null", "~", "on", "off"].contains(value.lowercased())
             && Double(value) == nil
         if plain { return value }

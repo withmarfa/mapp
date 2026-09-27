@@ -1,33 +1,18 @@
 import Foundation
 
-/// Reads a note's title and preview out of its markdown, the way Notes reads them out of rich text:
-/// the first line is the title and what follows is the preview.
+/// Reads a note's words out of its markdown, as they read on screen: the first line, which names a note, and
+/// the preview that follows it.
 nonisolated enum NoteText {
     static let previewLimit = 240
 
-    static func titleAndPreview(of body: String) -> (title: String, preview: String) {
-        var title: String?
-        var parts: [String] = []
-        var length = 0
-        for line in readableLines(of: body) {
-            guard title != nil else {
-                title = line
-                continue
-            }
-            parts.append(line)
-            length += line.count + 1
-            if length >= previewLimit { break }
-        }
-        let preview = parts.joined(separator: " ")
-        return (
-            title ?? String(localized: "New Note"),
-            preview.isEmpty ? String(localized: "No additional text") : String(preview.prefix(previewLimit))
-        )
+    /// The first line with words in it, as it reads; nil for a note with nothing in it yet.
+    static func firstLine(of body: String) -> String? {
+        readableLines(of: body, limit: 1).first
     }
 
     /// What follows the title: the body's text, less a first line that only repeats the title.
     static func preview(of body: String, title: String) -> String {
-        var lines = readableLines(of: body)
+        var lines = readableLines(of: body, limit: 64)
         if let first = lines.first, first.localizedCaseInsensitiveCompare(title) == .orderedSame {
             lines.removeFirst()
         }
@@ -45,17 +30,53 @@ nonisolated enum NoteText {
         body.trimmingCharacters(in: .whitespacesAndNewlines).contains("\n")
     }
 
-    /// The name a note's file takes from its first line: the line as it reads, without characters a file name
-    /// cannot hold, and short enough for any file system.
+    /// Whether a note holds nothing worth keeping: no words and nothing else, only markers such as an empty
+    /// checklist item or a heading with no text.
+    static func isBlank(_ body: String) -> Bool {
+        body.split(whereSeparator: \.isNewline).allSatisfy { $0.wholeMatch(of: bareMarkers) != nil }
+    }
+
+    /// The name a note's file takes from its first line.
     static func fileName(for body: String) -> String {
-        let line = readableLines(of: body).first ?? ""
-        let cleaned = line
-            .replacing(/[\/\\:\x00-\x1F]/, with: "-")
-            .trimmingCharacters(in: .whitespaces)
-            .trimmingPrefix { $0 == "." }
-        let name = fitted(String(cleaned)).trimmingCharacters(in: .whitespaces)
+        name(for: firstLine(of: body) ?? "")
+    }
+
+    /// The name for a first line: the line as it reads, as a file can hold it, or New Note for none.
+    static func name(for line: String) -> String {
+        let name = fileSafe(line)
         return name.isEmpty ? String(localized: "New Note") : name
     }
+
+    /// Whether a file's name is the one a first line gives, or that name numbered, as a second note of the
+    /// same name is.
+    static func isName(_ fileTitle: String, of line: String) -> Bool {
+        let name = name(for: line)
+        if fileTitle == name { return true }
+        guard fileTitle.hasPrefix(name + " ") else { return false }
+        return Int(fileTitle.dropFirst(name.count + 1)).map { $0 > 1 } ?? false
+    }
+
+    /// Whether a first line has characters its file's name cannot, so the note keeps the line as its `title`,
+    /// where Marfa reads a title from.
+    static func needsTitle(_ line: String) -> Bool {
+        line.contains(unsafeInName) || line.hasPrefix(".")
+    }
+
+    /// A name as a file can take it: characters no file name can hold replaced, leading dots dropped, which
+    /// would hide the file, and short enough for any file system. The one place a name is made safe, for notes,
+    /// folders and attachments alike.
+    static func fileSafe(_ name: String) -> String {
+        fitted(
+            name.replacing(unsafeInName, with: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingPrefix { $0 == "." }
+                .trimmingCharacters(in: .whitespaces)
+        ).trimmingCharacters(in: .whitespaces)
+    }
+
+    private nonisolated(unsafe) static let unsafeInName = /[\/\\:\x00-\x1F\x7F]/
+    /// A line holding only block markers, or nothing.
+    private nonisolated(unsafe) static let bareMarkers = /\s*(?:(?:>|#{1,6}|[-*+]|\d{1,9}[.)])\s*)*(?:\[[ xX]\]\s*)?/
 
     /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
     static func fitted(_ name: String, room: Int = 0) -> String {
@@ -104,11 +125,13 @@ nonisolated enum NoteText {
     /// A markdown link or image up to the end of its destination: `[text](` and the destination.
     private nonisolated(unsafe) static let markdownLink = /(!?\[(?:[^\]\\]|\\.)*\]\()(<[^>\n]*>|[^)\s]+)/
 
-    /// The body's lines as they read on screen, blank lines dropped. Code inside fences is kept as written.
-    static func readableLines(of body: String) -> [String] {
+    /// The body's lines as they read on screen, blank lines dropped, up to a limit, since a title and preview
+    /// need only the first few. Code inside fences is kept as written.
+    static func readableLines(of body: String, limit: Int = .max) -> [String] {
         var lines: [String] = []
         var inFence = false
         for line in body.split(whereSeparator: \.isNewline) {
+            if lines.count >= limit { break }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.wholeMatch(of: fence) != nil {
                 inFence.toggle()
@@ -137,7 +160,11 @@ nonisolated enum NoteText {
                 .filter { !$0.isEmpty }
                 .joined(separator: "  ")
         }
-        return inlineText(text).trimmingCharacters(in: .whitespaces)
+        // A control character reads as a space, and has no place in a title, a name or front matter.
+        let readable = String(String.UnicodeScalarView(inlineText(text).unicodeScalars.map {
+            $0.properties.generalCategory == .control ? " " : $0
+        }))
+        return readable.trimmingCharacters(in: .whitespaces)
     }
 
     /// Code spans keep their contents as written; everything around them loses links and emphasis.
@@ -145,12 +172,40 @@ nonisolated enum NoteText {
         var result = ""
         var rest = text[...]
         while let span = rest.firstMatch(of: codeSpan) {
-            result += stripInline(String(rest[..<span.range.lowerBound]))
+            result += unescaped(stripInline(String(rest[..<span.range.lowerBound])))
             result += span.output.1
             rest = rest[span.range.upperBound...]
         }
-        return result + stripInline(String(rest))
+        return result + unescaped(stripInline(String(rest)))
     }
+
+    /// Text as markdown means it: a backslash before punctuation is only there to keep the punctuation plain,
+    /// and a character reference such as `&amp;` or `&#x20;` stands for its character.
+    static func unescaped(_ text: String) -> String {
+        guard text.contains("\\") || text.contains("&") else { return text }
+        var text = text.replacing(backslashEscape) { String($0.output.1) }
+        text.replace(characterReference) { match in
+            let (whole, name) = match.output
+            // A reference to a control character stands as written; it has no place in a title or a name.
+            let number = name.hasPrefix("#x") || name.hasPrefix("#X")
+                ? UInt32(name.dropFirst(2), radix: 16) : name.hasPrefix("#") ? UInt32(name.dropFirst()) : nil
+            if name.hasPrefix("#") {
+                guard let scalar = number.flatMap(Unicode.Scalar.init), scalar.properties.generalCategory != .control
+                else { return String(whole) }
+                return String(scalar)
+            }
+            return namedReferences[String(name)] ?? String(whole)
+        }
+        return text
+    }
+
+    private nonisolated(unsafe) static let backslashEscape = /\\([!-\/:-@\[-`{-~])/
+    private nonisolated(unsafe) static let characterReference = /&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/
+    /// The references writers use for plain text; the full HTML list is not worth carrying for a preview.
+    private static let namedReferences = [
+        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{A0}",
+        "ndash": "\u{2013}", "mdash": "\u{2014}", "hellip": "\u{2026}", "copy": "\u{A9}",
+    ]
 
     private static func stripInline(_ text: String) -> String {
         var text = text

@@ -22,6 +22,11 @@ nonisolated struct Note: Identifiable, Hashable {
     var binID: UUID?
     /// The file's identity when last read, to know it again if another app renames it.
     var fileID: UInt64?
+    /// The first line the note's name was taken from, while the note still goes by it; nil for a note named
+    /// otherwise, which keeps its name whatever its first line says. A new note follows its first line too.
+    var namedLine: String? {
+        didSet { refreshText() }
+    }
 
     init(
         id: UUID = UUID(),
@@ -42,7 +47,26 @@ nonisolated struct Note: Identifiable, Hashable {
         self.folderID = folderID
         self.deleted = deleted
         self.binID = binID
+        namedLine = derivedNamedLine
         refreshText()
+    }
+
+    /// The line the file's name comes from, when it comes from the first line: the name is that line's and no
+    /// other title has been given. A note with no words yet goes by the empty line, and New Note.
+    private var derivedNamedLine: String? {
+        guard let fileTitle else { return nil }
+        let line = NoteText.firstLine(of: file.body) ?? ""
+        return NoteText.isName(fileTitle, of: line) && (file.title == nil || file.title == line) ? line : nil
+    }
+
+    /// Takes in a change made outside, to the file's name or text. A note still carrying the name of the line
+    /// it follows goes on following it, whichever change arrived first; otherwise it follows its first line
+    /// only if it is named after it, and a `title` given elsewhere always stops it.
+    mutating func reviewNaming() {
+        if let named = namedLine, let fileTitle, NoteText.isName(fileTitle, of: named), file.title == nil || file.title == named {
+            return
+        }
+        namedLine = derivedNamedLine
     }
 
     var body: String { file.body }
@@ -62,11 +86,14 @@ nonisolated struct Note: Identifiable, Hashable {
         path.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }
     }
 
-    /// As Marfa reads a note: its `title` property, otherwise its file name. A note with no file yet takes its
-    /// first line, which its file will be named after.
+    /// Whether the note's name comes from its first line, so it changes as the line does.
+    var followsFirstLine: Bool { isDraft || namedLine != nil }
+
+    /// As Marfa reads a note: its `title` property, otherwise its file name. A note named after its first line
+    /// shows the line as it now reads, which its name takes once the note is left.
     private mutating func refreshText() {
-        let firstLine = NoteText.titleAndPreview(of: file.body)
-        title = file.title ?? fileTitle ?? firstLine.title
+        let line = NoteText.firstLine(of: file.body)
+        title = (followsFirstLine ? line : nil) ?? file.title ?? fileTitle ?? String(localized: "New Note")
         preview = NoteText.preview(of: file.body, title: title)
     }
 }

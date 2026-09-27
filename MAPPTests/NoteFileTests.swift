@@ -107,6 +107,8 @@ struct NoteFileTests {
         ("- dash", "\"- dash\""),
         ("a \"b\"", "a \"b\""),
         ("'quote", "\"'quote\""),
+        ("Todo:", "\"Todo:\""),
+        ("R&D: plan", "\"R&D: plan\""),
     ])
     func valuesAreQuotedOnlyWhereYAMLNeedsIt(value: String, written: String) {
         var file = NoteFile(text: "")

@@ -28,6 +28,12 @@ final class NoteLibrary {
     /// it again, so a note goes only once it has stayed away a moment.
     @ObservationIgnored private var missingSince: [Note.ID: Date] = [:]
     private static let missingGrace: TimeInterval = 2
+    /// Notes changed on a page since it was last left, whose names may need to follow their first lines.
+    @ObservationIgnored private var edited: Set<Note.ID> = []
+    /// A new note still being typed on its first line is written once the typing pauses this long, so a
+    /// one-line note is on disk before the app could be stopped.
+    @ObservationIgnored var draftDelay: Duration = .seconds(2)
+    @ObservationIgnored private var draftSaves: [Note.ID: Task<Void, Never>] = [:]
 
     private static var unreadable: (title: String, message: String) {
         (String(localized: "Can’t Read the Notes Folder"), String(localized: "It may have been moved or deleted. Choose it again in Settings."))
@@ -178,15 +184,18 @@ final class NoteLibrary {
         func take(_ disk: StoredNote, at index: Int) {
             seen.insert(updated[index].id)
             updated[index].fileID = disk.fileID
-            if updated[index].path != disk.path {
+            let moved = updated[index].path != disk.path
+            if moved {
                 updated[index].path = disk.path
                 updated[index].folderID = folderID(forPath: disk.path)
             }
             missingSince[updated[index].id] = nil
-            if updated[index].file.text != disk.text, !unsaved.contains(disk.path) {
+            let rewritten = updated[index].file.text != disk.text && !unsaved.contains(disk.path)
+            if rewritten {
                 updated[index].file = NoteFile(text: disk.text)
                 updated[index].modified = disk.modified
             }
+            if moved || rewritten { updated[index].reviewNaming() }
         }
         for index in updated.indices where !updated[index].isDeleted {
             guard let path = updated[index].path, let disk = onDisk.removeValue(forKey: path) else { continue }
@@ -260,11 +269,12 @@ final class NoteLibrary {
     }
 
     /// Where each note is, to open it in a window of its own that finds it again at the next launch. A new
-    /// note is written first, so it has somewhere to be.
+    /// note is written first, so it has somewhere to be; one with nothing in it has nowhere yet, and stays.
     func paths(forWindows ids: some Collection<Note.ID>) -> [String] {
         ids.compactMap { id in
+            guard let note = note(id), !(note.isDraft && NoteText.isBlank(note.body)) else { return nil }
             leave(id)
-            return note(id)?.path
+            return self.note(id)?.path
         }
     }
 
@@ -305,8 +315,8 @@ final class NoteLibrary {
         return note
     }
 
-    /// A note being written. A new note gets its file, named after its first line, once that line is finished.
-    /// Typing is undone by the page that holds it, so this registers nothing.
+    /// A note being written. A new note gets its file, named after its first line, once that line is finished
+    /// or the typing pauses. Typing is undone by the page that holds it, so this registers nothing.
     func updateBody(of id: Note.ID, to body: String) {
         guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body,
               !notes[index].isDeleted
@@ -314,27 +324,46 @@ final class NoteLibrary {
         if let path = notes[index].path { unsaved.remove(path) }
         notes[index].file.body = body
         notes[index].modified = now()
+        edited.insert(id)
         if notes[index].isDraft {
-            if NoteText.hasCompleteFirstLine(body) { writeDraft(at: index) }
+            draftSaves[id]?.cancel()
+            if NoteText.hasCompleteFirstLine(body) {
+                writeDraft(at: index)
+            } else if !NoteText.isBlank(body) {
+                draftSaves[id] = Task { [weak self, draftDelay] in
+                    try? await Task.sleep(for: draftDelay)
+                    guard !Task.isCancelled, let self,
+                          let index = notes.firstIndex(where: { $0.id == id }), notes[index].isDraft, !notes[index].isDeleted
+                    else { return }
+                    writeDraft(at: index)
+                }
+            }
         } else if let path = notes[index].path {
             perform(.write(path: path, text: notes[index].file.text))
         }
     }
 
     /// The note is no longer on the page. A new note is written with what it has, or let go if it has nothing,
-    /// as Notes lets an empty new note go.
+    /// as Notes lets an empty new note go. A note named after its first line takes the line's new name.
     func leave(_ id: Note.ID) {
-        guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].isDraft else { return }
-        if notes[index].body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            notes.remove(at: index)
-        } else {
-            writeDraft(at: index)
+        draftSaves.removeValue(forKey: id)?.cancel()
+        guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted else { return }
+        if notes[index].isDraft {
+            if NoteText.isBlank(notes[index].body) {
+                notes.remove(at: index)
+            } else {
+                writeDraft(at: index)
+            }
+        } else if edited.contains(id) {
+            followFirstLine(at: index)
         }
+        edited.remove(id)
     }
 
-    /// Every new note that has something in it gets its file, and the store finishes, as the app quits.
+    /// Every note being written is left, so new notes with something in them get their files and names follow
+    /// their first lines, and the store finishes, as the app quits.
     func finish() {
-        for note in notes where note.isDraft { leave(note.id) }
+        for note in notes where note.isDraft || edited.contains(note.id) { leave(note.id) }
         store?.drain()
     }
 
@@ -391,7 +420,7 @@ final class NoteLibrary {
     /// Renames the note's file. Marfa keeps a note's title in its front matter when it has one, so that is
     /// changed too. A new note is written under the name. An empty name, or one another note has, is refused.
     func renameNote(_ id: Note.ID, to name: String, undoManager: UndoManager? = nil) {
-        let name = Self.fileSafe(name)
+        let name = NoteText.fileSafe(name)
         guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted, !name.isEmpty,
               !isNoteNameTaken(name, for: id)
         else { return }
@@ -399,12 +428,28 @@ final class NoteLibrary {
         rename(at: index, to: name, title: title, undoManager: undoManager)
     }
 
+    /// A note named after its first line whose line has changed takes the new line's name, numbered if another
+    /// note has it, and its new `title` where it keeps one or the line has characters a name cannot. Marfa sees
+    /// one rename, made as the person leaves the note rather than as they type.
+    private func followFirstLine(at index: Int) {
+        guard let named = notes[index].namedLine else { return }
+        let line = NoteText.firstLine(of: notes[index].body) ?? ""
+        guard line != named else { return }
+        let title = notes[index].file.title != nil || NoteText.needsTitle(line) ? line : nil
+        rename(at: index, to: NoteText.name(for: line), title: title, undoManager: nil)
+    }
+
     private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?) {
         let id = notes[index].id
         let oldName = notes[index].fileTitle ?? NoteText.fileName(for: notes[index].body)
         let oldTitle = notes[index].file.property("title")
         let directory = notes[index].path.map { _ in notes[index].directory } ?? directory(for: notes[index].folderID)
-        let path = directory.isEmpty ? "\(name).md" : "\(directory)/\(name).md"
+        let path = uniquePath(name, in: directory, except: id)
+        defer {
+            // A note goes by its first line again once it is given the line's name, whatever gave it.
+            let line = NoteText.firstLine(of: notes[index].body) ?? ""
+            notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line) ? line : nil }
+        }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }
         if let from = notes[index].path {
@@ -449,10 +494,10 @@ final class NoteLibrary {
         // A name such as `.png` is all extension.
         let bare = name.hasPrefix(".") && !name.dropFirst().contains(".")
         let ext = bare ? String(name.dropFirst()) : (name as NSString).pathExtension
-        let stem = bare ? "" : fileSafe((name as NSString).deletingPathExtension)
+        let stem = bare ? "" : NoteText.fileSafe((name as NSString).deletingPathExtension)
         let fitted = NoteText.fitted(stem, room: ext.utf8.count + 1)
         let base = fitted.isEmpty ? String(localized: "Image") : fitted
-        return ext.isEmpty ? base : "\(base).\(fileSafe(ext))"
+        return ext.isEmpty ? base : "\(base).\(NoteText.fileSafe(ext))"
     }
 
 
@@ -469,7 +514,7 @@ final class NoteLibrary {
     /// Whether the name cannot be a folder's: another folder has it, ignoring case as the Finder does, or it is
     /// the attachments folder's.
     func isFolderNameTaken(_ name: String, except id: Folder.ID? = nil) -> Bool {
-        let name = Self.fileSafe(name)
+        let name = NoteText.fileSafe(name)
         if name.localizedCaseInsensitiveCompare(FolderStore.attachments) == .orderedSame { return true }
         return folders.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
     }
@@ -477,7 +522,7 @@ final class NoteLibrary {
     /// Renames the folder's directory. An empty name, or one another folder already has, is refused and
     /// leaves the name as it was.
     func rename(_ id: Folder.ID, to name: String, undoManager: UndoManager? = nil) {
-        let name = Self.fileSafe(name)
+        let name = NoteText.fileSafe(name)
         guard let index = folders.firstIndex(where: { $0.id == id }), !name.isEmpty,
               !isFolderNameTaken(name, except: id)
         else { return }
@@ -539,6 +584,9 @@ final class NoteLibrary {
             relocate(at: index, to: placement)
         }
         notes.removeAll { $0.isDraft && $0.isDeleted }
+        // A new note deleted with nothing in it is gone, with nothing to bring back.
+        previous = previous.filter { id, _ in notes.contains { $0.id == id } }
+        guard !previous.isEmpty else { return }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.apply(previous, undoManager: undoManager, name: name)
         }
@@ -551,7 +599,7 @@ final class NoteLibrary {
         switch (note.isDeleted, placement.isDeleted) {
         case (false, true):
             // A new note with something in it is written first, so undoing the deletion brings it back.
-            if note.isDraft, !note.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if note.isDraft, !NoteText.isBlank(note.body) {
                 writeDraft(at: index)
             }
             notes[index].deleted = now()
@@ -650,10 +698,16 @@ final class NoteLibrary {
         perform(.write(path: path, text: notes[index].file.text))
     }
 
+    /// A new note's file, named after its first line; a line with characters a name cannot hold is kept whole
+    /// as the note's `title`.
     private func writeDraft(at index: Int) {
+        draftSaves.removeValue(forKey: notes[index].id)?.cancel()
         let note = notes[index]
-        let path = uniquePath(NoteText.fileName(for: note.body), in: directory(for: note.folderID), except: note.id)
+        let line = NoteText.firstLine(of: note.body) ?? ""
+        if NoteText.needsTitle(line) { notes[index].file.setProperty("title", line) }
+        let path = uniquePath(NoteText.name(for: line), in: directory(for: note.folderID), except: note.id)
         notes[index].path = path
+        notes[index].namedLine = line
         perform(.create(path: path, text: notes[index].file.text))
     }
 
@@ -700,16 +754,6 @@ final class NoteLibrary {
             ?? notes.firstIndex(where: { $0.path == from })
         else { return }
         notes[index].path = to
-    }
-
-    /// A name as a file can take it: separators replaced and leading dots dropped, which would hide the file.
-    static func fileSafe(_ name: String) -> String {
-        NoteText.fitted(
-            name.replacing(/[\/\\:\x00-\x1F]/, with: "-")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingPrefix { $0 == "." }
-                .trimmingCharacters(in: .whitespaces)
-        )
     }
 
     private func newFolderName() -> String {

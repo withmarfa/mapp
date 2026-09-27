@@ -3,8 +3,9 @@ import Testing
 @testable import MAPP
 
 struct NoteTextTests {
-    func title(_ body: String) -> String { NoteText.titleAndPreview(of: body).title }
-    func preview(_ body: String) -> String { NoteText.titleAndPreview(of: body).preview }
+    /// A new note's title and preview, as the list shows them while its name follows its first line.
+    func title(_ body: String) -> String { Note(text: body, created: .now).title }
+    func preview(_ body: String) -> String { Note(text: body, created: .now).preview }
 
     @Test func titleIsTheFirstHeadingWithoutItsMarker() {
         #expect(title("# Kitchen quotes\n\nThree quotes.") == "Kitchen quotes")
@@ -92,9 +93,63 @@ struct NoteTextTests {
         ("~~struck~~ and **strong** and _light_", "struck and strong and light"),
         ("===", ""),
         ("| --- | :---: |", ""),
+        ("R\\&D budget", "R&D budget"),
+        ("\\[Draft\\] plan", "[Draft] plan"),
+        ("\\#work and 5 \\* 3", "#work and 5 * 3"),
+        ("Hello&#x20;", "Hello"),
+        ("Tom &amp; Jerry &#233;t&#xE9;", "Tom & Jerry été"),
+        ("Keep `\\*code\\*` as written", "Keep \\*code\\* as written"),
+        ("&bogus; stays", "&bogus; stays"),
     ])
     func plainTextOfOneLine(line: String, expected: String) {
         #expect(NoteText.plainText(of: line[...]) == expected)
+    }
+
+    @Test(arguments: [
+        ("Groceries", "Groceries"),
+        ("Podcast idea: short episodes", "Podcast idea- short episodes"),
+        ("a/b\\c", "a-b-c"),
+        (".hidden plan", "hidden plan"),
+        ("  spaced  ", "spaced"),
+        ("", "New Note"),
+        ("...", "New Note"),
+    ])
+    func nameForAFirstLine(line: String, expected: String) {
+        #expect(NoteText.name(for: line) == expected)
+    }
+
+    @Test func aNameIsCutToFitAnyFileSystemAtACharacter() {
+        let name = NoteText.name(for: String(repeating: "é", count: 300))
+        #expect(name.utf8.count <= 200)
+        #expect(name.allSatisfy { $0 == "é" })
+    }
+
+    @Test func aFileIsKnownByTheNameItsFirstLineGivesNumberedOrNot() {
+        #expect(NoteText.isName("Groceries", of: "Groceries"))
+        #expect(NoteText.isName("Groceries 2", of: "Groceries"))
+        #expect(NoteText.isName("Plan- week", of: "Plan: week"))
+        #expect(!NoteText.isName("Groceries 1", of: "Groceries"))
+        #expect(!NoteText.isName("Shopping", of: "Groceries"))
+        #expect(!NoteText.isName("Groceries list", of: "Groceries"))
+    }
+
+    @Test func onlyALineANameCannotHoldNeedsATitle() {
+        #expect(NoteText.needsTitle("Plan: week"))
+        #expect(NoteText.needsTitle(".profile"))
+        #expect(!NoteText.needsTitle("R&D budget"))
+    }
+
+    @Test func aNoteOfMarkersAloneIsBlank() {
+        #expect(NoteText.isBlank(""))
+        #expect(NoteText.isBlank("- [ ] \n"))
+        #expect(NoteText.isBlank("#\n\n> \n1. "))
+        #expect(!NoteText.isBlank("- [ ] Milk"))
+        #expect(!NoteText.isBlank("![](Attachments/a.png)"))
+    }
+
+    @Test func aTitleReadsAsWrittenWhateverTheEditorEscaped() {
+        #expect(title("R\\&D: plan\n\nNext") == "R&D: plan")
+        #expect(preview("R\\&D: plan\n\nsnake\\_case") == "snake_case")
     }
 
     @Test func attachmentLinksFollowANoteToAnotherDepthAndOtherLinksStay() {
