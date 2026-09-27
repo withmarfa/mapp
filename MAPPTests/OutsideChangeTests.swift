@@ -15,6 +15,8 @@ struct OutsideChangeTests {
         try root.write("# Plan\n\nFirst draft\n", to: "Work/Plan.md")
         try root.write("Shopping\n", to: "Shopping.md")
         library = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url), defaults: nil)
+        // A file gone from the folder is waited for a moment before its note goes; not the app's whole moment.
+        library.missingGrace = 0.05
         await library.load()
     }
 

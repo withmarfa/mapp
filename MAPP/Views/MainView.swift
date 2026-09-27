@@ -58,16 +58,7 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             if library.isLoaded { restore() }
         }
-        .confirmationDialog(
-            library.notesToPurge.count == 1
-                ? "Delete this note immediately?"
-                : "Delete \(library.notesToPurge.count) notes immediately?",
-            isPresented: Binding { !library.notesToPurge.isEmpty } set: { if !$0 { library.notesToPurge = [] } }
-        ) {
-            Button("Delete", role: .destructive) { library.deletePermanently(library.notesToPurge) }
-        } message: {
-            Text("You can’t undo this action.")
-        }
+        .libraryDialogs()
         .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
             TextField("Name", text: $noteName)
             Button("Rename") { renameNote() }
@@ -77,13 +68,6 @@ struct MainView: View {
         }
         .onChange(of: browser.renamingNote) {
             noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
-        }
-        .alert(
-            library.failure?.title ?? "",
-            isPresented: Binding { library.failure != nil } set: { if !$0 { library.failure = nil } }
-        ) {
-        } message: {
-            Text(library.failure?.message ?? "")
         }
         .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
         } message: {

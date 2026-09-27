@@ -22,7 +22,8 @@ struct AppCommands: Commands {
                 if let library { browser?.newFolder(in: library, order: order, undoManager: notes?.undoManager) }
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .disabled(browser == nil || library == nil)
+            // A folder made before the notes folder is read would be lost in the reading.
+            .disabled(browser == nil || library?.isLoaded != true)
             Button("New Window", systemImage: "macwindow.badge.plus") {
                 openWindow(id: "main")
             }

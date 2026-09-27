@@ -8,18 +8,23 @@ final class FolderWatcher {
     private var stream: FSEventStreamRef?
     private let root: String
     private let changed: () -> Void
+    private let rootChanged: () -> Void
 
-    init(_ url: URL, changed: @escaping () -> Void) {
+    /// `rootChanged` is told when the notes folder itself is moved, renamed or deleted.
+    init(_ url: URL, changed: @escaping () -> Void, rootChanged: @escaping () -> Void = {}) {
         root = url.standardizedFileURL.resolvingSymlinksInPath().path
         self.changed = changed
+        self.rootChanged = rootChanged
         var context = FSEventStreamContext(
             version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil
         )
-        let callback: FSEventStreamCallback = { _, info, count, paths, _, _ in
+        let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
             guard let info else { return }
             let paths = Unmanaged<CFArray>.fromOpaque(paths).takeUnretainedValue() as? [String] ?? []
+            let rootMoved = (0..<count).contains { flags[$0] & FSEventStreamEventFlags(kFSEventStreamEventFlagRootChanged) != 0 }
             MainActor.assumeIsolated {
                 let watcher = Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue()
+                if rootMoved { return watcher.rootChanged() }
                 if paths.isEmpty || paths.contains(where: watcher.matters) { watcher.changed() }
             }
         }

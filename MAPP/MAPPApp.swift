@@ -22,6 +22,10 @@ struct MAPPApp: App {
             if let library = folder.library {
                 NoteWindow(path: $path)
                     .environment(library)
+            } else {
+                // A note's window has nothing to show without a notes folder, as when one is restored before
+                // any is chosen.
+                ClosingView()
             }
         }
         .defaultSize(width: 640, height: 720)

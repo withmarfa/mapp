@@ -40,6 +40,19 @@ struct NoteWindow: View {
             if let moved = note?.path { path = moved }
         }
         .onChange(of: note == nil) { if library.isLoaded, note == nil { dismiss() } }
+        // Another notes folder is another library, which does not hold this window's note.
+        .onChange(of: ObjectIdentifier(library)) { dismiss() }
         .onDisappear { editor.flush() }
+        .libraryDialogs()
+    }
+}
+
+/// A window with nothing to show, which closes.
+struct ClosingView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Color.clear
+            .onAppear { dismiss() }
     }
 }

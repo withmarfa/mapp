@@ -45,13 +45,11 @@ struct NoteList: View {
         .accessibilityIdentifier("NoteList")
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
-        .onDeleteCommand {
-            Browser.delete(browser.selection, in: library, undoManager: undoManager)
-        }
+        .onDeleteCommand(perform: deleteSelection)
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
         .onKeyPress(.delete, phases: .down) { press in
             guard press.modifiers.contains(.command), !browser.selection.isEmpty else { return .ignored }
-            Browser.delete(browser.selection, in: library, undoManager: undoManager)
+            deleteSelection()
             return .handled
         }
         // Return opens the note for writing; a deleted note cannot be written in, so it stays in the list.
@@ -105,6 +103,14 @@ struct NoteList: View {
         .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) note](inflect: true)"))
+    }
+
+    /// What was just typed reaches the note before it goes, since a deleted note takes no edit.
+    private func deleteSelection() {
+        let ids = browser.selection
+        EditorController.flushAll(leaving: false) { [library, undoManager] in
+            Browser.delete(ids, in: library, undoManager: undoManager)
+        }
     }
 
     private func folderName(for note: Note) -> String {

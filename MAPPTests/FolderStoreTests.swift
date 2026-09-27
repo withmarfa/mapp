@@ -49,7 +49,8 @@ struct FolderStoreTests {
         store.drain()
         #expect(root.read("Note.md") == "Someone else's")
         #expect(root.read("Note 2.md") == "Mine")
-        await Task.yield()
+        // The store tells the library on the main actor, after the change.
+        for _ in 0..<100 where moved == nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(moved?.0 == "Note.md")
         #expect(moved?.1 == "Note 2.md")
     }
@@ -89,7 +90,7 @@ struct FolderStoreTests {
         store.failed = { path, _ in failure = path }
         store.perform(.write(path: String(repeating: "x", count: 300) + ".md", text: "Too long a name"))
         store.drain()
-        await Task.yield()
+        for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(failure?.hasSuffix(".md") == true)
     }
 
@@ -162,5 +163,32 @@ struct FolderStoreTests {
         store.drain()
         #expect(root.read("Office/Note.md") == "Text")
         #expect(!root.exists("Work"))
+    }
+
+    @Test func aTrashListThatCannotBeReadIsSetAsideAndMadeAgainFromTheBin() throws {
+        try root.write("# Groceries\n\nMilk\n", to: "Work/Groceries.md")
+        store.perform(.trash(path: "Work/Groceries.md", id: UUID(), date: .now))
+        store.drain()
+        try Data("not a list".utf8).write(to: bin.url.appending(path: "Trash.json"))
+        let trash = try store.load().trash
+        #expect(trash.count == 1)
+        #expect(trash.first?.note.path == "Groceries.md", "where it was is lost, so it comes back at the top")
+        #expect(trash.first?.note.text == "# Groceries\n\nMilk\n")
+        let names = try FileManager.default.contentsOfDirectory(atPath: bin.url.path)
+        #expect(names.contains { $0.hasPrefix("Trash ") && $0.hasSuffix(".json") }, "the unreadable list is kept aside")
+        store.perform(.trash(path: "Work/Other.md", id: UUID(), date: .now))
+        store.drain()
+        #expect(try store.load().trash.count == 1, "a later change keeps what was found")
+    }
+
+    @Test func aNotesFolderThatHasGoneIsNeverMadeAgain() async throws {
+        var failure: String?
+        store.failed = { path, _ in failure = path }
+        try FileManager.default.removeItem(at: root.url)
+        store.perform(.create(path: "Work/Note.md", text: "Text"))
+        store.drain()
+        #expect(!FileManager.default.fileExists(atPath: root.url.path))
+        for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(failure == "Work/Note.md")
     }
 }
