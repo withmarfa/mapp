@@ -98,4 +98,24 @@ struct OutsideChangeTests {
         #expect(root.read("Groceries.md") == "Groceries\n")
         #expect(!root.exists("Shopping.md"))
     }
+
+    @Test func aMoveToAFolderThatFailsKeepsTheNotesLinksWhereItStayed() async throws {
+        let shopping = try #require(note(at: "Shopping.md"))
+        let work = try #require(library.folders.first { $0.name == "Work" })
+        library.updateBody(of: shopping.id, to: "Shopping\n\n![Receipt](Attachments/Receipt.png)\n")
+        library.store?.drain()
+        let file = root.url.appending(path: "Shopping.md").path
+        defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: file) }
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: file)
+        library.move([shopping.id], to: work.id)
+        #expect(library.note(shopping.id)?.body.contains("](../Attachments/Receipt.png)") == true)
+        library.store?.drain()
+        for _ in 0..<100 where library.note(shopping.id)?.path != "Shopping.md" || library.failure == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let stayed = try #require(library.note(shopping.id))
+        #expect(stayed.path == "Shopping.md")
+        #expect(stayed.folderID == nil)
+        #expect(stayed.body == "Shopping\n\n![Receipt](Attachments/Receipt.png)\n")
+    }
 }
