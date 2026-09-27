@@ -66,6 +66,7 @@ struct MainView: View {
         }
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, editor)
+        .focusedSceneValue(\.marfaTypes, browser.showsTypes ? types : nil)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)

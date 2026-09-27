@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// The menu bar. File makes and opens notes and acts on the selected ones; View orders the list.
+/// The menu bar. File makes and opens notes and acts on the selected ones; View orders the list and moves back
+/// and forward through the types Marfa Types has shown.
 struct AppCommands: Commands {
     /// Nil until a folder of notes is chosen.
     let library: NoteLibrary?
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
+    @FocusedValue(\.marfaTypes) private var marfaTypes
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
 
@@ -84,6 +86,14 @@ struct AppCommands: Commands {
             OrderOptions()
             Divider()
             PageWidthOptions()
+            Divider()
+            // ⌘[ and ⌘], as in Safari and the Finder.
+            Button("Back", systemImage: "chevron.backward") { marfaTypes?.goBack() }
+                .keyboardShortcut("[")
+                .disabled(marfaTypes?.canGoBack != true)
+            Button("Forward", systemImage: "chevron.forward") { marfaTypes?.goForward() }
+                .keyboardShortcut("]")
+                .disabled(marfaTypes?.canGoForward != true)
             Divider()
         }
 
