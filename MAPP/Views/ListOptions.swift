@@ -4,6 +4,7 @@ import SwiftUI
 enum ListKey {
     static let previewLines = "listPreviewLines"
     static let defaultPreviewLines = 2
+    static let all = [previewLines]
 }
 
 /// How many lines of each note's text its row shows under the title, as Mail offers for its messages. Every row

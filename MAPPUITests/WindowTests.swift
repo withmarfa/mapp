@@ -307,9 +307,13 @@ final class WindowTests: XCTestCase {
             case .parentChild: return true
             case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
             case .contrast:
+                // A row cut off at the pane's edge still belongs to the pane.
+                @MainActor func isIn(_ pane: CGRect) -> Bool {
+                    element.frame.intersects(pane) && element.frame.minX >= pane.minX && element.frame.maxX <= pane.maxX
+                }
                 let isListTitle = element.frame.minY < listFrame.minY
                     && element.frame.minX >= listFrame.minX && element.frame.maxX <= listFrame.maxX
-                return sidebarFrame.contains(element.frame) || listFrame.contains(element.frame) || isListTitle
+                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }

@@ -5,6 +5,7 @@ enum PageKey {
     static let fullWidth = "fullWidthPages"
     static let textSize = "noteTextSize"
     static let checksSpelling = "checksSpelling"
+    static let all = [fullWidth, textSize, checksSpelling]
 }
 
 /// How a note's page is set out. The defaults here are the only ones; stored settings fall back to them.

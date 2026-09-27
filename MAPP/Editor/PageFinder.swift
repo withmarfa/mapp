@@ -152,7 +152,8 @@ final class EditorContainer: NSView, NSTextFinderBarContainer {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override var isFlipped: Bool { true }
+    // WebKit lays a note out for printing on a thread of its own, which asks the views above the page this.
+    nonisolated override var isFlipped: Bool { true }
 
     var findBarView: NSView? {
         didSet {
