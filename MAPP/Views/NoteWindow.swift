@@ -6,14 +6,14 @@ struct NoteWindow: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
+    @State private var editor = EditorController()
     @Binding var path: String?
-    let editor: EditorController
     @State private var id: Note.ID?
 
     private var note: Note? { id.flatMap { library.note($0) } }
 
     var body: some View {
-        ZStack {
+        Group {
             if let note {
                 NotePage(note: note, editor: editor)
                     .navigationTitle(note.title)
@@ -44,5 +44,15 @@ struct NoteWindow: View {
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
         .onDisappear { editor.flush() }
         .libraryDialogs()
+    }
+}
+
+/// A window with nothing to show, which closes.
+struct ClosingView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Color.clear
+            .onAppear { dismiss() }
     }
 }

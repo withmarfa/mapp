@@ -4,7 +4,7 @@ struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
-    let editor: EditorController
+    @State private var editor = EditorController()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?

@@ -7,7 +7,7 @@ struct RootView: View {
 
     var body: some View {
         if let library = folder.library {
-            WithEditor { MainView(editor: $0) }
+            MainView()
                 .environment(library)
                 // A different folder is a different library, and the window starts afresh with it.
                 .id(ObjectIdentifier(library))

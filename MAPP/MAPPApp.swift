@@ -20,7 +20,7 @@ struct MAPPApp: App {
 
         WindowGroup("Note", for: String.self) { $path in
             if let library = folder.library {
-                WithEditor { NoteWindow(path: $path, editor: $0) }
+                NoteWindow(path: $path)
                     .environment(library)
             } else {
                 // A note's window has nothing to show without a notes folder, as when one is restored before
