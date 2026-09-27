@@ -94,7 +94,7 @@ struct MainView: View {
     /// A name another note in the folder has is refused with an alert, as the Finder does.
     private func renameNote() {
         guard let id = browser.renamingNote else { return }
-        let name = NoteLibrary.fileSafe(noteName)
+        let name = NoteText.fileSafe(noteName)
         if library.isNoteNameTaken(name, for: id) {
             takenNoteName = name
         } else {

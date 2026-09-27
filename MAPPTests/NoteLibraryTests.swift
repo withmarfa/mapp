@@ -344,6 +344,80 @@ struct NoteLibraryTests {
         ])
     }
 
+    @Test func aNoteNamedAfterItsFirstLineTakesTheNewLineOnceLeft() {
+        let (library, _, filed, _, _) = makeLibrary()
+        library.updateBody(of: filed.id, to: "# Filed notes\n\nMore\n")
+        #expect(library.note(filed.id)?.title == "Filed notes", "the list reads the line as it is typed")
+        #expect(library.note(filed.id)?.path == "Work/Filed note.md", "the file is renamed once, when the note is left")
+        library.leave(filed.id)
+        #expect(library.note(filed.id)?.path == "Work/Filed notes.md")
+        #expect(store.changes.last == .move(from: "Work/Filed note.md", to: "Work/Filed notes.md"))
+        library.leave(filed.id)
+        #expect(store.changes.count == 2, "leaving again changes nothing")
+    }
+
+    @Test func aNoteNamedByHandKeepsItsNameWhateverItsFirstLineSays() {
+        let (library, _, filed, _, _) = makeLibrary()
+        library.renameNote(filed.id, to: "Office")
+        library.updateBody(of: filed.id, to: "# Something else\n")
+        library.leave(filed.id)
+        #expect(library.note(filed.id)?.path == "Work/Office.md")
+        #expect(library.note(filed.id)?.title == "Office")
+        library.renameNote(filed.id, to: "Something else")
+        library.updateBody(of: filed.id, to: "# Something new\n")
+        library.leave(filed.id)
+        #expect(library.note(filed.id)?.path == "Work/Something new.md", "named after the line again, it follows it again")
+    }
+
+    @Test func aFirstLineTakesANumberWhenAnotherNoteHasItsName() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let other = Note(body: "Other", created: start)
+        let crowded = NoteLibrary(notes: library.notes + [other], store: store)
+        crowded.updateBody(of: inbox.id, to: "Other\n")
+        crowded.leave(inbox.id)
+        #expect(crowded.note(inbox.id)?.path == "Other 2.md")
+        crowded.updateBody(of: inbox.id, to: "Another\n")
+        crowded.leave(inbox.id)
+        #expect(crowded.note(inbox.id)?.path == "Another.md", "a numbered name still follows its line")
+    }
+
+    @Test func aFirstLineANameCannotHoldIsKeptWholeAsTheTitle() {
+        let (library, _, _, _, _) = makeLibrary()
+        let note = library.newNote(in: .inbox)
+        library.updateBody(of: note.id, to: "R\\&D: plan\n\nBudget\n")
+        #expect(library.note(note.id)?.path == "R&D- plan.md")
+        #expect(library.note(note.id)?.file.title == "R&D: plan")
+        #expect(library.note(note.id)?.title == "R&D: plan")
+        #expect(library.note(note.id)?.preview == "Budget")
+    }
+
+    @Test func aOneLineNoteIsWrittenOnceTheTypingPauses() async throws {
+        let (library, _, _, _, _) = makeLibrary()
+        library.draftDelay = .milliseconds(20)
+        let note = library.newNote(in: .inbox)
+        library.updateBody(of: note.id, to: "Call the plumber\n")
+        #expect(store.changes.isEmpty)
+        for _ in 0..<50 where store.changes.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(store.changes == [.create(path: "Call the plumber.md", text: "Call the plumber\n")])
+        library.updateBody(of: note.id, to: "Call the plumber today\n")
+        library.leave(note.id)
+        #expect(library.note(note.id)?.path == "Call the plumber today.md", "an early name corrects itself")
+    }
+
+    @Test func aNewNoteOfMarkersAloneIsLetGoAndTakesNoUndo() {
+        let (library, _, _, _, _) = makeLibrary()
+        let manager = undoManager()
+        var note: Note?
+        undoably(manager) { note = library.newNote(in: .inbox, undoManager: manager) }
+        library.updateBody(of: note!.id, to: "- [ ] \n")
+        #expect(library.paths(forWindows: [note!.id]).isEmpty)
+        #expect(library.note(note!.id) != nil, "opening it in a window lets nothing go")
+        undoably(manager) { library.delete([note!.id], undoManager: manager) }
+        #expect(library.note(note!.id) == nil)
+        #expect(manager.undoActionName == "New Note", "deleting nothing leaves nothing to undo")
+        #expect(store.changes.isEmpty)
+    }
+
     @Test func undoingANewNoteAlreadyWrittenMovesItToRecentlyDeleted() {
         let (library, _, _, _, _) = makeLibrary()
         let manager = undoManager()
@@ -445,7 +519,7 @@ struct NoteLibraryTests {
     @Test func longFirstLinesMakeNamesAnyFileSystemTakes() {
         let name = NoteText.fileName(for: String(repeating: "議事録", count: 60))
         #expect(name.utf8.count <= 200)
-        #expect(NoteLibrary.fileSafe(String(repeating: "é", count: 300)).utf8.count <= 200)
+        #expect(NoteText.fileSafe(String(repeating: "é", count: 300)).utf8.count <= 200)
     }
 
     @Test func attachedFilesAreLinkedFromWhereTheNoteIs() {

@@ -109,6 +109,23 @@ struct EditorTests {
         #expect(page.changes == ["# Draft\n"])
     }
 
+    @Test func aFirstLineTypedWithASpaceAtItsEndNamesTheFileWithoutIt() async throws {
+        let store = RecordingStore()
+        let library = NoteLibrary(store: store)
+        let note = library.newNote(in: .inbox)
+        let page = try await Harness()
+        page.editor.library = library
+        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
+        page.editor.load(try #require(library.note(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'R&D plan ')")
+        try await page.run("document.execCommand('insertParagraph'); document.execCommand('insertText', false, 'Budget')")
+        page.editor.flush()
+        try await page.wait { library.note(note.id)?.path != nil }
+        #expect(library.note(note.id)?.path == "R&D plan.md")
+        #expect(library.note(note.id)?.title == "R&D plan")
+    }
+
     @Test func anEditOverlappingAnOutsideChangeWinsOnThePageAsInTheFile() async throws {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
