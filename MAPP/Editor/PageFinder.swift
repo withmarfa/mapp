@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// What the page tells the find bar: its text as the find bar searches it, the selection and the visible
 /// stretch as offsets into that text, and each visible character's box in page coordinates.
@@ -122,24 +123,9 @@ final class PageFinder: NSObject, NSTextFinderClient {
     }
 }
 
-/// Holds the page and, while it shows, the find bar above it. Both stay below the toolbar: WebKit draws a hard
-/// edge under the toolbar over a page that reaches beneath it, and moving the page under it only once scrolled
-/// made the text jump, since WebKit does not keep the text in place as the page moves.
-final class EditorContainer: NSView, NSTextFinderBarContainer {
-    let webView: EditorWebView
+/// The page with the system find bar above it while the bar shows, both under the toolbar.
+final class EditorContainer: WebViewContainer, NSTextFinderBarContainer {
     var onFindBarVisibilityChange: (Bool) -> Void = { _ in }
-
-    init(webView: EditorWebView) {
-        self.webView = webView
-        super.init(frame: .zero)
-        addSubview(webView)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    // WebKit lays a note out for printing on a thread of its own, which asks the views above the page this.
-    nonisolated override var isFlipped: Bool { true }
 
     var findBarView: NSView? {
         didSet {
@@ -165,16 +151,18 @@ final class EditorContainer: NSView, NSTextFinderBarContainer {
         needsLayout = true
     }
 
-    override func layout() {
-        super.layout()
-        var top: CGFloat = 0
-        if isFindBarVisible, let findBarView {
-            // The finder gives the bar its height; until it has, the bar's own fitting height.
-            let height = findBarView.frame.height > 0 ? findBarView.frame.height : findBarView.fittingSize.height
-            findBarView.frame = NSRect(x: 0, y: 0, width: bounds.width, height: height)
-            top = height
-        }
-        webView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+    /// The finder gives the bar its height; until it has, the bar's own fitting height.
+    private var findBarHeight: CGFloat {
+        guard isFindBarVisible, let findBarView else { return 0 }
+        return findBarView.frame.height > 0 ? findBarView.frame.height : findBarView.fittingSize.height
     }
 
+    override var coveredTop: CGFloat { topInset + findBarHeight }
+
+    override func layout() {
+        if isFindBarVisible, let findBarView {
+            findBarView.frame = NSRect(x: 0, y: topInset, width: bounds.width, height: findBarHeight)
+        }
+        super.layout()
+    }
 }

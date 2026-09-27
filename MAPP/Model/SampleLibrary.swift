@@ -239,6 +239,41 @@ Notes as I read.
 - When people make mistakes, the design is usually at fault.
 
 See also [the revised edition](https://en.wikipedia.org/wiki/The_Design_of_Everyday_Things).
+
+## The psychology of everyday actions
+
+- The gulf of execution: working out how to do what you want.
+- The gulf of evaluation: working out whether it happened.
+- Seven stages of action: goal, plan, specify, perform, perceive, interpret, compare.
+- Most everyday actions run on the lower, subconscious stages.
+
+## Knowledge in the head and in the world
+
+- Precise behaviour can come from imprecise knowledge, when the world holds the rest.
+- Constraints narrow the choices: physical, cultural, semantic and logical.
+- Natural mapping puts controls where their effects are.
+- A good design makes the right action the obvious one.
+
+## Knowing what to do
+
+- Forcing functions stop the wrong action before it happens.
+- Interlocks, lock-ins and lockouts are all forcing functions.
+- Conventions are powerful and slow to change.
+- Standardise only when nothing else works.
+
+## Human error? No, bad design
+
+- Slips are errors of action; mistakes are errors of intention.
+- Design for error: make it easy to see, easy to undo.
+- Checklists work when they are short and in the right place.
+- Root cause analysis stops too early when it stops at a person.
+
+## The design challenge
+
+- Solve the right problem: observe, ideate, prototype, test.
+- Human-centred design is iterative by nature.
+- Complexity is fine; confusion is not.
+- Good design is noticed least when it works best.
 """
 
 nonisolated private let giftIdeas = """
