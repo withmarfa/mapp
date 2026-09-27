@@ -1,7 +1,19 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld pt" : {
+
+    },
+    "1 Line" : {
+
+    },
+    "2 Lines" : {
+
+    },
     "A folder named “%@” already exists. Please choose a different name." : {
+
+    },
+    "A note named “%@” is already in this folder. Please choose a different name." : {
 
     },
     "Add Column" : {
@@ -34,6 +46,18 @@
     "All Notes" : {
 
     },
+    "Archive" : {
+
+    },
+    "Archive Note" : {
+
+    },
+    "Attach Image" : {
+
+    },
+    "Attach Image…" : {
+
+    },
     "Block Quote" : {
 
     },
@@ -46,7 +70,25 @@
     "Bulleted List" : {
 
     },
+    "Cancel" : {
+
+    },
+    "Can’t Read the Notes Folder" : {
+
+    },
+    "Change…" : {
+
+    },
+    "Check Spelling While Typing" : {
+
+    },
     "Checklist" : {
+
+    },
+    "Choose Folder…" : {
+
+    },
+    "Choose a Folder for Your Notes" : {
 
     },
     "Code" : {
@@ -58,7 +100,13 @@
     "Column" : {
 
     },
+    "Command Palette" : {
+
+    },
     "Copy" : {
+
+    },
+    "Couldn’t Save “%@”" : {
 
     },
     "Date Created" : {
@@ -79,13 +127,13 @@
     "Delete Folder…" : {
 
     },
-    "Delete Immediately" : {
+    "Delete Immediately…" : {
 
     },
     "Delete Note" : {
 
     },
-    "Delete Note Immediately" : {
+    "Delete Note Immediately…" : {
 
     },
     "Delete Notes" : {
@@ -97,6 +145,30 @@
     "Delete the folder “%@”?" : {
 
     },
+    "Deleted notes stay in Recently Deleted for %lld days, then they’re deleted for good." : {
+
+    },
+    "Empty Now…" : {
+
+    },
+    "Export as PDF…" : {
+
+    },
+    "Find" : {
+
+    },
+    "Find Next" : {
+
+    },
+    "Find Previous" : {
+
+    },
+    "Find and Replace…" : {
+
+    },
+    "Find…" : {
+
+    },
     "Folder Name" : {
 
     },
@@ -106,11 +178,27 @@
     "Format" : {
 
     },
+    "Full Width" : {
+
+    },
     "Group by Date" : {
 
     },
     "Heading" : {
 
+    },
+    "Image" : {
+
+    },
+    "Image %@.%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Image %1$@.%2$@"
+          }
+        }
+      }
     },
     "Inbox" : {
 
@@ -118,10 +206,22 @@
     "Insert Table" : {
 
     },
+    "It may have been moved or deleted. Choose it again in Settings." : {
+
+    },
     "Italic" : {
 
     },
     "Its notes will be moved to Recently Deleted." : {
+
+    },
+    "List Preview" : {
+
+    },
+    "MAPP keeps each note as a markdown file in the folder you choose. Folders inside it become folders in MAPP." : {
+
+    },
+    "More" : {
 
     },
     "Move" : {
@@ -133,7 +233,19 @@
     "Move To" : {
 
     },
+    "Move to %@" : {
+
+    },
+    "Move to Inbox" : {
+
+    },
+    "Name" : {
+
+    },
     "Name Taken" : {
+
+    },
+    "Narrow" : {
 
     },
     "New Folder" : {
@@ -154,16 +266,28 @@
     "No Notes" : {
 
     },
+    "No Results" : {
+
+    },
     "No additional text" : {
 
     },
+    "None" : {
+
+    },
     "Note" : {
+
+    },
+    "Notes Folder" : {
 
     },
     "Numbered List" : {
 
     },
     "Open in New Window" : {
+
+    },
+    "Page Width" : {
 
     },
     "Pin" : {
@@ -181,6 +305,9 @@
     "Previous 7 Days" : {
 
     },
+    "Print…" : {
+
+    },
     "Recently Deleted" : {
 
     },
@@ -193,7 +320,19 @@
     "Redo" : {
 
     },
+    "Rename" : {
+
+    },
     "Rename Folder" : {
+
+    },
+    "Rename Note" : {
+
+    },
+    "Rename Note…" : {
+
+    },
+    "Rename…" : {
 
     },
     "Row" : {
@@ -202,13 +341,34 @@
     "Search" : {
 
     },
+    "Search Commands and Notes" : {
+
+    },
     "Search Notes" : {
+
+    },
+    "Settings…" : {
+
+    },
+    "Share" : {
+
+    },
+    "Show" : {
+
+    },
+    "Show in Finder" : {
 
     },
     "Sort" : {
 
     },
     "Sort By" : {
+
+    },
+    "Standard" : {
+
+    },
+    "Standard Width" : {
 
     },
     "Strikethrough" : {
@@ -218,6 +378,12 @@
 
     },
     "Table" : {
+
+    },
+    "Text Size" : {
+
+    },
+    "The note’s file takes the new name." : {
 
     },
     "Title" : {
@@ -235,7 +401,19 @@
     "Unpin Note" : {
 
     },
+    "Use Selection for Find" : {
+
+    },
+    "Version" : {
+
+    },
+    "Wide" : {
+
+    },
     "Yesterday" : {
+
+    },
+    "You can’t undo this action." : {
 
     },
     "^[%lld note](inflect: true)" : {
@@ -245,6 +423,9 @@
 
     },
     "^[%lld result](inflect: true)" : {
+
+    },
+    "^[Delete %lld note](inflect: true) immediately?" : {
 
     }
   },
