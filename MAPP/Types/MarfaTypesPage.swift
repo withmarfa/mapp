@@ -9,12 +9,14 @@ import WebKit
 /// so the page stays as generated and is refreshed by replacing it whole. Each window makes its page the first
 /// time Marfa Types is shown and keeps it, so the page is where it was left when the window comes back to it.
 ///
-/// The page stops below the toolbar, since WebKit draws a hard edge under the toolbar whenever a page reaches
-/// beneath it. Its list of types is given the page's own background and no divider, so the page reads as one
-/// surface under the toolbar rather than a column that stops short of it.
+/// The page runs under the toolbar as a note does (`WebViewContainer`), and lets the window's background through;
+/// its list of types takes the same background and no divider, so the page reads as one surface.
 @Observable
 final class MarfaTypesPage: NSObject, WKNavigationDelegate {
-    @ObservationIgnored private(set) lazy var webView = makeWebView()
+    /// The page under the toolbar, as the window shows it. It is made, and set up before it loads, the first time
+    /// anything asks for it or its web view.
+    @ObservationIgnored private(set) lazy var container = makeContainer()
+    var webView: WKWebView { container.webView }
     /// The page asks for the toolbar's search, when / is typed as it would have focused its own.
     @ObservationIgnored var onFind: () -> Void = {}
     /// Whether Back and Forward have somewhere to go among the types the page has shown.
@@ -54,7 +56,7 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         }, true);
         """
 
-    private func makeWebView() -> WKWebView {
+    private func makeContainer() -> WebViewContainer {
         let configuration = WKWebViewConfiguration()
         // The page keeps only which of its groups are closed, and only for as long as the window is open.
         configuration.websiteDataStore = .nonPersistent()
@@ -82,8 +84,9 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
                 MainActor.assumeIsolated { self?.canGoForward = webView.canGoForward }
             },
         ]
+        let container = WebViewContainer(webView: webView)
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL)
-        return webView
+        return container
     }
 
     func goBack() { webView.goBack() }
@@ -146,18 +149,32 @@ private final class FindProxy: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// The page across the list and the note, beside the sidebar.
-struct MarfaTypesView: NSViewRepresentable {
+/// The page across the list and the note, beside the sidebar, reaching up under the toolbar as a note's does.
+struct MarfaTypesView: View {
     let page: MarfaTypesPage
 
-    func makeNSView(context: Context) -> WKWebView {
-        page.webView
+    var body: some View {
+        GeometryReader { proxy in
+            MarfaTypesWebView(page: page, topInset: proxy.safeAreaInsets.top)
+                .ignoresSafeArea(.container, edges: .top)
+        }
+    }
+}
+
+private struct MarfaTypesWebView: NSViewRepresentable {
+    let page: MarfaTypesPage
+    let topInset: CGFloat
+
+    func makeNSView(context: Context) -> WebViewContainer {
+        page.container
     }
 
-    func updateNSView(_ webView: WKWebView, context: Context) {}
+    func updateNSView(_ container: WebViewContainer, context: Context) {
+        container.topInset = topInset
+    }
 
     // WebKit lays out badly at fractional sizes, so the proposal is rounded down to whole points.
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: WKWebView, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: WebViewContainer, context: Context) -> CGSize? {
         guard let width = proposal.width, let height = proposal.height else { return nil }
         return CGSize(width: width.rounded(.down), height: height.rounded(.down))
     }

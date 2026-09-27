@@ -340,6 +340,34 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
+    // MARK: The page under the toolbar
+
+    func testALongNoteStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
+        sidebarItem("Reading").click()
+        row(titled: "The Design of Everyday Things").click()
+        let title = page.staticTexts["The Design of Everyday Things"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(title.frame.minY, window.toolbars.firstMatch.frame.maxY, "the note starts below the toolbar")
+        let heading = page.staticTexts["The psychology of everyday actions"].firstMatch
+        var last = heading.frame.minY
+        for _ in 0..<10 {
+            page.scroll(byDeltaX: 0, deltaY: -15)
+            let now = heading.frame.minY
+            // Each step moves the text up by the step, never back and never by a jump.
+            XCTAssertEqual(last - now, 15, accuracy: 4, "the page moved \(last - now) for a 15 point scroll")
+            last = now
+        }
+    }
+
+    func testAShortNoteStaysPutWhenScrolled() {
+        row(titled: "Garden ideas").click()
+        let title = page.staticTexts["Garden ideas"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        let before = title.frame.minY
+        page.scroll(byDeltaX: 0, deltaY: -40)
+        XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
+    }
+
     func testShareAndMoreSitBesideSearch() {
         let more = window.menuButtons["More"]
         let search = window.searchFields.firstMatch
