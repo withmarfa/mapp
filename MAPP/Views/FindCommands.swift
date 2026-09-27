@@ -2,13 +2,16 @@ import AppKit
 import SwiftUI
 
 /// Edit > Find, as TextEdit and Notes lay it out, acting on the note whose page the window shows through the
-/// system find bar. Search Notes keeps ⌥⌘F, as in Notes, so Find and Replace has no shortcut of its own.
+/// system find bar. Search Notes leads it with ⌥⌘F, as in Notes, so Find and Replace has no shortcut of its own.
 struct FindCommands: Commands {
     @FocusedValue(\.editor) private var editor
 
     var body: some Commands {
         CommandGroup(after: .textEditing) {
             Menu("Find", systemImage: "magnifyingglass") {
+                SearchNotesButton()
+                    .keyboardShortcut("f", modifiers: [.command, .option])
+                Divider()
                 item("Find…", systemImage: "magnifyingglass", .showFindInterface)
                     .keyboardShortcut("f")
                 item("Find and Replace…", systemImage: "arrow.left.arrow.right", .showReplaceInterface)

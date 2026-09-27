@@ -4,6 +4,7 @@ import SwiftUI
 enum OrderKey {
     static let sort = "noteSort"
     static let groupsByDate = "groupsByDate"
+    static let all = [sort, groupsByDate]
 }
 
 /// The list's sort and grouping, offered alike by the View menu, the list's toolbar and Settings.

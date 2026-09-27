@@ -8,6 +8,7 @@ struct NoteList: View {
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
+    @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
 
     var body: some View {
         // Reading the counter ties the dates and sections to the day changing, so "Today" moves at midnight.
@@ -34,7 +35,8 @@ struct NoteList: View {
                     NoteRow(
                         note: note,
                         dateLabel: NoteDate.listLabel(for: order.sort.date(of: note), now: now),
-                        folderName: browser.showsFolders ? folderName(for: note) : nil
+                        folderName: browser.showsFolders ? folderName(for: note) : nil,
+                        previewLines: previewLines
                     )
                     .draggable(containerItemID: note.id)
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
@@ -118,12 +120,13 @@ struct NoteList: View {
     }
 }
 
-/// Laid out as Mail lays out a message, so the date lines up at the trailing edge and two lines of preview
-/// keep every row the same height.
+/// Laid out as Mail lays out a message, so the date lines up at the trailing edge, and the preview's lines are
+/// reserved whether the note fills them or not, keeping every row the same height.
 struct NoteRow: View {
     let note: Note
     let dateLabel: String
     let folderName: String?
+    let previewLines: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -138,10 +141,12 @@ struct NoteRow: View {
                     .lineLimit(1)
                     .layoutPriority(1)
             }
-            Text(note.preview)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(2, reservesSpace: true)
+            if previewLines > 0 {
+                Text(note.preview)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(previewLines, reservesSpace: true)
+            }
             if let folderName {
                 Label(folderName, systemImage: "folder")
                     .font(.caption)

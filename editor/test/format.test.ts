@@ -555,3 +555,14 @@ test('a width in a table cell is escaped where the cell needs it and read back',
     editor.format('alignColumn', 'center')
     expect(editor.markdown()).toContain('![Photo\\|400](Attachments/a.png)')
   }))
+
+test('spelling is checked as typed unless the app turns it off', async () => {
+  await withNoteEditor('Teh plan', (editor) => {
+    const dom = ctxOf(editor).get(editorViewCtx).dom
+    expect(dom.getAttribute('spellcheck')).toBe('true')
+    editor.setSpellcheck(false)
+    expect(dom.getAttribute('spellcheck')).toBe('false')
+    editor.setSpellcheck(true)
+    expect(dom.getAttribute('spellcheck')).toBe('true')
+  })
+})

@@ -40,6 +40,17 @@ struct MAPPApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let folder = NotesFolder()
 
+    override init() {
+        #if DEBUG
+        // The sample folder starts as a person's first launch does, whatever an earlier run chose, so no UI test
+        // inherits another's settings.
+        if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
+            for key in OrderKey.all + PageKey.all + ListKey.all { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        #endif
+        super.init()
+    }
+
     /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
     /// get their files, and the store finishes writing, before the app goes.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

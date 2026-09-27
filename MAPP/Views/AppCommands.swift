@@ -6,6 +6,7 @@ struct AppCommands: Commands {
     let library: NoteLibrary?
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
+    @FocusedValue(\.editor) private var editor
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
 
@@ -60,12 +61,18 @@ struct AppCommands: Commands {
             .disabled(browser?.selectedFolder == nil)
         }
 
+        // ⌘P is Search Notes, so Print takes ⇧⌘P, which Page Setup would have had; the print panel sets the paper.
+        CommandGroup(replacing: .printItem) {
+            Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
+                .disabled(editor?.hasNote != true)
+            Button("Print…", systemImage: "printer") { editor?.printNote() }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(editor?.hasNote != true)
+        }
+
         CommandGroup(after: .textEditing) {
-            Button("Search Notes", systemImage: "magnifyingglass") {
-                browser?.focusRequest = .search
-            }
-            .keyboardShortcut("f", modifiers: [.command, .option])
-            .disabled(browser == nil)
+            SearchNotesButton()
+                .keyboardShortcut("p")
         }
 
         CommandGroup(before: .sidebar) {
@@ -77,5 +84,17 @@ struct AppCommands: Commands {
 
         // There is no help book yet, and a Help item that only says so is not worth showing.
         CommandGroup(replacing: .help) {}
+    }
+}
+
+/// Search in the window in front: ⌘P from the Edit menu, and ⌥⌘F under Find, as Notes has it.
+struct SearchNotesButton: View {
+    @FocusedValue(\.browser) private var browser
+
+    var body: some View {
+        Button("Search Notes", systemImage: "magnifyingglass") {
+            browser?.focusRequest = .search
+        }
+        .disabled(browser == nil)
     }
 }

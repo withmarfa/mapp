@@ -191,6 +191,15 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
     }
 
+    func testCommandPSearchesNotesFromThePage() {
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        editor.click()
+        app.typeKey("p", modifierFlags: .command)
+        app.typeText("ragu")
+        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
+        XCTAssertFalse(text.contains("ragu"), "the search field took the typing, not the page")
+    }
+
     func testAFolderIsRenamedFromTheMenuAndDeletedWithTheDeleteKey() {
         sidebarItem("Reading").click()
         app.menuBars.menuBarItems["File"].click()
@@ -298,9 +307,13 @@ final class WindowTests: XCTestCase {
             case .parentChild: return true
             case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
             case .contrast:
+                // A row cut off at the pane's edge still belongs to the pane.
+                @MainActor func isIn(_ pane: CGRect) -> Bool {
+                    element.frame.intersects(pane) && element.frame.minX >= pane.minX && element.frame.maxX <= pane.maxX
+                }
                 let isListTitle = element.frame.minY < listFrame.minY
                     && element.frame.minX >= listFrame.minX && element.frame.maxX <= listFrame.maxX
-                return sidebarFrame.contains(element.frame) || listFrame.contains(element.frame) || isListTitle
+                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }
