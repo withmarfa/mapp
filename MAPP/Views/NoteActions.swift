@@ -35,7 +35,8 @@ struct NoteActions: View {
                 Button(inMenuBar ? "Archive Note" : "Archive", systemImage: "archivebox") {}
                     .disabled(true)
                 Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
-                    library.delete(ids, undoManager: undoManager)
+                    // What was just typed reaches the note before it goes, since a deleted note takes no edit.
+                    EditorController.flushAll(leaving: false) { [ids, undoManager] in library.delete(ids, undoManager: undoManager) }
                 }
             }
             .disabled(notes.isEmpty)

@@ -120,19 +120,19 @@ final class EditorController: NSObject {
         guard isReady else { return }
         call("setImageBase", json(library?.directory(of: note) ?? note.directory))
         generation += 1
-        // A late report can only belong to the load before this one.
-        notesByGeneration = notesByGeneration.filter { $0.key >= generation - 1 }
+        // A late report belongs to one of the last few loads, however quickly outside changes came in.
+        notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
         notesByGeneration[generation] = note.id
         call(function, json(note.body), String(generation), String(isEditable))
     }
 
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
-    /// and then leaves the note. The page answers in order, so this lands before anything asked of it later.
-    /// The reply keeps this controller alive until it arrives.
-    func flush(then done: @escaping () -> Void = {}) {
+    /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
+    /// anything asked of it later. The reply keeps this controller alive until it arrives.
+    func flush(leaving: Bool = true, then done: @escaping () -> Void = {}) {
         guard let noteID else { return done() }
         guard isReady else {
-            onLeave(noteID)
+            if leaving { onLeave(noteID) }
             return done()
         }
         webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
@@ -140,17 +140,18 @@ final class EditorController: NSObject {
                 if noteID == self.noteID { self.markdown = markdown }
                 onChange(noteID, markdown)
             }
-            onLeave(noteID)
+            if leaving { onLeave(noteID) }
             done()
         }
     }
 
-    /// Hands over every open editor's last edit, then carries on. A page that does not answer within a couple
-    /// of seconds is not waited for.
-    static func flushAll(then done: @escaping () -> Void) {
+    /// Hands over every open editor's last edit, then carries on; with `leaving` off, the pages stay on their
+    /// notes, as before a note is deleted, since a note in Recently Deleted takes no edit. A page that does not
+    /// answer within a couple of seconds is not waited for.
+    static func flushAll(leaving: Bool = true, then done: @escaping () -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
-        for editor in editors { editor.flush(then: gate.arrive) }
+        for editor in editors { editor.flush(leaving: leaving, then: gate.arrive) }
         Task {
             try? await Task.sleep(for: .seconds(2))
             gate.open()

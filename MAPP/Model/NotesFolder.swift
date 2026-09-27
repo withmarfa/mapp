@@ -13,6 +13,9 @@ final class NotesFolder {
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var watcher: FolderWatcher?
+    /// Has every open page hand over its last edit, then carries on; the app sets it, since the pages are not
+    /// the model's to know.
+    @ObservationIgnored var handOverEdits: (@escaping () -> Void) -> Void = { $0() }
     private static let bookmarkKey = "notesFolder"
 
     init(defaults: UserDefaults = .standard) {
@@ -54,8 +57,27 @@ final class NotesFolder {
     private func start(_ library: NoteLibrary, watching url: URL) {
         self.library = library
         // Watching starts before the folder is read, so a change made while it is read is taken in after.
-        watcher = FolderWatcher(url) { library.refresh() }
+        watcher = FolderWatcher(url, changed: { library.refresh() }, rootChanged: { [weak self] in self?.follow() })
         Task { await library.load() }
+    }
+
+    /// The notes folder itself was moved or renamed, in the Finder say. Its bookmark knows where it went, and
+    /// the notes are read from there. A folder deleted leaves the library as it is, which says it cannot read it.
+    private func follow() {
+        guard let bookmark = defaults.data(forKey: Self.bookmarkKey) else {
+            library?.refresh()
+            return
+        }
+        var isStale = false
+        guard let moved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale),
+              moved.standardizedFileURL != url?.standardizedFileURL,
+              FileManager.default.fileExists(atPath: moved.path)
+        else {
+            library?.refresh()
+            return
+        }
+        log.info("the notes folder moved")
+        handOverEdits { [self] in choose(moved) }
     }
 
     private func remember(_ url: URL) {

@@ -27,7 +27,7 @@ final class NoteLibrary {
     /// When each note was first found missing from the folder. Some apps save by taking a file away and writing
     /// it again, so a note goes only once it has stayed away a moment.
     @ObservationIgnored private var missingSince: [Note.ID: Date] = [:]
-    private static let missingGrace: TimeInterval = 2
+    @ObservationIgnored var missingGrace: TimeInterval = 2
     /// Notes changed on a page since it was last left, whose names may need to follow their first lines.
     @ObservationIgnored private var edited: Set<Note.ID> = []
     /// A new note still being typed on its first line is written once the typing pauses this long, so a
@@ -62,6 +62,9 @@ final class NoteLibrary {
             let name = (path as NSString).lastPathComponent
             self?.failure = (String(localized: "Couldn’t Save “\(name)”"), message)
             self?.unsaved.insert(path)
+            // What the folder holds is read again, so a change that did not happen, a folder not renamed say,
+            // is not taken to have.
+            self?.refresh()
         }
     }
 
@@ -141,29 +144,47 @@ final class NoteLibrary {
         Task { await reread() }
     }
 
+    /// One reading at a time, taken again while anything changed during it. A reading taken while the library
+    /// handed the store more changes is set aside until those changes stop, as when someone is typing, since
+    /// they may not be in it.
     func reread() async {
         guard let store, isLoaded else { return }
-        isRefreshing = true
-        needsRefresh = false
-        let generation = queued
-        let stored = await Task.detached { try? store.load() }.value
-        isRefreshing = false
-        guard let stored else {
-            failure = Self.unreadable
+        // A reading under way takes this one in, and this waits for it.
+        guard !isRefreshing else {
+            needsRefresh = true
+            while isRefreshing { try? await Task.sleep(for: .milliseconds(20)) }
             return
         }
-        // A reading taken while the library handed the store more changes is set aside and taken again after a
-        // pause, since those changes may not be in it.
-        if generation != queued {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        repeat {
+            needsRefresh = false
+            let generation = queued
+            let stored = await Task.detached { try? store.load() }.value
+            guard let stored else {
+                failure = Self.unreadable
+                return
+            }
+            if generation != queued {
+                await settle()
+                needsRefresh = true
+                continue
+            }
+            reconcile(stored)
+            if !missingSince.isEmpty {
+                try? await Task.sleep(for: .seconds(missingGrace))
+                needsRefresh = true
+            }
+        } while needsRefresh
+    }
+
+    /// Waits until the library has handed the store nothing new for a moment.
+    private func settle() async {
+        var seen = -1
+        while seen != queued {
+            seen = queued
             try? await Task.sleep(for: .milliseconds(500))
-            return await reread()
         }
-        reconcile(stored)
-        if !missingSince.isEmpty {
-            try? await Task.sleep(for: .seconds(Self.missingGrace))
-            needsRefresh = true
-        }
-        if needsRefresh { await reread() }
     }
 
     /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added or
@@ -180,6 +201,7 @@ final class NoteLibrary {
 
         var updated = notes
         var onDisk = Dictionary(stored.notes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        let onDiskText = onDisk.mapValues(\.text)
         var seen: Set<Note.ID> = []
         func take(_ disk: StoredNote, at index: Int) {
             seen.insert(updated[index].id)
@@ -232,9 +254,14 @@ final class NoteLibrary {
             guard !note.isDeleted, !note.isDraft, !seen.contains(note.id), !unsaved.contains(note.path ?? "") else { return false }
             let since = missingSince[note.id] ?? now
             missingSince[note.id] = since
-            return now.timeIntervalSince(since) >= Self.missingGrace
+            return now.timeIntervalSince(since) >= missingGrace
         }
         missingSince = missingSince.filter { id, _ in updated.contains { $0.id == id } }
+        // A failed change is behind a note once the folder holds what the note does, or no note is there.
+        unsaved = unsaved.filter { path in
+            guard let note = updated.first(where: { $0.path == path && !$0.isDeleted }) else { return false }
+            return onDiskText[path] != note.file.text
+        }
         if updated != notes { notes = updated }
     }
 

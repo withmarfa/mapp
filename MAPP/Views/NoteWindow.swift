@@ -6,14 +6,14 @@ struct NoteWindow: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @State private var editor = EditorController()
     @Binding var path: String?
+    let editor: EditorController
     @State private var id: Note.ID?
 
     private var note: Note? { id.flatMap { library.note($0) } }
 
     var body: some View {
-        Group {
+        ZStack {
             if let note {
                 NotePage(note: note, editor: editor)
                     .navigationTitle(note.title)
@@ -40,6 +40,9 @@ struct NoteWindow: View {
             if let moved = note?.path { path = moved }
         }
         .onChange(of: note == nil) { if library.isLoaded, note == nil { dismiss() } }
+        // Another notes folder is another library, which does not hold this window's note.
+        .onChange(of: ObjectIdentifier(library)) { dismiss() }
         .onDisappear { editor.flush() }
+        .libraryDialogs()
     }
 }

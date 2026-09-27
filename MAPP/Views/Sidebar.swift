@@ -55,6 +55,7 @@ struct Sidebar: View {
             Button("New Folder", systemImage: "plus.circle") {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
             }
+                .disabled(!library.isLoaded)
                 .buttonStyle(.borderless)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
@@ -66,7 +67,9 @@ struct Sidebar: View {
             presenting: folderToDelete
         ) { folder in
             Button("Delete Folder", role: .destructive) {
-                library.deleteFolder(folder.id, undoManager: undoManager)
+                EditorController.flushAll(leaving: false) { [undoManager] in
+                    library.deleteFolder(folder.id, undoManager: undoManager)
+                }
             }
         } message: { _ in
             Text("Its notes will be moved to Recently Deleted.")

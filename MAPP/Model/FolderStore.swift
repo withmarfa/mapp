@@ -153,6 +153,11 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func make(_ change: StoreChange) throws {
+        // A notes folder moved or deleted is never made again where it was, which would scatter notes there.
+        var isDirectory: ObjCBool = false
+        guard files.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: root.path])
+        }
         switch change {
         case .create(let path, let text):
             aliases[path] = nil
@@ -175,11 +180,15 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         case .trash(let path, let id, let date):
             let source = url(path)
             guard let note = read(source, path: path) else { return }
-            try files.createDirectory(at: bin, withIntermediateDirectories: true)
-            try move(source, to: binURL(id))
-            var manifest = readManifest()
-            manifest.append(BinEntry(id: id, path: path, trashed: date, created: note.created, modified: note.modified))
-            try writeManifest(manifest)
+            // The entry is written first, so a file in the bin is never there without one saying where it was.
+            let manifest = readManifest()
+            try writeManifest(manifest + [BinEntry(id: id, path: path, trashed: date, created: note.created, modified: note.modified)])
+            do {
+                try move(source, to: binURL(id))
+            } catch {
+                try? writeManifest(manifest)
+                throw error
+            }
         case .restore(let id, let path):
             aliases[path] = nil
             let target = available(url(path))
@@ -311,9 +320,28 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
 
     private var manifestURL: URL { bin.appending(path: "Trash.json") }
 
+    /// The bin's list of what it holds. A list that cannot be read is set aside, never written over, and made
+    /// again from the notes in the bin, each to come back at the top of the notes folder under its first line,
+    /// since where it was went with the list.
     private func readManifest() -> [BinEntry] {
         guard let data = try? Data(contentsOf: manifestURL) else { return [] }
-        return (try? JSONDecoder().decode([BinEntry].self, from: data)) ?? []
+        if let manifest = try? JSONDecoder().decode([BinEntry].self, from: data) { return manifest }
+        log.error("the trash list could not be read; it is kept aside and made again")
+        let aside = bin.appending(path: "Trash \(Int(Date.now.timeIntervalSince1970)).json")
+        try? files.moveItem(at: manifestURL, to: aside)
+        let keys: [URLResourceKey] = [.creationDateKey, .contentModificationDateKey]
+        let found = (try? files.contentsOfDirectory(at: bin, includingPropertiesForKeys: keys)) ?? []
+        let manifest = found.compactMap { url -> BinEntry? in
+            guard url.pathExtension == "md", let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                  let text = try? String(contentsOf: url, encoding: .utf8)
+            else { return nil }
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            let modified = values?.contentModificationDate ?? .now
+            let name = NoteText.fileName(for: NoteFile(text: text).body)
+            return BinEntry(id: id, path: "\(name).md", trashed: modified, created: values?.creationDate ?? modified, modified: modified)
+        }
+        try? writeManifest(manifest)
+        return manifest
     }
 
     private func writeManifest(_ manifest: [BinEntry]) throws {
