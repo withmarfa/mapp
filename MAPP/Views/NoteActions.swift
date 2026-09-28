@@ -35,8 +35,7 @@ struct NoteActions: View {
                 Button(inMenuBar ? "Archive Note" : "Archive", systemImage: "archivebox") {}
                     .disabled(true)
                 Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
-                    // What was just typed reaches the note before it goes, since a deleted note takes no edit.
-                    EditorController.flushAll(leaving: false) { [ids, undoManager] in library.delete(ids, undoManager: undoManager) }
+                    library.deleteAfterSaving(ids, undoManager: undoManager)
                 }
             }
             .disabled(notes.isEmpty)
@@ -62,5 +61,13 @@ struct NoteActions: View {
                     .disabled(notes.allSatisfy { $0.folderID == folder.id && !$0.isDeleted })
             }
         }
+    }
+}
+
+extension NoteLibrary {
+    /// Moves notes to Recently Deleted once every open page has handed over what was just typed, since a deleted
+    /// note takes no edit. Every way of deleting a note comes through here.
+    func deleteAfterSaving(_ ids: Set<Note.ID>, undoManager: UndoManager?) {
+        EditorController.flushAll(leaving: false) { [self] in delete(ids, undoManager: undoManager) }
     }
 }

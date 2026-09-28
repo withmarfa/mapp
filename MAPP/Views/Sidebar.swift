@@ -141,7 +141,7 @@ struct Sidebar: View {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .pinned: library.setPinned(ids, true, undoManager: undoManager)
-        case .recentlyDeleted: library.delete(ids, undoManager: undoManager)
+        case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
         case .allNotes, .marfaTypes: break
         }
     }

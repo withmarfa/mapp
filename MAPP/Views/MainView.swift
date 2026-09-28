@@ -9,7 +9,6 @@ struct MainView: View {
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
-    @State private var typesQuery = ""
     @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
@@ -32,7 +31,7 @@ struct MainView: View {
                         .toolbar {
                             ColumnSearch(
                                 isExpanded: $browser.isSearchExpanded,
-                                text: $typesQuery,
+                                text: $browser.typesQuery,
                                 prompt: String(localized: "Search Types"),
                                 columnWidth: typesListWidth,
                                 focusRequests: browser.searchFocusRequests,
@@ -58,7 +57,7 @@ struct MainView: View {
                 NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
             }
         }
-        .onChange(of: typesQuery) { types.search(typesQuery) }
+        .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 ZStack(alignment: .top) {

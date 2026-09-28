@@ -188,6 +188,13 @@ final class MarfaTypesPage: NSObject, WKNavigationDelegate {
         if !fragment.isEmpty { move(webView, to: fragment) }
     }
 
+    /// A part whose page process ended loads again, and takes the type and search back once it has.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        loaded.remove(ObjectIdentifier(webView))
+        webView.isHidden = true
+        webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL)
+    }
+
     /// The page moves between its own sections by fragment. A web link opens in the browser, since this page
     /// never leaves itself, and anything else is refused.
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {

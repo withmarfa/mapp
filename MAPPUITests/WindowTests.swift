@@ -225,6 +225,19 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
     }
 
+    func testCommandZInTheSearchFieldLeavesThePageAlone() {
+        row(titled: "Garden ideas").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
+        app.typeKey(.return, modifierFlags: [])
+        app.typeText(" Draft")
+        XCTAssertTrue(waitForText("CONTAINS", "Draft"))
+        app.typeKey("f", modifierFlags: [.command, .option])
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
+        app.typeText("garden")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(waitForText("CONTAINS", "Draft"), "the note kept its typing; ⌘Z was the field's")
+    }
+
     func testOptionCommandFReturnsToAnOpenSearch() {
         app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
@@ -444,6 +457,17 @@ final class WindowTests: XCTestCase {
         open("marfa types")
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
         XCTAssertFalse(sidebar.exists, "the sidebar stays as it was left")
+    }
+
+    func testAMarfaTypesSearchEndsWhenAnotherPlaceIsPicked() {
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        app.typeKey("f", modifierFlags: .command)
+        app.typeText("calendar")
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForNonExistence(timeout: 2))
+        sidebarItem("Inbox").click()
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 3), "the whole list is back")
     }
 
     func testTheToolbarSearchesMarfaTypes() {

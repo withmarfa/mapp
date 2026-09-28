@@ -21,6 +21,8 @@ final class Browser {
     var palette: Palette?
     /// Whether the list's search is out as a field, rather than a button beside Sort.
     var isSearchExpanded = false
+    /// What Marfa Types' page is searched for.
+    var typesQuery = ""
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
 
@@ -76,6 +78,7 @@ final class Browser {
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
         searchText = ""
+        typesQuery = ""
         isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)
