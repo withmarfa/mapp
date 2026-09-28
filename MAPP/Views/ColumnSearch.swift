@@ -102,9 +102,14 @@ struct ColumnSearchField: NSViewRepresentable {
 }
 
 final class FocusingSearchField: NSSearchField {
+    private var hasAppeared = false
+
+    // Once only: the toolbar moves its items between windows (full screen, Customize Toolbar, overflow), and an
+    // open field should not take the keyboard from the page each time.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard window != nil else { return }
+        guard window != nil, !hasAppeared else { return }
+        hasAppeared = true
         // The toolbar places the field once this returns; asked any sooner, the window keeps the keyboard where it was.
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window else { return }

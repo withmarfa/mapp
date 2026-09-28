@@ -80,9 +80,13 @@ final class EditorWebView: WKWebView {
 
     // WebKit answers Command-Z itself, from its own undo manager, before the Edit menu sees the key, so the key
     // comes here, where the page's history and then the window's are asked in turn.
+    // AppKit offers a key equivalent to every view in the window, so only a page with the keyboard takes it; a
+    // search field or a folder's name being edited undoes its own typing.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
-        guard event.charactersIgnoringModifiers?.lowercased() == "z" else { return super.performKeyEquivalent(with: event) }
+        guard window?.firstResponder === self, event.charactersIgnoringModifiers?.lowercased() == "z" else {
+            return super.performKeyEquivalent(with: event)
+        }
         switch modifiers {
         case .command:
             undo(nil)

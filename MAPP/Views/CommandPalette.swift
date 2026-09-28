@@ -223,7 +223,7 @@ struct CommandPalette: View {
                 add(String(localized: "Move to \(folder.name)"), "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
             }
             add(String(localized: "Delete Note"), "trash") {
-                EditorController.flushAll(leaving: false) { [library, undoManager] in library.delete(ids, undoManager: undoManager) }
+                library.deleteAfterSaving(ids, undoManager: undoManager)
             }
         }
 
