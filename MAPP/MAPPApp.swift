@@ -43,9 +43,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     override init() {
         #if DEBUG
         // The sample folder starts as a person's first launch does, whatever an earlier run chose, so no UI test
-        // inherits another's settings.
+        // inherits another's settings, a hidden sidebar or a dragged column among them, which the window keeps.
         if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
-            for key in OrderKey.all + PageKey.all + ListKey.all { UserDefaults.standard.removeObject(forKey: key) }
+            let defaults = UserDefaults.standard
+            let columns = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("NSSplitView Subview Frames") }
+            for key in OrderKey.all + PageKey.all + ListKey.all + columns { defaults.removeObject(forKey: key) }
         }
         #endif
         super.init()

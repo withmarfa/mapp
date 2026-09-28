@@ -10,45 +10,51 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @FocusState private var isSearchFocused: Bool
-    @FocusState private var isTypesSearchFocused: Bool
     @State private var typesQuery = ""
     @State private var noteName = ""
     @State private var takenNoteName: String?
 
     var body: some View {
-        // Marfa Types has no list, so its page takes the list's column and the note's together.
-        Group {
-            if browser.showsTypes {
-                NavigationSplitView {
-                    sidebar
-                } detail: {
-                    MarfaTypesView(page: types)
+        // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
+        // the window never changes its columns (see MarfaTypesPage).
+        NavigationSplitView {
+            Sidebar(browser: browser, order: order)
+                // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
+                .focused($pane, equals: .sidebar)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+        } content: {
+            Group {
+                if browser.showsTypes {
+                    MarfaTypesView(part: types.list)
                         .navigationTitle(library.name(of: .marfaTypes))
+                } else {
+                    NoteList(browser: browser, order: order, pane: $pane)
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
+        } detail: {
+            Group {
+                if browser.showsTypes {
+                    MarfaTypesView(part: types.content)
                         // The note that was on the page is out of sight, so it is left.
                         .onAppear { editor.close() }
-                }
-                // The page's own search, in the toolbar where the notes' search is everywhere else.
-                .searchable(text: $typesQuery, placement: .toolbar, prompt: Text("Search Types"))
-                .searchFocused($isTypesSearchFocused)
-                .onSubmit(of: .search) { types.openFirstMatch() }
-                .onChange(of: typesQuery) { types.search(typesQuery) }
-            } else {
-                NavigationSplitView {
-                    sidebar
-                } content: {
-                    NoteList(browser: browser, order: order, pane: $pane)
-                        .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
-                } detail: {
+                } else {
                     NoteDetail(browser: browser, editor: editor)
-                        .toolbar(id: "main") {
-                            NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
-                        }
                 }
-                // Only the notes are searched here; Marfa Types has a search of its own.
-                .searchable(text: $browser.searchText, placement: .toolbar)
-                .searchFocused($isSearchFocused)
+            }
+            .toolbar(id: "main") {
+                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
             }
         }
+        // One search field: Marfa Types' page where it shows, the notes everywhere else.
+        .searchable(
+            text: browser.showsTypes ? $typesQuery : $browser.searchText,
+            placement: .toolbar,
+            prompt: browser.showsTypes ? Text("Search Types") : Text("Search")
+        )
+        .searchFocused($isSearchFocused)
+        .onSubmit(of: .search) { if browser.showsTypes { types.openFirstMatch() } }
+        .onChange(of: typesQuery) { types.search(typesQuery) }
         .background(SearchBesideTrailingItems())
         .overlay(alignment: .top) {
             if browser.isShowingPalette {
@@ -74,7 +80,6 @@ struct MainView: View {
         }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
-        .onChange(of: browser.showsTypes, grantFocusRequest)
         .onChange(of: browser.snapshot(in: library)) { _, snapshot in
             storedBrowser = try? JSONEncoder().encode(snapshot)
         }
@@ -107,24 +112,17 @@ struct MainView: View {
         }
     }
 
-    /// Search Notes from Marfa Types goes to All Notes first, and its search field takes the keyboard once shown.
+    /// Search Notes from Marfa Types goes to All Notes, whose notes the field then searches.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.showsTypes { return browser.show(.allNotes, in: library, order: order) }
+            if browser.showsTypes { browser.show(.allNotes, in: library, order: order) }
             isSearchFocused = true
-        case .typesSearch: isTypesSearchFocused = true
+        case .typesSearch: isSearchFocused = true
         case .sidebar, .list: pane = browser.focusRequest
         case .page, nil: return
         }
         browser.focusRequest = nil
-    }
-
-    private var sidebar: some View {
-        Sidebar(browser: browser, order: order)
-            // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
-            .focused($pane, equals: .sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
     }
 
     /// A name another note in the folder has is refused with an alert, as the Finder does.

@@ -21,27 +21,36 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "format") {
             FormatMenu(editor: editor, note: editableNote)
         }
+        .hidden(showsTypes)
         ToolbarItem(id: "checklist") {
             FormatButton(format: .checklist, systemImage: "checklist", editor: editor, note: editableNote)
         }
+        .hidden(showsTypes)
         ToolbarItem(id: "table") {
             FormatButton(format: .table, systemImage: "tablecells", editor: editor, note: editableNote)
         }
+        .hidden(showsTypes)
         ToolbarItem(id: "attach") {
             Button("Attach Image", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .help("Attach Image")
                 .disabled(editableNote == nil)
         }
+        .hidden(showsTypes)
 
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
             NoteShareLink(note: notes.count == 1 ? notes.first : nil)
                 .help("Share")
         }
+        .hidden(showsTypes)
         ToolbarItem(id: "more") {
             MoreMenu(notes: notes, browser: browser)
         }
+        .hidden(showsTypes)
     }
+
+    /// Marfa Types shows a page, not a note, so the tools for notes step aside.
+    private var showsTypes: Bool { browser?.showsTypes == true }
 
     /// The one note shown, when it can be written in; the formatting tools act on nothing else.
     private var editableNote: Note? {

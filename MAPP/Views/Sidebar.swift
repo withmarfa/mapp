@@ -53,7 +53,8 @@ struct Sidebar: View {
         .onChange(of: browser.folderToDelete) {
             if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // A bar rather than an inset, so folders scrolling under the places fade as content does under a toolbar.
+        .safeAreaBar(edge: .bottom, spacing: 0) {
             places
                 .padding(.bottom, 8)
         }
