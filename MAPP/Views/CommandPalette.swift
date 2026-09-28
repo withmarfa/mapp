@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. Arrow
-/// keys choose, Return runs, and Escape or a click outside puts it away. It offers only what could be done now,
-/// so what it lists is what the menus have enabled.
+/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⌘P: the
+/// same field searching the text of every note, each found note shown with the words around what was found.
+/// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
+/// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
@@ -11,6 +12,7 @@ struct CommandPalette: View {
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     let browser: Browser
     let editor: EditorController
+    let mode: Browser.Palette
     @State private var query = ""
     @State private var highlighted = 0
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
@@ -21,8 +23,12 @@ struct CommandPalette: View {
         let id: String
         let title: String
         var detail: String?
+        /// The words around what a search found.
+        var snippet: String?
         let systemImage: String
         var shortcut: String?
+        /// Opens the other palette, which takes the keyboard itself.
+        var opensPalette = false
         let action: () -> Void
     }
 
@@ -32,12 +38,12 @@ struct CommandPalette: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search Commands and Notes", text: $query)
+                TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($isFieldFocused)
                     .onSubmit { run(entries) }
-                    .onExitCommand(perform: close)
+                    .onExitCommand { close() }
                     .accessibilityIdentifier("CommandPaletteField")
             }
             .padding(12)
@@ -98,12 +104,22 @@ struct CommandPalette: View {
             Image(systemName: entry.systemImage)
                 .frame(width: 20)
                 .foregroundStyle(isHighlighted ? .white : .secondary)
-            Text(entry.title)
-                .lineLimit(1)
-            if let detail = entry.detail {
-                Text(detail)
-                    .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 10) {
+                    Text(entry.title)
+                        .lineLimit(1)
+                    if let detail = entry.detail {
+                        Text(detail)
+                            .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
+                            .lineLimit(1)
+                    }
+                }
+                if let snippet = entry.snippet {
+                    Text(snippet)
+                        .font(.callout)
+                        .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             if let shortcut = entry.shortcut {
@@ -126,24 +142,41 @@ struct CommandPalette: View {
     private func run(_ entries: [Entry], at index: Int? = nil) {
         let index = index ?? highlighted
         guard entries.indices.contains(index) else { return }
-        close()
+        close(returningFocus: !entries[index].opensPalette)
         entries[index].action()
     }
 
-    private func close() {
-        browser.isShowingPalette = false
-        if browser.focusRequest == nil { browser.focusRequest = returnFocus }
+    private func close(returningFocus: Bool = true) {
+        browser.palette = nil
+        if returningFocus, browser.focusRequest == nil { browser.focusRequest = returnFocus }
     }
 
     // MARK: What it offers
 
     private func matching(_ entries: [Entry]) -> [Entry] {
-        PaletteMatch.ranked(entries.map(\.title), query).map { entries[$0] }
+        // A search's results are already what it found, most recently edited first.
+        mode == .search ? entries : PaletteMatch.ranked(entries.map(\.title), query).map { entries[$0] }
     }
 
     /// The commands first, then the places, then the notes, the order in which equally good matches are listed.
     private var entries: [Entry] {
-        commands + places + (query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : notes)
+        if mode == .search { return found }
+        return commands + places + (query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : notes)
+    }
+
+    /// Notes whose text has what was typed, or the most recently edited before anything is.
+    private var found: [Entry] {
+        let isEmpty = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let notes = isEmpty ? library.notes(in: .allNotes) : library.notes(matching: query)
+        return notes.sorted { $0.modified > $1.modified }.prefix(isEmpty ? 12 : 50).map { note in
+            let folder = note.folderID.flatMap { library.folder($0)?.name } ?? String(localized: "Inbox")
+            // Found in the title, the note is known by its title, and its preview says more than the title again.
+            let inTitle = note.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            let snippet = isEmpty || inTitle ? note.preview : NoteText.snippet(of: note.body, around: query) ?? note.preview
+            return Entry(id: "note:\(note.id)", title: note.title, detail: folder, snippet: snippet, systemImage: "note.text") {
+                reveal(note)
+            }
+        }
     }
 
     private var commands: [Entry] {
@@ -161,7 +194,10 @@ struct CommandPalette: View {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
             }
         }
-        add(String(localized: "Search Notes"), "magnifyingglass", "⌘P") { browser.focusRequest = .search }
+        let search = String(localized: "Search Notes")
+        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⌘P", opensPalette: true) {
+            browser.palette = .search
+        })
 
         if let one, !one.isDeleted {
             for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
