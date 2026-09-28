@@ -377,14 +377,17 @@ final class WindowTests: XCTestCase {
 
     // MARK: Marfa Types
 
+    /// The chosen type, where a note would be.
     private var typesPage: XCUIElement { window.groups["MarfaTypes"].webViews.firstMatch }
+    /// The page's list of types, where the note list would be.
+    private var typesList: XCUIElement { window.groups["MarfaTypesList"].webViews.firstMatch }
 
     func testMarfaTypesTakesTheListAndThePageUntilAnotherPlaceIsPicked() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
         XCTAssertTrue(list.waitForNonExistence(timeout: 2), "the page takes the list's column")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 2), "and the note's")
-        let person = typesPage.links["Person"].firstMatch
+        let person = typesList.links["Person"].firstMatch
         XCTAssertTrue(person.waitForExistence(timeout: 5), "the page shows its own navigation")
         person.click()
         XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2), "the page's links move it on")
@@ -404,15 +407,32 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(window.searchFields.firstMatch.value as? String, "ragu")
     }
 
+    func testSwitchingToAndFromMarfaTypesWithTheSidebarHiddenWorks() {
+        // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar hidden.
+        let open = { (place: String) in
+            self.app.typeKey("k", modifierFlags: .command)
+            self.app.typeText(place + "\r")
+        }
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 2))
+        open("marfa types")
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        open("inbox")
+        XCTAssertTrue(list.waitForExistence(timeout: 5))
+        open("marfa types")
+        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertFalse(sidebar.exists, "the sidebar stays as it was left")
+    }
+
     func testTheToolbarSearchesMarfaTypes() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertFalse(typesPage.searchFields.firstMatch.exists, "the toolbar's search stands in for the page's")
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(typesPage.searchFields.firstMatch.exists || typesList.searchFields.firstMatch.exists, "the toolbar's search stands in for the page's")
         app.typeKey("f", modifierFlags: .command)
         app.typeText("calendar")
-        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForNonExistence(timeout: 2), "the page's list narrows")
-        XCTAssertTrue(typesPage.links["Google Calendar Event"].firstMatch.exists)
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForNonExistence(timeout: 2), "the page's list narrows")
+        XCTAssertTrue(typesList.links["Google Calendar Event"].firstMatch.exists)
         app.typeKey(.return, modifierFlags: [])
         let fields = typesPage.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Fields'")).firstMatch
         XCTAssertTrue(fields.waitForExistence(timeout: 2), "Return opens the match")
@@ -420,10 +440,10 @@ final class WindowTests: XCTestCase {
 
     func testBackAndForwardMoveThroughTheTypesShown() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesPage.links["Person"].firstMatch.waitForExistence(timeout: 5))
-        typesPage.links["Person"].firstMatch.click()
+        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        typesList.links["Person"].firstMatch.click()
         XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
-        typesPage.links["Place"].firstMatch.click()
+        typesList.links["Place"].firstMatch.click()
         XCTAssertTrue(typesPage.staticTexts["core.entity.place"].firstMatch.waitForExistence(timeout: 2))
         app.typeKey("[", modifierFlags: .command)
         XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
