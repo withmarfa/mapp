@@ -359,6 +359,28 @@ struct NoteLibraryTests {
         #expect(store.changes.count == 2, "leaving again changes nothing")
     }
 
+    @Test func aNoteAnEarlierVersionNamedWithACharacterReferenceTakesItsLinesNameOnceEdited() {
+        let old = Note(body: "Plan&#x20;\n\nMore\n", path: "Plan&#x20;.md", created: start)
+        let library = NoteLibrary(notes: [old], folders: [], store: store, now: { start + 60 })
+        #expect(library.note(old.id)?.title == "Plan", "the list reads the line")
+        library.leave(old.id)
+        #expect(store.changes.isEmpty, "a note opened and left alone is not renamed")
+        library.updateBody(of: old.id, to: "Plan&#x20;\n\nMore, and more\n")
+        library.leave(old.id)
+        #expect(library.note(old.id)?.path == "Plan.md")
+        #expect(store.changes.last == .move(from: "Plan&#x20;.md", to: "Plan.md"))
+    }
+
+    @Test func aNameGivenByHandThatResemblesAnEarlierVersionsIsKept() {
+        let (library, _, filed, _, _) = makeLibrary()
+        library.updateBody(of: filed.id, to: "# Q&A\n")
+        library.leave(filed.id)
+        library.renameNote(filed.id, to: "Q&amp;A")
+        library.updateBody(of: filed.id, to: "# Q&A\n\nMore\n")
+        library.leave(filed.id)
+        #expect(library.note(filed.id)?.path == "Work/Q&amp;A.md", "the person's name stands")
+    }
+
     @Test func aNoteNamedByHandKeepsItsNameWhateverItsFirstLineSays() {
         let (library, _, filed, _, _) = makeLibrary()
         library.renameNote(filed.id, to: "Office")

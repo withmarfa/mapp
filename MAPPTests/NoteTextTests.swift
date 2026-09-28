@@ -131,6 +131,11 @@ struct NoteTextTests {
         #expect(!NoteText.isName("Groceries 1", of: "Groceries"))
         #expect(!NoteText.isName("Shopping", of: "Groceries"))
         #expect(!NoteText.isName("Groceries list", of: "Groceries"))
+        // A name an earlier version gave kept the line's character references and escapes as written.
+        #expect(NoteText.isName("Plan&#x20;", of: "Plan"))
+        #expect(NoteText.isName("R\\&D", of: "R&D"))
+        #expect(!NoteText.isName("Plan&#x20;", of: "Plan", exactly: true))
+        #expect(!NoteText.isName("Plan&#x20;", of: "Other"))
     }
 
     @Test func onlyALineANameCannotHoldNeedsATitle() {
@@ -158,4 +163,13 @@ struct NoteTextTests {
         #expect(moved == "![a](../Attachments/Photo%201.png) [site](https://e.com) ![b](../Attachments/b%20c.png) ![x](Other/x.png)")
         #expect(NoteText.rebasingAttachmentLinks(in: moved, from: "Work", to: "") == "![a](Attachments/Photo%201.png) [site](https://e.com) ![b](Attachments/b%20c.png) ![x](Other/x.png)")
     }
+
+    @Test func aSnippetShowsTheTextAroundWhatWasFound() {
+        let body = "# Recipes\n\nA proper **ragù** takes three hours on a low heat, stirred now and then."
+        #expect(NoteText.snippet(of: body, around: "RAGU", reach: 10) == "…A proper ragù takes thr…")
+        #expect(NoteText.snippet(of: body, around: "Recipes", reach: 8) == "Recipes A prope…")
+        #expect(NoteText.snippet(of: body, around: "missing") == nil)
+        #expect(NoteText.snippet(of: body, around: "  ") == nil)
+    }
+
 }

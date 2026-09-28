@@ -463,7 +463,8 @@ final class NoteLibrary {
     private func followFirstLine(at index: Int) {
         guard let named = notes[index].namedLine else { return }
         let line = NoteText.firstLine(of: notes[index].body) ?? ""
-        guard line != named else { return }
+        let hasLinesName = notes[index].fileTitle.map { NoteText.isName($0, of: line, exactly: true) } ?? true
+        guard line != named || !hasLinesName else { return }
         let title = notes[index].file.title != nil || NoteText.needsTitle(line) ? line : nil
         rename(at: index, to: NoteText.name(for: line), title: title, undoManager: nil)
     }
@@ -475,9 +476,10 @@ final class NoteLibrary {
         let directory = notes[index].path.map { _ in notes[index].directory } ?? directory(for: notes[index].folderID)
         let path = uniquePath(name, in: directory, except: id)
         defer {
-            // A note goes by its first line again once it is given the line's name, whatever gave it.
+            // A note goes by its first line again once it is given the line's name, whatever gave it; exactly the
+            // line's, since a name given by hand that only resembles an earlier version's is the person's choice.
             let line = NoteText.firstLine(of: notes[index].body) ?? ""
-            notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line) ? line : nil }
+            notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line, exactly: true) ? line : nil }
         }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }

@@ -24,6 +24,18 @@ nonisolated enum NoteText {
         return preview.isEmpty ? String(localized: "No additional text") : String(preview.prefix(previewLimit))
     }
 
+    /// The note's text around the first place a search finds, as one line, to show why a note was found.
+    static func snippet(of body: String, around query: String, reach: Int = 48) -> String? {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = readableLines(of: body).joined(separator: " ")
+        guard !query.isEmpty, let found = text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive])
+        else { return nil }
+        let start = text.index(found.lowerBound, offsetBy: -reach, limitedBy: text.startIndex) ?? text.startIndex
+        let end = text.index(found.upperBound, offsetBy: reach, limitedBy: text.endIndex) ?? text.endIndex
+        let stretch = text[start..<end].trimmingCharacters(in: .whitespaces)
+        return (start > text.startIndex ? "…" : "") + stretch + (end < text.endIndex ? "…" : "")
+    }
+
     /// Whether the note's first line is finished, which shows once something is written on a line after it.
     /// The page writes every note with a closing line break, so one alone says nothing.
     static func hasCompleteFirstLine(_ body: String) -> Bool {
@@ -48,12 +60,17 @@ nonisolated enum NoteText {
     }
 
     /// Whether a file's name is the one a first line gives, or that name numbered, as a second note of the
-    /// same name is.
-    static func isName(_ fileTitle: String, of line: String) -> Bool {
+    /// same name is. Unless `exactly`, a name an earlier version gave the line also counts: it kept the line's
+    /// backslash escapes and character references as written (`Plan&#x20;`), and the note goes on following
+    /// its line, to take the name it should have when next left.
+    static func isName(_ fileTitle: String, of line: String, exactly: Bool = false) -> Bool {
         let name = name(for: line)
         if fileTitle == name { return true }
-        guard fileTitle.hasPrefix(name + " ") else { return false }
-        return Int(fileTitle.dropFirst(name.count + 1)).map { $0 > 1 } ?? false
+        if fileTitle.hasPrefix(name + " "), let number = Int(fileTitle.dropFirst(name.count + 1)), number > 1 {
+            return true
+        }
+        let earlier = fileSafe(unescaped(fileTitle))
+        return !exactly && earlier != fileTitle && isName(earlier, of: line, exactly: true)
     }
 
     /// Whether a first line has characters its file's name cannot, so the note keeps the line as its `title`,

@@ -17,8 +17,16 @@ final class Browser {
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
-    /// Whether the command palette is out.
-    var isShowingPalette = false
+    /// The palette that is out, if any: ⌘K's commands, or ⌘P's search of every note.
+    var palette: Palette?
+    /// Whether the list's search is out as a field, rather than a button beside Sort.
+    var isSearchExpanded = false
+    /// Counts each request for the list's search, so a field already out takes the keyboard again.
+    var searchFocusRequests = 0
+
+    nonisolated enum Palette: Hashable {
+        case commands, search
+    }
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
@@ -68,6 +76,7 @@ final class Browser {
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
         searchText = ""
+        isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)
     }
@@ -82,6 +91,7 @@ final class Browser {
     func newNote(in library: NoteLibrary, undoManager: UndoManager?) {
         if item == .recentlyDeleted || item == .marfaTypes { sidebarItem = .inbox }
         searchText = ""
+        isSearchExpanded = false
         let note = library.newNote(in: item, undoManager: undoManager)
         selection = [note.id]
         focusRequest = .page

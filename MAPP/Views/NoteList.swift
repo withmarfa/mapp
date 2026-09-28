@@ -8,6 +8,7 @@ struct NoteList: View {
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
+    @State private var width: CGFloat = 340
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
 
     var body: some View {
@@ -44,6 +45,7 @@ struct NoteList: View {
             }
         }
         .listStyle(.inset)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .accessibilityIdentifier("NoteList")
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
@@ -63,12 +65,20 @@ struct NoteList: View {
             return .handled
         }
         .toolbar {
-            ToolbarItem {
+            ColumnSearch(
+                isExpanded: $browser.isSearchExpanded,
+                text: $browser.searchText,
+                prompt: String(localized: "Search"),
+                columnWidth: width,
+                focusRequests: browser.searchFocusRequests,
+                onDown: { browser.focusRequest = .list }
+            ) {
                 Menu("Sort", systemImage: "arrow.up.arrow.down") {
                     OrderOptions()
                         .pickerStyle(.inline)
                 }
                 .menuIndicator(.hidden)
+                .help("Sort")
             }
         }
         .task {
@@ -105,6 +115,8 @@ struct NoteList: View {
         .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) note](inflect: true)"))
+        // The search field takes the title's place while it is out.
+        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.

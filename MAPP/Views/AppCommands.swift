@@ -73,13 +73,10 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .textEditing) {
-            SearchNotesButton()
+            palette("Search Notes…", systemImage: "magnifyingglass", .search)
                 .keyboardShortcut("p")
-            Button("Command Palette", systemImage: "command") {
-                browser?.isShowingPalette.toggle()
-            }
-            .keyboardShortcut("k")
-            .disabled(browser == nil)
+            palette("Command Palette", systemImage: "command", .commands)
+                .keyboardShortcut("k")
         }
 
         CommandGroup(before: .sidebar) {
@@ -102,12 +99,22 @@ struct AppCommands: Commands {
     }
 }
 
-/// Search in the window in front: ⌘P from the Edit menu, and ⌥⌘F under Find, as Notes has it.
-struct SearchNotesButton: View {
+extension AppCommands {
+    /// Opens a palette over the window in front, or puts it away if that palette is already out.
+    private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {
+        Button(title, systemImage: systemImage) {
+            browser?.palette = browser?.palette == palette ? nil : palette
+        }
+        .disabled(browser == nil)
+    }
+}
+
+/// The list's own search, beside Sort, from ⌥⌘F under Find, as Notes has it.
+struct SearchListButton: View {
     @FocusedValue(\.browser) private var browser
 
     var body: some View {
-        Button("Search Notes", systemImage: "magnifyingglass") {
+        Button("Search List", systemImage: "magnifyingglass") {
             browser?.focusRequest = .search
         }
         .disabled(browser == nil)

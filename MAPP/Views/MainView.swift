@@ -9,8 +9,8 @@ struct MainView: View {
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
-    @FocusState private var isSearchFocused: Bool
     @State private var typesQuery = ""
+    @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
 
@@ -26,7 +26,19 @@ struct MainView: View {
             Group {
                 if browser.showsTypes {
                     MarfaTypesView(part: types.list)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
                         .navigationTitle(library.name(of: .marfaTypes))
+                        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+                        .toolbar {
+                            ColumnSearch(
+                                isExpanded: $browser.isSearchExpanded,
+                                text: $typesQuery,
+                                prompt: String(localized: "Search Types"),
+                                columnWidth: typesListWidth,
+                                focusRequests: browser.searchFocusRequests,
+                                onSubmit: types.openFirstMatch
+                            ) {}
+                        }
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane)
                 }
@@ -46,27 +58,20 @@ struct MainView: View {
                 NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
             }
         }
-        // One search field: Marfa Types' page where it shows, the notes everywhere else.
-        .searchable(
-            text: browser.showsTypes ? $typesQuery : $browser.searchText,
-            placement: .toolbar,
-            prompt: browser.showsTypes ? Text("Search Types") : Text("Search")
-        )
-        .searchFocused($isSearchFocused)
-        .onSubmit(of: .search) { if browser.showsTypes { types.openFirstMatch() } }
         .onChange(of: typesQuery) { types.search(typesQuery) }
-        .background(SearchBesideTrailingItems())
         .overlay(alignment: .top) {
-            if browser.isShowingPalette {
+            if let palette = browser.palette {
                 ZStack(alignment: .top) {
                     // A click anywhere else puts the palette away, as it does a menu.
                     Color.clear
                         .contentShape(.rect)
                         .onTapGesture {
-                            browser.isShowingPalette = false
+                            browser.palette = nil
                             browser.focusRequest = browser.showsTypes ? .sidebar : .list
                         }
-                    CommandPalette(browser: browser, editor: editor)
+                    CommandPalette(browser: browser, editor: editor, mode: palette)
+                        // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
+                        .id(palette)
                         .padding(.top, 72)
                 }
             }
@@ -112,13 +117,17 @@ struct MainView: View {
         }
     }
 
-    /// Search Notes from Marfa Types goes to All Notes, whose notes the field then searches.
+    /// The list's search comes out as a field, which takes the keyboard; asked for over Marfa Types, it searches
+    /// All Notes, since that page has a search of its own.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
             if browser.showsTypes { browser.show(.allNotes, in: library, order: order) }
-            isSearchFocused = true
-        case .typesSearch: isSearchFocused = true
+            browser.isSearchExpanded = true
+            browser.searchFocusRequests += 1
+        case .typesSearch:
+            browser.isSearchExpanded = true
+            browser.searchFocusRequests += 1
         case .sidebar, .list: pane = browser.focusRequest
         case .page, nil: return
         }

@@ -132,13 +132,20 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
-    func testSearchFindsNotesAcrossFolders() {
-        let search = window.searchFields.firstMatch
-        search.click()
-        search.typeText("ragu")
+    /// The list's search, a field only once its button beside Sort is clicked.
+    private var listSearch: XCUIElement { window.searchFields["ColumnSearch"] }
+
+    func testTheListsSearchFindsNotesAcrossFoldersAndEscapePutsItAway() {
+        XCTAssertFalse(listSearch.exists, "a button until it is clicked")
+        window.buttons["Search"].firstMatch.click()
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
+        app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"), "the page follows the results")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(listSearch.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
     }
 
     func testPinningFromTheContextMenuAddsToPinned() {
@@ -218,13 +225,28 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
     }
 
-    func testCommandPSearchesNotesFromThePage() {
+    func testOptionCommandFReturnsToAnOpenSearch() {
+        app.typeKey("f", modifierFlags: [.command, .option])
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
+        app.typeText("rag")
+        row(titled: "Recipes to try").click()
+        app.typeKey("f", modifierFlags: [.command, .option])
+        // As any search field does, it takes the keyboard with its text selected, so typing replaces it.
+        app.typeText("tomatoes")
+        XCTAssertEqual(listSearch.value as? String, "tomatoes", "the field took the keyboard again")
+    }
+
+    func testCommandPSearchesEveryNotesTextAndOpensTheOneChosen() {
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
         editor.click()
         app.typeKey("p", modifierFlags: .command)
+        let field = window.textFields["CommandPaletteField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
         app.typeText("ragu")
-        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
-        XCTAssertFalse(text.contains("ragu"), "the search field took the typing, not the page")
+        XCTAssertFalse(text.contains("ragu"), "the palette took the typing, not the page")
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
     }
 
     func testAFolderIsRenamedFromTheMenuAndDeletedWithTheDeleteKey() {
@@ -368,11 +390,10 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
     }
 
-    func testShareAndMoreSitBesideSearch() {
+    func testShareAndMoreSitAtTheToolbarsEnd() {
         let more = window.menuButtons["More"]
-        let search = window.searchFields.firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 2))
-        XCTAssertLessThan(search.frame.minX - more.frame.maxX, 24, "More is beside search, not mid-toolbar")
+        XCTAssertLessThan(window.frame.maxX - more.frame.maxX, 30, "More is at the end, not mid-toolbar")
     }
 
     // MARK: Marfa Types
@@ -396,15 +417,16 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typesPage.waitForNonExistence(timeout: 2))
     }
 
-    func testSearchNotesFromMarfaTypesGoesToAllNotesAndSearches() {
+    func testSearchListFromMarfaTypesGoesToAllNotesAndSearches() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        app.typeKey("p", modifierFlags: .command)
+        app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(list.waitForExistence(timeout: 2))
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(window.searchFields.firstMatch.value as? String, "ragu")
+        XCTAssertEqual(listSearch.value as? String, "ragu")
     }
 
     func testSwitchingToAndFromMarfaTypesWithTheSidebarHiddenWorks() {
@@ -475,6 +497,8 @@ final class WindowTests: XCTestCase {
             guard let element = issue.element else { return false }
             // The audit is of the window; the menu bar above it is the system's to draw.
             if !windowFrame.intersects(element.frame) { return true }
+            // A tooltip, shown where the pointer happens to rest, is the system's to draw and describe.
+            if element.elementType == .helpTag { return true }
             switch issue.auditType {
             case .parentChild: return true
             case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
