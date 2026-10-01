@@ -380,6 +380,15 @@ final class WindowTests: XCTestCase {
     func testALongNoteStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
         sidebarItem("Reading").click()
         row(titled: "The Design of Everyday Things").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "The Design of Everyday Things"))
+        // The sample alone can fit a restored, maximized window. Add enough text to overflow any
+        // viewport this test uses, so it tests scrolling rather than the screen's dimensions.
+        editor.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        let paragraphs = max(80, Int(window.frame.height / 20) * 2)
+        app.typeText("\n\nScroll overflow.\n\n" + Array(repeating: "x", count: paragraphs).joined(separator: "\n\n"))
+        XCTAssertTrue(waitForText("CONTAINS", "Scroll overflow."))
+        app.typeKey(.upArrow, modifierFlags: .command)
         let title = page.staticTexts["The Design of Everyday Things"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(title.frame.minY, window.toolbars.firstMatch.frame.maxY, "the note starts below the toolbar")
@@ -476,9 +485,9 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertFalse(typesPage.searchFields.firstMatch.exists || typesList.searchFields.firstMatch.exists, "the toolbar's search stands in for the page's")
         app.typeKey("f", modifierFlags: .command)
-        app.typeText("calendar")
+        app.typeText("core.task")
         XCTAssertTrue(typesList.links["Person"].firstMatch.waitForNonExistence(timeout: 2), "the page's list narrows")
-        XCTAssertTrue(typesList.links["Google Calendar Event"].firstMatch.exists)
+        XCTAssertTrue(typesList.links["Task"].firstMatch.exists)
         app.typeKey(.return, modifierFlags: [])
         let fields = typesPage.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Fields'")).firstMatch
         XCTAssertTrue(fields.waitForExistence(timeout: 2), "Return opens the match")
@@ -540,4 +549,3 @@ final class WindowTests: XCTestCase {
         }
     }
 }
-
