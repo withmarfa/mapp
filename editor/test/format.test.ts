@@ -478,7 +478,9 @@ test('images go on lines of their own from an empty line', async () =>
       { src: 'Attachments/Photo%201.png', alt: 'Photo 1' },
       { src: 'Attachments/b.png', alt: 'b' },
     ])
-    expect(editor.markdown()).toBe('![Photo 1](Attachments/Photo%201.png)\n\n![b](Attachments/b.png)\n')
+    expect(editor.markdown()).toBe(
+      '![Photo 1](Attachments/Photo%201.png)\n\n![b](Attachments/b.png)\n',
+    )
   }))
 
 test('an image goes inline within text', async () =>
@@ -500,7 +502,8 @@ function posOf(editor: NoteEditor, text: string): number {
   ctxOf(editor)
     .get(editorViewCtx)
     .state.doc.descendants((node, pos) => {
-      if (found < 0 && node.isText && node.text?.includes(text)) found = pos + node.text.indexOf(text)
+      if (found < 0 && node.isText && node.text?.includes(text))
+        found = pos + node.text.indexOf(text)
     })
   return found
 }
@@ -523,18 +526,23 @@ test('spaces at the edges of a paragraph or heading are not written, so they nev
 
 test('an image is drawn at the width in its alt text, and shows its name without it', async () => {
   const webkit = window.webkit
-  window.webkit = { messageHandlers: { files: { postMessage: async () => 'data:image/png;base64,AAAA' } } }
+  window.webkit = {
+    messageHandlers: { files: { postMessage: async () => 'data:image/png;base64,AAAA' } },
+  }
   try {
-    await withNoteEditor('![Dusk|320](Attachments/a.png) and ![Far|90](https://example.com/far.png)\n', async (editor) => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      const dom = ctxOf(editor).get(editorViewCtx).dom
-      const image = dom.querySelector('.image img') as HTMLImageElement
-      expect(image.alt).toBe('Dusk')
-      expect(image.style.width).toBe('320px')
-      expect(dom.querySelector('.image .image-handle')).not.toBe(null)
-      expect(dom.querySelector('.image-absent')?.textContent).toBe('Far')
-      expect(editor.markdown()).toBe(null)
-    })
+    await withNoteEditor(
+      '![Dusk|320](Attachments/a.png) and ![Far|90](https://example.com/far.png)\n',
+      async (editor) => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        const dom = ctxOf(editor).get(editorViewCtx).dom
+        const image = dom.querySelector('.image img') as HTMLImageElement
+        expect(image.alt).toBe('Dusk')
+        expect(image.style.width).toBe('320px')
+        expect(dom.querySelector('.image .image-handle')).not.toBe(null)
+        expect(dom.querySelector('.image-absent')?.textContent).toBe('Far')
+        expect(editor.markdown()).toBe(null)
+      },
+    )
   } finally {
     window.webkit = webkit
   }

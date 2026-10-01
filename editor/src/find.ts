@@ -80,7 +80,12 @@ export function visibleRange(view: EditorView, model: TextModel): [number, numbe
 
 /** Each character's box in the range, as four numbers in page coordinates (the scroll added), so the app can
  *  draw any match within the range without asking again. A line break's box is empty. */
-export function characterBoxes(view: EditorView, model: TextModel, from: number, to: number): number[] {
+export function characterBoxes(
+  view: EditorView,
+  model: TextModel,
+  from: number,
+  to: number,
+): number[] {
   const boxes: number[] = []
   const range = document.createRange()
   const scrollX = window.scrollX
@@ -111,7 +116,11 @@ export function characterBoxes(view: EditorView, model: TextModel, from: number,
 }
 
 export function selectText(view: EditorView, model: TextModel, from: number, to: number): void {
-  const selection = TextSelection.create(view.state.doc, positionAt(model, from), positionAt(model, to))
+  const selection = TextSelection.create(
+    view.state.doc,
+    positionAt(model, from),
+    positionAt(model, to),
+  )
   view.dispatch(view.state.tr.setSelection(selection))
 }
 

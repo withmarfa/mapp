@@ -14,11 +14,7 @@ let asked = new Map<string, Promise<string | null>>()
 /** The note's directory within the notes folder, empty at the top. Images are asked for again for each note,
  *  so one changed on disk shows as it now is. */
 export function setImageBase(directory: string): void {
-  const path = directory
-    .split('/')
-    .filter(Boolean)
-    .map(encodeURIComponent)
-    .join('/')
+  const path = directory.split('/').filter(Boolean).map(encodeURIComponent).join('/')
   base = `${origin}/${path ? `${path}/` : ''}`
   asked = new Map()
 }
@@ -41,10 +37,12 @@ function image(path: string): Promise<string | null> {
   let answer = asked.get(path)
   if (!answer) {
     const files = window.webkit?.messageHandlers?.files
-    answer = (files ? files.postMessage(path).catch(() => null) : Promise.resolve(null)).then((data) => {
-      if (!data) asked.delete(path)
-      return data
-    })
+    answer = (files ? files.postMessage(path).catch(() => null) : Promise.resolve(null)).then(
+      (data) => {
+        if (!data) asked.delete(path)
+        return data
+      },
+    )
     asked.set(path, answer)
   }
   return answer
@@ -123,7 +121,8 @@ class ImageView implements NodeView {
       if (this.path !== path) return
       if (!data) {
         const delay = retries[attempt]
-        if (delay != null) setTimeout(() => this.path === path && this.show(path, name, attempt + 1), delay)
+        if (delay != null)
+          setTimeout(() => this.path === path && this.show(path, name, attempt + 1), delay)
         return
       }
       const element = document.createElement('img')

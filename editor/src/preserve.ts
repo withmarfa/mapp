@@ -52,7 +52,8 @@ function split(ctx: Ctx, source: Source): void {
   const body = source.body
   const tree = ctx.get(remarkCtx).parse(body) as Root
   const parse = ctx.get(parserCtx)
-  const slice = (node: Nodes) => body.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0)
+  const slice = (node: Nodes) =>
+    body.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0)
   // A block is read after the note's link definitions, so `[text][ref]` means what it means in the note.
   const definitions = definitionsIn(tree).map(slice).join('\n')
   source.blocks = []
@@ -68,7 +69,9 @@ function split(ctx: Ctx, source: Source): void {
       source.definitions.push({ text, start, end })
       continue
     }
-    const canonical = trimmed(serialize(ctx, parse(definitions ? `${definitions}\n\n${text}` : text)))
+    const canonical = trimmed(
+      serialize(ctx, parse(definitions ? `${definitions}\n\n${text}` : text)),
+    )
     if (canonical) source.blocks.push({ text, canonical, start, end })
   }
 }
@@ -189,9 +192,11 @@ export function preserve(ctx: Ctx, source: Source, doc: ProseNode, canonical: st
   else out += '\n'
 
   const lost = definitions.filter(
-    (definition) => !kept.some(([start, end]) => start <= definition.start && definition.end <= end),
+    (definition) =>
+      !kept.some(([start, end]) => start <= definition.start && definition.end <= end),
   )
-  if (lost.length > 0) out = `${trimmed(out)}\n\n${lost.map((definition) => definition.text).join('\n')}\n`
+  if (lost.length > 0)
+    out = `${trimmed(out)}\n\n${lost.map((definition) => definition.text).join('\n')}\n`
 
   return serialize(ctx, ctx.get(parserCtx)(out)) === canonical ? out : canonical
 }

@@ -4,7 +4,10 @@ import type { Ctx } from '@milkdown/kit/ctx'
 import { NoteEditor, type FindState } from '../src/editor'
 import { offsetAt, positionAt, textModel } from '../src/find'
 
-async function withNoteEditor<T>(markdown: string, run: (editor: NoteEditor, found: FindState[]) => T) {
+async function withNoteEditor<T>(
+  markdown: string,
+  run: (editor: NoteEditor, found: FindState[]) => T,
+) {
   const root = document.createElement('div')
   document.body.append(root)
   const found: FindState[] = []
@@ -30,10 +33,13 @@ function ctxOf(editor: NoteEditor): Ctx {
 }
 
 test('the find bar searches the note as it reads, a line to each block', async () =>
-  withNoteEditor('# Kitchen *quotes*\n\n- [ ] Ask about **worktops**\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n', (editor) => {
-    const model = textModel(ctxOf(editor).get(editorViewCtx).state.doc)
-    expect(model.text).toBe('Kitchen quotes\nAsk about worktops\na\nb\n1\n2')
-  }))
+  withNoteEditor(
+    '# Kitchen *quotes*\n\n- [ ] Ask about **worktops**\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n',
+    (editor) => {
+      const model = textModel(ctxOf(editor).get(editorViewCtx).state.doc)
+      expect(model.text).toBe('Kitchen quotes\nAsk about worktops\na\nb\n1\n2')
+    },
+  ))
 
 test('text offsets and document positions map both ways', async () =>
   withNoteEditor('One\n\nTwo three\n', (editor) => {

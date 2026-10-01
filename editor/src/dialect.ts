@@ -110,7 +110,8 @@ function trimmed<T extends Paragraph | Heading>(node: T): T {
   const first = children[0]
   if (first?.type === 'text') children[0] = { ...first, value: first.value.replace(/^[ \t]+/, '') }
   const last = children.at(-1)
-  if (last?.type === 'text') children[children.length - 1] = { ...last, value: last.value.replace(/[ \t]+$/, '') }
+  if (last?.type === 'text')
+    children[children.length - 1] = { ...last, value: last.value.replace(/[ \t]+$/, '') }
   return { ...node, children }
 }
 
