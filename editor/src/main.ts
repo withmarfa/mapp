@@ -20,7 +20,12 @@ declare global {
       findSelect(from: number, to: number): void
       findScroll(from: number): void
       findReplace(from: number, to: number, text: string): void
-      insertImages(images: { src: string; alt: string }[], x?: number, y?: number, height?: number): void
+      insertImages(
+        images: { src: string; alt: string }[],
+        x?: number,
+        y?: number,
+        height?: number,
+      ): void
       setKeymap(keymap: Keymap): void
       setLabels(labels: Partial<Labels>): void
       setFullWidth(full: boolean): void
@@ -114,7 +119,11 @@ window.editor = {
   findReplace: (from, to, text) => editor.findReplace(from, to, text),
   // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
   insertImages: (images, x, y, height) =>
-    editor.insertImages(images, x, y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight)),
+    editor.insertImages(
+      images,
+      x,
+      y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
+    ),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
   setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
@@ -123,7 +132,8 @@ window.editor = {
     document.documentElement.style.fontSize = `${points}px`
   },
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
-  setReadingWidth: (ems) => document.documentElement.style.setProperty('--reading-width', `${ems}rem`),
+  setReadingWidth: (ems) =>
+    document.documentElement.style.setProperty('--reading-width', `${ems}rem`),
 }
 
 postToHost({ type: 'ready' })

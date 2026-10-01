@@ -436,7 +436,10 @@ export class NoteEditor {
         ctx.update(editorViewOptionsCtx, (options) => ({
           ...options,
           editable: () => instance.editable,
-          attributes: () => ({ 'aria-label': labels.note, spellcheck: String(instance.spellcheck) }),
+          attributes: () => ({
+            'aria-label': labels.note,
+            spellcheck: String(instance.spellcheck),
+          }),
           scrollThreshold: 24,
           scrollMargin: 24,
         }))
@@ -636,7 +639,9 @@ export class NoteEditor {
     const model = this.model()
     const start = positionAt(model, from)
     const end = positionAt(model, to)
-    view.dispatch(text ? view.state.tr.insertText(text, start, end) : view.state.tr.delete(start, end))
+    view.dispatch(
+      text ? view.state.tr.insertText(text, start, end) : view.state.tr.delete(start, end),
+    )
   }
 
   /** Puts images where they were dropped, or at the caret: each on a line of its own when the caret is on an
@@ -654,7 +659,11 @@ export class NoteEditor {
     }
     const nodes = images.map((image) => type.create({ src: image.src, alt: image.alt, title: '' }))
     const { $from } = tr.selection
-    if ($from.parent.isTextblock && $from.parent.content.size === 0 && $from.parent.type.name === 'paragraph') {
+    if (
+      $from.parent.isTextblock &&
+      $from.parent.content.size === 0 &&
+      $from.parent.type.name === 'paragraph'
+    ) {
       const paragraphs = nodes.map((node) => schema.nodes.paragraph!.create(null, node))
       tr = tr.replaceWith($from.before(), $from.after(), paragraphs)
     } else {
