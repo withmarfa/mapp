@@ -67,7 +67,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
         }
         func matches(_ name: String) -> [UUID] {
             if let id = Self.itemID(name) { return declaredIDs[id, default: []] }
-            return names[Self.nameKey(name), default: []]
+            return names[Self.nameKey(name.trimmingCharacters(in: .whitespacesAndNewlines)), default: []]
         }
         func resolve(_ title: String) -> NoteReferenceResolution {
             let name = Self.baseName(title)
@@ -116,15 +116,16 @@ nonisolated struct NoteConnectionIndex: Sendable {
     }
 
     private static func nameKey(_ name: String) -> String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .precomposedStringWithCanonicalMapping.lowercased()
+        name.precomposedStringWithCanonicalMapping.lowercased()
             .precomposedStringWithCanonicalMapping
     }
 
     private static func names(of record: NoteProjection) -> [String] {
-        guard let path = record.filePath else { return [record.title] }
+        let title = record.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let path = record.filePath else { return [title] }
         let filename = (path as NSString).lastPathComponent
-        return [record.title, path, (path as NSString).deletingPathExtension,
+        // File names retain their whitespace; only titles and typed names are trimmed.
+        return [title, path, (path as NSString).deletingPathExtension,
                 filename, (filename as NSString).deletingPathExtension]
     }
 
@@ -134,8 +135,9 @@ nonisolated struct NoteConnectionIndex: Sendable {
     }
 
     private static func baseName(_ title: String) -> String {
-        String(title.prefix { $0 != "|" && $0 != "#" })
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // A combining mark can share a grapheme with the delimiter, but cannot hide it.
+        let base = title.unicodeScalars.prefix { $0 != "|" && $0 != "#" }
+        return String(String.UnicodeScalarView(base)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func typedTarget(_ text: String) -> String? {

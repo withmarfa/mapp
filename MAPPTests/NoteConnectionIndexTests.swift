@@ -140,4 +140,33 @@ struct NoteConnectionIndexTests {
         #expect(index.references.first?.targetTitle == "Absent|shown")
         #expect(index.edges.isEmpty)
     }
+
+    @Test func fileNameWhitespaceIsSignificantWhileTitleWhitespaceIsTrimmed() {
+        let spacedFile = NoteProjection(note: Note(path: " Leading.md", text: "---\ntitle: Unrelated\n---", created: .now))
+        let source = record("Source", header: "about: '[[Leading]]'\n")
+        let unmatched = NoteConnectionIndex(records: [spacedFile, source], rulesByType: rules)
+        #expect(unmatched.references.first?.resolution == .missing)
+        #expect(unmatched.edges.isEmpty)
+
+        let genuine = NoteProjection(note: Note(path: "Leading.md", text: "---\ntitle: Another\n---", created: .now))
+        let matched = NoteConnectionIndex(records: [spacedFile, genuine, source], rulesByType: rules)
+        #expect(matched.references.first?.resolution == .resolved(genuine.id))
+        #expect(matched.edges.count == 1)
+
+        let spacedTitle = record(" Leading ")
+        let titleMatched = NoteConnectionIndex(records: [spacedFile, spacedTitle, source], rulesByType: rules)
+        #expect(titleMatched.references.first?.resolution == .resolved(spacedTitle.id))
+    }
+
+    @Test(arguments: ["C|\u{301}shown", "C#\u{301}part"])
+    func combiningMarksAfterAliasAndHeadingDelimitersDoNotHideTheBase(typed: String) {
+        let target = record("C")
+        let source = record("Source", header: "about: '[[\(typed)]]'\n", body: "[[\(typed)]]")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.count == 2)
+        #expect(index.references.allSatisfy { $0.resolution == .resolved(target.id) })
+        #expect(index.references.allSatisfy { $0.targetTitle == typed })
+        #expect(index.edges.count == 1)
+    }
+
 }
