@@ -125,7 +125,10 @@ nonisolated struct NoteFile: Hashable, Sendable {
         } else {
             return
         }
-        frontMatter = lines.isEmpty ? "" : String(raw.first!) + lines.joined() + String(raw.last!)
+        // Marfa treats an empty line immediately after the opening fence as a thematic break, not metadata.
+        if value == nil { lines = Array(lines.drop(while: { $0.trimmingCharacters(in: .newlines).isEmpty })) }
+        let hasContent = lines.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        frontMatter = hasContent ? String(raw.first!) + lines.joined() + String(raw.last!) : ""
     }
 
     var isPinned: Bool { property("pinned")?.lowercased() == "true" }

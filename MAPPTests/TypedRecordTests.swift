@@ -4,6 +4,30 @@ import Testing
 
 @MainActor
 struct TypedRecordTests {
+    @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
+    func unpinningTheFirstPropertyKeepsTypedMetadataAfterReread(opening: String, following: String) async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let store = FolderStore(root: root.url, bin: bin.url)
+        let path = "Records/Task.md"
+        let remainder = "type: example.task\(following)title: Task\(following)child-of: \"[[Parent]]\"\(following)\(following)custom: unchanged\(following)---\(opening)Body\(following)"
+        try root.write("---\(opening)pinned: true\(opening)\(following)\(remainder)", to: path)
+        let library = NoteLibrary(loadingFrom: store, defaults: nil)
+        await library.load()
+        let note = try #require(library.notes.first)
+        library.setPinned([note.id], false)
+        store.drain()
+        #expect(try Data(contentsOf: root.url.appending(path: path)) == Data("---\(opening)\(remainder)".utf8))
+        await library.reread()
+        let reopened = NoteLibrary(loadingFrom: store, defaults: nil)
+        await reopened.load()
+        let reread = try #require(reopened.note(note.id))
+        #expect(reread.file.property("type") == "example.task")
+        #expect(reread.file.property("child-of") == "[[Parent]]")
+        #expect(reread.file.property("custom") == "unchanged")
+        #expect(reread.body == "Body\n")
+    }
+
     @Test(arguments: ["example.project", "example.task", "example.decision"])
     func editingANestedTypedRecordKeepsItsEnvelopeAndConnections(type: String) async throws {
         let root = try TemporaryFolder()

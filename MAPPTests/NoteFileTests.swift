@@ -117,6 +117,26 @@ struct NoteFileTests {
         #expect(file.text == "---\ntitle: New\ncustom: untouched\n---")
     }
 
+    @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
+    func removingTheFirstPropertyKeepsTheHeaderReadable(opening: String, following: String) {
+        let remainder = "type: example.task\(following)child-of: \"[[Parent]]\"\(following)\(following)custom: [one, two]\(following)---\(opening)Body\(following)"
+        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following)\(remainder)")
+        file.setFlag("pinned", false)
+        #expect(file.text == "---\(opening)\(remainder)")
+        let reread = NoteFile(text: file.text)
+        #expect(reread.property("type") == "example.task")
+        #expect(reread.property("child-of") == "[[Parent]]")
+        #expect(reread.body == "Body\n")
+    }
+
+    @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
+    func removingTheLastPropertyRemovesTheHeaderAndItsBlankSeparators(opening: String, following: String) {
+        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following) \t\(following)---\(opening)Body\(following)")
+        file.setFlag("pinned", false)
+        #expect(file.text == "Body\(following)")
+        #expect(NoteFile(text: file.text).body == "Body\n")
+    }
+
     @Test func frontMatterIsMadeForTheFirstPropertyAndGoesWithTheLast() {
         var file = NoteFile(text: "Body\n")
         file.setFlag("pinned", true)
