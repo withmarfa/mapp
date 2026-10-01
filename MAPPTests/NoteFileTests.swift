@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MAPP
 
@@ -90,6 +91,50 @@ struct NoteFileTests {
         file.setFlag("pinned", false)
         file.setProperty("absent", nil)
         #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\n---\nBody\n")
+    }
+
+    @Test func changingAPropertyPreservesUnrelatedLineEndingsAndBlankLines() {
+        let text = "---\r\ntype: example.task\ntitle: Old\r\n\r\nchild-of: \"[[Project]]\"\r\ncustom:\n  labels: [one, two]\r\n---\r\nBody\n"
+        var file = NoteFile(text: text)
+        file.setProperty("title", "New")
+        #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New"))
+        file.setFlag("pinned", true)
+        #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New")
+            .replacingOccurrences(of: "---\r\nBody", with: "pinned: true\r\n---\r\nBody"))
+        file.setFlag("pinned", false)
+        #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New"))
+    }
+
+    @Test func changingAMultilinePropertyKeepsTheSeparatorAfterItsValue() {
+        var file = NoteFile(text: "---\ntitle: |\n  Old\n\n  title\n\nchild-of: \"[[Project]]\"\n---\nBody\n")
+        file.setProperty("title", "New")
+        #expect(file.text == "---\ntitle: New\n\nchild-of: \"[[Project]]\"\n---\nBody\n")
+    }
+
+    @Test func aPropertyEditKeepsTheClosingFenceAtTheEndOfTheFile() {
+        var file = NoteFile(text: "---\ntitle: Old\ncustom: untouched\n---")
+        file.setProperty("title", "New")
+        #expect(file.text == "---\ntitle: New\ncustom: untouched\n---")
+    }
+
+    @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
+    func removingTheFirstPropertyKeepsTheHeaderReadable(opening: String, following: String) {
+        let remainder = "type: example.task\(following)child-of: \"[[Parent]]\"\(following)\(following)custom: [one, two]\(following)---\(opening)Body\(following)"
+        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following)\(remainder)")
+        file.setFlag("pinned", false)
+        #expect(file.text == "---\(opening)\(remainder)")
+        let reread = NoteFile(text: file.text)
+        #expect(reread.property("type") == "example.task")
+        #expect(reread.property("child-of") == "[[Parent]]")
+        #expect(reread.body == "Body\n")
+    }
+
+    @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
+    func removingTheLastPropertyRemovesTheHeaderAndItsBlankSeparators(opening: String, following: String) {
+        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following) \t\(following)---\(opening)Body\(following)")
+        file.setFlag("pinned", false)
+        #expect(file.text == "Body\(following)")
+        #expect(NoteFile(text: file.text).body == "Body\n")
     }
 
     @Test func frontMatterIsMadeForTheFirstPropertyAndGoesWithTheLast() {

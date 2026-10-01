@@ -7,7 +7,7 @@ nonisolated struct NoteFile: Hashable, Sendable {
     var hasByteOrderMark: Bool
     /// Windows line endings throughout; a mixture is read, and written back, as it stands.
     var usesCRLF: Bool
-    /// The front matter as written, fences included and line endings as `\n`, or empty when there is none.
+    /// The front matter as written, fences included; uniformly Windows line endings are held as `\n`.
     private(set) var frontMatter: String
     var body: String
 
@@ -59,12 +59,20 @@ nonisolated struct NoteFile: Hashable, Sendable {
 
     // MARK: Properties
 
+    private var rawLines: [Substring] {
+        var result: [Substring] = []
+        var start = frontMatter.startIndex
+        while start < frontMatter.endIndex {
+            let end = frontMatter.utf8[start...].firstIndex(of: UInt8(ascii: "\n"))
+                .map { frontMatter.utf8.index(after: $0) } ?? frontMatter.endIndex
+            result.append(frontMatter[start..<end])
+            start = end
+        }
+        return result
+    }
+
     private var lines: [Substring] {
-        guard !frontMatter.isEmpty else { return [] }
-        let lines = frontMatter.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
-        // The fences, and the empty remainder after a closing line break, are not properties.
-        let end = lines.last == "" ? lines.count - 2 : lines.count - 1
-        return end > 1 ? Array(lines[1..<end]) : []
+        Array(rawLines.dropFirst().dropLast())
     }
 
     /// A top-level property's value when it is a single scalar, unquoted; nil when absent or not a scalar.
@@ -88,14 +96,28 @@ nonisolated struct NoteFile: Hashable, Sendable {
     }
 
     private mutating func setProperty(_ key: String, yaml value: String?) {
+        guard !frontMatter.isEmpty else {
+            if let value { frontMatter = "---\n\(key): \(value)\n---\n" }
+            return
+        }
+        let raw = rawLines
         var lines = lines
         let index = lines.firstIndex { Self.value(in: $0, for: key) != nil }
-        let line = value.map { Substring("\(key): \($0)") }
+        let endingSource = index.map { lines[$0] } ?? raw.last!
+        let ending = endingSource.hasSuffix("\r\n") ? "\r\n" : "\n"
+        let line = value.map { Substring("\(key): \($0)\(ending)") }
         if let index {
-            // A value written over several lines continues on the lines indented under the key.
+            // Blank lines within an indented value belong to it; a separator after it belongs to the file.
             var end = index + 1
-            while end < lines.count, lines[end].first == " " || lines[end].first == "\t" || lines[end].isEmpty {
-                end += 1
+            var scan = end
+            while scan < lines.count {
+                if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    scan += 1
+                    continue
+                }
+                guard lines[scan].first == " " || lines[scan].first == "\t" else { break }
+                scan += 1
+                end = scan
             }
             lines.replaceSubrange(index..<end, with: line.map { [$0] } ?? [])
         } else if let line {
@@ -103,7 +125,10 @@ nonisolated struct NoteFile: Hashable, Sendable {
         } else {
             return
         }
-        frontMatter = lines.isEmpty ? "" : "---\n" + lines.joined(separator: "\n") + "\n---\n"
+        // Marfa treats an empty line immediately after the opening fence as a thematic break, not metadata.
+        if value == nil { lines = Array(lines.drop(while: { $0.trimmingCharacters(in: .newlines).isEmpty })) }
+        let hasContent = lines.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        frontMatter = hasContent ? String(raw.first!) + lines.joined() + String(raw.last!) : ""
     }
 
     var isPinned: Bool { property("pinned")?.lowercased() == "true" }
@@ -118,7 +143,7 @@ nonisolated struct NoteFile: Hashable, Sendable {
         let rest = line.dropFirst(key.count)
         guard rest.first == ":" else { return nil }
         let value = rest.dropFirst()
-        guard value.isEmpty || value.first == " " || value.first == "\t" else { return nil }
+        guard value.isEmpty || value.first == " " || value.first == "\t" || value.first?.isNewline == true else { return nil }
         return value
     }
 

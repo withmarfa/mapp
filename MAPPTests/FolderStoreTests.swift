@@ -41,6 +41,14 @@ struct FolderStoreTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.url.path) == ["Note.md"], "no scratch file is left")
     }
 
+    @Test func unreadableUTF8IsSkippedAndAByteOrderMarkIsKept() throws {
+        try root.write("\u{FEFF}Body\n", to: "Kept.md")
+        try Data([0xFF]).write(to: root.url.appending(path: "Unreadable.md"))
+        let loaded = try store.load()
+        #expect(loaded.notes.map(\.path) == ["Kept.md"])
+        #expect(loaded.notes.first?.text == "\u{FEFF}Body\n")
+    }
+
     @Test func aCreateNeverWritesOverAFileAndSaysWhereItWent() async throws {
         try root.write("Someone else's", to: "Note.md")
         var moved: (String, String)?
