@@ -30,6 +30,8 @@ nonisolated enum NoteFrontMatter: Equatable, Sendable {
 nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
     let id: UUID
     let file: NoteFile
+    /// The source file path, relative to the notes folder; drafts have none.
+    let filePath: String?
     let frontMatter: NoteFrontMatter
     let title: String
     let declaredType: String?
@@ -42,12 +44,13 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
     }
 
     init(note: Note) {
-        self.init(id: note.id, file: note.file, fallbackTitle: note.title)
+        self.init(id: note.id, file: note.file, fallbackTitle: note.title, filePath: note.path)
     }
 
-    init(id: UUID, file: NoteFile, fallbackTitle: String) {
+    init(id: UUID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
         self.id = id
         self.file = file
+        self.filePath = filePath
         frontMatter = Self.parse(file.frontMatter)
         let fields: [String: NoteFieldValue]
         if case .parsed(let parsed) = frontMatter { fields = parsed } else { fields = [:] }

@@ -35,7 +35,7 @@ struct NoteConnectionIndexTests {
         let index = NoteConnectionIndex(records: [target, unknown, ordinary], rulesByType: rules)
         #expect(index.edges.isEmpty)
         #expect(index.references.contains { $0.sourceID == unknown.id && $0.origin == .body && $0.resolution == .resolved(target.id) })
-        #expect(index.references.filter { $0.sourceID == ordinary.id }.allSatisfy { $0.resolution == .missing })
+        #expect(index.references.filter { $0.sourceID == ordinary.id }.allSatisfy { $0.resolution == .resolved(target.id) })
     }
 
     @Test func missingAndCaseInsensitiveDuplicateTitlesStayUnresolved() {
@@ -55,5 +55,89 @@ struct NoteConnectionIndexTests {
         #expect(index.edges.count == 1)
         #expect(index.issues.count == 3)
         #expect(index.issues.allSatisfy { $0.sourceID == source.id })
+    }
+
+    @Test func aliasesAndHeadingsResolveTheirBaseWithoutChangingTypedText() {
+        let target = record("Café")
+        let source = record("Source", header: "about: ['[[CAFÉ|shown]]', '[[Cafe\u{301}#part]]']\n", body: "[[Café|shown]] [[CAFÉ#part|shown]]")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.count == 4)
+        #expect(index.references.allSatisfy { $0.resolution == .resolved(target.id) })
+        #expect(index.references.map(\.targetTitle) == ["Café|shown", "CAFÉ#part|shown", "CAFÉ|shown", "Cafe\u{301}#part"])
+        #expect(index.edges.count == 1)
+        #expect(source.file.text.contains("[[CAFÉ|shown]]"))
+        #expect(index.issues.isEmpty)
+    }
+
+    @Test(arguments: ["C# notes", "C|shown"])
+    func wholeTextNamingAnotherRecordIsAmbiguous(typed: String) {
+        let base = record("C")
+        let whole = record(typed)
+        let source = record("Source", header: "about: '[[\(typed)]]'\n", body: "[[\(typed)]]")
+        let index = NoteConnectionIndex(records: [base, whole, source], rulesByType: rules)
+        #expect(index.references.count == 2)
+        #expect(index.references.allSatisfy { $0.resolution == .ambiguous([base.id, whole.id]) })
+        #expect(index.edges.isEmpty)
+    }
+
+    @Test func wholeAndBaseNamesOfTheSameRecordAreOneTarget() {
+        let target = NoteProjection(note: Note(path: "C.md", text: "---\ntitle: 'C# notes'\n---", created: .now))
+        let source = record("Source", header: "about: ['[[C# notes]]', '[[C|shown]]']\n")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.count == 2)
+        #expect(index.references.allSatisfy { $0.resolution == .resolved(target.id) })
+        #expect(index.edges.count == 1)
+    }
+
+    @Test func filePathAndNameResolveWithAndWithoutTheirExtension() {
+        let target = NoteProjection(note: Note(path: "Projects/Café.md", text: "---\ntitle: Project\n---", created: .now))
+        let source = record("Source", header: "about: ['[[Cafe\u{301}]]', '[[CAFÉ.MD]]', '[[projects/café]]', '[[PROJECTS/CAFÉ.MD]]']\n")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.count == 4)
+        #expect(index.references.allSatisfy { $0.resolution == .resolved(target.id) })
+        #expect(index.edges.count == 1)
+    }
+
+    @Test func titleAndFileAliasesDoNotMakeOneRecordAmbiguousButCollisionsDo() {
+        let first = NoteProjection(note: Note(path: "Same.md", text: "---\ntitle: same\n---", created: .now))
+        let source = record("Source", header: "about: '[[SAME]]'\n")
+        let single = NoteConnectionIndex(records: [first, source], rulesByType: rules)
+        #expect(single.references.first?.resolution == .resolved(first.id))
+        let second = record("SAME")
+        let collision = NoteConnectionIndex(records: [first, second, source], rulesByType: rules)
+        #expect(collision.references.first?.resolution == .ambiguous([first.id, second.id]))
+        #expect(collision.edges.isEmpty)
+    }
+
+    @Test func knownDeclaredIDsResolveWithoutTreatingLocalOrUnknownIDsAsNames() {
+        let declaredID = UUID()
+        let unknownID = UUID()
+        let target = record("Target", header: "marfa_id: '\(declaredID.uuidString)'\n")
+        let numericName = record(unknownID.uuidString)
+        let source = record("Source", header: "about: ['[[\(declaredID.uuidString.lowercased())]]', '[[\(unknownID.uuidString)]]', '[[\(target.id.uuidString)]]']\n")
+        let index = NoteConnectionIndex(records: [target, numericName, source], rulesByType: rules)
+        #expect(index.references.map(\.resolution) == [.resolved(target.id), .missing, .missing])
+        #expect(index.edges.count == 1)
+        #expect(target.fields?["marfa_id"] == .string(declaredID.uuidString))
+    }
+
+    @Test func repeatedDeclaredIDsAreAmbiguousAndInvalidIDsStayOrdinaryFields() {
+        let declaredID = UUID()
+        let first = record("First", header: "marfa_id: '\(declaredID)'\n")
+        let second = record("Second", header: "marfa_id: '\(declaredID)'\n")
+        let invalid = record("Invalid", header: "marfa_id: 'opaque-id'\n")
+        let source = record("Source", header: "about: ['[[\(declaredID)]]', '[[opaque-id]]']\n")
+        let index = NoteConnectionIndex(records: [first, second, invalid, source], rulesByType: rules)
+        #expect(index.references.map(\.resolution) == [.ambiguous([first.id, second.id]), .missing])
+        #expect(index.edges.isEmpty)
+    }
+
+    @Test func emptyBaseNamesRemainMalformedAndMissingAliasesRemainMissing() {
+        let source = record("Source", header: "about: ['[[|shown]]', '[[#part]]', '[[Absent|shown]]']\n")
+        let index = NoteConnectionIndex(records: [source], rulesByType: rules)
+        #expect(index.issues.count == 2)
+        #expect(index.references.map(\.resolution) == [.missing])
+        #expect(index.references.first?.targetTitle == "Absent|shown")
+        #expect(index.edges.isEmpty)
     }
 }

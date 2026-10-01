@@ -72,6 +72,7 @@ struct NoteProjectionTests {
         let projection = NoteProjection(note: note)
         #expect(projection.id == note.id)
         #expect(projection.title == "Record")
+        #expect(projection.filePath == "Tasks/Record.md")
         #expect(note.file.text == projection.file.text)
     }
 
@@ -101,4 +102,16 @@ struct NoteProjectionTests {
         let projection = NoteProjection(id: UUID(), file: NoteFile(text: "---\nvalue: \(spelling)\n---"), fallbackTitle: "Filename")
         #expect(projection.fields?["value"] == .number(Decimal(string: "1.25")!))
     }
+
+    @Test func manualProjectionHasOnlyExplicitFileNamesAndDraftsHaveNone() {
+        let file = NoteFile(text: "---\ntitle: Title\n---")
+        let manual = NoteProjection(id: UUID(), file: file, fallbackTitle: "Fallback")
+        let named = NoteProjection(id: UUID(), file: file, fallbackTitle: "Fallback", filePath: "Folder/File.md")
+        let draft = NoteProjection(note: Note(text: "Draft", created: .now))
+        #expect(manual.filePath == nil)
+        #expect(named.filePath == "Folder/File.md")
+        #expect(draft.filePath == nil)
+        #expect(named.file.text == file.text)
+    }
+
 }
