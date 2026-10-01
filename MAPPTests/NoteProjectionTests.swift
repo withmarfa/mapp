@@ -50,6 +50,7 @@ struct NoteProjectionTests {
         "nested: {1: value}",
         "number: .inf",
         "number: 1.0e-400",
+        "number: 1:20.5",
         "custom: !unsupported value",
     ])
     func unusableYAMLIsExplicitAndDoesNotDiscardTheFile(header: String) {
@@ -72,5 +73,32 @@ struct NoteProjectionTests {
         #expect(projection.id == note.id)
         #expect(projection.title == "Record")
         #expect(note.file.text == projection.file.text)
+    }
+
+    @Test(arguments: [
+        "0.12345678901234567890123456789012345678901234567890",
+        "1.2345678901234567890123456789012345678901234567890e-1",
+    ])
+    func floatingPointPrecisionLossIsExplicit(spelling: String) {
+        let file = NoteFile(text: "---\nvalue: \(spelling)\n---")
+        let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
+        guard case .invalid(let error) = projection.frontMatter else {
+            Issue.record("A rounded number must not be exposed as an exact field value")
+            return
+        }
+        #expect(error.message.contains("exactly"))
+        #expect(projection.file.text == file.text)
+    }
+
+    @Test(arguments: [
+        "1.2500000000000000000000000000000000000000000000000000",
+        "125.0e-2",
+        "+1.250e+0",
+        "0.012500e+2",
+        "1.25_00",
+    ])
+    func equivalentDecimalSpellingsRemainRepresentable(spelling: String) {
+        let projection = NoteProjection(id: UUID(), file: NoteFile(text: "---\nvalue: \(spelling)\n---"), fallbackTitle: "Filename")
+        #expect(projection.fields?["value"] == .number(Decimal(string: "1.25")!))
     }
 }
