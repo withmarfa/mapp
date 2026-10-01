@@ -66,7 +66,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             }
             library.trash = readManifest().compactMap { entry in
                 let url = binURL(entry.id)
-                guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                guard let text = readText(url) else { return nil }
                 return TrashedNote(
                     id: entry.id,
                     note: StoredNote(path: entry.path, text: text, created: entry.created, modified: entry.modified),
@@ -80,7 +80,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private func read(_ url: URL, path: String) -> StoredNote? {
         guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey, .documentIdentifierKey, .fileIdentifierKey]),
               values.isDirectory != true,
-              let text = try? String(contentsOf: url, encoding: .utf8)
+              let text = readText(url)
         else { return nil }
         let modified = values.contentModificationDate ?? .now
         return StoredNote(
@@ -94,6 +94,12 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         let base = root.standardizedFileURL.resolvingSymlinksInPath().pathComponents
         let components = url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
         return components.dropFirst(base.count).joined(separator: "/")
+    }
+
+    private func readText(_ url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        // Foundation's file/string initializers consume a UTF-8 BOM, which is part of the saved envelope.
+        return String(validating: data, as: UTF8.self)
     }
 
     // MARK: Changing
@@ -349,7 +355,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         let found = (try? files.contentsOfDirectory(at: bin, includingPropertiesForKeys: keys)) ?? []
         let manifest = found.compactMap { url -> BinEntry? in
             guard url.pathExtension == "md", let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
-                  let text = try? String(contentsOf: url, encoding: .utf8)
+                  let text = readText(url)
             else { return nil }
             let values = try? url.resourceValues(forKeys: Set(keys))
             let modified = values?.contentModificationDate ?? .now
