@@ -136,7 +136,13 @@ nonisolated struct NoteFile: Hashable, Sendable {
         func range(in lines: [Substring]) -> Range<Int>? {
             guard let start = lines.firstIndex(where: { Self.value(in: $0, for: key) != nil }) else { return nil }
             var end = start + 1
-            while end < lines.count && (lines[end].first == " " || lines[end].first == "\t") { end += 1 }
+            var scan = end
+            while scan < lines.count {
+                if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { scan += 1; continue }
+                guard lines[scan].first == " " || lines[scan].first == "\t" else { break }
+                scan += 1
+                end = scan
+            }
             return start..<end
         }
         let originalLines = original.lines

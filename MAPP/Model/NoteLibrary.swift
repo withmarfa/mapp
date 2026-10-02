@@ -570,19 +570,28 @@ final class NoteLibrary {
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
             guard let index = library.notes.firstIndex(where: { $0.id == id }), !library.notes[index].isDeleted else { return }
             library.rename(at: index, to: oldName, title: oldTitle, undoManager: undoManager, updateLinks: false)
-            var restored: [UUID: NoteFile] = [:]
-            for (sourceID, original) in originals {
-                guard var current = library.note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
-                if current.body == replacement.body { current.body = original.body }
-                let oldFields = NoteProjection(id: sourceID, file: original, fallbackTitle: "").fields ?? [:]
-                let newFields = NoteProjection(id: sourceID, file: replacement, fallbackTitle: "").fields ?? [:]
-                let currentFields = NoteProjection(id: sourceID, file: current, fallbackTitle: "").fields ?? [:]
-                for key in Set(oldFields.keys).union(newFields.keys) where oldFields[key] != newFields[key] && currentFields[key] == newFields[key] {
-                    current.restoreField(key, from: original)
-                }
-                restored[sourceID] = current
+            library.restoreRenameReferences(originals: originals, replacements: replacements, undoManager: undoManager)
+        }
+    }
+
+    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], undoManager: UndoManager?) {
+        var restored: [UUID: NoteFile] = [:]
+        var before: [UUID: NoteFile] = [:]
+        for (sourceID, original) in originals {
+            guard var current = note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
+            before[sourceID] = current
+            if current.body == replacement.body { current.body = original.body }
+            let oldFields = NoteProjection(id: sourceID, file: original, fallbackTitle: "").fields ?? [:]
+            let newFields = NoteProjection(id: sourceID, file: replacement, fallbackTitle: "").fields ?? [:]
+            let currentFields = NoteProjection(id: sourceID, file: current, fallbackTitle: "").fields ?? [:]
+            for key in Set(oldFields.keys).union(newFields.keys) where oldFields[key] != newFields[key] && currentFields[key] == newFields[key] {
+                current.restoreField(key, from: original)
             }
-            library.applyItemFiles(restored, undoManager: nil, name: String(localized: "Rename Links"))
+            restored[sourceID] = current
+        }
+        applyItemFiles(restored, undoManager: nil, name: String(localized: "Rename Links"))
+        registerUndo(undoManager, name: String(localized: "Rename Links")) { [weak undoManager] library in
+            library.restoreRenameReferences(originals: before, replacements: restored, undoManager: undoManager)
         }
     }
 
