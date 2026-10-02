@@ -24,7 +24,9 @@ struct MainView: View {
         self.restoresWindow = restoresWindow
     }
 
-    var body: some View {
+    var body: some View { renamingWindow }
+
+    private var splitView: some View {
         // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
         // the window never changes its columns (see MarfaTypesPage).
         NavigationSplitView {
@@ -68,6 +70,10 @@ struct MainView: View {
                 NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
             }
         }
+    }
+
+    private var presentedWindow: some View {
+        splitView
         .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
@@ -96,6 +102,10 @@ struct MainView: View {
         .focusedSceneValue(\.editor, editor)
         .focusedSceneValue(\.marfaTypes, browser.showsTypes ? types : nil)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
+    }
+
+    private var lifecycleWindow: some View {
+        presentedWindow
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
@@ -118,6 +128,10 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             if library.isLoaded && restoresWindow { restore() }
         }
+    }
+
+    private var importingWindow: some View {
+        lifecycleWindow
         .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
@@ -129,6 +143,10 @@ struct MainView: View {
         .onChange(of: library.files.map(\.id), revealImportedItem)
         .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
+    }
+
+    private var renamingWindow: some View {
+        importingWindow
         .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
             TextField("Name", text: $noteName)
             Button("Rename") { renameNote() }
