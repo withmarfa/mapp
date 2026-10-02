@@ -204,7 +204,17 @@ extension NoteLibrary {
             }
         }
         var file = note.file
-        let targets = targetIDs.compactMap { self.item($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
+        let unresolved = connectionIndex.references.filter {
+            $0.sourceID == id && $0.origin == .header(field) && { if case .resolved = $0.resolution { false } else { true } }($0)
+        }.map { NoteFieldValue.string("[[\($0.targetTitle)]]") }
+        guard unresolved.isEmpty || field == "about" else {
+            failure = (String(localized: "Unresolved Relationship"), String(localized: "Resolve the existing target before replacing this relationship."))
+            return false
+        }
+        let targets = targetIDs.compactMap { self.item($0) }.map { target in
+            let duplicate = items.filter { $0.title.caseInsensitiveCompare(target.title) == .orderedSame }.count > 1
+            return NoteFieldValue.string("[[\(duplicate ? (target.projection.filePath ?? target.title) : target.title)]]")
+        } + unresolved
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return true

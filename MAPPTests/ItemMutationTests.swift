@@ -52,4 +52,24 @@ struct ItemMutationTests {
         undo.undo()
         #expect(library.note(source.id)?.file.text == source.file.text)
     }
+    @Test func propertyUndoKeepsSubsequentBodyEdits() {
+        let note = ticket()
+        let library = NoteLibrary(notes: [note])
+        let undo = UndoManager()
+        #expect(library.setItemProperty(note.id, key: "status", value: .string("completed"), undoManager: undo))
+        library.updateBody(of: note.id, to: "New body\n")
+        undo.undo()
+        #expect(library.note(note.id)?.body == "New body\n")
+        #expect(library.note(note.id)?.file.property("status") == "pending")
+    }
+
+    @Test func addingAboutKeepsUnresolvedTargets() {
+        let source = Note(path: "Log.md", text: "---\ntype: aic.agent.log\nabout: [\"[[Missing]]\"]\n---\nBody", created: .now)
+        let target = ticket()
+        let library = NoteLibrary(notes: [source, target])
+        #expect(library.setItemRelationship(source.id, field: "about", targetIDs: [target.id]))
+        #expect(library.note(source.id)?.file.text.contains("[[Missing]]") == true)
+        #expect(library.connectionIndex.edges.contains { $0.name == "about" && $0.targetID == target.id })
+    }
+
 }
