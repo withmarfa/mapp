@@ -89,6 +89,24 @@ extension NoteLibrary {
         }
     }
 
+    private func reference(to targetID: UUID) -> String? {
+        guard let target = item(targetID) else { return nil }
+        let candidates = [target.title, target.projection.filePath, target.fields["marfa_id"]?.string].compactMap { $0 }
+        for candidate in candidates {
+            let spelling = "[[\(candidate)]]"
+            var file = NoteFile(text: "")
+            file.setProperty("type", "aic.agent.log")
+            file.setProperty("about", spelling)
+            let probeID = UUID()
+            let probe = NoteProjection(id: probeID, file: file, fallbackTitle: probeID.uuidString)
+            let records = notes.filter { !$0.isDeleted }.map(NoteProjection.init) + files.map { AppItem(file: $0).projection } + [probe]
+            let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
+            if index.references.contains(where: { $0.sourceID == probeID && $0.resolution == .resolved(targetID) }) { return spelling }
+        }
+        failure = (String(localized: "Can’t Link This Item"), String(localized: "The item's title and path cannot be represented as an unambiguous file link."))
+        return nil
+    }
+
     @discardableResult
     func createItem(typeID: String, title: String, parentID: UUID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
         let title = NoteName.trimmed(title)
@@ -107,7 +125,7 @@ extension NoteLibrary {
             file.setProperty("status", "pending")
             file.setProperty("priority", "medium")
         }
-        if let parentID, let parent = note(parentID) { file.setProperty("child-of", "[[\(parent.title)]]") }
+        if let parentID { guard let parentReference = reference(to: parentID) else { return nil }; file.setProperty("child-of", parentReference) }
         if typeID == "aic.decision" { file.setProperty("occurred_at", DateFormatter.itemDay.string(from: now())) }
         if typeID == "aic.agent.session" { file.setProperty("starts_at", ISO8601DateFormatter().string(from: now())); file.setProperty("ends_at", "") }
         file.body = "\n"
@@ -169,7 +187,9 @@ extension NoteLibrary {
                     targets.append(id)
                 }
                 var file = source.file
-                let values = targets.compactMap { self.item($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
+                let references = targets.compactMap { reference(to: $0) }
+                guard references.count == targets.count else { return false }
+                let values = references.map(NoteFieldValue.string)
                 file.setField(ownerField, values.isEmpty ? nil : ownerField == "about" ? .array(values) : values.first)
                 files[ownerID] = file
             }
@@ -211,10 +231,9 @@ extension NoteLibrary {
             failure = (String(localized: "Unresolved Relationship"), String(localized: "Resolve the existing target before replacing this relationship."))
             return false
         }
-        let targets = targetIDs.compactMap { self.item($0) }.map { target in
-            let duplicate = items.filter { $0.title.caseInsensitiveCompare(target.title) == .orderedSame }.count > 1
-            return NoteFieldValue.string("[[\(duplicate ? (target.projection.filePath ?? target.title) : target.title)]]")
-        } + unresolved
+        let references = targetIDs.compactMap { reference(to: $0) }
+        guard references.count == targetIDs.count else { return false }
+        let targets = references.map(NoteFieldValue.string) + unresolved
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return self.note(id)?.file == file
