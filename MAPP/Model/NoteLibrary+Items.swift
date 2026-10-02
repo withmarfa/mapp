@@ -75,7 +75,7 @@ extension NoteLibrary {
         var file = notes[index].file
         file.setField(key, value)
         applyItemFieldFiles([id: file], key: key, undoManager: undoManager, name: String(localized: "Edit Property"))
-        return true
+        return self.note(id)?.file == file
     }
 
     private static func valid(_ value: NoteFieldValue, for kind: ItemPropertyDefinition.Kind) -> Bool {
@@ -174,7 +174,7 @@ extension NoteLibrary {
                 files[ownerID] = file
             }
             applyItemFieldFiles(files, key: ownerField, undoManager: undoManager, name: String(localized: "Edit Relationship"))
-            return true
+            return files.allSatisfy { self.note($0.key)?.file == $0.value }
         }
         guard let item = item(id), item.isEditable, item.relationshipFields.contains(field),
               let note = note(id), !note.isDeleted,
@@ -217,11 +217,19 @@ extension NoteLibrary {
         } + unresolved
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
-        return true
+        return self.note(id)?.file == file
     }
 
     private func applyItemFieldFiles(_ files: [UUID: NoteFile], key: String, undoManager: UndoManager?, name: String) {
         let previous = Dictionary(uniqueKeysWithValues: files.keys.compactMap { id in note(id).map { (id, $0.file) } })
+        guard files.allSatisfy({ id, file in
+            let old = note(id).map(NoteProjection.init)?.fields ?? [:]
+            guard let proposed = NoteProjection(id: id, file: file, fallbackTitle: "").fields else { return false }
+            return old.filter { $0.key != key } == proposed.filter { $0.key != key }
+        }) else {
+            failure = (String(localized: "Can’t Edit This Property"), String(localized: "This metadata uses a form that cannot be safely changed. Your file has been left unchanged."))
+            return
+        }
         applyItemFiles(files, undoManager: nil, name: name)
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             var restored: [UUID: NoteFile] = [:]
