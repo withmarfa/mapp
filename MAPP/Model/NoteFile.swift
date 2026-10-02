@@ -131,6 +131,47 @@ nonisolated struct NoteFile: Hashable, Sendable {
         frontMatter = hasContent ? String(raw.first!) + lines.joined() + String(raw.last!) : ""
     }
 
+    /// Restores one field's original spelling without replacing a subsequently edited body or other fields.
+    mutating func restoreField(_ key: String, from original: NoteFile) {
+        func range(in lines: [Substring]) -> Range<Int>? {
+            guard let start = lines.firstIndex(where: { Self.value(in: $0, for: key) != nil }) else { return nil }
+            var end = start + 1
+            var scan = end
+            while scan < lines.count {
+                if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { scan += 1; continue }
+                guard lines[scan].first == " " || lines[scan].first == "\t" else { break }
+                scan += 1
+                end = scan
+            }
+            return start..<end
+        }
+        let originalLines = original.lines
+        let source = range(in: originalLines).map { Array(originalLines[$0]) } ?? []
+        if source.isEmpty { setField(key, nil); return }
+        if frontMatter.isEmpty { frontMatter = "---\n" + source.joined() + "---\n"; return }
+        let raw = rawLines
+        var current = lines
+        if let target = range(in: current) { current.replaceSubrange(target, with: source) }
+        else { current.append(contentsOf: source) }
+        frontMatter = String(raw.first!) + current.joined() + String(raw.last!)
+    }
+
+    /// Encodes only the changed field; the remaining envelope keeps its original spelling.
+    mutating func setField(_ key: String, _ value: NoteFieldValue?) {
+        setProperty(key, yaml: value.map(Self.fieldYAML))
+    }
+
+    private static func fieldYAML(_ value: NoteFieldValue) -> String {
+        switch value {
+        case .null: "null"
+        case .bool(let flag): flag ? "true" : "false"
+        case .number(let number): NSDecimalNumber(decimal: number).stringValue
+        case .string(let text): yaml(text)
+        case .array(let values): "[" + values.map(fieldYAML).joined(separator: ", ") + "]"
+        case .object(let values): "{" + values.keys.sorted().map { yaml($0) + ": " + fieldYAML(values[$0]!) }.joined(separator: ", ") + "}"
+        }
+    }
+
     var isPinned: Bool { property("pinned")?.lowercased() == "true" }
 
     /// The note's own title, which Marfa keeps in the front matter.

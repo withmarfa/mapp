@@ -110,7 +110,10 @@ final class NotesFolder {
         let root = URL.temporaryDirectory.appending(path: "Sample Notes", directoryHint: .isDirectory)
         let bin = URL.temporaryDirectory.appending(path: "Sample Trash", directoryHint: .isDirectory)
         do {
-            try SampleLibrary.write(to: root, bin: bin)
+            let keepExisting = ProcessInfo.processInfo.arguments.contains("-MAPPKeepSampleFolder")
+            if !keepExisting || !FileManager.default.fileExists(atPath: root.path) {
+                try SampleLibrary.write(to: root, bin: bin)
+            }
         } catch {
             log.error("the sample folder could not be written: \(error.localizedDescription, privacy: .public)")
         }

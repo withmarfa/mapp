@@ -8,9 +8,17 @@ struct NoteDetail: View {
 
     var body: some View {
         let notes = browser.selection.compactMap { library.note($0) }
-        if notes.count > 1 {
-            ContentUnavailableView("^[\(notes.count) note](inflect: true) selected", systemImage: "note.text")
+        if browser.selection.count > 1 {
+            ContentUnavailableView("^[\(browser.selection.count) item](inflect: true) selected", systemImage: "note.text")
                 .onAppear { editor.close() }
+        } else if let id = browser.selection.first, let item = library.item(id), let file = item.file {
+            if let url = library.fileURL(for: file.id) {
+                FileItemContent(url: url)
+                    .onAppear { editor.close() }
+            } else {
+                ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+                    .onAppear { editor.close() }
+            }
         } else if let note = notes.first {
             NotePage(note: note, editor: editor)
                 .onAppear(perform: grantFocusRequest)
@@ -33,6 +41,7 @@ struct NoteDetail: View {
 /// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
 /// text into a page that is already running.
 struct NotePage: View {
+    @Environment(NoteLibrary.self) private var library
     let note: Note
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
@@ -45,6 +54,8 @@ struct NotePage: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if note.isDeleted {
                 DeletedNoteBanner(id: note.id)
+            } else if let item = library.item(note.id), item.type?.id != "core.note" {
+                ItemSummary(item: item, parent: library.relationships(for: note.id).first { $0.field == "child-of" }?.targets.first?.title)
             }
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
@@ -75,6 +86,27 @@ private struct DeletedNoteBanner: View {
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .background(.bar)
+    }
+}
+
+/// Only useful at-a-glance information occupies the document header; full details stay in the inspector.
+struct ItemSummary: View {
+    let item: AppItem
+    let parent: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(item.title).font(.title2.weight(.semibold)).textSelection(.enabled)
+            HStack(spacing: 12) {
+                if let type = item.type { Text(type.label) }
+                if let status = item.fields["status"]?.string { Text(ItemPropertyRow.choiceLabel(status)) }
+                if let parent { Label(parent, systemImage: "square.stack").lineLimit(1) }
+            }
+            .font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 24).padding(.vertical, 10)
         .background(.bar)
     }
 }

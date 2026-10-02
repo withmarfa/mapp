@@ -9,6 +9,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.marfaTypes) private var marfaTypes
+    @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
 
@@ -21,6 +22,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n")
             .disabled(browser == nil || library?.isLoaded != true)
+            Button("New Item…") { browser?.isCreatingItem = true }
+                .keyboardShortcut("n", modifiers: [.command, .control])
+                .disabled(browser == nil || library?.isLoaded != true)
+            Button("Import Files…") { browser?.isImportingFiles = true }
+                .disabled(browser == nil || library?.isLoaded != true)
             Button("New Folder", systemImage: "folder.badge.plus") {
                 if let library { browser?.newFolder(in: library, order: order, undoManager: notes?.undoManager) }
             }
@@ -41,13 +47,13 @@ struct AppCommands: Commands {
                 for path in library?.paths(forWindows: ids) ?? [] { openWindow(value: path) }
             }
             .keyboardShortcut("o")
-            .disabled(browser == nil || shown.isEmpty)
+            .disabled(browser == nil || ids.isEmpty)
             Divider()
-            NoteShareLink(note: shown.count == 1 ? shown.first : nil)
+            NoteShareLink(note: ids.count == 1 ? shown.first : nil, fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
             Button("Rename Note…", systemImage: "pencil") {
-                browser?.renamingNote = shown.first?.id
+                browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
             }
-            .disabled(browser == nil || shown.count != 1 || shown.first?.isDeleted != false)
+            .disabled(browser == nil || ids.count != 1 || shown.count != 1 || shown.first?.isDeleted != false)
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                     .environment(library)
@@ -80,6 +86,12 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
+                details?.isPresented.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(details == nil || notes?.ids.count != 1 || marfaTypes != nil)
+            Divider()
             OrderOptions()
             Divider()
             PageWidthOptions()

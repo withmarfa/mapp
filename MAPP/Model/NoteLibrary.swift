@@ -5,8 +5,10 @@ import Observation
 /// made here at once, handed to the store to make on disk, and undoable through the undo manager it is given.
 @Observable
 final class NoteLibrary {
-    private(set) var notes: [Note]
-    private(set) var folders: [Folder]
+    var notes: [Note] { didSet { cachedConnectionIndex = nil } }
+    var folders: [Folder]
+    private(set) var files: [AppFile] = [] { didSet { cachedConnectionIndex = nil } }
+    private(set) var completedImports: [UUID: UUID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
@@ -14,6 +16,10 @@ final class NoteLibrary {
     /// Something the store could not do, to tell the person: what failed and why.
     var failure: (title: String, message: String)?
     let now: () -> Date
+
+    /// Derived snapshots only; source files and note identities remain the authority.
+    @ObservationIgnored var cachedItemProjections: [UUID: NoteProjection] = [:]
+    @ObservationIgnored var cachedConnectionIndex: NoteConnectionIndex?
 
     @ObservationIgnored let store: NoteStore?
     @ObservationIgnored private let defaults: UserDefaults?
@@ -57,6 +63,12 @@ final class NoteLibrary {
         self.defaults = defaults
         self.now = now
         isLoaded = true
+        store?.imported = { [weak self] requestID, path in
+            guard let self else { return }
+            let namespace = (path as NSString).pathExtension.lowercased() == "md" ? "note:" : "file:"
+            self.completedImports[requestID] = UUID(stableFrom: namespace + path)
+            self.refresh()
+        }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
         store?.failed = { [weak self] path, message in
             let name = (path as NSString).lastPathComponent
@@ -72,6 +84,30 @@ final class NoteLibrary {
     convenience init(loadingFrom store: NoteStore, defaults: UserDefaults?, now: @escaping () -> Date = Date.init) {
         self.init(notes: [], folders: [], store: store, defaults: defaults, now: now)
         isLoaded = false
+    }
+
+    func fileURL(for id: UUID) -> URL? {
+        guard let file = files.first(where: { $0.id == id }) else { return nil }
+        return store?.fileURL(for: file.path)
+    }
+
+    func importFiles(_ sources: [URL], folderID: Folder.ID? = nil, requestID: UUID = UUID()) {
+        guard store != nil else { return }
+        let prefix = folders.first(where: { $0.id == folderID }).map { $0.name + "/" } ?? ""
+        for source in sources {
+            perform(.importFile(path: prefix + source.lastPathComponent, source: source, requestID: requestID))
+        }
+    }
+
+    func consumeImportCompletion(_ requestID: UUID) {
+        completedImports[requestID] = nil
+    }
+
+    private func reconcileFiles(_ stored: [StoredFile]) {
+        files = stored.map { disk in
+            let previous = files.first { $0.path == disk.path || (disk.fileID != nil && $0.stored.fileID == disk.fileID) }
+            return AppFile(id: previous?.id ?? UUID(stableFrom: "file:" + disk.path), stored: disk, folderID: folderID(forPath: disk.path))
+        }
     }
 
     // MARK: Loading
@@ -125,6 +161,7 @@ final class NoteLibrary {
                 binID: trashed.id
             ))
         }
+        reconcileFiles(stored.files)
         // Notes begun while the folder was being read are kept.
         notes = loaded + notes.filter(\.isDraft)
         isLoaded = true
@@ -198,6 +235,7 @@ final class NoteLibrary {
             order.append(Folder(id: order.contains { $0.id == stable } ? UUID() : stable, name: name))
         }
         if order != folders { folders = order }
+        reconcileFiles(stored.files)
 
         var updated = notes
         var onDisk = Dictionary(stored.notes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
@@ -277,13 +315,30 @@ final class NoteLibrary {
 
     func notes(in item: SidebarItem) -> [Note] {
         switch item {
-        case .inbox: notes.filter { !$0.isDeleted && $0.folderID == nil }
-        case .allNotes: notes.filter { !$0.isDeleted }
-        case .pinned: notes.filter { !$0.isDeleted && $0.isPinned }
-        case .folder(let id): notes.filter { !$0.isDeleted && $0.folderID == id }
-        case .recentlyDeleted: notes.filter(\.isDeleted)
-        case .marfaTypes: []
+        case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
+        case .allNotes: return notes.filter { !$0.isDeleted }
+        case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
+        case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
+        case .recentlyDeleted: return notes.filter(\.isDeleted)
+        case .marfaTypes, .files: return []
+        case .itemType(let typeID): return notes.filter { !$0.isDeleted && self.item($0.id)?.type?.id == typeID }
+        case .project(let projectID):
+            let descendants = projectDescendants(projectID)
+            return notes.filter { !$0.isDeleted && (descendants.contains($0.id) || $0.id == projectID) }
         }
+    }
+
+    private func projectDescendants(_ id: UUID) -> Set<UUID> {
+        let edges = connectionIndex.edges.filter { $0.name == "parent-of" }
+        var result: Set<UUID> = []
+        var pending = [id]
+        while let current = pending.popLast() {
+            for edge in edges where edge.sourceID == current && !result.contains(edge.targetID) && edge.targetID != id {
+                result.insert(edge.targetID)
+                pending.append(edge.targetID)
+            }
+        }
+        return result
     }
 
     /// Search covers every note that has not been deleted, whichever sidebar item is selected.
@@ -300,6 +355,7 @@ final class NoteLibrary {
     /// note is written first, so it has somewhere to be; one with nothing in it has nowhere yet, and stays.
     func paths(forWindows ids: some Collection<Note.ID>) -> [String] {
         ids.compactMap { id in
+            if let file = files.first(where: { $0.id == id }) { return file.path }
             guard let note = note(id), !(note.isDraft && NoteText.isBlank(note.body)) else { return nil }
             leave(id)
             return self.note(id)?.path
@@ -312,7 +368,14 @@ final class NoteLibrary {
     }
 
     func count(in item: SidebarItem) -> Int {
-        notes(in: item).count
+        let fileCount: Int
+        switch item {
+        case .allNotes, .files: fileCount = files.count
+        case .inbox: fileCount = files.filter { $0.folderID == nil }.count
+        case .folder(let id): fileCount = files.filter { $0.folderID == id }.count
+        default: fileCount = 0
+        }
+        return notes(in: item).count + fileCount
     }
 
     func name(of item: SidebarItem) -> String {
@@ -323,6 +386,10 @@ final class NoteLibrary {
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
+        case .files: String(localized: "Files")
+        case .itemType(let typeID): WorkbenchSchema.definition(typeID)?.label ?? typeID
+        case .project(let id): note(id)?.title ?? ""
+
         }
     }
 
@@ -469,7 +536,7 @@ final class NoteLibrary {
         rename(at: index, to: NoteText.name(for: line), title: title, undoManager: nil)
     }
 
-    private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?) {
+    private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?, updateLinks: Bool = true) {
         let id = notes[index].id
         let oldName = notes[index].fileTitle ?? NoteText.fileName(for: notes[index].body)
         let oldTitle = notes[index].file.property("title")
@@ -481,6 +548,62 @@ final class NoteLibrary {
             let line = NoteText.firstLine(of: notes[index].body) ?? ""
             notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line, exactly: true) ? line : nil }
         }
+        var titleFile = notes[index].file
+        if title != oldTitle { titleFile.setProperty("title", title) }
+        let titleProjection = NoteProjection(id: id, file: titleFile, fallbackTitle: name)
+        if case .invalid = titleProjection.frontMatter {
+            failure = (String(localized: "Can’t Rename Item"), String(localized: "Its metadata cannot be safely changed."))
+            return
+        }
+        let predictedTitle = title ?? name
+        var originals: [UUID: NoteFile] = [:]
+        var replacements: [UUID: NoteFile] = [:]
+        var spans: [UUID: [RenameReferenceSpan]] = [:]
+        if updateLinks {
+            let references = connectionIndex.references.filter { $0.resolution == .resolved(id) }
+            let usePath = notes.contains { !$0.isDeleted && $0.id != id && $0.title.caseInsensitiveCompare(predictedTitle) == .orderedSame }
+                || predictedTitle.contains(where: { "[]|#".contains($0) })
+            let base = usePath ? path : predictedTitle
+            guard !base.contains(where: { "[]|#".contains($0) }) else {
+                failure = (String(localized: "Can’t Rename Item"), String(localized: "The new name cannot be represented safely in file links."))
+                return
+            }
+            for candidate in notes where !candidate.isDeleted && candidate.id != id {
+                let relevant = references.filter { $0.sourceID == candidate.id }
+                guard !relevant.isEmpty else { continue }
+                var rewrites: [String: String] = [:]
+                for reference in relevant {
+                    let delimiter = reference.targetTitle.firstIndex { $0 == "|" || $0 == "#" }
+                    let suffix = delimiter.map { String(reference.targetTitle[$0...]) } ?? ""
+                    rewrites["[[\(reference.targetTitle)]]"] = "[[\(base + suffix)]]"
+                }
+                var file = candidate.file
+                let changed = Self.rewriteReferenceBody(file.body, rewrites: rewrites)
+                file.body = changed.text
+                let projection = NoteProjection(note: candidate)
+                if let fields = projection.fields {
+                    for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
+                        guard let value = fields[field] else { continue }
+                        func rewrite(_ value: NoteFieldValue) -> NoteFieldValue {
+                            if case .array(let values) = value { return .array(values.map(rewrite)) }
+                            if case .string(let text) = value, let replacement = rewrites[text] { return .string(replacement) }
+                            return value
+                        }
+                        let rewritten = rewrite(value)
+                        if rewritten != value { file.setField(field, rewritten) }
+                    }
+                }
+                if case .invalid = NoteProjection(id: candidate.id, file: file, fallbackTitle: candidate.title).frontMatter {
+                    failure = (String(localized: "Can’t Rename Item"), String(localized: "A related file's metadata cannot be safely updated."))
+                    return
+                }
+                if file != candidate.file {
+                    originals[candidate.id] = candidate.file
+                    replacements[candidate.id] = file
+                    spans[candidate.id] = changed.spans
+                }
+            }
+        }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }
         if let from = notes[index].path {
@@ -491,10 +614,101 @@ final class NoteLibrary {
             notes[index].path = path
             perform(.create(path: path, text: notes[index].file.text))
         }
+        applyItemFiles(replacements, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
             guard let index = library.notes.firstIndex(where: { $0.id == id }), !library.notes[index].isDeleted else { return }
-            library.rename(at: index, to: oldName, title: oldTitle, undoManager: undoManager)
+            library.rename(at: index, to: oldName, title: oldTitle, undoManager: undoManager, updateLinks: false)
+            library.restoreRenameReferences(originals: originals, replacements: replacements, spans: spans, undoManager: undoManager)
         }
+    }
+
+    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], spans: [UUID: [RenameReferenceSpan]], undoManager: UndoManager?) {
+        var nextSpans: [UUID: [RenameReferenceSpan]] = [:]
+        var restored: [UUID: NoteFile] = [:]
+        var before: [UUID: NoteFile] = [:]
+        for (sourceID, original) in originals {
+            guard var current = note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
+            before[sourceID] = current
+            let changedSpans = spans[sourceID] ?? []
+            let bodyChange = Self.revertReferenceSpans(replacement: replacement.body, current: current.body, spans: changedSpans)
+            current.body = bodyChange.text
+            nextSpans[sourceID] = bodyChange.spans
+            let oldFields = NoteProjection(id: sourceID, file: original, fallbackTitle: "").fields ?? [:]
+            let newFields = NoteProjection(id: sourceID, file: replacement, fallbackTitle: "").fields ?? [:]
+            let currentFields = NoteProjection(id: sourceID, file: current, fallbackTitle: "").fields ?? [:]
+            for key in Set(oldFields.keys).union(newFields.keys) where oldFields[key] != newFields[key] && currentFields[key] == newFields[key] {
+                current.restoreField(key, from: original)
+            }
+            restored[sourceID] = current
+        }
+        applyItemFiles(restored, undoManager: nil, name: String(localized: "Rename Links"))
+        registerUndo(undoManager, name: String(localized: "Rename Links")) { [weak undoManager] library in
+            library.restoreRenameReferences(originals: before, replacements: restored, spans: nextSpans, undoManager: undoManager)
+        }
+    }
+
+    private struct RenameReferenceSpan {
+        let range: NSRange
+        let before: String
+        let after: String
+    }
+
+    private static func rewriteReferenceBody(_ body: String, rewrites: [String: String]) -> (text: String, spans: [RenameReferenceSpan]) {
+        var edits: [(NSRange, String, String)] = []
+        for match in body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/.matchingSemantics(.unicodeScalar)) {
+            let old = String(match.output.0)
+            guard let new = rewrites[old], old != new else { continue }
+            edits.append((NSRange(match.range, in: body), old, new))
+        }
+        let result = NSMutableString(string: body)
+        for (range, _, new) in edits.reversed() { result.replaceCharacters(in: range, with: new) }
+        var delta = 0
+        let spans = edits.map { range, old, new in
+            let span = RenameReferenceSpan(range: NSRange(location: range.location + delta, length: (new as NSString).length), before: old, after: new)
+            delta += span.range.length - range.length
+            return span
+        }
+        return (result as String, spans)
+    }
+
+    private static func revertReferenceSpans(replacement: String, current: String, spans: [RenameReferenceSpan]) -> (text: String, spans: [RenameReferenceSpan]) {
+        let expected = Array(replacement.utf16)
+        let actual = Array(current.utf16)
+        let difference = actual.difference(from: expected)
+        var removed: Set<Int> = []
+        var inserted: Set<Int> = []
+        for change in difference {
+            switch change { case .remove(let offset, _, _): removed.insert(offset); case .insert(let offset, _, _): inserted.insert(offset) }
+        }
+        var mapping: [Int: Int] = [:]
+        var source = 0
+        var destination = 0
+        while source < expected.count || destination < actual.count {
+            if removed.contains(source) { source += 1; continue }
+            if inserted.contains(destination) { destination += 1; continue }
+            guard source < expected.count, destination < actual.count else { break }
+            mapping[source] = destination
+            source += 1
+            destination += 1
+        }
+        let actualString = current as NSString
+        var mappedSpans: [RenameReferenceSpan] = []
+        for span in spans {
+            if let mapped = mapping[span.range.location], (0..<span.range.length).allSatisfy({ mapping[span.range.location + $0] == mapped + $0 }),
+               mapped + span.range.length <= actualString.length,
+               actualString.substring(with: NSRange(location: mapped, length: span.range.length)) == span.after {
+                mappedSpans.append(.init(range: NSRange(location: mapped, length: span.range.length), before: span.before, after: span.after))
+            }
+        }
+        let result = NSMutableString(string: current)
+        for span in mappedSpans.reversed() { result.replaceCharacters(in: span.range, with: span.before) }
+        var delta = 0
+        let reverseSpans = mappedSpans.map { span in
+            let reverse = RenameReferenceSpan(range: NSRange(location: span.range.location + delta, length: (span.before as NSString).length), before: span.after, after: span.before)
+            delta += reverse.range.length - span.range.length
+            return reverse
+        }
+        return (result as String, reverseSpans)
     }
 
     // MARK: Attachments
@@ -707,12 +921,12 @@ final class NoteLibrary {
         }
     }
 
-    private func perform(_ change: StoreChange) {
+    func perform(_ change: StoreChange) {
         queued += 1
         store?.perform(change)
     }
 
-    private func registerUndo(_ undoManager: UndoManager?, name: String, _ handler: @escaping (NoteLibrary) -> Void) {
+    func registerUndo(_ undoManager: UndoManager?, name: String, _ handler: @escaping (NoteLibrary) -> Void) {
         guard let undoManager else { return }
         undoManager.registerUndo(withTarget: self, handler: handler)
         undoManager.setActionName(name)
@@ -760,7 +974,7 @@ final class NoteLibrary {
     }
 
     /// `name.md` in the directory, or the first free name numbered after it, as the Finder numbers a copy.
-    private func uniquePath(_ name: String, in directory: String, except id: Note.ID?) -> String {
+    func uniquePath(_ name: String, in directory: String, except id: Note.ID?) -> String {
         let prefix = directory.isEmpty ? "" : directory + "/"
         var candidate = "\(prefix)\(name).md"
         var number = 2

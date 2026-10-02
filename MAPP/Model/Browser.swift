@@ -25,6 +25,8 @@ final class Browser {
     var typesQuery = ""
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
+    var isCreatingItem = false
+    var isImportingFiles = false
 
     nonisolated enum Palette: Hashable {
         case commands, search
@@ -54,6 +56,18 @@ final class Browser {
     }
 
     /// The selected notes that still exist.
+    func files(in library: NoteLibrary) -> [AppFile] {
+        let files: [AppFile]
+        switch item {
+        case .allNotes, .files: files = library.files
+        case .inbox: files = library.files.filter { $0.folderID == nil }
+        case .folder(let id): files = library.files.filter { $0.folderID == id }
+        default: files = []
+        }
+        guard isSearching else { return files }
+        return library.files.filter { $0.title.localizedStandardContains(searchText) }
+    }
+
     func selectedNotes(in library: NoteLibrary) -> [Note] {
         selection.compactMap { library.note($0) }
     }
@@ -86,13 +100,16 @@ final class Browser {
 
     func selectFirstNote(in library: NoteLibrary, order: NoteOrder) {
         let first = sections(in: library, order: order, now: library.now()).first?.notes.first
-        selection = first.map { [$0.id] } ?? []
+        selection = (first?.id ?? files(in: library).first?.id).map { [$0] } ?? []
     }
 
     /// A new note where the list can show it. Recently Deleted and Marfa Types cannot hold one, so it goes to
     /// the Inbox, and a search is cleared so the note is not hidden by it.
     func newNote(in library: NoteLibrary, undoManager: UndoManager?) {
-        if item == .recentlyDeleted || item == .marfaTypes { sidebarItem = .inbox }
+        switch item {
+        case .recentlyDeleted, .marfaTypes, .files, .project, .itemType: sidebarItem = .inbox
+        default: break
+        }
         searchText = ""
         isSearchExpanded = false
         let note = library.newNote(in: item, undoManager: undoManager)
@@ -117,6 +134,9 @@ final class Browser {
     /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
     func folderRemoved(in library: NoteLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
+            show(.allNotes, in: library, order: order)
+        }
+        if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
             show(.allNotes, in: library, order: order)
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
@@ -149,7 +169,8 @@ final class Browser {
         var selection: [String]
 
         enum Item: Codable, Equatable {
-            case inbox, allNotes, pinned, recentlyDeleted, marfaTypes
+            case inbox, allNotes, pinned, recentlyDeleted, marfaTypes, files
+            case itemType(String), project(String)
             case folder(String)
         }
     }
@@ -162,10 +183,13 @@ final class Browser {
             case .pinned: .pinned
             case .recentlyDeleted: .recentlyDeleted
             case .marfaTypes: .marfaTypes
+            case .files: .files
+            case .itemType(let type): .itemType(type)
+            case .project(let id): .project(library.note(id)?.path ?? "")
             case .folder(let id): .folder(library.folder(id)?.name ?? "")
             }
         }
-        let paths = selection.compactMap { library.note($0)?.path }.sorted()
+        let paths = selection.compactMap { library.item($0)?.projection.filePath }.sorted()
         return Snapshot(sidebarItem: item, selection: paths)
     }
 
@@ -177,12 +201,16 @@ final class Browser {
         case .pinned: sidebarItem = .pinned
         case .recentlyDeleted: sidebarItem = .recentlyDeleted
         case .marfaTypes: sidebarItem = .marfaTypes
+        case .files: sidebarItem = .files
+        case .itemType(let type): sidebarItem = WorkbenchSchema.definition(type) == nil ? .allNotes : .itemType(type)
+        case .project(let path): sidebarItem = library.note(at: path).map { .project($0.id) } ?? .allNotes
         case .folder(let name):
             sidebarItem = library.folders.first { $0.name == name }.map { .folder($0.id) } ?? .allNotes
         case .allNotes, nil: sidebarItem = .allNotes
         }
         let paths = Set(snapshot.selection)
         selection = Set(notes(in: library).filter { $0.path.map(paths.contains) == true }.map(\.id))
+        selection.formUnion(files(in: library).filter { paths.contains($0.path) }.map(\.id))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }

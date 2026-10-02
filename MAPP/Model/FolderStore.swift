@@ -22,6 +22,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let files = FileManager()
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+    var imported: @MainActor @Sendable (UUID, String) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     /// Paths the library gave that were taken, and the paths used instead, for the changes the library queued
     /// before it heard of the new path; once it has, the old path is its own again. Read and written on the
@@ -61,8 +62,12 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             for case let url as URL in walk {
                 let path = relativePath(of: url)
                 if path == Self.attachments { walk.skipDescendants(); continue }
-                guard url.pathExtension.lowercased() == "md", let note = read(url, path: path) else { continue }
-                library.notes.append(note)
+                guard let safe = fileURL(for: path), safe == url.standardizedFileURL else { continue }
+                if url.pathExtension.lowercased() == "md" {
+                    if let note = read(url, path: path) { library.notes.append(note) }
+                } else if let file = readFile(url, path: path) {
+                    library.files.append(file)
+                }
             }
             library.trash = readManifest().compactMap { entry in
                 let url = binURL(entry.id)
@@ -75,6 +80,26 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             }
             return library
         }
+    }
+
+    func fileURL(for path: String) -> URL? {
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains("..") else { return nil }
+        let base = root.standardizedFileURL.resolvingSymlinksInPath()
+        let target = root.appending(path: path).standardizedFileURL
+        let resolved = target.resolvingSymlinksInPath()
+        guard resolved.pathComponents.starts(with: base.pathComponents), resolved.pathComponents.count > base.pathComponents.count,
+              let values = try? target.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              values.isRegularFile == true, values.isSymbolicLink != true else { return nil }
+        return target
+    }
+
+    private func readFile(_ url: URL, path: String) -> StoredFile? {
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey, .documentIdentifierKey, .fileIdentifierKey]),
+              values.isRegularFile == true else { return nil }
+        let modified = values.contentModificationDate ?? .now
+        return StoredFile(path: path, created: values.creationDate ?? modified, modified: modified,
+                          byteCount: Int64(values.fileSize ?? 0),
+                          fileID: values.documentIdentifier.map { UInt64(truncatingIfNeeded: $0) } ?? values.fileIdentifier)
     }
 
     private func read(_ url: URL, path: String) -> StoredNote? {
@@ -217,6 +242,41 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try move(binURL(id), to: target)
             try writeManifest(readManifest().filter { $0.id != id })
             report(path, target)
+        case .importFile(let path, let source, let requestID):
+            guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains(".."),
+                  !path.split(separator: "/").contains(where: { $0.hasPrefix(".") }),
+                  path.split(separator: "/").first != Substring(Self.attachments) else { throw CocoaError(.fileWriteInvalidFileName) }
+            let target = available(root.appending(path: path))
+            let base = root.standardizedFileURL.resolvingSymlinksInPath()
+            guard target.resolvingSymlinksInPath().pathComponents.starts(with: base.pathComponents) else { throw CocoaError(.fileWriteNoPermission) }
+            let access = source.startAccessingSecurityScopedResource()
+            defer { if access { source.stopAccessingSecurityScopedResource() } }
+            let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else { throw CocoaError(.fileReadUnsupportedScheme) }
+            try files.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var failure: Error?
+            var coordinationError: NSError?
+            NSFileCoordinator().coordinate(readingItemAt: source, options: .withoutChanges,
+                                           writingItemAt: target, options: .forReplacing, error: &coordinationError) { from, to in
+                do {
+                    let coordinatedValues = try from.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                    guard coordinatedValues.isRegularFile == true, coordinatedValues.isSymbolicLink != true,
+                          to.resolvingSymlinksInPath().pathComponents.starts(with: base.pathComponents) else {
+                        throw CocoaError(.fileWriteNoPermission)
+                    }
+                    // An interrupted copy must not appear as a complete item in the library.
+                    let scratch = try files.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: to, create: true)
+                    defer { try? files.removeItem(at: scratch) }
+                    let staged = scratch.appending(path: to.lastPathComponent)
+                    try files.copyItem(at: from, to: staged)
+                    // Move fails if another writer took the destination meanwhile; never overwrite it.
+                    try files.moveItem(at: staged, to: to)
+                } catch { failure = error }
+            }
+            if let error = coordinationError ?? failure { throw error }
+            let actual = relativePath(of: target)
+            let imported = imported
+            Task { @MainActor in imported(requestID, actual) }
         case .attach(let path, let data):
             defer { reservations.withLock { _ = $0.remove(path.lowercased()) } }
             try writeNew(data, to: root.appending(path: path))

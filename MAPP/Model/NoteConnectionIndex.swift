@@ -90,7 +90,8 @@ nonisolated struct NoteConnectionIndex: Sendable {
             for title in Self.bodyTargets(record.body) {
                 references.append(.init(sourceID: record.id, origin: .body, targetTitle: title, resolution: resolve(title)))
             }
-            guard let type = record.declaredType, let fields = record.fields else { continue }
+            guard let fields = record.fields else { continue }
+            let type = record.declaredType ?? "core.note"
             for rule in rulesByType[type, default: []] {
                 guard let field = fields[rule.field] else { continue }
                 let values: [NoteFieldValue]

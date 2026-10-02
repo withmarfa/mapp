@@ -6,6 +6,7 @@ import SwiftUI
 /// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
     @Environment(NoteLibrary.self) private var library
+    @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openSettings) private var openSettings
     @StoredOrder private var order
@@ -182,13 +183,18 @@ struct CommandPalette: View {
     private var commands: [Entry] {
         let selected = browser.selectedNotes(in: library)
         let ids = Set(selected.map(\.id))
-        let one = selected.count == 1 ? selected.first : nil
+        let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
         }
 
         if library.isLoaded {
+            add(String(localized: "New Item…"), "plus", "⌃⌘N") { browser.isCreatingItem = true }
+            add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
+            if browser.selection.count == 1, let details {
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
+            }
             add(String(localized: "New Note"), "square.and.pencil", "⌘N") { browser.newNote(in: library, undoManager: undoManager) }
             add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
@@ -200,11 +206,13 @@ struct CommandPalette: View {
         })
 
         if let one, !one.isDeleted {
+            if editor.hasNote, editor.noteID == one.id {
             for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                            .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
             where format != .table || !editor.caret.inTable {
                 let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
                 add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
+            }
             }
             add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
         }
@@ -242,6 +250,9 @@ struct CommandPalette: View {
 
     private var places: [Entry] {
         var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.pinned, "pin")]
+        items += library.items.filter { $0.type?.id == "aic.project" }.map { (.project($0.id), "square.stack") }
+        items += WorkbenchSchema.types.map { (.itemType($0.id), "doc.text") }
+        items += [(.files, "doc")]
         items += library.folders.map { (.folder($0.id), "folder") }
         items += [(.recentlyDeleted, "trash"), (.marfaTypes, "cube")]
         return items.map { item, systemImage in

@@ -1,10 +1,13 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
     @State private var editor = EditorController()
+    @State private var details = DetailsPresentation()
+    @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @State private var types = MarfaTypesPage()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
@@ -12,8 +15,18 @@ struct MainView: View {
     @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
+    @State private var importRequestID: UUID?
+    private let restoresWindow: Bool
 
-    var body: some View {
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
+        _browser = State(initialValue: browser)
+        _details = State(initialValue: details)
+        self.restoresWindow = restoresWindow
+    }
+
+    var body: some View { renamingWindow }
+
+    private var splitView: some View {
         // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
         // the window never changes its columns (see MarfaTypesPage).
         NavigationSplitView {
@@ -54,9 +67,19 @@ struct MainView: View {
                 }
             }
             .toolbar(id: "main") {
-                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
+                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
             }
         }
+    }
+
+    private var presentedWindow: some View {
+        splitView
+        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes } set: { details.isPresented = $0 }) {
+            ItemInspectorHost(browser: browser, details: details)
+                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+        }
+        .focusedSceneValue(\.detailsPresentation, details)
+        .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
@@ -79,16 +102,22 @@ struct MainView: View {
         .focusedSceneValue(\.editor, editor)
         .focusedSceneValue(\.marfaTypes, browser.showsTypes ? types : nil)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
+    }
+
+    private var lifecycleWindow: some View {
+        presentedWindow
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
+        .onChange(of: library.items.map(\.id)) { browser.folderRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot(in: library)) { _, snapshot in
-            storedBrowser = try? JSONEncoder().encode(snapshot)
+            if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
         .onDisappear { editor.flush() }
         .onAppear {
+            if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
@@ -97,9 +126,27 @@ struct MainView: View {
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
-            if library.isLoaded { restore() }
+            if library.isLoaded && restoresWindow { restore() }
         }
+    }
+
+    private var importingWindow: some View {
+        lifecycleWindow
+        .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
+        .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                let requestID = UUID()
+                importRequestID = requestID
+                library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
+            }
+        }
+        .onChange(of: library.items.map(\.id), revealImportedItem)
+        .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
+    }
+
+    private var renamingWindow: some View {
+        importingWindow
         .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
             TextField("Name", text: $noteName)
             Button("Rename") { renameNote() }
@@ -114,6 +161,20 @@ struct MainView: View {
         } message: {
             Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
         }
+    }
+
+    private var completedImportID: UUID? {
+        importRequestID.flatMap { library.completedImports[$0] }
+    }
+
+    private func revealImportedItem() {
+        guard let requestID = importRequestID, let id = completedImportID,
+              library.item(id) != nil else { return }
+        browser.sidebarItem = .allNotes
+        browser.searchText = ""
+        browser.selection = [id]
+        library.consumeImportCompletion(requestID)
+        importRequestID = nil
     }
 
     /// The list's search comes out as a field, which takes the keyboard; asked for over Marfa Types, it searches
