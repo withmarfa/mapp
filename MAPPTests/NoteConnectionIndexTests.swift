@@ -190,4 +190,27 @@ struct NoteConnectionIndexTests {
         #expect(index.edges.isEmpty)
     }
 
+
+    @Test func zeroWidthSpaceIsSignificantInTitlesAndTypedNames() {
+        let significant = record("\u{200B}Leading")
+        let plain = record("Leading")
+        let source = record("Source", header: "about: ['[[Leading]]', '[[\u{200B}Leading]]', '[[\u{200B}Leading|shown]]', '\u{200B}[[Leading]]']\n")
+        let index = NoteConnectionIndex(records: [significant, plain, source], rulesByType: rules)
+        #expect(index.references.map(\.resolution) == [.resolved(plain.id), .resolved(significant.id), .resolved(significant.id)])
+        #expect(index.references.map(\.targetTitle) == ["Leading", "\u{200B}Leading", "\u{200B}Leading|shown"])
+        #expect(index.issues.count == 1)
+        let missing = NoteConnectionIndex(records: [plain, source], rulesByType: rules)
+        #expect(missing.references.map(\.resolution) == [.resolved(plain.id), .missing, .missing])
+    }
+
+    @Test(arguments: [" ", "\t", "\u{A0}"])
+    func unicodeWhitespaceAroundTitlesAndTypedNamesIsTrimmed(space: String) {
+        let target = record("\(space)Leading\(space)")
+        let source = record("Source", header: "about: '\(space)[[\(space)Leading\(space)]]\(space)'\n")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.first?.resolution == .resolved(target.id))
+        #expect(index.references.first?.targetTitle == "Leading")
+        #expect(index.issues.isEmpty)
+    }
+
 }

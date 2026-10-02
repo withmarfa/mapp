@@ -67,7 +67,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
         }
         func matches(_ name: String) -> [UUID] {
             if let id = Self.itemID(name) { return declaredIDs[id, default: []] }
-            return names[Self.nameKey(name.trimmingCharacters(in: .whitespacesAndNewlines)), default: []]
+            return names[Self.nameKey(NoteName.trimmed(name)), default: []]
         }
         func resolve(_ title: String) -> NoteReferenceResolution {
             let name = Self.baseName(title)
@@ -121,7 +121,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
     }
 
     private static func names(of record: NoteProjection) -> [String] {
-        let title = record.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = NoteName.trimmed(record.title)
         guard let path = record.filePath else { return [title] }
         let filename = (path as NSString).lastPathComponent
         // File names retain their whitespace; only titles and typed names are trimmed.
@@ -137,16 +137,15 @@ nonisolated struct NoteConnectionIndex: Sendable {
     private static func baseName(_ title: String) -> String {
         // A combining mark can share a grapheme with the delimiter, but cannot hide it.
         let base = title.unicodeScalars.prefix { $0 != "|" && $0 != "#" }
-        return String(String.UnicodeScalarView(base)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return NoteName.trimmed(String(String.UnicodeScalarView(base)))
     }
 
     private static func typedTarget(_ text: String) -> String? {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = NoteName.trimmed(text)
         let scalars = text.unicodeScalars
         guard scalars.count > 4, scalars.prefix(2).elementsEqual("[[".unicodeScalars),
               scalars.suffix(2).elementsEqual("]]".unicodeScalars) else { return nil }
-        let title = String(String.UnicodeScalarView(scalars.dropFirst(2).dropLast(2)))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = NoteName.trimmed(String(String.UnicodeScalarView(scalars.dropFirst(2).dropLast(2))))
         guard !title.isEmpty,
               !title.unicodeScalars.contains(where: { $0 == "[" || $0 == "]" || $0 == "\n" || $0 == "\r" }) else { return nil }
         guard !baseName(title).isEmpty else { return nil }

@@ -114,4 +114,12 @@ struct NoteProjectionTests {
         #expect(named.file.text == file.text)
     }
 
+
+    @Test func zeroWidthSpaceTitleIsNotEmptyButUnicodeWhitespaceIs() {
+        let significant = NoteProjection(id: UUID(), file: NoteFile(text: "---\ntitle: '\u{200B}'\n---"), fallbackTitle: "Fallback")
+        #expect(significant.title == "\u{200B}")
+        let whitespace = NoteProjection(id: UUID(), file: NoteFile(text: "---\ntitle: ' \u{A0}'\n---"), fallbackTitle: "Fallback")
+        #expect(whitespace.title == "Fallback")
+    }
+
 }
