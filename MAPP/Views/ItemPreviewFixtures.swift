@@ -60,8 +60,11 @@ enum ItemPreviewFixtures {
 }
 
 #Preview("New Item") {
-    NewItemSheet(browser: Browser())
+    let browser = Browser()
+    let _ = browser.startItemDraft()
+    MainView(browser: browser, restoresWindow: false)
         .environment(ItemPreviewFixtures.library)
+        .frame(width: 1180, height: 760)
 }
 
 #Preview("Complete Item Window") {

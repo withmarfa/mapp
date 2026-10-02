@@ -89,15 +89,22 @@ struct ItemPropertyRow: View {
     }
 
     private var textField: some View {
-        TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
-            input.text = $0
-            input.isDirty = true
-            input.rejected = false
-        }, axis: definition.key == "description" ? .vertical : .horizontal)
-        .lineLimit(definition.key == "description" ? 2...5 : 1...1)
-        .focused($isFocused)
-        .onSubmit { commit() }
-        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+        VStack(alignment: .leading, spacing: 5) {
+            Text(LocalizedStringKey(definition.label))
+                .font(.subheadline).foregroundStyle(.secondary)
+            TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
+                input.text = $0
+                input.isDirty = true
+                input.rejected = false
+            }, axis: definition.key == "description" ? .vertical : .horizontal)
+            .textFieldStyle(.plain)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(definition.key == "description" ? 2...5 : 1...1)
+            .focused($isFocused)
+            .onSubmit { commit() }
+            .accessibilityIdentifier("ItemProperty.\(definition.key)")
+        }
     }
 
     private var invalidValue: String? {
@@ -169,14 +176,16 @@ nonisolated enum ItemValueText {
 }
 
 #Preview("Property Controls") {
-    Form {
-        ForEach(WorkbenchSchema.taskProperties) { definition in
-            ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
-                            isEditable: true, onChange: { _ in true })
+    ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(WorkbenchSchema.taskProperties) { definition in
+                ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
+                                isEditable: true, onChange: { _ in true })
+            }
+            ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date),
+                            value: .string("2026-10-02"), isEditable: true, onChange: { _ in true })
         }
-        ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date),
-                        value: .string("2026-10-02"), isEditable: true, onChange: { _ in true })
+        .padding(16)
     }
-    .formStyle(.grouped)
     .frame(width: 320, height: 440)
 }

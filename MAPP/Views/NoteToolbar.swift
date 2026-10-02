@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The toolbar over a note, laid out as Notes lays out its own: New Note leading, the formatting tools in the
-/// centre, and Share and a More menu trailing. Everything but New Note can be moved or removed
+/// The toolbar over a note, laid out as Notes lays out its own: New Item leading, the formatting tools in the
+/// centre, and Share and a More menu trailing. Everything but New Item can be moved or removed
 /// through Customize Toolbar, and every item is also a menu command, since a toolbar can be hidden.
 struct NoteToolbar: CustomizableToolbarContent {
     @Environment(NoteLibrary.self) private var library
@@ -22,39 +22,39 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "format") {
             FormatMenu(editor: editor, note: editableNote)
         }
-        .hidden(showsTypes || selectedFileURL != nil)
+        .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
         ToolbarItem(id: "checklist") {
             FormatButton(format: .checklist, systemImage: "checklist", editor: editor, note: editableNote)
         }
-        .hidden(showsTypes || selectedFileURL != nil)
+        .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
         ToolbarItem(id: "table") {
             FormatButton(format: .table, systemImage: "tablecells", editor: editor, note: editableNote)
         }
-        .hidden(showsTypes || selectedFileURL != nil)
+        .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
         ToolbarItem(id: "attach") {
             Button("Attach Image", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .help("Attach Image")
                 .disabled(editableNote == nil)
         }
-        .hidden(showsTypes || selectedFileURL != nil)
+        .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
 
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
             NoteShareLink(note: (browser?.selection.count ?? notes.count) == 1 ? notes.first : nil, fileURL: selectedFileURL)
                 .help("Share")
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || browser?.isCreatingItem == true)
         ToolbarItem(id: "details") {
             Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
                 .help(details.isPresented ? "Hide Details" : "Show Details")
                 .disabled((browser?.selection.count ?? notes.count) != 1)
                 .accessibilityIdentifier("DetailsToggle")
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || browser?.isCreatingItem == true)
         ToolbarItem(id: "more") {
             MoreMenu(notes: (browser?.selection.count ?? notes.count) == notes.count ? notes : [], browser: browser)
         }
-        .hidden(showsTypes || selectedFileURL != nil)
+        .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
     }
 
     /// Marfa Types shows a page, not a note, so the tools for notes step aside.
@@ -75,19 +75,13 @@ struct NoteToolbar: CustomizableToolbarContent {
 
 private struct NewNoteButton: View {
     @Environment(NoteLibrary.self) private var library
-    @Environment(\.undoManager) private var undoManager
     let browser: Browser?
 
     var body: some View {
-        Menu("New Item", systemImage: "square.and.pencil") {
-            Button("New Note") { browser?.newNote(in: library, undoManager: undoManager) }
-            Button("New Item…") { browser?.isCreatingItem = true }
-            Divider()
-            Button("Import Files…") { browser?.isImportingFiles = true }
-        } primaryAction: {
-            browser?.newNote(in: library, undoManager: undoManager)
+        Button("New Item", systemImage: "square.and.pencil") {
+            browser?.startItemDraft()
         }
-        .help("New Note")
+        .help("New Item")
         .disabled(browser == nil || !library.isLoaded)
     }
 }

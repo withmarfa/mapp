@@ -67,34 +67,39 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
-    // A note is titled by its file, as Marfa reads it, and a note's file is named after its first line for as
-    // long as the note goes by it, taking a changed line's name once the note is left.
-    func testANewNoteIsNamedAfterItsFirstLineAndFollowsIt() {
-        sidebarItem("Inbox").click()
-        window.toolbars.buttons["New Note"].click()
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
-        editor.typeText("Groceries\nMilk and eggs")
+    private func beginNewItem(title: String = "") {
+        app.typeKey("n", modifierFlags: .command)
+        let field = window.textFields["NewItemTitle"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.click()
+        if !title.isEmpty { field.typeText(title) }
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(editor.waitForExistence(timeout: 3))
+    }
+
+    func testANewItemHasAnEditableTitleIndependentOfItsBody() {
+        beginNewItem(title: "Groceries")
         XCTAssertTrue(row(titled: "Groceries").waitForExistence(timeout: 3))
-        row(titled: "Garden ideas").click()
-        row(titled: "Groceries").click()
-        editor.click()
-        editor.typeKey(.upArrow, modifierFlags: .command)
-        editor.typeText("Weekly ")
+        editor.typeText("Milk and eggs")
+        let title = window.textFields["ItemPageTitle"]
+        title.click()
+        title.typeKey("a", modifierFlags: .command)
+        title.typeText("Weekly Groceries")
+        title.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(row(titled: "Weekly Groceries").waitForExistence(timeout: 3))
-        row(titled: "Garden ideas").click()
-        row(titled: "Weekly Groceries").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Weekly Groceries"))
+        XCTAssertTrue(waitForText("CONTAINS", "Milk and eggs"))
     }
 
     func testNewNoteIsCreatedSelectedAndEmpty() {
-        let before = count(of: "Inbox")
+        let before = count(of: "All Notes")
         sidebarItem("Inbox").click()
-        window.toolbars.buttons["New Note"].click()
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         // An empty page holds nothing but the line the caret sits on.
         let empty = expectation(for: NSPredicate(format: "value == nil OR value MATCHES %@", "\\s*"), evaluatedWith: editor)
         wait(for: [empty], timeout: 3)
-        XCTAssertEqual(count(of: "Inbox"), before + 1)
+        XCTAssertEqual(count(of: "All Notes"), before + 1)
     }
 
     func testDeletingFromTheContextMenuMovesToRecentlyDeletedAndUndoes() {
@@ -180,10 +185,10 @@ final class WindowTests: XCTestCase {
     }
 
     func testCommandNMakesANoteReadyForTyping() {
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
-        app.typeText("# Shopping")
-        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
+        app.typeText("Shopping")
+        XCTAssertTrue(waitForText("CONTAINS", "Shopping"))
     }
 
     func testTheDeleteKeyDeletesTheSelectedNote() {
@@ -210,7 +215,7 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        // New Note leads what "new" finds; the arrow key moves on to New Folder.
+        // New Item leads what "new" finds; the arrow key moves on to New Folder.
         app.typeText("new")
         app.typeKey(.downArrow, modifierFlags: [])
         app.typeKey(.return, modifierFlags: [])
@@ -298,8 +303,8 @@ final class WindowTests: XCTestCase {
     }
 
     func testUndoInTheEditMenuUndoesTypingInThePage() {
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeText("Groceries")
         XCTAssertTrue(waitForText("==", "Groceries"))
         app.menuBars.menuBarItems["Edit"].click()
@@ -309,16 +314,16 @@ final class WindowTests: XCTestCase {
 
     func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
         let before = count(of: "All Notes")
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeKey("z", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "Untitled").waitForNonExistence(timeout: 2))
         XCTAssertEqual(count(of: "All Notes"), before)
     }
 
     func testATableIsInsertedFromTheFormatMenu() {
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeText("Quotes")
         app.typeKey("t", modifierFlags: [.command, .option])
         let table = page.tables.firstMatch
@@ -509,11 +514,11 @@ final class WindowTests: XCTestCase {
     func testANewNoteFromMarfaTypesGoesToTheInbox() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "New Note").waitForExistence(timeout: 2))
-        XCTAssertTrue(window.title.hasPrefix("Inbox"), "the window shows the Inbox, not \(window.title)")
-        app.typeText("# Shopping")
-        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 2))
+        beginNewItem()
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
+        XCTAssertTrue(window.textFields["ItemPageTitle"].exists, "the new item opens its own page")
+        app.typeText("Shopping")
+        XCTAssertTrue(waitForText("CONTAINS", "Shopping"))
     }
 
     func testTheMainWindowPassesTheAccessibilityAudit() throws {

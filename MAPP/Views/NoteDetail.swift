@@ -5,6 +5,7 @@ struct NoteDetail: View {
     @Environment(NoteLibrary.self) private var library
     let browser: Browser
     let editor: EditorController
+    let details: DetailsPresentation
 
     var body: some View {
         let notes = browser.selection.compactMap { library.note($0) }
@@ -20,7 +21,7 @@ struct NoteDetail: View {
                     .onAppear { editor.close() }
             }
         } else if let note = notes.first {
-            NotePage(note: note, editor: editor)
+            NotePage(note: note, editor: editor, headerDrafts: details)
                 .onAppear(perform: grantFocusRequest)
                 .onChange(of: browser.focusRequest, grantFocusRequest)
         } else {
@@ -45,18 +46,23 @@ struct NotePage: View {
     let note: Note
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
+    let headerDrafts: DetailsPresentation
 
     var body: some View {
         GeometryReader { proxy in
             NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
                 .ignoresSafeArea(.container, edges: .top)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if note.isDeleted {
-                DeletedNoteBanner(id: note.id)
-            } else if let item = library.item(note.id), item.type?.id != "core.note" {
-                ItemSummary(item: item, parent: library.relationships(for: note.id).first { $0.field == "child-of" }?.targets.first?.title)
-            }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if note.isDeleted {
+                        DeletedNoteBanner(id: note.id)
+                    } else if let item = library.item(note.id) {
+                        ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                            .id(note.id)
+                            .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+                    }
+                }
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
@@ -86,27 +92,6 @@ private struct DeletedNoteBanner: View {
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(.bar)
-    }
-}
-
-/// Only useful at-a-glance information occupies the document header; full details stay in the inspector.
-struct ItemSummary: View {
-    let item: AppItem
-    let parent: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(item.title).font(.title2.weight(.semibold)).textSelection(.enabled)
-            HStack(spacing: 12) {
-                if let type = item.type { Text(type.label) }
-                if let status = item.fields["status"]?.string { Text(ItemPropertyRow.choiceLabel(status)) }
-                if let parent { Label(parent, systemImage: "square.stack").lineLimit(1) }
-            }
-            .font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24).padding(.vertical, 10)
         .background(.bar)
     }
 }

@@ -18,7 +18,7 @@ struct NoteWindow: View {
     var body: some View {
         Group {
             if let note {
-                NotePage(note: note, editor: editor)
+                NotePage(note: note, editor: editor, headerDrafts: details)
                     .navigationTitle(note.title)
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [note.id], undoManager: undoManager))

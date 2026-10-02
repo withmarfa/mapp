@@ -5,22 +5,53 @@ struct ItemRelationshipSection: View {
     let onOpen: (UUID) -> Void
     let onEdit: () -> Void
 
+    var onRemove: ((UUID) -> Bool)? = nil
+    @State private var rejected = false
+
     var body: some View {
-        Section {
-            if relationship.targets.isEmpty {
-                Text("Not Set").foregroundStyle(.secondary)
-            } else {
-                ForEach(relationship.targets) { target in
-                    ItemTargetRow(target: target, onOpen: onOpen)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(LocalizedStringKey(relationship.label))
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                if relationship.isEditable {
+                    Button(action: onEdit) {
+                        Image(systemName: relationship.targets.isEmpty ? "plus" : "pencil")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(relationship.targets.isEmpty ? String(localized: "Add Relationship") : String(localized: "Change Relationship"))
+                    .accessibilityLabel(relationship.targets.isEmpty ? "Add Relationship" : "Change Relationship")
+                    .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
                 }
             }
-            if relationship.isEditable {
-                Button("Edit…", action: onEdit)
-                    .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
+            ForEach(relationship.targets) { target in
+                HStack(alignment: .top, spacing: 6) {
+                    ItemTargetRow(target: target, onOpen: onOpen)
+                    if relationship.isEditable {
+                        Menu {
+                            if let id = target.itemID {
+                                Button("Open Item") { onOpen(id) }
+                            }
+                            Button(relationship.allowsMultiple ? "Manage Connections…" : "Replace…", action: onEdit)
+                            if let id = target.itemID, let onRemove {
+                                Button("Remove Connection", role: .destructive) { rejected = !onRemove(id) }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .accessibilityLabel("Connection Actions")
+                    }
+                }
             }
-        } header: {
-            Text(LocalizedStringKey(relationship.label))
+            if rejected {
+                Text("The connection could not be removed.")
+                    .font(.caption).foregroundStyle(.red)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -32,7 +63,10 @@ struct ItemTargetRow: View {
         if let id = target.itemID {
             Button { onOpen(id) } label: {
                 HStack {
-                    Text(target.title).multilineTextAlignment(.leading)
+                    Text(target.title)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.right").foregroundStyle(.tertiary)
                 }
@@ -42,6 +76,7 @@ struct ItemTargetRow: View {
         } else {
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.title)
+                    .fixedSize(horizontal: false, vertical: true)
                 Label(resolutionLabel, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -95,6 +130,8 @@ struct ItemRelationshipPicker: View {
                             .foregroundStyle(selection.contains(candidate.id) ? Color.accentColor : .secondary)
                         VStack(alignment: .leading) {
                             Text(candidate.title)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(LocalizedStringKey(candidate.type?.label ?? "File"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -138,4 +175,16 @@ struct ItemRelationshipPicker: View {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.isEmpty ? candidates : candidates.filter { $0.title.localizedStandardContains(query) }
     }
+}
+
+#Preview("Wrapping Connections") {
+    let id = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+    ItemRelationshipSection(
+        relationship: .init(field: "child-of", label: "Parent", targets: [
+            .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
+        ], isEditable: true, allowsMultiple: false),
+        onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
+    )
+    .padding(16)
+    .frame(width: 300)
 }

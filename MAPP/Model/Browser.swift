@@ -26,6 +26,7 @@ final class Browser {
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
     var isCreatingItem = false
+    var itemDraft: NewItemDraft?
     var isImportingFiles = false
 
     nonisolated enum Palette: Hashable {
@@ -69,7 +70,7 @@ final class Browser {
     }
 
     func selectedNotes(in library: NoteLibrary) -> [Note] {
-        selection.compactMap { library.note($0) }
+        isCreatingItem ? [] : selection.compactMap { library.note($0) }
     }
 
     /// The list's sections. Pinned notes lead wherever pins mean something: not in Pinned itself, where every
@@ -91,6 +92,7 @@ final class Browser {
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
+        isCreatingItem = false
         searchText = ""
         typesQuery = ""
         isSearchExpanded = false
@@ -103,18 +105,37 @@ final class Browser {
         selection = (first?.id ?? files(in: library).first?.id).map { [$0] } ?? []
     }
 
-    /// A new note where the list can show it. Recently Deleted and Marfa Types cannot hold one, so it goes to
-    /// the Inbox, and a search is cleared so the note is not hidden by it.
-    func newNote(in library: NoteLibrary, undoManager: UndoManager?) {
-        switch item {
-        case .recentlyDeleted, .marfaTypes, .files, .project, .itemType: sidebarItem = .inbox
-        default: break
+    /// A draft belongs to the window, so leaving its page never discards what was typed.
+    func startItemDraft() {
+        if itemDraft == nil { itemDraft = NewItemDraft(place: item) }
+        isCreatingItem = true
+        focusRequest = .page
+    }
+
+    /// Blank titles receive a unique name without requiring a naming dialog before typing.
+    func createDraft(in library: NoteLibrary, undoManager: UndoManager?) -> Note? {
+        guard let draft = itemDraft else { return nil }
+        var title = NoteName.trimmed(draft.title)
+        if title.isEmpty {
+            let untitled = String(localized: "Untitled")
+            title = untitled
+            var suffix = 2
+            while library.notes.contains(where: { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }) {
+                title = "\(untitled) \(suffix)"
+                suffix += 1
+            }
         }
+        guard let note = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
+        isCreatingItem = false
+        itemDraft = nil
         searchText = ""
         isSearchExpanded = false
-        let note = library.newNote(in: item, undoManager: undoManager)
+        if !library.notes(in: item).contains(where: { $0.id == note.id }) {
+            sidebarItem = .itemType(draft.typeID)
+        }
         selection = [note.id]
         focusRequest = .page
+        return note
     }
 
     func newFolder(in library: NoteLibrary, order: NoteOrder, undoManager: UndoManager?) {
@@ -212,5 +233,20 @@ final class Browser {
         selection = Set(notes(in: library).filter { $0.path.map(paths.contains) == true }.map(\.id))
         selection.formUnion(files(in: library).filter { paths.contains($0.path) }.map(\.id))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
+    }
+}
+
+@Observable
+final class NewItemDraft {
+    var typeID: String
+    var title = ""
+    var body = ""
+    var parentID: UUID?
+    let place: SidebarItem
+
+    init(place: SidebarItem) {
+        self.place = place
+        if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
+        if case .project(let id) = place { parentID = id }
     }
 }

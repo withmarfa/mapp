@@ -123,7 +123,7 @@ extension NoteLibrary {
     }
 
     @discardableResult
-    func createItem(typeID: String, title: String, parentID: UUID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
+    func createItem(typeID: String, title: String, body: String = "\n", parentID: UUID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
         let title = NoteName.trimmed(title)
         guard let type = WorkbenchSchema.definition(typeID), !title.isEmpty,
               NoteText.fileSafe(title) == title,
@@ -143,7 +143,7 @@ extension NoteLibrary {
         if let parentID { guard let parentReference = reference(to: parentID) else { return nil }; file.setProperty("child-of", parentReference) }
         if typeID == "aic.decision" { file.setProperty("occurred_at", DateFormatter.itemDay.string(from: now())) }
         if typeID == "aic.agent.session" { file.setProperty("starts_at", ISO8601DateFormatter().string(from: now())); file.setProperty("ends_at", "") }
-        file.body = "\n"
+        file.body = body
         var note = Note(text: file.text, created: now())
         var directory = type.folder
         if case .folder(let id) = place, let folder = folder(id) { directory = folder.name; note.folderID = id }
