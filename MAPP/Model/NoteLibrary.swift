@@ -5,9 +5,9 @@ import Observation
 /// made here at once, handed to the store to make on disk, and undoable through the undo manager it is given.
 @Observable
 final class NoteLibrary {
-    var notes: [Note]
+    var notes: [Note] { didSet { cachedConnectionIndex = nil } }
     var folders: [Folder]
-    private(set) var files: [AppFile] = []
+    private(set) var files: [AppFile] = [] { didSet { cachedConnectionIndex = nil } }
     private(set) var completedImports: [UUID: UUID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
@@ -16,6 +16,10 @@ final class NoteLibrary {
     /// Something the store could not do, to tell the person: what failed and why.
     var failure: (title: String, message: String)?
     let now: () -> Date
+
+    /// Derived snapshots only; source files and note identities remain the authority.
+    @ObservationIgnored var cachedItemProjections: [UUID: NoteProjection] = [:]
+    @ObservationIgnored var cachedConnectionIndex: NoteConnectionIndex?
 
     @ObservationIgnored let store: NoteStore?
     @ObservationIgnored private let defaults: UserDefaults?

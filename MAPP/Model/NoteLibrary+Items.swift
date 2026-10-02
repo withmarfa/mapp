@@ -4,14 +4,29 @@ extension NoteLibrary {
     // MARK: Typed items
 
     func item(_ id: UUID) -> AppItem? {
-        if let note = note(id) { return AppItem(projection: NoteProjection(note: note), isDeleted: note.isDeleted) }
+        if let note = note(id) { return AppItem(projection: itemProjection(note), isDeleted: note.isDeleted) }
         return files.first { $0.id == id }.map(AppItem.init(file:))
     }
 
-    var items: [AppItem] { notes.filter { !$0.isDeleted }.map { AppItem(projection: NoteProjection(note: $0)) } + files.map(AppItem.init(file:)) }
+    var items: [AppItem] { notes.filter { !$0.isDeleted }.map { AppItem(projection: itemProjection($0)) } + files.map(AppItem.init(file:)) }
+
+    func itemProjection(_ note: Note) -> NoteProjection {
+        if let cached = cachedItemProjections[note.id], cached.file == note.file,
+           cached.filePath == note.path, cached.title == note.title { return cached }
+        let projection = NoteProjection(note: note)
+        cachedItemProjections[note.id] = projection
+        return projection
+    }
 
     var connectionIndex: NoteConnectionIndex {
-        NoteConnectionIndex(records: notes.filter { !$0.isDeleted }.map(NoteProjection.init) + files.map { AppItem(file: $0).projection }, rulesByType: WorkbenchSchema.rulesByType)
+        // Read observable sources on cache hits too, so views keep their dependencies.
+        let sourceNotes = notes
+        let sourceFiles = files
+        if let cachedConnectionIndex { return cachedConnectionIndex }
+        let records = sourceNotes.filter { !$0.isDeleted }.map(itemProjection) + sourceFiles.map { AppItem(file: $0).projection }
+        let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
+        cachedConnectionIndex = index
+        return index
     }
 
     func relationships(for id: UUID) -> [ItemRelationship] {
@@ -46,7 +61,7 @@ extension NoteLibrary {
                 return item(note.id)?.relationshipFields.contains(ownerField) == true && (ownerField != "child-of" || validParent(id, forType: item(note.id)?.type?.id ?? "core.note"))
             }
             return field != "child-of" || validParent(note.id, forType: item(id)?.type?.id ?? "core.note")
-        }.map { AppItem(projection: NoteProjection(note: $0)) } + ((field == "about" || field == "derived-from") ? files.map(AppItem.init(file:)) : [])
+        }.map { AppItem(projection: itemProjection($0)) } + ((field == "about" || field == "derived-from") ? files.map(AppItem.init(file:)) : [])
         return candidates.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -99,7 +114,7 @@ extension NoteLibrary {
             file.setProperty("about", spelling)
             let probeID = UUID()
             let probe = NoteProjection(id: probeID, file: file, fallbackTitle: probeID.uuidString)
-            let records = notes.filter { !$0.isDeleted }.map(NoteProjection.init) + files.map { AppItem(file: $0).projection } + [probe]
+            let records = notes.filter { !$0.isDeleted }.map(itemProjection) + files.map { AppItem(file: $0).projection } + [probe]
             let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
             if index.references.contains(where: { $0.sourceID == probeID && $0.resolution == .resolved(targetID) }) { return spelling }
         }
@@ -267,7 +282,7 @@ extension NoteLibrary {
     }
 
     func creationParentCandidates(typeID: String) -> [AppItem] {
-        notes.filter { validParent($0.id, forType: typeID) }.map { AppItem(projection: NoteProjection(note: $0)) }
+        notes.filter { validParent($0.id, forType: typeID) }.map { AppItem(projection: itemProjection($0)) }
     }
 
     func applyItemFiles(_ files: [UUID: NoteFile], undoManager: UndoManager?, name: String) {

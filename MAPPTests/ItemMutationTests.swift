@@ -148,4 +148,23 @@ struct ItemMutationTests {
         #expect(library.note(source.id)?.file.text == source.file.text)
     }
 
+    @Test func itemAndConnectionCachesFollowMutations() {
+        let project = Note(path: "Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\nBody", created: .now)
+        let task = ticket()
+        let library = NoteLibrary(notes: [project, task])
+        _ = library.connectionIndex
+        #expect(library.item(task.id)?.fields["status"] == .string("pending"))
+        #expect(library.setItemProperty(task.id, key: "status", value: .string("completed")))
+        #expect(library.item(task.id)?.fields["status"] == .string("completed"))
+        #expect(library.setItemRelationship(task.id, field: "child-of", targetIDs: [project.id]))
+        #expect(library.connectionIndex.edges.contains { $0.name == "parent-of" && $0.sourceID == project.id && $0.targetID == task.id })
+        library.updateBody(of: task.id, to: "See [[Area]].")
+        #expect(library.bodyMentions(for: task.id).first?.itemID == project.id)
+        library.renameNote(project.id, to: "New Area")
+        #expect(library.item(project.id)?.title == "New Area")
+        #expect(library.bodyMentions(for: task.id).first?.itemID == project.id)
+        library.delete([task.id])
+        #expect(!library.connectionIndex.edges.contains { $0.targetID == task.id })
+    }
+
 }
