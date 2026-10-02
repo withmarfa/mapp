@@ -40,7 +40,7 @@ struct NoteToolbar: CustomizableToolbarContent {
 
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
-            NoteShareLink(note: notes.count == 1 ? notes.first : nil, fileURL: selectedFileURL)
+            NoteShareLink(note: (browser?.selection.count ?? notes.count) == 1 ? notes.first : nil, fileURL: selectedFileURL)
                 .help("Share")
         }
         .hidden(showsTypes)
@@ -52,7 +52,7 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .hidden(showsTypes)
         ToolbarItem(id: "more") {
-            MoreMenu(notes: notes, browser: browser)
+            MoreMenu(notes: (browser?.selection.count ?? notes.count) == notes.count ? notes : [], browser: browser)
         }
         .hidden(showsTypes || selectedFileURL != nil)
     }
@@ -67,7 +67,8 @@ struct NoteToolbar: CustomizableToolbarContent {
 
     /// The one note shown, when it can be written in; the formatting tools act on nothing else.
     private var editableNote: Note? {
-        guard notes.count == 1, let note = notes.first, !note.isDeleted else { return nil }
+        guard (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
+              let note = notes.first, !note.isDeleted, editor.hasNote, editor.noteID == note.id else { return nil }
         return note
     }
 }

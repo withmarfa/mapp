@@ -183,7 +183,7 @@ struct CommandPalette: View {
     private var commands: [Entry] {
         let selected = browser.selectedNotes(in: library)
         let ids = Set(selected.map(\.id))
-        let one = selected.count == 1 ? selected.first : nil
+        let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
@@ -206,11 +206,13 @@ struct CommandPalette: View {
         })
 
         if let one, !one.isDeleted {
+            if editor.hasNote, editor.noteID == one.id {
             for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                            .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
             where format != .table || !editor.caret.inTable {
                 let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
                 add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
+            }
             }
             add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
         }

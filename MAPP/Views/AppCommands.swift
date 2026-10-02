@@ -49,11 +49,11 @@ struct AppCommands: Commands {
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)
             Divider()
-            NoteShareLink(note: shown.count == 1 ? shown.first : nil, fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
+            NoteShareLink(note: ids.count == 1 ? shown.first : nil, fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
             Button("Rename Note…", systemImage: "pencil") {
-                browser?.renamingNote = shown.first?.id
+                browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
             }
-            .disabled(browser == nil || shown.count != 1 || shown.first?.isDeleted != false)
+            .disabled(browser == nil || ids.count != 1 || shown.count != 1 || shown.first?.isDeleted != false)
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                     .environment(library)
