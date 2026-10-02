@@ -121,4 +121,18 @@ struct ItemMutationTests {
         #expect(library.note(source.id)?.body == "[[Old]] [[New]]\nMore")
     }
 
+    @Test func renameRedoKeepsUnchangedReferencesAndLaterTextWithDifferentTitleLengths() {
+        let target = ticket("OldLong")
+        let source = Note(path: "Source.md", text: "[[OldLong]] [[New]]", created: .now)
+        let library = NoteLibrary(notes: [target, source])
+        let undo = UndoManager()
+        library.renameNote(target.id, to: "New", undoManager: undo)
+        library.updateBody(of: source.id, to: "[[New]] [[New]]\nMore")
+        undo.undo()
+        #expect(library.note(source.id)?.body == "[[OldLong]] [[New]]\nMore")
+        library.updateBody(of: source.id, to: "[[OldLong]] [[New]]\nMore\nExtra")
+        undo.redo()
+        #expect(library.note(source.id)?.body == "[[New]] [[New]]\nMore\nExtra")
+    }
+
 }

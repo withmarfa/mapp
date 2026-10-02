@@ -610,13 +610,17 @@ final class NoteLibrary {
         }
     }
 
-    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], oldLink: String, newLink: String, undoManager: UndoManager?) {
+    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], oldLink: String, newLink: String, spans: [UUID: [NSRange]]? = nil, undoManager: UndoManager?) {
+        var nextSpans: [UUID: [NSRange]] = [:]
         var restored: [UUID: NoteFile] = [:]
         var before: [UUID: NoteFile] = [:]
         for (sourceID, original) in originals {
             guard var current = note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
             before[sourceID] = current
-            current.body = Self.revertReferenceSpans(original: original.body, replacement: replacement.body, current: current.body, oldLink: oldLink, newLink: newLink)
+            let changedSpans = spans?[sourceID] ?? Self.renamedReferenceSpans(original: original.body, oldLink: oldLink, newLink: newLink)
+            let bodyChange = Self.revertReferenceSpans(replacement: replacement.body, current: current.body, oldLink: oldLink, newLink: newLink, spans: changedSpans)
+            current.body = bodyChange.text
+            nextSpans[sourceID] = bodyChange.spans
             let oldFields = NoteProjection(id: sourceID, file: original, fallbackTitle: "").fields ?? [:]
             let newFields = NoteProjection(id: sourceID, file: replacement, fallbackTitle: "").fields ?? [:]
             let currentFields = NoteProjection(id: sourceID, file: current, fallbackTitle: "").fields ?? [:]
@@ -627,12 +631,27 @@ final class NoteLibrary {
         }
         applyItemFiles(restored, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Links")) { [weak undoManager] library in
-            library.restoreRenameReferences(originals: before, replacements: restored, oldLink: newLink, newLink: oldLink, undoManager: undoManager)
+            library.restoreRenameReferences(originals: before, replacements: restored, oldLink: newLink, newLink: oldLink, spans: nextSpans, undoManager: undoManager)
         }
     }
 
-    private static func revertReferenceSpans(original: String, replacement: String, current: String, oldLink: String, newLink: String) -> String {
-        if current == replacement { return original }
+    private static func renamedReferenceSpans(original: String, oldLink: String, newLink: String) -> [NSRange] {
+        let old = original as NSString
+        var cursor = 0
+        var delta = 0
+        var spans: [NSRange] = []
+        while cursor < old.length {
+            let range = old.range(of: oldLink, options: [], range: NSRange(location: cursor, length: old.length - cursor))
+            guard range.location != NSNotFound else { break }
+            let length = (newLink as NSString).length
+            spans.append(NSRange(location: range.location + delta, length: length))
+            delta += length - range.length
+            cursor = range.location + range.length
+        }
+        return spans
+    }
+
+    private static func revertReferenceSpans(replacement: String, current: String, oldLink: String, newLink: String, spans: [NSRange]) -> (text: String, spans: [NSRange]) {
         let expected = Array(replacement.utf16)
         let actual = Array(current.utf16)
         let difference = actual.difference(from: expected)
@@ -652,24 +671,24 @@ final class NoteLibrary {
             source += 1
             destination += 1
         }
-        let old = original as NSString
-        var cursor = 0
-        var delta = 0
+        let actualString = current as NSString
         var ranges: [NSRange] = []
-        while cursor < old.length {
-            let range = old.range(of: oldLink, options: [], range: NSRange(location: cursor, length: old.length - cursor))
-            guard range.location != NSNotFound else { break }
-            let start = range.location + delta
-            let length = (newLink as NSString).length
-            if let mapped = mapping[start], (0..<length).allSatisfy({ mapping[start + $0] == mapped + $0 }) {
-                ranges.append(NSRange(location: mapped, length: length))
+        for span in spans {
+            if let mapped = mapping[span.location], (0..<span.length).allSatisfy({ mapping[span.location + $0] == mapped + $0 }),
+               mapped + span.length <= actualString.length,
+               actualString.substring(with: NSRange(location: mapped, length: span.length)) == newLink {
+                ranges.append(NSRange(location: mapped, length: span.length))
             }
-            delta += length - range.length
-            cursor = range.location + range.length
         }
         let result = NSMutableString(string: current)
         for range in ranges.reversed() { result.replaceCharacters(in: range, with: oldLink) }
-        return result as String
+        var delta = 0
+        let reverseSpans = ranges.map { range in
+            let span = NSRange(location: range.location + delta, length: (oldLink as NSString).length)
+            delta += span.length - range.length
+            return span
+        }
+        return (result as String, reverseSpans)
     }
 
     // MARK: Attachments
