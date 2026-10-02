@@ -94,31 +94,21 @@ struct ItemInspector: View {
                 }
                 if relationships.contains(where: { !$0.targets.isEmpty || $0.isEditable }) {
                     Divider()
-                    VStack(alignment: .leading, spacing: 14) {
-                        ForEach(relationships.filter { !$0.targets.isEmpty }) { relationship in
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(relationships.filter { !$0.targets.isEmpty || $0.isEditable }) { relationship in
                             ItemRelationshipSection(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
                                 onRemove: onRemove.map { remove in { target in remove(relationship, target) } })
                         }
-                        let emptyRelationships = relationships.filter { $0.targets.isEmpty && $0.isEditable }
-                        if !emptyRelationships.isEmpty {
-                            Menu {
-                                ForEach(emptyRelationships) { relationship in
-                                    Button(LocalizedStringKey(relationship.label)) { onEdit(relationship) }
-                                        .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
-                                }
-                            } label: {
-                                Label("Add Connection", systemImage: "plus")
-                            }
-                            .menuStyle(.borderlessButton)
-                            .accessibilityIdentifier("AddConnection")
-                            .fixedSize()
-                        }
+
                     }
                 }
                 if !mentions.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Links in Content").font(.subheadline).foregroundStyle(.secondary)
-                        ForEach(mentions) { ItemTargetRow(target: $0, onOpen: onOpen) }
+                        ForEach(mentions) { target in
+                            ItemTargetRow(target: target, onOpen: onOpen)
+                                .padding(.vertical, 5)
+                        }
                         Text("These links come from the document text.")
                             .font(.caption).foregroundStyle(.secondary)
                     }

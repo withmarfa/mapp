@@ -9,23 +9,11 @@ struct ItemRelationshipSection: View {
     @State private var rejected = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(LocalizedStringKey(relationship.label))
-                    .font(.subheadline).foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                if relationship.isEditable {
-                    Button(action: onEdit) {
-                        Image(systemName: relationship.targets.isEmpty ? "plus" : "pencil")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(relationship.targets.isEmpty ? String(localized: "Add Relationship") : String(localized: "Change Relationship"))
-                    .accessibilityLabel(relationship.targets.isEmpty ? "Add Relationship" : "Change Relationship")
-                    .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
-                }
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(LocalizedStringKey(relationship.label))
+                .font(.subheadline).foregroundStyle(.secondary)
             ForEach(relationship.targets) { target in
-                HStack(alignment: .top, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     ItemTargetRow(target: target, onOpen: onOpen)
                     if relationship.isEditable {
                         Menu {
@@ -33,6 +21,7 @@ struct ItemRelationshipSection: View {
                                 Button("Open Item") { onOpen(id) }
                             }
                             Button(relationship.allowsMultiple ? "Manage Connections…" : "Replace…", action: onEdit)
+                                .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
                             if let id = target.itemID, let onRemove {
                                 Button("Remove Connection", role: .destructive) { rejected = !onRemove(id) }
                             }
@@ -43,8 +32,23 @@ struct ItemRelationshipSection: View {
                         .menuIndicator(.hidden)
                         .fixedSize()
                         .accessibilityLabel("Connection Actions")
+                        .accessibilityIdentifier("RelationshipActions.\(relationship.field).\(target.id)")
                     }
                 }
+                .padding(.vertical, 4)
+            }
+            if relationship.isEditable && (relationship.targets.isEmpty || relationship.allowsMultiple) {
+                Button(action: onEdit) {
+                    Label {
+                        Text("Add \(Text(LocalizedStringKey(relationship.label)))…")
+                    } icon: {
+                        Image(systemName: "plus")
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
+                .accessibilityIdentifier("RelationshipAdd.\(relationship.field)")
             }
             if rejected {
                 Text("The connection could not be removed.")
@@ -62,14 +66,11 @@ struct ItemTargetRow: View {
     var body: some View {
         if let id = target.itemID {
             Button { onOpen(id) } label: {
-                HStack {
-                    Text(target.title)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer(minLength: 4)
-                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-                }
+                Text(target.title)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("RelationshipTarget.\(id.uuidString)")
@@ -179,12 +180,24 @@ struct ItemRelationshipPicker: View {
 
 #Preview("Wrapping Connections") {
     let id = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
-    ItemRelationshipSection(
-        relationship: .init(field: "child-of", label: "Parent", targets: [
-            .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
-        ], isEditable: true, allowsMultiple: false),
-        onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
-    )
+    VStack(alignment: .leading, spacing: 18) {
+        ItemRelationshipSection(
+            relationship: .init(field: "child-of", label: "Parent", targets: [
+                .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
+            ], isEditable: true, allowsMultiple: false),
+            onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
+        )
+        ItemRelationshipSection(
+            relationship: .init(field: "about", label: "About", targets: [
+                .init(title: "Field notes", itemID: id, resolution: .resolved(id))
+            ], isEditable: true, allowsMultiple: true),
+            onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
+        )
+        ItemRelationshipSection(
+            relationship: .init(field: "supersedes", label: "Supersedes", targets: [], isEditable: true, allowsMultiple: false),
+            onOpen: { _ in }, onEdit: {}
+        )
+    }
     .padding(16)
     .frame(width: 300)
 }

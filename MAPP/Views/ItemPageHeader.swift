@@ -42,10 +42,7 @@ struct ItemPageHeader: View {
                 Button("Discard Changes") { titleDraft.isDirty = false; titleDraft.rejected = false }
                     .font(.caption)
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 8) { chips }
-                VStack(alignment: .leading, spacing: 8) { chips }
-            }
+            ItemChipLayout { chips }
             if propertyError {
                 Text("The value could not be saved. Please try again.")
                     .font(.caption).foregroundStyle(.red)
@@ -64,10 +61,9 @@ struct ItemPageHeader: View {
 
     @ViewBuilder private var chips: some View {
         if let type = item.type {
-            Text(LocalizedStringKey(type.label))
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.horizontal, 9).padding(.vertical, 5)
-                .background(.quaternary, in: .capsule)
+            ItemChipLabel(title: Text(LocalizedStringKey(type.label)))
+                .itemChipStyle()
+                .accessibilityIdentifier("ItemTypeChip")
                 .help("Item Type")
         }
         if let status, case .choice(let choices) = status.kind {
@@ -84,11 +80,10 @@ struct ItemPageHeader: View {
                     }
                 }
             } label: {
-                Label((item.fields[status.key]?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status"), systemImage: "circle.lefthalf.filled")
+                ItemChipLabel(title: Text((item.fields[status.key]?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status")),
+                              systemImage: "circle.lefthalf.filled")
             }
-            .menuStyle(.borderlessButton).fixedSize()
-            .font(.caption).padding(.horizontal, 9).padding(.vertical, 5)
-            .background(.quaternary, in: .capsule)
+            .itemChipMenuStyle()
             .disabled(!item.isEditable)
             .accessibilityIdentifier("ItemStatusChip")
             .accessibilityLabel("Status")
@@ -102,12 +97,10 @@ struct ItemPageHeader: View {
                 Button(parent.targets.isEmpty ? "Choose Parent…" : "Change Parent…") { editingParent = true }
                     .disabled(!parent.isEditable)
             } label: {
-                Label(parent.targets.first?.title ?? String(localized: "Add Parent"), systemImage: "square.stack")
-                    .lineLimit(2).multilineTextAlignment(.leading)
+                ItemChipLabel(title: Text(parent.targets.first?.title ?? String(localized: "Add Parent")),
+                              systemImage: "square.stack")
             }
-            .menuStyle(.borderlessButton)
-            .font(.caption).padding(.horizontal, 9).padding(.vertical, 5)
-            .background(.quaternary, in: .rect(cornerRadius: 10))
+            .itemChipMenuStyle()
             .accessibilityIdentifier("ItemParentChip")
         }
     }

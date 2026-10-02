@@ -123,7 +123,7 @@ final class PageFinder: NSObject, NSTextFinderClient {
     }
 }
 
-/// The page with the system find bar above it while the bar shows, both under the toolbar.
+/// The system find bar reserves space inside the editor so matches never sit behind it.
 final class EditorContainer: WebViewContainer, NSTextFinderBarContainer {
     var onFindBarVisibilityChange: (Bool) -> Void = { _ in }
 

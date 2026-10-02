@@ -9,7 +9,6 @@ struct NewItemPage: View {
     @StoredPageStyle private var style
     @State private var rejected = false
     @FocusState private var titleFocused: Bool
-    @FocusState private var bodyFocused: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -29,15 +28,37 @@ struct NewItemPage: View {
                 .onSubmit { startWriting() }
                 .accessibilityLabel("Title")
                 .accessibilityIdentifier("NewItemTitle")
-            HStack {
-                Picker("Type", selection: $draft.typeID) {
-                    ForEach(WorkbenchSchema.types) { type in Text(LocalizedStringKey(type.label)).tag(type.id) }
+            ItemChipLayout {
+                Menu {
+                    ForEach(WorkbenchSchema.types) { type in
+                        Button { draft.typeID = type.id } label: {
+                            if draft.typeID == type.id {
+                                Label(LocalizedStringKey(type.label), systemImage: "checkmark")
+                            } else {
+                                Text(LocalizedStringKey(type.label))
+                            }
+                        }
+                    }
+                } label: {
+                    ItemChipLabel(title: Text(LocalizedStringKey(WorkbenchSchema.definition(draft.typeID)?.label ?? "Type")))
                 }
+                .itemChipMenuStyle()
+                .accessibilityLabel("Type")
                 .accessibilityIdentifier("NewItemType")
-                Picker("Parent", selection: $draft.parentID) {
-                    Text("None").tag(nil as UUID?)
-                    ForEach(parents) { item in Text(item.title).tag(Optional(item.id)) }
+                Menu {
+                    Button("None") { draft.parentID = nil }
+                    ForEach(parents) { item in
+                        Button { draft.parentID = item.id } label: {
+                            if draft.parentID == item.id { Label(item.title, systemImage: "checkmark") }
+                            else { Text(item.title) }
+                        }
+                    }
+                } label: {
+                    ItemChipLabel(title: Text(parents.first { $0.id == draft.parentID }?.title ?? String(localized: "Add Parent")),
+                                  systemImage: "square.stack")
                 }
+                .itemChipMenuStyle()
+                .accessibilityLabel("Parent")
                 .accessibilityIdentifier("NewItemParent")
             }
             if rejected {
@@ -45,33 +66,18 @@ struct NewItemPage: View {
                     .font(.callout).foregroundStyle(.red)
                 Button("Start Writing") { startWriting() }
             }
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $draft.body)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .focused($bodyFocused)
-                    .accessibilityLabel("Content")
-                    .accessibilityIdentifier("NewItemBody")
-                if draft.body.isEmpty {
-                    Text("Start writing")
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
-                }
+            Button(action: startWriting) {
+                Text("Start writing")
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .contentShape(.rect)
             }
-            HStack {
-                Button("Import File…", systemImage: "square.and.arrow.down") { browser.isImportingFiles = true }
-                Spacer()
-                Button("Back") { browser.isCreatingItem = false }
-                    .help("Your draft is kept until you resume it with New Item.")
-            }
-            .font(.callout)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Start Writing")
+            .accessibilityIdentifier("NewItemBody")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .defaultFocus($titleFocused, true)
-        .onChange(of: bodyFocused) { if bodyFocused { startWriting() } }
-        .onChange(of: draft.body) { if !draft.body.isEmpty { startWriting() } }
         .onChange(of: draft.typeID) {
             if !parents.contains(where: { $0.id == draft.parentID }) { draft.parentID = nil }
             rejected = false

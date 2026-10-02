@@ -219,7 +219,7 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// One part of the page in its column, reaching up under the toolbar as a note does.
+/// The type browser extends under the toolbar; unlike notes, it has no native item header.
 struct MarfaTypesView: View {
     let part: WebViewContainer
 

@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The editor's web view, with the find bar above it when it shows, in SwiftUI. It reaches up under the toolbar
-/// and is told how far the toolbar reaches, so the page can scroll beneath it.
+/// The editor receives only the region below the native item header; the find bar reserves space inside it.
 struct NoteEditor: NSViewRepresentable {
     let controller: EditorController
     let topInset: CGFloat
