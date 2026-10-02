@@ -110,4 +110,15 @@ struct ItemMutationTests {
         #expect(library.relationships(for: note.id).first { $0.field == "child-of" }?.targets.first?.itemID == parent.id)
     }
 
+    @Test func renameUndoRebasesOverLaterBodyEdits() {
+        let target = ticket("Old")
+        let source = Note(path: "Source.md", text: "[[Old]] [[New]]", created: .now)
+        let library = NoteLibrary(notes: [target, source])
+        let undo = UndoManager()
+        library.renameNote(target.id, to: "New", undoManager: undo)
+        library.updateBody(of: source.id, to: "[[New]] [[New]]\nMore")
+        undo.undo()
+        #expect(library.note(source.id)?.body == "[[Old]] [[New]]\nMore")
+    }
+
 }

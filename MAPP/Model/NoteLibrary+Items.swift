@@ -63,7 +63,7 @@ extension NoteLibrary {
             guard let title = value?.string, let item = item(id), item.isEditable, !title.isEmpty,
                   NoteText.fileSafe(title) == title, !isNoteNameTaken(title, for: id) else { return false }
             renameNote(id, to: title, undoManager: undoManager)
-            return true
+            return self.note(id)?.title == title
         }
         guard let index = notes.firstIndex(where: { $0.id == id && !$0.isDeleted }),
               let item = item(id), item.isEditable,
