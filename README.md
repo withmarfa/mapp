@@ -20,7 +20,7 @@ Open `MAPP.xcodeproj`, choose the `MAPP` scheme, and open `MAPP/Views/ItemPrevie
 - **Ticket Details** and **Project and Related Work** show dynamic properties and relationships.
 - **Missing and Unfamiliar Values** shows unresolved targets and preserved unfamiliar properties.
 - **Relationship Selection** and **New Item** expose the native editing flows.
-- **Content and Details** shows the restrained header beside the inspector.
+- **Complete Item Window** renders the actual split view, toolbar, editor, and inspector against the in-memory library.
 - **Unsaved Property Input** lets a rejected save be exercised by editing the field and committing it.
 
 `MAPP/Views/ItemProperties.swift` also previews the individual property controls. `MAPP/Views/FileItemContent.swift` contains the file-view previews. Review the real app for editor behavior, window resizing, keyboard navigation, and saved-file persistence; the component canvas is for iterating on each piece.

@@ -106,7 +106,10 @@ final class Browser {
     /// A new note where the list can show it. Recently Deleted and Marfa Types cannot hold one, so it goes to
     /// the Inbox, and a search is cleared so the note is not hidden by it.
     func newNote(in library: NoteLibrary, undoManager: UndoManager?) {
-        if item == .recentlyDeleted || item == .marfaTypes { sidebarItem = .inbox }
+        switch item {
+        case .recentlyDeleted, .marfaTypes, .files, .project, .itemType: sidebarItem = .inbox
+        default: break
+        }
         searchText = ""
         isSearchExpanded = false
         let note = library.newNote(in: item, undoManager: undoManager)

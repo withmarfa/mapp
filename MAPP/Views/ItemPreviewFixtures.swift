@@ -52,20 +52,13 @@ enum ItemPreviewFixtures {
         .environment(ItemPreviewFixtures.library)
 }
 
-#Preview("Content and Details") {
+#Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
-    HStack(spacing: 0) {
-        VStack(alignment: .leading, spacing: 20) {
-            ItemSummary(item: library.item(ItemPreviewFixtures.ticketID)!, parent: "Field Research")
-            Text("Findings").font(.title).padding(.horizontal, 24)
-            Text("Read the field notes before writing the review.").padding(.horizontal, 24)
-            Spacer()
-        }
-        Divider()
-        ItemInspectorHost(itemID: ItemPreviewFixtures.ticketID).frame(width: 310)
-    }
-    .environment(library)
-    .frame(width: 900, height: 650)
+    let browser = Browser()
+    browser.selection = [ItemPreviewFixtures.ticketID]
+    MainView(browser: browser, restoresWindow: false)
+        .environment(library)
+        .frame(width: 1280, height: 800)
 }
 
 #Preview("Unsaved Property Input") {

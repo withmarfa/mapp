@@ -11,6 +11,12 @@ struct NewItemSheet: View {
     @State private var rejected = false
     @FocusState private var titleFocused: Bool
 
+    init(browser: Browser) {
+        self.browser = browser
+        if case .itemType(let id) = browser.item { _typeID = State(initialValue: id) }
+        if case .project(let id) = browser.item { _parentID = State(initialValue: id) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("New Item").font(.title2.bold())

@@ -55,7 +55,7 @@ struct NoteWindow: View {
         // there when the window is restored, closes.
         .onChange(of: library.isLoaded, initial: true) {
             guard library.isLoaded, id == nil else { return }
-            id = library.items.first { $0.projection.filePath == path }?.id
+            id = path.flatMap { library.note(at: $0) }?.id ?? library.items.first { $0.projection.filePath == path }?.id
             if id == nil { dismiss() }
         }
         .onChange(of: item?.projection.filePath) {

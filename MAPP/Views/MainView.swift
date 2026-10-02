@@ -16,6 +16,12 @@ struct MainView: View {
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var selectedImportID: UUID?
+    private let restoresWindow: Bool
+
+    init(browser: Browser = Browser(), restoresWindow: Bool = true) {
+        _browser = State(initialValue: browser)
+        self.restoresWindow = restoresWindow
+    }
 
     var body: some View {
         // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
@@ -66,7 +72,7 @@ struct MainView: View {
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
         .focusedSceneValue(\.detailsPresentation, details)
-        .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
+        .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
@@ -95,11 +101,11 @@ struct MainView: View {
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot(in: library)) { _, snapshot in
-            storedBrowser = try? JSONEncoder().encode(snapshot)
+            if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
         .onDisappear { editor.flush() }
         .onAppear {
-            details.isPresented = storedDetailsPresented
+            if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
@@ -108,7 +114,7 @@ struct MainView: View {
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
-            if library.isLoaded { restore() }
+            if library.isLoaded && restoresWindow { restore() }
         }
         .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in

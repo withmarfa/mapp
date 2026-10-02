@@ -567,9 +567,11 @@
       "extractionState": "manual"
     },
     "New Item": {
+      "generatesSymbol": false,
       "extractionState": "manual"
     },
     "New Item…": {
+      "generatesSymbol": false,
       "extractionState": "manual"
     },
     "No": {
@@ -660,6 +662,7 @@
       "extractionState": "manual"
     },
     "Type": {
+      "generatesSymbol": false,
       "extractionState": "manual"
     },
     "Unresolved connections will be preserved.": {
