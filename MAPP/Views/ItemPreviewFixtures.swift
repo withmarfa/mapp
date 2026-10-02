@@ -56,7 +56,9 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     let browser = Browser()
     browser.selection = [ItemPreviewFixtures.ticketID]
-    MainView(browser: browser, restoresWindow: false)
+    let details = DetailsPresentation()
+    details.isPresented = true
+    MainView(browser: browser, details: details, restoresWindow: false)
         .environment(library)
         .frame(width: 1280, height: 800)
 }

@@ -18,8 +18,9 @@ struct MainView: View {
     @State private var selectedImportID: UUID?
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), restoresWindow: Bool = true) {
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
         _browser = State(initialValue: browser)
+        _details = State(initialValue: details)
         self.restoresWindow = restoresWindow
     }
 
@@ -98,6 +99,7 @@ struct MainView: View {
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
+        .onChange(of: library.items.map(\.id)) { browser.folderRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot(in: library)) { _, snapshot in

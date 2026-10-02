@@ -16,7 +16,13 @@ struct NoteList: View {
         let _ = daysSeen
         let now = library.now()
         let sections = browser.sections(in: library, order: order, now: now)
-        let files = browser.files(in: library)
+        let files = browser.files(in: library).sorted { lhs, rhs in
+            switch order.sort {
+            case .title: lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            case .dateCreated: lhs.stored.created > rhs.stored.created
+            case .dateEdited: lhs.stored.modified > rhs.stored.modified
+            }
+        }
         let ids = sections.flatMap { $0.notes.map(\.id) } + files.map(\.id)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
@@ -44,8 +50,12 @@ struct NoteList: View {
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
                 }
             }
+            if !files.isEmpty && !sections.isEmpty {
+                Text("Files").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    .padding(.top, 10).selectionDisabled().listRowSeparator(.hidden)
+            }
             ForEach(files) { file in
-                FileListRow(file: file, dateLabel: NoteDate.listLabel(for: file.stored.modified, now: now), previewLines: previewLines)
+                FileListRow(file: file, dateLabel: NoteDate.listLabel(for: order.sort == .dateCreated ? file.stored.created : file.stored.modified, now: now), previewLines: previewLines)
                     .tag(file.id)
             }
         }

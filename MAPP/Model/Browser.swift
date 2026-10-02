@@ -136,6 +136,9 @@ final class Browser {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
+        if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
+            show(.allNotes, in: library, order: order)
+        }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
         }
