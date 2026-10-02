@@ -16,6 +16,18 @@ enum ItemPreviewFixtures {
         ], now: { date })
     }
 
+    static var browser: Browser {
+        let browser = Browser()
+        browser.selection = [ticketID]
+        return browser
+    }
+
+    static var details: DetailsPresentation {
+        let details = DetailsPresentation()
+        details.isPresented = true
+        return details
+    }
+
     static var unresolved: AppItem {
         AppItem(projection: NoteProjection(id: ticketID, file: NoteFile(text: "---\ntype: aic.ticket.task\ntitle: Review the findings\nstatus: unfamiliar_status\npriority: high\nchild-of: \"[[Missing project]]\"\ncustom_property: preserved\n---\nNotes\n"), fallbackTitle: "Review the findings"))
     }
@@ -54,11 +66,7 @@ enum ItemPreviewFixtures {
 
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
-    let browser = Browser()
-    browser.selection = [ItemPreviewFixtures.ticketID]
-    let details = DetailsPresentation()
-    details.isPresented = true
-    MainView(browser: browser, details: details, restoresWindow: false)
+    MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)
         .environment(library)
         .frame(width: 1280, height: 800)
 }
