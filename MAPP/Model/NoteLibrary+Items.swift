@@ -149,7 +149,10 @@ extension NoteLibrary {
     private func validParent(_ parentID: UUID, forType type: String) -> Bool {
         guard let parent = note(parentID), !parent.isDeleted else { return false }
         let parentType = NoteProjection(note: parent).declaredType
-        return parentType == "aic.project" || (parentType == "aic.epic" && type.hasPrefix("aic.ticket."))
+        if parentType == "aic.project" { return true }
+        if type == "aic.project" || type == "aic.epic" { return false }
+        if parentType == "aic.epic" { return true }
+        return !type.hasPrefix("aic.ticket.") && parentType?.hasPrefix("aic.ticket.") == true
     }
 
     @discardableResult
