@@ -312,7 +312,7 @@ final class NoteLibrary {
         case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
         case .recentlyDeleted: return notes.filter(\.isDeleted)
         case .marfaTypes, .files: return []
-        case .itemType(let typeID): return notes.filter { !$0.isDeleted && item($0.id)?.type?.id == typeID }
+        case .itemType(let typeID): return notes.filter { !$0.isDeleted && self.item($0.id)?.type?.id == typeID }
         case .project(let projectID):
             let descendants = projectDescendants(projectID)
             return notes.filter { !$0.isDeleted && descendants.contains($0.id) }
@@ -346,6 +346,7 @@ final class NoteLibrary {
     /// note is written first, so it has somewhere to be; one with nothing in it has nowhere yet, and stays.
     func paths(forWindows ids: some Collection<Note.ID>) -> [String] {
         ids.compactMap { id in
+            if let file = files.first(where: { $0.id == id }) { return file.path }
             guard let note = note(id), !(note.isDraft && NoteText.isBlank(note.body)) else { return nil }
             leave(id)
             return self.note(id)?.path

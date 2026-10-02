@@ -74,7 +74,7 @@ extension NoteLibrary {
         }
         var file = notes[index].file
         file.setField(key, value)
-        applyItemFiles([id: file], undoManager: undoManager, name: String(localized: "Edit Property"))
+        applyItemFieldFiles([id: file], key: key, undoManager: undoManager, name: String(localized: "Edit Property"))
         return true
     }
 
@@ -169,11 +169,11 @@ extension NoteLibrary {
                     targets.append(id)
                 }
                 var file = source.file
-                let values = targets.compactMap { note($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
+                let values = targets.compactMap { self.item($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
                 file.setField(ownerField, values.isEmpty ? nil : ownerField == "about" ? .array(values) : values.first)
                 files[ownerID] = file
             }
-            applyItemFiles(files, undoManager: undoManager, name: String(localized: "Edit Relationship"))
+            applyItemFieldFiles(files, key: ownerField, undoManager: undoManager, name: String(localized: "Edit Relationship"))
             return true
         }
         guard let item = item(id), item.isEditable, item.relationshipFields.contains(field),
@@ -206,11 +206,29 @@ extension NoteLibrary {
         var file = note.file
         let targets = targetIDs.compactMap { self.item($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
-        applyItemFiles([id: file], undoManager: undoManager, name: String(localized: "Edit Relationship"))
+        applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return true
     }
 
-    private func applyItemFiles(_ files: [UUID: NoteFile], undoManager: UndoManager?, name: String) {
+    private func applyItemFieldFiles(_ files: [UUID: NoteFile], key: String, undoManager: UndoManager?, name: String) {
+        let previous = Dictionary(uniqueKeysWithValues: files.keys.compactMap { id in note(id).map { (id, $0.file) } })
+        applyItemFiles(files, undoManager: nil, name: name)
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            var restored: [UUID: NoteFile] = [:]
+            for (id, original) in previous {
+                guard var current = library.note(id)?.file else { continue }
+                current.restoreField(key, from: original)
+                restored[id] = current
+            }
+            library.applyItemFieldFiles(restored, key: key, undoManager: undoManager, name: name)
+        }
+    }
+
+    func creationParentCandidates(typeID: String) -> [AppItem] {
+        notes.filter { validParent($0.id, forType: typeID) }.map { AppItem(projection: NoteProjection(note: $0)) }
+    }
+
+    func applyItemFiles(_ files: [UUID: NoteFile], undoManager: UndoManager?, name: String) {
         var previous: [UUID: NoteFile] = [:]
         for index in notes.indices {
             guard let file = files[notes[index].id], !notes[index].isDeleted, file != notes[index].file else { continue }
