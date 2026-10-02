@@ -3,9 +3,11 @@ import Foundation
 nonisolated struct AppItem: Identifiable, Sendable {
     let projection: NoteProjection
     let file: AppFile?
-    init(projection: NoteProjection) { self.projection = projection; file = nil }
+    let isDeleted: Bool
+    init(projection: NoteProjection, isDeleted: Bool = false) { self.projection = projection; file = nil; self.isDeleted = isDeleted }
     init(file: AppFile) {
         self.file = file
+        isDeleted = false
         projection = NoteProjection(id: file.id, file: NoteFile(text: ""), fallbackTitle: file.title, filePath: file.path)
     }
     var id: UUID { projection.id }
@@ -17,7 +19,7 @@ nonisolated struct AppItem: Identifiable, Sendable {
     var fields: [String: NoteFieldValue] { projection.fields ?? [:] }
     var properties: [ItemPropertyDefinition] { type?.properties ?? [] }
     var relationshipFields: [String] { type?.relationshipFields ?? [] }
-    var isEditable: Bool { if file != nil { return false }; return if case .invalid = projection.frontMatter { false } else { true } }
+    var isEditable: Bool { if file != nil || isDeleted { return false }; return if case .invalid = projection.frontMatter { false } else { true } }
     var validationMessage: String? { if case .invalid(let error) = projection.frontMatter { error.message } else { nil } }
 }
 

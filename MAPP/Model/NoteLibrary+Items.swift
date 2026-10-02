@@ -4,7 +4,7 @@ extension NoteLibrary {
     // MARK: Typed items
 
     func item(_ id: UUID) -> AppItem? {
-        if let note = note(id) { return AppItem(projection: NoteProjection(note: note)) }
+        if let note = note(id) { return AppItem(projection: NoteProjection(note: note), isDeleted: note.isDeleted) }
         return files.first { $0.id == id }.map(AppItem.init(file:))
     }
 
