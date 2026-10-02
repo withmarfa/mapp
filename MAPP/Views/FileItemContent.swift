@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import PDFKit
 import QuickLookUI
 import SwiftUI
@@ -53,9 +54,18 @@ private struct FilePDFView: NSViewRepresentable {
 private struct FileImageView: View {
     let url: URL
     let zoom: Double
+    private var previewImage: NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: 3000,
+                kCGImageSourceCreateThumbnailWithTransform: true
+              ] as CFDictionary) else { return nil }
+        return NSImage(cgImage: thumbnail, size: .zero)
+    }
     var body: some View {
         GeometryReader { geometry in
-            if let image = NSImage(contentsOf: url) {
+            if let image = previewImage {
                 ScrollView([.horizontal, .vertical]) {
                     Image(nsImage: image).resizable().scaledToFit()
                         .frame(width: max(1, geometry.size.width) * zoom, height: max(1, geometry.size.height) * zoom)

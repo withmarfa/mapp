@@ -38,6 +38,28 @@ struct FileItemStoreTests {
         #expect(try Data(contentsOf: input) == Data("Private".utf8))
     }
 
+    @Test func successfulImportReportsActualPathAndDirectoryImportFails() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let source = try TemporaryFolder()
+        try source.write("PDF", to: "Report.pdf")
+        try root.write("Existing", to: "Report.pdf")
+        let store = FolderStore(root: root.url, bin: bin.url)
+        var imported: String?
+        var failure: String?
+        store.imported = { imported = $0 }
+        store.failed = { _, message in failure = message }
+        store.perform(.importFile(path: "Report.pdf", source: source.url.appending(path: "Report.pdf")))
+        store.drain()
+        for _ in 0..<100 where imported == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(imported == "Report 2.pdf")
+        store.perform(.importFile(path: "Directory", source: source.url))
+        store.drain()
+        for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(failure != nil)
+        #expect(!root.exists("Directory"))
+    }
+
     @Test func attachmentAndHiddenFilesRemainExcluded() throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()
