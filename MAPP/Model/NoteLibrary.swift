@@ -306,13 +306,30 @@ final class NoteLibrary {
 
     func notes(in item: SidebarItem) -> [Note] {
         switch item {
-        case .inbox: notes.filter { !$0.isDeleted && $0.folderID == nil }
-        case .allNotes: notes.filter { !$0.isDeleted }
-        case .pinned: notes.filter { !$0.isDeleted && $0.isPinned }
-        case .folder(let id): notes.filter { !$0.isDeleted && $0.folderID == id }
-        case .recentlyDeleted: notes.filter(\.isDeleted)
-        case .marfaTypes: []
+        case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
+        case .allNotes: return notes.filter { !$0.isDeleted }
+        case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
+        case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
+        case .recentlyDeleted: return notes.filter(\.isDeleted)
+        case .marfaTypes, .files: return []
+        case .itemType(let typeID): return notes.filter { !$0.isDeleted && item($0.id)?.type?.id == typeID }
+        case .project(let projectID):
+            let descendants = projectDescendants(projectID)
+            return notes.filter { !$0.isDeleted && descendants.contains($0.id) }
         }
+    }
+
+    private func projectDescendants(_ id: UUID) -> Set<UUID> {
+        let edges = connectionIndex.edges.filter { $0.name == "parent-of" }
+        var result: Set<UUID> = []
+        var pending = [id]
+        while let current = pending.popLast() {
+            for edge in edges where edge.sourceID == current && !result.contains(edge.targetID) && edge.targetID != id {
+                result.insert(edge.targetID)
+                pending.append(edge.targetID)
+            }
+        }
+        return result
     }
 
     /// Search covers every note that has not been deleted, whichever sidebar item is selected.
@@ -352,6 +369,10 @@ final class NoteLibrary {
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
+        case .files: String(localized: "Files")
+        case .itemType(let typeID): WorkbenchSchema.definition(typeID)?.label ?? typeID
+        case .project(let id): note(id)?.title ?? ""
+
         }
     }
 
@@ -594,6 +615,12 @@ final class NoteLibrary {
 
     @discardableResult
     func setItemProperty(_ id: UUID, key: String, value: NoteFieldValue?, undoManager: UndoManager? = nil) -> Bool {
+        if key == "title" {
+            guard let title = value?.string, let item = item(id), item.isEditable, !title.isEmpty,
+                  NoteText.fileSafe(title) == title, !isNoteNameTaken(title, for: id) else { return false }
+            renameNote(id, to: title, undoManager: undoManager)
+            return true
+        }
         guard let index = notes.firstIndex(where: { $0.id == id && !$0.isDeleted }),
               let item = item(id), item.isEditable,
               let definition = item.properties.first(where: { $0.key == key }) else { return false }
@@ -673,6 +700,14 @@ final class NoteLibrary {
             for ownerID in Set(existing + targetIDs) {
                 guard let owner = item(ownerID), owner.isEditable, owner.relationshipFields.contains(ownerField), let source = note(ownerID) else { return false }
                 if ownerField == "child-of" && targetIDs.contains(ownerID) && !validParent(id, forType: owner.type?.id ?? "core.note") { return false }
+                if ownerField == "child-of", targetIDs.contains(ownerID) {
+                    var seen: Set<UUID> = [ownerID]
+                    var cursor: UUID? = id
+                    while let next = cursor {
+                        guard seen.insert(next).inserted else { return false }
+                        cursor = connectionIndex.edges.first { $0.name == "parent-of" && $0.targetID == next }?.sourceID
+                    }
+                }
                 let current = relationships(for: ownerID).first { $0.field == ownerField }?.targets ?? []
                 guard current.allSatisfy({ $0.itemID != nil }) else { return false }
                 var targets = current.compactMap(\.itemID).filter { $0 != id }
