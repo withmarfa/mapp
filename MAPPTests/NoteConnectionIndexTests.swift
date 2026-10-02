@@ -169,4 +169,25 @@ struct NoteConnectionIndexTests {
         #expect(index.edges.count == 1)
     }
 
+
+    @Test func structuralMarkersAreScalarsEvenBesideCombiningMarks() {
+        let title = "\u{301}C"
+        let target = record(title)
+        let source = record("Source", header: "about: '[[\(title)]]'\n", body: "[[\(title)]]\u{301}")
+        let index = NoteConnectionIndex(records: [target, source], rulesByType: rules)
+        #expect(index.references.count == 2)
+        #expect(index.references.allSatisfy { $0.resolution == .resolved(target.id) })
+        #expect(index.references.allSatisfy { $0.targetTitle == title })
+        #expect(index.edges.count == 1)
+        #expect(index.issues.isEmpty)
+    }
+
+    @Test func combiningMarksDoNotHideMalformedInnerBrackets() {
+        let source = record("Source", header: "about: ['[[C[\u{301}part]]', '[[C]\u{301}part]]']\n")
+        let index = NoteConnectionIndex(records: [source], rulesByType: rules)
+        #expect(index.issues.count == 2)
+        #expect(index.references.isEmpty)
+        #expect(index.edges.isEmpty)
+    }
+
 }

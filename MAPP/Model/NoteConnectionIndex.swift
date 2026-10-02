@@ -142,15 +142,19 @@ nonisolated struct NoteConnectionIndex: Sendable {
 
     private static func typedTarget(_ text: String) -> String? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.hasPrefix("[["), text.hasSuffix("]]"), text.count > 4 else { return nil }
-        let title = text.dropFirst(2).dropLast(2).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, !title.contains("["), !title.contains("]"), !title.contains("\n"), !title.contains("\r") else { return nil }
+        let scalars = text.unicodeScalars
+        guard scalars.count > 4, scalars.prefix(2).elementsEqual("[[".unicodeScalars),
+              scalars.suffix(2).elementsEqual("]]".unicodeScalars) else { return nil }
+        let title = String(String.UnicodeScalarView(scalars.dropFirst(2).dropLast(2)))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty,
+              !title.unicodeScalars.contains(where: { $0 == "[" || $0 == "]" || $0 == "\n" || $0 == "\r" }) else { return nil }
         guard !baseName(title).isEmpty else { return nil }
         return title
     }
 
     private static func bodyTargets(_ body: String) -> [String] {
-        body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/).compactMap { match in
+        body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/.matchingSemantics(.unicodeScalar)).compactMap { match in
             typedTarget(String(match.output.0))
         }
     }
