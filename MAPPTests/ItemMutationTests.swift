@@ -72,4 +72,42 @@ struct ItemMutationTests {
         #expect(library.connectionIndex.edges.contains { $0.name == "about" && $0.targetID == target.id })
     }
 
+    @Test func unsupportedQuotedKeyIsRefusedWithoutChangingFile() {
+        let note = Note(path: "Quoted.md", text: "---\ntype: aic.ticket.task\n\"status\": pending\n---\nBody", created: .now)
+        let library = NoteLibrary(notes: [note])
+        #expect(!library.setItemProperty(note.id, key: "status", value: .string("completed")))
+        #expect(library.note(note.id)?.file.text == note.file.text)
+    }
+
+    @Test func undoRestoresMultiParagraphBlockProperty() {
+        let note = Note(path: "Block.md", text: "---\ntype: aic.ticket.task\ndescription: |\n  first\n\n  second\nstatus: pending\n---\nBody", created: .now)
+        let library = NoteLibrary(notes: [note])
+        let undo = UndoManager()
+        #expect(library.setItemProperty(note.id, key: "description", value: .string("Changed"), undoManager: undo))
+        undo.undo()
+        #expect(library.note(note.id)?.file.text == note.file.text)
+    }
+
+    @Test func renameUndoLeavesPreexistingNewReferencesAndProtectedMetadataAlone() {
+        let target = ticket("Old")
+        let source = Note(path: "Source.md", text: "---\ntype: aic.agent.log\nabout: [\"[[Old]]\"]\ncustom: \"[[Old]]\"\nmarfa_id: \"[[Old]]\"\n---\n[[Old]] [[New]]", created: .now)
+        let library = NoteLibrary(notes: [target, source])
+        let undo = UndoManager()
+        library.renameNote(target.id, to: "New", undoManager: undo)
+        #expect(library.note(source.id)?.file.property("custom") == "[[Old]]")
+        #expect(library.note(source.id)?.file.property("marfa_id") == "[[Old]]")
+        undo.undo()
+        #expect(library.note(source.id)?.file.text == source.file.text)
+        undo.redo()
+        #expect(library.note(source.id)?.body == "[[New]] [[New]]")
+    }
+
+    @Test func untypedNoteConnectionsAreVisible() {
+        let parent = Note(path: "Project.md", text: "---\ntype: aic.project\ntitle: Area\n---\nBody", created: .now)
+        let note = Note(path: "Plain.md", text: "Body", created: .now)
+        let library = NoteLibrary(notes: [parent, note])
+        #expect(library.setItemRelationship(note.id, field: "child-of", targetIDs: [parent.id]))
+        #expect(library.relationships(for: note.id).first { $0.field == "child-of" }?.targets.first?.itemID == parent.id)
+    }
+
 }
