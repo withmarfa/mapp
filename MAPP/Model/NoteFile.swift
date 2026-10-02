@@ -131,6 +131,22 @@ nonisolated struct NoteFile: Hashable, Sendable {
         frontMatter = hasContent ? String(raw.first!) + lines.joined() + String(raw.last!) : ""
     }
 
+    /// Encodes only the changed field; the remaining envelope keeps its original spelling.
+    mutating func setField(_ key: String, _ value: NoteFieldValue?) {
+        setProperty(key, yaml: value.map(Self.fieldYAML))
+    }
+
+    private static func fieldYAML(_ value: NoteFieldValue) -> String {
+        switch value {
+        case .null: "null"
+        case .bool(let flag): flag ? "true" : "false"
+        case .number(let number): NSDecimalNumber(decimal: number).stringValue
+        case .string(let text): yaml(text)
+        case .array(let values): "[" + values.map(fieldYAML).joined(separator: ", ") + "]"
+        case .object(let values): "{" + values.keys.sorted().map { yaml($0) + ": " + fieldYAML(values[$0]!) }.joined(separator: ", ") + "}"
+        }
+    }
+
     var isPinned: Bool { property("pinned")?.lowercased() == "true" }
 
     /// The note's own title, which Marfa keeps in the front matter.
