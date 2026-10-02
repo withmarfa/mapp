@@ -15,7 +15,6 @@ struct MainView: View {
     @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
-    @State private var selectedImportID: UUID?
     @State private var importRequestID: UUID?
     private let restoresWindow: Bool
 
@@ -127,15 +126,8 @@ struct MainView: View {
                 library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
             }
         }
-        .onChange(of: library.files.map(\.id)) {
-            if let id = library.lastImportedFileID, library.lastImportedRequestID == importRequestID,
-               importRequestID != nil, id != selectedImportID, library.files.contains(where: { $0.id == id }) {
-                selectedImportID = id
-                browser.sidebarItem = .allNotes
-                browser.searchText = ""
-                browser.selection = [id]
-            }
-        }
+        .onChange(of: library.files.map(\.id), revealImportedItem)
+        .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
         .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
             TextField("Name", text: $noteName)
@@ -151,6 +143,20 @@ struct MainView: View {
         } message: {
             Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
         }
+    }
+
+    private var completedImportID: UUID? {
+        importRequestID.flatMap { library.completedImports[$0] }
+    }
+
+    private func revealImportedItem() {
+        guard let requestID = importRequestID, let id = completedImportID,
+              library.files.contains(where: { $0.id == id }) else { return }
+        browser.sidebarItem = .allNotes
+        browser.searchText = ""
+        browser.selection = [id]
+        library.consumeImportCompletion(requestID)
+        importRequestID = nil
     }
 
     /// The list's search comes out as a field, which takes the keyboard; asked for over Marfa Types, it searches
