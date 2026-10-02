@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -39,11 +40,13 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.click()
         editor.typeText("A document written through the existing editor.")
+        let typedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: editor)
+        wait(for: [typedBody], timeout: 5)
         app.terminate()
         app.launchArguments.append("-MAPPKeepSampleFolder")
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
-        let row = app.outlines["NoteList"].staticTexts["Interface Test Task"]
+        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Interface Test Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.click()
         XCTAssertTrue(app.webViews.firstMatch.textViews.firstMatch.waitForExistence(timeout: 3))
@@ -55,6 +58,23 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 3))
         XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.exists)
+    }
+
+    func testImportPhotoAndShowNativeViewer() {
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "MAPP/PreviewAssets/item-preview-photo.png")
+        app.menuBars.menuBarItems["File"].click()
+        app.menuItems["Import Files…"].click()
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(source.path, forType: .string)
+        app.typeKey("v", modifierFlags: [.command])
+        app.typeKey(.return, modifierFlags: [])
+        let open = app.buttons["Open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 3))
+        open.click()
+        XCTAssertTrue(app.buttons["Zoom In"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.images["item-preview-photo.png"].exists)
     }
 
     private func create(type: String, title: String) {
