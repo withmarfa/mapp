@@ -22,7 +22,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let files = FileManager()
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
-    var imported: @MainActor @Sendable (String) -> Void = { _ in }
+    var imported: @MainActor @Sendable (UUID, String) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     /// Paths the library gave that were taken, and the paths used instead, for the changes the library queued
     /// before it heard of the new path; once it has, the old path is its own again. Read and written on the
@@ -242,7 +242,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             try move(binURL(id), to: target)
             try writeManifest(readManifest().filter { $0.id != id })
             report(path, target)
-        case .importFile(let path, let source):
+        case .importFile(let path, let source, let requestID):
             guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains(".."),
                   !path.split(separator: "/").contains(where: { $0.hasPrefix(".") }),
                   path.split(separator: "/").first != Substring(Self.attachments) else { throw CocoaError(.fileWriteInvalidFileName) }
@@ -276,7 +276,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             if let error = coordinationError ?? failure { throw error }
             let actual = relativePath(of: target)
             let imported = imported
-            Task { @MainActor in imported(actual) }
+            Task { @MainActor in imported(requestID, actual) }
         case .attach(let path, let data):
             defer { reservations.withLock { _ = $0.remove(path.lowercased()) } }
             try writeNew(data, to: root.appending(path: path))

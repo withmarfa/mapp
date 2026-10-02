@@ -47,7 +47,7 @@ struct FileItemStoreTests {
         let store = FolderStore(root: root.url, bin: bin.url)
         var imported: String?
         var failure: String?
-        store.imported = { imported = $0 }
+        store.imported = { _, path in imported = path }
         store.failed = { _, message in failure = message }
         store.perform(.importFile(path: "Report.pdf", source: source.url.appending(path: "Report.pdf")))
         store.drain()

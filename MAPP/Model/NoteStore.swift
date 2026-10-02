@@ -15,7 +15,7 @@ nonisolated protocol NoteStore: AnyObject, Sendable {
     func fileURL(for path: String) -> URL?
 
     /// Called after an imported file is available on disk.
-    var imported: @MainActor @Sendable (String) -> Void { get set }
+    var imported: @MainActor @Sendable (UUID, String) -> Void { get set }
 
     /// Waits until every queued change is made, as the app quits.
     func drain()
@@ -83,7 +83,7 @@ nonisolated enum StoreChange: Sendable, Equatable {
     /// A file a note points at, such as a pasted image, written into the attachments folder.
     case attach(path: String, data: Data)
     /// Copies a user-selected regular file without changing its bytes.
-    case importFile(path: String, source: URL)
+    case importFile(path: String, source: URL, requestID: UUID = UUID())
     /// Erases whatever has been in the trash since before the date.
     case purgeTrash(before: Date)
     case createFolder(path: String)
@@ -97,7 +97,7 @@ extension StoreChange {
     nonisolated var path: String? {
         switch self {
         case .create(let path, _), .write(let path, _), .trash(let path, _, _), .restore(_, let path), .attach(let path, _),
-             .createFolder(let path), .removeFolder(let path), .importFile(let path, _):
+             .createFolder(let path), .removeFolder(let path), .importFile(let path, _, _):
             path
         case .move(_, let to), .moveFolder(_, let to):
             to
@@ -109,8 +109,8 @@ extension StoreChange {
 
 nonisolated extension NoteStore {
     func fileURL(for path: String) -> URL? { nil }
-    var imported: @MainActor @Sendable (String) -> Void {
-        get { { _ in } }
+    var imported: @MainActor @Sendable (UUID, String) -> Void {
+        get { { _, _ in } }
         set {}
     }
 }

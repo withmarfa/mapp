@@ -9,6 +9,7 @@ final class NoteLibrary {
     var folders: [Folder]
     private(set) var files: [AppFile] = []
     private(set) var lastImportedFileID: UUID?
+    private(set) var lastImportedRequestID: UUID?
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
@@ -59,8 +60,9 @@ final class NoteLibrary {
         self.defaults = defaults
         self.now = now
         isLoaded = true
-        store?.imported = { [weak self] path in
+        store?.imported = { [weak self] requestID, path in
             guard let self else { return }
+            self.lastImportedRequestID = requestID
             self.lastImportedFileID = UUID(stableFrom: "file:" + path)
             self.refresh()
         }
@@ -86,11 +88,11 @@ final class NoteLibrary {
         return store?.fileURL(for: file.path)
     }
 
-    func importFiles(_ sources: [URL], folderID: Folder.ID? = nil) {
+    func importFiles(_ sources: [URL], folderID: Folder.ID? = nil, requestID: UUID = UUID()) {
         guard store != nil else { return }
         let prefix = folders.first(where: { $0.id == folderID }).map { $0.name + "/" } ?? ""
         for source in sources {
-            perform(.importFile(path: prefix + source.lastPathComponent, source: source))
+            perform(.importFile(path: prefix + source.lastPathComponent, source: source, requestID: requestID))
         }
     }
 
