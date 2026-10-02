@@ -140,7 +140,7 @@ struct MainView: View {
                 library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
             }
         }
-        .onChange(of: library.files.map(\.id), revealImportedItem)
+        .onChange(of: library.items.map(\.id), revealImportedItem)
         .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
     }
@@ -169,7 +169,7 @@ struct MainView: View {
 
     private func revealImportedItem() {
         guard let requestID = importRequestID, let id = completedImportID,
-              library.files.contains(where: { $0.id == id }) else { return }
+              library.item(id) != nil else { return }
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]

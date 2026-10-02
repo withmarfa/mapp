@@ -4,6 +4,31 @@ import Testing
 
 @MainActor
 struct FileItemStoreTests {
+    @Test func markdownImportCompletionResolvesLoadedNoteAndIsConsumed() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let source = try TemporaryFolder()
+        let text = "---\ntitle: Imported\n---\n# Body\n"
+        try source.write(text, to: "Imported.MD")
+        let store = FolderStore(root: root.url, bin: bin.url)
+        let library = NoteLibrary(loadingFrom: store, defaults: nil)
+        await library.load()
+        let requestID = UUID()
+        library.importFiles([source.url.appending(path: "Imported.MD")], requestID: requestID)
+        store.drain()
+        for _ in 0..<100 where library.completedImports[requestID] == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await library.reread()
+        let expected = UUID(stableFrom: "note:Imported.MD")
+        #expect(library.completedImports[requestID] == expected)
+        #expect(library.note(expected)?.file.text == text)
+        #expect(library.item(expected) != nil)
+        #expect(library.files.isEmpty)
+        library.consumeImportCompletion(requestID)
+        #expect(library.completedImports[requestID] == nil)
+    }
+
     @Test func importsPreserveBytesAndCollisionDoesNotOverwrite() throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()

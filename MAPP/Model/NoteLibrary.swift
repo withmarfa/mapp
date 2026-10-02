@@ -61,7 +61,8 @@ final class NoteLibrary {
         isLoaded = true
         store?.imported = { [weak self] requestID, path in
             guard let self else { return }
-            self.completedImports[requestID] = UUID(stableFrom: "file:" + path)
+            let namespace = (path as NSString).pathExtension.lowercased() == "md" ? "note:" : "file:"
+            self.completedImports[requestID] = UUID(stableFrom: namespace + path)
             self.refresh()
         }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
