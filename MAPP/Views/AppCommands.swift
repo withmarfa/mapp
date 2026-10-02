@@ -9,6 +9,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.marfaTypes) private var marfaTypes
+    @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
 
@@ -21,6 +22,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n")
             .disabled(browser == nil || library?.isLoaded != true)
+            Button("New Item…") { browser?.isCreatingItem = true }
+                .keyboardShortcut("n", modifiers: [.command, .control])
+                .disabled(browser == nil || library?.isLoaded != true)
+            Button("Import Files…") { browser?.isImportingFiles = true }
+                .disabled(browser == nil || library?.isLoaded != true)
             Button("New Folder", systemImage: "folder.badge.plus") {
                 if let library { browser?.newFolder(in: library, order: order, undoManager: notes?.undoManager) }
             }
@@ -80,6 +86,12 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
+                details?.isPresented.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(details == nil || notes?.ids.count != 1 || marfaTypes != nil)
+            Divider()
             OrderOptions()
             Divider()
             PageWidthOptions()

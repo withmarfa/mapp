@@ -1,10 +1,13 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
     @State private var editor = EditorController()
+    @State private var details = DetailsPresentation()
+    @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @State private var types = MarfaTypesPage()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
@@ -12,6 +15,7 @@ struct MainView: View {
     @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
+    @State private var selectedImportID: UUID?
 
     var body: some View {
         // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
@@ -54,9 +58,15 @@ struct MainView: View {
                 }
             }
             .toolbar(id: "main") {
-                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor)
+                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
             }
         }
+        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes } set: { details.isPresented = $0 }) {
+            ItemInspectorHost(browser: browser)
+                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+        }
+        .focusedSceneValue(\.detailsPresentation, details)
+        .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
@@ -89,6 +99,7 @@ struct MainView: View {
         }
         .onDisappear { editor.flush() }
         .onAppear {
+            details.isPresented = storedDetailsPresented
             editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
@@ -98,6 +109,18 @@ struct MainView: View {
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
             if library.isLoaded { restore() }
+        }
+        .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
+        .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { library.importFiles(urls, folderID: browser.selectedFolder) }
+        }
+        .onChange(of: library.files.map(\.id)) {
+            if let id = library.lastImportedFileID, id != selectedImportID, library.files.contains(where: { $0.id == id }) {
+                selectedImportID = id
+                browser.sidebarItem = .allNotes
+                browser.searchText = ""
+                browser.selection = [id]
+            }
         }
         .libraryDialogs()
         .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {

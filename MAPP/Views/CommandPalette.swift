@@ -6,6 +6,7 @@ import SwiftUI
 /// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
     @Environment(NoteLibrary.self) private var library
+    @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openSettings) private var openSettings
     @StoredOrder private var order
@@ -189,6 +190,11 @@ struct CommandPalette: View {
         }
 
         if library.isLoaded {
+            add(String(localized: "New Item…"), "plus", "⌃⌘N") { browser.isCreatingItem = true }
+            add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
+            if browser.selection.count == 1, let details {
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
+            }
             add(String(localized: "New Note"), "square.and.pencil", "⌘N") { browser.newNote(in: library, undoManager: undoManager) }
             add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
@@ -242,6 +248,9 @@ struct CommandPalette: View {
 
     private var places: [Entry] {
         var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.pinned, "pin")]
+        items += library.items.filter { $0.type?.id == "aic.project" }.map { (.project($0.id), "square.stack") }
+        items += WorkbenchSchema.types.map { (.itemType($0.id), "doc.text") }
+        items += [(.files, "doc")]
         items += library.folders.map { (.folder($0.id), "folder") }
         items += [(.recentlyDeleted, "trash"), (.marfaTypes, "cube")]
         return items.map { item, systemImage in

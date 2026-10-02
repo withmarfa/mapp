@@ -4,10 +4,12 @@ import SwiftUI
 /// centre, and Share and a More menu trailing. Everything but New Note can be moved or removed
 /// through Customize Toolbar, and every item is also a menu command, since a toolbar can be hidden.
 struct NoteToolbar: CustomizableToolbarContent {
+    @Environment(NoteLibrary.self) private var library
     /// The main window's browser; nil in a note's own window, which makes no notes.
     let browser: Browser?
     let notes: [Note]
     let editor: EditorController
+    let details: DetailsPresentation
 
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: "newNote") {
@@ -38,8 +40,15 @@ struct NoteToolbar: CustomizableToolbarContent {
 
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
-            NoteShareLink(note: notes.count == 1 ? notes.first : nil)
+            NoteShareLink(note: notes.count == 1 ? notes.first : nil, fileURL: selectedFileURL)
                 .help("Share")
+        }
+        .hidden(showsTypes)
+        ToolbarItem(id: "details") {
+            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+                .help(details.isPresented ? "Hide Details" : "Show Details")
+                .disabled((browser?.selection.count ?? notes.count) != 1)
+                .accessibilityIdentifier("DetailsToggle")
         }
         .hidden(showsTypes)
         ToolbarItem(id: "more") {
@@ -49,6 +58,11 @@ struct NoteToolbar: CustomizableToolbarContent {
     }
 
     /// Marfa Types shows a page, not a note, so the tools for notes step aside.
+    private var selectedFileURL: URL? {
+        guard browser?.selection.count == 1, let id = browser?.selection.first else { return nil }
+        return library.fileURL(for: id)
+    }
+
     private var showsTypes: Bool { browser?.showsTypes == true }
 
     /// The one note shown, when it can be written in; the formatting tools act on nothing else.
@@ -64,7 +78,12 @@ private struct NewNoteButton: View {
     let browser: Browser?
 
     var body: some View {
-        Button("New Note", systemImage: "square.and.pencil") {
+        Menu("New Item", systemImage: "square.and.pencil") {
+            Button("New Note") { browser?.newNote(in: library, undoManager: undoManager) }
+            Button("New Item…") { browser?.isCreatingItem = true }
+            Divider()
+            Button("Import Files…") { browser?.isImportingFiles = true }
+        } primaryAction: {
             browser?.newNote(in: library, undoManager: undoManager)
         }
         .help("New Note")
@@ -136,9 +155,12 @@ private struct MoreMenu: View {
 /// Shares a note's markdown as text, the form every destination can take.
 struct NoteShareLink: View {
     let note: Note?
+    var fileURL: URL? = nil
 
     var body: some View {
-        if let note {
+        if let fileURL {
+            ShareLink(item: fileURL)
+        } else if let note {
             ShareLink(item: note.body, subject: Text(note.title), preview: SharePreview(note.title))
         } else {
             ShareLink(item: "")

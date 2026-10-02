@@ -16,7 +16,8 @@ struct NoteList: View {
         let _ = daysSeen
         let now = library.now()
         let sections = browser.sections(in: library, order: order, now: now)
-        let ids = sections.flatMap { $0.notes.map(\.id) }
+        let files = browser.files(in: library)
+        let ids = sections.flatMap { $0.notes.map(\.id) } + files.map(\.id)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
@@ -42,6 +43,10 @@ struct NoteList: View {
                     .draggable(containerItemID: note.id)
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
                 }
+            }
+            ForEach(files) { file in
+                FileListRow(file: file, dateLabel: NoteDate.listLabel(for: file.stored.modified, now: now), previewLines: previewLines)
+                    .tag(file.id)
             }
         }
         .listStyle(.inset)
@@ -107,14 +112,14 @@ struct NoteList: View {
                 if browser.isSearching {
                     ContentUnavailableView.search(text: browser.searchText)
                 } else {
-                    ContentUnavailableView("No Notes", systemImage: "note.text")
+                    ContentUnavailableView(browser.item == .files ? "No Files" : "No Items", systemImage: browser.item == .files ? "doc" : "note.text")
                 }
             }
         }
         .navigationTitle(title)
         .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
-            : Text("^[\(ids.count) note](inflect: true)"))
+            : Text("^[\(ids.count) item](inflect: true)"))
         // The search field takes the title's place while it is out.
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
@@ -194,5 +199,29 @@ private enum ListLine: Identifiable {
             }
         }
         return lines
+    }
+}
+
+/// File rows keep the same title, date and preview rhythm as the existing note list.
+struct FileListRow: View {
+    let file: AppFile
+    let dateLabel: String
+    let previewLines: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(file.title).font(.headline).lineLimit(1)
+                Spacer(minLength: 8)
+                Text(dateLabel).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).layoutPriority(1)
+            }
+            if previewLines > 0 {
+                Label(file.contentType.localizedDescription ?? String(localized: "File"), systemImage: file.isImage ? "photo" : "doc")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .lineLimit(previewLines, reservesSpace: true)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 }

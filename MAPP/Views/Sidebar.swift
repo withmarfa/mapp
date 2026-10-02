@@ -29,6 +29,19 @@ struct Sidebar: View {
                 row(.pinned, systemImage: "pin")
             }
 
+            if !projects.isEmpty {
+                Section("Projects") {
+                    ForEach(projects) { project in
+                        row(.project(project.id), systemImage: "square.stack")
+                    }
+                }
+            }
+            Section("Item Types") {
+                ForEach(WorkbenchSchema.types) { type in
+                    row(.itemType(type.id), systemImage: "doc.text")
+                }
+                row(.files, systemImage: "doc")
+            }
             Section {
                 ForEach(library.folders) { folder in
                     folderRow(folder)
@@ -103,11 +116,16 @@ struct Sidebar: View {
         }
     }
 
+    private var projects: [AppItem] {
+        library.items.filter { $0.type?.id == "aic.project" }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
     private func row(_ item: SidebarItem, systemImage: String) -> some View {
         Label(library.name(of: item), systemImage: systemImage)
             .badge(library.count(in: item))
             .tag(item)
-            .dropDestination(for: NoteReference.self, isEnabled: item != .allNotes && item != .marfaTypes) { notes, _ in
+            .dropDestination(for: NoteReference.self, isEnabled: canDrop(on: item)) { notes, _ in
                 drop(notes, on: item)
             }
     }
@@ -135,6 +153,13 @@ struct Sidebar: View {
         }
     }
 
+    private func canDrop(on item: SidebarItem) -> Bool {
+        switch item {
+        case .inbox, .folder, .pinned, .recentlyDeleted: true
+        default: false
+        }
+    }
+
     private func drop(_ notes: [NoteReference], on item: SidebarItem) {
         let ids = Set(notes.map(\.id))
         switch item {
@@ -142,7 +167,7 @@ struct Sidebar: View {
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .pinned: library.setPinned(ids, true, undoManager: undoManager)
         case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .marfaTypes: break
+        case .allNotes, .marfaTypes, .itemType, .project, .files: break
         }
     }
 

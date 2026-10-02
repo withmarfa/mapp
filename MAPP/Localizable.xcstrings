@@ -448,6 +448,228 @@
     },
     "^[Delete %lld note](inflect: true) immediately?" : {
 
+    },
+    "About": {
+      "extractionState": "manual"
+    },
+    "Assignee": {
+      "extractionState": "manual"
+    },
+    "Blocked": {
+      "extractionState": "manual"
+    },
+    "Canceled": {
+      "extractionState": "manual"
+    },
+    "Children": {
+      "extractionState": "manual"
+    },
+    "Choose Date": {
+      "extractionState": "manual"
+    },
+    "Clear Selection": {
+      "extractionState": "manual"
+    },
+    "Completed": {
+      "extractionState": "manual"
+    },
+    "Create": {
+      "extractionState": "manual"
+    },
+    "Created": {
+      "extractionState": "manual"
+    },
+    "Decided": {
+      "extractionState": "manual"
+    },
+    "Decision": {
+      "extractionState": "manual"
+    },
+    "Derived From": {
+      "extractionState": "manual"
+    },
+    "Description": {
+      "extractionState": "manual"
+    },
+    "Details": {
+      "extractionState": "manual"
+    },
+    "Edit…": {
+      "extractionState": "manual"
+    },
+    "Ends": {
+      "extractionState": "manual"
+    },
+    "Epic": {
+      "extractionState": "manual"
+    },
+    "Feature": {
+      "extractionState": "manual"
+    },
+    "File": {
+      "extractionState": "manual"
+    },
+    "File Unavailable": {
+      "extractionState": "manual"
+    },
+    "File properties cannot be edited in this file-backed library.": {
+      "extractionState": "manual"
+    },
+    "Hide Details": {
+      "extractionState": "manual"
+    },
+    "High": {
+      "extractionState": "manual"
+    },
+    "Import Files…": {
+      "extractionState": "manual"
+    },
+    "In Progress": {
+      "extractionState": "manual"
+    },
+    "Item": {
+      "extractionState": "manual"
+    },
+    "Item Types": {
+      "extractionState": "manual"
+    },
+    "Item not found": {
+      "extractionState": "manual"
+    },
+    "Item unavailable": {
+      "extractionState": "manual"
+    },
+    "Items About This": {
+      "extractionState": "manual"
+    },
+    "Kind": {
+      "extractionState": "manual"
+    },
+    "Links in Content": {
+      "extractionState": "manual"
+    },
+    "Location": {
+      "extractionState": "manual"
+    },
+    "Log": {
+      "extractionState": "manual"
+    },
+    "Low": {
+      "extractionState": "manual"
+    },
+    "Medium": {
+      "extractionState": "manual"
+    },
+    "Modified": {
+      "extractionState": "manual"
+    },
+    "More than one item matches": {
+      "extractionState": "manual"
+    },
+    "New Item": {
+      "extractionState": "manual"
+    },
+    "New Item…": {
+      "extractionState": "manual"
+    },
+    "No": {
+      "extractionState": "manual"
+    },
+    "No Files": {
+      "extractionState": "manual"
+    },
+    "No Item Selected": {
+      "extractionState": "manual"
+    },
+    "No Items": {
+      "extractionState": "manual"
+    },
+    "Not Selected": {
+      "extractionState": "manual"
+    },
+    "Not Set": {
+      "extractionState": "manual"
+    },
+    "Other Properties": {
+      "extractionState": "manual"
+    },
+    "Parent": {
+      "extractionState": "manual"
+    },
+    "Pending": {
+      "extractionState": "manual"
+    },
+    "Priority": {
+      "extractionState": "manual"
+    },
+    "Project": {
+      "extractionState": "manual"
+    },
+    "Projects": {
+      "extractionState": "manual"
+    },
+    "Properties": {
+      "extractionState": "manual"
+    },
+    "Question": {
+      "extractionState": "manual"
+    },
+    "Save": {
+      "extractionState": "manual"
+    },
+    "Search Items": {
+      "extractionState": "manual"
+    },
+    "Selected": {
+      "extractionState": "manual"
+    },
+    "Session": {
+      "extractionState": "manual"
+    },
+    "Show Details": {
+      "extractionState": "manual"
+    },
+    "Size": {
+      "extractionState": "manual"
+    },
+    "Someday": {
+      "extractionState": "manual"
+    },
+    "Starts": {
+      "extractionState": "manual"
+    },
+    "Status": {
+      "extractionState": "manual"
+    },
+    "Supersedes": {
+      "extractionState": "manual"
+    },
+    "Task": {
+      "extractionState": "manual"
+    },
+    "The connections could not be saved. Your selection has been kept.": {
+      "extractionState": "manual"
+    },
+    "The item could not be created. Check its title and parent, then try again.": {
+      "extractionState": "manual"
+    },
+    "The value could not be saved. Your input has been kept.": {
+      "extractionState": "manual"
+    },
+    "These links come from the document text.": {
+      "extractionState": "manual"
+    },
+    "Type": {
+      "extractionState": "manual"
+    },
+    "Unresolved connections will be preserved.": {
+      "extractionState": "manual"
+    },
+    "Yes": {
+      "extractionState": "manual"
+    },
+    "You can edit the item’s properties and relationships in Details after creating it.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
