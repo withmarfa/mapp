@@ -47,9 +47,9 @@ struct AppCommands: Commands {
                 for path in library?.paths(forWindows: ids) ?? [] { openWindow(value: path) }
             }
             .keyboardShortcut("o")
-            .disabled(browser == nil || shown.isEmpty)
+            .disabled(browser == nil || ids.isEmpty)
             Divider()
-            NoteShareLink(note: shown.count == 1 ? shown.first : nil)
+            NoteShareLink(note: shown.count == 1 ? shown.first : nil, fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
             Button("Rename Note…", systemImage: "pencil") {
                 browser?.renamingNote = shown.first?.id
             }

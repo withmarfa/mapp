@@ -22,21 +22,21 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "format") {
             FormatMenu(editor: editor, note: editableNote)
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || selectedFileURL != nil)
         ToolbarItem(id: "checklist") {
             FormatButton(format: .checklist, systemImage: "checklist", editor: editor, note: editableNote)
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || selectedFileURL != nil)
         ToolbarItem(id: "table") {
             FormatButton(format: .table, systemImage: "tablecells", editor: editor, note: editableNote)
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || selectedFileURL != nil)
         ToolbarItem(id: "attach") {
             Button("Attach Image", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .help("Attach Image")
                 .disabled(editableNote == nil)
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || selectedFileURL != nil)
 
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "share") {
@@ -54,7 +54,7 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "more") {
             MoreMenu(notes: notes, browser: browser)
         }
-        .hidden(showsTypes)
+        .hidden(showsTypes || selectedFileURL != nil)
     }
 
     /// Marfa Types shows a page, not a note, so the tools for notes step aside.
