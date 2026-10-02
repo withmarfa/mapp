@@ -11,7 +11,7 @@ extension NoteLibrary {
     var items: [AppItem] { notes.filter { !$0.isDeleted }.map { AppItem(projection: NoteProjection(note: $0)) } + files.map(AppItem.init(file:)) }
 
     var connectionIndex: NoteConnectionIndex {
-        NoteConnectionIndex(records: notes.filter { !$0.isDeleted }.map(NoteProjection.init), rulesByType: WorkbenchSchema.rulesByType)
+        NoteConnectionIndex(records: notes.filter { !$0.isDeleted }.map(NoteProjection.init) + files.map { AppItem(file: $0).projection }, rulesByType: WorkbenchSchema.rulesByType)
     }
 
     func relationships(for id: UUID) -> [ItemRelationship] {
@@ -22,7 +22,7 @@ extension NoteLibrary {
                 reference.sourceID == id && reference.origin == .header(field)
             }.map { reference in
                 let targetID: UUID? = if case .resolved(let target) = reference.resolution { target } else { nil }
-                return ItemRelationshipTarget(title: targetID.flatMap { note($0)?.title } ?? reference.targetTitle, itemID: targetID, resolution: reference.resolution)
+                return ItemRelationshipTarget(title: targetID.flatMap { self.item($0)?.title } ?? reference.targetTitle, itemID: targetID, resolution: reference.resolution)
             }
             return ItemRelationship(field: field, label: WorkbenchSchema.label(for: field), targets: targets, isEditable: item.isEditable, allowsMultiple: field == "about")
         }
@@ -30,7 +30,7 @@ extension NoteLibrary {
         for name in Set(inverse.map(\.name)).sorted() {
             let targets = inverse.filter { $0.name == name }.compactMap { edge -> ItemRelationshipTarget? in
                 let targetID = name == "parent-of" ? edge.targetID : edge.sourceID
-                guard let target = note(targetID) else { return nil }
+                guard let target = self.item(targetID) else { return nil }
                 return .init(title: target.title, itemID: targetID, resolution: .resolved(targetID))
             }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
             results.append(.init(field: "inverse:" + name, label: name == "parent-of" ? "Children" : name == "about" ? "Items About This" : "Incoming " + WorkbenchSchema.label(for: name), targets: targets, isEditable: item.isEditable, allowsMultiple: true))
@@ -39,14 +39,15 @@ extension NoteLibrary {
     }
 
     func relationshipCandidates(for id: UUID, field: String) -> [AppItem] {
-        notes.filter { note in
+        let candidates = notes.filter { note in
             guard note.id != id, !note.isDeleted else { return false }
             if field.hasPrefix("inverse:") {
                 let ownerField = field == "inverse:parent-of" ? "child-of" : String(field.dropFirst("inverse:".count))
                 return item(note.id)?.relationshipFields.contains(ownerField) == true && (ownerField != "child-of" || validParent(id, forType: item(note.id)?.type?.id ?? "core.note"))
             }
             return field != "child-of" || validParent(note.id, forType: item(id)?.type?.id ?? "core.note")
-        }.map { AppItem(projection: NoteProjection(note: $0)) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        }.map { AppItem(projection: NoteProjection(note: $0)) } + ((field == "about" || field == "derived-from") ? files.map(AppItem.init(file:)) : [])
+        return candidates.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     func bodyMentions(for id: UUID) -> [ItemRelationshipTarget] {
@@ -171,7 +172,7 @@ extension NoteLibrary {
               Set(targetIDs).count == targetIDs.count,
               field == "about" || targetIDs.count <= 1 else { return false }
         for targetID in targetIDs {
-            guard targetID != id, let target = self.note(targetID), !target.isDeleted else { return false }
+            guard targetID != id, self.item(targetID) != nil, self.note(targetID)?.isDeleted != true else { return false }
             if field == "child-of" && !validParent(targetID, forType: item.type?.id ?? "core.note") { return false }
         }
         if field == "child-of", let parent = targetIDs.first {
@@ -183,8 +184,18 @@ extension NoteLibrary {
                 cursor = edges.first(where: { $0.name == "parent-of" && $0.targetID == next })?.sourceID
             }
         }
+        if field == "supersedes", let target = targetIDs.first {
+            let edges = connectionIndex.edges.filter { $0.name == "supersedes" }
+            guard !edges.contains(where: { $0.targetID == target && $0.sourceID != id }) else { return false }
+            var seen: Set<UUID> = [id]
+            var cursor: UUID? = target
+            while let next = cursor {
+                guard seen.insert(next).inserted else { return false }
+                cursor = edges.first { $0.sourceID == next }?.targetID
+            }
+        }
         var file = note.file
-        let targets = targetIDs.compactMap { self.note($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
+        let targets = targetIDs.compactMap { self.item($0) }.map { NoteFieldValue.string("[[\($0.title)]]") }
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFiles([id: file], undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return true
