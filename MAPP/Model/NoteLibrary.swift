@@ -10,6 +10,7 @@ final class NoteLibrary {
     private(set) var files: [AppFile] = []
     private(set) var lastImportedFileID: UUID?
     private(set) var lastImportedRequestID: UUID?
+    private(set) var completedImports: [UUID: UUID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
@@ -64,6 +65,7 @@ final class NoteLibrary {
             guard let self else { return }
             self.lastImportedRequestID = requestID
             self.lastImportedFileID = UUID(stableFrom: "file:" + path)
+            self.completedImports[requestID] = self.lastImportedFileID
             self.refresh()
         }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
@@ -94,6 +96,10 @@ final class NoteLibrary {
         for source in sources {
             perform(.importFile(path: prefix + source.lastPathComponent, source: source, requestID: requestID))
         }
+    }
+
+    func consumeImportCompletion(_ requestID: UUID) {
+        completedImports[requestID] = nil
     }
 
     private func reconcileFiles(_ stored: [StoredFile]) {
