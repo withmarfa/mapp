@@ -673,6 +673,9 @@
     },
     "You can edit the item’s properties and relationships in Details after creating it.": {
       "extractionState": "manual"
+    },
+    "Discard Changes": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

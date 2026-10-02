@@ -7,10 +7,11 @@ struct ItemInspectorHost: View {
     @Environment(\.openWindow) private var openWindow
     let browser: Browser?
     let itemID: UUID?
+    let details: DetailsPresentation
     @State private var editing: ItemRelationship?
 
-    init(browser: Browser) { self.browser = browser; itemID = nil }
-    init(itemID: UUID) { self.itemID = itemID; browser = nil }
+    init(browser: Browser, details: DetailsPresentation) { self.browser = browser; itemID = nil; self.details = details }
+    init(itemID: UUID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
 
     private var selectedID: UUID? { itemID ?? (browser?.selection.count == 1 ? browser?.selection.first : nil) }
 
@@ -23,7 +24,8 @@ struct ItemInspectorHost: View {
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
                     onOpen: open,
-                    onEdit: { editing = $0 }
+                    onEdit: { editing = $0 },
+                    drafts: details
                 )
                 .id(id)
             } else {
@@ -60,13 +62,14 @@ struct ItemInspector: View {
     let onProperty: (String, NoteFieldValue?) -> Bool
     let onOpen: (UUID) -> Void
     let onEdit: (ItemRelationship) -> Void
+    var drafts: DetailsPresentation? = nil
 
     var body: some View {
         Form {
             Section("Item") {
                 ItemPropertyRow(definition: .init(key: "title", label: "Title", kind: .text),
                                 value: .string(item.title), isEditable: item.isEditable,
-                                onChange: { onProperty("title", $0) })
+                                onChange: { onProperty("title", $0) }, retainedDraft: drafts?.draft(for: item.id, key: "title"))
                 LabeledContent("Type") {
                     if let type = item.type { Text(LocalizedStringKey(type.label)) }
                     else { Text(item.projection.declaredType ?? String(localized: "File")) }
@@ -80,7 +83,7 @@ struct ItemInspector: View {
                 Section("Properties") {
                     ForEach(item.properties) { property in
                         ItemPropertyRow(definition: property, value: item.fields[property.key], isEditable: item.isEditable,
-                                        onChange: { onProperty(property.key, $0) })
+                                        onChange: { onProperty(property.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: property.key))
                     }
                 }
             }

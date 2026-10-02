@@ -69,7 +69,7 @@ struct MainView: View {
             }
         }
         .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes } set: { details.isPresented = $0 }) {
-            ItemInspectorHost(browser: browser)
+            ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
         .focusedSceneValue(\.detailsPresentation, details)

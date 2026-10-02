@@ -41,7 +41,7 @@ struct NoteWindow: View {
             }
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-            if let id { ItemInspectorHost(itemID: id) }
+            if let id { ItemInspectorHost(itemID: id, details: details) }
         }
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }

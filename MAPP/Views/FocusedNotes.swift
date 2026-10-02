@@ -22,4 +22,20 @@ extension FocusedValues {
 @Observable
 final class DetailsPresentation {
     var isPresented = false
+    @ObservationIgnored private var drafts: [UUID: [String: ItemPropertyDraft]] = [:]
+
+    func draft(for itemID: UUID, key: String) -> ItemPropertyDraft {
+        if let draft = drafts[itemID]?[key] { return draft }
+        let draft = ItemPropertyDraft()
+        drafts[itemID, default: [:]][key] = draft
+        return draft
+    }
+}
+
+/// A rejected input belongs to its window and item, rather than to the lifetime of a row.
+@Observable
+final class ItemPropertyDraft {
+    var text = ""
+    var isDirty = false
+    var rejected = false
 }

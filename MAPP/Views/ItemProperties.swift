@@ -6,9 +6,9 @@ struct ItemPropertyRow: View {
     let value: NoteFieldValue?
     let isEditable: Bool
     let onChange: (NoteFieldValue?) -> Bool
-    @State private var draft = ""
-    @State private var isDirty = false
-    @State private var rejected = false
+    var retainedDraft: ItemPropertyDraft? = nil
+    @State private var localDraft = ItemPropertyDraft()
+    private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -18,14 +18,19 @@ struct ItemPropertyRow: View {
             if let invalidValue {
                 Text(invalidValue).font(.caption).foregroundStyle(.orange)
             }
-            if rejected {
+            if input.rejected {
                 Text("The value could not be saved. Your input has been kept.")
                     .font(.caption)
                     .foregroundStyle(.red)
+                Button("Discard Changes") {
+                    input.isDirty = false
+                    seed()
+                }
+                .font(.caption)
             }
         }
-        .onAppear { seed() }
-        .onChange(of: value) { if !isDirty { seed() } }
+        .onAppear { if !input.isDirty { seed() } }
+        .onChange(of: value) { if !input.isDirty { seed() } }
         .onChange(of: isFocused) { if !isFocused { commit() } }
         .onDisappear { commit() }
     }
@@ -36,7 +41,7 @@ struct ItemPropertyRow: View {
             Picker(LocalizedStringKey(definition.label), selection: Binding {
                 value?.string ?? ""
             } set: { selected in
-                rejected = !onChange(selected.isEmpty ? nil : .string(selected))
+                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
             }) {
                 Text("Not Set").tag("")
                 if let current = value?.string, !choices.contains(current) {
@@ -49,7 +54,7 @@ struct ItemPropertyRow: View {
             Picker(LocalizedStringKey(definition.label), selection: Binding {
                 if case .bool(let selected) = value { selected ? "true" : "false" } else { "" }
             } set: { selected in
-                rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
+                input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
             }) {
                 Text("Not Set").tag("")
                 Text("Yes").tag("true")
@@ -67,14 +72,14 @@ struct ItemPropertyRow: View {
                         let text = dateOnly
                             ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
                             : selected.ISO8601Format()
-                        rejected = !onChange(.string(text))
-                        if !rejected { draft = text; isDirty = false }
+                        input.rejected = !onChange(.string(text))
+                        if !input.rejected { input.text = text; input.isDirty = false }
                     }, displayedComponents: value?.string?.count == 10 ? [.date] : [.date, .hourAndMinute])
                     .labelsHidden()
                 } else if value == nil || value?.string == "" {
                     Button("Set Date") {
                         let text = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                        rejected = !onChange(.string(text))
+                        input.rejected = !onChange(.string(text))
                     }
                 }
             }
@@ -84,10 +89,10 @@ struct ItemPropertyRow: View {
     }
 
     private var textField: some View {
-        TextField(LocalizedStringKey(definition.label), text: Binding { draft } set: {
-            draft = $0
-            isDirty = true
-            rejected = false
+        TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
+            input.text = $0
+            input.isDirty = true
+            input.rejected = false
         }, axis: definition.key == "description" ? .vertical : .horizontal)
         .lineLimit(definition.key == "description" ? 2...5 : 1...1)
         .focused($isFocused)
@@ -108,29 +113,29 @@ struct ItemPropertyRow: View {
     }
 
     private func seed() {
-        draft = value.map(ItemValueText.string) ?? ""
-        rejected = false
+        input.text = value.map(ItemValueText.string) ?? ""
+        input.rejected = false
     }
 
     private func commit() {
-        guard isDirty, isEditable else { return }
+        guard input.isDirty, isEditable else { return }
         let value: NoteFieldValue?
-        if draft.isEmpty {
+        if input.text.isEmpty {
             value = nil
         } else if case .number = definition.kind {
-            let scanner = Scanner(string: draft)
+            let scanner = Scanner(string: input.text)
             scanner.locale = Locale(identifier: "en_US_POSIX")
             var number = Decimal()
             guard scanner.scanDecimal(&number), scanner.isAtEnd, !number.isNaN else {
-                rejected = true
+                input.rejected = true
                 return
             }
             value = .number(number)
         } else {
-            value = .string(draft)
+            value = .string(input.text)
         }
-        rejected = !onChange(value)
-        if !rejected { isDirty = false }
+        input.rejected = !onChange(value)
+        if !input.rejected { input.isDirty = false }
     }
 
     static func choiceLabel(_ value: String) -> String {
