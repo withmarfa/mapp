@@ -8,8 +8,6 @@ final class NoteLibrary {
     var notes: [Note]
     var folders: [Folder]
     private(set) var files: [AppFile] = []
-    private(set) var lastImportedFileID: UUID?
-    private(set) var lastImportedRequestID: UUID?
     private(set) var completedImports: [UUID: UUID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
@@ -63,9 +61,7 @@ final class NoteLibrary {
         isLoaded = true
         store?.imported = { [weak self] requestID, path in
             guard let self else { return }
-            self.lastImportedRequestID = requestID
-            self.lastImportedFileID = UUID(stableFrom: "file:" + path)
-            self.completedImports[requestID] = self.lastImportedFileID
+            self.completedImports[requestID] = UUID(stableFrom: "file:" + path)
             self.refresh()
         }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
@@ -537,7 +533,6 @@ final class NoteLibrary {
 
     private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?, updateLinks: Bool = true) {
         let id = notes[index].id
-        let oldDisplayTitle = notes[index].title
         let oldName = notes[index].fileTitle ?? NoteText.fileName(for: notes[index].body)
         let oldTitle = notes[index].file.property("title")
         let directory = notes[index].path.map { _ in notes[index].directory } ?? directory(for: notes[index].folderID)
@@ -556,24 +551,51 @@ final class NoteLibrary {
             return
         }
         let predictedTitle = title ?? name
+        var originals: [UUID: NoteFile] = [:]
+        var replacements: [UUID: NoteFile] = [:]
+        var spans: [UUID: [RenameReferenceSpan]] = [:]
         if updateLinks {
+            let references = connectionIndex.references.filter { $0.resolution == .resolved(id) }
+            let usePath = notes.contains { !$0.isDeleted && $0.id != id && $0.title.caseInsensitiveCompare(predictedTitle) == .orderedSame }
+                || predictedTitle.contains(where: { "[]|#".contains($0) })
+            let base = usePath ? path : predictedTitle
+            guard !base.contains(where: { "[]|#".contains($0) }) else {
+                failure = (String(localized: "Can’t Rename Item"), String(localized: "The new name cannot be represented safely in file links."))
+                return
+            }
             for candidate in notes where !candidate.isDeleted && candidate.id != id {
-                let projection = NoteProjection(note: candidate)
-                guard let fields = projection.fields else { continue }
-                var check = candidate.file
-                for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
-                    guard let value = fields[field] else { continue }
-                    func rewritten(_ value: NoteFieldValue) -> NoteFieldValue {
-                        if case .array(let values) = value { return .array(values.map(rewritten)) }
-                        if case .string(let text) = value, text == "[[\(oldDisplayTitle)]]" { return .string("[[\(predictedTitle)]]") }
-                        return value
-                    }
-                    let changed = rewritten(value)
-                    if changed != value { check.setField(field, changed) }
+                let relevant = references.filter { $0.sourceID == candidate.id }
+                guard !relevant.isEmpty else { continue }
+                var rewrites: [String: String] = [:]
+                for reference in relevant {
+                    let delimiter = reference.targetTitle.firstIndex { $0 == "|" || $0 == "#" }
+                    let suffix = delimiter.map { String(reference.targetTitle[$0...]) } ?? ""
+                    rewrites["[[\(reference.targetTitle)]]"] = "[[\(base + suffix)]]"
                 }
-                if case .invalid = NoteProjection(id: candidate.id, file: check, fallbackTitle: candidate.title).frontMatter {
+                var file = candidate.file
+                let changed = Self.rewriteReferenceBody(file.body, rewrites: rewrites)
+                file.body = changed.text
+                let projection = NoteProjection(note: candidate)
+                if let fields = projection.fields {
+                    for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
+                        guard let value = fields[field] else { continue }
+                        func rewrite(_ value: NoteFieldValue) -> NoteFieldValue {
+                            if case .array(let values) = value { return .array(values.map(rewrite)) }
+                            if case .string(let text) = value, let replacement = rewrites[text] { return .string(replacement) }
+                            return value
+                        }
+                        let rewritten = rewrite(value)
+                        if rewritten != value { file.setField(field, rewritten) }
+                    }
+                }
+                if case .invalid = NoteProjection(id: candidate.id, file: file, fallbackTitle: candidate.title).frontMatter {
                     failure = (String(localized: "Can’t Rename Item"), String(localized: "A related file's metadata cannot be safely updated."))
                     return
+                }
+                if file != candidate.file {
+                    originals[candidate.id] = candidate.file
+                    replacements[candidate.id] = file
+                    spans[candidate.id] = changed.spans
                 }
             }
         }
@@ -587,46 +609,23 @@ final class NoteLibrary {
             notes[index].path = path
             perform(.create(path: path, text: notes[index].file.text))
         }
-        let newDisplayTitle = notes[index].title
-        var originals: [UUID: NoteFile] = [:]
-        var replacements: [UUID: NoteFile] = [:]
-        if updateLinks && oldDisplayTitle != newDisplayTitle {
-            for candidate in notes where !candidate.isDeleted && candidate.id != id {
-                var file = candidate.file
-                file.body = file.body.replacing("[[\(oldDisplayTitle)]]", with: "[[\(newDisplayTitle)]]")
-                let projection = NoteProjection(note: candidate)
-                if let fields = projection.fields {
-                    for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
-                        guard let value = fields[field] else { continue }
-                        func rewrite(_ value: NoteFieldValue) -> NoteFieldValue {
-                            if case .array(let values) = value { return .array(values.map(rewrite)) }
-                            if case .string(let text) = value, text == "[[\(oldDisplayTitle)]]" { return .string("[[\(newDisplayTitle)]]") }
-                            return value
-                        }
-                        let rewritten = rewrite(value)
-                        if rewritten != value { file.setField(field, rewritten) }
-                    }
-                }
-                if file != candidate.file { originals[candidate.id] = candidate.file; replacements[candidate.id] = file }
-            }
-            applyItemFiles(replacements, undoManager: nil, name: String(localized: "Rename Links"))
-        }
+        applyItemFiles(replacements, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
             guard let index = library.notes.firstIndex(where: { $0.id == id }), !library.notes[index].isDeleted else { return }
             library.rename(at: index, to: oldName, title: oldTitle, undoManager: undoManager, updateLinks: false)
-            library.restoreRenameReferences(originals: originals, replacements: replacements, oldLink: "[[\(oldDisplayTitle)]]", newLink: "[[\(newDisplayTitle)]]", undoManager: undoManager)
+            library.restoreRenameReferences(originals: originals, replacements: replacements, spans: spans, undoManager: undoManager)
         }
     }
 
-    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], oldLink: String, newLink: String, spans: [UUID: [NSRange]]? = nil, undoManager: UndoManager?) {
-        var nextSpans: [UUID: [NSRange]] = [:]
+    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], spans: [UUID: [RenameReferenceSpan]], undoManager: UndoManager?) {
+        var nextSpans: [UUID: [RenameReferenceSpan]] = [:]
         var restored: [UUID: NoteFile] = [:]
         var before: [UUID: NoteFile] = [:]
         for (sourceID, original) in originals {
             guard var current = note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
             before[sourceID] = current
-            let changedSpans = spans?[sourceID] ?? Self.renamedReferenceSpans(original: original.body, oldLink: oldLink, newLink: newLink)
-            let bodyChange = Self.revertReferenceSpans(replacement: replacement.body, current: current.body, oldLink: oldLink, newLink: newLink, spans: changedSpans)
+            let changedSpans = spans[sourceID] ?? []
+            let bodyChange = Self.revertReferenceSpans(replacement: replacement.body, current: current.body, spans: changedSpans)
             current.body = bodyChange.text
             nextSpans[sourceID] = bodyChange.spans
             let oldFields = NoteProjection(id: sourceID, file: original, fallbackTitle: "").fields ?? [:]
@@ -639,27 +638,36 @@ final class NoteLibrary {
         }
         applyItemFiles(restored, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Links")) { [weak undoManager] library in
-            library.restoreRenameReferences(originals: before, replacements: restored, oldLink: newLink, newLink: oldLink, spans: nextSpans, undoManager: undoManager)
+            library.restoreRenameReferences(originals: before, replacements: restored, spans: nextSpans, undoManager: undoManager)
         }
     }
 
-    private static func renamedReferenceSpans(original: String, oldLink: String, newLink: String) -> [NSRange] {
-        let old = original as NSString
-        var cursor = 0
+    private struct RenameReferenceSpan {
+        let range: NSRange
+        let before: String
+        let after: String
+    }
+
+    private static func rewriteReferenceBody(_ body: String, rewrites: [String: String]) -> (text: String, spans: [RenameReferenceSpan]) {
+        let string = body as NSString
+        var edits: [(NSRange, String, String)] = []
+        for match in body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/.matchingSemantics(.unicodeScalar)) {
+            let old = String(match.output.0)
+            guard let new = rewrites[old], old != new else { continue }
+            edits.append((NSRange(match.range, in: body), old, new))
+        }
+        let result = NSMutableString(string: string)
+        for (range, _, new) in edits.reversed() { result.replaceCharacters(in: range, with: new) }
         var delta = 0
-        var spans: [NSRange] = []
-        while cursor < old.length {
-            let range = old.range(of: oldLink, options: [], range: NSRange(location: cursor, length: old.length - cursor))
-            guard range.location != NSNotFound else { break }
-            let length = (newLink as NSString).length
-            spans.append(NSRange(location: range.location + delta, length: length))
-            delta += length - range.length
-            cursor = range.location + range.length
+        let spans = edits.map { range, old, new in
+            let span = RenameReferenceSpan(range: NSRange(location: range.location + delta, length: (new as NSString).length), before: old, after: new)
+            delta += span.range.length - range.length
+            return span
         }
-        return spans
+        return (result as String, spans)
     }
 
-    private static func revertReferenceSpans(replacement: String, current: String, oldLink: String, newLink: String, spans: [NSRange]) -> (text: String, spans: [NSRange]) {
+    private static func revertReferenceSpans(replacement: String, current: String, spans: [RenameReferenceSpan]) -> (text: String, spans: [RenameReferenceSpan]) {
         let expected = Array(replacement.utf16)
         let actual = Array(current.utf16)
         let difference = actual.difference(from: expected)
@@ -680,21 +688,21 @@ final class NoteLibrary {
             destination += 1
         }
         let actualString = current as NSString
-        var ranges: [NSRange] = []
+        var mappedSpans: [RenameReferenceSpan] = []
         for span in spans {
-            if let mapped = mapping[span.location], (0..<span.length).allSatisfy({ mapping[span.location + $0] == mapped + $0 }),
-               mapped + span.length <= actualString.length,
-               actualString.substring(with: NSRange(location: mapped, length: span.length)) == newLink {
-                ranges.append(NSRange(location: mapped, length: span.length))
+            if let mapped = mapping[span.range.location], (0..<span.range.length).allSatisfy({ mapping[span.range.location + $0] == mapped + $0 }),
+               mapped + span.range.length <= actualString.length,
+               actualString.substring(with: NSRange(location: mapped, length: span.range.length)) == span.after {
+                mappedSpans.append(.init(range: NSRange(location: mapped, length: span.range.length), before: span.before, after: span.after))
             }
         }
         let result = NSMutableString(string: current)
-        for range in ranges.reversed() { result.replaceCharacters(in: range, with: oldLink) }
+        for span in mappedSpans.reversed() { result.replaceCharacters(in: span.range, with: span.before) }
         var delta = 0
-        let reverseSpans = ranges.map { range in
-            let span = NSRange(location: range.location + delta, length: (oldLink as NSString).length)
-            delta += span.length - range.length
-            return span
+        let reverseSpans = mappedSpans.map { span in
+            let reverse = RenameReferenceSpan(range: NSRange(location: span.range.location + delta, length: (span.before as NSString).length), before: span.after, after: span.before)
+            delta += reverse.range.length - span.range.length
+            return reverse
         }
         return (result as String, reverseSpans)
     }

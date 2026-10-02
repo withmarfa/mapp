@@ -135,4 +135,17 @@ struct ItemMutationTests {
         #expect(library.note(source.id)?.body == "[[New]] [[New]]\nMore\nExtra")
     }
 
+    @Test func renameUpdatesResolvedPathReferencesAndKeepsAliasesAndHeadings() {
+        let first = Note(path: "Projects/One.md", text: "---\ntype: aic.project\ntitle: Area\n---\nBody", created: .now)
+        let other = Note(path: "Projects/Two.md", text: "---\ntype: aic.project\ntitle: Area\n---\nBody", created: .now)
+        let source = Note(path: "Source.md", text: "---\ntype: aic.agent.log\nabout: [\"[[Projects/One.md]]\"]\n---\n[[Projects/One.md#Heading|Label]] [[Area]]", created: .now)
+        let library = NoteLibrary(notes: [first, other, source])
+        let undo = UndoManager()
+        library.renameNote(first.id, to: "New", undoManager: undo)
+        #expect(library.note(source.id)?.body == "[[New#Heading|Label]] [[Area]]")
+        #expect(library.connectionIndex.edges.contains { $0.sourceID == source.id && $0.targetID == first.id })
+        undo.undo()
+        #expect(library.note(source.id)?.file.text == source.file.text)
+    }
+
 }
