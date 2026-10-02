@@ -649,14 +649,13 @@ final class NoteLibrary {
     }
 
     private static func rewriteReferenceBody(_ body: String, rewrites: [String: String]) -> (text: String, spans: [RenameReferenceSpan]) {
-        let string = body as NSString
         var edits: [(NSRange, String, String)] = []
         for match in body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/.matchingSemantics(.unicodeScalar)) {
             let old = String(match.output.0)
             guard let new = rewrites[old], old != new else { continue }
             edits.append((NSRange(match.range, in: body), old, new))
         }
-        let result = NSMutableString(string: string)
+        let result = NSMutableString(string: body)
         for (range, _, new) in edits.reversed() { result.replaceCharacters(in: range, with: new) }
         var delta = 0
         let spans = edits.map { range, old, new in
