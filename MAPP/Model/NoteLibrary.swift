@@ -359,7 +359,14 @@ final class NoteLibrary {
     }
 
     func count(in item: SidebarItem) -> Int {
-        notes(in: item).count
+        let fileCount: Int
+        switch item {
+        case .allNotes, .files: fileCount = files.count
+        case .inbox: fileCount = files.filter { $0.folderID == nil }.count
+        case .folder(let id): fileCount = files.filter { $0.folderID == id }.count
+        default: fileCount = 0
+        }
+        return notes(in: item).count + fileCount
     }
 
     func name(of item: SidebarItem) -> String {
