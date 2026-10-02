@@ -46,17 +46,40 @@ nonisolated struct NoteConnectionIssue: Equatable, Sendable {
 nonisolated struct NoteConnectionIndex: Sendable {
     let references: [NoteIndexedReference]
     let edges: Set<NoteConnectionEdge>
-    /// Configured fields containing values other than exact title references.
+    /// Configured fields containing malformed target references.
     let issues: [NoteConnectionIssue]
 
     init(records: [NoteProjection], rulesByType: [String: [NoteConnectionRule]]) {
-        let titles = Dictionary(grouping: records, by: { Self.titleKey($0.title) })
+        var names: [String: [UUID]] = [:]
+        var declaredIDs: [UUID: [UUID]] = [:]
+        for record in records {
+            for name in Self.names(of: record) {
+                let key = Self.nameKey(name)
+                if !names[key, default: []].contains(record.id) {
+                    names[key, default: []].append(record.id)
+                }
+            }
+            // A file's declaration is a local lookup hint, not a verified Marfa identity.
+            if let text = record.fields?["marfa_id"]?.string, let id = Self.itemID(text),
+               !declaredIDs[id, default: []].contains(record.id) {
+                declaredIDs[id, default: []].append(record.id)
+            }
+        }
+        func matches(_ name: String) -> [UUID] {
+            if let id = Self.itemID(name) { return declaredIDs[id, default: []] }
+            return names[Self.nameKey(NoteName.trimmed(name)), default: []]
+        }
         func resolve(_ title: String) -> NoteReferenceResolution {
-            let matches = titles[Self.titleKey(title), default: []].map(\.id)
-            switch matches.count {
+            let name = Self.baseName(title)
+            var found = matches(name)
+            // Choosing the base when the whole spelling names another record would guess.
+            if !found.isEmpty, title != name {
+                for id in matches(title) where !found.contains(id) { found.append(id) }
+            }
+            switch found.count {
             case 0: return .missing
-            case 1: return .resolved(matches[0])
-            default: return .ambiguous(matches)
+            case 1: return .resolved(found[0])
+            default: return .ambiguous(found)
             }
         }
 
@@ -64,7 +87,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
         var edges: Set<NoteConnectionEdge> = []
         var issues: [NoteConnectionIssue] = []
         for record in records {
-            for title in Self.bodyTitles(record.body) {
+            for title in Self.bodyTargets(record.body) {
                 references.append(.init(sourceID: record.id, origin: .body, targetTitle: title, resolution: resolve(title)))
             }
             guard let type = record.declaredType, let fields = record.fields else { continue }
@@ -73,7 +96,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 let values: [NoteFieldValue]
                 if case .array(let array) = field { values = array } else { values = [field] }
                 for value in values {
-                    guard let string = value.string, let title = Self.exactTitle(string) else {
+                    guard let string = value.string, let title = Self.typedTarget(string) else {
                         issues.append(.init(sourceID: record.id, field: rule.field, value: value))
                         continue
                     }
@@ -92,22 +115,46 @@ nonisolated struct NoteConnectionIndex: Sendable {
         self.issues = issues
     }
 
-    private static func titleKey(_ title: String) -> String {
-        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    private static func nameKey(_ name: String) -> String {
+        name.precomposedStringWithCanonicalMapping.lowercased()
+            .precomposedStringWithCanonicalMapping
     }
 
-    private static func exactTitle(_ text: String) -> String? {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.hasPrefix("[["), text.hasSuffix("]]"), text.count > 4 else { return nil }
-        let title = text.dropFirst(2).dropLast(2).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, !title.contains("["), !title.contains("]"), !title.contains("\n"), !title.contains("\r") else { return nil }
-        // Pipes and heading suffixes remain part of the exact title; they do not introduce alias semantics.
+    private static func names(of record: NoteProjection) -> [String] {
+        let title = NoteName.trimmed(record.title)
+        guard let path = record.filePath else { return [title] }
+        let filename = (path as NSString).lastPathComponent
+        // File names retain their whitespace; only titles and typed names are trimmed.
+        return [title, path, (path as NSString).deletingPathExtension,
+                filename, (filename as NSString).deletingPathExtension]
+    }
+
+    private static func itemID(_ text: String) -> UUID? {
+        guard text.count == 36 else { return nil }
+        return UUID(uuidString: text)
+    }
+
+    private static func baseName(_ title: String) -> String {
+        // A combining mark can share a grapheme with the delimiter, but cannot hide it.
+        let base = title.unicodeScalars.prefix { $0 != "|" && $0 != "#" }
+        return NoteName.trimmed(String(String.UnicodeScalarView(base)))
+    }
+
+    private static func typedTarget(_ text: String) -> String? {
+        let text = NoteName.trimmed(text)
+        let scalars = text.unicodeScalars
+        guard scalars.count > 4, scalars.prefix(2).elementsEqual("[[".unicodeScalars),
+              scalars.suffix(2).elementsEqual("]]".unicodeScalars) else { return nil }
+        let title = NoteName.trimmed(String(String.UnicodeScalarView(scalars.dropFirst(2).dropLast(2))))
+        guard !title.isEmpty,
+              !title.unicodeScalars.contains(where: { $0 == "[" || $0 == "]" || $0 == "\n" || $0 == "\r" }) else { return nil }
+        guard !baseName(title).isEmpty else { return nil }
         return title
     }
 
-    private static func bodyTitles(_ body: String) -> [String] {
-        body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/).compactMap { match in
-            exactTitle(String(match.output.0))
+    private static func bodyTargets(_ body: String) -> [String] {
+        body.matches(of: /\[\[([^\[\]\r\n]+)\]\]/.matchingSemantics(.unicodeScalar)).compactMap { match in
+            typedTarget(String(match.output.0))
         }
     }
 }

@@ -1,6 +1,16 @@
 import Foundation
 import Yams
 
+/// Marfa trims Unicode White_Space, which excludes format characters such as U+200B.
+nonisolated enum NoteName {
+    static func trimmed(_ text: String) -> String {
+        let scalars = text.unicodeScalars
+        guard let first = scalars.firstIndex(where: { !$0.properties.isWhitespace }),
+              let last = scalars.lastIndex(where: { !$0.properties.isWhitespace }) else { return "" }
+        return String(String.UnicodeScalarView(scalars[first...last]))
+    }
+}
+
 /// JSON-compatible values read from YAML, without assigning Marfa property semantics to header fields.
 nonisolated indirect enum NoteFieldValue: Equatable, Sendable {
     case null
@@ -30,6 +40,8 @@ nonisolated enum NoteFrontMatter: Equatable, Sendable {
 nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
     let id: UUID
     let file: NoteFile
+    /// The source file path, relative to the notes folder; drafts have none.
+    let filePath: String?
     let frontMatter: NoteFrontMatter
     let title: String
     let declaredType: String?
@@ -42,17 +54,18 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
     }
 
     init(note: Note) {
-        self.init(id: note.id, file: note.file, fallbackTitle: note.title)
+        self.init(id: note.id, file: note.file, fallbackTitle: note.title, filePath: note.path)
     }
 
-    init(id: UUID, file: NoteFile, fallbackTitle: String) {
+    init(id: UUID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
         self.id = id
         self.file = file
+        self.filePath = filePath
         frontMatter = Self.parse(file.frontMatter)
         let fields: [String: NoteFieldValue]
         if case .parsed(let parsed) = frontMatter { fields = parsed } else { fields = [:] }
         let headerTitle = fields["title"]?.string
-        title = headerTitle.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 } ?? fallbackTitle
+        title = headerTitle.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 } ?? fallbackTitle
         declaredType = fields["type"]?.string
     }
 
