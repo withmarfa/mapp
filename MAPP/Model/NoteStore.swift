@@ -11,6 +11,12 @@ nonisolated protocol NoteStore: AnyObject, Sendable {
     /// Queues a change; changes are made in the order they are queued.
     func perform(_ change: StoreChange)
 
+    /// A readable file within the selected library, never a path outside it.
+    func fileURL(for path: String) -> URL?
+
+    /// Called after an imported file is available on disk.
+    var imported: @MainActor @Sendable (String) -> Void { get set }
+
     /// Waits until every queued change is made, as the app quits.
     func drain()
 
@@ -47,10 +53,19 @@ nonisolated struct TrashedNote: Sendable {
     var trashed: Date
 }
 
+nonisolated struct StoredFile: Sendable {
+    var path: String
+    var created: Date
+    var modified: Date
+    var byteCount: Int64
+    var fileID: UInt64? = nil
+}
+
 nonisolated struct StoredLibrary: Sendable {
     var folders: [String] = []
     var notes: [StoredNote] = []
     var trash: [TrashedNote] = []
+    var files: [StoredFile] = []
 }
 
 nonisolated enum StoreChange: Sendable, Equatable {
@@ -67,6 +82,8 @@ nonisolated enum StoreChange: Sendable, Equatable {
     case purge(id: UUID)
     /// A file a note points at, such as a pasted image, written into the attachments folder.
     case attach(path: String, data: Data)
+    /// Copies a user-selected regular file without changing its bytes.
+    case importFile(path: String, source: URL)
     /// Erases whatever has been in the trash since before the date.
     case purgeTrash(before: Date)
     case createFolder(path: String)
@@ -80,12 +97,20 @@ extension StoreChange {
     nonisolated var path: String? {
         switch self {
         case .create(let path, _), .write(let path, _), .trash(let path, _, _), .restore(_, let path), .attach(let path, _),
-             .createFolder(let path), .removeFolder(let path):
+             .createFolder(let path), .removeFolder(let path), .importFile(let path, _):
             path
         case .move(_, let to), .moveFolder(_, let to):
             to
         case .purge, .purgeTrash:
             nil
         }
+    }
+}
+
+nonisolated extension NoteStore {
+    func fileURL(for path: String) -> URL? { nil }
+    var imported: @MainActor @Sendable (String) -> Void {
+        get { { _ in } }
+        set {}
     }
 }
