@@ -50,19 +50,23 @@ struct NotePage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
-                .ignoresSafeArea(.container, edges: .top)
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    if note.isDeleted {
-                        DeletedNoteBanner(id: note.id)
-                    } else if let item = library.item(note.id) {
-                        ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
-                            .id(note.id)
-                            .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-                    }
+            VStack(spacing: 0) {
+                if note.isDeleted {
+                    DeletedNoteBanner(id: note.id)
+                } else if let item = library.item(note.id) {
+                    ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                        .id(note.id)
+                        .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                // The native header occupies real layout space. An ignored safe-area inset lets WebKit
+                // paint through it, so the editor has its own clipped region below the header.
+                NoteEditor(controller: editor, topInset: 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            }
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }

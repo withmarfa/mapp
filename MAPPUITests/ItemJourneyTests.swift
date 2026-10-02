@@ -21,10 +21,7 @@ final class ItemJourneyTests: XCTestCase {
         let details = app.buttons["DetailsToggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
         details.click()
-        let addConnection = app.descendants(matching: .any)["AddConnection"]
-        XCTAssertTrue(addConnection.waitForExistence(timeout: 3))
-        addConnection.click()
-        let parentEdit = app.menuItems["RelationshipEdit.child-of"]
+        let parentEdit = app.buttons["RelationshipAdd.child-of"]
         XCTAssertTrue(parentEdit.waitForExistence(timeout: 3))
         parentEdit.click()
         let search = app.textFields["RelationshipSearch"]
@@ -65,14 +62,14 @@ final class ItemJourneyTests: XCTestCase {
 
     func testBodyFocusCreatesItemAndHeaderEditsSurviveReopening() {
         app.typeKey("n", modifierFlags: .command)
-        let type = app.popUpButtons["NewItemType"]
+        let type = app.descendants(matching: .any)["NewItemType"]
         XCTAssertTrue(type.waitForExistence(timeout: 3))
         type.click()
         app.menuItems["Task"].click()
         let draftTitle = app.textFields["NewItemTitle"]
         draftTitle.click()
         draftTitle.typeText("Body Focus Draft")
-        let body = app.textViews["NewItemBody"]
+        let body = app.buttons["NewItemBody"]
         XCTAssertTrue(body.waitForExistence(timeout: 3))
         body.click()
         XCTAssertTrue(draftTitle.waitForNonExistence(timeout: 3))
@@ -98,6 +95,10 @@ final class ItemJourneyTests: XCTestCase {
         let inspectorStatus = app.popUpButtons["ItemProperty.status"]
         XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
         XCTAssertEqual(inspectorStatus.value as? String, "Completed")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Item page with shared chips and details"
+        attachment.lifetime = .keepAlways
+        add(attachment)
         app.terminate()
         app.launchArguments.append("-MAPPKeepSampleFolder")
         app.launch()
@@ -131,7 +132,7 @@ final class ItemJourneyTests: XCTestCase {
 
     private func create(type: String, title: String) {
         app.typeKey("n", modifierFlags: .command)
-        let typePicker = app.popUpButtons["NewItemType"]
+        let typePicker = app.descendants(matching: .any)["NewItemType"]
         XCTAssertTrue(typePicker.waitForExistence(timeout: 3))
         typePicker.click()
         app.menuItems[type].click()
