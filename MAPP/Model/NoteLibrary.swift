@@ -533,6 +533,35 @@ final class NoteLibrary {
             let line = NoteText.firstLine(of: notes[index].body) ?? ""
             notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line, exactly: true) ? line : nil }
         }
+        var titleFile = notes[index].file
+        if title != oldTitle { titleFile.setProperty("title", title) }
+        let titleProjection = NoteProjection(id: id, file: titleFile, fallbackTitle: name)
+        if case .invalid = titleProjection.frontMatter {
+            failure = (String(localized: "Can’t Rename Item"), String(localized: "Its metadata cannot be safely changed."))
+            return
+        }
+        let predictedTitle = title ?? name
+        if updateLinks {
+            for candidate in notes where !candidate.isDeleted && candidate.id != id {
+                let projection = NoteProjection(note: candidate)
+                guard let fields = projection.fields else { continue }
+                var check = candidate.file
+                for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
+                    guard let value = fields[field] else { continue }
+                    func rewritten(_ value: NoteFieldValue) -> NoteFieldValue {
+                        if case .array(let values) = value { return .array(values.map(rewritten)) }
+                        if case .string(let text) = value, text == "[[\(oldDisplayTitle)]]" { return .string("[[\(predictedTitle)]]") }
+                        return value
+                    }
+                    let changed = rewritten(value)
+                    if changed != value { check.setField(field, changed) }
+                }
+                if case .invalid = NoteProjection(id: candidate.id, file: check, fallbackTitle: candidate.title).frontMatter {
+                    failure = (String(localized: "Can’t Rename Item"), String(localized: "A related file's metadata cannot be safely updated."))
+                    return
+                }
+            }
+        }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }
         if let from = notes[index].path {

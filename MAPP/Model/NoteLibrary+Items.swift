@@ -243,7 +243,9 @@ extension NoteLibrary {
         let previous = Dictionary(uniqueKeysWithValues: files.keys.compactMap { id in note(id).map { (id, $0.file) } })
         guard files.allSatisfy({ id, file in
             let old = note(id).map(NoteProjection.init)?.fields ?? [:]
-            guard let proposed = NoteProjection(id: id, file: file, fallbackTitle: "").fields else { return false }
+            let projection = NoteProjection(id: id, file: file, fallbackTitle: "")
+            if case .invalid = projection.frontMatter { return false }
+            let proposed = projection.fields ?? [:]
             return old.filter { $0.key != key } == proposed.filter { $0.key != key }
         }) else {
             failure = (String(localized: "Can’t Edit This Property"), String(localized: "This metadata uses a form that cannot be safely changed. Your file has been left unchanged."))
