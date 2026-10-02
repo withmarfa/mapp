@@ -130,6 +130,7 @@ struct ItemRelationshipPicker: View {
         }
         .padding(20)
         .frame(width: 440, height: 460)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("RelationshipPicker")
     }
 

@@ -54,6 +54,7 @@ struct NewItemSheet: View {
         .frame(width: 440)
         .defaultFocus($titleFocused, true)
         .onChange(of: typeID) { if !parents.contains(where: { $0.id == parentID }) { parentID = nil } }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NewItemSheet")
     }
 

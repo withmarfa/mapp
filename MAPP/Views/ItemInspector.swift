@@ -39,6 +39,7 @@ struct ItemInspectorHost: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemInspector")
     }
 
