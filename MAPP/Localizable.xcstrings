@@ -1,6 +1,78 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Add Connection" : {
+
+    },
+    "Add Parent" : {
+
+    },
+    "Add Relationship" : {
+
+    },
+    "Change Parent…" : {
+
+    },
+    "Change Relationship" : {
+
+    },
+    "Choose Parent…" : {
+
+    },
+    "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
+
+    },
+    "Connection Actions" : {
+
+    },
+    "Content" : {
+
+    },
+    "Import File…" : {
+
+    },
+    "Item Type" : {
+
+    },
+    "Manage Connections…" : {
+
+    },
+    "Open Item" : {
+
+    },
+    "Open Parent" : {
+
+    },
+    "Remove Connection" : {
+
+    },
+    "Replace…" : {
+
+    },
+    "Set Status" : {
+
+    },
+    "Start Writing" : {
+
+    },
+    "Start writing" : {
+
+    },
+    "The connection could not be removed." : {
+
+    },
+    "The title could not be saved. Use a unique file name without slashes or line breaks." : {
+
+    },
+    "The value could not be saved. Please try again." : {
+
+    },
+    "Untitled" : {
+
+    },
+    "Your draft is kept until you resume it with New Item." : {
+
+    },
     "%lld pt" : {
 
     },

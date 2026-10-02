@@ -25,6 +25,10 @@ struct ItemInspectorHost: View {
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
                     onOpen: open,
                     onEdit: { editing = $0 },
+                    onRemove: { relationship, target in
+                        library.setItemRelationship(id, field: relationship.field,
+                            targetIDs: relationship.targets.compactMap(\.itemID).filter { $0 != target }, undoManager: undoManager)
+                    },
                     drafts: details
                 )
                 .id(id)
@@ -63,66 +67,96 @@ struct ItemInspector: View {
     let onProperty: (String, NoteFieldValue?) -> Bool
     let onOpen: (UUID) -> Void
     let onEdit: (ItemRelationship) -> Void
+    var onRemove: ((ItemRelationship, UUID) -> Bool)? = nil
     var drafts: DetailsPresentation? = nil
 
     var body: some View {
-        Form {
-            Section("Item") {
-                ItemPropertyRow(definition: .init(key: "title", label: "Title", kind: .text),
-                                value: .string(item.title), isEditable: item.isEditable,
-                                onChange: { onProperty("title", $0) }, retainedDraft: drafts?.draft(for: item.id, key: "title"))
-                LabeledContent("Type") {
-                    if let type = item.type { Text(LocalizedStringKey(type.label)) }
-                    else { Text(item.projection.declaredType ?? String(localized: "File")) }
-                }
-                if let message = item.validationMessage {
-                    Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.callout).foregroundStyle(.red)
-                }
-            }
-            if !item.properties.isEmpty {
-                Section("Properties") {
-                    ForEach(item.properties) { property in
-                        ItemPropertyRow(definition: property, value: item.fields[property.key], isEditable: item.isEditable,
-                                        onChange: { onProperty(property.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: property.key))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 10) {
+                    LabeledContent("Type") {
+                        if let type = item.type { Text(LocalizedStringKey(type.label)) }
+                        else { Text(item.projection.declaredType ?? String(localized: "File")) }
+                    }
+                    .font(.callout)
+                    if let message = item.validationMessage {
+                        Label(message, systemImage: "exclamationmark.triangle")
+                            .font(.callout).foregroundStyle(.red)
                     }
                 }
-            }
-            ForEach(relationships) { relationship in
-                ItemRelationshipSection(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) })
-            }
-            if !mentions.isEmpty {
-                Section {
-                    ForEach(mentions) { ItemTargetRow(target: $0, onOpen: onOpen) }
-                } header: {
-                    Text("Links in Content")
-                } footer: {
-                    Text("These links come from the document text.")
-                }
-            }
-            if !otherFields.isEmpty {
-                Section("Other Properties") {
-                    ForEach(otherFields, id: \.self) { key in
-                        LabeledContent(key, value: ItemValueText.string(item.fields[key]!))
-                            .textSelection(.enabled)
+                if !item.properties.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(item.properties) { property in
+                            ItemPropertyRow(definition: property, value: item.fields[property.key], isEditable: item.isEditable,
+                                            onChange: { onProperty(property.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: property.key))
+                        }
                     }
                 }
-            }
-            if let path = item.projection.filePath {
-                Section("File") {
-                    LabeledContent("Location", value: path).textSelection(.enabled)
-                    if let file = item.file {
-                        LabeledContent("Kind", value: file.contentType.localizedDescription ?? String(localized: "File"))
-                        LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: file.stored.byteCount, countStyle: .file))
-                        LabeledContent("Created", value: file.stored.created.formatted(date: .abbreviated, time: .shortened))
-                        LabeledContent("Modified", value: file.stored.modified.formatted(date: .abbreviated, time: .shortened))
-                        Text("File properties cannot be edited in this file-backed library.")
+                if relationships.contains(where: { !$0.targets.isEmpty || $0.isEditable }) {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(relationships.filter { !$0.targets.isEmpty }) { relationship in
+                            ItemRelationshipSection(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
+                                onRemove: onRemove.map { remove in { target in remove(relationship, target) } })
+                        }
+                        let emptyRelationships = relationships.filter { $0.targets.isEmpty && $0.isEditable }
+                        if !emptyRelationships.isEmpty {
+                            Menu {
+                                ForEach(emptyRelationships) { relationship in
+                                    Button(LocalizedStringKey(relationship.label)) { onEdit(relationship) }
+                                        .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
+                                }
+                            } label: {
+                                Label("Add Connection", systemImage: "plus")
+                            }
+                            .menuStyle(.borderlessButton)
+                            .accessibilityIdentifier("AddConnection")
+                            .fixedSize()
+                        }
+                    }
+                }
+                if !mentions.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Links in Content").font(.subheadline).foregroundStyle(.secondary)
+                        ForEach(mentions) { ItemTargetRow(target: $0, onOpen: onOpen) }
+                        Text("These links come from the document text.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                if !otherFields.isEmpty {
+                    DisclosureGroup("Other Properties") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(otherFields, id: \.self) { key in
+                                LabeledContent(key, value: ItemValueText.string(item.fields[key]!))
+                                    .textSelection(.enabled)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+                if let path = item.projection.filePath {
+                    Divider()
+                    DisclosureGroup("File") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(path).font(.caption).textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if let file = item.file {
+                                LabeledContent("Kind", value: file.contentType.localizedDescription ?? String(localized: "File"))
+                                LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: file.stored.byteCount, countStyle: .file))
+                                LabeledContent("Created", value: file.stored.created.formatted(date: .abbreviated, time: .shortened))
+                                LabeledContent("Modified", value: file.stored.modified.formatted(date: .abbreviated, time: .shortened))
+                                Text("File properties cannot be edited in this file-backed library.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .font(.callout)
+                        .padding(.top, 8)
+                    }
+                }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .formStyle(.grouped)
     }
 
     private var otherFields: [String] {

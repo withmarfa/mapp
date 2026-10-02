@@ -17,13 +17,8 @@ struct AppCommands: Commands {
         SidebarCommands()
 
         CommandGroup(replacing: .newItem) {
-            Button("New Note", systemImage: "square.and.pencil") {
-                if let library { browser?.newNote(in: library, undoManager: notes?.undoManager) }
-            }
-            .keyboardShortcut("n")
-            .disabled(browser == nil || library?.isLoaded != true)
-            Button("New Item…") { browser?.isCreatingItem = true }
-                .keyboardShortcut("n", modifiers: [.command, .control])
+            Button("New Item", systemImage: "square.and.pencil") { browser?.startItemDraft() }
+                .keyboardShortcut("n")
                 .disabled(browser == nil || library?.isLoaded != true)
             Button("Import Files…") { browser?.isImportingFiles = true }
                 .disabled(browser == nil || library?.isLoaded != true)
@@ -41,7 +36,7 @@ struct AppCommands: Commands {
 
         // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
-            let ids = notes?.ids ?? []
+            let ids: Set<Note.ID> = browser?.isCreatingItem == true ? [] : (notes?.ids ?? [])
             let shown = ids.compactMap { library?.note($0) }
             Button("Open in New Window", systemImage: "macwindow") {
                 for path in library?.paths(forWindows: ids) ?? [] { openWindow(value: path) }
@@ -72,10 +67,10 @@ struct AppCommands: Commands {
         // ⌘P is Search Notes, so Print takes ⇧⌘P, which Page Setup would have had; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
-                .disabled(editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-                .disabled(editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
@@ -90,7 +85,7 @@ struct AppCommands: Commands {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(details == nil || notes?.ids.count != 1 || marfaTypes != nil)
+            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1 || marfaTypes != nil)
             Divider()
             OrderOptions()
             Divider()

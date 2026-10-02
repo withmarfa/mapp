@@ -21,7 +21,10 @@ final class ItemJourneyTests: XCTestCase {
         let details = app.buttons["DetailsToggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
         details.click()
-        let parentEdit = app.buttons["RelationshipEdit.child-of"]
+        let addConnection = app.descendants(matching: .any)["AddConnection"]
+        XCTAssertTrue(addConnection.waitForExistence(timeout: 3))
+        addConnection.click()
+        let parentEdit = app.menuItems["RelationshipEdit.child-of"]
         XCTAssertTrue(parentEdit.waitForExistence(timeout: 3))
         parentEdit.click()
         let search = app.textFields["RelationshipSearch"]
@@ -30,7 +33,7 @@ final class ItemJourneyTests: XCTestCase {
         search.typeText("Interface Test Project")
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipCandidate.'")).firstMatch.click()
         app.buttons["RelationshipSave"].click()
-        let description = app.textFields["ItemProperty.description"]
+        let description = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(description.waitForExistence(timeout: 3))
         description.click()
         description.typeText("Saved through the native inspector")
@@ -54,10 +57,59 @@ final class ItemJourneyTests: XCTestCase {
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
         app.buttons["DetailsToggle"].click()
-        let savedDescription = app.textFields["ItemProperty.description"]
+        let savedDescription = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 3))
         XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.exists)
+    }
+
+    func testBodyFocusCreatesItemAndHeaderEditsSurviveReopening() {
+        app.typeKey("n", modifierFlags: .command)
+        let type = app.popUpButtons["NewItemType"]
+        XCTAssertTrue(type.waitForExistence(timeout: 3))
+        type.click()
+        app.menuItems["Task"].click()
+        let draftTitle = app.textFields["NewItemTitle"]
+        draftTitle.click()
+        draftTitle.typeText("Body Focus Draft")
+        let body = app.textViews["NewItemBody"]
+        XCTAssertTrue(body.waitForExistence(timeout: 3))
+        body.click()
+        XCTAssertTrue(draftTitle.waitForNonExistence(timeout: 3))
+        let editor = app.webViews.firstMatch.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 3))
+        editor.typeText("Created by starting the document body.")
+        let typedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: editor)
+        wait(for: [typedBody], timeout: 5)
+
+        let title = app.descendants(matching: .any)["ItemPageTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.click()
+        title.typeKey("a", modifierFlags: .command)
+        title.typeText("Body Focus Saved Task")
+        title.typeKey(.return, modifierFlags: [])
+        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        let status = app.descendants(matching: .any)["ItemStatusChip"]
+        XCTAssertTrue(status.waitForExistence(timeout: 3))
+        status.click()
+        app.menuItems["Completed"].click()
+        app.buttons["DetailsToggle"].click()
+        let inspectorStatus = app.popUpButtons["ItemProperty.status"]
+        XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
+        XCTAssertEqual(inspectorStatus.value as? String, "Completed")
+        app.terminate()
+        app.launchArguments.append("-MAPPKeepSampleFolder")
+        app.launch()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.click()
+        let reopened = app.webViews.firstMatch.textViews.firstMatch
+        XCTAssertTrue(reopened.waitForExistence(timeout: 3))
+        let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: reopened)
+        wait(for: [savedBody], timeout: 5)
+        if !inspectorStatus.exists { app.buttons["DetailsToggle"].click() }
+        XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
+        XCTAssertEqual(inspectorStatus.value as? String, "Completed")
     }
 
     func testImportPhotoAndShowNativeViewer() {
@@ -78,7 +130,7 @@ final class ItemJourneyTests: XCTestCase {
     }
 
     private func create(type: String, title: String) {
-        app.typeKey("n", modifierFlags: [.command, .control])
+        app.typeKey("n", modifierFlags: .command)
         let typePicker = app.popUpButtons["NewItemType"]
         XCTAssertTrue(typePicker.waitForExistence(timeout: 3))
         typePicker.click()
@@ -86,7 +138,7 @@ final class ItemJourneyTests: XCTestCase {
         let field = app.textFields["NewItemTitle"]
         field.click()
         field.typeText(title)
-        app.buttons["NewItemCreate"].click()
-        XCTAssertTrue(app.buttons["NewItemCreate"].waitForNonExistence(timeout: 3))
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
     }
 }

@@ -190,12 +190,11 @@ struct CommandPalette: View {
         }
 
         if library.isLoaded {
-            add(String(localized: "New Item…"), "plus", "⌃⌘N") { browser.isCreatingItem = true }
+            add(String(localized: "New Item"), "square.and.pencil", "⌘N") { browser.startItemDraft() }
             add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
-            if browser.selection.count == 1, let details {
+            if !browser.isCreatingItem, browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
             }
-            add(String(localized: "New Note"), "square.and.pencil", "⌘N") { browser.newNote(in: library, undoManager: undoManager) }
             add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
             }

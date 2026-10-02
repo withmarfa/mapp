@@ -58,12 +58,15 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
         } detail: {
             Group {
-                if browser.showsTypes {
+                if browser.isCreatingItem, let draft = browser.itemDraft {
+                    NewItemPage(browser: browser, draft: draft)
+                        .onAppear { editor.close() }
+                } else if browser.showsTypes {
                     MarfaTypesView(part: types.content)
                         // The note that was on the page is out of sight, so it is left.
                         .onAppear { editor.close() }
                 } else {
-                    NoteDetail(browser: browser, editor: editor)
+                    NoteDetail(browser: browser, editor: editor, details: details)
                 }
             }
             .toolbar(id: "main") {
@@ -74,7 +77,7 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         splitView
-        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes } set: { details.isPresented = $0 }) {
+        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
@@ -101,7 +104,7 @@ struct MainView: View {
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, editor)
         .focusedSceneValue(\.marfaTypes, browser.showsTypes ? types : nil)
-        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
+        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
@@ -132,7 +135,8 @@ struct MainView: View {
 
     private var importingWindow: some View {
         lifecycleWindow
-        .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
+        .onChange(of: browser.sidebarItem) { browser.isCreatingItem = false }
+        .onChange(of: browser.selection) { browser.isCreatingItem = false }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
                 let requestID = UUID()

@@ -19,6 +19,11 @@ nonisolated struct PageStyle: Equatable {
     /// whatever the text size.
     var readingWidth = 54
 
+    /// Matches the editor's three-rem minimum margins and chosen reading width.
+    func horizontalInset(for width: CGFloat) -> CGFloat {
+        max(CGFloat(textSize * 3), fullWidth ? 0 : (width - CGFloat(readingWidth * textSize)) / 2)
+    }
+
     static let textSizes = [11, 12, 13, 14, 16, 18, 20, 24]
     static let readingWidths = 36...80
 }

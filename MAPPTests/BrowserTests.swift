@@ -14,6 +14,32 @@ struct BrowserTests {
         return (library, older, newer, pinned)
     }
 
+    @Test func draftDoesNotExposePreviouslySelectedNoteToCommands() {
+        let (library, _, newer, _) = makeLibrary()
+        let browser = Browser()
+        browser.selection = [newer.id]
+        #expect(browser.selectedNotes(in: library).count == 1)
+        browser.startItemDraft()
+        #expect(browser.selectedNotes(in: library).isEmpty)
+        browser.isCreatingItem = false
+        #expect(browser.selectedNotes(in: library).count == 1)
+    }
+
+    @Test func creationOutsideOriginalProjectRevealsTheNewItem() throws {
+        let library = NoteLibrary(notes: [])
+        let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes))
+        let browser = Browser()
+        browser.sidebarItem = .project(project.id)
+        browser.startItemDraft()
+        browser.itemDraft?.typeID = "aic.ticket.task"
+        browser.itemDraft?.title = "Unparented task"
+        browser.itemDraft?.parentID = nil
+        let note = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(browser.notes(in: library).contains { $0.id == note.id })
+        #expect(browser.selection == [note.id])
+        #expect(browser.focusRequest == .page)
+    }
+
     // MARK: Keeping the selection in the list
 
     let a = UUID(), b = UUID(), c = UUID(), d = UUID()
@@ -50,15 +76,68 @@ struct BrowserTests {
     }
 
     @Test(arguments: [SidebarItem.recentlyDeleted, .marfaTypes])
-    func aNewNoteFromAPlaceWithoutNotesGoesToTheInboxAndStaysSelected(from item: SidebarItem) {
+    func aNewItemFromAPlaceWithoutNotesOpensADraftThenRevealsTheCreatedItem(from item: SidebarItem) {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
         browser.show(item, in: library, order: NoteOrder())
         browser.searchText = "Pinned"
-        browser.newNote(in: library, undoManager: nil)
-        #expect(browser.item == .inbox)
+        let count = library.notes.count
+        browser.startItemDraft()
+        #expect(browser.isCreatingItem)
+        #expect(browser.item == item)
+        #expect(library.notes.count == count)
+        let created = browser.createDraft(in: library, undoManager: nil)
+        #expect(created != nil)
+        #expect(browser.item == .itemType("core.note"))
         #expect(!browser.isSearching)
         #expect(browser.selectedNotes(in: library).map(\.body) == [""])
+        #expect(browser.selection == Set(created.map { [$0.id] } ?? []))
+    }
+
+    @Test func newItemDraftRespectsTypeAndSurvivesNavigation() {
+        let (library, _, _, _) = makeLibrary()
+        let browser = Browser()
+        browser.sidebarItem = .itemType("aic.ticket.feature")
+        browser.startItemDraft()
+        #expect(browser.itemDraft?.typeID == "aic.ticket.feature")
+        browser.itemDraft?.title = "Draft feature"
+        browser.itemDraft?.body = "Keep this content"
+        browser.show(.inbox, in: library, order: NoteOrder())
+        #expect(!browser.isCreatingItem)
+        browser.startItemDraft()
+        #expect(browser.itemDraft?.title == "Draft feature")
+        #expect(browser.itemDraft?.body == "Keep this content")
+        #expect(browser.itemDraft?.typeID == "aic.ticket.feature")
+    }
+
+    @Test func rejectedCreationKeepsDraftAndSuccessfulCreationIncludesContent() {
+        let (library, _, _, _) = makeLibrary()
+        let browser = Browser()
+        browser.startItemDraft()
+        browser.itemDraft?.title = "Not/a/title"
+        browser.itemDraft?.body = "A draft body.\n"
+        #expect(browser.createDraft(in: library, undoManager: nil) == nil)
+        #expect(browser.isCreatingItem)
+        #expect(browser.itemDraft?.body == "A draft body.\n")
+        browser.itemDraft?.title = "A valid title"
+        let note = browser.createDraft(in: library, undoManager: nil)
+        #expect(note?.body == "A draft body.\n")
+        #expect(note?.file.property("title") == "A valid title")
+        #expect(browser.itemDraft == nil)
+        #expect(!browser.isCreatingItem)
+    }
+
+    @Test func untitledDraftNamesAreUniqueAndProjectsSupplyParents() {
+        let existing = Note(path: "Notes/Untitled.md", text: "---\ntype: core.note\ntitle: Untitled\n---\n", created: start)
+        let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\n", created: start)
+        let library = NoteLibrary(notes: [existing, project])
+        let browser = Browser()
+        browser.sidebarItem = .project(project.id)
+        browser.startItemDraft()
+        #expect(browser.itemDraft?.parentID == project.id)
+        let created = browser.createDraft(in: library, undoManager: nil)
+        #expect(created?.title == "Untitled 2")
+        #expect(created?.file.property("child-of") == "[[Area]]")
     }
 
     @Test func aWhitespaceSearchIsNoSearch() {
@@ -98,10 +177,11 @@ struct BrowserTests {
         #expect(library.notesToPurge == [older.id])
     }
 
-    @Test func aNewNoteAsksForThePage() {
-        let (library, _, _, _) = makeLibrary()
+    @Test func aNewItemDraftAsksForThePage() {
         let browser = Browser()
-        browser.newNote(in: library, undoManager: nil)
+        browser.startItemDraft()
+        #expect(browser.isCreatingItem)
+        #expect(browser.itemDraft != nil)
         #expect(browser.focusRequest == .page)
     }
 
