@@ -26,7 +26,11 @@ struct FileItemContent: View {
             }
             .padding()
             if type.conforms(to: .pdf) {
-                FilePDFView(url: url)
+                if PDFDocument(url: url) != nil {
+                    FilePDFView(url: url)
+                } else {
+                    ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
+                }
             } else if type.conforms(to: .image) {
                 FileImageView(url: url, zoom: zoom)
             } else {
@@ -91,6 +95,26 @@ private struct FileQuickLookView: NSViewRepresentable {
     }
 }
 
-#Preview("File unavailable") {
-    FileItemContent(url: URL(fileURLWithPath: "/missing/example.png"))
+private enum FilePreviewFixtures {
+    static func url(_ name: String, extension ext: String) -> URL? {
+        Bundle.main.url(forResource: name, withExtension: ext)
+    }
+}
+
+#Preview("Photo item") {
+    if let url = FilePreviewFixtures.url("item-preview-photo", extension: "png") {
+        FileItemContent(url: url).frame(width: 700, height: 600)
+    }
+}
+
+#Preview("PDF item") {
+    if let url = FilePreviewFixtures.url("item-preview-brief", extension: "pdf") {
+        FileItemContent(url: url).frame(width: 700, height: 600)
+    }
+}
+
+#Preview("Other file item") {
+    if let url = FilePreviewFixtures.url("item-preview-file", extension: "txt") {
+        FileItemContent(url: url).frame(width: 700, height: 600)
+    }
 }

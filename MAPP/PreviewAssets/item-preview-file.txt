@@ -1,0 +1,3 @@
+Sample imported file
+
+A file item retains its original bytes and opens in the system preview.
