@@ -16,6 +16,7 @@ struct MainView: View {
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var selectedImportID: UUID?
+    @State private var importRequestID: UUID?
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -120,10 +121,15 @@ struct MainView: View {
         }
         .sheet(isPresented: $browser.isCreatingItem) { NewItemSheet(browser: browser) }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { library.importFiles(urls, folderID: browser.selectedFolder) }
+            if case .success(let urls) = result {
+                let requestID = UUID()
+                importRequestID = requestID
+                library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
+            }
         }
         .onChange(of: library.files.map(\.id)) {
-            if let id = library.lastImportedFileID, id != selectedImportID, library.files.contains(where: { $0.id == id }) {
+            if let id = library.lastImportedFileID, library.lastImportedRequestID == importRequestID,
+               importRequestID != nil, id != selectedImportID, library.files.contains(where: { $0.id == id }) {
                 selectedImportID = id
                 browser.sidebarItem = .allNotes
                 browser.searchText = ""

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NoteList: View {
     @Environment(NoteLibrary.self) private var library
