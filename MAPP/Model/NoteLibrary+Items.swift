@@ -33,7 +33,7 @@ extension NoteLibrary {
                 guard let target = self.item(targetID) else { return nil }
                 return .init(title: target.title, itemID: targetID, resolution: .resolved(targetID))
             }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-            results.append(.init(field: "inverse:" + name, label: name == "parent-of" ? "Children" : name == "about" ? "Items About This" : "Incoming " + WorkbenchSchema.label(for: name), targets: targets, isEditable: item.isEditable, allowsMultiple: true))
+            results.append(.init(field: "inverse:" + name, label: name == "parent-of" ? "Children" : name == "about" ? "Items About This" : "Incoming " + WorkbenchSchema.label(for: name), targets: targets, isEditable: item.isEditable, allowsMultiple: name != "supersedes"))
         }
         return results
     }
@@ -139,6 +139,15 @@ extension NoteLibrary {
         if field.hasPrefix("inverse:") {
             let name = String(field.dropFirst("inverse:".count))
             let ownerField = name == "parent-of" ? "child-of" : name
+            guard name != "supersedes" || targetIDs.count <= 1 else { return false }
+            if name == "supersedes", let owner = targetIDs.first {
+                var seen: Set<UUID> = [owner]
+                var cursor: UUID? = id
+                while let next = cursor {
+                    guard seen.insert(next).inserted else { return false }
+                    cursor = connectionIndex.edges.first { $0.name == "supersedes" && $0.sourceID == next }?.targetID
+                }
+            }
             let existing = relationships(for: id).first { $0.field == field }?.targets.compactMap(\.itemID) ?? []
             var files: [UUID: NoteFile] = [:]
             for ownerID in Set(existing + targetIDs) {
