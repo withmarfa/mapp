@@ -60,6 +60,22 @@ struct FileItemStoreTests {
         #expect(!root.exists("Directory"))
     }
 
+    @Test func rejectedImportLeavesNoPartialItemOrTemporaryFile() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let source = try TemporaryFolder()
+        let input = source.url.appending(path: "Missing.pdf")
+        let store = FolderStore(root: root.url, bin: bin.url)
+        var failure: String?
+        store.failed = { _, message in failure = message }
+        store.perform(.importFile(path: "Missing.pdf", source: input))
+        store.drain()
+        for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(failure != nil)
+        #expect(try store.load().files.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.url.path).isEmpty)
+    }
+
     @Test func attachmentAndHiddenFilesRemainExcluded() throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()

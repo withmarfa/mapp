@@ -258,7 +258,20 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             var coordinationError: NSError?
             NSFileCoordinator().coordinate(readingItemAt: source, options: .withoutChanges,
                                            writingItemAt: target, options: .forReplacing, error: &coordinationError) { from, to in
-                do { try files.copyItem(at: from, to: to) } catch { failure = error }
+                do {
+                    let coordinatedValues = try from.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                    guard coordinatedValues.isRegularFile == true, coordinatedValues.isSymbolicLink != true,
+                          to.resolvingSymlinksInPath().pathComponents.starts(with: base.pathComponents) else {
+                        throw CocoaError(.fileWriteNoPermission)
+                    }
+                    // An interrupted copy must not appear as a complete item in the library.
+                    let scratch = try files.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: to, create: true)
+                    defer { try? files.removeItem(at: scratch) }
+                    let staged = scratch.appending(path: to.lastPathComponent)
+                    try files.copyItem(at: from, to: staged)
+                    // Move fails if another writer took the destination meanwhile; never overwrite it.
+                    try files.moveItem(at: staged, to: to)
+                } catch { failure = error }
             }
             if let error = coordinationError ?? failure { throw error }
             let actual = relativePath(of: target)
