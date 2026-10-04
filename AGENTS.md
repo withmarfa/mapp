@@ -10,7 +10,7 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 - **American English** in code, comments, commits and repository files.
 - **Scoped Conventional Commits**, for example `feat(app):`, `fix(editor):`, `test(model):`. Present tense, lowercase, short.
-- **Branches and pull requests.** Work goes on a branch and reaches `main` through a pull request, squash-merged once the tests pass and a reviewer has read it. There is no CI; the tests are run locally before merging.
+- **Branches and pull requests.** Work goes on a branch and reaches `main` through a pull request, squash-merged once the tests pass and a reviewer has read it. There is no CI; the tests are run locally before merging. Once the work is merged, bring the local `main` up to date (`git pull --ff-only` on `main`) so the next piece of work starts from it.
 - **Comments explain why, not what.** A comment survives only if it carries a reason the code cannot.
 - **No personal detail.** No absolute paths, machine names, account names or credentials in any file here.
 - **No legacy.** No compatibility shims, deprecation aliases or migration paths. Removed means gone.
