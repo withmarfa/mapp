@@ -389,7 +389,7 @@ final class NoteLibrary {
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
         case .files: String(localized: "Files")
-        case .itemType(let typeID): typeID == "aic.project" ? String(localized: "All Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
+        case .itemType(let typeID): typeID == "aic.project" ? String(localized: "Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
         case .project(let id): self.item(id)?.title ?? ""
 
         }

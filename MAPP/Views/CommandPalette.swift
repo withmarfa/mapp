@@ -190,7 +190,7 @@ struct CommandPalette: View {
         }
 
         if library.isLoaded {
-            add(String(localized: "New Item"), "square.and.pencil", "⌘N") { browser.startItemDraft() }
+            add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
             add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
             if !browser.isCreatingItem, browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "info.circle", "⌥⌘I") { details.isPresented.toggle() }

@@ -79,7 +79,7 @@ struct SidebarNavigationTests {
         #expect(Set(library.notes(in: .project(project.id)).map(\.id)) == [project.id, child.id])
         #expect(library.notes(in: .pinnedItem(project.id)).map(\.id) == [project.id])
         #expect(library.notes(in: .itemType("aic.project")).map(\.id) == [project.id])
-        #expect(library.name(of: .itemType("aic.project")) == "All Projects")
+        #expect(library.name(of: .itemType("aic.project")) == "Projects")
     }
 
     @Test func shortcutAndProjectTitlesUseTheSharedItemProjection() {

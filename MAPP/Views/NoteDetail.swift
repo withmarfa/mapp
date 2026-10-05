@@ -25,7 +25,7 @@ struct NoteDetail: View {
                 .onAppear(perform: grantFocusRequest)
                 .onChange(of: browser.focusRequest, grantFocusRequest)
         } else {
-            ContentUnavailableView("No Note Selected", systemImage: "note.text")
+            UnselectedItemContent(hasItems: !browser.notes(in: library).isEmpty || !browser.files(in: library).isEmpty)
                 // The page no longer shows the note it had, so that note is left.
                 .onAppear { editor.close() }
         }
@@ -37,6 +37,33 @@ struct NoteDetail: View {
         browser.focusRequest = nil
         editor.focus()
     }
+}
+
+private struct UnselectedItemContent: View {
+    let hasItems: Bool
+
+    var body: some View {
+        VStack {
+            if hasItems {
+                Text("Select an item")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("SelectItemPrompt")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.windowBackground)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    }
+}
+
+#Preview("Items with no selection") {
+    UnselectedItemContent(hasItems: true)
+        .frame(width: 600, height: 500)
+}
+
+#Preview("Empty item collection") {
+    UnselectedItemContent(hasItems: false)
+        .frame(width: 600, height: 500)
 }
 
 /// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads

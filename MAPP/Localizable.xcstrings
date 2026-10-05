@@ -1,10 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "All Projects" : {
-
-    },
-    "All Pinned" : {
+    "Add Attachment…" : {
 
     },
     "Items" : {
@@ -179,12 +176,6 @@
 
     },
     "Archive Note" : {
-
-    },
-    "Attach Image" : {
-
-    },
-    "Attach Image…" : {
 
     },
     "Back" : {
@@ -398,7 +389,7 @@
     "New Window" : {
 
     },
-    "No Note Selected" : {
+    "Select an item" : {
 
     },
     "No Notes" : {
