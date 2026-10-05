@@ -28,7 +28,7 @@ struct ItemPageHeader: View {
             }, axis: .vertical)
             .textFieldStyle(.plain)
             .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color(nsColor: .textColor))
             .lineLimit(1...6)
             .focused($titleFocused)
             .disabled(!item.isEditable)

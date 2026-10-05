@@ -1,6 +1,60 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "All Projects" : {
+
+    },
+    "All Pinned" : {
+
+    },
+    "Items" : {
+
+    },
+    "Close Search" : {
+
+    },
+    "Back to MAPP" : {
+
+    },
+    "Search Settings" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Appearance" : {
+
+    },
+    "Editor" : {
+
+    },
+    "Library" : {
+
+    },
+    "Notes List" : {
+
+    },
+    "Page Layout" : {
+
+    },
+    "Text" : {
+
+    },
+    "Folder" : {
+
+    },
+    "Sort By Group by Date List Preview Notes List" : {
+
+    },
+    "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing" : {
+
+    },
+    "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete" : {
+
+    },
+    "MAPP Version Build" : {
+
+    },
     "Add %@…" : {
 
     },

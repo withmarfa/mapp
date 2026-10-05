@@ -63,6 +63,40 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
     }
 
+    @Test func headingMarksAppearOnlyWhileEditing() async throws {
+        let page = try await Harness()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+            window.close()
+        }
+        try await page.load("A paragraph.\n\n## Closing\n")
+        let markers = "getComputedStyle(document.querySelector('h2'), '::before').content"
+        let hidden = ["none", "normal", "\"\""]
+        let beforeFocus = try await page.editor.webView.evaluateJavaScript(markers) as? String
+        #expect(hidden.contains(beforeFocus ?? ""))
+        page.editor.focus()
+        try await page.run("0")
+        let hasFocus = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement === document.querySelector('.ProseMirror')"
+        ) as? Bool
+        #expect(hasFocus == true)
+        let focused = try await page.editor.webView.evaluateJavaScript(markers) as? String
+        #expect(focused == "\"##\"")
+        try await page.run("document.querySelector('.ProseMirror').blur()")
+        let afterBlur = try await page.editor.webView.evaluateJavaScript(markers) as? String
+        #expect(hidden.contains(afterBlur ?? ""))
+        #expect(try await page.markdown() == nil)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func formattingReportsTheNoteAsMarkdown() async throws {
         let page = try await Harness()
         try await page.load("Milk\n")

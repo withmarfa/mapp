@@ -4,6 +4,8 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case inbox
     case allNotes
     case pinned
+    /// A shortcut to one pinned item, distinct from the collection containing every pin.
+    case pinnedItem(UUID)
     case folder(Folder.ID)
     case itemType(String)
     case project(UUID)

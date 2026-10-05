@@ -81,7 +81,7 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
-            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
+            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "info.circle") {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])

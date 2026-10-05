@@ -3,11 +3,12 @@ import SwiftUI
 @main
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
+    @State private var settingsRequest = SettingsRequest()
     private var folder: NotesFolder { delegate.folder }
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            RootView()
+            RootView(settingsRequest: settingsRequest)
                 .environment(folder)
         }
         .defaultSize(width: 1100, height: 720)
@@ -16,6 +17,7 @@ struct MAPPApp: App {
             FindCommands()
             FormatCommands()
             ToolbarCommands()
+            SettingsCommands(request: settingsRequest)
         }
 
         WindowGroup("Note", for: String.self) { $path in
@@ -29,11 +31,6 @@ struct MAPPApp: App {
             }
         }
         .defaultSize(width: 640, height: 720)
-
-        Settings {
-            SettingsView()
-                .environment(folder)
-        }
     }
 }
 

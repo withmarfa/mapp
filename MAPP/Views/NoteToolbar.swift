@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The toolbar over a note, laid out as Notes lays out its own: New Item leading, the formatting tools in the
-/// centre, and Share and a More menu trailing. Everything but New Item can be moved or removed
-/// through Customize Toolbar, and every item is also a menu command, since a toolbar can be hidden.
+/// The formatting tools stay central, with creation and item actions at the trailing edge.
+/// The compact title and New Item stay fixed; the other items can be moved or removed through Customize Toolbar.
+/// Every action is also a menu command, since a toolbar can be hidden.
 struct NoteToolbar: CustomizableToolbarContent {
     @Environment(NoteLibrary.self) private var library
     /// The main window's browser; nil in a note's own window, which makes no notes.
@@ -12,11 +12,17 @@ struct NoteToolbar: CustomizableToolbarContent {
     let details: DetailsPresentation
 
     var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "newNote") {
-            NewNoteButton(browser: browser)
+        ToolbarItem(id: "scrolledTitle") {
+            Text(notes.first.flatMap { library.item($0.id)?.title } ?? "")
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 220, alignment: .leading)
+                .accessibilityIdentifier("ScrolledItemTitle")
         }
+        .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(browser == nil)
+        .hidden(!editor.isHeaderScrolledAway || notes.count != 1 || browser?.isCreatingItem == true || showsTypes)
         ToolbarSpacer(.flexible)
 
         ToolbarItem(id: "format") {
@@ -39,13 +45,18 @@ struct NoteToolbar: CustomizableToolbarContent {
         .hidden(showsTypes || selectedFileURL != nil || browser?.isCreatingItem == true)
 
         ToolbarSpacer(.flexible)
+        ToolbarItem(id: "newNote") {
+            NewNoteButton(browser: browser)
+        }
+        .customizationBehavior(.disabled)
+        .hidden(browser == nil)
         ToolbarItem(id: "share") {
             NoteShareLink(note: (browser?.selection.count ?? notes.count) == 1 ? notes.first : nil, fileURL: selectedFileURL)
                 .help("Share")
         }
         .hidden(showsTypes || browser?.isCreatingItem == true)
         ToolbarItem(id: "details") {
-            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+            Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
                 .help(details.isPresented ? "Hide Details" : "Show Details")
                 .disabled((browser?.selection.count ?? notes.count) != 1)
                 .accessibilityIdentifier("DetailsToggle")

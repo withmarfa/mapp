@@ -29,6 +29,7 @@ nonisolated enum EditorMessage: Sendable {
     case ready
     case changed(String, generation: Int)
     case state(CaretState)
+    case scrolled(CGFloat, generation: Int)
     case openLink(String)
     case copy(String)
     case escape
@@ -58,6 +59,10 @@ nonisolated enum EditorMessage: Sendable {
         case "openLink":
             guard let href = dict["href"] as? String else { return nil }
             self = .openLink(href)
+        case "scrolled":
+            guard let offset = dict["offset"] as? Double, offset.isFinite,
+                  let generation = dict["generation"] as? Int else { return nil }
+            self = .scrolled(offset, generation: generation)
         case "copy":
             guard let text = dict["text"] as? String else { return nil }
             self = .copy(text)

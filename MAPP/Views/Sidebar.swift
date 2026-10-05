@@ -9,6 +9,9 @@ struct Sidebar: View {
     @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
+    @SceneStorage("sidebarProjectsExpanded") private var projectsExpanded = true
+    @SceneStorage("sidebarItemsExpanded") private var itemsExpanded = false
+    @SceneStorage("sidebarFoldersExpanded") private var foldersExpanded = true
 
     /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
     /// cannot show, so that is ignored.
@@ -26,36 +29,58 @@ struct Sidebar: View {
             Section {
                 row(.inbox, systemImage: "tray")
                 row(.allNotes, systemImage: "note.text")
-                row(.pinned, systemImage: "pin")
             }
 
-            if !projects.isEmpty {
-                Section("Projects") {
+            Section("Pinned") {
+                row(.pinned, systemImage: "pin", title: String(localized: "All Pinned"))
+                ForEach(pinned) { item in
+                    Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
+                        .tag(SidebarItem.pinnedItem(item.id))
+                        .accessibilityIdentifier("SidebarPinnedItem-\(item.id.uuidString)")
+                }
+            }
+
+            Section {
+                DisclosureGroup(isExpanded: $projectsExpanded) {
                     ForEach(projects) { project in
                         row(.project(project.id), systemImage: "square.stack")
                     }
+                } label: {
+                    Label("All Projects", systemImage: "square.stack")
+                        .badge(library.count(in: .itemType("aic.project")))
                 }
-            }
-            Section("Item Types") {
-                ForEach(WorkbenchSchema.types) { type in
-                    row(.itemType(type.id), systemImage: "doc.text")
+                .tag(SidebarItem.itemType("aic.project"))
+                .accessibilityIdentifier("SidebarProjects")
+
+                DisclosureGroup(isExpanded: $itemsExpanded) {
+                    ForEach(itemTypes) { type in
+                        row(.itemType(type.id), systemImage: "doc.text")
+                    }
+                    row(.files, systemImage: "doc")
+                } label: {
+                    Label("Items", systemImage: "doc.text")
                 }
-                row(.files, systemImage: "doc")
-            }
-            Section {
-                ForEach(library.folders) { folder in
-                    folderRow(folder)
+                .accessibilityIdentifier("SidebarItems")
+
+                DisclosureGroup(isExpanded: $foldersExpanded) {
+                    ForEach(library.folders) { folder in
+                        folderRow(folder)
+                    }
+                    .onMove { source, destination in
+                        let ids = source.map { library.folders[$0].id }
+                        let target = destination < library.folders.count ? library.folders[destination].id : nil
+                        library.moveFolders(ids, before: target, undoManager: undoManager)
+                    }
+                } label: {
+                    Label("Folders", systemImage: "folder")
+                        .contextMenu {
+                            Button("New Folder") {
+                                browser.newFolder(in: library, order: order, undoManager: undoManager)
+                            }
+                            .disabled(!library.isLoaded)
+                        }
                 }
-                .onMove { source, destination in
-                    let ids = source.map { library.folders[$0].id }
-                    let target = destination < library.folders.count ? library.folders[destination].id : nil
-                    library.moveFolders(ids, before: target, undoManager: undoManager)
-                }
-            } header: {
-                FoldersHeader {
-                    browser.newFolder(in: library, order: order, undoManager: undoManager)
-                }
-                .disabled(!library.isLoaded)
+                .accessibilityIdentifier("SidebarFolders")
             }
         }
         .listStyle(.sidebar)
@@ -65,6 +90,12 @@ struct Sidebar: View {
         }
         .onChange(of: browser.folderToDelete) {
             if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
+        }
+        .onChange(of: browser.renamingFolder) {
+            if browser.renamingFolder != nil { foldersExpanded = true }
+        }
+        .onChange(of: pinned.map(\.id)) {
+            browser.folderRemoved(in: library, order: order)
         }
         // A bar rather than an inset, so folders scrolling under the places fade as content does under a toolbar.
         .safeAreaBar(edge: .bottom, spacing: 0) {
@@ -121,8 +152,18 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private func row(_ item: SidebarItem, systemImage: String) -> some View {
-        Label(library.name(of: item), systemImage: systemImage)
+    private var pinned: [AppItem] {
+        library.notes(in: .pinned)
+            .compactMap { library.item($0.id) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    private var itemTypes: [ItemTypeDefinition] {
+        WorkbenchSchema.types.filter { $0.id != "aic.project" }
+    }
+
+    private func row(_ item: SidebarItem, systemImage: String, title: String? = nil) -> some View {
+        Label(title ?? library.name(of: item), systemImage: systemImage)
             .badge(library.count(in: item))
             .tag(item)
             .dropDestination(for: NoteReference.self, isEnabled: canDrop(on: item)) { notes, _ in
@@ -167,7 +208,7 @@ struct Sidebar: View {
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .pinned: library.setPinned(ids, true, undoManager: undoManager)
         case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .marfaTypes, .itemType, .project, .files: break
+        case .allNotes, .marfaTypes, .itemType, .project, .pinnedItem, .files: break
         }
     }
 
@@ -182,34 +223,9 @@ struct Sidebar: View {
     }
 }
 
-/// The Folders heading, with a button for a new folder that shows while the pointer is over it, as Mail's
-/// headings show theirs, in line with the rows' counts. The list reads a heading as one line, so the button is
-/// left to the pointer; New Folder in the File menu, on ⇧⌘N, is there for everything else.
-private struct FoldersHeader: View {
-    let newFolder: () -> Void
-    @State private var isHovering = false
-
-    var body: some View {
-        HStack {
-            Text("Folders")
-            Spacer()
-            Button("New Folder", systemImage: "plus", action: newFolder)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .help("New Folder")
-                .opacity(isHovering ? 1 : 0)
-                .accessibilityHidden(true)
-        }
-        // A heading runs to the list's edge, past where the rows end their counts.
-        .padding(.trailing, 14)
-        .contentShape(.rect)
-        .onHover { isHovering = $0 }
-    }
-}
-
 /// The folder's name as an editable field, focused when it appears. Return or leaving the field commits and
-/// Escape cancels. The draft is seeded once from the folder's name. Return also takes the focus away, so the
-/// field commits only the first time.
+/// Escape cancels. List can retain the field's state between edits, so each appearance starts a fresh draft
+/// and commit guard. Return also takes the focus away, so each edit commits only once.
 private struct FolderNameField: View {
     let folder: Folder
     let onCommit: (String) -> Void
@@ -233,7 +249,11 @@ private struct FolderNameField: View {
         } icon: {
             Image(systemName: "folder")
         }
-        .onAppear { isFocused = true }
+        .onAppear {
+            name = folder.name
+            isCommitted = false
+            isFocused = true
+        }
     }
 
     private func commit(_ name: String) {
@@ -242,3 +262,14 @@ private struct FolderNameField: View {
         onCommit(name)
     }
 }
+
+#if DEBUG
+#Preview("Grouped Sidebar") {
+    let source = ItemPreviewFixtures.library
+    let library = NoteLibrary(notes: source.notes, folders: [Folder(name: "Projects"), Folder(name: "Notes")], now: { ItemPreviewFixtures.date })
+    let _ = library.setPinned([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
+    Sidebar(browser: Browser(), order: NoteOrder())
+        .environment(library)
+        .frame(width: 260, height: 740)
+}
+#endif

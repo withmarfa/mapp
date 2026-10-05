@@ -79,7 +79,7 @@ final class Browser {
         NoteGroup.sections(
             of: notes(in: library),
             sort: order.sort,
-            pinnedFirst: !isSearching && item != .pinned && item != .recentlyDeleted,
+            pinnedFirst: !isSearching && !showsOnlyPinned && item != .recentlyDeleted,
             groupsByDate: order.groupsByDate,
             now: now
         )
@@ -87,7 +87,12 @@ final class Browser {
 
     /// Whether the list mixes notes from several places, so each row says where its note lives.
     var showsFolders: Bool {
-        isSearching || item == .allNotes || item == .pinned || item == .recentlyDeleted
+        isSearching || item == .allNotes || showsOnlyPinned || item == .recentlyDeleted
+    }
+
+    private var showsOnlyPinned: Bool {
+        if case .pinnedItem = item { return true }
+        return item == .pinned
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
@@ -160,6 +165,10 @@ final class Browser {
         if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
             show(.allNotes, in: library, order: order)
         }
+        if case .pinnedItem(let id) = sidebarItem,
+           library.note(id).map({ !$0.isDeleted && $0.isPinned }) != true {
+            show(.pinned, in: library, order: order)
+        }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
         }
@@ -192,6 +201,7 @@ final class Browser {
         enum Item: Codable, Equatable {
             case inbox, allNotes, pinned, recentlyDeleted, marfaTypes, files
             case itemType(String), project(String)
+            case pinnedItem(String)
             case folder(String)
         }
     }
@@ -202,6 +212,7 @@ final class Browser {
             case .inbox: .inbox
             case .allNotes: .allNotes
             case .pinned: .pinned
+            case .pinnedItem(let id): .pinnedItem(library.note(id)?.path ?? "")
             case .recentlyDeleted: .recentlyDeleted
             case .marfaTypes: .marfaTypes
             case .files: .files
@@ -220,6 +231,8 @@ final class Browser {
         switch snapshot.sidebarItem {
         case .inbox: sidebarItem = .inbox
         case .pinned: sidebarItem = .pinned
+        case .pinnedItem(let path):
+            sidebarItem = library.note(at: path).flatMap { $0.isPinned && !$0.isDeleted ? .pinnedItem($0.id) : nil } ?? .pinned
         case .recentlyDeleted: sidebarItem = .recentlyDeleted
         case .marfaTypes: sidebarItem = .marfaTypes
         case .files: sidebarItem = .files

@@ -8,11 +8,11 @@ struct CommandPalette: View {
     @Environment(NoteLibrary.self) private var library
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.openSettings) private var openSettings
     @StoredOrder private var order
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     let browser: Browser
     let editor: EditorController
+    let settings: SettingsPresentation
     let mode: Browser.Palette
     @State private var query = ""
     @State private var highlighted = 0
@@ -28,8 +28,8 @@ struct CommandPalette: View {
         var snippet: String?
         let systemImage: String
         var shortcut: String?
-        /// Opens the other palette, which takes the keyboard itself.
-        var opensPalette = false
+        /// Another interface takes the keyboard itself, so the note should not regain focus first.
+        var takesFocus = false
         let action: () -> Void
     }
 
@@ -143,7 +143,7 @@ struct CommandPalette: View {
     private func run(_ entries: [Entry], at index: Int? = nil) {
         let index = index ?? highlighted
         guard entries.indices.contains(index) else { return }
-        close(returningFocus: !entries[index].opensPalette)
+        close(returningFocus: !entries[index].takesFocus)
         entries[index].action()
     }
 
@@ -193,14 +193,14 @@ struct CommandPalette: View {
             add(String(localized: "New Item"), "square.and.pencil", "⌘N") { browser.startItemDraft() }
             add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
             if !browser.isCreatingItem, browser.selection.count == 1, let details {
-                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "info.circle", "⌥⌘I") { details.isPresented.toggle() }
             }
             add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
                 browser.newFolder(in: library, order: order, undoManager: undoManager)
             }
         }
         let search = String(localized: "Search Notes")
-        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⌘P", opensPalette: true) {
+        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⌘P", takesFocus: true) {
             browser.palette = .search
         })
 
@@ -243,7 +243,10 @@ struct CommandPalette: View {
             add(String(localized: "Print…"), "printer", "⇧⌘P") { editor.printNote() }
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
-        add(String(localized: "Settings…"), "gear", "⌘,") { openSettings() }
+        let settingsTitle = String(localized: "Settings…")
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gear", shortcut: "⌘,", takesFocus: true) {
+            settings.show()
+        })
         return entries
     }
 

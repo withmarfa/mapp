@@ -31,6 +31,7 @@ declare global {
       setFullWidth(full: boolean): void
       setTextSize(points: number): void
       setReadingWidth(ems: number): void
+      setHeaderHeight(height: number): void
       setSpellcheck(spellcheck: boolean): void
     }
   }
@@ -97,14 +98,36 @@ window.addEventListener('blur', () => {
 })
 window.addEventListener('focus', () => document.documentElement.classList.remove('inactive'))
 
-window.editor = {
-  load: (markdown, generation, editable) => {
-    editor.setEditable(editable)
-    editor.load(markdown, generation)
+let generation = 0
+let scrollPending = false
+function reportScroll(): void {
+  postToHost({ type: 'scrolled', offset: window.scrollY, generation })
+}
+window.addEventListener(
+  'scroll',
+  () => {
+    if (scrollPending) return
+    scrollPending = true
+    requestAnimationFrame(() => {
+      scrollPending = false
+      reportScroll()
+    })
   },
-  reload: (markdown, generation, editable) => {
+  { passive: true },
+)
+
+window.editor = {
+  load: (markdown, nextGeneration, editable) => {
+    generation = nextGeneration
     editor.setEditable(editable)
-    editor.reload(markdown, generation)
+    editor.load(markdown, nextGeneration)
+    reportScroll()
+  },
+  reload: (markdown, nextGeneration, editable) => {
+    generation = nextGeneration
+    editor.setEditable(editable)
+    editor.reload(markdown, nextGeneration)
+    reportScroll()
   },
   markdown: () => editor.markdown(),
   flush: () => editor.flush(),
@@ -127,13 +150,16 @@ window.editor = {
   setKeymap: (keymap) => editor.setKeymap(keymap),
   setLabels: (labels) => setLabels(labels),
   setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
-  // Every size and measure on the page is in rem, so the whole note scales with its text.
+  // Text measures use rem, so the reading width scales with its text.
   setTextSize: (points) => {
     document.documentElement.style.fontSize = `${points}px`
   },
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
   setReadingWidth: (ems) =>
     document.documentElement.style.setProperty('--reading-width', `${ems}rem`),
+  setHeaderHeight: (height) => {
+    document.documentElement.style.setProperty('--item-header-height', `${Math.max(0, height)}px`)
+  },
 }
 
 postToHost({ type: 'ready' })

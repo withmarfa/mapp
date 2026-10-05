@@ -19,13 +19,14 @@ struct ColumnSearch<Leading: View>: ToolbarContent {
 
     var body: some ToolbarContent {
         if isExpanded {
-            ToolbarItem {
+            ToolbarItem(placement: .principal) {
                 ColumnSearchField(text: $text, prompt: prompt, focusRequests: focusRequests, onSubmit: onSubmit, onDown: onDown) {
                     text = ""
                     isExpanded = false
                 }
-                .frame(width: max(160, columnWidth - 40))
+                .frame(width: max(160, columnWidth - 24))
             }
+            .sharedBackgroundVisibility(.hidden)
         } else {
             ToolbarItemGroup {
                 leading()
@@ -50,6 +51,7 @@ struct ColumnSearchField: NSViewRepresentable {
         field.placeholderString = prompt
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
+        field.onClose = onEnd
         field.setAccessibilityIdentifier("ColumnSearch")
         return field
     }
@@ -58,6 +60,7 @@ struct ColumnSearchField: NSViewRepresentable {
         context.coordinator.parent = self
         if field.stringValue != text { field.stringValue = text }
         field.placeholderString = prompt
+        field.onClose = onEnd
         if context.coordinator.focusRequests != focusRequests {
             context.coordinator.focusRequests = focusRequests
             DispatchQueue.main.async { field.window?.makeFirstResponder(field) }
@@ -103,6 +106,46 @@ struct ColumnSearchField: NSViewRepresentable {
 
 final class FocusingSearchField: NSSearchField {
     private var hasAppeared = false
+    var onClose: () -> Void = {}
+    private let closeButton = NSButton()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        cell = ClosingSearchFieldCell(textCell: "")
+        isEditable = true
+        isSelectable = true
+        isBezeled = true
+        bezelStyle = .roundedBezel
+        controlSize = .large
+        // NSSearchField hides its cancel button when empty; an expanded column still needs a way to close.
+        // Only that accessory is supplied here. AppKit draws and edits the search field itself.
+        (cell as? NSSearchFieldCell)?.cancelButtonCell = nil
+        closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: String(localized: "Close Search"))
+        closeButton.imagePosition = .imageOnly
+        closeButton.isBordered = false
+        closeButton.bezelStyle = .inline
+        closeButton.contentTintColor = .secondaryLabelColor
+        closeButton.target = self
+        closeButton.action = #selector(closeSearch)
+        closeButton.setAccessibilityLabel(String(localized: "Close Search"))
+        closeButton.setAccessibilityIdentifier("CloseColumnSearch")
+        addSubview(closeButton)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        closeButton.frame = NSRect(x: bounds.maxX - 28, y: (bounds.height - 20) / 2, width: 20, height: 20)
+    }
+
+    // NSSearchField exposes its cell accessories rather than arbitrary subviews.
+    override func accessibilityChildren() -> [Any]? {
+        (super.accessibilityChildren() ?? []) + [closeButton]
+    }
+
+    @objc private func closeSearch() { onClose() }
 
     // Once only: the toolbar moves its items between windows (full screen, Customize Toolbar, overflow), and an
     // open field should not take the keyboard from the page each time.
@@ -115,5 +158,13 @@ final class FocusingSearchField: NSSearchField {
             guard let self, let window = self.window else { return }
             window.makeFirstResponder(self)
         }
+    }
+}
+
+private final class ClosingSearchFieldCell: NSSearchFieldCell {
+    override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+        var textRect = super.searchTextRect(forBounds: rect)
+        textRect.size.width = max(0, min(textRect.maxX, rect.maxX - 32) - textRect.minX)
+        return textRect
     }
 }

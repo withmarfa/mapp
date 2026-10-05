@@ -3,6 +3,8 @@ const none = () => [] as unknown as DOMRectList
 const zero = () => new DOMRect(0, 0, 0, 0)
 Range.prototype.getClientRects ??= none
 Range.prototype.getBoundingClientRect ??= zero
+// Loading resets the reading position; scroll requests are tested with a spy.
+window.scrollTo = () => {}
 // Nor does it hit-test; a drop point then resolves to the caret.
 document.elementFromPoint ??= () => null
 // The editor runs in a macOS web view, so Mod means Meta; jsdom reports no platform.

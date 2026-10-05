@@ -8,6 +8,7 @@ struct NoteList: View {
     @Bindable var browser: Browser
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
+    var settingsPresented = false
     @State private var daysSeen = 0
     @State private var width: CGFloat = 340
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
@@ -127,8 +128,8 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(title)
-        .navigationSubtitle(browser.isSearching
+        .navigationTitle(settingsPresented ? String(localized: "Settings") : title)
+        .navigationSubtitle(settingsPresented ? Text("") : browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) item](inflect: true)"))
         // The search field takes the title's place while it is out.
