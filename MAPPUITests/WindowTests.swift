@@ -50,7 +50,9 @@ final class WindowTests: XCTestCase {
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
-        case "All Projects": "SidebarProjects"
+        case "Pinned": "SidebarPinnedSection"
+        case "Library": "SidebarLibrarySection"
+        case "Projects": "SidebarProjects"
         case "Items": "SidebarItems"
         case "Folders": "SidebarFolders"
         default: nil
@@ -66,7 +68,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "All Pinned", "All Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
+        for name in ["Inbox", "All Notes", "Pinned", "Library", "Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -176,11 +178,11 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
     }
 
-    func testPinningFromTheContextMenuAddsToPinned() {
-        let before = count(of: "All Pinned")
+    func testPinningFromTheContextMenuAddsAPinnedShortcut() {
+        XCTAssertFalse(sidebarItem("Garden ideas").exists)
         row(titled: "Garden ideas").rightClick()
         window.menuItems["Pin"].click()
-        XCTAssertEqual(count(of: "All Pinned"), before + 1)
+        XCTAssertTrue(sidebarItem("Garden ideas").waitForExistence(timeout: 2))
     }
 
     func testMovingTheSelectedNoteAwaySelectsTheNextOne() {

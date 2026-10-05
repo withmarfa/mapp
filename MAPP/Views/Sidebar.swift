@@ -9,6 +9,7 @@ struct Sidebar: View {
     @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
+    @SceneStorage("sidebarPinnedExpanded") private var pinnedExpanded = true
     @SceneStorage("sidebarProjectsExpanded") private var projectsExpanded = true
     @SceneStorage("sidebarItemsExpanded") private var itemsExpanded = false
     @SceneStorage("sidebarFoldersExpanded") private var foldersExpanded = true
@@ -31,12 +32,16 @@ struct Sidebar: View {
                 row(.allNotes, systemImage: "note.text")
             }
 
-            Section("Pinned") {
-                row(.pinned, systemImage: "pin", title: String(localized: "All Pinned"))
-                ForEach(pinned) { item in
-                    Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
-                        .tag(SidebarItem.pinnedItem(item.id))
-                        .accessibilityIdentifier("SidebarPinnedItem-\(item.id.uuidString)")
+            if !pinned.isEmpty {
+                Section(isExpanded: $pinnedExpanded) {
+                    ForEach(pinned) { item in
+                        Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
+                            .tag(SidebarItem.pinnedItem(item.id))
+                            .accessibilityIdentifier("SidebarPinnedItem-\(item.id.uuidString)")
+                    }
+                } header: {
+                    Text("Pinned")
+                        .accessibilityIdentifier("SidebarPinnedSection")
                 }
             }
 
@@ -46,7 +51,7 @@ struct Sidebar: View {
                         row(.project(project.id), systemImage: "square.stack")
                     }
                 } label: {
-                    Label("All Projects", systemImage: "square.stack")
+                    Label("Projects", systemImage: "square.stack")
                         .badge(library.count(in: .itemType("aic.project")))
                 }
                 .tag(SidebarItem.itemType("aic.project"))
@@ -81,6 +86,9 @@ struct Sidebar: View {
                         }
                 }
                 .accessibilityIdentifier("SidebarFolders")
+            } header: {
+                Text("Library")
+                    .accessibilityIdentifier("SidebarLibrarySection")
             }
         }
         .listStyle(.sidebar)
@@ -97,8 +105,8 @@ struct Sidebar: View {
         .onChange(of: pinned.map(\.id)) {
             browser.folderRemoved(in: library, order: order)
         }
-        // A bar rather than an inset, so folders scrolling under the places fade as content does under a toolbar.
-        .safeAreaBar(edge: .bottom, spacing: 0) {
+        .scrollEdgeEffectHidden(for: .bottom)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             places
                 .padding(.bottom, 8)
         }
@@ -125,11 +133,12 @@ struct Sidebar: View {
     /// are a list of their own, selected as the sidebar's other places are, sized to its two rows.
     private var places: some View {
         List(selection: selection) {
-            row(.marfaTypes, systemImage: "cube")
-            row(.recentlyDeleted, systemImage: "trash")
+            row(.marfaTypes, systemImage: "cube", secondaryIcon: true)
+            row(.recentlyDeleted, systemImage: "trash", secondaryIcon: true)
         }
         .listStyle(.sidebar)
         .scrollDisabled(true)
+        .scrollEdgeEffectHidden(for: .top)
         .scrollContentBackground(.hidden)
         .contentMargins(.vertical, 0, for: .scrollContent)
         .frame(height: 2 * rowHeight)
@@ -162,8 +171,17 @@ struct Sidebar: View {
         WorkbenchSchema.types.filter { $0.id != "aic.project" }
     }
 
-    private func row(_ item: SidebarItem, systemImage: String, title: String? = nil) -> some View {
-        Label(title ?? library.name(of: item), systemImage: systemImage)
+    private func row(_ item: SidebarItem, systemImage: String, secondaryIcon: Bool = false) -> some View {
+        Label {
+            Text(library.name(of: item))
+        } icon: {
+            if secondaryIcon {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: systemImage)
+            }
+        }
             .badge(library.count(in: item))
             .tag(item)
             .dropDestination(for: NoteReference.self, isEnabled: canDrop(on: item)) { notes, _ in
@@ -196,7 +214,7 @@ struct Sidebar: View {
 
     private func canDrop(on item: SidebarItem) -> Bool {
         switch item {
-        case .inbox, .folder, .pinned, .recentlyDeleted: true
+        case .inbox, .folder, .recentlyDeleted: true
         default: false
         }
     }
@@ -206,9 +224,8 @@ struct Sidebar: View {
         switch item {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
-        case .pinned: library.setPinned(ids, true, undoManager: undoManager)
         case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .marfaTypes, .itemType, .project, .pinnedItem, .files: break
+        case .allNotes, .pinned, .marfaTypes, .itemType, .project, .pinnedItem, .files: break
         }
     }
 
@@ -270,6 +287,12 @@ private struct FolderNameField: View {
     let _ = library.setPinned([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
     Sidebar(browser: Browser(), order: NoteOrder())
         .environment(library)
+        .frame(width: 260, height: 740)
+}
+
+#Preview("Sidebar Without Pins") {
+    Sidebar(browser: Browser(), order: NoteOrder())
+        .environment(ItemPreviewFixtures.library)
         .frame(width: 260, height: 740)
 }
 #endif

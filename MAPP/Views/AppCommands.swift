@@ -17,7 +17,7 @@ struct AppCommands: Commands {
         SidebarCommands()
 
         CommandGroup(replacing: .newItem) {
-            Button("New Item", systemImage: "square.and.pencil") { browser?.startItemDraft() }
+            Button("New Item", systemImage: "plus") { browser?.startItemDraft() }
                 .keyboardShortcut("n")
                 .disabled(browser == nil || library?.isLoaded != true)
             Button("Import Files…") { browser?.isImportingFiles = true }

@@ -8,7 +8,7 @@ struct FormatCommands: Commands {
     var body: some Commands {
         // Where Notes keeps Attach File, after the pasteboard's commands.
         CommandGroup(after: .pasteboard) {
-            Button("Attach Image…", systemImage: "paperclip") { editor?.isChoosingImages = true }
+            Button("Add Attachment…", systemImage: "paperclip") { editor?.isChoosingImages = true }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(editor?.hasNote != true || editor?.isEditable != true)
         }
