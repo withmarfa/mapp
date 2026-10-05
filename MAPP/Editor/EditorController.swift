@@ -14,6 +14,10 @@ final class EditorController: NSObject {
     private(set) var isReady = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
+    private(set) var scrollOffset: CGFloat = 0
+    private(set) var isHeaderScrolledAway = false
+    private(set) var findBarHeight: CGFloat = 0
+    @ObservationIgnored private var headerHeight: CGFloat = 0
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
@@ -60,6 +64,7 @@ final class EditorController: NSObject {
         container.onFindBarVisibilityChange = { [weak self] visible in
             self?.call("setFinding", String(visible))
         }
+        container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
         files.root = { [weak self] in (self?.library?.store as? FolderStore)?.root }
@@ -104,7 +109,16 @@ final class EditorController: NSObject {
     /// left once its last edit is in.
     func load(_ note: Note) {
         if noteID != nil, noteID != note.id { flush() }
+        scrollOffset = 0
+        isHeaderScrolledAway = false
         show(note, as: "load")
+    }
+
+    func setHeaderHeight(_ height: CGFloat) {
+        guard height != headerHeight else { return }
+        headerHeight = height
+        isHeaderScrolledAway = height > 0 && scrollOffset >= height
+        if isReady { call("setHeaderHeight", String(Double(height))) }
     }
 
     /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
@@ -133,6 +147,7 @@ final class EditorController: NSObject {
     func close() {
         flush()
         noteID = nil
+        isHeaderScrolledAway = false
     }
 
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
@@ -411,6 +426,7 @@ final class EditorController: NSObject {
             applyLabels()
             applyKeymap()
             applyStyle()
+            call("setHeaderHeight", String(Double(headerHeight)))
             if let noteID {
                 if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? note.directory)) }
                 generation += 1
@@ -427,6 +443,10 @@ final class EditorController: NSObject {
             if id == noteID, generation != self.generation, let note = library?.note(id) { noteChanged(note) }
         case .state(let state):
             if state != caret { caret = state }
+        case .scrolled(let offset, let generation):
+            guard generation == self.generation else { return }
+            scrollOffset = max(0, offset)
+            isHeaderScrolledAway = headerHeight > 0 && scrollOffset >= headerHeight
         case .openLink(let href):
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
                 NSWorkspace.shared.open(url)

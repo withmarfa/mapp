@@ -16,11 +16,13 @@ struct MainView: View {
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var importRequestID: UUID?
+    private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
+        self.settings = settings
         self.restoresWindow = restoresWindow
     }
 
@@ -39,7 +41,7 @@ struct MainView: View {
                 if browser.showsTypes {
                     MarfaTypesView(part: types.list)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(library.name(of: .marfaTypes))
+                        .navigationTitle(settings.isPresented ? String(localized: "Settings") : library.name(of: .marfaTypes))
                         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
                         .toolbar {
                             ColumnSearch(
@@ -52,7 +54,7 @@ struct MainView: View {
                             ) {}
                         }
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane)
+                    NoteList(browser: browser, order: order, pane: $pane, settingsPresented: settings.isPresented)
                 }
             }
             .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
@@ -77,11 +79,11 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         splitView
-        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
+        .inspector(isPresented: Binding { details.isPresented && !settings.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { if !settings.isPresented { details.isPresented = $0 } }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
-        .focusedSceneValue(\.detailsPresentation, details)
+        .focusedSceneValue(\.detailsPresentation, settings.isPresented ? nil : details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
         .overlay(alignment: .top) {
@@ -94,21 +96,28 @@ struct MainView: View {
                             browser.palette = nil
                             browser.focusRequest = browser.showsTypes ? .sidebar : .list
                         }
-                    CommandPalette(browser: browser, editor: editor, mode: palette)
+                    CommandPalette(browser: browser, editor: editor, settings: settings, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
                         .id(palette)
                         .padding(.top, 72)
                 }
             }
         }
-        .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, editor)
-        .focusedSceneValue(\.marfaTypes, browser.showsTypes ? types : nil)
-        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
+        .focusedSceneValue(\.browser, settings.isPresented ? nil : browser)
+        .focusedSceneValue(\.editor, settings.isPresented ? nil : editor)
+        .focusedSceneValue(\.marfaTypes, !settings.isPresented && browser.showsTypes ? types : nil)
+        .focusedSceneValue(\.focusedNotes, settings.isPresented ? nil : FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
         presentedWindow
+        .onChange(of: settings.isPresented) {
+            if settings.isPresented {
+                editor.flush()
+                browser.palette = nil
+                pane = nil
+            }
+        }
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }

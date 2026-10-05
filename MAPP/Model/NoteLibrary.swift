@@ -318,6 +318,7 @@ final class NoteLibrary {
         case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
         case .allNotes: return notes.filter { !$0.isDeleted }
         case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
+        case .pinnedItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isPinned }
         case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
         case .recentlyDeleted: return notes.filter(\.isDeleted)
         case .marfaTypes, .files: return []
@@ -383,12 +384,13 @@ final class NoteLibrary {
         case .inbox: String(localized: "Inbox")
         case .allNotes: String(localized: "All Notes")
         case .pinned: String(localized: "Pinned")
+        case .pinnedItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
         case .files: String(localized: "Files")
-        case .itemType(let typeID): WorkbenchSchema.definition(typeID)?.label ?? typeID
-        case .project(let id): note(id)?.title ?? ""
+        case .itemType(let typeID): typeID == "aic.project" ? String(localized: "All Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
+        case .project(let id): self.item(id)?.title ?? ""
 
         }
     }

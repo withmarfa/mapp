@@ -516,12 +516,12 @@ export class NoteEditor {
   load(markdown: string, generation: number): void {
     this.replace(markdown, generation)
     const view = this.editor.ctx.get(editorViewCtx)
-    // A caret at the end, where writing carries on; at the start it would sit in a first-line heading and
-    // show its marks. The last place text can go, so a document ending in a rule takes a caret above it
-    // rather than selecting the rule itself.
+    // Keep an insertion point for an explicit request to edit, without moving the reading position to it.
+    // A document ending in a rule takes a caret above it rather than selecting the rule itself.
     const { doc } = view.state
     const end = Selection.findFrom(doc.resolve(doc.content.size), -1, true) ?? Selection.atEnd(doc)
-    view.dispatch(view.state.tr.setSelection(end).scrollIntoView())
+    view.dispatch(view.state.tr.setSelection(end))
+    window.scrollTo(0, 0)
     this.events.stateChanged(caretState(view.state))
   }
 
@@ -555,7 +555,9 @@ export class NoteEditor {
   }
 
   focus(): void {
-    this.editor.ctx.get(editorViewCtx).focus()
+    const view = this.view
+    view.focus()
+    view.dispatch(view.state.tr.scrollIntoView())
   }
 
   /** Binds keys, in ProseMirror's names, to the formatting each runs; replaces the previous bindings. */

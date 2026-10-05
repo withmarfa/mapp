@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The editor receives only the region below the native item header; the find bar reserves space inside it.
+/// WebKit scrolls the body and the reserved space for the native item header; the find bar has its own inset.
 struct NoteEditor: NSViewRepresentable {
     let controller: EditorController
     let topInset: CGFloat

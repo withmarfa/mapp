@@ -53,6 +53,8 @@ struct PageWidthOptions: View {
             Text("Standard").tag(false)
             Text("Full Width").tag(true)
         }
+        .accessibilityLabel("Page Width")
+        .accessibilityIdentifier("PageWidth")
     }
 }
 
@@ -74,6 +76,8 @@ struct ReadingWidthOptions: View {
         } maximumValueLabel: {
             Text("Wide")
         }
+        .accessibilityLabel("Standard Width")
+        .accessibilityIdentifier("ReadingWidth")
         .disabled(fullWidth)
     }
 }
@@ -89,6 +93,10 @@ struct TextOptions: View {
                 Text("\(size) pt").tag(size)
             }
         }
+        .accessibilityLabel("Text Size")
+        .accessibilityIdentifier("TextSize")
         Toggle("Check Spelling While Typing", systemImage: "textformat.abc.dottedunderline", isOn: $checksSpelling)
+            .accessibilityLabel("Check Spelling While Typing")
+            .accessibilityIdentifier("CheckSpelling")
     }
 }

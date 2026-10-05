@@ -18,8 +18,12 @@ struct OrderOptions: View {
                 Text(sort.title)
             }
         }
+        .accessibilityLabel("Sort By")
+        .accessibilityIdentifier("NoteSort")
         // Title order has no dates to group by.
         Toggle("Group by Date", systemImage: "calendar", isOn: $groupsByDate)
+            .accessibilityLabel("Group by Date")
+            .accessibilityIdentifier("GroupByDate")
             .disabled(sort == .title)
     }
 }

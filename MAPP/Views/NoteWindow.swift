@@ -19,7 +19,8 @@ struct NoteWindow: View {
         Group {
             if let note {
                 NotePage(note: note, editor: editor, headerDrafts: details)
-                    .navigationTitle(note.title)
+                    .navigationTitle(item?.title ?? note.title)
+                    .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [note.id], undoManager: undoManager))
                     .toolbar(id: "note") {
@@ -34,7 +35,7 @@ struct NoteWindow: View {
                             ShareLink(item: url)
                         }
                         ToolbarItem {
-                            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+                            Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
                                 .accessibilityIdentifier("DetailsToggle")
                         }
                     }

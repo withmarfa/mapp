@@ -4,6 +4,7 @@ export type EditorMessage =
   | { type: 'ready' }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
+  | { type: 'scrolled'; offset: number; generation: number }
   | { type: 'openLink'; href: string }
   | { type: 'copy'; text: string }
   | { type: 'escape' }

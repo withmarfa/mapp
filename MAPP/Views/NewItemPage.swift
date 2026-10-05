@@ -23,7 +23,7 @@ struct NewItemPage: View {
             TextField("Untitled", text: $draft.title)
                 .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
                 .textFieldStyle(.plain)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color(nsColor: .textColor))
                 .focused($titleFocused)
                 .onSubmit { startWriting() }
                 .accessibilityLabel("Title")

@@ -1,0 +1,82 @@
+import Observation
+import SwiftUI
+
+/// Settings belongs to one main window; opening it leaves that window's workspace in place.
+@Observable
+final class SettingsPresentation {
+    var isPresented = false
+    var pane: SettingsPane? = .appearance
+    var query = ""
+
+    func show() { isPresented = true }
+    func close() { isPresented = false }
+}
+
+/// A request made with no focused main window is consumed by the main window the command opens.
+@Observable
+final class SettingsRequest {
+    var isPending = false
+}
+
+extension FocusedValues {
+    @Entry var settingsPresentation: SettingsPresentation?
+}
+
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case appearance, editor, library, about
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .appearance: String(localized: "Appearance")
+        case .editor: String(localized: "Editor")
+        case .library: String(localized: "Library")
+        case .about: String(localized: "About")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .appearance: "paintpalette"
+        case .editor: "square.and.pencil"
+        case .library: "folder"
+        case .about: "info.circle"
+        }
+    }
+
+    private var searchTerms: String {
+        switch self {
+        case .appearance: String(localized: "Sort By Group by Date List Preview Notes List")
+        case .editor: String(localized: "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing")
+        case .library: String(localized: "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete")
+        case .about: String(localized: "MAPP Version Build")
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        let words = query.split(whereSeparator: \.isWhitespace)
+        let text = title + " " + searchTerms
+        return words.allSatisfy { text.localizedStandardContains(String($0)) }
+    }
+}
+
+struct SettingsCommands: Commands {
+    let request: SettingsRequest
+    @FocusedValue(\.settingsPresentation) private var settings
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                if let settings {
+                    settings.show()
+                } else {
+                    request.isPending = true
+                    openWindow(id: "main")
+                }
+            }
+            .keyboardShortcut(",")
+        }
+    }
+}

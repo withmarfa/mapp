@@ -50,23 +50,24 @@ struct NotePage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
+                    .ignoresSafeArea(.container, edges: .top)
                 if note.isDeleted {
-                    DeletedNoteBanner(id: note.id)
+                    ScrollingPageHeader(editor: editor) {
+                        DeletedNoteBanner(id: note.id)
+                    }
                 } else if let item = library.item(note.id) {
-                    ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
-                        .id(note.id)
-                        .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                        .padding(.top, 16)
-                        .padding(.bottom, 8)
-                        .fixedSize(horizontal: false, vertical: true)
+                    ScrollingPageHeader(editor: editor) {
+                        ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                            .id(note.id)
+                            .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+                    }
                 }
-                // The native header occupies real layout space. An ignored safe-area inset lets WebKit
-                // paint through it, so the editor has its own clipped region below the header.
-                NoteEditor(controller: editor, topInset: 0)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
@@ -77,6 +78,29 @@ struct NotePage: View {
         .onChange(of: note.id, initial: true) { editor.load(note) }
         .onChange(of: note.body) { editor.noteChanged(note) }
         .onChange(of: note.isDeleted) { editor.noteChanged(note) }
+    }
+}
+
+/// WebKit owns scrolling. Its public script bridge supplies the offset for the native controls, while the
+/// page reserves their measured height. No second scroll view or copy of the item's data is involved.
+private struct ScrollingPageHeader<Content: View>: View {
+    let editor: EditorController
+    @ViewBuilder let content: () -> Content
+    @State private var height: CGFloat = 0
+
+    var body: some View {
+        ScrollingHeader(webView: editor.webView, content: content)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                height = $0
+                editor.setHeaderHeight($0)
+            }
+            .offset(y: -editor.scrollOffset)
+            .frame(height: max(0, height - editor.scrollOffset), alignment: .top)
+            .clipped()
+            .padding(.top, editor.findBarHeight)
+            .accessibilityHidden(editor.isHeaderScrolledAway)
+            .allowsHitTesting(!editor.isHeaderScrolledAway)
     }
 }
 

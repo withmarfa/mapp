@@ -33,7 +33,28 @@ final class WindowTests: XCTestCase {
     }
 
     private func sidebarItem(_ name: String) -> XCUIElement {
-        name == "Marfa Types" || name == "Recently Deleted" ? places.staticTexts[name] : sidebar.staticTexts[name]
+        let source = name == "Marfa Types" || name == "Recently Deleted" ? places : sidebar
+        if let identifier = groupIdentifier(for: name) {
+            // Use the full indexed query: firstMatch omitted native outline labels visible in its own snapshot.
+            return sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
+        }
+        if ["Note", "Epic", "Feature", "Question", "Task", "Decision", "Session", "Log", "Files"].contains(name) {
+            let row = sidebar.outlineRows.containing(.any, identifier: "SidebarItems").element(boundBy: 0)
+            let disclosure = row.disclosureTriangles.element(boundBy: 0)
+            XCTAssertTrue(disclosure.waitForExistence(timeout: 2))
+            let expanded = (disclosure.value as? NSNumber)?.boolValue ?? ((disclosure.value as? String) == "1")
+            if !expanded { disclosure.click() }
+        }
+        return source.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", name, name)).firstMatch
+    }
+
+    private func groupIdentifier(for name: String) -> String? {
+        switch name {
+        case "All Projects": "SidebarProjects"
+        case "Items": "SidebarItems"
+        case "Folders": "SidebarFolders"
+        default: nil
+        }
     }
 
     private func row(titled title: String) -> XCUIElement {
@@ -45,7 +66,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "Pinned", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
+        for name in ["Inbox", "All Notes", "All Pinned", "All Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -133,7 +154,9 @@ final class WindowTests: XCTestCase {
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.typeKey("a", modifierFlags: .command)
-        field.typeText("Projects\r")
+        field.typeText("Projects")
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
@@ -154,10 +177,10 @@ final class WindowTests: XCTestCase {
     }
 
     func testPinningFromTheContextMenuAddsToPinned() {
-        let before = count(of: "Pinned")
+        let before = count(of: "All Pinned")
         row(titled: "Garden ideas").rightClick()
         window.menuItems["Pin"].click()
-        XCTAssertEqual(count(of: "Pinned"), before + 1)
+        XCTAssertEqual(count(of: "All Pinned"), before + 1)
     }
 
     func testMovingTheSelectedNoteAwaySelectsTheNextOne() {
@@ -274,7 +297,9 @@ final class WindowTests: XCTestCase {
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.typeKey("a", modifierFlags: .command)
-        field.typeText("Books\r")
+        field.typeText("Books")
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         XCTAssertTrue(sidebarItem("Books").waitForExistence(timeout: 2))
         app.typeKey(.delete, modifierFlags: [])
         let confirm = app.sheets.buttons["Delete Folder"].firstMatch
@@ -367,16 +392,19 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
 
-    func testTheFoldersHeadingOffersANewFolderUnderThePointer() {
-        // The button is the pointer's alone, at the heading's end, in line with the rows' counts.
-        let heading = sidebar.staticTexts["Folders"]
-        heading.hover()
-        heading.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: heading.frame.width - 21, dy: heading.frame.height / 2)).click()
+    func testTheFoldersHeadingCreatesANewFolderFromItsContextMenu() {
+        let heading = sidebarItem("Folders")
+        heading.rightClick()
+        let newFolder = window.menuItems["New Folder"]
+        XCTAssertTrue(newFolder.waitForExistence(timeout: 2))
+        newFolder.click()
         let field = sidebar.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
+        field.click()
         field.typeKey("a", modifierFlags: .command)
-        field.typeText("Projects\r")
+        field.typeText("Projects")
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
