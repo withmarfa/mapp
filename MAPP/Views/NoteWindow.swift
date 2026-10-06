@@ -10,6 +10,8 @@ struct NoteWindow: View {
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @Binding var id: ItemID?
+    /// Where the item's file is, once known, for sharing.
+    @State private var fileURL: URL?
 
     /// The library is given here as well as in the environment, since the editor is made with it.
     init(library: any ItemLibrary, id: Binding<ItemID?>) {
@@ -30,13 +32,17 @@ struct NoteWindow: View {
                     .toolbar(id: "note") {
                         NoteToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
-            } else if let item, let url = library.fileURL(for: item.id) {
-                FileItemContent(url: url)
+            } else if let item {
+                ItemFileView(id: item.id) { fileURL = $0 }
                     .navigationTitle(item.title)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar {
                         ToolbarItem {
-                            ShareLink(item: url)
+                            if let fileURL {
+                                ShareLink(item: fileURL)
+                            } else {
+                                ShareLink(item: "").disabled(true)
+                            }
                         }
                         ToolbarItem {
                             Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }

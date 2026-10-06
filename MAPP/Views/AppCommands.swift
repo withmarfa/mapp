@@ -3,7 +3,7 @@ import SwiftUI
 /// The menu bar. File makes and opens notes and acts on the selected ones; View orders the list and moves back
 /// and forward through the types Marfa Types has shown.
 struct AppCommands: Commands {
-    /// Nil until a folder of notes is chosen.
+    /// Nil while no library is open: before a folder is chosen, or while a server's copy opens.
     let library: (any ItemLibrary)?
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
@@ -47,7 +47,7 @@ struct AppCommands: Commands {
             Divider()
             NoteShareLink(
                 title: one?.title ?? "", text: one.flatMap { library?.body(of: $0.id)?.text },
-                fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
+                fileURL: ids.count == 1 ? ids.first.flatMap { id in library.flatMap { browser?.fileURL(of: id, in: $0) ?? $0.fileURL(for: id) } } : nil)
             Button("Rename Note…", systemImage: "pencil") {
                 browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
             }
