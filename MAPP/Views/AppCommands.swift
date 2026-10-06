@@ -37,18 +37,22 @@ struct AppCommands: Commands {
         // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
             let ids: Set<ItemID> = browser?.isCreatingItem == true ? [] : (notes?.ids ?? [])
-            let shown = ids.compactMap { library?.note($0) }
+            // The note commands act on notes; a file selected has only its share and its window.
+            let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
+            let one = ids.count == 1 ? shown.first : nil
             Button("Open in New Window", systemImage: "macwindow") {
                 for id in library?.idsForWindows(ids) ?? [] { openWindow(value: id) }
             }
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)
             Divider()
-            NoteShareLink(note: ids.count == 1 ? shown.first : nil, fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
+            NoteShareLink(
+                title: one?.title ?? "", text: one.flatMap { library?.body(of: $0.id)?.text },
+                fileURL: ids.count == 1 ? ids.first.flatMap { library?.fileURL(for: $0) } : nil)
             Button("Rename Note…", systemImage: "pencil") {
                 browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
             }
-            .disabled(browser == nil || ids.count != 1 || shown.count != 1 || shown.first?.isDeleted != false)
+            .disabled(browser == nil || ids.count != 1 || shown.count != 1 || shown.first?.isWritable != true)
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                     .environment(library)

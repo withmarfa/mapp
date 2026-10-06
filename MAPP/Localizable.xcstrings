@@ -727,6 +727,9 @@
     "Parent": {
       "extractionState": "manual"
     },
+    "PDF": {
+      "extractionState": "manual"
+    },
     "Pending": {
       "extractionState": "manual"
     },

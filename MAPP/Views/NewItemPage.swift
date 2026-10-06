@@ -87,7 +87,7 @@ struct NewItemPage: View {
         .accessibilityIdentifier("NewItemPage")
     }
 
-    private var parents: [AppItem] { library.creationParentCandidates(typeID: draft.typeID) }
+    private var parents: [Item] { library.creationParentCandidates(typeID: draft.typeID) }
 
     private func startWriting() {
         guard browser.isCreatingItem else { return }

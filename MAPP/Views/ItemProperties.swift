@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Each row keeps unfinished input until it is committed; unrelated inspector updates do not replace it.
 struct ItemPropertyRow: View {
-    let definition: ItemPropertyDefinition
-    let value: NoteFieldValue?
+    let definition: ItemTypeInfo.Field
+    let value: PropertyValue?
     let isEditable: Bool
-    let onChange: (NoteFieldValue?) -> Bool
+    let onChange: (PropertyValue?) -> Bool
     var retainedDraft: ItemPropertyDraft? = nil
     @State private var localDraft = ItemPropertyDraft()
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
@@ -85,6 +85,10 @@ struct ItemPropertyRow: View {
             }
         case .text, .number:
             textField
+        // A list or an object is shown as written, since a text field would replace it with a string.
+        case .other:
+            textField
+                .disabled(true)
         }
     }
 
@@ -114,6 +118,7 @@ struct ItemPropertyRow: View {
         case (.text, .string), (.boolean, .bool), (.number, .number): valid = true
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
         case (.date, .string(let text)): valid = text.isEmpty || Self.date(text) != nil
+        case (.other, _): valid = true
         default: valid = false
         }
         return valid ? nil : String(localized: "Unrecognized value: \(ItemValueText.string(value)). It is preserved until you replace it.")
@@ -126,7 +131,7 @@ struct ItemPropertyRow: View {
 
     private func commit() {
         guard input.isDirty, isEditable else { return }
-        let value: NoteFieldValue?
+        let value: PropertyValue?
         if input.text.isEmpty {
             value = nil
         } else if case .number = definition.kind {
@@ -163,7 +168,7 @@ struct ItemPropertyRow: View {
 
 /// Displaying unfamiliar values is intentionally independent of their editable schema.
 nonisolated enum ItemValueText {
-    static func string(_ value: NoteFieldValue) -> String {
+    static func string(_ value: PropertyValue) -> String {
         switch value {
         case .null: "null"
         case .bool(let value): value ? "true" : "false"
@@ -178,11 +183,11 @@ nonisolated enum ItemValueText {
 #Preview("Property Controls") {
     ScrollView {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(WorkbenchSchema.taskProperties) { definition in
+            ForEach(WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")]?.fields ?? []) { definition in
                 ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
             }
-            ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date),
+            ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date, declaredBy: TypeID("aic.decision")),
                             value: .string("2026-10-02"), isEditable: true, onChange: { _ in true })
         }
         .padding(16)

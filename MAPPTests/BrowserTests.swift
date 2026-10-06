@@ -18,11 +18,11 @@ struct BrowserTests {
         let (library, _, newer, _) = makeLibrary()
         let browser = Browser()
         browser.selection = [newer.id]
-        #expect(browser.selectedNotes(in: library).count == 1)
+        #expect(browser.selectedItems(in: library).count == 1)
         browser.startItemDraft()
-        #expect(browser.selectedNotes(in: library).isEmpty)
+        #expect(browser.selectedItems(in: library).isEmpty)
         browser.isCreatingItem = false
-        #expect(browser.selectedNotes(in: library).count == 1)
+        #expect(browser.selectedItems(in: library).count == 1)
     }
 
     @Test func creationOutsideOriginalProjectRevealsTheNewItem() throws {
@@ -34,9 +34,9 @@ struct BrowserTests {
         browser.itemDraft?.typeID = "aic.ticket.task"
         browser.itemDraft?.title = "Unparented task"
         browser.itemDraft?.parentID = nil
-        let note = try #require(browser.createDraft(in: library, undoManager: nil))
-        #expect(browser.notes(in: library).contains { $0.id == note.id })
-        #expect(browser.selection == [note.id])
+        let id = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(browser.items(in: library).contains { $0.id == id })
+        #expect(browser.selection == [id])
         #expect(browser.focusRequest == .page)
     }
 
@@ -90,8 +90,8 @@ struct BrowserTests {
         #expect(created != nil)
         #expect(browser.item == .itemType("core.note"))
         #expect(!browser.isSearching)
-        #expect(browser.selectedNotes(in: library).map(\.body) == [""])
-        #expect(browser.selection == Set(created.map { [$0.id] } ?? []))
+        #expect(browser.selectedItems(in: library).map { library.body(of: $0.id)?.text } == [""])
+        #expect(browser.selection == Set(created.map { [$0] } ?? []))
     }
 
     @Test func newItemDraftRespectsTypeAndSurvivesNavigation() {
@@ -120,7 +120,7 @@ struct BrowserTests {
         #expect(browser.isCreatingItem)
         #expect(browser.itemDraft?.body == "A draft body.\n")
         browser.itemDraft?.title = "A valid title"
-        let note = browser.createDraft(in: library, undoManager: nil)
+        let note = browser.createDraft(in: library, undoManager: nil).flatMap { library.note($0) }
         #expect(note?.body == "A draft body.\n")
         #expect(note?.file.property("title") == "A valid title")
         #expect(browser.itemDraft == nil)
@@ -135,7 +135,7 @@ struct BrowserTests {
         browser.sidebarItem = .project(project.id)
         browser.startItemDraft()
         #expect(browser.itemDraft?.parentID == project.id)
-        let created = browser.createDraft(in: library, undoManager: nil)
+        let created = browser.createDraft(in: library, undoManager: nil).flatMap { library.note($0) }
         #expect(created?.title == "Untitled 2")
         #expect(created?.file.property("child-of") == "[[Area]]")
     }
@@ -165,7 +165,7 @@ struct BrowserTests {
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.group == .favorites)
         browser.searchText = "e"
-        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.notes.first?.id == newer.id)
+        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.items.first?.id == newer.id)
     }
 
     @Test func deletingMovesLiveNotesAwayAndAsksBeforeErasingDeletedOnes() {

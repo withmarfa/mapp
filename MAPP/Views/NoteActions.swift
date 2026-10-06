@@ -9,13 +9,14 @@ struct NoteActions: View {
     /// The menu bar names what its items act on, since nothing has been clicked to say so.
     var inMenuBar = false
 
-    private var notes: [Note] { ids.compactMap { library.note($0) } }
+    /// Files mode moves, deletes and favors notes only, so a file selected takes none of these.
+    private var notes: [Item] { ids.compactMap { library.item($0) }.filter { !$0.isFile } }
 
     var body: some View {
         let notes = notes
         if notes.isEmpty && !inMenuBar {
             EmptyView()
-        } else if !notes.isEmpty && notes.allSatisfy(\.isDeleted) {
+        } else if !notes.isEmpty && notes.allSatisfy({ $0.state == .trashed }) {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             moveMenu(notes)
             Divider()
@@ -42,14 +43,14 @@ struct NoteActions: View {
         }
     }
 
-    private func moveMenu(_ notes: [Note]) -> some View {
+    private func moveMenu(_ notes: [Item]) -> some View {
         Menu("Move To", systemImage: "folder") {
             Button("Inbox", systemImage: "tray") { library.move(ids, to: nil, undoManager: undoManager) }
-                .disabled(notes.allSatisfy { $0.folderID == nil && !$0.isDeleted })
+                .disabled(notes.allSatisfy { $0.container == nil && $0.state == .active })
             Divider()
             ForEach(library.folders) { folder in
                 Button(folder.name, systemImage: "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
-                    .disabled(notes.allSatisfy { $0.folderID == folder.id && !$0.isDeleted })
+                    .disabled(notes.allSatisfy { $0.container == ContainerID(folder.id) && $0.state == .active })
             }
         }
     }

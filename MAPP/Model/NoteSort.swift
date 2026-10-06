@@ -20,19 +20,19 @@ nonisolated enum NoteSort: String, CaseIterable {
         }
     }
 
-    func date(of note: Note) -> Date {
+    func date(of item: Item) -> Date {
         switch self {
-        case .dateCreated: note.created
-        case .dateEdited, .title: note.modified
+        case .dateCreated: item.created
+        case .dateEdited, .title: item.modified
         }
     }
 
-    func sorted(_ notes: [Note]) -> [Note] {
+    func sorted(_ items: [Item]) -> [Item] {
         switch self {
         case .title:
-            notes.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         case .dateEdited, .dateCreated:
-            notes.sorted { date(of: $0) > date(of: $1) }
+            items.sorted { date(of: $0) > date(of: $1) }
         }
     }
 }

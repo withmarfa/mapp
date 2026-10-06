@@ -11,28 +11,13 @@ nonisolated enum NoteName {
     }
 }
 
-/// JSON-compatible values read from YAML, without assigning Marfa property semantics to header fields.
-nonisolated indirect enum NoteFieldValue: Equatable, Sendable {
-    case null
-    case bool(Bool)
-    case number(Decimal)
-    case string(String)
-    case array([NoteFieldValue])
-    case object([String: NoteFieldValue])
-
-    var string: String? {
-        guard case .string(let value) = self else { return nil }
-        return value
-    }
-}
-
 nonisolated struct NoteFrontMatterError: Error, Equatable, Sendable {
     let message: String
 }
 
 nonisolated enum NoteFrontMatter: Equatable, Sendable {
     case absent
-    case parsed([String: NoteFieldValue])
+    case parsed([String: PropertyValue])
     case invalid(NoteFrontMatterError)
 }
 
@@ -48,7 +33,7 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
 
     var body: String { file.body }
 
-    var fields: [String: NoteFieldValue]? {
+    var fields: [String: PropertyValue]? {
         guard case .parsed(let fields) = frontMatter else { return nil }
         return fields
     }
@@ -62,7 +47,7 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
         self.file = file
         self.filePath = filePath
         frontMatter = Self.parse(file.frontMatter)
-        let fields: [String: NoteFieldValue]
+        let fields: [String: PropertyValue]
         if case .parsed(let parsed) = frontMatter { fields = parsed } else { fields = [:] }
         let headerTitle = fields["title"]?.string
         title = headerTitle.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 } ?? fallbackTitle
@@ -90,13 +75,13 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
         }
     }
 
-    private static func value(_ node: Node) throws -> NoteFieldValue {
+    private static func value(_ node: Node) throws -> PropertyValue {
         switch node {
         case .mapping(let mapping):
             guard node.tag.rawValue == Tag.Name.map.rawValue else {
                 throw NoteFrontMatterError(message: "Unsupported YAML mapping tag: \(node.tag.rawValue)")
             }
-            var fields: [String: NoteFieldValue] = [:]
+            var fields: [String: PropertyValue] = [:]
             for (keyNode, valueNode) in mapping {
                 guard case .scalar(let key) = keyNode, keyNode.tag.rawValue == Tag.Name.str.rawValue else {
                     throw NoteFrontMatterError(message: "Front matter mappings require string keys.")

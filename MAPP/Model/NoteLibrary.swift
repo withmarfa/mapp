@@ -5,9 +5,9 @@ import Observation
 /// made here at once, handed to the store to make on disk, and undoable through the undo manager it is given.
 @Observable
 final class NoteLibrary {
-    var notes: [Note] { didSet { cachedConnectionIndex = nil } }
+    var notes: [Note] { didSet { contentStamp &+= 1 } }
     var folders: [Folder]
-    private(set) var files: [AppFile] = [] { didSet { cachedConnectionIndex = nil } }
+    private(set) var files: [AppFile] = [] { didSet { contentStamp &+= 1 } }
     private(set) var completedImports: [UUID: ItemID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
@@ -17,9 +17,15 @@ final class NoteLibrary {
     var failure: (title: String, message: String)?
     let now: () -> Date
 
-    /// Derived snapshots only; source files and note identities remain the authority.
-    @ObservationIgnored var cachedItemProjections: [ItemID: NoteProjection] = [:]
-    @ObservationIgnored var cachedConnectionIndex: NoteConnectionIndex?
+    /// Derived snapshots only; source files and note identities remain the authority. Each is kept until a
+    /// revision it was made from changes, which compares numbers rather than text.
+    @ObservationIgnored var cachedItemProjections: [ItemID: (revision: Int64, projection: NoteProjection)] = [:]
+    @ObservationIgnored var cachedItems: [ItemID: CachedItem] = [:]
+    @ObservationIgnored var itemCollection: ItemCollection?
+    @ObservationIgnored var itemCounts: ItemCounts?
+    @ObservationIgnored var connections: Connections?
+    /// Counts every change to the notes or files, so a cache knows it is current without looking at them.
+    @ObservationIgnored var contentStamp = 0
 
     @ObservationIgnored let store: NoteStore?
     @ObservationIgnored private let defaults: UserDefaults?
@@ -80,11 +86,6 @@ final class NoteLibrary {
         isLoaded = false
     }
 
-    func fileURL(for id: ItemID) -> URL? {
-        guard let file = files.first(where: { $0.id == id }) else { return nil }
-        return store?.fileURL(for: file.path)
-    }
-
     func importFiles(_ sources: [URL], folderID: ItemID? = nil, requestID: UUID = UUID()) {
         guard store != nil else { return }
         let prefix = folders.first(where: { $0.id == folderID }).map { $0.name + "/" } ?? ""
@@ -102,12 +103,21 @@ final class NoteLibrary {
     private func reconcileFiles(_ stored: [StoredFile]) {
         var taken = Set(notes.map(\.id))
         let previous = Dictionary(files.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
-        files = stored.map { disk in
+        let held = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let reconciled = stored.map { disk in
             var id = disk.id
             if taken.contains(id) { id = previous[disk.path].flatMap { taken.contains($0) ? nil : $0 } ?? .mint() }
             taken.insert(id)
-            return AppFile(id: id, stored: disk, folderID: folderID(forPath: disk.path))
+            let folderID = folderID(forPath: disk.path)
+            // A file read again unchanged keeps its revision, so nothing made from it is made again.
+            if let file = held[id], file.folderID == folderID, file.stored.path == disk.path,
+               file.stored.modified == disk.modified, file.stored.created == disk.created,
+               file.stored.byteCount == disk.byteCount {
+                return file
+            }
+            return AppFile(id: id, stored: disk, folderID: folderID)
         }
+        if reconciled.map(\.revision) != files.map(\.revision) { files = reconciled }
     }
 
     // MARK: Loading
@@ -302,7 +312,11 @@ final class NoteLibrary {
     // MARK: Reading
 
     func note(_ id: ItemID) -> Note? {
-        notes.first { $0.id == id }
+        // The collection's positions follow the notes, so a note is usually found without a search.
+        if let position = itemCollection?.positions[id], position < notes.count, notes[position].id == id {
+            return notes[position]
+        }
+        return notes.first { $0.id == id }
     }
 
     /// Whether a window kept for this item has nothing left to show: the folder has been read and holds no such
@@ -315,45 +329,6 @@ final class NoteLibrary {
         folders.first { $0.id == id }
     }
 
-    func notes(in item: SidebarItem) -> [Note] {
-        switch item {
-        case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
-        case .allNotes: return notes.filter { !$0.isDeleted }
-        case .favorites: return notes.filter { !$0.isDeleted && $0.isFavorite }
-        case .favoriteItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isFavorite }
-        case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
-        case .recentlyDeleted: return notes.filter(\.isDeleted)
-        case .marfaTypes, .files: return []
-        case .itemType(let typeID): return notes.filter { !$0.isDeleted && self.item($0.id)?.type?.id == typeID }
-        case .project(let projectID):
-            let descendants = projectDescendants(projectID)
-            return notes.filter { !$0.isDeleted && (descendants.contains($0.id) || $0.id == projectID) }
-        }
-    }
-
-    private func projectDescendants(_ id: ItemID) -> Set<ItemID> {
-        let edges = connectionIndex.edges.filter { $0.name == "parent-of" }
-        var result: Set<ItemID> = []
-        var pending = [id]
-        while let current = pending.popLast() {
-            for edge in edges where edge.sourceID == current && !result.contains(edge.targetID) && edge.targetID != id {
-                result.insert(edge.targetID)
-                pending.append(edge.targetID)
-            }
-        }
-        return result
-    }
-
-    /// Search covers every note that has not been deleted, whichever sidebar item is selected.
-    func notes(matching query: String) -> [Note] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        return notes.filter {
-            !$0.isDeleted && ($0.body.range(of: query, options: options) != nil || $0.title.range(of: query, options: options) != nil)
-        }
-    }
-
     /// The items to open in windows of their own. A note is left first, so a name that follows its first line
     /// is current before the window shows it.
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID] {
@@ -362,17 +337,6 @@ final class NoteLibrary {
             leave(id)
             return note(id) != nil
         }
-    }
-
-    func count(in item: SidebarItem) -> Int {
-        let fileCount: Int
-        switch item {
-        case .allNotes, .files: fileCount = files.count
-        case .inbox: fileCount = files.filter { $0.folderID == nil }.count
-        case .folder(let id): fileCount = files.filter { $0.folderID == id }.count
-        default: fileCount = 0
-        }
-        return notes(in: item).count + fileCount
     }
 
     func name(of item: SidebarItem) -> String {
@@ -387,7 +351,6 @@ final class NoteLibrary {
         case .files: String(localized: "Files")
         case .itemType(let typeID): typeID == "aic.project" ? String(localized: "Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
         case .project(let id): self.item(id)?.title ?? ""
-
         }
     }
 
@@ -604,7 +567,7 @@ final class NoteLibrary {
                 if let fields = projection.fields {
                     for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
                         guard let value = fields[field] else { continue }
-                        func rewrite(_ value: NoteFieldValue) -> NoteFieldValue {
+                        func rewrite(_ value: PropertyValue) -> PropertyValue {
                             if case .array(let values) = value { return .array(values.map(rewrite)) }
                             if case .string(let text) = value, let replacement = rewrites[text] { return .string(replacement) }
                             return value

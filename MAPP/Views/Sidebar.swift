@@ -35,7 +35,7 @@ struct Sidebar: View {
             if !favorites.isEmpty {
                 Section(isExpanded: $favoritesExpanded) {
                     ForEach(favorites) { item in
-                        Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
+                        Label(item.title, systemImage: item.type == WorkbenchSchema.projectType ? "square.stack" : "doc.text")
                             .tag(SidebarItem.favoriteItem(item.id))
                             .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
                     }
@@ -156,14 +156,13 @@ struct Sidebar: View {
         }
     }
 
-    private var projects: [AppItem] {
-        library.items.filter { $0.type?.id == "aic.project" }
+    private var projects: [Item] {
+        library.items(in: .itemType(WorkbenchSchema.projectType.rawValue))
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private var favorites: [AppItem] {
-        library.notes(in: .favorites)
-            .compactMap { library.item($0.id) }
+    private var favorites: [Item] {
+        library.items(in: .favorites)
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 

@@ -7,13 +7,16 @@ struct NoteToolbar: CustomizableToolbarContent {
     @Environment(NoteLibrary.self) private var library
     /// The main window's browser; nil in a note's own window, which makes no notes.
     let browser: Browser?
-    let notes: [Note]
+    let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
 
+    /// The notes among the items, which the note tools act on; a file has tools of its own.
+    private var notes: [Item] { items.filter { !$0.isFile } }
+
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: "scrolledTitle") {
-            Text(notes.first.flatMap { library.item($0.id)?.title } ?? "")
+            Text(notes.first?.title ?? "")
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -59,9 +62,9 @@ struct NoteToolbar: CustomizableToolbarContent {
     private var showsTypes: Bool { browser?.showsTypes == true }
 
     /// The one note shown, when it can be written in; the formatting tools act on nothing else.
-    private var editableNote: Note? {
+    private var editableNote: Item? {
         guard browser?.isCreatingItem != true, (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
-              let note = notes.first, !note.isDeleted, editor.hasNote, editor.noteID == note.id else { return nil }
+              let note = notes.first, note.isWritable, editor.hasNote, editor.noteID == note.id else { return nil }
         return note
     }
 }
@@ -83,7 +86,7 @@ private struct NewNoteButton: View {
 /// Text styles and emphasis, as Notes offers them under Aa.
 private struct FormatMenu: View {
     let editor: EditorController
-    let note: Note?
+    let note: Item?
 
     var body: some View {
         Menu("Format", systemImage: "textformat") {
@@ -111,22 +114,24 @@ private struct FormatMenu: View {
 
 /// What else can be done to the notes shown, as Notes keeps it under its More button.
 private struct MoreMenu: View {
+    @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
-    let notes: [Note]
+    let notes: [Item]
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController
-    let editableNote: Note?
+    let editableNote: Item?
 
     var body: some View {
         Menu("More", systemImage: "ellipsis") {
-            NoteShareLink(note: notes.count == 1 ? notes.first : nil, fileURL: fileURL)
+            let note = notes.count == 1 ? notes.first : nil
+            NoteShareLink(title: note?.title ?? "", text: note.flatMap { library.body(of: $0.id)?.text }, fileURL: fileURL)
             Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .disabled(editableNote == nil)
             Divider()
             if let browser {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = notes.first?.id }
-                    .disabled(notes.count != 1 || notes.first?.isDeleted != false)
+                    .disabled(notes.count != 1 || notes.first?.isWritable != true)
                 Divider()
             }
             if !notes.isEmpty {
@@ -139,16 +144,18 @@ private struct MoreMenu: View {
     }
 }
 
-/// Shares a note's markdown as text, the form every destination can take.
+/// Shares a note's markdown as text, the form every destination can take, or a file as itself.
 struct NoteShareLink: View {
-    let note: Note?
+    var title = ""
+    /// Nil when there is no one note to share.
+    let text: String?
     var fileURL: URL? = nil
 
     var body: some View {
         if let fileURL {
             ShareLink(item: fileURL)
-        } else if let note {
-            ShareLink(item: note.body, subject: Text(note.title), preview: SharePreview(note.title))
+        } else if let text {
+            ShareLink(item: text, subject: Text(title), preview: SharePreview(title))
         } else {
             ShareLink(item: "")
                 .disabled(true)

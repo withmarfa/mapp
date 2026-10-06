@@ -61,7 +61,7 @@ struct TypedRecordTests {
         #expect(note.title == "Record title")
         #expect(note.file.text == original)
         #expect(note.directory == "Records/Group")
-        #expect(library.notes(in: .folder(folder.id)).map(\.id) == [note.id])
+        #expect(library.items(in: .folder(folder.id)).map(\.id) == [note.id])
         library.leave(note.id)
         store.drain()
         #expect(try Data(contentsOf: root.url.appending(path: path)) == Data(original.utf8), "opening and leaving must not rewrite a typed record")

@@ -367,7 +367,7 @@ struct IdentityTests {
         first.delete(many)
         first.finish()
         let second = await open()
-        #expect(Set(second.notes(in: .recentlyDeleted).map(\.id)) == many)
+        #expect(Set(second.items(in: .recentlyDeleted).map(\.id)) == many)
     }
 
     /// When the store and the library disagree, the library still never gives two items one identifier.

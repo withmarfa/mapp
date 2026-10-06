@@ -5,7 +5,7 @@ struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
-    @State private var editor = EditorController()
+    @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @State private var types = MarfaTypesPage()
@@ -19,7 +19,9 @@ struct MainView: View {
     private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    /// The library is given here as well as in the environment, since the editor is made with it.
+    init(library: NoteLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+        _editor = State(initialValue: EditorController(library: library))
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings
@@ -72,7 +74,7 @@ struct MainView: View {
                 }
             }
             .toolbar(id: "main") {
-                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
+                NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
             }
         }
     }
@@ -121,7 +123,7 @@ struct MainView: View {
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
-        .onChange(of: library.items.map(\.id)) { browser.folderRemoved(in: library, order: order) }
+        .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.folderRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot()) { _, snapshot in
@@ -130,7 +132,6 @@ struct MainView: View {
         .onDisappear { editor.flush() }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
-            editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
@@ -153,7 +154,7 @@ struct MainView: View {
                 library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
             }
         }
-        .onChange(of: library.items.map(\.id), revealImportedItem)
+        .onChange(of: library.items(in: .allNotes).map(\.id), revealImportedItem)
         .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
     }
@@ -168,7 +169,7 @@ struct MainView: View {
             Text("The note’s file takes the new name.")
         }
         .onChange(of: browser.renamingNote) {
-            noteName = browser.renamingNote.flatMap { library.note($0) }.map(\.fileTitle) ?? ""
+            noteName = browser.renamingNote.flatMap { library.fileName(of: $0) } ?? ""
         }
         .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
         } message: {

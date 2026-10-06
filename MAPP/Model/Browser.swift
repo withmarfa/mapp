@@ -51,33 +51,21 @@ final class Browser {
     /// Whether the window shows Marfa's types in place of the list and the note.
     var showsTypes: Bool { item == .marfaTypes }
 
-    /// The notes the list shows: the search results while searching, the sidebar item's notes otherwise.
-    func notes(in library: NoteLibrary) -> [Note] {
-        isSearching ? library.notes(matching: searchText) : library.notes(in: item)
+    /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
+    func items(in library: NoteLibrary) -> [Item] {
+        isSearching ? library.items(matching: searchText) : library.items(in: item)
     }
 
-    /// The selected notes that still exist.
-    func files(in library: NoteLibrary) -> [AppFile] {
-        let files: [AppFile]
-        switch item {
-        case .allNotes, .files: files = library.files
-        case .inbox: files = library.files.filter { $0.folderID == nil }
-        case .folder(let id): files = library.files.filter { $0.folderID == id }
-        default: files = []
-        }
-        guard isSearching else { return files }
-        return library.files.filter { $0.title.localizedStandardContains(searchText) }
-    }
-
-    func selectedNotes(in library: NoteLibrary) -> [Note] {
-        isCreatingItem ? [] : selection.compactMap { library.note($0) }
+    /// The selected items that still exist.
+    func selectedItems(in library: NoteLibrary) -> [Item] {
+        isCreatingItem ? [] : selection.compactMap { library.item($0) }
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
     /// note is one, nor in Recently Deleted or search results.
     func sections(in library: NoteLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
-            of: notes(in: library),
+            of: items(in: library),
             sort: order.sort,
             favoritesFirst: !isSearching && !showsOnlyFavorites && item != .recentlyDeleted,
             groupsByDate: order.groupsByDate,
@@ -106,8 +94,8 @@ final class Browser {
     }
 
     func selectFirstNote(in library: NoteLibrary, order: NoteOrder) {
-        let first = sections(in: library, order: order, now: library.now()).first?.notes.first
-        selection = (first?.id ?? files(in: library).first?.id).map { [$0] } ?? []
+        let first = sections(in: library, order: order, now: library.now()).first?.items.first
+        selection = first.map { [$0.id] } ?? []
     }
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
@@ -118,29 +106,29 @@ final class Browser {
     }
 
     /// Blank titles receive a unique name without requiring a naming dialog before typing.
-    func createDraft(in library: NoteLibrary, undoManager: UndoManager?) -> Note? {
+    func createDraft(in library: NoteLibrary, undoManager: UndoManager?) -> ItemID? {
         guard let draft = itemDraft else { return nil }
         var title = NoteName.trimmed(draft.title)
         if title.isEmpty {
             let untitled = String(localized: "Untitled")
             title = untitled
             var suffix = 2
-            while library.notes.contains(where: { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }) {
+            while library.isItemTitleTaken(title) {
                 title = "\(untitled) \(suffix)"
                 suffix += 1
             }
         }
-        guard let note = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
+        guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager)?.id else { return nil }
         isCreatingItem = false
         itemDraft = nil
         searchText = ""
         isSearchExpanded = false
-        if !library.notes(in: item).contains(where: { $0.id == note.id }) {
+        if !library.items(in: item).contains(where: { $0.id == id }) {
             sidebarItem = .itemType(draft.typeID)
         }
-        selection = [note.id]
+        selection = [id]
         focusRequest = .page
-        return note
+        return id
     }
 
     func newFolder(in library: NoteLibrary, order: NoteOrder, undoManager: UndoManager?) {
@@ -152,7 +140,7 @@ final class Browser {
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
     /// person confirms, since that cannot be undone.
     static func delete(_ ids: Set<ItemID>, in library: NoteLibrary, undoManager: UndoManager?) {
-        let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
+        let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
         if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
@@ -162,11 +150,11 @@ final class Browser {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
-        if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
+        if case .project(let id) = sidebarItem, library.item(id)?.state != .active {
             show(.allNotes, in: library, order: order)
         }
         if case .favoriteItem(let id) = sidebarItem,
-           library.note(id).map({ !$0.isDeleted && $0.isFavorite }) != true {
+           library.item(id).map({ $0.state == .active && $0.isFavorite }) != true {
             show(.favorites, in: library, order: order)
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
@@ -218,15 +206,14 @@ final class Browser {
     func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
-            library.note(id).flatMap { $0.isFavorite && !$0.isDeleted ? snapshot.place : nil } ?? .favorites
-        case .project(let id): library.note(id).map { _ in snapshot.place } ?? .allNotes
+            library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
+        case .project(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
         case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
         case .itemType(let type): WorkbenchSchema.definition(type).map { _ in snapshot.place } ?? .allNotes
         case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
         }
         let ids = Set(snapshot.selection)
-        selection = Set(notes(in: library).map(\.id).filter(ids.contains))
-        selection.formUnion(files(in: library).map(\.id).filter(ids.contains))
+        selection = Set(items(in: library).map(\.id).filter(ids.contains))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }

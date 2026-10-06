@@ -156,9 +156,9 @@ struct ItemMutationTests {
         let task = ticket()
         let library = NoteLibrary(notes: [project, task])
         _ = library.connectionIndex
-        #expect(library.item(task.id)?.fields["status"] == .string("pending"))
+        #expect(library.item(task.id)?.value(of: "status") == .string("pending"))
         #expect(library.setItemProperty(task.id, key: "status", value: .string("completed")))
-        #expect(library.item(task.id)?.fields["status"] == .string("completed"))
+        #expect(library.item(task.id)?.value(of: "status") == .string("completed"))
         #expect(library.setItemRelationship(task.id, field: "child-of", targetIDs: [project.id]))
         #expect(library.connectionIndex.edges.contains { $0.name == "parent-of" && $0.sourceID == project.id && $0.targetID == task.id })
         library.updateBody(of: task.id, to: "See [[Area]].")

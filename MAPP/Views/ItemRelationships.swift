@@ -95,15 +95,16 @@ struct ItemTargetRow: View {
 
 /// Changes are committed together; dismissing the chooser leaves existing connections intact.
 struct ItemRelationshipPicker: View {
+    @Environment(NoteLibrary.self) private var library
     let relationship: ItemRelationship
-    let candidates: [AppItem]
+    let candidates: [Item]
     let onSave: ([ItemID]) -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selection: Set<ItemID>
     @State private var rejected = false
 
-    init(relationship: ItemRelationship, candidates: [AppItem], onSave: @escaping ([ItemID]) -> Bool) {
+    init(relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) -> Bool) {
         self.relationship = relationship
         self.candidates = candidates
         self.onSave = onSave
@@ -133,7 +134,7 @@ struct ItemRelationshipPicker: View {
                             Text(candidate.title)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text(LocalizedStringKey(candidate.type?.label ?? "File"))
+                            Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -172,7 +173,7 @@ struct ItemRelationshipPicker: View {
         .accessibilityIdentifier("RelationshipPicker")
     }
 
-    private var filtered: [AppItem] {
+    private var filtered: [Item] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.isEmpty ? candidates : candidates.filter { $0.title.localizedStandardContains(query) }
     }

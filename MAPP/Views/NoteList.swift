@@ -18,14 +18,7 @@ struct NoteList: View {
         let _ = daysSeen
         let now = library.now()
         let sections = browser.sections(in: library, order: order, now: now)
-        let files = browser.files(in: library).sorted { lhs, rhs in
-            switch order.sort {
-            case .title: lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-            case .dateCreated: lhs.stored.created > rhs.stored.created
-            case .dateEdited: lhs.stored.modified > rhs.stored.modified
-            }
-        }
-        let ids = sections.flatMap { $0.notes.map(\.id) } + files.map(\.id)
+        let ids = sections.flatMap { $0.items.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
@@ -41,24 +34,21 @@ struct NoteList: View {
                         .accessibilityAddTraits(.isHeader)
                         .selectionDisabled()
                         .listRowSeparator(.hidden, edges: .top)
-                case .note(let note, let endsSection):
-                    NoteRow(
-                        note: note,
-                        dateLabel: NoteDate.listLabel(for: order.sort.date(of: note), now: now),
-                        folderName: browser.showsFolders ? folderName(for: note) : nil,
+                case .item(let item, let endsSection):
+                    let row = ItemRow(
+                        item: item,
+                        dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
+                        folderName: browser.showsFolders ? folderName(for: item) : nil,
                         previewLines: previewLines
                     )
-                    .draggable(containerItemID: note.id)
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
+                    // A file has no markdown to carry, so only a note is dragged.
+                    if item.isFile {
+                        row
+                    } else {
+                        row.draggable(containerItemID: item.id)
+                    }
                 }
-            }
-            if !files.isEmpty && !sections.isEmpty {
-                Text("Files").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                    .padding(.top, 10).selectionDisabled().listRowSeparator(.hidden)
-            }
-            ForEach(files) { file in
-                FileListRow(file: file, dateLabel: NoteDate.listLabel(for: order.sort == .dateCreated ? file.stored.created : file.stored.modified, now: now), previewLines: previewLines)
-                    .tag(file.id)
             }
         }
         .listStyle(.inset)
@@ -73,10 +63,10 @@ struct NoteList: View {
             deleteSelection()
             return .handled
         }
-        // Return opens the note for writing; a deleted note cannot be written in, so it stays in the list.
+        // Return opens the note for writing; a deleted note or a file cannot be written in, so it stays in the list.
         .onKeyPress(.return, phases: .down) { press in
             guard press.modifiers.isEmpty, browser.selection.count == 1,
-                  browser.selectedNotes(in: library).first?.isDeleted == false
+                  browser.selectedItems(in: library).first?.isWritable == true
             else { return .ignored }
             browser.focusRequest = .page
             return .handled
@@ -104,14 +94,14 @@ struct NoteList: View {
             }
         }
         .dragContainer(for: NoteReference.self) { ids in
-            ids.compactMap { library.note($0) }.map { NoteReference(id: $0.id, markdown: $0.body) }
+            ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
         }
         .dragContainerSelection(Array(browser.selection))
         .onChange(of: ids) { old, new in
             browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            if ids.count == 1, let id = ids.first, library.note(id)?.isDeleted == false {
+            if ids.count == 1, let id = ids.first, library.item(id)?.isWritable == true {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = id }
                 Divider()
             }
@@ -144,15 +134,16 @@ struct NoteList: View {
         }
     }
 
-    private func folderName(for note: Note) -> String {
-        note.folderID.flatMap { library.folder($0)?.name } ?? String(localized: "Inbox")
+    private func folderName(for item: Item) -> String {
+        library.folder(of: item)?.name ?? String(localized: "Inbox")
     }
 }
 
 /// Laid out as Mail lays out a message, so the date lines up at the trailing edge, and the preview's lines are
-/// reserved whether the note fills them or not, keeping every row the same height.
-struct NoteRow: View {
-    let note: Note
+/// reserved whether the item fills them or not, keeping every row the same height. A file's kind stands in for
+/// the preview a note has.
+struct ItemRow: View {
+    let item: Item
     let dateLabel: String
     let folderName: String?
     let previewLines: Int
@@ -160,7 +151,7 @@ struct NoteRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
-                Text(note.title)
+                Text(item.title)
                     .font(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -171,10 +162,16 @@ struct NoteRow: View {
                     .layoutPriority(1)
             }
             if previewLines > 0 {
-                Text(note.preview)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(previewLines, reservesSpace: true)
+                Group {
+                    if case .file(let type, _) = item.content {
+                        Label(type.localizedDescription ?? String(localized: "File"), systemImage: type.conforms(to: .image) ? "photo" : "doc")
+                    } else {
+                        Text(item.preview)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(previewLines, reservesSpace: true)
             }
             if let folderName {
                 Label(folderName, systemImage: "folder")
@@ -188,17 +185,17 @@ struct NoteRow: View {
     }
 }
 
-/// A line of the note list: a section's heading, or a note, with where it falls in its section.
+/// A line of the list: a section's heading, or an item, with where it falls in its section.
 private enum ListLine: Identifiable {
     case heading(NoteGroup, isFirst: Bool)
-    case note(Note, endsSection: Bool)
+    case item(Item, endsSection: Bool)
 
-    /// A note's line is known by the note, so the list's selection is its notes; a heading takes an identifier
+    /// An item's line is known by the item, so the list's selection is its items; a heading takes an identifier
     /// of its own, never selected.
     var id: ItemID {
         switch self {
         case .heading(let group, _): ItemID(UUID(stableFrom: "heading:\(group)").uuidString)
-        case .note(let note, _): note.id
+        case .item(let item, _): item.id
         }
     }
 
@@ -206,34 +203,10 @@ private enum ListLine: Identifiable {
         var lines: [ListLine] = []
         for section in sections {
             if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty)) }
-            for note in section.notes {
-                lines.append(.note(note, endsSection: note.id == section.notes.last?.id))
+            for item in section.items {
+                lines.append(.item(item, endsSection: item.id == section.items.last?.id))
             }
         }
         return lines
-    }
-}
-
-/// File rows keep the same title, date and preview rhythm as the existing note list.
-struct FileListRow: View {
-    let file: AppFile
-    let dateLabel: String
-    let previewLines: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(file.title).font(.headline).lineLimit(1)
-                Spacer(minLength: 8)
-                Text(dateLabel).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).layoutPriority(1)
-            }
-            if previewLines > 0 {
-                Label(file.contentType.localizedDescription ?? String(localized: "File"), systemImage: file.isImage ? "photo" : "doc")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .lineLimit(previewLines, reservesSpace: true)
-            }
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
     }
 }
