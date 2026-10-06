@@ -1,8 +1,8 @@
 import AppKit
-import AVFoundation
 import Darwin
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 import WebKit
 @testable import MAPP
 
@@ -38,34 +38,38 @@ enum EmbedFixtures {
         return data
     }
 
-    /// A second of 64 by 64 H.264 video in a QuickTime movie.
-    static func movie(to url: URL) async throws {
-        let size = 64
-        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: size, AVVideoHeightKey: size,
-        ])
-        input.expectsMediaDataInRealTime = false
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: size, kCVPixelBufferHeightKey as String: size,
-        ])
-        writer.add(input)
-        try #require(writer.startWriting())
-        writer.startSession(atSourceTime: .zero)
-        for frame in 0..<10 {
-            while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(10)) }
-            var buffer: CVPixelBuffer?
-            CVPixelBufferPoolCreatePixelBuffer(nil, try #require(adaptor.pixelBufferPool), &buffer)
-            let pixels = try #require(buffer)
-            CVPixelBufferLockBaseAddress(pixels, [])
-            memset(CVPixelBufferGetBaseAddress(pixels), Int32(frame * 20), CVPixelBufferGetDataSize(pixels))
-            CVPixelBufferUnlockBaseAddress(pixels, [])
-            try #require(adaptor.append(pixels, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 10)))
+    /// A second of 64 by 64 H.264 video, made once with ffmpeg (`MAPPTests/Fixtures/README.md`). No test encodes
+    /// video as it runs: the hardware encoder is not for test runs.
+    static func movie(to url: URL) throws {
+        try fixture("Clip").write(to: url)
+    }
+
+    /// Five seconds of video in fragments, with zeros between the first fragment and the rest so the later frames lie
+    /// further into the file than the scheme answers at once.
+    static func longMovie(to url: URL, padding: Int) throws {
+        let source = try fixture("Fragmented")
+        var offset = 0
+        var boxes: [(start: Int, name: String)] = []
+        while offset + 8 <= source.count {
+            let size = Int(source[offset..<offset + 4].reduce(0) { $0 << 8 | Int($1) })
+            boxes.append((offset, String(decoding: source[offset + 4..<offset + 8], as: UTF8.self)))
+            offset += size
         }
-        input.markAsFinished()
-        await writer.finishWriting()
-        try #require(writer.status == .completed, "\(String(describing: writer.error))")
+        let fragments = boxes.filter { $0.name == "moof" }
+        let second = try #require(fragments.dropFirst().first).start
+        var gap = Data()
+        for byte in [UInt32(padding + 8).bigEndian] { withUnsafeBytes(of: byte) { gap.append(contentsOf: $0) } }
+        gap.append(contentsOf: Array("free".utf8))
+        gap.append(Data(count: padding))
+        var movie = source.prefix(second)
+        movie.append(gap)
+        movie.append(source.suffix(from: second))
+        try movie.write(to: url)
+    }
+
+    private static func fixture(_ name: String) throws -> Data {
+        let url = try #require(Bundle(for: FixtureBundle.self).url(forResource: name, withExtension: "mov"))
+        return try Data(contentsOf: url)
     }
 
     /// One page filled red, so a frame showing it can be told from an empty one.
@@ -345,3 +349,6 @@ struct EmbeddedFilesTests {
         #expect(EmbeddedFiles.kind(of: nil) == "file")
     }
 }
+
+/// Anchors the test bundle, whose resources hold the fixtures.
+final class FixtureBundle {}

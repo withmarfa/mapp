@@ -254,7 +254,7 @@ struct EditorTests {
         try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
         try EmbedFixtures.png(width: 5, height: 2).write(to: attachments.appending(path: "Photo.png"))
         try EmbedFixtures.wav().write(to: attachments.appending(path: "Tone.wav"))
-        try await EmbedFixtures.movie(to: attachments.appending(path: "Clip.mov"))
+        try EmbedFixtures.movie(to: attachments.appending(path: "Clip.mov"))
         try EmbedFixtures.pdf(to: attachments.appending(path: "Plan.pdf"))
         try Data("Item,Cost\nOak,11850\n".utf8).write(to: attachments.appending(path: "Budget.csv"))
         let body = """
