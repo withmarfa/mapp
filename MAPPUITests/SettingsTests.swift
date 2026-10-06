@@ -47,8 +47,11 @@ final class SettingsTests: XCTestCase {
     }
 
     func testSettingsUsesNativeSidebarAndToolbarAcrossCategories() {
+        let workspaceTitle = window.toolbars.staticTexts["All Notes"]
+        XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertTrue(workspaceTitle.waitForNonExistence(timeout: 3), "the hidden workspace does not contribute a title")
         let back = window.toolbars.buttons["SettingsBack"]
         XCTAssertTrue(back.waitForExistence(timeout: 3), "Back belongs to the system toolbar")
         let sidebar = window.outlines["SettingsSidebar"]
@@ -63,11 +66,13 @@ final class SettingsTests: XCTestCase {
             let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
             XCTAssertTrue(category.exists)
             category.click()
+            XCTAssertFalse(workspaceTitle.exists)
             XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0).exists)
             attachScreenshot("NativeSettings-\(pane)")
             XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the active pane has a native toolbar title")
         }
         back.click()
+        XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
     }
