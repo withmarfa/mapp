@@ -34,7 +34,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func items(in place: SidebarItem) -> [Item]
     /// Every item not deleted whose title or text has the query.
     func items(matching query: String) -> [Item]
-    /// What `items(matching:)` finds, best match first, each with the words around what was found.
+    /// What `items(matching:)` finds, each with the words around what was found; a library that ranks its matches
+    /// gives the best first.
     func search(_ query: String) async throws -> [SearchMatch]
     func count(in place: SidebarItem) -> Int
     func name(of place: SidebarItem) -> String

@@ -130,8 +130,8 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
-    /// The copy restores only what it still holds: a delete the server has taken leaves the copy, and is back
-    /// in Marfa's bin there.
+    /// The copy restores only what it still holds: an item whose delete the server has taken leaves the copy for
+    /// the server's bin.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
         for id in ids { if item(id)?.state == .trashed { changes[id] = (.trashed, .active) } }
