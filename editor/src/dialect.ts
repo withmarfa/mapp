@@ -54,10 +54,12 @@ import { gfmTable } from 'micromark-extension-gfm-table'
 import { gfmTaskListItem } from 'micromark-extension-gfm-task-list-item'
 import type { Processor } from 'unified'
 import {
-  wikiEmbedFromMarkdown,
   wikiEmbedSchema,
-  wikiEmbedSyntax,
-  wikiEmbedToMarkdown,
+  wikiFromMarkdown,
+  wikiInputRule,
+  wikiLinkSchema,
+  wikiSyntax,
+  wikiToMarkdown,
 } from './wikiembeds'
 
 const bareURL = /^https?:\/\/[^\s<>]+$/
@@ -147,17 +149,17 @@ function remarkDialect(this: Processor) {
   add('micromarkExtensions', gfmTaskListItem())
   add('micromarkExtensions', gfmAutolinkLiteral())
   add('micromarkExtensions', gfmTable())
-  add('micromarkExtensions', wikiEmbedSyntax)
+  add('micromarkExtensions', wikiSyntax)
   add('fromMarkdownExtensions', gfmStrikethroughFromMarkdown())
   add('fromMarkdownExtensions', gfmTaskListItemFromMarkdown())
   add('fromMarkdownExtensions', gfmAutolinkLiteralFromMarkdown())
   add('fromMarkdownExtensions', gfmTableFromMarkdown())
-  add('fromMarkdownExtensions', wikiEmbedFromMarkdown)
+  add('fromMarkdownExtensions', wikiFromMarkdown)
   add('toMarkdownExtensions', gfmStrikethroughToMarkdown())
   add('toMarkdownExtensions', gfmTaskListItemToMarkdown())
   add('toMarkdownExtensions', gfmAutolinkLiteralToMarkdown())
   add('toMarkdownExtensions', tableToMarkdown)
-  add('toMarkdownExtensions', wikiEmbedToMarkdown)
+  add('toMarkdownExtensions', wikiToMarkdown)
   add('toMarkdownExtensions', { handlers: { link, paragraph, heading } })
 }
 
@@ -215,6 +217,8 @@ export const dialect: MilkdownPlugin[] = [
   tables,
   remarkDialectPlugin,
   wikiEmbedSchema,
+  wikiLinkSchema,
+  wikiInputRule,
   imageView,
   wikiEmbedView,
 ].flat()

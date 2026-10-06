@@ -139,7 +139,7 @@ function align(a: string[], b: string[]): Map<number, number> {
  *  between blocks that are still neighbours. An edited or new block is written in the canonical form, and
  *  an edited block standing where a source block stood keeps that block's surrounding blank lines. Link
  *  definitions are never dropped. If the result would read back differently from the document, as when two
- *  kept lists would run together, the whole body is written canonically instead. */
+ *  kept lists would run together, the whole body is written canonically instead, its definitions after it. */
 export function preserve(ctx: Ctx, source: Source, doc: ProseNode, canonical: string): string {
   if (!source.blocks || !source.definitions) split(ctx, source)
   const blocks = source.blocks!
@@ -198,5 +198,9 @@ export function preserve(ctx: Ctx, source: Source, doc: ProseNode, canonical: st
   if (lost.length > 0)
     out = `${trimmed(out)}\n\n${lost.map((definition) => definition.text).join('\n')}\n`
 
-  return serialize(ctx, ctx.get(parserCtx)(out)) === canonical ? out : canonical
+  if (serialize(ctx, ctx.get(parserCtx)(out)) === canonical) return out
+  // The page shows no definition, so the canonical form has none; they are kept after it, where they change
+  // nothing it writes, since it writes every link inline and escapes any other brackets.
+  if (definitions.length === 0) return canonical
+  return `${trimmed(canonical)}\n\n${definitions.map((definition) => definition.text).join('\n')}\n`
 }
