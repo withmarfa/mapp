@@ -240,10 +240,20 @@ nonisolated enum MarfaMapping {
         SyncProblem(
             code: refusal.code ?? refusal.reason, message: refusal.message,
             fields: Dictionary(refusal.fields.map { ($0.field, $0.message) }, uniquingKeysWith: { first, _ in first }),
-            isTrashed: refusal.trashed)
+            isTrashed: refusal.trashed, grant: refusal.grant.map(grant))
     }
 
-    private static func blockedReason(_ reason: Marfa.BlockedReason) -> BlockedReason? {
+    private static func grant(_ grant: MissingGrant) -> SyncProblem.Grant {
+        let kind: SyncProblem.Grant.Kind =
+            switch grant.kind {
+            case .type: .type
+            case .edgeType: .edgeType
+            case .extension: .extension
+            }
+        return SyncProblem.Grant(kind: kind, name: grant.name, level: grant.level == .read ? .read : .write)
+    }
+
+    static func blockedReason(_ reason: Marfa.BlockedReason) -> BlockedReason? {
         switch reason {
         case .credentialRefused: .credentialRefused
         case .keySpent: .keySpent

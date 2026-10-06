@@ -9,13 +9,16 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     case online
     /// The server cannot be reached; writes wait in the queue and go when it can.
     case offline(reason: String?)
+    /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
+    /// another.
+    case keyRefused
     /// Following the server stopped, and stays stopped until the next refresh. The copy still reads and queues.
     case stopped(code: String, message: String)
 }
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
 /// library shows what it holds before, and without, the network.
-nonisolated final class MarfaSource: ItemSource {
+nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
     let capabilities: SourceCapabilities = [.archive]
     let embeds: any EmbedResolver = MarfaEmbeds()
@@ -81,6 +84,61 @@ nonisolated final class MarfaSource: ItemSource {
 
     func submit(_ write: ItemWrite, as id: WriteID) {
         events.yield(.write(write, id))
+    }
+
+    /// Takes the new key between server calls; the follow and the drain go on with it.
+    func useKey(_ key: String) async throws {
+        do {
+            try await engine.sync.useKey(key)
+        } catch let error as MarfaError {
+            // A copy that could not open its store again is closed for good, and is opened again.
+            if case .closed = error { throw SourceFailure(kind: .missing, message: error.message) }
+            throw SourceFailure(kind: .failed, message: error.message)
+        }
+    }
+
+    // MARK: Sync problems
+
+    var syncReport: SyncReport { hub.report.value }
+
+    func syncReports() -> AsyncStream<SyncReport> {
+        hub.report.values()
+    }
+
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
+        guard let entry = hub.report.value.problems.first(where: { $0.id == problem }), entry.actions.contains(action)
+        else { return false }
+        switch (problem, action) {
+        case (.write(let id), .discard):
+            return try await ask { .discard(id, $0) }
+        case (.write(let id), .tryAgain):
+            return try await ask { .release(id, $0) }
+        case (.write(let id), .withdraw):
+            // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
+            // copy announces the withdrawal, which the engine reads again.
+            do {
+                return try await copy.queue.withdraw(id)
+            } catch let error as MarfaError {
+                throw SourceFailure(kind: .failed, message: error.message)
+            }
+        case (.conflictedCopy(let copy), .discard):
+            submit(.transition(copy, .trashed), as: WriteID())
+            return true
+        case (.conflictedCopy(let copy), .keep):
+            submit(.tag(copy, MarfaProblems.conflictedCopyTag, on: false), as: WriteID())
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func ask(
+        _ event: (CheckedContinuation<Result<Bool, SourceFailure>, Never>) -> MarfaEngine.Event
+    ) async throws -> Bool {
+        let result = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(event(continuation)) { continuation.resume(returning: .success(false)) }
+        }
+        return try result.get()
     }
 
     func body(of item: ItemID) async throws -> ItemBody {
@@ -174,14 +232,14 @@ nonisolated final class MarfaHub: Sendable {
     private struct State {
         var snapshot: SourceSnapshot?
         var readers: [UUID: AsyncStream<SourceChange>.Continuation] = [:]
-        var connection = MarfaConnectionState.connecting
-        var watchers: [UUID: AsyncStream<MarfaConnectionState>.Continuation] = [:]
         var finished = false
     }
 
     private let state = Mutex(State())
+    private let connectionState = Latest(MarfaConnectionState.connecting)
+    let report = Latest(SyncReport())
 
-    var connection: MarfaConnectionState { state.withLock { $0.connection } }
+    var connection: MarfaConnectionState { connectionState.value }
     var catalogue: Catalogue { state.withLock { $0.snapshot?.catalogue ?? Catalogue() } }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {
@@ -211,17 +269,7 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     func connectionStates() -> AsyncStream<MarfaConnectionState> {
-        let (stream, continuation) = AsyncStream<MarfaConnectionState>.makeStream()
-        let token = UUID()
-        continuation.onTermination = { [weak self] _ in self?.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
-        let finished = state.withLock { state in
-            guard !state.finished else { return true }
-            continuation.yield(state.connection)
-            state.watchers[token] = continuation
-            return false
-        }
-        if finished { continuation.finish() }
-        return stream
+        connectionState.values()
     }
 
     /// Only the engine publishes, one change at a time, so telling readers outside the lock keeps their order.
@@ -239,25 +287,18 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     func set(_ connection: MarfaConnectionState) {
-        let watchers = state.withLock { state -> [AsyncStream<MarfaConnectionState>.Continuation] in
-            guard state.connection != connection else { return [] }
-            state.connection = connection
-            return Array(state.watchers.values)
-        }
-        for watcher in watchers { watcher.yield(connection) }
+        connectionState.set(connection)
     }
 
     func finish() {
-        let (readers, watchers) = state.withLock { state in
+        let readers = state.withLock { state in
             state.finished = true
-            defer {
-                state.readers = [:]
-                state.watchers = [:]
-            }
-            return (Array(state.readers.values), Array(state.watchers.values))
+            defer { state.readers = [:] }
+            return Array(state.readers.values)
         }
         for reader in readers { reader.finish() }
-        for watcher in watchers { watcher.finish() }
+        connectionState.finish()
+        report.finish()
     }
 }
 

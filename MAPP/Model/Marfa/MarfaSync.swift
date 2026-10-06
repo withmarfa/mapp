@@ -18,6 +18,8 @@ actor MarfaSync {
     private let tell: @Sendable (MarfaEngine.Event) -> Bool
     private var started = false
     private var stopped = false
+    /// Set while the copy changes key, when every call on it is refused.
+    private var paused = false
     private var wantsRefresh = false
     private var wantsDrain = false
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
@@ -109,6 +111,9 @@ actor MarfaSync {
         draining = []
     }
 
+    /// Why a copy expires when the server ends its key, the contract's word for it.
+    nonisolated static let credentialEnded = "credential_ended"
+
     /// The person gives a new key in Settings; nothing is sent until then.
     nonisolated static var keyRefused: String {
         String(localized: "The Marfa server refused this library’s key. Check the key in Settings.")
@@ -119,13 +124,29 @@ actor MarfaSync {
         .seconds(min(5 * (1 << min(max(failures, 1) - 1, 10)), 300))
     }
 
+    /// Gives the copy a new key between server calls. Writes a refused key parked clear on their own at the
+    /// next drain, which the refresh after it sends, so nothing is released here.
+    func useKey(_ key: String) async throws {
+        paused = true
+        retry?.cancel()
+        retry = nil
+        working?.cancel()
+        defer {
+            paused = false
+            work()
+        }
+        try await copy.useKey(key)
+        failures = 0
+        wantsRefresh = true
+    }
+
     private func work() {
-        guard started, !stopped, working == nil else { return }
+        guard started, !stopped, !paused, working == nil else { return }
         working = Task { await self.loop() }
     }
 
     private func loop() async {
-        while !stopped {
+        while !stopped, !paused, !Task.isCancelled {
             if wantsRefresh {
                 wantsRefresh = false
                 await runRefresh()
@@ -141,6 +162,8 @@ actor MarfaSync {
             }
         }
         working = nil
+        // A loop cancelled for a change of key leaves what it was asked for to the next one.
+        if Task.isCancelled { work() }
     }
 
     private func runRefresh() async {
@@ -178,8 +201,8 @@ actor MarfaSync {
                 }
             }
             switch Self.result(of: report) {
-            case .parked(let reason):
-                hub.set(.stopped(code: BlockedReason.credentialRefused.rawValue, message: reason))
+            case .parked:
+                hub.set(.keyRefused)
                 _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
             case .offline(let reason):
                 hub.set(.offline(reason: reason))
@@ -197,6 +220,8 @@ actor MarfaSync {
     /// A new copy holds only Marfa's built-in types, so its first slice is theirs; the server's catalogue then
     /// names every namespace, and the copy is hydrated again with them all.
     private func hydrate() async throws {
+        hub.report.update { $0.phase = .catchingUp }
+        defer { hub.report.update { $0.phase = .current } }
         var slice = MarfaMapping.namespaces(of: try await catalogue())
         for _ in 0..<2 {
             _ = try await copy.hydrate(types: slice, tier: Self.tier)
@@ -243,7 +268,13 @@ actor MarfaSync {
             hub.set(.offline(reason: error.message))
             schedule(kind)
         case .unauthorized, .forbidden, .signedOut:
-            hub.set(.stopped(code: error.code(), message: error.message))
+            hub.set(.keyRefused)
+            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
+        case .copyExpired(let reason, _) where reason == Self.credentialEnded:
+            // The key was refused for good, which expires the copy; hydrating again before a new key is given
+            // would only be refused again.
+            refreshed = false
+            hub.set(.keyRefused)
             _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
         case .copyExpired:
             // The server asks for a new hydration, which keeps the queue. The follow that stopped for it runs
@@ -253,6 +284,9 @@ actor MarfaSync {
             work()
         case .hydrationIncomplete, .noCursor, .canceled, .closed:
             break
+        case .invalid:
+            // The copy was changing its key or moved during the call; the package asks for it again.
+            schedule(kind)
         default:
             hub.set(.stopped(code: error.code(), message: error.message))
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
