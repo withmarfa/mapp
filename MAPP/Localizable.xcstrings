@@ -1175,9 +1175,6 @@
     "The copy of your library on this Mac can’t be opened.": {
       "extractionState": "manual"
     },
-    "The copy of your library on this Mac can’t be opened. %@": {
-      "extractionState": "manual"
-    },
     "Can’t Keep the Key": {
       "extractionState": "manual"
     },
@@ -1597,6 +1594,42 @@
       "extractionState": "manual"
     },
     "Replace Key": {
+      "extractionState": "manual"
+    },
+    "Some Changes Weren’t Saved": {
+      "extractionState": "manual"
+    },
+    "MAPP closed the library before it could keep your change. Make the change again.": {
+      "extractionState": "manual"
+    },
+    "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the kind of item you chose or the item you chose as its parent, so your new item is a note with no parent. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the kind of item you chose, so your new item is a note. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the item you chose as its parent, so your new item has no parent. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "New Item Changed": {
+      "extractionState": "manual"
+    },
+    "Can’t Check the Key": {
+      "extractionState": "manual"
+    },
+    "MAPP kept the new key and opened your library again, but couldn’t check the key with the server.": {
+      "extractionState": "manual"
+    },
+    "Can’t Use the New Key": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again.": {
+      "extractionState": "manual"
+    },
+    "MAPP kept the new key, but the copy of your library on this Mac can’t be opened.": {
       "extractionState": "manual"
     }
   },

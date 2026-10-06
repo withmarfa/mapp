@@ -59,10 +59,14 @@ struct LibraryUnavailableView: View {
 
     var body: some View {
         let status = ConnectionStatus(libraries.host.state)
+        // The pane's own line points "below", which here is only this button.
+        let detail = libraries.host.state == .keyRefused
+            ? String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
+            : status.detail
         ContentUnavailableView {
             Label("Can’t Open Your Marfa Library", systemImage: "exclamationmark.triangle")
         } description: {
-            Text(status.detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
+            Text(detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
         } actions: {
             Button("Open Settings…") { settings.show(.marfa) }
                 .buttonStyle(.borderedProminent)
