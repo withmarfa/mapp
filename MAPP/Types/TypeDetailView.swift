@@ -57,10 +57,11 @@ private struct ItemTypePage: View {
                     }
                 }
                 LabeledContent("Body") {
-                    if let field = detail.bodyProperty {
-                        Text(field).monospaced()
-                    } else {
-                        Text("None").foregroundStyle(.secondary)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(detail.bodyProperty).monospaced()
+                        if !detail.declaresBody {
+                            Text("Not a field of this type").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -190,10 +191,10 @@ private struct EdgeTypePage: View {
 
             Section {
                 EndRow(
-                    title: "From", types: detail.sourceTypes, roles: detail.sourceRoles,
+                    title: "From", types: detail.sourceTypes, roles: detail.sourceRoles, allowsAny: detail.edge.allowsAnySource(),
                     wording: detail.edge.sourceEndWording, browser: browser)
                 EndRow(
-                    title: "To", types: detail.targetTypes, roles: detail.targetRoles,
+                    title: "To", types: detail.targetTypes, roles: detail.targetRoles, allowsAny: detail.edge.allowsAnyTarget(),
                     wording: detail.edge.targetEndWording, browser: browser)
             } header: {
                 Text("Ends")
@@ -217,13 +218,14 @@ private struct EndRow: View {
     let title: LocalizedStringKey
     let types: [TypeReference]
     let roles: [String]
+    let allowsAny: Bool
     let wording: String
     let browser: TypesBrowser
 
     var body: some View {
         LabeledContent(title) {
             VStack(alignment: .trailing, spacing: 2) {
-                if types.isEmpty && roles.isEmpty {
+                if allowsAny {
                     Text("Any type")
                 } else {
                     TypeLinks(references: types, browser: browser)

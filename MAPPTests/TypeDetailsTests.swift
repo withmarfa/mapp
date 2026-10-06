@@ -62,20 +62,20 @@ struct TypeDetailsTests {
         let named = ItemTypeDetail(
             TypesFixtures.type("a.x", fields: [TypesFixtures.field("name", by: "a.x")], titleField: "name"), in: Catalogue())
         #expect(named.titleProperty == "name" && named.declaresTitle)
-        #expect(named.bodyProperty == nil)
+        #expect(named.bodyProperty == "body" && !named.declaresBody)
         // A type naming neither hint is read under `title` and `body`, where it declares them.
         let folder = ItemTypeDetail(
             TypesFixtures.type("a.folder", fields: [
                 TypesFixtures.field("title", by: "a.folder"), TypesFixtures.field("body", by: "a.folder")
             ], titleField: nil), in: Catalogue())
-        #expect(folder.titleProperty == "title" && folder.declaresTitle && folder.bodyProperty == "body")
+        #expect(folder.titleProperty == "title" && folder.declaresTitle && folder.bodyProperty == "body" && folder.declaresBody)
         let bare = ItemTypeDetail(TypesFixtures.type("a.bare", titleField: nil), in: Catalogue())
-        #expect(bare.titleProperty == "title" && !bare.declaresTitle && bare.bodyProperty == nil)
+        #expect(bare.titleProperty == "title" && !bare.declaresTitle && bare.bodyProperty == "body" && !bare.declaresBody)
         // A type naming only its body field is still titled by `title`.
         let message = ItemTypeDetail(
             TypesFixtures.type("a.message", fields: [TypesFixtures.field("text", by: "a.message")], titleField: nil, bodyField: "text"),
             in: Catalogue())
-        #expect(message.titleProperty == "title" && message.bodyProperty == "text")
+        #expect(message.titleProperty == "title" && message.bodyProperty == "text" && !message.declaresTitle)
     }
 
     @Test func edgeTypesThatNameATypeOrOneAboveItConnectIt() throws {

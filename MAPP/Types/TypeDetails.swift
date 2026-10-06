@@ -81,8 +81,10 @@ nonisolated struct ItemTypeDetail: Sendable {
     /// Whether the type declares that property. If not, an item has a title only where one was written there anyway.
     var declaresTitle: Bool { type.declares(titleProperty) }
 
-    /// The property the app reads and writes an item's text under, as `MarfaMapping.bodyField(of:)` decides.
-    var bodyProperty: String? { MarfaMapping.bodyField(of: type) }
+    /// The property Marfa reads the text under: the hint's field, or `body` where the hints name none.
+    var bodyProperty: String { type.bodyField ?? "body" }
+
+    var declaresBody: Bool { type.declares(bodyProperty) }
 }
 
 /// Everything the page for an edge type shows.
