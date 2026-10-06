@@ -89,7 +89,10 @@ window.addEventListener(
 // before WebKit asks it for the menu.
 window.addEventListener(
   'contextmenu',
-  (event) => postToHost({ type: 'embedMenu', embed: embedAt(event.target) }),
+  (event) => {
+    const shown = embedAt(event.target)
+    postToHost({ type: 'embedMenu', embed: shown?.embed ?? null, opens: shown?.opens ?? false })
+  },
   { capture: true },
 )
 

@@ -31,8 +31,9 @@ final class EditorController: NSObject {
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
     @ObservationIgnored private let embeds = EmbeddedFiles()
-    /// The embedded file the context menu is opening over, which it offers to open.
-    @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference)?
+    /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
+    /// was told it may be.
+    @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -72,7 +73,7 @@ final class EditorController: NSObject {
         container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
-        embeds.resolve = { [weak self] reference, item in await self?.library?.embeddedFile(reference, in: item) }
+        embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         #if DEBUG
         webView.isInspectable = true
@@ -372,11 +373,12 @@ final class EditorController: NSObject {
 
     // MARK: Embedded files
 
-    /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder.
+    /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder: always for
+    /// one that might run when opened (`EmbeddedFiles.opens`), whatever the page asked.
     func openEmbed(_ reference: EmbedReference, in item: ItemID, revealing: Bool = false) {
         Task {
-            guard let url = await library?.embeddedFile(reference, in: item) else { return }
-            if revealing {
+            guard let url = await library?.openEmbeddedFile(reference, in: item)?.url else { return }
+            if revealing || !EmbeddedFiles.opens(url) {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } else {
                 NSWorkspace.shared.open(url)
@@ -385,7 +387,7 @@ final class EditorController: NSObject {
     }
 
     /// The embed the context menu opening now is over, heard from the page just before; each menu takes it once.
-    func takeMenuEmbed() -> (item: ItemID, reference: EmbedReference)? {
+    func takeMenuEmbed() -> (item: ItemID, reference: EmbedReference, opens: Bool)? {
         defer { menuEmbed = nil }
         return menuEmbed
     }

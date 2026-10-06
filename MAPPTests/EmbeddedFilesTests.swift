@@ -155,7 +155,7 @@ struct EmbeddedFilesTests {
         }
 
         func file(_ reference: EmbedReference) async -> String? {
-            let base = root.url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.count
+            let base = FolderFiles.realPath(of: root.url)?.pathComponents.count ?? 0
             return await library.embeddedFile(reference, in: note.id)?.pathComponents.dropFirst(base).joined(separator: "/")
         }
     }
@@ -208,11 +208,25 @@ struct EmbeddedFilesTests {
         #expect(EmbedPaths.named("pic.png", from: "", among: ["x/y/pic.png", "x/pic.png", "w/pic.png"]) == "w/pic.png", "the shallowest, then path order")
     }
 
+    @Test func aFileWrittenJustNowIsFoundByName() async throws {
+        let folder = try Folder()
+        #expect(await folder.file(.name("New.png")) == nil)
+        // The folder was just listed; the file arrives within the moment that listing is reused.
+        try folder.write(try EmbedFixtures.png(), to: "Attachments/New.png")
+        #expect(await folder.file(.name("New.png")) == "Attachments/New.png")
+    }
+
+    @Test func aFileInsideAPackageIsFoundByNameAsMarfaFindsIt() async throws {
+        let folder = try Folder()
+        try folder.write(try EmbedFixtures.png(), to: "Trip.textbundle/assets/Map.png")
+        #expect(await folder.file(.name("Map.png")) == "Trip.textbundle/assets/Map.png")
+    }
+
     // MARK: Serving
 
     func serve(_ folder: Folder, _ reference: EmbedReference, range: String? = nil, keepingData: Bool = true) async throws -> RecordingSchemeTask {
         let files = EmbeddedFiles()
-        files.resolve = { reference, item in await folder.library.embeddedFile(reference, in: item) }
+        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
         let task = RecordingSchemeTask(EmbeddedFiles.url(for: reference, in: folder.note.id, version: 1), range: range)
         task.keepsData = keepingData
         files.webView(WKWebView(), start: task)
@@ -250,6 +264,18 @@ struct EmbeddedFilesTests {
 
         let suffix = try await serve(folder, reference, range: "bytes=-10")
         #expect(suffix.response?.value(forHTTPHeaderField: "Content-Range") == "bytes 2990-2999/3000")
+
+        let window = Int(EmbeddedFiles.window)
+        let large = Data(count: window + 3000)
+        try folder.write(large, to: "Attachments/Long.mov")
+        let first = try await serve(folder, .name("Long.mov"), range: "bytes=0-")
+        #expect(first.response?.statusCode == 206)
+        #expect(first.response?.value(forHTTPHeaderField: "Content-Range") == "bytes 0-\(window - 1)/\(window + 3000)", "an open-ended range is answered a window at a time")
+        #expect(first.received == window)
+        let rest = try await serve(folder, .name("Long.mov"), range: "bytes=\(window)-")
+        #expect(rest.response?.value(forHTTPHeaderField: "Content-Range") == "bytes \(window)-\(window + 2999)/\(window + 3000)")
+        let asked = try await serve(folder, .name("Long.mov"), range: "bytes=0-\(window + 99)")
+        #expect(asked.received == window + 100, "a closed range is answered whole")
 
         let past = try await serve(folder, reference, range: "bytes=5000-")
         #expect(past.response?.statusCode == 416)
@@ -310,7 +336,7 @@ struct EmbeddedFilesTests {
         try #require(before > 0)
         var peak = before
         let files = EmbeddedFiles()
-        files.resolve = { reference, item in await folder.library.embeddedFile(reference, in: item) }
+        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
         let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Large.mov"), in: folder.note.id, version: 1))
         task.keepsData = false
         task.onPiece = { peak = max(peak, Self.footprint()) }
@@ -326,7 +352,7 @@ struct EmbeddedFilesTests {
         let folder = try Folder()
         try folder.write(Data(count: 8 * EmbeddedFiles.piece), to: "Attachments/Long.wav")
         let files = EmbeddedFiles()
-        files.resolve = { reference, item in await folder.library.embeddedFile(reference, in: item) }
+        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
         let webView = WKWebView()
         let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Long.wav"), in: folder.note.id, version: 1))
         task.keepsData = false

@@ -152,7 +152,7 @@ test('only a path to a file in the folder is asked for', () => {
 
 // MARK: The page, with an app that answers
 
-const files: Record<string, Omit<EmbeddedFile, 'url' | 'icon'>> = {
+const files: Record<string, Omit<EmbeddedFile, 'url' | 'icon' | 'opens'>> = {
   'Photo.png': { kind: 'image', name: 'Photo.png', detail: '2 KB' },
   'Clip.mp3': { kind: 'audio', name: 'Clip.mp3', detail: '1 MB' },
   'Walkthrough.mov': { kind: 'video', name: 'Walkthrough.mov', detail: '9 MB' },
@@ -176,7 +176,7 @@ function answer(): void {
           const key = 'name' in request ? request.name : request.path
           const file = files[key.slice(key.lastIndexOf('/') + 1)]
           return file
-            ? { ...file, url: `mapp-embed://file/${key}`, icon: 'mapp-embed://icon/x' }
+            ? { ...file, url: `mapp-embed://file/${key}`, icon: 'mapp-embed://icon/x', opens: true }
             : null
         },
       },
@@ -253,8 +253,8 @@ test('a card opens its file, and the context menu over an embed names it', async
       embed: { item: 'item-1', path: 'Budget.xlsx' },
     })
     expect(embedAt(card.querySelector('.embed-name'))).toEqual({
-      item: 'item-1',
-      path: 'Budget.xlsx',
+      embed: { item: 'item-1', path: 'Budget.xlsx' },
+      opens: true,
     })
     expect(embedAt(dom.querySelector('p'))).toBe(null)
   }))

@@ -170,9 +170,9 @@ final class EditorWebView: WKWebView {
                 item.target = self
                 item.representedObject = MenuEmbed(item: embed.item, reference: embed.reference)
             }
-            menu.insertItem(open, at: 0)
-            menu.insertItem(reveal, at: 1)
-            menu.insertItem(.separator(), at: 2)
+            let items = embed.opens ? [open, reveal] : [reveal]
+            for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
+            menu.insertItem(.separator(), at: items.count)
         }
         for item in menu.items {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")

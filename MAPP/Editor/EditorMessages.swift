@@ -36,8 +36,9 @@ nonisolated enum EditorMessage: Sendable {
     case pasteImages
     /// A card for an embedded file was clicked.
     case openEmbed(ItemID, EmbedReference)
-    /// The context menu is opening over an embedded file, or over anything else when nil.
-    case embedMenu((item: ItemID, reference: EmbedReference)?)
+    /// The context menu is opening over an embedded file, or over anything else when nil, with whether the
+    /// app said it may be opened.
+    case embedMenu((item: ItemID, reference: EmbedReference, opens: Bool)?)
     case find(FindState)
     case error(String)
 
@@ -78,7 +79,7 @@ nonisolated enum EditorMessage: Sendable {
             guard let (item, reference) = EmbedReference.request(dict["embed"]) else { return nil }
             self = .openEmbed(item, reference)
         case "embedMenu":
-            self = .embedMenu(EmbedReference.request(dict["embed"]))
+            self = .embedMenu(EmbedReference.request(dict["embed"]).map { ($0.item, $0.reference, dict["opens"] as? Bool ?? false) })
         case "find":
             guard let text = dict["text"] as? String,
                   let selection = dict["selection"] as? [Int], selection.count == 2,

@@ -95,10 +95,12 @@ function describe(node: ProseNode): Described {
   }
 }
 
-/** The request behind an embed the page shows, for the context menu the app adds Open to. */
-const shown = new WeakMap<Element, EmbedRequest>()
+/** The embed the page shows, for the context menu the app adds Open and Show in Finder to. */
+const shown = new WeakMap<Element, { embed: EmbedRequest; opens: boolean }>()
 
-export function embedAt(target: EventTarget | null): EmbedRequest | null {
+export function embedAt(
+  target: EventTarget | null,
+): { embed: EmbedRequest; opens: boolean } | null {
   let element = target instanceof Element ? target : null
   while (element) {
     const request = shown.get(element)
@@ -173,7 +175,7 @@ class EmbedView implements NodeView {
           setTimeout(() => this.key === key && this.show(described, request, attempt + 1), delay)
         return
       }
-      shown.set(this.dom, request)
+      shown.set(this.dom, { embed: request, opens: file.opens })
       switch (file.kind) {
         case 'image':
           return this.showImage(file, described, request)

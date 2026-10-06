@@ -535,6 +535,7 @@ test('an image is drawn at the width in its alt text, and shows its name without
           name: 'a.png',
           detail: '1 KB',
           icon: 'mapp-embed://icon/a',
+          opens: true,
         }),
       },
     },

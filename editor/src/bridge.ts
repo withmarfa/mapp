@@ -12,6 +12,8 @@ export interface EmbeddedFile {
   name: string
   detail: string
   icon: string
+  /** Whether Open hands it to an app; a file that might run is only shown in the Finder. */
+  opens: boolean
 }
 
 export type EditorMessage =
@@ -24,7 +26,7 @@ export type EditorMessage =
   | { type: 'escape' }
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
-  | { type: 'embedMenu'; embed: EmbedRequest | null }
+  | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | ({ type: 'find' } & FindState)
 
 declare global {

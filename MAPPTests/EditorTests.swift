@@ -321,6 +321,32 @@ struct EditorTests {
         #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
     }
 
+    @Test func aVideoLargerThanOneAnswerPlaysToItsEnd() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let movie = root.url.appending(path: "Long.mov")
+        try EmbedFixtures.longMovie(to: movie, padding: Int(2 * EmbeddedFiles.window))
+        let size = try #require(try movie.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        try #require(UInt64(size) > 2 * EmbeddedFiles.window, "the movie is \(size) bytes")
+        let note = Note(path: "Embeds.md", text: "![[Long.mov]]\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
+        let page = try await Harness(library: library)
+        // WebKit loads no media for a page outside a window.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        page.editor.load(try #require(library.item(note.id)))
+        let duration = try await settle(page.editor, "(() => { const v = document.querySelector('video'); return v && v.readyState >= 1 ? v.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
+        try #require((duration ?? 0) > 3)
+        try await page.run("const v = document.querySelector('video'); v.currentTime = v.duration - 0.1")
+        let shown = try await settle(page.editor, "(() => { const v = document.querySelector('video'); return !v.seeking && v.readyState >= 2 && v.currentTime > v.duration - 0.5 })()", as: Bool.self) { $0 == true }
+        #expect(shown == true, "the frames past the first answer load")
+    }
+
     @Test func theContextMenuOverAnEmbeddedFileKnowsWhichFile() async throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()
