@@ -180,7 +180,7 @@ struct DepartureSheet: View {
             .disabled(model.isWorking)
         }
         .padding(20)
-        .frame(width: 460)
+        .frame(width: 580)
         .accessibilityIdentifier("DepartureSheet")
     }
 

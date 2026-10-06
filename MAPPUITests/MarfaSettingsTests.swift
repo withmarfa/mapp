@@ -67,7 +67,7 @@ final class MarfaSettingsTests: XCTestCase {
         connect.click()
         let notice = window.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
-        XCTAssertTrue(window.staticTexts["Check the Address"].exists)
+        XCTAssertTrue(notice.label.contains("Check the Address"), "the notice reads as one element, with its title in its label")
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
