@@ -16,7 +16,6 @@ struct MarfaSettingsView: View {
                 disconnected
             }
         }
-        .onChange(of: model.isConnected) { model.dismissNotice() }
     }
 
     // MARK: Not connected

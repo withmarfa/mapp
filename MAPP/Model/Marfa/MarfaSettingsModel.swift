@@ -165,10 +165,6 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         departure = nil
     }
 
-    func dismissNotice() {
-        notice = nil
-    }
-
     // MARK: Words
 
     /// A problem in the app's words: what happened, and what to do. Nil for the question about changes that

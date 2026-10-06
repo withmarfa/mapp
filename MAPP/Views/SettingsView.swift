@@ -54,8 +54,10 @@ struct SettingsView: View {
         }
         // A question about changes that wait is put again when Settings is next opened, not answered by leaving.
         .onDisappear { libraries.marfaSettings.cancelDeparture() }
-        .sheet(item: Binding { libraries.marfaSettings.departure } set: { if $0 == nil { libraries.marfaSettings.cancelDeparture() } }) { departure in
+        .sheet(item: Binding { libraries.marfaSettings.departure } set: { if $0 == nil, !libraries.marfaSettings.isWorking { libraries.marfaSettings.cancelDeparture() } }) { departure in
             DepartureSheet(model: libraries.marfaSettings, departure: departure)
+                // A step already under way cannot be called off by closing the sheet.
+                .interactiveDismissDisabled(libraries.marfaSettings.isWorking)
         }
         .confirmationDialog("Disconnect from this server?", isPresented: Bindable(libraries.marfaSettings).isConfirmingDisconnect) {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
