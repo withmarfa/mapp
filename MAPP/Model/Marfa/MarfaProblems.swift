@@ -93,16 +93,18 @@ nonisolated enum MarfaProblems {
     /// What the person last wrote to the item across a write and those that went only with it, in the order
     /// they were queued: each later value wins, field by field, and tags add up. An edge's properties are the
     /// edge's, not the item's.
-    static func merged(_ root: QueuedWrite, with folded: [QueuedWrite]) -> [String: JSONValue] {
+    static func merged(_ root: QueuedWrite, with folded: [QueuedWrite]) -> JSONObject {
         var body = root.body
-        var properties: [String: JSONValue] = [:]
+        var properties = JSONObject()
         if case .object(let written) = body["properties"] { properties = written }
         var tags: [JSONValue] = []
         if case .array(let written) = body["tags"] { tags = written }
         for write in folded where write.itemId == root.itemId {
             switch write.kind {
             case .createItem, .updateItem:
-                if case .object(let written) = write.body["properties"] { properties.merge(written) { _, later in later } }
+                if case .object(let written) = write.body["properties"] {
+                    for (key, value) in written { properties[key] = value }
+                }
             case .addTag:
                 if case .array(let written) = write.body["tags"] { tags += written.filter { !tags.contains($0) } }
             default:
@@ -120,7 +122,7 @@ nonisolated enum MarfaProblems {
     }
 
     static func entry(
-        for write: QueuedWrite, body: [String: JSONValue]? = nil, type: TypeID?, catalogue: Catalogue
+        for write: QueuedWrite, body: JSONObject? = nil, type: TypeID?, catalogue: Catalogue
     ) -> SyncProblemEntry? {
         let kind: SyncProblemEntry.Kind
         let reason: SyncProblem
@@ -149,7 +151,7 @@ nonisolated enum MarfaProblems {
     static func entry(for copy: ConflictedCopy, catalogue: Catalogue) -> SyncProblemEntry {
         let id = ItemID(copy.row.id)
         let kind = SyncProblemEntry.Kind.conflicted(sibling: id, original: copy.original)
-        var content = content(of: ["properties": .object(copy.row.properties)], type: TypeID(copy.row.type), catalogue: catalogue)
+        var content = content(of: JSONObject([("properties", .object(copy.row.properties))]), type: TypeID(copy.row.type), catalogue: catalogue)
         // The copy carries the original's tags beside its own, which are not what the person wrote.
         content.tags = []
         return SyncProblemEntry(
@@ -187,10 +189,10 @@ nonisolated enum MarfaProblems {
 
     /// The title and body by the type's fields, then every other value written, in the catalogue's order. A
     /// cleared value is not content.
-    static func content(of body: [String: JSONValue], type: TypeID?, catalogue: Catalogue) -> SyncContent {
-        var properties: [String: JSONValue] = [:]
+    static func content(of body: JSONObject, type: TypeID?, catalogue: Catalogue) -> SyncContent {
+        var properties = JSONObject()
         if case .object(let written) = body["properties"] { properties = written }
-        properties = properties.filter { $0.value != .null }
+        properties = JSONObject(properties.filter { $0.value != .null }.map { ($0.key, $0.value) })
         let info = type.flatMap { catalogue.itemTypes[$0] }
         var content = SyncContent()
         if let titleField = MarfaMapping.titleField(of: info) {
@@ -200,7 +202,8 @@ nonisolated enum MarfaProblems {
             content.body = properties.removeValue(forKey: bodyField).flatMap { text(MarfaMapping.value($0)) }
         }
         let fields = info?.fields ?? []
-        let ordered = catalogue.ordered(properties.mapValues(MarfaMapping.value), for: type ?? TypeID(""))
+        let ordered = catalogue.ordered(
+            properties.map { Property(key: $0.key, value: MarfaMapping.value($0.value)) }, for: type ?? TypeID(""))
         content.properties = ordered.compactMap { property in
             guard let value = text(property.value) else { return nil }
             let label = fields.first { $0.key == property.key }?.label ?? MarfaMapping.label(forField: property.key)

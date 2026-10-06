@@ -33,8 +33,10 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
 /// library shows what it holds before, and without, the network.
 nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
-    let capabilities: SourceCapabilities = [.archive]
-    let embeds: any EmbedResolver = MarfaEmbeds()
+    /// Purge needs the server, which the library offers only while it can be reached; moving, renaming files,
+    /// folders and importing are a files library's.
+    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier]
+    let embeds: any EmbedResolver
     let copy: WorkingCopy
     private let hub = MarfaHub()
     let engine: MarfaEngine
@@ -45,6 +47,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         self.connection = connection
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
+        embeds = MarfaEmbeds(events: events)
         engine = MarfaEngine(copy: copy, hub: hub, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
@@ -178,7 +181,10 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             throw SourceFailure(kind: .failed, message: error.message)
         }
         let catalogue = hub.catalogue
-        return rows.compactMap { row in
+        // An item in the server's bin is not in the copy, so its text is what the bin read gave.
+        let held = Set(rows.map(\.id))
+        let binned = items.compactMap { id in held.contains(id.rawValue) ? nil : hub.binnedRow(id.rawValue) }
+        return (rows + binned).compactMap { row in
             MarfaMapping.body(of: row, catalogue: catalogue)
                 .map { ItemBody(id: ItemID(row.id), text: $0, version: ItemVersion(row.version)) }
         }
@@ -262,14 +268,15 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
     }
 
-    /// A row in the bin is not answered by `get`, only by a list of the bin.
+    /// A row in the bin is not answered by `get`: the copy lists those it still holds, and the rest are the ones
+    /// the server's bin gave.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
             let row = try await MarfaEngine.asking(hub) { () async throws -> Marfa.Item? in
                 if let row = try await copy.items.get(id.rawValue) { return row }
                 return try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue }
             }
-            if let row { return row }
+            if let row = row ?? hub.binnedRow(id.rawValue) { return row }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -277,12 +284,22 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     }
 }
 
-/// The package has no embeds yet: body links and attachments as edges are still to come.
+/// Attaches files through the engine, which asks the package to queue each one's upload, its file item and its
+/// edge to the item, and says what to write in the text to embed it.
 nonisolated struct MarfaEmbeds: EmbedResolver {
-    func base(for item: ItemID) -> String { "" }
-    func resolve(_ reference: String, from item: ItemID) async -> URL? { nil }
+    let events: AsyncStream<MarfaEngine.Event>.Continuation
+
     func attach(_ files: [URL], to item: ItemID) async throws -> [Embed] {
-        throw SourceFailure(kind: .failed, message: MarfaEngine.notYet)
+        var embeds: [Embed] = []
+        for file in files {
+            let result = await withCheckedContinuation { continuation in
+                if case .terminated = events.yield(.attach(file, item, continuation)) {
+                    continuation.resume(returning: .failure(SourceFailure(kind: .missing, message: MarfaEngine.closedLibrary)))
+                }
+            }
+            embeds.append(try result.get())
+        }
+        return embeds
     }
 }
 
@@ -298,6 +315,8 @@ nonisolated final class MarfaHub: Sendable {
     private let keyChange = Mutex((changing: false, count: 0))
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())
+    /// The rows of the server's bin that the copy does not hold, for the readers of their text.
+    private let bin = Mutex<[String: Marfa.Item]>([:])
 
     var connection: MarfaConnectionState { connectionState.value }
 
@@ -315,6 +334,14 @@ nonisolated final class MarfaHub: Sendable {
             $0.count += 1
         }
     }
+    func setBinned(_ rows: [String: Marfa.Item]) {
+        bin.withLock { $0 = rows }
+    }
+
+    func binnedRow(_ id: String) -> Marfa.Item? {
+        bin.withLock { $0[id] }
+    }
+
     var catalogue: Catalogue { state.withLock { $0.snapshot?.catalogue ?? Catalogue() } }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {

@@ -279,6 +279,8 @@ extension NoteLibrary {
             case .resolved(let target): .item(target)
             case .missing: .unresolved(spelling: reference.targetTitle, ambiguous: false)
             case .ambiguous: .unresolved(spelling: reference.targetTitle, ambiguous: true)
+            // A folder resolves every name at once; only a server's lookup waits or is refused.
+            case .pending, .refused: .unresolved(spelling: reference.targetTitle, ambiguous: false)
             }
             let (type, origin): (String, EdgeOrigin) = switch reference.origin {
             case .body: (MarfaMapping.bodyLinkEdge, .body)

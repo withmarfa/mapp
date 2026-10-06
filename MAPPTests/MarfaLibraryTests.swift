@@ -464,26 +464,74 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.last == .transition(F.n3, .trashed))
     }
 
-    @Test func anItemTheServersBinHoldsIsNotRecoveredAndThePersonIsTold() async throws {
+    @Test func anItemTheServersBinHoldsIsListedAndRecoveredLikeAnyOther() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1], undoManager: undo)
-        // The server took the delete, so the copy no longer holds the item.
-        source.send(.removed([F.n1]))
-        #expect(await eventually { library.item(F.n1) == nil })
+        // The server took the delete and the copy let the row go; the source still lists it, as the bin holds it.
+        var binned = try #require(library.item(F.n1))
+        binned.state = .trashed
+        source.send(.upserted([binned]))
+        #expect(await eventually { library.items(in: .recentlyDeleted).contains { $0.id == F.n1 } })
+        #expect(library.count(in: .recentlyDeleted) == 2)
         source.clearWrites()
         undo.undo()
-        #expect(source.writes.isEmpty)
-        #expect(library.failure?.title == String(localized: "Can’t Recover"))
-        let inTheBin = try #require(library.failure?.message)
+        #expect(source.writes == [.transition(F.n1, .active)])
+        #expect(library.failure == nil)
 
-        // One the copy held when asked, but not by the time the source made it, is told the same way.
-        library.failure = nil
+        // A restore the server refuses is told in the server's own words.
         library.recover([F.n3], undoManager: nil)
         let restore = try #require(source.submitted.last?.id)
-        source.send(.answered(restore, .refused(SyncProblem(code: MarfaLibrary.notHeldCode, message: "not found"))))
+        source.send(.answered(restore, .refused(SyncProblem(code: "item_not_found", message: "The server doesn’t hold this item."))))
         #expect(await eventually { library.failure != nil })
-        #expect(library.failure?.message == inTheBin)
+        #expect(library.failure?.title == String(localized: "Can’t Recover"))
+        #expect(library.failure?.message == "The server doesn’t hold this item.")
+    }
+
+    @Test func anItemTheCopyNoLongerHoldsIsNotRecovered() async throws {
+        let (library, source) = try await loaded()
+        source.send(.removed([F.n3]))
+        #expect(await eventually { library.item(F.n3) == nil })
+        source.clearWrites()
+        library.recover([F.n3], undoManager: nil)
+        #expect(source.writes.isEmpty)
+    }
+
+    @Test func deletingForGoodSendsEachItemInTheBinAtTheVersionShown() async throws {
+        let (library, source) = try await loaded()
+        source.offered.withLock { $0 = [.archive, .purge] }
+        source.state.set(.online)
+        #expect(await eventually { library.capabilities.contains(.purge) })
+        var binned = try #require(library.item(F.n3))
+        binned.version = ItemVersion(9)
+        source.send(.upserted([binned]))
+        #expect(await eventually { library.item(F.n3)?.version == ItemVersion(9) })
+        library.notesToPurge = [F.n3, F.n1]
+        library.deletePermanentlyOnConfirm([F.n3, F.n1])
+        // An item not in the bin is only moved there, never destroyed.
+        #expect(source.writes == [.purge(F.n3, version: ItemVersion(9))])
+        #expect(library.notesToPurge.isEmpty)
+
+        let purge = try #require(source.submitted.last?.id)
+        source.send(.answered(purge, .refused(SyncProblem(code: "version_conflict", message: "The item changed after you saw it."))))
+        #expect(await eventually { library.failure != nil })
+        #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
+        #expect(library.failure?.message == "The item changed after you saw it.")
+    }
+
+    @Test func deletingForGoodWaitsForTheServer() async throws {
+        let (library, source) = try await loaded()
+        source.offered.withLock { $0 = [.archive, .purge] }
+        source.state.set(.offline(reason: "network"))
+        #expect(await eventually { library.connection == .offline(reason: "network") })
+        #expect(!library.capabilities.contains(.purge))
+        library.deletePermanentlyOnConfirm([F.n3])
+        #expect(source.writes.isEmpty)
+        #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
+        library.failure = nil
+        library.deletePermanently([F.n3])
+        #expect(source.writes.isEmpty)
+        #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
     }
 
     @Test func aLinkIsAddedAndRemovedButNotReplacedYet() async throws {
@@ -569,7 +617,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.isEmpty)
     }
 
-    @Test func whatTheLibraryCannotDoYetIsSaidPlainly() async throws {
+    @Test func whatOnlyFilesDoIsSaidPlainly() async throws {
         let (library, source) = try await loaded()
         let cases: [(String, () -> Void)] = [
             ("move", { library.move([F.n1], to: nil, undoManager: nil) }),
@@ -583,31 +631,37 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         for (name, act) in cases {
             library.failure = nil
             act()
-            #expect(library.failure?.message == MarfaEngine.notYet, "\(name)")
+            #expect(library.failure?.message == MarfaEngine.filesOnly, "\(name)")
         }
-        library.notesToPurge = [F.n3]
-        library.failure = nil
-        library.deletePermanently([F.n3])
-        #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
-        #expect(library.notesToPurge.isEmpty)
-        library.failure = nil
-        library.deletePermanentlyOnConfirm([F.n3])
-        #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
-        await #expect(throws: SourceFailure.self) {
-            try await library.attach([(name: "a.png", data: Data([1]))], to: F.n1)
-        }
+        #expect(!library.capabilities.contains(.importFiles))
+        #expect(!library.capabilities.contains(.move))
         #expect(source.writes.isEmpty)
         #expect(library.folders.isEmpty)
+    }
+
+    @Test func attachedFilesGoToTheSourceAndTheTextItGivesIsWhatThePageWrites() async throws {
+        let (library, source) = try await loaded()
+        let embeds = try await library.attach(
+            [(name: "a.png", data: Data([1])), (name: "b.png", data: Data([2]))], to: F.n1)
+        #expect(embeds.map(\.name) == ["a.png", "b.png"])
+        #expect(embeds.map(\.link) == ["a.png", "b.png"])
+        #expect(source.attaching.attached.withLock { $0.map(\.item) } == [F.n1, F.n1])
+        #expect(source.writes.isEmpty)
+
+        source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The file can’t be written into the text.") }
+        await #expect(throws: SourceFailure.self) {
+            try await library.attach([(name: "c.png", data: Data([3]))], to: F.n1)
+        }
     }
 
     @Test func aRefusalTheSourceAnswersReachesThePerson() async throws {
         let (library, source) = try await loaded()
         library.setFavorite([F.n2], true, undoManager: nil)
         let write = try #require(source.submitted.first?.id)
-        source.send(.answered(write, .refused(SyncProblem(code: "unsupported", message: MarfaEngine.notYet))))
+        source.send(.answered(write, .refused(SyncProblem(code: "unsupported", message: MarfaEngine.filesOnly))))
         #expect(await eventually { library.failure != nil })
         #expect(library.failure?.title == String(localized: "Can’t Add to Favorites"))
-        #expect(library.failure?.message == MarfaEngine.notYet)
+        #expect(library.failure?.message == MarfaEngine.filesOnly)
 
         // A conflict is the item's own state to show, not an alert; an answer told twice is told once.
         library.failure = nil
@@ -634,16 +688,16 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         #expect(library.capabilities == [.archive])
         #expect(library.connection == .connecting)
-        source.offered.withLock { $0 = [.archive, .purge, .move, .folders, .retype] }
-        #expect(library.capabilities == [.archive, .retype])
+        source.offered.withLock { $0 = [.archive, .purge, .move, .folders, .retype, .retier, .importFiles] }
+        #expect(library.capabilities == [.archive, .retype, .retier])
         let watched = observes { _ = library.capabilities }
         source.state.set(.online)
         #expect(await eventually { library.connection == .online })
         #expect(watched.isSet)
-        #expect(library.capabilities == [.archive, .retype, .purge])
+        #expect(library.capabilities == [.archive, .retype, .retier, .purge])
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
-        #expect(library.capabilities == [.archive, .retype])
+        #expect(library.capabilities == [.archive, .retype, .retier])
         source.state.set(.keyRefused)
         #expect(await eventually { library.connection == .keyRefused })
         source.state.set(.stopped(code: "x", message: "Stopped."))
@@ -785,5 +839,71 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(warm < 1)
         #expect(keystroke < 50)
         #expect(searchRead < 20)
+    }
+}
+
+/// What an item's text links and embeds: the package writes each as an edge when the text is saved, so the items
+/// at both ends show it.
+@MainActor
+@Suite struct MarfaLibraryTextEdgeTests {
+    typealias F = LibraryFixture
+
+    private static var catalogue: Catalogue {
+        var catalogue = F.catalogue
+        catalogue.edgeTypes["attached-to"] = EdgeTypeInfo(
+            id: "attached-to", label: "Attached to", reverseName: nil, cardinality: .many, writtenAt: .source,
+            sourceTypes: [MarfaMapping.fileType], targetTypes: [])
+        return catalogue
+    }
+
+    private static func loaded() async throws -> MarfaLibrary {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        var items = F.items
+        func replace(_ id: ItemID, _ change: (inout MAPP.Item) -> Void) {
+            if let position = items.firstIndex(where: { $0.id == id }) { change(&items[position]) }
+        }
+        replace(F.n1) { note in
+            note.edgesOut += [
+                Edge(id: EdgeID("n1#references#1"), type: "references", source: F.n1, target: .pending(spelling: "Later"), origin: .body),
+                Edge(id: EdgeID("n1#references#2"), type: "references", source: F.n1, target: .unresolved(spelling: "Nowhere", ambiguous: false), origin: .body),
+                Edge(id: EdgeID("n1#references#3"), type: "references", source: F.n1, target: .unresolved(spelling: "Twin", ambiguous: true), origin: .body),
+                Edge(id: EdgeID("n1#references#4"), type: "references", source: F.n1, target: .refused(spelling: "Banned", reason: "forbidden"), origin: .body),
+            ]
+        }
+        replace(F.f1) { file in
+            file.edgesOut = [Edge(id: EdgeID("at1"), type: "attached-to", source: F.f1, target: .item(F.n1), origin: .property("attached-to"))]
+        }
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue, places: [])))
+        try #require(await eventually { library.isLoaded })
+        return library
+    }
+
+    @Test func linksThatNameNoItemAreShownWithWhyAsTheTextsOwn() async throws {
+        let library = try await Self.loaded()
+        let mentions = library.bodyMentions(for: F.n1)
+        #expect(mentions.map(\.title) == ["Bug one", "Later", "Nowhere", "Twin", "Banned"])
+        #expect(mentions.map(\.resolution) == [.resolved(F.t1), .pending, .missing, .ambiguous([]), .refused("forbidden")])
+        #expect(mentions.map(\.itemID) == [F.t1, nil, nil, nil, nil])
+        // They are the text's, not relationships an item holds under a field of its own.
+        #expect(!library.relationships(for: F.n1).contains { $0.field == "references" })
+    }
+
+    @Test func aLinkShowsAtItsTargetAsLinkedFromAndIsChangedInTheText() async throws {
+        let library = try await Self.loaded()
+        let linked = try #require(library.relationships(for: F.t1).first { $0.field == "inverse:references" })
+        #expect(linked.label == "Linked From")
+        #expect(linked.targets.map(\.itemID) == [F.n1])
+        #expect(!linked.isEditable)
+        #expect(!library.setItemRelationship(F.t1, field: "inverse:references", targetIDs: [], undoManager: nil))
+    }
+
+    @Test func anEmbeddedFileShowsAtBothEndsOfItsAttachment() async throws {
+        let library = try await Self.loaded()
+        let attachments = try #require(library.relationships(for: F.n1).first { $0.field == "inverse:attached-to" })
+        #expect(attachments.label == "Attachments")
+        #expect(attachments.targets.map(\.itemID) == [F.f1])
+        let attachedTo = try #require(library.relationships(for: F.f1).first { $0.field == "attached-to" })
+        #expect(attachedTo.targets.map(\.itemID) == [F.n1])
     }
 }

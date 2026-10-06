@@ -9,7 +9,7 @@ import Testing
 nonisolated final class FakeMarfaSource: MarfaHostedSource {
     let connection: MarfaConnection
     let capabilities: SourceCapabilities = []
-    let embeds: any EmbedResolver = MarfaEmbeds()
+    let embeds: any EmbedResolver = FakeEmbeds()
     let state = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport(queueRead: true))
     let refusesKeys = Mutex(false)

@@ -68,8 +68,6 @@ import Observation
 
     private nonisolated struct Refusal {
         var title: String
-        /// Said instead of the source's words when the copy no longer holds the item.
-        var notHeld: String?
     }
 
     private nonisolated struct Replacement {
@@ -115,7 +113,8 @@ import Observation
     }
 
     /// Purge needs the server, so it is offered only while the server can be reached. Moving, renaming files,
-    /// folders and importing are a files library's.
+    /// folders and importing are a files library's: the package attaches a file to an item, and has no call that
+    /// makes a file item of its own.
     var capabilities: SourceCapabilities {
         var offered = source.capabilities.intersection([.archive, .retype, .retier, .purge])
         if connection != .online { offered.remove(.purge) }
@@ -251,8 +250,7 @@ import Observation
     private func answered(_ id: WriteID, _ outcome: WriteOutcome) async {
         let refusal = refusals.removeValue(forKey: id)
         if case .refused(let problem) = outcome, let refusal {
-            let message = problem.code == Self.notHeldCode ? refusal.notHeld ?? problem.message : problem.message
-            failure = (refusal.title, message ?? String(localized: "The Marfa server refused this change."))
+            failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
         }
         settleReplacement(id, outcome)
         guard let item = textWrites.removeValue(forKey: id) else { return }
@@ -289,14 +287,11 @@ import Observation
         }
     }
 
-    /// The package's code for an item the copy does not hold.
-    static let notHeldCode = "item_not_found"
-
     /// Every write the library makes goes through here, so a refusal reaches the person under `title`.
     @discardableResult
-    func submit(_ write: ItemWrite, failing title: String, notHeld: String? = nil) -> WriteID {
+    func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
-        refusals[id] = Refusal(title: title, notHeld: notHeld)
+        refusals[id] = Refusal(title: title)
         source.submit(write, as: id)
         return id
     }

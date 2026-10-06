@@ -266,7 +266,7 @@ extension LiveMarfaTests {
     /// Runs against the test instance only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY` are in the environment
     /// (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and `TEST_RUNNER_MARFA_TEST_MAPP_KEY`). Every item it
     /// makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
-    /// `items.purge`, since the package cannot purge yet.
+    /// `items.purge`, which reaches an item the copy never held or has let go of.
     @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
     struct MarfaSourceLiveTests {
         private static let note = TypeID("core.note")
@@ -394,20 +394,72 @@ extension LiveMarfaTests {
                 state = try await apply(.transition(item.id, .active))
                 #expect(state.item(titled: title)?.state == .active)
 
+                // The tier moves as an edit, and the item stays in the one copy at its new tier.
+                let current = try #require(state.item(titled: title))
+                state = try await apply(.retier(item.id, .feed, base: current.version))
+                #expect(state.item(titled: title)?.tier == .feed)
+                state = try await apply(.retier(item.id, .library, base: try #require(state.item(titled: title)).version))
+                #expect(state.item(titled: title)?.tier == .library)
+
+                // A write only files make is refused in plain words, and queues nothing.
                 let unsupported = WriteID()
-                source.submit(.retype(item.id, TypeID("core.task"), base: item.version), as: unsupported)
+                source.submit(.move(item.id, to: nil), as: unsupported)
                 let refused = try #require(await log.wait { $0.answer(to: unsupported) != nil })
                 guard case .refused(let problem) = refused.answer(to: unsupported) else {
-                    Issue.record("a retype was not refused")
+                    Issue.record("a move was not refused")
                     return
                 }
                 #expect(problem.code == "unsupported")
 
-                // Marfa cannot list or restore the bin once the delete is sent, so the item leaves the copy.
+                // The server keeps the bin once the delete is sent, and the item stays shown from it.
                 let binned = WriteID()
                 source.submit(.transition(item.id, .trashed), as: binned)
-                let gone = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title) == nil })
-                #expect(gone.answer(to: binned) == .accepted)
+                let inBin = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title)?.state == .trashed })
+                #expect(inBin.answer(to: binned) == .accepted)
+                #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")
+
+                // Restoring an item the copy let go of is made by its id, and the item arrives once it is answered.
+                state = try await apply(.transition(item.id, .active))
+                #expect(state.item(titled: title)?.state == .active)
+
+                // Delete Permanently destroys an item in the bin, at the version shown, and takes it out of the copy.
+                let again = WriteID()
+                source.submit(.transition(item.id, .trashed), as: again)
+                _ = try #require(await log.wait { $0.answer(to: again) != nil && $0.item(titled: title)?.state == .trashed })
+                let shown = try #require(log.current.item(titled: title))
+                let purge = WriteID()
+                source.submit(.purge(item.id, version: shown.version), as: purge)
+                let gone = try #require(await log.wait { $0.answer(to: purge) != nil && $0.item(titled: title) == nil })
+                #expect(gone.answer(to: purge) == .accepted)
+                #expect(!(try await source.copy.items.bin()).items.contains { $0.id == item.id.rawValue })
+
+                // An item that was never in the bin is refused, and nothing is destroyed.
+                let live = made.mint()
+                let made2 = WriteID()
+                source.submit(.create(id: live, ItemDraft(type: Self.note, title: title + " live", body: "Stays.")), as: made2)
+                _ = try #require(await log.wait { $0.answer(to: made2) != nil && $0.item(titled: title + " live")?.sync == .settled })
+                let refusedPurge = WriteID()
+                source.submit(.purge(live, version: try #require(log.current.item(titled: title + " live")).version), as: refusedPurge)
+                let notInBin = try #require(await log.wait { $0.answer(to: refusedPurge) != nil })
+                guard case .refused = notInBin.answer(to: refusedPurge) else {
+                    Issue.record("a purge of an item outside the bin was not refused: \(String(describing: notInBin.answer(to: refusedPurge)))")
+                    return
+                }
+                #expect(log.current.item(titled: title + " live") != nil)
+            }
+        }
+
+        /// The copy holds both tiers, so the Inbox, which is the feed, and the rest of the library read from one copy.
+        @Test(.timeLimit(.minutes(2)))
+        func holdsBothTiersInOneCopy() async throws {
+            try await withSource { source, log, _ in
+                let status = try await source.copy.status()
+                #expect(status.sliceTier == .all)
+                let items = try #require(log.current.snapshot?.items)
+                #expect(items.contains { $0.tier == .feed })
+                #expect(items.contains { $0.tier == .library })
+                let feed = try await source.copy.items.list(ListFilters(tier: .feed))
+                #expect(Set(feed.map { ItemID($0.id) }).isSubset(of: Set(items.map(\.id))))
             }
         }
 
@@ -432,7 +484,7 @@ extension LiveMarfaTests {
                     store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
                 let row = try #require(try await other.items.get(id.rawValue))
-                _ = try await other.items.update(id.rawValue, Edit(properties: ["description": "From another device"], baseVersion: row.version))
+                _ = try await other.items.update(id.rawValue, Edit(.merge(["description": .string("From another device")]), baseVersion: row.version))
                 _ = try await other.queue.drain()
                 await other.close()
                 _ = try #require(await log.wait { ($0.item(titled: title)?.version ?? version) > version })
@@ -497,13 +549,13 @@ extension LiveMarfaTests {
             let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(a.rawValue))
-            _ = try await other.items.update(a.rawValue, Edit(properties: ["body": "Another device"], baseVersion: row.version))
+            _ = try await other.items.update(a.rawValue, Edit(.merge(["body": .string("Another device")]), baseVersion: row.version))
             _ = try await other.queue.drain()
             await other.close()
 
             // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
             let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
-            _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": "This device"], baseVersion: version.rawValue))
+            _ = try await raw.items.update(a.rawValue, Edit(.merge(["body": .string("This device")]), baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
                 if case .conflicted(let sibling, _)? = answer.verdict { sibling } else { nil }

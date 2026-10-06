@@ -2,6 +2,21 @@ import Foundation
 import Synchronization
 @testable import MAPP
 
+/// Embeds that keep what they are asked to attach, as the file's name inside the text the page writes for it, and
+/// fail where the test says.
+nonisolated final class FakeEmbeds: EmbedResolver {
+    let attached = Mutex<[(file: String, item: ItemID)]>([])
+    let failure = Mutex<SourceFailure?>(nil)
+
+    func attach(_ files: [URL], to item: ItemID) async throws -> [Embed] {
+        if let failure = failure.withLock({ $0 }) { throw failure }
+        return files.map { file in
+            attached.withLock { $0.append((file.lastPathComponent, item)) }
+            return Embed(link: file.lastPathComponent, name: file.lastPathComponent)
+        }
+    }
+}
+
 /// A source the test drives: it tells its one reader the changes the test sends, answers bodies and searches
 /// from what the test gives it, and keeps every write it is handed without applying any.
 nonisolated final class FakeItemSource: ConnectedItemSource {
@@ -11,7 +26,8 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     }
 
     let offered = Mutex<SourceCapabilities>([.archive])
-    let embeds: any EmbedResolver = MarfaEmbeds()
+    let attaching = FakeEmbeds()
+    var embeds: any EmbedResolver { attaching }
     let state = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport(queueRead: true))
     /// What `search` answers for each query; any other finds nothing.

@@ -8,9 +8,8 @@ actor MarfaSync {
         case refresh, drain
     }
 
-    /// One slice, the library tier. Marfa is to hold both tiers in one copy; the feed then joins this slice, never a
-    /// second store.
-    private static let tier = Marfa.Tier.library
+    /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
+    private static let tier = SliceTier.all
 
     private let copy: WorkingCopy
     private let hub: MarfaHub
@@ -22,6 +21,8 @@ actor MarfaSync {
     private var paused = false
     private var wantsRefresh = false
     private var wantsDrain = false
+    /// The bin is read from the server alone, so it is read again when something may have changed it.
+    private var wantsBin = false
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
     private var refreshed = false
     private var working: Task<Void, Never>?
@@ -72,6 +73,12 @@ actor MarfaSync {
         work()
     }
 
+    /// An item may have gone to or left the server's bin, which the copy does not say.
+    func binChanged() {
+        wantsBin = true
+        work()
+    }
+
     /// Returns once a drain begun after this call has ended, or at once when the source is closing.
     func flush() async {
         guard !stopped else { return }
@@ -85,6 +92,7 @@ actor MarfaSync {
     func reachable() {
         hub.set(.online)
         if refreshed { wantsDrain = true } else { wantsRefresh = true }
+        wantsBin = true
         work()
     }
 
@@ -195,6 +203,9 @@ actor MarfaSync {
                 await runDrain()
                 for flusher in draining { flusher.resume() }
                 draining = []
+            } else if wantsBin {
+                wantsBin = false
+                await runBin()
             } else {
                 break
             }
@@ -211,6 +222,7 @@ actor MarfaSync {
             refreshed = true
             succeeded()
             wantsDrain = true
+            wantsBin = true
         } catch {
             await failed(error, retrying: .refresh)
         }
@@ -220,7 +232,9 @@ actor MarfaSync {
         let status = try await copy.status()
         if status.hydration == .complete {
             _ = try await copy.catchUp()
-            if Set(MarfaMapping.namespaces(of: try await catalogue())) != Set(status.sliceTypes) {
+            // A copy hydrated for one tier, as an earlier version of the app made them, takes the other too.
+            let namespaces = try await MarfaMapping.namespaces(of: catalogue())
+            if status.sliceTier != Self.tier || Set(namespaces) != Set(status.sliceTypes) {
                 try await hydrate()
             }
         } else {
@@ -235,6 +249,7 @@ actor MarfaSync {
         drains += 1
         do {
             let report = try await copy.queue.drain()
+            if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
             // The next drain waits until the engine has taken these answers, since the engine's forgetting them
             // would also forget a later drain's answers it has not taken yet.
             if !report.verdicts.isEmpty {
@@ -258,6 +273,40 @@ actor MarfaSync {
             await failed(error, retrying: .drain)
         }
     }
+
+    /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
+    /// reached leaves the bin as it was, shown from what the engine last held, and is asked again when it can.
+    private func runBin() async {
+        var found: [Marfa.Item] = []
+        var cursor: String?
+        var complete = false
+        do {
+            for _ in 0..<Self.binPages {
+                let page = try await copy.items.bin(after: cursor, limit: Self.binPageSize)
+                found += page.items
+                guard let next = page.nextCursor else {
+                    complete = true
+                    break
+                }
+                cursor = next
+            }
+        } catch let error as MarfaError {
+            switch error {
+            case .network, .io, .unnamed, .redirected, .rateLimited, .closed, .invalid, .canceled, .noServer:
+                break
+            default:
+                _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
+            }
+            return
+        } catch {
+            return
+        }
+        _ = tell(.binned(found, complete: complete))
+    }
+
+    nonisolated static let binPageSize = 100
+    /// Recently Deleted shows this many pages of the bin; the server keeps the rest.
+    nonisolated static let binPages = 10
 
     /// A new copy holds only Marfa's built-in types, so its first slice is theirs; the server's catalogue then
     /// names every namespace, and the copy is hydrated again with them all.
