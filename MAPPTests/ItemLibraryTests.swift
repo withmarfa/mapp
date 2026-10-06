@@ -62,7 +62,7 @@ struct ItemLibraryTests {
         #expect(!library.canRenameFile(of: nil))
     }
 
-    @Test func aTitleIsEditedAsAPropertyWhereFilesCannotBeRenamed() throws {
+    @Test func aTitleIsEditedAsAPropertyNeedingOnlyAnEditableItem() throws {
         let note = Note(body: "# Plan", path: "Plan.md", created: start)
         let library = NoteLibrary(notes: [note], now: { start })
         let item = try #require(library.item(note.id))
