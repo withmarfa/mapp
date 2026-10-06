@@ -79,6 +79,10 @@ struct LibraryPerformanceTests {
         }
 
         let all = Self.measure(readAllItems)
+        // The views hold the library as `any ItemLibrary`; reading through it should cost what reading it directly does.
+        let existential: any ItemLibrary = library
+        let direct = Self.measure { #expect(!library.items(in: .allNotes).isEmpty) }
+        let throughProtocol = Self.measure { #expect(!existential.items(in: .allNotes).isEmpty) }
         let type = Self.measure {
             #expect(library.items(in: .itemType("aic.ticket.task")).count == Self.noteCount / 2)
         }
@@ -100,7 +104,8 @@ struct LibraryPerformanceTests {
         }
 
         let timings = [
-            ("items in All Notes", all), ("items of a type", type),
+            ("items in All Notes", all), ("All Notes read directly", direct), ("All Notes read through ItemLibrary", throughProtocol),
+            ("items of a type", type),
             ("one body edit, then the list, the item and its relationships", edit), ("sidebar counts", counts),
             ("one body edit, then the sidebar counts", countsAfterEdit)
         ]
@@ -110,6 +115,7 @@ struct LibraryPerformanceTests {
         try? Data(report.utf8).write(to: URL.temporaryDirectory.appending(path: "MAPP-performance.txt"))
 
         #expect(all < 50)
+        #expect(throughProtocol < 50)
         #expect(type < 50)
         #expect(edit < 100)
         #expect(counts < 50)

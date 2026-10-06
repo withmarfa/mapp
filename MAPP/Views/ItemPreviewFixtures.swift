@@ -38,13 +38,13 @@ enum ItemPreviewFixtures {
 #Preview("Ticket Details") {
     let library = ItemPreviewFixtures.library
     ItemInspectorHost(itemID: ItemPreviewFixtures.ticketID)
-        .environment(library)
+        .environment(\.library, library)
         .frame(width: 330, height: 750)
 }
 
 #Preview("Project and Related Work") {
     ItemInspectorHost(itemID: ItemPreviewFixtures.projectID)
-        .environment(ItemPreviewFixtures.library)
+        .environment(\.library, ItemPreviewFixtures.library)
         .frame(width: 330, height: 600)
 }
 
@@ -60,7 +60,7 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     ItemRelationshipPicker(relationship: library.relationships(for: ItemPreviewFixtures.ticketID)[0],
                            candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: "child-of"), onSave: { _ in true })
-        .environment(library)
+        .environment(\.library, library)
 }
 
 #Preview("New Item") {
@@ -68,14 +68,14 @@ enum ItemPreviewFixtures {
     let _ = browser.startItemDraft()
     let library = ItemPreviewFixtures.library
     MainView(library: library, browser: browser, restoresWindow: false)
-        .environment(library)
+        .environment(\.library, library)
         .frame(width: 1180, height: 760)
 }
 
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
     MainView(library: library, browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)
-        .environment(library)
+        .environment(\.library, library)
         .frame(width: 1280, height: 800)
 }
 

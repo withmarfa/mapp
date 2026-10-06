@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The actions for a set of notes, shared by the list's context menu and the menu bar.
 struct NoteActions: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     let ids: Set<ItemID>
     /// Passed in, since the menu bar has no window of its own to read one from.
     let undoManager: UndoManager?
@@ -23,6 +23,7 @@ struct NoteActions: View {
             Button(inMenuBar ? "Delete Note Immediately…" : "Delete Immediately…", systemImage: "trash", role: .destructive) {
                 library.notesToPurge = ids
             }
+            .disabled(!library.capabilities.contains(.purge))
         } else {
             let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
             // The menu bar keeps these in place, dimmed, when nothing is selected.
@@ -53,10 +54,11 @@ struct NoteActions: View {
                     .disabled(notes.allSatisfy { $0.container == ContainerID(folder.id) && $0.state == .active })
             }
         }
+        .disabled(!library.capabilities.contains(.move))
     }
 }
 
-extension NoteLibrary {
+extension ItemLibrary {
     /// Moves notes to Recently Deleted once every open page has handed over what was just typed, since a deleted
     /// note takes no edit. Every way of deleting a note comes through here.
     func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?) {

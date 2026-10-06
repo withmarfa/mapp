@@ -23,7 +23,7 @@ struct MAPPApp: App {
         WindowGroup("Item", for: ItemID.self) { $id in
             if let library = folder.library {
                 NoteWindow(library: library, id: $id)
-                    .environment(library)
+                    .environment(\.library, library)
             } else {
                 // An item's window has nothing to show without a notes folder, as when one is restored before
                 // any is chosen.

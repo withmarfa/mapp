@@ -234,6 +234,69 @@ struct EditorTests {
         #expect(absent == ["b"])
     }
 
+    // MARK: Attaching images through any library
+
+    /// An editor over a library held in memory, showing `notes[0]` once its page has loaded.
+    func attachingEditor(_ library: FakeItemLibrary) async throws -> EditorController {
+        let editor = EditorController(library: library)
+        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(editor.isReady)
+        editor.load(library.items[0])
+        _ = try await editor.webView.evaluateJavaScript("1")
+        return editor
+    }
+
+    static let pasted = [PastedImages.Source.data(name: "Photo.png", Data("png".utf8))]
+
+    /// What the page would save once the images have had time to land, or nil while it is as loaded.
+    func settledMarkdown(_ editor: EditorController) async throws -> String? {
+        try await Task.sleep(for: .milliseconds(300))
+        return try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
+    }
+
+    @Test func attachedImagesAreInsertedIntoTheNote() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { [Embed(link: "Attachments/Photo.png", name: "Photo")] }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(try await settledMarkdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true)
+        #expect(library.failure == nil)
+    }
+
+    @Test func imagesTheLibraryCannotKeepAreReportedInThePersonsWords() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { throw SourceFailure(kind: .failed, message: "The server is out of space.") }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(try await settledMarkdown(editor) == nil, "nothing is inserted")
+        #expect(library.failure?.title == "Can’t Attach Images")
+        #expect(library.failure?.message == "The images weren’t added to the note. The server is out of space.")
+    }
+
+    @Test func imagesAttachedAfterTheNoteChangesAreNotInsertedIntoTheNextOne() async throws {
+        let first = FakeItemLibrary.note("Plan", modified: .now)
+        let second = FakeItemLibrary.note("Other", modified: .now)
+        let library = FakeItemLibrary(items: [first, second])
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        var started = false
+        library.attaching = {
+            started = true
+            for await _ in gate { break }
+            return [Embed(link: "Attachments/Photo.png", name: "Photo")]
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        for _ in 0..<100 where !started { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(started)
+        editor.load(second)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        open.yield()
+        open.finish()
+        #expect(try await settledMarkdown(editor) == nil, "the note now on the page takes nothing")
+        #expect(editor.noteID == second.id)
+        #expect(library.failure == nil)
+    }
+
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {
         let page = try await Harness()
         let written = "Title\n=====\n\n* star bullet\n* another\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n\n\n\nMilk\n"

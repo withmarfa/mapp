@@ -14,8 +14,17 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
+    /// The same three notes in a library held in memory, for what the browser asks of any library.
+    func makeFakeLibrary() -> (FakeItemLibrary, older: Item, newer: Item, favorite: Item) {
+        let older = FakeItemLibrary.note("Older", modified: start - 120)
+        let newer = FakeItemLibrary.note("Newer", modified: start - 60)
+        let favorite = FakeItemLibrary.note("Favorite", modified: start - 3600, in: work, isFavorite: true)
+        let library = FakeItemLibrary(items: [older, newer, favorite], folders: [work], now: start)
+        return (library, older, newer, favorite)
+    }
+
     @Test func draftDoesNotExposePreviouslySelectedNoteToCommands() {
-        let (library, _, newer, _) = makeLibrary()
+        let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.selection = [newer.id]
         #expect(browser.selectedItems(in: library).count == 1)
@@ -27,7 +36,7 @@ struct BrowserTests {
 
     @Test func creationOutsideOriginalProjectRevealsTheNewItem() throws {
         let library = NoteLibrary(notes: [])
-        let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes))
+        let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes).flatMap { library.note($0) })
         let browser = Browser()
         browser.sidebarItem = .project(project.id)
         browser.startItemDraft()
@@ -65,7 +74,7 @@ struct BrowserTests {
     // MARK: Showing and making
 
     @Test func showingAnItemClearsTheSearchAndSelectsItsTopRow() {
-        let (library, _, newer, favorite) = makeLibrary()
+        let (library, _, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
         browser.searchText = "Older"
         browser.show(.allNotes, in: library, order: NoteOrder())
@@ -168,6 +177,46 @@ struct BrowserTests {
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.items.first?.id == newer.id)
     }
 
+    @Test func aLibraryThatCannotPurgeIsNeverAskedToEraseWhatIsDeleted() {
+        let (library, older, newer, _) = makeFakeLibrary()
+        library.capabilities = []
+        library.delete([older.id], undoManager: nil)
+        Browser.delete([older.id, newer.id], in: library, undoManager: nil)
+        #expect(library.item(newer.id)?.state == .trashed, "what is live still goes to Recently Deleted")
+        #expect(library.item(older.id)?.state == .trashed)
+        #expect(library.notesToPurge.isEmpty)
+        library.capabilities = .purge
+        Browser.delete([older.id], in: library, undoManager: nil)
+        #expect(library.notesToPurge == [older.id])
+    }
+
+    @Test func dropsOnTheInboxAndFoldersNeedALibraryThatMoves() {
+        let (library, _, _, _) = makeFakeLibrary()
+        library.capabilities = []
+        #expect(!Browser.canDrop(on: .inbox, in: library))
+        #expect(!Browser.canDrop(on: .folder(work.id), in: library))
+        #expect(Browser.canDrop(on: .recentlyDeleted, in: library), "deleting needs no capability")
+        library.capabilities = .move
+        #expect(Browser.canDrop(on: .inbox, in: library))
+        #expect(Browser.canDrop(on: .folder(work.id), in: library))
+        for place: SidebarItem in [.allNotes, .favorites, .files, .marfaTypes, .itemType("core.note")] {
+            #expect(!Browser.canDrop(on: place, in: library))
+        }
+    }
+
+    @Test func aNewFolderIsMadeOnlyWhereTheLibraryEditsFolders() {
+        let (library, _, _, _) = makeFakeLibrary()
+        library.capabilities = []
+        let browser = Browser()
+        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
+        #expect(library.folders.count == 1)
+        #expect(browser.renamingFolder == nil)
+        library.capabilities = .folders
+        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
+        #expect(library.folders.count == 2)
+        #expect(browser.renamingFolder == library.folders.last?.id)
+    }
+
     @Test func deletingMovesLiveNotesAwayAndAsksBeforeErasingDeletedOnes() {
         let (library, older, _, _) = makeLibrary()
         Browser.delete([older.id], in: library, undoManager: nil)
@@ -188,7 +237,7 @@ struct BrowserTests {
     // MARK: Restoring
 
     @Test func aRestoredWindowShowsWhatItShowedBefore() {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let saved = Browser()
         saved.show(.inbox, in: library, order: NoteOrder())
         saved.selection = [older.id]
@@ -208,7 +257,7 @@ struct BrowserTests {
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
-        let (library, _, _, favorite) = makeLibrary()
+        let (library, _, _, favorite) = makeFakeLibrary()
         let snapshot = Browser.Snapshot(place: .folder(.mint()), selection: [.mint()])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: NoteOrder())

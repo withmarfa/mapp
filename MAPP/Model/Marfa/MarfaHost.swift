@@ -430,7 +430,7 @@ extension MarfaSource: MarfaHostedSource {}
     }
 
     private static func message(_ error: any Error) -> String {
-        (error as? SourceFailure)?.message ?? error.localizedDescription
+        error.localizedDescription
     }
 
     private static func state(_ state: MarfaConnectionState) -> State {

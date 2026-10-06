@@ -3,7 +3,7 @@ import SwiftUI
 /// One item in a window of its own, opened by double-clicking it in the list. The window remembers its item's
 /// identifier, which outlasts a rename or a move, so it finds the item again at the next launch.
 struct NoteWindow: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
     @State private var editor: EditorController
@@ -12,7 +12,7 @@ struct NoteWindow: View {
     @Binding var id: ItemID?
 
     /// The library is given here as well as in the environment, since the editor is made with it.
-    init(library: NoteLibrary, id: Binding<ItemID?>) {
+    init(library: any ItemLibrary, id: Binding<ItemID?>) {
         _editor = State(initialValue: EditorController(library: library))
         _id = id
     }

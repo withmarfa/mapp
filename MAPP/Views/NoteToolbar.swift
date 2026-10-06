@@ -4,7 +4,7 @@ import SwiftUI
 /// The compact title and New Item stay fixed; the other items can be moved or removed through Customize Toolbar.
 /// Every action is also a menu command, since a toolbar can be hidden.
 struct NoteToolbar: CustomizableToolbarContent {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     /// The main window's browser; nil in a note's own window, which makes no notes.
     let browser: Browser?
     let items: [Item]
@@ -70,7 +70,7 @@ struct NoteToolbar: CustomizableToolbarContent {
 }
 
 private struct NewNoteButton: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     let browser: Browser?
 
     var body: some View {
@@ -114,7 +114,7 @@ private struct FormatMenu: View {
 
 /// What else can be done to the notes shown, as Notes keeps it under its More button.
 private struct MoreMenu: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let notes: [Item]
     let fileURL: URL?
@@ -131,7 +131,7 @@ private struct MoreMenu: View {
             Divider()
             if let browser {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = notes.first?.id }
-                    .disabled(notes.count != 1 || notes.first?.isWritable != true)
+                    .disabled(notes.count != 1 || !library.canRenameFile(of: notes.first))
                 Divider()
             }
             if !notes.isEmpty {

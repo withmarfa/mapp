@@ -77,8 +77,8 @@ struct SidebarNavigationTests {
 
     @Test func aProjectFavoriteAndItsProjectCollectionHaveDistinctDestinations() throws {
         let library = NoteLibrary(notes: [], now: { date })
-        let project = try #require(library.createItem(typeID: "aic.project", title: "Field research"))
-        let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id))
+        let project = try #require(library.createItem(typeID: "aic.project", title: "Field research").flatMap { library.note($0) })
+        let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id).flatMap { library.note($0) })
         library.setFavorite([project.id], true)
         #expect(SidebarItem.project(project.id) != .favoriteItem(project.id))
         #expect(Set(library.items(in: .project(project.id)).map(\.id)) == [project.id, child.id])

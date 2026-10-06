@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NoteList: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
@@ -101,7 +101,7 @@ struct NoteList: View {
             browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            if ids.count == 1, let id = ids.first, library.item(id)?.isWritable == true {
+            if ids.count == 1, let id = ids.first, library.canRenameFile(of: library.item(id)) {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = id }
                 Divider()
             }

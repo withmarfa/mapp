@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The blank page starts in the window; its metadata becomes a file when writing begins.
 struct NewItemPage: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     @Bindable var draft: NewItemDraft

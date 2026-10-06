@@ -30,7 +30,7 @@ struct ItemMutationTests {
     @Test func creationAndRelationshipChangesUseOwningFiles() {
         let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\nAn area.", created: .now)
         let library = NoteLibrary(notes: [project])
-        let created = library.createItem(typeID: "aic.ticket.feature", title: "New Feature", parentID: project.id)
+        let created = library.createItem(typeID: "aic.ticket.feature", title: "New Feature", parentID: project.id).flatMap { library.note($0) }
         #expect(created?.path == "Tickets/New Feature.md")
         #expect(created?.file.property("child-of") == "[[Area]]")
         #expect(library.createItem(typeID: "core.note", title: "new feature") == nil)

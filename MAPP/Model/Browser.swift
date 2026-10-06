@@ -52,18 +52,18 @@ final class Browser {
     var showsTypes: Bool { item == .marfaTypes }
 
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
-    func items(in library: NoteLibrary) -> [Item] {
+    func items(in library: any ItemLibrary) -> [Item] {
         isSearching ? library.items(matching: searchText) : library.items(in: item)
     }
 
     /// The selected items that still exist.
-    func selectedItems(in library: NoteLibrary) -> [Item] {
+    func selectedItems(in library: any ItemLibrary) -> [Item] {
         isCreatingItem ? [] : selection.compactMap { library.item($0) }
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
     /// note is one, nor in Recently Deleted or search results.
-    func sections(in library: NoteLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+    func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
             of: items(in: library),
             sort: order.sort,
@@ -84,7 +84,7 @@ final class Browser {
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
-    func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
+    func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         isCreatingItem = false
         searchText = ""
         typesQuery = ""
@@ -93,7 +93,7 @@ final class Browser {
         selectFirstNote(in: library, order: order)
     }
 
-    func selectFirstNote(in library: NoteLibrary, order: NoteOrder) {
+    func selectFirstNote(in library: any ItemLibrary, order: NoteOrder) {
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
         selection = first.map { [$0.id] } ?? []
     }
@@ -106,7 +106,7 @@ final class Browser {
     }
 
     /// Blank titles receive a unique name without requiring a naming dialog before typing.
-    func createDraft(in library: NoteLibrary, undoManager: UndoManager?) -> ItemID? {
+    func createDraft(in library: any ItemLibrary, undoManager: UndoManager?) -> ItemID? {
         guard let draft = itemDraft else { return nil }
         var title = NoteName.trimmed(draft.title)
         if title.isEmpty {
@@ -118,7 +118,7 @@ final class Browser {
                 suffix += 1
             }
         }
-        guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager)?.id else { return nil }
+        guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
         isCreatingItem = false
         itemDraft = nil
         searchText = ""
@@ -131,22 +131,32 @@ final class Browser {
         return id
     }
 
-    func newFolder(in library: NoteLibrary, order: NoteOrder, undoManager: UndoManager?) {
+    func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
+        guard library.capabilities.contains(.folders) else { return }
         let folder = library.newFolder(undoManager: undoManager)
         show(.folder(folder.id), in: library, order: order)
         renamingFolder = folder.id
     }
 
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
-    /// person confirms, since that cannot be undone.
-    static func delete(_ ids: Set<ItemID>, in library: NoteLibrary, undoManager: UndoManager?) {
+    /// person confirms, since that cannot be undone, where the library can erase them.
+    static func delete(_ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
-        if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
+        if !alreadyDeleted.isEmpty, library.capabilities.contains(.purge) { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 
+    /// Dropped items move into a folder or the Inbox, where the library moves items, or go to Recently Deleted.
+    static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
+        switch place {
+        case .inbox, .folder: library.capabilities.contains(.move)
+        case .recentlyDeleted: true
+        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .marfaTypes: false
+        }
+    }
+
     /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
-    func folderRemoved(in library: NoteLibrary, order: NoteOrder) {
+    func folderRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
@@ -193,7 +203,7 @@ final class Browser {
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
     /// leaves the window at its default.
-    func restore(from data: Data?, in library: NoteLibrary, order: NoteOrder) {
+    func restore(from data: Data?, in library: any ItemLibrary, order: NoteOrder) {
         if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             restore(snapshot, in: library, order: order)
         } else {
@@ -203,7 +213,7 @@ final class Browser {
 
     /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
     /// items no longer in the list are dropped, leaving the top row selected if none remain.
-    func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
+    func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites

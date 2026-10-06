@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(NotesFolder.self) private var folder
+    @Environment(\.library) private var library
     @Bindable var presentation: SettingsPresentation
     @State private var isChoosing = false
     @State private var isEmptying = false
@@ -18,7 +19,7 @@ struct SettingsView: View {
     }
 
     private var deleted: Set<ItemID> {
-        folder.library.map { Set($0.items(in: .recentlyDeleted).map(\.id)) } ?? []
+        library.map { Set($0.items(in: .recentlyDeleted).map(\.id)) } ?? []
     }
 
     var body: some View {
@@ -44,7 +45,7 @@ struct SettingsView: View {
             "^[Delete \(deleted.count) note](inflect: true) immediately?",
             isPresented: $isEmptying
         ) {
-            Button("Delete", role: .destructive) { folder.library?.deletePermanently(deleted) }
+            Button("Delete", role: .destructive) { library?.deletePermanentlyOnConfirm(deleted) }
         } message: {
             Text("You can’t undo this action.")
         }
@@ -132,11 +133,13 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Recently Deleted") {
                     Button("Empty Now…") { isEmptying = true }
-                        .disabled(deleted.isEmpty)
+                        .disabled(deleted.isEmpty || library?.capabilities.contains(.purge) != true)
                 }
             } footer: {
-                Text("Deleted notes stay in Recently Deleted for \(NoteLibrary.trashDays) days, then they’re deleted for good.")
-                    .foregroundStyle(.secondary)
+                if let days = library?.trashDays {
+                    Text("Deleted notes stay in Recently Deleted for \(days) days, then they’re deleted for good.")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
