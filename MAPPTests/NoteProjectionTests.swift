@@ -6,7 +6,7 @@ struct NoteProjectionTests {
     @Test func typedFieldsRetainUnknownDataAndSourceText() {
         let text = "\u{FEFF}---\r\ntype: custom.session\r\ntitle: \"A: session\"\r\nstarts_at: 2026-10-01T21:30:00+01:00\r\nreviewed: true\r\ncount: 9007199254740993\r\nratio: 1.25\r\nempty: null\r\nquoted: 'false'\r\nmetadata: {labels: [one, two], enabled: false}\r\nmarfa_id: 'opaque-id'\r\n---\r\n# Body\r\n"
         let file = NoteFile(text: text)
-        let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
+        let projection = NoteProjection(id: .mint(), file: file, fallbackTitle: "Filename")
         #expect(projection.declaredType == "custom.session")
         #expect(projection.title == "A: session")
         #expect(projection.body == "# Body\n")
@@ -25,7 +25,7 @@ struct NoteProjectionTests {
 
     @Test func headerOnlyRecordAndYAMLStringsAreReadWithoutRewriting() {
         let file = NoteFile(text: "---\ntype: custom.task\ntitle: >-\n  Multi-line\n  title\ndate: 2026-10-01\ncode: \"0012\"\nlist: &labels [red, green]\ncopy: *labels\n---")
-        let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
+        let projection = NoteProjection(id: .mint(), file: file, fallbackTitle: "Filename")
         #expect(projection.title == "Multi-line title")
         #expect(projection.body.isEmpty)
         #expect(projection.fields?["date"] == .string("2026-10-01"))
@@ -35,8 +35,8 @@ struct NoteProjectionTests {
     }
 
     @Test func noHeaderAndEmptyHeaderAreDifferent() {
-        let plain = NoteProjection(id: UUID(), file: NoteFile(text: "Body"), fallbackTitle: "Filename")
-        let empty = NoteProjection(id: UUID(), file: NoteFile(text: "---\n---"), fallbackTitle: "Filename")
+        let plain = NoteProjection(id: .mint(), file: NoteFile(text: "Body"), fallbackTitle: "Filename")
+        let empty = NoteProjection(id: .mint(), file: NoteFile(text: "---\n---"), fallbackTitle: "Filename")
         #expect(plain.frontMatter == .absent)
         #expect(empty.frontMatter == .parsed([:]))
         #expect(plain.title == "Filename")
@@ -55,7 +55,7 @@ struct NoteProjectionTests {
     ])
     func unusableYAMLIsExplicitAndDoesNotDiscardTheFile(header: String) {
         let file = NoteFile(text: "---\n\(header)\n---\nBody")
-        let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
+        let projection = NoteProjection(id: .mint(), file: file, fallbackTitle: "Filename")
         guard case .invalid(let error) = projection.frontMatter else {
             Issue.record("Expected a front matter error")
             return
@@ -82,7 +82,7 @@ struct NoteProjectionTests {
     ])
     func floatingPointPrecisionLossIsExplicit(spelling: String) {
         let file = NoteFile(text: "---\nvalue: \(spelling)\n---")
-        let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
+        let projection = NoteProjection(id: .mint(), file: file, fallbackTitle: "Filename")
         guard case .invalid(let error) = projection.frontMatter else {
             Issue.record("A rounded number must not be exposed as an exact field value")
             return
@@ -99,26 +99,26 @@ struct NoteProjectionTests {
         "1.25_00",
     ])
     func equivalentDecimalSpellingsRemainRepresentable(spelling: String) {
-        let projection = NoteProjection(id: UUID(), file: NoteFile(text: "---\nvalue: \(spelling)\n---"), fallbackTitle: "Filename")
+        let projection = NoteProjection(id: .mint(), file: NoteFile(text: "---\nvalue: \(spelling)\n---"), fallbackTitle: "Filename")
         #expect(projection.fields?["value"] == .number(Decimal(string: "1.25")!))
     }
 
     @Test func manualProjectionHasOnlyExplicitFileNames() {
         let file = NoteFile(text: "---\ntitle: Title\n---")
-        let manual = NoteProjection(id: UUID(), file: file, fallbackTitle: "Fallback")
-        let named = NoteProjection(id: UUID(), file: file, fallbackTitle: "Fallback", filePath: "Folder/File.md")
-        let unwritten = NoteProjection(note: Note(text: "Draft", created: .now))
+        let manual = NoteProjection(id: .mint(), file: file, fallbackTitle: "Fallback")
+        let named = NoteProjection(id: .mint(), file: file, fallbackTitle: "Fallback", filePath: "Folder/File.md")
+        let note = NoteProjection(note: Note(path: "Notes/Draft.md", text: "Draft", created: .now))
         #expect(manual.filePath == nil)
         #expect(named.filePath == "Folder/File.md")
-        #expect(unwritten.filePath == nil)
+        #expect(note.filePath == "Notes/Draft.md")
         #expect(named.file.text == file.text)
     }
 
 
     @Test func zeroWidthSpaceTitleIsNotEmptyButUnicodeWhitespaceIs() {
-        let significant = NoteProjection(id: UUID(), file: NoteFile(text: "---\ntitle: '\u{200B}'\n---"), fallbackTitle: "Fallback")
+        let significant = NoteProjection(id: .mint(), file: NoteFile(text: "---\ntitle: '\u{200B}'\n---"), fallbackTitle: "Fallback")
         #expect(significant.title == "\u{200B}")
-        let whitespace = NoteProjection(id: UUID(), file: NoteFile(text: "---\ntitle: ' \u{A0}'\n---"), fallbackTitle: "Fallback")
+        let whitespace = NoteProjection(id: .mint(), file: NoteFile(text: "---\ntitle: ' \u{A0}'\n---"), fallbackTitle: "Fallback")
         #expect(whitespace.title == "Fallback")
     }
 

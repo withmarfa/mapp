@@ -11,9 +11,9 @@ nonisolated struct NoteConnectionRule: Equatable, Sendable {
 }
 
 nonisolated enum NoteReferenceResolution: Equatable, Sendable {
-    case resolved(UUID)
+    case resolved(ItemID)
     case missing
-    case ambiguous([UUID])
+    case ambiguous([ItemID])
 }
 
 nonisolated struct NoteIndexedReference: Equatable, Sendable {
@@ -22,7 +22,7 @@ nonisolated struct NoteIndexedReference: Equatable, Sendable {
         case header(String)
     }
 
-    let sourceID: UUID
+    let sourceID: ItemID
     let origin: Origin
     let targetTitle: String
     let resolution: NoteReferenceResolution
@@ -32,12 +32,12 @@ nonisolated struct NoteIndexedReference: Equatable, Sendable {
 nonisolated struct NoteConnectionEdge: Hashable, Sendable {
     let name: String
     let reverseName: String?
-    let sourceID: UUID
-    let targetID: UUID
+    let sourceID: ItemID
+    let targetID: ItemID
 }
 
 nonisolated struct NoteConnectionIssue: Equatable, Sendable {
-    let sourceID: UUID
+    let sourceID: ItemID
     let field: String
     let value: NoteFieldValue
 }
@@ -50,8 +50,8 @@ nonisolated struct NoteConnectionIndex: Sendable {
     let issues: [NoteConnectionIssue]
 
     init(records: [NoteProjection], rulesByType: [String: [NoteConnectionRule]]) {
-        var names: [String: [UUID]] = [:]
-        var declaredIDs: [UUID: [UUID]] = [:]
+        var names: [String: [ItemID]] = [:]
+        var declaredIDs: [UUID: [ItemID]] = [:]
         for record in records {
             for name in Self.names(of: record) {
                 let key = Self.nameKey(name)
@@ -60,13 +60,13 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 }
             }
             // A file's declaration is a local lookup hint, not a verified Marfa identity.
-            if let text = record.fields?["marfa_id"]?.string, let id = Self.itemID(text),
+            if let text = record.fields?["marfa_id"]?.string, let id = Self.declaredID(text),
                !declaredIDs[id, default: []].contains(record.id) {
                 declaredIDs[id, default: []].append(record.id)
             }
         }
-        func matches(_ name: String) -> [UUID] {
-            if let id = Self.itemID(name) { return declaredIDs[id, default: []] }
+        func matches(_ name: String) -> [ItemID] {
+            if let id = Self.declaredID(name) { return declaredIDs[id, default: []] }
             return names[Self.nameKey(NoteName.trimmed(name)), default: []]
         }
         func resolve(_ title: String) -> NoteReferenceResolution {
@@ -130,7 +130,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 filename, (filename as NSString).deletingPathExtension]
     }
 
-    private static func itemID(_ text: String) -> UUID? {
+    private static func declaredID(_ text: String) -> UUID? {
         guard text.count == 36 else { return nil }
         return UUID(uuidString: text)
     }

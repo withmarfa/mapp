@@ -81,7 +81,7 @@ struct NoteLibraryTests {
         #expect(note.path == "Notes/Loose.md")
         #expect(library.folder(note.folderID!)?.name == "Notes")
         #expect(store.changes.contains(.createFolder(path: "Notes", id: try #require(note.folderID))))
-        let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(UUID())))
+        let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(.mint())))
         #expect(gone.path == "Notes/Also loose.md", "a folder that is gone takes nothing")
         #expect(gone.folderID == note.folderID)
     }
@@ -261,7 +261,7 @@ struct NoteLibraryTests {
 
     @Test func aFolderThatIsGoneTakesNoNotes() {
         let (library, inbox, _, _, _) = makeLibrary()
-        let gone = UUID()
+        let gone = ItemID.mint()
         library.move([inbox.id], to: gone)
         #expect(library.note(inbox.id)?.folderID == nil)
     }
@@ -278,7 +278,7 @@ struct NoteLibraryTests {
         let (library, inbox, filed, favorite, _) = makeLibrary()
         let manager = undoManager()
         let before = library.notes
-        undoably(manager) { library.delete([UUID()], undoManager: manager) }
+        undoably(manager) { library.delete([.mint()], undoManager: manager) }
         undoably(manager) { library.setFavorite([favorite.id], true, undoManager: manager) }
         undoably(manager) { library.recover([inbox.id], undoManager: manager) }
         undoably(manager) { library.move([filed.id], to: work.id, undoManager: manager) }
@@ -548,10 +548,10 @@ struct NoteLibraryTests {
         #expect(library.note(note.id)?.path == "Snippets.md")
     }
 
-    @Test func windowPathsAreEachNotesCurrentPathAfterItsNameHasFollowedItsLine() {
+    @Test func openingWindowsLeavesEachNoteSoItsNameHasFollowedItsLine() {
         let (library, inbox, filed, _, _) = makeLibrary()
         library.updateBody(of: inbox.id, to: "Renamed\n")
-        #expect(library.paths(forWindows: [inbox.id, filed.id, UUID()]) == ["Renamed.md", "Work/Filed note.md"])
+        #expect(library.idsForWindows([inbox.id, filed.id, .mint()]) == [inbox.id, filed.id], "an item that is not there opens nothing")
         #expect(library.note(inbox.id)?.path == "Renamed.md")
     }
 

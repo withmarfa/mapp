@@ -3,7 +3,7 @@ import SwiftUI
 /// The actions for a set of notes, shared by the list's context menu and the menu bar.
 struct NoteActions: View {
     @Environment(NoteLibrary.self) private var library
-    let ids: Set<Note.ID>
+    let ids: Set<ItemID>
     /// Passed in, since the menu bar has no window of its own to read one from.
     let undoManager: UndoManager?
     /// The menu bar names what its items act on, since nothing has been clicked to say so.
@@ -58,7 +58,7 @@ struct NoteActions: View {
 extension NoteLibrary {
     /// Moves notes to Recently Deleted once every open page has handed over what was just typed, since a deleted
     /// note takes no edit. Every way of deleting a note comes through here.
-    func deleteAfterSaving(_ ids: Set<Note.ID>, undoManager: UndoManager?) {
+    func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         EditorController.flushAll(leaving: false) { [self] in delete(ids, undoManager: undoManager) }
     }
 }

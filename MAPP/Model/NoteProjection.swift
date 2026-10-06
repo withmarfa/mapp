@@ -38,7 +38,7 @@ nonisolated enum NoteFrontMatter: Equatable, Sendable {
 
 /// A read-only view of a file. The original envelope remains the authority for saving and editing.
 nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
-    let id: UUID
+    let id: ItemID
     let file: NoteFile
     /// The source file path, relative to the notes folder; nil for a projection made without a file.
     let filePath: String?
@@ -57,7 +57,7 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
         self.init(id: note.id, file: note.file, fallbackTitle: note.title, filePath: note.path)
     }
 
-    init(id: UUID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
+    init(id: ItemID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
         self.id = id
         self.file = file
         self.filePath = filePath

@@ -45,20 +45,20 @@ struct SidebarNavigationTests {
         #expect(library.notes(in: .favoriteItem(favorite.id)).isEmpty)
     }
 
-    @Test func aFavoriteShortcutRestoresByFilePathAcrossItemIdentities() throws {
+    @Test func aFavoriteShortcutRestoresByItsIdentifierWhereverItsFileIsNow() throws {
         let favorite = Note(body: "# Favorite", path: "Notes/Favorite.md", created: date, isFavorite: true)
         let library = NoteLibrary(notes: [favorite], now: { date })
         let browser = Browser()
         browser.show(.favoriteItem(favorite.id), in: library, order: NoteOrder())
-        let data = try JSONEncoder().encode(browser.snapshot(in: library))
+        let data = try JSONEncoder().encode(browser.snapshot())
         let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: data)
-        let reloaded = Note(body: "# Favorite", path: "Notes/Favorite.md", created: date, isFavorite: true)
+        let reloaded = Note(id: favorite.id, path: "Elsewhere/Renamed.md", text: favorite.file.text, created: date)
         let restoredLibrary = NoteLibrary(notes: [reloaded], now: { date })
         let restored = Browser()
         restored.restore(snapshot, in: restoredLibrary, order: NoteOrder())
-        #expect(restored.item == .favoriteItem(reloaded.id))
-        #expect(restored.selection == [reloaded.id])
-        #expect(snapshot.sidebarItem == .favoriteItem("Notes/Favorite.md"))
+        #expect(restored.item == .favoriteItem(favorite.id))
+        #expect(restored.selection == [favorite.id])
+        #expect(snapshot.place == .favoriteItem(favorite.id))
     }
 
     @Test func aSnapshotSavedBeforeFavoritesFailsToDecodeSoTheWindowOpensAtItsDefault() {
@@ -70,7 +70,7 @@ struct SidebarNavigationTests {
         let note = Note(body: "# Former favorite", path: "Notes/Former favorite.md", created: date)
         let library = NoteLibrary(notes: [note], now: { date })
         let browser = Browser()
-        browser.restore(.init(sidebarItem: .favoriteItem("Notes/Former favorite.md"), selection: ["Notes/Former favorite.md"]), in: library, order: NoteOrder())
+        browser.restore(.init(place: .favoriteItem(note.id), selection: [note.id]), in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
         #expect(browser.selection.isEmpty)
     }

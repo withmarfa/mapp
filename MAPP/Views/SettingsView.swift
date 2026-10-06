@@ -17,7 +17,7 @@ struct SettingsView: View {
         return pane
     }
 
-    private var deleted: Set<Note.ID> {
+    private var deleted: Set<ItemID> {
         folder.library.map { Set($0.notes(in: .recentlyDeleted).map(\.id)) } ?? []
     }
 

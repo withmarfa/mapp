@@ -53,7 +53,7 @@ struct FolderStoreTests {
         try root.write("Someone else's", to: "Note.md")
         var moved: (String, String)?
         store.relocated = { from, to in moved = (from, to) }
-        store.perform(.create(path: "Note.md", text: "Mine", id: UUID()))
+        store.perform(.create(path: "Note.md", text: "Mine", id: .mint()))
         store.drain()
         #expect(root.read("Note.md") == "Someone else's")
         #expect(root.read("Note 2.md") == "Mine")
@@ -65,7 +65,7 @@ struct FolderStoreTests {
 
     @Test func changesQueuedForATakenPathReachTheFileMadeInstead() throws {
         try root.write("Someone else's", to: "Ideas.md")
-        store.perform(.create(path: "Ideas.md", text: "Mine", id: UUID()))
+        store.perform(.create(path: "Ideas.md", text: "Mine", id: .mint()))
         store.perform(.write(path: "Ideas.md", text: "Mine, edited"))
         store.perform(.trash(path: "Ideas.md", id: UUID(), date: .now))
         store.drain()
@@ -76,7 +76,7 @@ struct FolderStoreTests {
 
     @Test func onceTheLibraryKnowsOfARelocationTheOldPathIsItsOwnAgain() throws {
         try root.write("Someone else's", to: "Ideas.md")
-        store.perform(.create(path: "Ideas.md", text: "Mine", id: UUID()))
+        store.perform(.create(path: "Ideas.md", text: "Mine", id: .mint()))
         store.drain()
         store.acknowledgeRelocation(of: "Ideas.md")
         store.perform(.write(path: "Ideas 2.md", text: "Mine, edited"))
@@ -185,7 +185,7 @@ struct FolderStoreTests {
 
     @Test func movesAndFolderRenamesMoveTheFiles() throws {
         try root.write("Text", to: "Note.md")
-        store.perform(.createFolder(path: "Work", id: UUID()))
+        store.perform(.createFolder(path: "Work", id: .mint()))
         store.perform(.move(from: "Note.md", to: "Work/Note.md"))
         store.perform(.moveFolder(from: "Work", to: "Office"))
         store.drain()
@@ -213,7 +213,7 @@ struct FolderStoreTests {
         var failure: String?
         store.failed = { path, _ in failure = path }
         try FileManager.default.removeItem(at: root.url)
-        store.perform(.create(path: "Work/Note.md", text: "Text", id: UUID()))
+        store.perform(.create(path: "Work/Note.md", text: "Text", id: .mint()))
         store.drain()
         #expect(!FileManager.default.fileExists(atPath: root.url.path))
         for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }

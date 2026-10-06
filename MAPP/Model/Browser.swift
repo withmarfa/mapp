@@ -6,14 +6,14 @@ import Observation
 @Observable
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
-    var selection: Set<Note.ID> = []
+    var selection: Set<ItemID> = []
     var searchText = ""
     /// The note whose file name is being asked for.
-    var renamingNote: Note.ID?
+    var renamingNote: ItemID?
     /// The folder whose name is being edited in the sidebar.
-    var renamingFolder: Folder.ID?
+    var renamingFolder: ItemID?
     /// The folder whose deletion awaits confirmation.
-    var folderToDelete: Folder.ID?
+    var folderToDelete: ItemID?
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -42,7 +42,7 @@ final class Browser {
     var item: SidebarItem { sidebarItem ?? .allNotes }
 
     /// The folder the sidebar has selected, which the folder commands act on.
-    var selectedFolder: Folder.ID? {
+    var selectedFolder: ItemID? {
         if case .folder(let id) = item { id } else { nil }
     }
 
@@ -151,7 +151,7 @@ final class Browser {
 
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
     /// person confirms, since that cannot be undone.
-    static func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
+    static func delete(_ ids: Set<ItemID>, in library: NoteLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
         if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
@@ -182,7 +182,7 @@ final class Browser {
     /// When selected notes leave the list (deleted, moved elsewhere, filtered out by a search), the selection
     /// keeps whichever are still there. If none are, it moves to the note that followed them, or failing that
     /// the one before, as Notes and Mail do.
-    static func selection(_ selection: Set<Note.ID>, keptFrom old: [Note.ID], in new: [Note.ID]) -> Set<Note.ID> {
+    static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
         let visible = Set(new)
         let kept = selection.intersection(visible)
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }
@@ -192,59 +192,41 @@ final class Browser {
 
     // MARK: Restoring a window
 
-    /// What a window brings back when the app opens again, by where things are in the notes folder, since that
-    /// is what lasts from one launch to the next.
+    /// What a window brings back when the app opens again, by the identifiers of what it showed, which last from
+    /// one launch to the next. A snapshot in any other form reads as none.
     struct Snapshot: Codable, Equatable {
-        var sidebarItem: Item?
-        var selection: [String]
+        var place: SidebarItem
+        var selection: [ItemID]
+    }
 
-        enum Item: Codable, Equatable {
-            case inbox, allNotes, favorites, recentlyDeleted, marfaTypes, files
-            case itemType(String), project(String)
-            case favoriteItem(String)
-            case folder(String)
+    func snapshot() -> Snapshot {
+        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue })
+    }
+
+    /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
+    /// leaves the window at its default.
+    func restore(from data: Data?, in library: NoteLibrary, order: NoteOrder) {
+        if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
+            restore(snapshot, in: library, order: order)
+        } else {
+            selectFirstNote(in: library, order: order)
         }
     }
 
-    func snapshot(in library: NoteLibrary) -> Snapshot {
-        let item: Snapshot.Item? = sidebarItem.map { item in
-            switch item {
-            case .inbox: .inbox
-            case .allNotes: .allNotes
-            case .favorites: .favorites
-            case .favoriteItem(let id): .favoriteItem(library.note(id)?.path ?? "")
-            case .recentlyDeleted: .recentlyDeleted
-            case .marfaTypes: .marfaTypes
-            case .files: .files
-            case .itemType(let type): .itemType(type)
-            case .project(let id): .project(library.note(id)?.path ?? "")
-            case .folder(let id): .folder(library.folder(id)?.name ?? "")
-            }
-        }
-        let paths = selection.compactMap { library.item($0)?.projection.filePath }.sorted()
-        return Snapshot(sidebarItem: item, selection: paths)
-    }
-
-    /// Restores what still exists: a folder deleted since gives way to All Notes, and notes no longer in the
-    /// list are dropped, leaving the top row selected if none remain.
+    /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
+    /// items no longer in the list are dropped, leaving the top row selected if none remain.
     func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
-        switch snapshot.sidebarItem {
-        case .inbox: sidebarItem = .inbox
-        case .favorites: sidebarItem = .favorites
-        case .favoriteItem(let path):
-            sidebarItem = library.note(at: path).flatMap { $0.isFavorite && !$0.isDeleted ? .favoriteItem($0.id) : nil } ?? .favorites
-        case .recentlyDeleted: sidebarItem = .recentlyDeleted
-        case .marfaTypes: sidebarItem = .marfaTypes
-        case .files: sidebarItem = .files
-        case .itemType(let type): sidebarItem = WorkbenchSchema.definition(type) == nil ? .allNotes : .itemType(type)
-        case .project(let path): sidebarItem = library.note(at: path).map { .project($0.id) } ?? .allNotes
-        case .folder(let name):
-            sidebarItem = library.folders.first { $0.name == name }.map { .folder($0.id) } ?? .allNotes
-        case .allNotes, nil: sidebarItem = .allNotes
+        sidebarItem = switch snapshot.place {
+        case .favoriteItem(let id):
+            library.note(id).flatMap { $0.isFavorite && !$0.isDeleted ? snapshot.place : nil } ?? .favorites
+        case .project(let id): library.note(id).map { _ in snapshot.place } ?? .allNotes
+        case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
+        case .itemType(let type): WorkbenchSchema.definition(type).map { _ in snapshot.place } ?? .allNotes
+        case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
         }
-        let paths = Set(snapshot.selection)
-        selection = Set(notes(in: library).filter { $0.path.map(paths.contains) == true }.map(\.id))
-        selection.formUnion(files(in: library).filter { paths.contains($0.path) }.map(\.id))
+        let ids = Set(snapshot.selection)
+        selection = Set(notes(in: library).map(\.id).filter(ids.contains))
+        selection.formUnion(files(in: library).map(\.id).filter(ids.contains))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }
@@ -254,7 +236,7 @@ final class NewItemDraft {
     var typeID: String
     var title = ""
     var body = ""
-    var parentID: UUID?
+    var parentID: ItemID?
     let place: SidebarItem
 
     init(place: SidebarItem) {

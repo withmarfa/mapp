@@ -124,7 +124,7 @@ struct MainView: View {
         .onChange(of: library.items.map(\.id)) { browser.folderRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
-        .onChange(of: browser.snapshot(in: library)) { _, snapshot in
+        .onChange(of: browser.snapshot()) { _, snapshot in
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
         .onDisappear { editor.flush() }
@@ -138,7 +138,7 @@ struct MainView: View {
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
-            if library.isLoaded && restoresWindow { restore() }
+            if library.isLoaded && restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
         }
     }
 
@@ -168,7 +168,7 @@ struct MainView: View {
             Text("The note’s file takes the new name.")
         }
         .onChange(of: browser.renamingNote) {
-            noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
+            noteName = browser.renamingNote.flatMap { library.note($0) }.map(\.fileTitle) ?? ""
         }
         .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
         } message: {
@@ -176,7 +176,7 @@ struct MainView: View {
         }
     }
 
-    private var completedImportID: UUID? {
+    private var completedImportID: ItemID? {
         importRequestID.flatMap { library.completedImports[$0] }
     }
 
@@ -215,14 +215,6 @@ struct MainView: View {
             takenNoteName = name
         } else {
             library.renameNote(id, to: name, undoManager: undoManager)
-        }
-    }
-
-    private func restore() {
-        if let storedBrowser, let snapshot = try? JSONDecoder().decode(Browser.Snapshot.self, from: storedBrowser) {
-            browser.restore(snapshot, in: library, order: order)
-        } else {
-            browser.selectFirstNote(in: library, order: order)
         }
     }
 }

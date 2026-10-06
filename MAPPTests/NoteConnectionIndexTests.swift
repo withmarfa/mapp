@@ -4,7 +4,7 @@ import Testing
 
 struct NoteConnectionIndexTests {
     private func record(_ title: String, type: String = "custom.task", header: String = "", body: String = "") -> NoteProjection {
-        NoteProjection(id: UUID(), file: NoteFile(text: "---\ntype: \(type)\ntitle: \"\(title)\"\n\(header)---\n\(body)"), fallbackTitle: title)
+        NoteProjection(id: .mint(), file: NoteFile(text: "---\ntype: \(type)\ntitle: \"\(title)\"\n\(header)---\n\(body)"), fallbackTitle: title)
     }
 
     private var rules: [String: [NoteConnectionRule]] {
@@ -114,7 +114,7 @@ struct NoteConnectionIndexTests {
         let unknownID = UUID()
         let target = record("Target", header: "marfa_id: '\(declaredID.uuidString)'\n")
         let numericName = record(unknownID.uuidString)
-        let source = record("Source", header: "about: ['[[\(declaredID.uuidString.lowercased())]]', '[[\(unknownID.uuidString)]]', '[[\(target.id.uuidString)]]']\n")
+        let source = record("Source", header: "about: ['[[\(declaredID.uuidString.lowercased())]]', '[[\(unknownID.uuidString)]]', '[[\(target.id.rawValue)]]']\n")
         let index = NoteConnectionIndex(records: [target, numericName, source], rulesByType: rules)
         #expect(index.references.map(\.resolution) == [.resolved(target.id), .missing, .missing])
         #expect(index.edges.count == 1)
