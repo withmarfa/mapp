@@ -312,6 +312,30 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// A move to the end the edge already holds, as an undo after a refused move makes, is taken at once and
+    /// queues nothing, since the server refuses an update that changes nothing.
+    @Test(.timeLimit(.minutes(1)))
+    func aMoveToTheEndTheEdgeHoldsIsTakenAndQueuesNothing() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent", "child")
+        let (parent, child) = (ids[0], ids[1])
+        let edge = try #require(await Self.edge(of: MarfaMapping.parentEdge, from: parent, in: source))
+        let before = try await source.copy.queue.all()
+
+        let write = WriteID()
+        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: write)
+        let answered = try #require(await log.wait { $0.answer(to: write) != nil })
+        #expect(answered.answer(to: write) == .accepted)
+        #expect(try await source.copy.queue.all().map(\.id) == before.map(\.id))
+        let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
+        #expect(held.contains { $0.target == .item(parent) })
+        await source.close()
+    }
+
     private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {
         _ = await LiveMarfa.until { ((try? await source.copy.edges.from(id.rawValue)) ?? []).contains { $0.edgeType == type } }
         return try? await source.copy.edges.from(id.rawValue).first { $0.edgeType == type }

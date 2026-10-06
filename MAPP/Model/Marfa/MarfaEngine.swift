@@ -686,7 +686,9 @@ actor MarfaEngine {
         }
     }
 
+    /// A write that needed nothing queued, such as a move to the end the edge already holds, is taken at once.
     private func record(_ id: WriteID, _ queued: [Marfa.QueuedWrite]) {
+        guard !queued.isEmpty else { return hub.publish(.answered(id, .accepted)) }
         outstanding[id] = Set(queued.map(\.id))
         for written in queued { submitted[written.id] = id }
     }
@@ -758,6 +760,9 @@ actor MarfaEngine {
                 // The copy's own version of the edge, since the move is refused on any other; an edge it shows
                 // moved by a move still waiting is read from its new ends.
                 let held = try await heldEdge(edge)
+                // The edge is already there, as when an undo follows a refused move. The package would queue an
+                // update that changes nothing, which the server refuses.
+                if (end == .source ? held.sourceId : held.targetId) == to.rawValue { return [] }
                 return [try await copy.edges.update(edge.id, EdgeEdit(baseVersion: held.version, move: move))]
             } catch let error as MarfaError {
                 if let problem = Self.moveProblem(error) { throw Refused(problem: problem) }
