@@ -205,6 +205,9 @@
     "Can’t Attach Images" : {
 
     },
+    "Can’t Delete Immediately" : {
+
+    },
     "Can’t Read the Notes Folder" : {
 
     },
@@ -425,6 +428,9 @@
     "Notes Folder" : {
 
     },
+    "Notes can’t be deleted immediately right now. They’re still in Recently Deleted." : {
+
+    },
     "Numbered List" : {
 
     },
@@ -540,6 +546,9 @@
 
     },
     "The tags of “%@” can’t be read, so its file was left unchanged." : {
+
+    },
+    "The images weren’t added to the note. %@" : {
 
     },
     "The note’s file takes the new name." : {

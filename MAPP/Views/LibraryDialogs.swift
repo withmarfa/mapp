@@ -29,7 +29,7 @@ private struct LibraryDialogs: ViewModifier {
                 "^[Delete \(purging.count) note](inflect: true) immediately?",
                 isPresented: Binding { !purging.isEmpty } set: { if !$0 { purging = [] } }
             ) {
-                Button("Delete", role: .destructive) { library.deletePermanently(purging) }
+                Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
             } message: {
                 Text("You can’t undo this action.")
             }

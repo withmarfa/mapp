@@ -95,6 +95,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?)
     /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
     /// sends them elsewhere may have to wait, and may fail.
+    /// A failure means nothing was inserted into the note, though files already stored may remain; the editor's
+    /// alert says so plainly.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed]
     /// Only where `capabilities` has `importFiles`.
     func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID)
@@ -110,6 +112,18 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
+    /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
+    func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
+        guard capabilities.contains(.purge) else {
+            failure = (
+                String(localized: "Can’t Delete Immediately"),
+                String(localized: "Notes can’t be deleted immediately right now. They’re still in Recently Deleted."))
+            return
+        }
+        deletePermanently(ids)
+    }
+
     /// Whether Rename Note applies: it names a file, which a deleted note keeps as it is.
     func canRenameFile(of item: Item?) -> Bool {
         capabilities.contains(.renameFiles) && item?.isWritable == true

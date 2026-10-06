@@ -291,7 +291,7 @@ final class EditorController: NSObject {
             do {
                 embeds = try await library.attach(files, to: noteID)
             } catch {
-                library.failure = (String(localized: "Can’t Attach Images"), error.localizedDescription)
+                library.failure = (String(localized: "Can’t Attach Images"), String(localized: "The images weren’t added to the note. \(error.localizedDescription)"))
                 return
             }
             // The images are kept either way; they go into the note only if it is still the one on the page.

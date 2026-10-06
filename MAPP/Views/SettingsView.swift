@@ -45,7 +45,7 @@ struct SettingsView: View {
             "^[Delete \(deleted.count) note](inflect: true) immediately?",
             isPresented: $isEmptying
         ) {
-            Button("Delete", role: .destructive) { library?.deletePermanently(deleted) }
+            Button("Delete", role: .destructive) { library?.deletePermanentlyOnConfirm(deleted) }
         } message: {
             Text("You can’t undo this action.")
         }
