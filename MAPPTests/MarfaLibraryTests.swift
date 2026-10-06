@@ -222,37 +222,36 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func searchAsksTheCopyAndLeavesOutTheBin() async throws {
         let (library, source) = try await loaded()
-        source.hits.withLock {
-            $0["body"] = [
-                ItemSearchHit(id: F.n1, snippet: "Note body"), ItemSearchHit(id: F.n3, snippet: "Old body"),
-                ItemSearchHit(id: F.p1, snippet: ""),
-            ]
-        }
+        source.hits.withLock { $0["body"] = [F.n1, F.n3, F.p1] }
         #expect(library.items(matching: "  ").isEmpty)
         #expect(await eventually { library.items(matching: "body").map(\.id) == [F.n1, F.p1] })
         let searches = source.searches.withLock { $0 }
         _ = library.items(matching: "body")
         #expect(source.searches.withLock { $0 } == searches)
 
-        let matches = try await library.search("body")
-        #expect(matches.map(\.item.id) == [F.n1, F.p1])
-        #expect(matches.first?.snippet == "Note body")
-        // A hit with no snippet shows the item's preview.
-        #expect(matches.last?.snippet == library.item(F.p1)?.preview)
-
         // A change to the items asks again, and the last results stand meanwhile.
-        source.hits.withLock { $0["body"] = [ItemSearchHit(id: F.p1)] }
+        source.hits.withLock { $0["body"] = [F.p1] }
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Other"
         source.send(.upserted([renamed]))
         #expect(await eventually { library.items(matching: "body").map(\.id) == [F.p1] })
     }
 
-    @Test func searchSnippetsReadAsPlainText() {
-        #expect(MarfaSnippet.plainText("a <mark>found</mark> word &amp; more") == "a found word & more")
-        #expect(MarfaSnippet.plainText("&lt;tag&gt; &quot;q&quot; &#39;s&#x27; &#8212;") == "<tag> \"q\" 's' \u{2014}")
-        #expect(MarfaSnippet.plainText("AT&T &unknown; a\n\n b") == "AT&T &unknown; a b")
-        #expect(MarfaSnippet.plainText("") == "")
+    @Test func aSearchThatFailsKeepsWhatWasFoundAndSaysWhy() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["body"] = [F.n1] }
+        #expect(await eventually { library.items(matching: "body").map(\.id) == [F.n1] })
+        source.searchFails.withLock { $0 = true }
+        var renamed = try #require(library.item(F.n2))
+        renamed.title = "Other"
+        source.send(.upserted([renamed]))
+        // The list reads the search again as it redraws for the change.
+        #expect(await eventually {
+            _ = library.items(matching: "body")
+            return library.failure != nil
+        })
+        #expect(library.failure?.title == String(localized: "Can’t Search"))
+        #expect(library.items(matching: "body").map(\.id) == [F.n1])
     }
 
     @Test func relationshipsReadBothWaysUnderTheirNames() async throws {
@@ -487,33 +486,50 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.message == inTheBin)
     }
 
-    @Test func aRelationshipReplacesWhatItsEndHolds() async throws {
+    @Test func aLinkIsAddedAndRemovedButNotReplacedYet() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
-        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
-        let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
-        #expect(source.writes == [.unlink(EdgeID("c2")), .link(toProject, undoing: nil)])
+        undo.groupsByEvent = false
+        let notYet = String(localized: "Changing this link isn’t available yet in a Marfa library.")
+        // A new parent, or a child taken from the parent it has, would replace the one link that end holds.
+        #expect(!library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        #expect(library.failure?.message == notYet)
+        library.failure = nil
+        #expect(!library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
+        #expect(library.failure?.message == notYet)
+        #expect(source.writes.isEmpty)
+        #expect(!undo.canUndo)
 
-        // The source says what it made; the undo takes that edge away and puts the old one back.
+        // Removing the parent, then choosing one for an end that holds none, are each one write.
+        undo.beginUndoGrouping()
+        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [], undoManager: undo))
+        undo.endUndoGrouping()
+        #expect(source.writes == [.unlink(EdgeID("c2"))])
+        source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite])]))
+        #expect(await eventually { library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.isEmpty == true })
+        source.clearWrites()
+        undo.beginUndoGrouping()
+        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        undo.endUndoGrouping()
+        let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
+        #expect(source.writes == [.link(toProject, undoing: nil)])
+
+        // The source says what it made; the undo takes that edge away, and the next puts the old parent back.
         source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [F.child("c7", F.t1, of: F.p1)])]))
         #expect(await eventually { library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.first?.itemID == F.p1 })
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.unlink(EdgeID("c7")), .link(EdgeDraft(type: "parent-of", source: F.e1, target: F.t1), undoing: nil)])
+        #expect(source.writes == [.unlink(EdgeID("c7"))])
+        undo.undo()
+        #expect(source.writes.last == .link(EdgeDraft(type: "parent-of", source: F.e1, target: F.t1), undoing: nil))
 
-        // Choosing a child for a project takes the child from the parent it had.
+        // A field that holds many adds and removes in one change.
         source.clearWrites()
-        #expect(library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: nil))
-        #expect(source.writes == [.unlink(EdgeID("c1")), .link(EdgeDraft(type: "parent-of", source: F.p2, target: F.e1), undoing: nil)])
-
-        source.clearWrites()
-        #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [], undoManager: nil))
-        #expect(source.writes == [.unlink(EdgeID("a1"))])
-        #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p1], undoManager: nil))
-        #expect(source.writes == [.unlink(EdgeID("a1"))])
+        #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
+        #expect(source.writes == [.unlink(EdgeID("a1")), .link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
     }
 
-    @Test func anItemPointedAtOnlyOnceKeepsItsOneAndAWriterGivesUpItsOwn() async throws {
+    @Test func anItemPointedAtOnlyOnceKeepsItsOne() async throws {
         let bug2 = F.item(ItemID("t2"), F.bug, "Bug two", age: 0, edges: [
             Edge(id: EdgeID("s1"), type: "supersedes", source: ItemID("t2"), target: .item(F.t1), origin: .property("supersedes")),
         ])
@@ -523,9 +539,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
         #expect(library.failure?.title == String(localized: "Can’t Change This Relationship"))
         #expect(!library.setItemRelationship(F.t1, field: "inverse:supersedes", targetIDs: [F.e1, bug2.id], undoManager: nil))
-        // Chosen from the other end, the second bug gives up what it superseded.
-        #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
-        #expect(source.writes == [.unlink(EdgeID("s1")), .link(EdgeDraft(type: "supersedes", source: bug2.id, target: F.e1), undoing: nil)])
+        // Chosen from the other end, the second bug would give up what it superseded: a replacement, not made yet.
+        library.failure = nil
+        #expect(!library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
+        #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
+        #expect(source.writes.isEmpty)
     }
 
     @Test func aRelationshipTheContractRefusesIsToldAndNotSent() async throws {
@@ -684,7 +702,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { missing.isSet })
 
         let search = observes { _ = library.items(matching: "x") }
-        source.hits.withLock { $0["x"] = [ItemSearchHit(id: F.n1)] }
+        source.hits.withLock { $0["x"] = [F.n1] }
         #expect(await eventually { search.isSet })
     }
 }
@@ -748,7 +766,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             for place in places { _ = library.count(in: place) }
         }
 
-        source.hits.withLock { $0["words"] = items.prefix(500).map { ItemSearchHit(id: $0.id, snippet: "Words") } }
+        source.hits.withLock { $0["words"] = items.prefix(500).map(\.id) }
         let searchStart = clock.now
         try #require(await eventually { library.items(matching: "words").count > 400 })
         let search = clock.now - searchStart

@@ -15,8 +15,9 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     let state = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport(queueRead: true))
     /// What `search` answers for each query; any other finds nothing.
-    let hits = Mutex<[String: [ItemSearchHit]]>([:])
+    let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
+    let searchFails = Mutex(false)
     let resolved = Mutex<[SyncAction]>([])
     let flushes = Mutex(0)
     let ended = Mutex<[ItemID]>([])
@@ -74,8 +75,9 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
         URL(filePath: "/dev/null")
     }
 
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemSearchHit] {
+    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
         searches.withLock { $0 += 1 }
+        if searchFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The search could not be read.") }
         return hits.withLock { $0[text] ?? [] }
     }
 
