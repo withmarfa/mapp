@@ -71,7 +71,10 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// Never blocks; writes are made in the order submitted.
     func submit(_ write: ItemWrite, as id: WriteID)
     func body(of item: ItemID) async throws -> ItemBody
+    /// The text of each item named that has any, read together, since a library reads every body as it loads.
+    func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
     func fileURL(of item: ItemID) async throws -> URL
+    /// Best match first.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
     /// A files source renames the file to follow its first line here, so a rename is one change, not one per word.
     func endEditing(_ item: ItemID)

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Everything the views, the commands and the editor use of a library, so none of them knows which kind holds the
-/// items. `NoteLibrary` is the folder of markdown files; a Marfa library is to be another.
+/// items. `NoteLibrary` is the folder of markdown files; `MarfaLibrary` is a Marfa server's working copy.
 ///
 /// Members that only make sense for files answer nil, or nothing, in a library whose items are not files, and a
 /// write a library cannot make is left out of its `capabilities`, so a view dims the command rather than asking.
@@ -74,8 +74,10 @@ protocol ItemLibrary: AnyObject, Observable {
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID?
-    /// Typing is undone by the page that holds it, so this registers nothing.
-    func updateBody(of id: ItemID, to body: String)
+    /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
+    /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
+    /// undone by the page that holds it, so this registers nothing.
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion)
     /// The note is no longer on the page.
     func leave(_ id: ItemID)
     /// Every note being written is left and every change handed over, as the app quits or the library changes.

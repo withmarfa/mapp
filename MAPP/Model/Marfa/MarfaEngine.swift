@@ -31,6 +31,13 @@ actor MarfaEngine {
         var message = MarfaEngine.notYet
     }
 
+    /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
+    /// version that edit was typed on, moved on by each answer to this device's writes of the item.
+    private nonisolated struct OwnText {
+        var text: String
+        var on: Int64
+    }
+
     nonisolated static var notYet: String {
         String(localized: "This change can’t be made in a Marfa library yet.")
     }
@@ -75,6 +82,12 @@ actor MarfaEngine {
     private var outstanding: [WriteID: Set<String>] = [:]
     private var outcomes: [WriteID: WriteOutcome] = [:]
     private var failures: [SourceFailure] = []
+    /// The person's latest edit of each item's text, which their next edit of it follows.
+    private var ownText: [ItemID: OwnText] = [:]
+    /// Answered writes already taken into `ownText`, so none is counted twice.
+    private var counted: Set<String> = []
+    /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.
+    private var sentAsRead: Set<String> = []
     private var following: Task<Void, Never>?
     private var painted = false
     private var closed = false
@@ -250,6 +263,8 @@ actor MarfaEngine {
             failures.append(Self.failure(error))
             return
         }
+        counted.formIntersection(queue.map(\.id))
+        sentAsRead.formIntersection(queue.map(\.id))
         if !readQueueOnce {
             readQueueOnce = true
             for write in queue {
@@ -461,9 +476,14 @@ actor MarfaEngine {
                     touched.insert(parent.rawValue)
                 }
             } else {
+                // An edge's ends are read before it goes, since its delete names only the edge.
+                var ends: Set<String> = []
+                if case .unlink(let edgeID) = write, let edge = edges[edgeID.rawValue] {
+                    ends = [edge.sourceId, edge.targetId]
+                }
                 let queued = try await Self.asking(hub) { try await queue(write) }
                 record(id, queued)
-                touched = Set(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
+                touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
             }
             await reread(touched)
             await sync.drain()
@@ -503,10 +523,26 @@ actor MarfaEngine {
             guard let bodyField = MarfaMapping.bodyField(of: catalogue.itemTypes[try itemType(of: id)]) else {
                 throw NotYet(message: Self.noText)
             }
-            return [try await edit(id, [bodyField: .string(text)], base: base, merge: merge)]
+            let properties: [String: JSONValue] = [bodyField: .string(text)]
+            // Read before the edit is sent: an answer that lands during the send is not in the version it was sent
+            // on, so it is counted later, as it comes.
+            let answeredBefore = merge == .following && ownText[id] != nil ? [] : try await answeredWrites(of: id)
+            let queued: Marfa.QueuedWrite
+            switch merge {
+            case .ifUnchanged:
+                queued = try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+            case .asRead:
+                queued = try await send(id, properties) { base.rawValue }
+            case .following:
+                queued = try await send(id, properties) { try await self.followingVersion(id, otherwise: base) }
+            }
+            ownText[id] = OwnText(text: text, on: queued.baseVersion ?? base.rawValue)
+            // A following edit counted the answers it saw as it chose its version (`followingVersion`).
+            counted.formUnion(answeredBefore)
+            return [queued]
         case .editProperties(let id, let changes, let base, _):
             let properties = changes.mapValues { $0.map(MarfaMapping.json) ?? .null }
-            return [try await edit(id, properties, base: base, merge: .asRead)]
+            return [try await send(id, properties) { base.rawValue }]
         case .tag(let id, let tag, let on):
             return [
                 on ? try await copy.tags.add(tag, to: id.rawValue) : try await copy.tags.remove(tag, from: id.rawValue)
@@ -519,7 +555,14 @@ actor MarfaEngine {
             case .active, .archived:
                 return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
-        case .retype, .retier, .move, .purge, .link, .unlink, .attach, .place:
+        case .link(let draft, _):
+            return [
+                try await copy.edges.create(
+                    from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+            ]
+        case .unlink(let edgeID):
+            return [try await copy.edges.delete(edgeID.rawValue)]
+        case .retype, .retier, .move, .purge, .attach, .place:
             throw NotYet()
         }
     }
@@ -559,18 +602,93 @@ actor MarfaEngine {
         }
     }
 
-    /// An edit read at the version the copy holds is an ordinary update; one read earlier is merged by the server
-    /// against what was read. Behind an edit of the same row still waiting, it goes on the held version and is moved
-    /// onto that edit's answer, since an edit said to be read earlier is never moved.
-    private func edit(
-        _ id: ItemID, _ properties: [String: JSONValue], base: ItemVersion, merge: BodyMerge
+    /// An edit is sent on the version of the text it was typed on: as an ordinary update where the copy holds that
+    /// version, and otherwise said to be read there, so the server merges it against what was read rather than
+    /// laying it over a change the person never saw (queue-and-verdicts 43). An edit queued behind the person's own
+    /// on the version the copy holds moves onto that edit's answer (42). The copy moves as answers and catch-ups
+    /// land, so the version is decided against one reading of the copy, and again if the copy moved meanwhile.
+    private func send(
+        _ id: ItemID, _ properties: [String: JSONValue], typedOn: () async throws -> Int64
     ) async throws -> Marfa.QueuedWrite {
-        if merge == .asRead, let held = rows[id.rawValue]?.version, base.rawValue < held {
-            let waiting = queue.contains { $0.kind == .updateItem && $0.itemId == id.rawValue && $0.verdict == nil }
-            if waiting { return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: held)) }
-            return try await copy.items.updateAsRead(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+        var attempt = 0
+        while true {
+            attempt += 1
+            let held = try await heldVersion(id)
+            let version = try await typedOn()
+            let steady = try await heldVersion(id) == held && version <= held
+            let edit = Edit(properties: properties, baseVersion: version)
+            do {
+                if steady, version < held {
+                    let queued = try await copy.items.updateAsRead(id.rawValue, edit)
+                    sentAsRead.insert(queued.id)
+                    return queued
+                }
+                if steady || attempt == 3 { return try await copy.items.update(id.rawValue, edit) }
+            } catch where attempt < 3 {
+                continue
+            }
         }
-        return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+    }
+
+    /// The version an edit that follows the person's last edit of the text was typed on: the version their own
+    /// writes account for. Where the copy holds that version it holds only the person's text over what they read;
+    /// where it holds a later one, another device's change came in, and the edit is merged against it. While the
+    /// person's own edits of it still wait, a later version cannot yet say whether the server will take them or
+    /// keep the other device's text, so the answer is waited for a moment, as the drain under way brings it; one
+    /// that does not come leaves the edit merged against the older version, which never overwrites.
+    private func followingVersion(_ id: ItemID, otherwise base: ItemVersion) async throws -> Int64 {
+        guard ownText[id] != nil else { return base.rawValue }
+        func waiting(_ queue: [Marfa.QueuedWrite]) -> Bool {
+            queue.contains { $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict == nil }
+        }
+        var queue = try await copy.queue.all()
+        try await count(answers: queue, for: id)
+        if let own = ownText[id], try await heldVersion(id) > own.on, waiting(queue) {
+            let clock = ContinuousClock()
+            let end = clock.now + .seconds(2)
+            while waiting(queue), clock.now < end {
+                try await Task.sleep(for: .milliseconds(50))
+                queue = try await copy.queue.all()
+            }
+            try await count(answers: queue, for: id)
+        }
+        return ownText[id]?.on ?? base.rawValue
+    }
+
+    /// Moves the version the person's own writes account for past the answers the copy has taken. A create or
+    /// update the server took on the version it held moves the item one version on (versions.md 2); one merged, or
+    /// sent as read on an older version, lands on whatever the server held, which the copy now shows with every
+    /// answer taken so far. Any other answer leaves the item where it was.
+    private func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
+        guard var own = ownText[id] else { return }
+        let answered = queue.filter {
+            $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict != nil
+                && !counted.contains($0.id)
+        }
+        guard !answered.isEmpty else { return }
+        counted.formUnion(answered.map(\.id))
+        let landedElsewhere = answered.contains { write in
+            if case .merged = write.verdict { return true }
+            return write.verdict == .accepted && sentAsRead.contains(write.id)
+        }
+        if landedElsewhere {
+            own.on = try await heldVersion(id)
+        } else {
+            own.on += Int64(answered.count { $0.verdict == .accepted })
+        }
+        ownText[id] = own
+    }
+
+    private func answeredWrites(of id: ItemID) async throws -> [String] {
+        try await copy.queue.all().filter { $0.itemId == id.rawValue && $0.verdict != nil }.map(\.id)
+    }
+
+    private func heldVersion(_ id: ItemID) async throws -> Int64 {
+        if let row = try await copy.items.get(id.rawValue) { return row.version }
+        guard let row = rows[id.rawValue] else {
+            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
+        }
+        return row.version
     }
 
     private func itemType(of id: ItemID) throws -> TypeID {
@@ -599,6 +717,11 @@ actor MarfaEngine {
             answered(answer.id, outcome)
         }
         await reread(ids)
+        if let queued = try? await copy.queue.all() {
+            for raw in Set(report.verdicts.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
+                try? await count(answers: queued, for: ItemID(raw))
+            }
+        }
         do {
             _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
         } catch {

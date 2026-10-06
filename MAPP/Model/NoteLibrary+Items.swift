@@ -63,7 +63,7 @@ extension NoteLibrary {
         guard let index = notes.firstIndex(where: { $0.id == id && !$0.isDeleted }),
               let item = item(id), item.isEditable,
               let definition = catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == key }) else { return false }
-        if let value, !Self.valid(value, for: definition.kind) {
+        if let value, !definition.kind.accepts(value) {
             failure = (String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
             return false
         }
@@ -71,17 +71,6 @@ extension NoteLibrary {
         file.setField(key, value)
         applyItemFieldFiles([id: file], key: key, undoManager: undoManager, name: String(localized: "Edit Property"))
         return self.note(id)?.file == file
-    }
-
-    private static func valid(_ value: PropertyValue, for kind: ItemTypeInfo.Field.Kind) -> Bool {
-        switch (kind, value) {
-        case (.text, .string): true
-        case (.choice(let choices), .string(let string)): choices.contains(string)
-        case (.date, .string(let string)):
-            string.isEmpty || ISO8601DateFormatter().date(from: string) != nil || DateFormatter.itemDay.date(from: string) != nil
-        case (.boolean, .bool), (.number, .number): true
-        default: false
-        }
     }
 
     private func reference(to targetID: ItemID) -> String? {
@@ -282,14 +271,4 @@ extension NoteLibrary {
         registerUndo(undoManager, name: name) { [weak undoManager] library in library.applyItemFiles(previous, undoManager: undoManager, name: name) }
     }
 
-}
-
-private extension DateFormatter {
-    static var itemDay: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.isLenient = false
-        return formatter
-    }
 }
