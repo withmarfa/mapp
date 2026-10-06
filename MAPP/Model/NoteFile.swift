@@ -90,11 +90,6 @@ nonisolated struct NoteFile: Hashable, Sendable {
         setProperty(key, yaml: value.map(Self.yaml))
     }
 
-    /// Sets a top-level property to true, or removes it, as a flag is written in YAML.
-    mutating func setFlag(_ key: String, _ isOn: Bool) {
-        setProperty(key, yaml: isOn ? "true" : nil)
-    }
-
     private mutating func setProperty(_ key: String, yaml value: String?) {
         guard !frontMatter.isEmpty else {
             if let value { frontMatter = "---\n\(key): \(value)\n---\n" }
@@ -102,56 +97,62 @@ nonisolated struct NoteFile: Hashable, Sendable {
         }
         let raw = rawLines
         var lines = lines
-        let index = lines.firstIndex { Self.value(in: $0, for: key) != nil }
-        let endingSource = index.map { lines[$0] } ?? raw.last!
+        let range = Self.range(of: key, in: lines)
+        let endingSource = range.map { lines[$0.lowerBound] } ?? raw.last!
         let ending = endingSource.hasSuffix("\r\n") ? "\r\n" : "\n"
         let line = value.map { Substring("\(key): \($0)\(ending)") }
-        if let index {
-            // Blank lines within an indented value belong to it; a separator after it belongs to the file.
-            var end = index + 1
-            var scan = end
-            while scan < lines.count {
-                if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    scan += 1
-                    continue
-                }
-                guard lines[scan].first == " " || lines[scan].first == "\t" else { break }
-                scan += 1
-                end = scan
-            }
-            lines.replaceSubrange(index..<end, with: line.map { [$0] } ?? [])
+        if let range {
+            lines.replaceSubrange(range, with: line.map { [$0] } ?? [])
         } else if let line {
             lines.append(line)
         } else {
             return
         }
+        store(lines, around: raw, removing: value == nil)
+    }
+
+    /// Puts edited property lines back between the fences, taking the front matter away when nothing is left.
+    private mutating func store(_ lines: [Substring], around raw: [Substring], removing: Bool) {
+        var lines = lines
         // Marfa treats an empty line immediately after the opening fence as a thematic break, not metadata.
-        if value == nil { lines = Array(lines.drop(while: { $0.trimmingCharacters(in: .newlines).isEmpty })) }
+        if removing { lines = Array(lines.drop(while: { $0.trimmingCharacters(in: .newlines).isEmpty })) }
         let hasContent = lines.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         frontMatter = hasContent ? String(raw.first!) + lines.joined() + String(raw.last!) : ""
     }
 
+    /// The lines of one top-level property: its own line and what belongs to it, an indented value or a block
+    /// list written at the key's own indent. Blank lines within a value belong to it; a separator after it
+    /// belongs to the file.
+    private static func range(of key: String, in lines: [Substring]) -> Range<Int>? {
+        guard let start = lines.firstIndex(where: { value(in: $0, for: key) != nil }) else { return nil }
+        var end = start + 1
+        var scan = end
+        while scan < lines.count {
+            if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                scan += 1
+                continue
+            }
+            guard lines[scan].first == " " || lines[scan].first == "\t" || isSequenceEntry(lines[scan]) else { break }
+            scan += 1
+            end = scan
+        }
+        return start..<end
+    }
+
+    private static func isSequenceEntry(_ line: Substring) -> Bool {
+        guard line.hasPrefix("-") else { return false }
+        return line.dropFirst().first.map { $0 == " " || $0 == "\t" || $0.isNewline } ?? true
+    }
+
     /// Restores one field's original spelling without replacing a subsequently edited body or other fields.
     mutating func restoreField(_ key: String, from original: NoteFile) {
-        func range(in lines: [Substring]) -> Range<Int>? {
-            guard let start = lines.firstIndex(where: { Self.value(in: $0, for: key) != nil }) else { return nil }
-            var end = start + 1
-            var scan = end
-            while scan < lines.count {
-                if lines[scan].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { scan += 1; continue }
-                guard lines[scan].first == " " || lines[scan].first == "\t" else { break }
-                scan += 1
-                end = scan
-            }
-            return start..<end
-        }
         let originalLines = original.lines
-        let source = range(in: originalLines).map { Array(originalLines[$0]) } ?? []
+        let source = Self.range(of: key, in: originalLines).map { Array(originalLines[$0]) } ?? []
         if source.isEmpty { setField(key, nil); return }
         if frontMatter.isEmpty { frontMatter = "---\n" + source.joined() + "---\n"; return }
         let raw = rawLines
         var current = lines
-        if let target = range(in: current) { current.replaceSubrange(target, with: source) }
+        if let target = Self.range(of: key, in: current) { current.replaceSubrange(target, with: source) }
         else { current.append(contentsOf: source) }
         frontMatter = String(raw.first!) + current.joined() + String(raw.last!)
     }
@@ -172,7 +173,150 @@ nonisolated struct NoteFile: Hashable, Sendable {
         }
     }
 
-    var isPinned: Bool { property("pinned")?.lowercased() == "true" }
+    // MARK: Tags
+
+    /// Marfa's ordinary tag for an item the person keeps close.
+    static let favoriteTag = "favorite"
+
+    /// The tags Marfa's folder reads from the `tags` front matter line, which it takes only as a YAML list, in
+    /// flow or block form. Empty when the line is absent or is anything else.
+    var tags: [String] { tagList()?.tags ?? [] }
+
+    var isFavorite: Bool { tags.contains(Self.favoriteTag) }
+
+    /// Adds or removes the `favorite` tag, changing nothing else. A tag is added in the form of the list already
+    /// there, or as a flow list when there is none; the last tag removed takes the whole line with it. A `tags`
+    /// value that is not a list is left as written.
+    mutating func setFavorite(_ isOn: Bool) {
+        let all = lines
+        guard Self.range(of: "tags", in: all) != nil else {
+            if isOn { setProperty("tags", yaml: "[\(Self.favoriteTag)]") }
+            return
+        }
+        guard let list = tagList() else { return }
+        var edited = all
+        let raw = rawLines
+        if isOn {
+            guard !list.tags.contains(Self.favoriteTag) else { return }
+            switch list.layout {
+            case .flow(let text, let items, let close, let hasTrailingComma):
+                let afterSpace = text[..<close].last?.isWhitespace == true
+                let insertion = items.isEmpty || (hasTrailingComma && afterSpace) ? Self.favoriteTag
+                    : hasTrailingComma ? " \(Self.favoriteTag)" : ", \(Self.favoriteTag)"
+                var changed = text
+                changed.insert(contentsOf: insertion, at: close)
+                edited.replaceSubrange(list.range, with: [Substring(changed)])
+            case .block(let entries):
+                let last = list.range.lowerBound + entries.last!
+                let indent = edited[last].prefix { $0 == " " || $0 == "\t" }
+                let gap = edited[last].dropFirst(indent.count + 1).prefix { $0 == " " || $0 == "\t" }
+                let marker = String(indent) + "-" + (gap.isEmpty ? " " : String(gap))
+                let ending = edited[last].hasSuffix("\r\n") ? "\r\n" : "\n"
+                edited.insert(Substring("\(marker)\(Self.favoriteTag)\(ending)"), at: last + 1)
+            }
+            store(edited, around: raw, removing: false)
+        } else {
+            var list = list
+            while let position = list.tags.firstIndex(of: Self.favoriteTag) {
+                if list.tags.count == 1 {
+                    edited.removeSubrange(list.range)
+                } else {
+                    switch list.layout {
+                    case .flow(let text, let items, _, _):
+                        let removal = position < items.count - 1
+                            ? items[position].lowerBound..<items[position + 1].lowerBound
+                            : items[position - 1].upperBound..<items[position].upperBound
+                        var changed = text
+                        changed.removeSubrange(removal)
+                        edited.replaceSubrange(list.range, with: [Substring(changed)])
+                    case .block(let entries):
+                        edited.remove(at: list.range.lowerBound + entries[position])
+                    }
+                }
+                store(edited, around: raw, removing: true)
+                guard let next = tagList() else { return }
+                list = next
+                edited = lines
+            }
+        }
+    }
+
+    private struct TagList {
+        enum Layout {
+            /// The joined lines of the list, each item's range within them, where the list closes, and whether
+            /// the last item is followed by a comma.
+            case flow(text: String, items: [Range<String.Index>], close: String.Index, hasTrailingComma: Bool)
+            /// The offset within the list's lines of each item's line.
+            case block(entries: [Int])
+        }
+
+        let range: Range<Int>
+        let layout: Layout
+        let tags: [String]
+    }
+
+    private func tagList() -> TagList? {
+        let all = lines
+        guard let range = Self.range(of: "tags", in: all), let value = Self.value(in: all[range.lowerBound], for: "tags") else { return nil }
+        let block = Array(all[range])
+        let head = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if head.isEmpty || head.hasPrefix("#") {
+            var entries: [Int] = []
+            var tags: [String] = []
+            for (offset, line) in block.enumerated().dropFirst() {
+                let content = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if content.isEmpty || content.hasPrefix("#") { continue }
+                guard Self.isSequenceEntry(Substring(content)), let tag = Self.scalar(content.dropFirst()) else { return nil }
+                entries.append(offset)
+                tags.append(tag)
+            }
+            return entries.isEmpty ? nil : TagList(range: range, layout: .block(entries: entries), tags: tags)
+        }
+        guard head.hasPrefix("[") else { return nil }
+        let text = block.joined()
+        var index = text.index(after: text.firstIndex(of: "[")!)
+        var items: [Range<String.Index>] = []
+        var start: String.Index?
+        var end = index
+        var quote: Character?
+        var escaped = false
+        var close: String.Index?
+        var hasTrailingComma = false
+        while index < text.endIndex {
+            let character = text[index]
+            if let open = quote {
+                if escaped { escaped = false }
+                else if open == "\"" && character == "\\" { escaped = true }
+                else if character == open { quote = nil }
+                end = text.index(after: index)
+            } else if character == "]" {
+                close = index
+                break
+            } else if character == "," {
+                guard let first = start else { return nil }
+                items.append(first..<end)
+                start = nil
+                hasTrailingComma = true
+            } else if character == "[" || character == "{" {
+                return nil
+            } else if !character.isWhitespace {
+                if start == nil {
+                    start = index
+                    if character == "\"" || character == "'" { quote = character }
+                }
+                hasTrailingComma = false
+                end = text.index(after: index)
+            }
+            index = text.index(after: index)
+        }
+        guard let close, quote == nil else { return nil }
+        if let first = start { items.append(first..<end) }
+        let rest = text[text.index(after: close)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard rest.isEmpty || rest.hasPrefix("#") else { return nil }
+        let tags = items.compactMap { Self.scalar(text[$0]) }
+        guard tags.count == items.count else { return nil }
+        return TagList(range: range, layout: .flow(text: text, items: items, close: close, hasTrailingComma: hasTrailingComma), tags: tags)
+    }
 
     /// The note's own title, which Marfa keeps in the front matter.
     var title: String? {

@@ -63,14 +63,14 @@ struct OutsideChangeTests {
     @Test func theLibrarysOwnChangesAreNotTakenForAnothersOnceMade() async throws {
         let plan = try #require(note(at: "Work/Plan.md"))
         library.updateBody(of: plan.id, to: "# Plan\n\nMine\n")
-        library.setPinned([plan.id], true)
+        library.setFavorite([plan.id], true)
         library.move([plan.id], to: nil)
         await library.reread()
         let after = try #require(library.note(plan.id))
         #expect(after.body == "# Plan\n\nMine\n")
-        #expect(after.isPinned)
+        #expect(after.isFavorite)
         #expect(after.path == "Plan.md")
-        #expect(root.read("Plan.md") == "---\npinned: true\n---\n# Plan\n\nMine\n")
+        #expect(root.read("Plan.md") == "---\ntags: [favorite]\n---\n# Plan\n\nMine\n")
     }
 
     @Test func aRenameThatFailsLeavesOneNoteAndIsTriedAgain() async throws {

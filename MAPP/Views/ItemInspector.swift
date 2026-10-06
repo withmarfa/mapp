@@ -150,7 +150,7 @@ struct ItemInspector: View {
     }
 
     private var otherFields: [String] {
-        let displayed = Set(item.properties.map(\.key) + item.relationshipFields + ["title", "type", "marfa_id", "marfa_version", "pinned"])
+        let displayed = Set(item.properties.map(\.key) + item.relationshipFields + ["title", "type", "marfa_id", "marfa_version"])
         return item.fields.keys.filter { !displayed.contains($0) }.sorted()
     }
 }

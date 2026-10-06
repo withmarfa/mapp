@@ -317,8 +317,8 @@ final class NoteLibrary {
         switch item {
         case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
         case .allNotes: return notes.filter { !$0.isDeleted }
-        case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
-        case .pinnedItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isPinned }
+        case .favorites: return notes.filter { !$0.isDeleted && $0.isFavorite }
+        case .favoriteItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isFavorite }
         case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
         case .recentlyDeleted: return notes.filter(\.isDeleted)
         case .marfaTypes, .files: return []
@@ -383,8 +383,8 @@ final class NoteLibrary {
         switch item {
         case .inbox: String(localized: "Inbox")
         case .allNotes: String(localized: "All Notes")
-        case .pinned: String(localized: "Pinned")
-        case .pinnedItem(let id): self.item(id)?.title ?? ""
+        case .favorites: String(localized: "Favorites")
+        case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
@@ -397,12 +397,12 @@ final class NoteLibrary {
 
     // MARK: Notes
 
-    /// A new, empty note placed where it will show in `item`: in that folder, pinned when made from Pinned, and in
+    /// A new, empty note placed where it will show in `item`: in that folder, a favorite when made from Favorites, and in
     /// the Inbox otherwise. It has no file until its first line is written.
     @discardableResult
     func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
         var file = NoteFile(text: "")
-        if item == .pinned { file.setFlag("pinned", true) }
+        if item == .favorites { file.setFavorite(true) }
         var note = Note(text: file.text, created: now())
         if case .folder(let id) = item { note.folderID = folder(id)?.id }
         notes.append(note)
@@ -493,17 +493,21 @@ final class NoteLibrary {
         }
     }
 
-    /// Deleted notes keep their pin as it was, since Recently Deleted shows no pins.
-    func setPinned(_ ids: Set<Note.ID>, _ pinned: Bool, undoManager: UndoManager? = nil) {
-        let name = pinned ? String(localized: "Pin") : String(localized: "Unpin")
-        let changed = notes.filter { ids.contains($0.id) && !$0.isDeleted && $0.isPinned != pinned }.map(\.id)
-        guard !changed.isEmpty else { return }
-        for index in notes.indices where changed.contains(notes[index].id) {
-            notes[index].file.setFlag("pinned", pinned)
+    /// Deleted notes keep their tags as they were, since Recently Deleted shows no favorites. A note whose `tags`
+    /// line is not a list is left as written, so it is not counted as changed.
+    func setFavorite(_ ids: Set<Note.ID>, _ isFavorite: Bool, undoManager: UndoManager? = nil) {
+        let name = isFavorite ? String(localized: "Add to Favorites") : String(localized: "Remove from Favorites")
+        var changed: Set<Note.ID> = []
+        for index in notes.indices where ids.contains(notes[index].id) && !notes[index].isDeleted && notes[index].isFavorite != isFavorite {
+            let before = notes[index].file
+            notes[index].file.setFavorite(isFavorite)
+            guard notes[index].file != before else { continue }
+            changed.insert(notes[index].id)
             if let path = notes[index].path { perform(.write(path: path, text: notes[index].file.text)) }
         }
+        guard !changed.isEmpty else { return }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.setPinned(Set(changed), !pinned, undoManager: undoManager)
+            library.setFavorite(changed, !isFavorite, undoManager: undoManager)
         }
     }
 

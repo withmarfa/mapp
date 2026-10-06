@@ -50,7 +50,7 @@ final class WindowTests: XCTestCase {
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
-        case "Pinned": "SidebarPinnedSection"
+        case "Favorites": "SidebarFavoritesSection"
         case "Library": "SidebarLibrarySection"
         case "Projects": "SidebarProjects"
         case "Items": "SidebarItems"
@@ -68,7 +68,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "Pinned", "Library", "Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
+        for name in ["Inbox", "All Notes", "Favorites", "Library", "Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -178,10 +178,10 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
     }
 
-    func testPinningFromTheContextMenuAddsAPinnedShortcut() {
+    func testAddingToFavoritesFromTheContextMenuAddsAShortcut() {
         XCTAssertFalse(sidebarItem("Garden ideas").exists)
         row(titled: "Garden ideas").rightClick()
-        window.menuItems["Pin"].click()
+        window.menuItems["Add to Favorites"].click()
         XCTAssertTrue(sidebarItem("Garden ideas").waitForExistence(timeout: 2))
     }
 

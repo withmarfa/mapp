@@ -70,7 +70,7 @@ nonisolated struct Note: Identifiable, Hashable {
     }
 
     var body: String { file.body }
-    var isPinned: Bool { file.isPinned }
+    var isFavorite: Bool { file.isFavorite }
     var isDeleted: Bool { deleted != nil }
     /// A note not yet written to a file.
     var isDraft: Bool { path == nil }

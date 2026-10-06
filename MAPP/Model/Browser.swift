@@ -73,13 +73,13 @@ final class Browser {
         isCreatingItem ? [] : selection.compactMap { library.note($0) }
     }
 
-    /// The list's sections. Pinned notes lead wherever pins mean something: not in Pinned itself, where every
-    /// note is pinned, nor in Recently Deleted or search results.
+    /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
+    /// note is one, nor in Recently Deleted or search results.
     func sections(in library: NoteLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
             of: notes(in: library),
             sort: order.sort,
-            pinnedFirst: !isSearching && !showsOnlyPinned && item != .recentlyDeleted,
+            favoritesFirst: !isSearching && !showsOnlyFavorites && item != .recentlyDeleted,
             groupsByDate: order.groupsByDate,
             now: now
         )
@@ -87,12 +87,12 @@ final class Browser {
 
     /// Whether the list mixes notes from several places, so each row says where its note lives.
     var showsFolders: Bool {
-        isSearching || item == .allNotes || showsOnlyPinned || item == .recentlyDeleted
+        isSearching || item == .allNotes || showsOnlyFavorites || item == .recentlyDeleted
     }
 
-    private var showsOnlyPinned: Bool {
-        if case .pinnedItem = item { return true }
-        return item == .pinned
+    private var showsOnlyFavorites: Bool {
+        if case .favoriteItem = item { return true }
+        return item == .favorites
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
@@ -165,9 +165,9 @@ final class Browser {
         if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
             show(.allNotes, in: library, order: order)
         }
-        if case .pinnedItem(let id) = sidebarItem,
-           library.note(id).map({ !$0.isDeleted && $0.isPinned }) != true {
-            show(.pinned, in: library, order: order)
+        if case .favoriteItem(let id) = sidebarItem,
+           library.note(id).map({ !$0.isDeleted && $0.isFavorite }) != true {
+            show(.favorites, in: library, order: order)
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
@@ -199,9 +199,9 @@ final class Browser {
         var selection: [String]
 
         enum Item: Codable, Equatable {
-            case inbox, allNotes, pinned, recentlyDeleted, marfaTypes, files
+            case inbox, allNotes, favorites, recentlyDeleted, marfaTypes, files
             case itemType(String), project(String)
-            case pinnedItem(String)
+            case favoriteItem(String)
             case folder(String)
         }
     }
@@ -211,8 +211,8 @@ final class Browser {
             switch item {
             case .inbox: .inbox
             case .allNotes: .allNotes
-            case .pinned: .pinned
-            case .pinnedItem(let id): .pinnedItem(library.note(id)?.path ?? "")
+            case .favorites: .favorites
+            case .favoriteItem(let id): .favoriteItem(library.note(id)?.path ?? "")
             case .recentlyDeleted: .recentlyDeleted
             case .marfaTypes: .marfaTypes
             case .files: .files
@@ -230,9 +230,9 @@ final class Browser {
     func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
         switch snapshot.sidebarItem {
         case .inbox: sidebarItem = .inbox
-        case .pinned: sidebarItem = .pinned
-        case .pinnedItem(let path):
-            sidebarItem = library.note(at: path).flatMap { $0.isPinned && !$0.isDeleted ? .pinnedItem($0.id) : nil } ?? .pinned
+        case .favorites: sidebarItem = .favorites
+        case .favoriteItem(let path):
+            sidebarItem = library.note(at: path).flatMap { $0.isFavorite && !$0.isDeleted ? .favoriteItem($0.id) : nil } ?? .favorites
         case .recentlyDeleted: sidebarItem = .recentlyDeleted
         case .marfaTypes: sidebarItem = .marfaTypes
         case .files: sidebarItem = .files

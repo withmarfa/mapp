@@ -2,7 +2,7 @@ import Foundation
 
 /// The sections of the note list, as Notes groups them.
 nonisolated enum NoteGroup: Hashable {
-    case pinned
+    case favorites
     case today
     case yesterday
     case previous7Days
@@ -12,7 +12,7 @@ nonisolated enum NoteGroup: Hashable {
 
     func title(calendar: Calendar = .current) -> String {
         switch self {
-        case .pinned: String(localized: "Pinned")
+        case .favorites: String(localized: "Favorites")
         case .today: String(localized: "Today")
         case .yesterday: String(localized: "Yesterday")
         case .previous7Days: String(localized: "Previous 7 Days")
@@ -42,12 +42,12 @@ nonisolated enum NoteGroup: Hashable {
         }
     }
 
-    /// Sorts the notes and splits them into sections. Pinned notes lead unless `pinnedFirst` is off, and date
+    /// Sorts the notes and splits them into sections. Favorites lead unless `favoritesFirst` is off, and date
     /// sections follow only when grouping by date and the list is sorted by a date.
     static func sections(
         of notes: [Note],
         sort: NoteSort,
-        pinnedFirst: Bool,
+        favoritesFirst: Bool,
         groupsByDate: Bool,
         now: Date,
         calendar: Calendar = .current
@@ -55,10 +55,10 @@ nonisolated enum NoteGroup: Hashable {
         let notes = sort.sorted(notes)
         var sections: [NoteSection] = []
         var rest = notes
-        if pinnedFirst {
-            let pinned = notes.filter(\.isPinned)
-            if !pinned.isEmpty { sections.append(NoteSection(group: .pinned, notes: pinned)) }
-            rest = notes.filter { !$0.isPinned }
+        if favoritesFirst {
+            let favorites = notes.filter(\.isFavorite)
+            if !favorites.isEmpty { sections.append(NoteSection(group: .favorites, notes: favorites)) }
+            rest = notes.filter { !$0.isFavorite }
         }
         guard groupsByDate, sort != .title else {
             if !rest.isEmpty { sections.append(NoteSection(group: nil, notes: rest)) }

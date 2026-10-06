@@ -160,6 +160,9 @@
     "Add Row Below" : {
 
     },
+    "Add to Favorites" : {
+
+    },
     "Align Center" : {
 
     },
@@ -275,6 +278,9 @@
 
     },
     "Export as PDF…" : {
+
+    },
+    "Favorites" : {
 
     },
     "Find" : {
@@ -419,15 +425,6 @@
     "Page Width" : {
 
     },
-    "Pin" : {
-
-    },
-    "Pin Note" : {
-
-    },
-    "Pinned" : {
-
-    },
     "Places" : {
 
     },
@@ -450,6 +447,9 @@
 
     },
     "Redo" : {
+
+    },
+    "Remove from Favorites" : {
 
     },
     "Rename" : {
@@ -534,12 +534,6 @@
 
     },
     "Undo" : {
-
-    },
-    "Unpin" : {
-
-    },
-    "Unpin Note" : {
 
     },
     "Use Selection for Find" : {

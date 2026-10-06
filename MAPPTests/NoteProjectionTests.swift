@@ -4,14 +4,14 @@ import Testing
 
 struct NoteProjectionTests {
     @Test func typedFieldsRetainUnknownDataAndSourceText() {
-        let text = "\u{FEFF}---\r\ntype: custom.session\r\ntitle: \"A: session\"\r\nstarts_at: 2026-10-01T21:30:00+01:00\r\npinned: true\r\ncount: 9007199254740993\r\nratio: 1.25\r\nempty: null\r\nquoted: 'false'\r\nmetadata: {labels: [one, two], enabled: false}\r\nmarfa_id: 'opaque-id'\r\n---\r\n# Body\r\n"
+        let text = "\u{FEFF}---\r\ntype: custom.session\r\ntitle: \"A: session\"\r\nstarts_at: 2026-10-01T21:30:00+01:00\r\nreviewed: true\r\ncount: 9007199254740993\r\nratio: 1.25\r\nempty: null\r\nquoted: 'false'\r\nmetadata: {labels: [one, two], enabled: false}\r\nmarfa_id: 'opaque-id'\r\n---\r\n# Body\r\n"
         let file = NoteFile(text: text)
         let projection = NoteProjection(id: UUID(), file: file, fallbackTitle: "Filename")
         #expect(projection.declaredType == "custom.session")
         #expect(projection.title == "A: session")
         #expect(projection.body == "# Body\n")
         #expect(projection.fields?["starts_at"] == .string("2026-10-01T21:30:00+01:00"))
-        #expect(projection.fields?["pinned"] == .bool(true))
+        #expect(projection.fields?["reviewed"] == .bool(true))
         #expect(projection.fields?["count"] == .number(Decimal(string: "9007199254740993")!))
         #expect(projection.fields?["ratio"] == .number(Decimal(string: "1.25")!))
         #expect(projection.fields?["empty"] == .null)

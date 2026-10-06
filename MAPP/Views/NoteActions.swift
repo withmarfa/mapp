@@ -23,11 +23,11 @@ struct NoteActions: View {
                 library.notesToPurge = ids
             }
         } else {
-            let allPinned = !notes.isEmpty && notes.allSatisfy(\.isPinned)
+            let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
             // The menu bar keeps these in place, dimmed, when nothing is selected.
             Group {
-                Button(pinTitle(allPinned), systemImage: allPinned ? "pin.slash" : "pin") {
-                    library.setPinned(ids, !allPinned, undoManager: undoManager)
+                Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
+                    library.setFavorite(ids, !allFavorites, undoManager: undoManager)
                 }
                 moveMenu(notes)
                 Divider()
@@ -39,15 +39,6 @@ struct NoteActions: View {
                 }
             }
             .disabled(notes.isEmpty)
-        }
-    }
-
-    private func pinTitle(_ allPinned: Bool) -> LocalizedStringKey {
-        switch (allPinned, inMenuBar) {
-        case (true, true): "Unpin Note"
-        case (true, false): "Unpin"
-        case (false, true): "Pin Note"
-        case (false, false): "Pin"
         }
     }
 
