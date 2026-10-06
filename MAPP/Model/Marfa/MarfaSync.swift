@@ -14,7 +14,8 @@ actor MarfaSync {
 
     private let copy: WorkingCopy
     private let hub: MarfaHub
-    private let tell: @Sendable (MarfaEngine.Event) -> Void
+    /// False once the engine has stopped taking events.
+    private let tell: @Sendable (MarfaEngine.Event) -> Bool
     private var started = false
     private var stopped = false
     private var wantsRefresh = false
@@ -26,8 +27,28 @@ actor MarfaSync {
     private var failures = 0
     private var flushers: [CheckedContinuation<Void, Never>] = []
     private var draining: [CheckedContinuation<Void, Never>] = []
+    /// How many drains this lane has sent, for the tests.
+    private(set) var drains = 0
 
-    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (MarfaEngine.Event) -> Void) {
+    nonisolated enum DrainResult: Hashable, Sendable {
+        /// The server refused the key and the core parked the queue until a new one is given.
+        case parked(String)
+        case offline(String?)
+        case online
+        /// Nothing was sent, so nothing was learned about the server.
+        case idle
+    }
+
+    /// What a drain says of the server. A refused key is answered `blocked`, which counts as answered, before the
+    /// core parks the queue, and a drain that got partway answered some writes, so neither is judged by `answered`.
+    nonisolated static func result(of report: DrainReport) -> DrainResult {
+        if let stopped = report.stopped { return .parked(stopped) }
+        if report.undelivered > 0 || report.unavailable != nil { return .offline(report.unavailable) }
+        if report.answered > 0 { return .online }
+        return .idle
+    }
+
+    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (MarfaEngine.Event) -> Bool) {
         self.copy = copy
         self.hub = hub
         self.tell = tell
@@ -88,6 +109,11 @@ actor MarfaSync {
         draining = []
     }
 
+    /// The person gives a new key in Settings; nothing is sent until then.
+    nonisolated static var keyRefused: String {
+        String(localized: "The Marfa server refused this library’s key. Check the key in Settings.")
+    }
+
     /// Five seconds, doubling to five minutes.
     nonisolated static func delay(after failures: Int) -> Duration {
         .seconds(min(5 * (1 << min(max(failures, 1) - 1, 10)), 300))
@@ -141,14 +167,27 @@ actor MarfaSync {
     /// for the first hydration.
     private func runDrain() async {
         guard (try? await copy.status())?.hydration == .complete else { return }
+        drains += 1
         do {
             let report = try await copy.queue.drain()
-            if !report.verdicts.isEmpty { tell(.drained(report)) }
-            if report.answered > 0 {
-                succeeded()
-            } else if report.undelivered > 0, let reason = report.unavailable {
+            // The next drain waits until the engine has taken these answers, since the engine's forgetting them
+            // would also forget a later drain's answers it has not taken yet.
+            if !report.verdicts.isEmpty {
+                await withCheckedContinuation { taken in
+                    if !tell(.drained(report, taken)) { taken.resume() }
+                }
+            }
+            switch Self.result(of: report) {
+            case .parked(let reason):
+                hub.set(.stopped(code: BlockedReason.credentialRefused.rawValue, message: reason))
+                _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
+            case .offline(let reason):
                 hub.set(.offline(reason: reason))
                 schedule(.drain)
+            case .online:
+                succeeded()
+            case .idle:
+                break
             }
         } catch {
             await failed(error, retrying: .drain)
@@ -205,16 +244,18 @@ actor MarfaSync {
             schedule(kind)
         case .unauthorized, .forbidden, .signedOut:
             hub.set(.stopped(code: error.code(), message: error.message))
-            tell(.failed(SourceFailure(kind: .denied, message: error.message)))
+            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
         case .copyExpired:
-            // The server asks for a new hydration, which keeps the queue.
+            // The server asks for a new hydration, which keeps the queue. The follow that stopped for it runs
+            // outside the loop, so the work starts here.
             refreshed = false
             wantsRefresh = true
+            work()
         case .hydrationIncomplete, .noCursor, .canceled, .closed:
             break
         default:
             hub.set(.stopped(code: error.code(), message: error.message))
-            tell(.failed(SourceFailure(kind: .failed, message: error.message)))
+            _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
         }
     }
 }

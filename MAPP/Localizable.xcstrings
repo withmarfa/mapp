@@ -829,6 +829,12 @@
     },
     "The item was made, but it couldn’t be put under its parent: %@": {
       "extractionState": "manual"
+    },
+    "This library is being brought up to date. Try again in a moment.": {
+      "extractionState": "manual"
+    },
+    "The Marfa server refused this library’s key. Check the key in Settings.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

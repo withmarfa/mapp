@@ -217,6 +217,43 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// The follow stops when the copy expires, and only a new hydration starts it again.
+    @Test(.timeLimit(.minutes(1)))
+    func anExpiredCopyIsHydratedAgain() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        #expect(source.connectionState == .connecting)
+        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
+        source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
+        // Hydrating again against a closed port fails at once, which shows the hydration was tried.
+        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        await source.close()
+    }
+
+    @Test func aWriteToACopyBeingBroughtUpToDateIsRefusedPlainly() {
+        for error in [
+            MarfaError.hydrationIncomplete(message: "hydration did not complete; hydrate again before reading"),
+            MarfaError.copyExpired(reason: "catchup_too_old", message: "the copy expired")
+        ] {
+            #expect(MarfaEngine.problem(for: error) == SyncProblem(code: error.code(), message: MarfaEngine.notCurrent))
+        }
+        let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing")
+        #expect(MarfaEngine.problem(for: other) == SyncProblem(code: other.code(), message: other.message))
+    }
+
+    @Test func aDrainIsJudgedByWhatItCouldNotSend() {
+        #expect(MarfaSync.result(of: DrainReport()) == .idle)
+        #expect(MarfaSync.result(of: DrainReport(answered: 2)) == .online)
+        // The core answers a refused key `blocked`, which counts as answered, and then parks the queue.
+        #expect(MarfaSync.result(of: DrainReport(answered: 1, stopped: "credential_refused")) == .parked("credential_refused"))
+        #expect(MarfaSync.result(of: DrainReport(answered: 1, undelivered: 2, unavailable: "network: timeout")) ==
+            .offline("network: timeout"))
+        #expect(MarfaSync.result(of: DrainReport(undelivered: 1, unavailable: "io: refused")) == .offline("io: refused"))
+    }
+
     @Test func aRetryWaitsLongerAfterEachFailureUpToFiveMinutes() {
         #expect(MarfaSync.delay(after: 1) == .seconds(5))
         #expect(MarfaSync.delay(after: 2) == .seconds(10))
@@ -418,6 +455,117 @@ struct MarfaSourceLiveTests {
         }
     }
 
+    /// A conflict answered in an earlier launch, and not yet forgotten, stays shown through later writes.
+    @Test(.timeLimit(.minutes(2)))
+    func aConflictFromAnEarlierLaunchStaysShown() async throws {
+        let root = scratch()
+        let made = LiveMarfa.Made()
+        defer { try? FileManager.default.removeItem(at: root) }
+        do {
+            try await conflictFromAnEarlierLaunch(root, made)
+        } catch {
+            await LiveMarfa.purge(made.ids)
+            throw error
+        }
+        await LiveMarfa.purge(made.ids)
+    }
+
+    private func conflictFromAnEarlierLaunch(_ root: URL, _ made: LiveMarfa.Made) async throws {
+        let address = try #require(LiveMarfa.address), key = try #require(LiveMarfa.key)
+        let connection = try MarfaConnection(address: address)
+        let location = try MarfaStoreLocation(root: root)
+        let keys = MemoryKeyStore([connection: key])
+        let a = made.mint(), b = made.mint()
+        let tag = UUID().uuidString.prefix(8)
+
+        var source = try await MarfaSource.open(connection, keys: keys, location: location)
+        var log = ChangeLog(source)
+        source.refresh()
+        _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
+        source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MAPPTEST earlier A \(tag)", body: "One")), as: WriteID())
+        source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MAPPTEST earlier B \(tag)", body: "One")), as: WriteID())
+        let both = try #require(await log.wait { state in
+            [a, b].allSatisfy { id in state.snapshot?.items.first { $0.id == id }?.sync == .settled }
+        })
+        let version = try #require(both.snapshot?.items.first { $0.id == a }?.version)
+        await source.close()
+
+        let otherRoot = scratch()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
+        let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
+        _ = try await other.hydrate(types: ["core.*"], tier: .library)
+        let row = try #require(try await other.items.get(a.rawValue))
+        _ = try await other.items.update(a.rawValue, Edit(properties: ["body": "Another device"], baseVersion: row.version))
+        _ = try await other.queue.drain()
+        await other.close()
+
+        // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
+        let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+        _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": "This device"], baseVersion: version.rawValue))
+        let report = try await raw.queue.drain()
+        let sibling = report.verdicts.compactMap { answer -> String? in
+            if case .conflicted(let sibling, _)? = answer.verdict { sibling } else { nil }
+        }.first
+        if let sibling { made.add(ItemID(sibling)) }
+        await raw.close()
+        _ = try #require(sibling)
+
+        source = try await MarfaSource.open(connection, keys: keys, location: location)
+        log = ChangeLog(source)
+        let reopened = try #require(await log.wait { $0.snapshot != nil })
+        guard case .conflicted? = reopened.snapshot?.items.first(where: { $0.id == a })?.sync else {
+            Issue.record("the earlier conflict is not shown")
+            await source.close()
+            return
+        }
+        source.refresh()
+        #expect(await waitForConnection(source) { $0 == .online })
+        let tagged = WriteID()
+        source.submit(.tag(b, ItemTag.favorite, on: true), as: tagged)
+        _ = try #require(await log.wait { $0.answer(to: tagged) != nil })
+        await source.flush()
+        let after = try #require(await log.wait { state in
+            state.snapshot?.items.first { $0.id == b }?.sync == .settled
+        })
+        guard case .conflicted? = after.snapshot?.items.first(where: { $0.id == a })?.sync else {
+            Issue.record("a later write cleared the earlier conflict")
+            await source.close()
+            return
+        }
+        await source.close()
+    }
+
+    /// A second drain forgetting answers the engine has not taken yet could lose them, so the next drain waits.
+    @Test(.timeLimit(.minutes(2)))
+    func aDrainWaitsUntilTheLastAnswersAreTaken() async throws {
+        try await withSource { source, log, made in
+            let title = "MAPPTEST drains \(UUID().uuidString.prefix(8))"
+            let id = made.mint()
+            let created = WriteID()
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: title, body: "One")), as: created)
+            _ = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
+
+            let holding = LiveMarfa.Flag()
+            await source.engine.whenAnswering {
+                holding.set()
+                try? await Task.sleep(for: .seconds(2))
+            }
+            let before = await source.engine.sync.drains
+            let tagged = WriteID()
+            source.submit(.tag(id, ItemTag.favorite, on: true), as: tagged)
+            #expect(await LiveMarfa.until { holding.isSet })
+            await source.engine.sync.drain()
+            try await Task.sleep(for: .milliseconds(800))
+            #expect(await source.engine.sync.drains == before + 1)
+            await source.engine.whenAnswering(nil)
+            _ = try #require(await log.wait { $0.answer(to: tagged) != nil })
+            #expect(await LiveMarfa.until { await source.engine.sync.drains == before + 2 })
+            source.submit(.transition(id, .trashed), as: WriteID())
+            await source.flush()
+        }
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func aRefusedWriteIsReportedAndKept() async throws {
         try await withSource { source, log, made in
@@ -453,9 +601,29 @@ nonisolated enum LiveMarfa {
 
         func mint() -> ItemID {
             let id = ItemID.mint()
-            minted.withLock { $0.append(id) }
+            add(id)
             return id
         }
+
+        func add(_ id: ItemID) {
+            minted.withLock { $0.append(id) }
+        }
+    }
+
+    final class Flag: Sendable {
+        private let value = Mutex(false)
+        var isSet: Bool { value.withLock { $0 } }
+        func set() { value.withLock { $0 = true } }
+    }
+
+    static func until(_ timeout: Duration = .seconds(20), _ condition: () async -> Bool) async -> Bool {
+        let clock = ContinuousClock()
+        let end = clock.now + timeout
+        while clock.now < end {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return false
     }
 
     /// Bins and then purges each item over HTTP. An item never made answers 404, which is fine.

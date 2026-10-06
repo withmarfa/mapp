@@ -9,7 +9,8 @@ actor MarfaEngine {
         case paint
         case write(ItemWrite, WriteID)
         case change(Marfa.Change)
-        case drained(DrainReport)
+        /// Resumed once the answers are taken and forgotten.
+        case drained(DrainReport, CheckedContinuation<Void, Never>)
         case failed(SourceFailure)
         case flush(CheckedContinuation<Void, Never>)
         case close(CheckedContinuation<Void, Never>)
@@ -24,6 +25,10 @@ actor MarfaEngine {
         String(localized: "This change can’t be made in a Marfa library yet.")
     }
 
+    nonisolated static var notCurrent: String {
+        String(localized: "This library is being brought up to date. Try again in a moment.")
+    }
+
     nonisolated static var noText: String {
         String(localized: "This kind of item has no text to edit.")
     }
@@ -31,7 +36,7 @@ actor MarfaEngine {
     let sync: MarfaSync
     private let copy: WorkingCopy
     private let hub: MarfaHub
-    private let tell: @Sendable (Event) -> Void
+    private let tell: @Sendable (Event) -> Bool
     private var catalogue = Catalogue()
     private var rows: [String: Marfa.Item] = [:]
     private var edges: [String: Marfa.Edge] = [:]
@@ -43,9 +48,11 @@ actor MarfaEngine {
     private var places: [Place] = []
     private var syncStates: [ItemID: SyncState] = [:]
     private var changedSync: Set<ItemID> = []
-    /// Refusals and conflicts a drain answered, which the queue forgets unless the write carried content, kept until
-    /// a later write of the same kind, or an edit, is accepted or merged.
+    /// Refusals and conflicts answered, which the queue forgets unless the write carried content, kept until a later
+    /// write of the same kind, or an edit, is accepted or merged. Answers already in the queue at launch, from a
+    /// launch that closed before forgetting them, are taken in at the first read of the queue.
     private var remembered: [ItemID: (state: SyncState, kind: WriteKind)] = [:]
+    private var readQueueOnce = false
     /// The app's write for each queued write it made, until every one of them is answered.
     private var submitted: [String: WriteID] = [:]
     private var outstanding: [WriteID: Set<String>] = [:]
@@ -54,8 +61,14 @@ actor MarfaEngine {
     private var following: Task<Void, Never>?
     private var painted = false
     private var closed = false
+    /// Run before each drain's answers are taken, for the tests.
+    private var answering: (@Sendable () async -> Void)?
 
-    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (Event) -> Void) {
+    func whenAnswering(_ hook: (@Sendable () async -> Void)?) {
+        answering = hook
+    }
+
+    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
         self.hub = hub
         self.tell = tell
@@ -67,13 +80,16 @@ actor MarfaEngine {
             if closed {
                 if case .flush(let done) = event { done.resume() }
                 if case .close(let done) = event { done.resume() }
+                if case .drained(_, let taken) = event { taken.resume() }
                 continue
             }
             switch event {
             case .paint: await paint()
             case .write(let write, let id): await perform(write, as: id)
             case .change(let change): await handle(change)
-            case .drained(let report): await answer(report)
+            case .drained(let report, let taken):
+                await answer(report)
+                taken.resume()
             case .failed(let failure):
                 failures.append(failure)
                 publish([])
@@ -101,7 +117,9 @@ actor MarfaEngine {
         guard following == nil else { return }
         let changes = copy.changes()
         following = Task { [tell] in
-            for await change in changes { tell(.change(change)) }
+            for await change in changes {
+                if !tell(.change(change)) { return }
+            }
         }
         await sync.start()
     }
@@ -165,6 +183,14 @@ actor MarfaEngine {
         } catch {
             failures.append(Self.failure(error))
             return
+        }
+        if !readQueueOnce {
+            readQueueOnce = true
+            for write in queue {
+                guard let itemID = write.itemId, let verdict = write.verdict, let outcome = MarfaMapping.outcome(verdict)
+                else { continue }
+                remember(outcome, of: write.kind, for: ItemID(itemID))
+            }
         }
         let states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
         changedSync.formUnion(Set(states.keys).union(syncStates.keys).filter { states[$0] != syncStates[$0] })
@@ -289,9 +315,22 @@ actor MarfaEngine {
             hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message))))
         } catch let error as MarfaError {
             // Refused before it was queued, such as a property the type does not allow: nothing is waiting.
-            hub.publish(.answered(id, .refused(SyncProblem(code: error.code(), message: error.message))))
+            hub.publish(.answered(id, .refused(Self.problem(for: error))))
+            switch error {
+            case .hydrationIncomplete, .copyExpired: await sync.refresh()
+            default: break
+            }
         } catch {
             hub.publish(.answered(id, .refused(SyncProblem(code: "failed", message: error.localizedDescription))))
+        }
+    }
+
+    /// A copy that expired, or whose hydration was cut short, takes no writes until it is hydrated again; the
+    /// package says so in its own words, which the person is spared. The app keeps the text it tried to save.
+    nonisolated static func problem(for error: MarfaError) -> SyncProblem {
+        switch error {
+        case .hydrationIncomplete, .copyExpired: SyncProblem(code: error.code(), message: notCurrent)
+        default: SyncProblem(code: error.code(), message: error.message)
         }
     }
 
@@ -384,9 +423,10 @@ actor MarfaEngine {
     }
 
     /// Tells each verdict to the app's write and shows it on its item while the queue still holds it, and only
-    /// then forgets the answered writes, so no refusal is cleared unseen, whichever launch made the write. Refused
-    /// writes that carried content stay queued until discarded.
+    /// then forgets the answered writes. A refusal or conflict stays shown after that through `remembered`, and
+    /// refused writes that carried content stay queued until discarded.
     private func answer(_ report: DrainReport) async {
+        await answering?()
         var ids: Set<String> = []
         for answer in report.verdicts {
             guard let verdict = answer.verdict, let outcome = MarfaMapping.outcome(verdict) else { continue }

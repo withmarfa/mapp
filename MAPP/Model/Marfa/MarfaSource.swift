@@ -21,7 +21,7 @@ nonisolated final class MarfaSource: ItemSource {
     let embeds: any EmbedResolver = MarfaEmbeds()
     let copy: WorkingCopy
     private let hub = MarfaHub()
-    private let engine: MarfaEngine
+    let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
     private init(copy: WorkingCopy, connection: MarfaConnection) {
@@ -29,7 +29,9 @@ nonisolated final class MarfaSource: ItemSource {
         self.connection = connection
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
-        engine = MarfaEngine(copy: copy, hub: hub, tell: { events.yield($0) })
+        engine = MarfaEngine(copy: copy, hub: hub, tell: { event in
+            if case .terminated = events.yield(event) { false } else { true }
+        })
         Task { [engine] in await engine.run(stream) }
     }
 
