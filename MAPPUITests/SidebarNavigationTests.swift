@@ -66,7 +66,7 @@ final class SidebarNavigationTests: XCTestCase {
         types.hover()
         attachScreenshot("FooterMarfaTypesHover")
         types.click()
-        XCTAssertTrue(window.groups["MarfaTypes"].webViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.descendants(matching: .any)["MarfaTypesList"].waitForExistence(timeout: 5))
         types.hover()
         attachScreenshot("FooterMarfaTypesSelected")
 

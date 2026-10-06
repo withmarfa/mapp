@@ -221,6 +221,30 @@ struct TypesBrowserTests {
 
     // MARK: Search
 
+    @Test func returnInTheSearchChoosesTheFirstMatchPassingOverTheTypesAboveIt() {
+        let browser = browser()
+        browser.searchText = "email"
+        #expect(browser.itemRows.first?.type.label == "Entity")
+        browser.selectFirstMatch()
+        #expect(browser.selection == person)
+    }
+
+    @Test func returnInTheSearchChoosesAnEdgeTypeWhenNoItemTypeMatches() {
+        let browser = browser()
+        browser.searchText = "has-attachment"
+        browser.selectFirstMatch()
+        #expect(browser.selection == .edge("attached-to"))
+    }
+
+    @Test func returnInASearchWithNoMatchesKeepsTheChoice() {
+        let browser = browser()
+        browser.select(image)
+        browser.searchText = "nothing like this"
+        browser.selectFirstMatch()
+        #expect(browser.selection == image)
+        #expect(!browser.canGoBack)
+    }
+
     private func labels(_ browser: TypesBrowser) -> [String] { browser.itemRows.map(\.type.label) }
 
     @Test func withoutASearchEveryTypeIsListed() {
