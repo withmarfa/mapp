@@ -61,6 +61,19 @@ import Observation
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
     /// so the draft it came from is the person's to send again.
     private(set) var refusedCreations: Set<ItemID> = []
+    /// The text of each item's last save until the source answers it, so text a closing source refuses can be
+    /// given back to the person. Only the last is kept, since it holds everything typed before it.
+    @ObservationIgnored private var lastTyped: [ItemID: (write: WriteID, text: String)] = [:]
+    /// Where a write this library's closed source would not take is told, with the text it carried. By then the
+    /// windows read another library, so this one's `failure` would be shown nowhere. Set by the app; without it
+    /// the library's own `failure` says so.
+    @ObservationIgnored var onNotKept: ((NotKept) -> Void)?
+
+    /// A write no queue holds, since the source had closed.
+    nonisolated struct NotKept: Hashable, Sendable {
+        var title: String
+        var text: String?
+    }
 
     /// A place's order changes only with what it holds, so a change to one item maps the items again without
     /// sorting them.
@@ -73,6 +86,8 @@ import Observation
 
     private nonisolated struct Refusal {
         var title: String
+        /// What a create carried, which a closing source would otherwise lose.
+        var text: String?
     }
 
     private nonisolated struct Replacement {
@@ -254,8 +269,14 @@ import Observation
 
     private func answered(_ id: WriteID, _ outcome: WriteOutcome) async {
         let refusal = refusals.removeValue(forKey: id)
+        let typed = textWrites[id].flatMap { item in lastTyped[item].flatMap { $0.write == id ? $0.text : nil } }
+        if let item = textWrites[id], lastTyped[item]?.write == id { lastTyped[item] = nil }
         if case .refused(let problem) = outcome, let refusal {
-            failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
+            if problem.code == MarfaEngine.closedCode {
+                notKept(refusal.title, text: typed ?? refusal.text)
+            } else {
+                failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
+            }
         }
         if let created = creating.removeValue(forKey: id), case .refused = outcome, records[created] == nil {
             refusedCreations.insert(created)
@@ -300,12 +321,32 @@ import Observation
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
-        refusals[id] = Refusal(title: title)
+        refusals[id] = Refusal(title: title, text: Self.createdText(write))
         if !source.submit(write, as: id) {
             refusals[id] = nil
-            failure = (title, MarfaEngine.notKept)
+            notKept(title, text: Self.typedText(write))
         }
         return id
+    }
+
+    /// Told where the person sees it, with the text they typed, since nothing else holds that text.
+    private func notKept(_ title: String, text: String?) {
+        if let onNotKept {
+            onNotKept(NotKept(title: title, text: text))
+        } else {
+            failure = (title, MarfaEngine.notKept)
+        }
+    }
+
+    private static func typedText(_ write: ItemWrite) -> String? {
+        if case .editBody(_, let text, _, _) = write { return text }
+        return createdText(write)
+    }
+
+    /// A draft refused while it waits is given back by the window that made it, unless that window has moved on.
+    private static func createdText(_ write: ItemWrite) -> String? {
+        guard case .create(_, let draft) = write else { return nil }
+        return draft.body.isEmpty ? draft.title : draft.title + "\n\n" + draft.body
     }
 
     /// A create is followed to its answer, so one refused before the source holds the item gives its draft back.
@@ -326,6 +367,7 @@ import Observation
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         unsettledText[id, default: []].insert(write)
         textWrites[write] = id
+        lastTyped[id] = (write, text)
         guard readAt == held else { return }
         savedOn[id] = readAt
         records[id]?.body = ItemBody(id: id, text: text, version: readAt)

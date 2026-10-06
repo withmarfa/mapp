@@ -9,6 +9,7 @@ struct MAPPApp: App {
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
+                .unkeptChanges(libraries)
                 .environment(libraries)
                 .environment(libraries.folder)
                 .environment(libraries.host)
@@ -23,18 +24,21 @@ struct MAPPApp: App {
         }
 
         WindowGroup("Item", for: ItemID.self) { $id in
-            if let library = libraries.current {
-                NoteWindow(library: library, id: $id)
-                    .environment(\.library, library)
-            } else if libraries.mode == .opening {
-                // A window restored while the server's copy opens waits for it rather than closing.
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // An item's window has nothing to show without a library, as when one is restored before a notes
-                // folder is chosen, or after the server's copy could not be opened.
-                ClosingView()
+            Group {
+                if let library = libraries.current {
+                    NoteWindow(library: library, id: $id)
+                        .environment(\.library, library)
+                } else if libraries.mode == .opening {
+                    // A window restored while the server's copy opens waits for it rather than closing.
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // An item's window has nothing to show without a library, as when one is restored before a
+                    // notes folder is chosen, or after the server's copy could not be opened.
+                    ClosingView()
+                }
             }
+            .unkeptChanges(libraries)
         }
         .defaultSize(width: 640, height: 720)
     }

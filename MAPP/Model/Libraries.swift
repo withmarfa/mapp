@@ -28,6 +28,17 @@ import Observation
     /// forgotten when Settings is put away and opened again.
     let marfaSettings: MarfaSettingsModel
 
+    /// Changes a Marfa library could not keep because its copy closed first, for the window in front to tell,
+    /// since by then the windows read another library and the one that refused them is shown nowhere.
+    var unkept: Unkept?
+
+    nonisolated struct Unkept: Hashable, Sendable {
+        var title: String
+        var message: String
+        /// The text the person typed that no library holds, for them to put back.
+        var text: String?
+    }
+
     @ObservationIgnored private var marfaLibrary: MarfaLibrary?
 
     init(folder: NotesFolder, host: MarfaHost) {
@@ -35,7 +46,7 @@ import Observation
         self.host = host
         marfaSettings = MarfaSettingsModel(host: host)
         isLaunching = host.configuredConnection != nil
-        marfaSettings.beforeChange = { [weak self] in await self?.flushEditors() }
+        host.handOverEdits = { [weak self] in await self?.flushEditors() }
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -79,8 +90,20 @@ import Observation
         guard let source = host.source else { return nil }
         if let marfaLibrary, marfaLibrary.source === source { return marfaLibrary }
         let library = MarfaLibrary(source: source)
+        library.onNotKept = { [weak self] in self?.tell($0) }
         marfaLibrary = library
         return library
+    }
+
+    /// Gathers what is not kept until the person has been told, so a second refusal adds its text to the first.
+    func tell(_ notKept: MarfaLibrary.NotKept) {
+        let texts = [unkept?.text, notKept.text].compactMap { $0 }.filter { !$0.isEmpty }
+        let text = texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+        let title = unkept == nil ? notKept.title : String(localized: "Some Changes Weren’t Saved")
+        let message = text == nil
+            ? String(localized: "MAPP closed the library before it could keep your change. Make the change again.")
+            : String(localized: "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
+        unkept = Unkept(title: title, message: message, text: text)
     }
 
     /// Hands every open page's last edit to the library it came from, and returns once each library keeps its

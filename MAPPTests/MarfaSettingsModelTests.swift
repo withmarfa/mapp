@@ -11,11 +11,12 @@ import Testing
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")
 
-    /// A model on a host, counting how often the pages were asked to hand over their edits first.
+    /// A model on a host, counting how often the host asked the pages to hand over their edits.
     private func model(_ bench: HostBench) -> (MarfaSettingsModel, flushed: Counter) {
         let flushed = Counter()
-        let model = MarfaSettingsModel(host: bench.host(), beforeChange: { flushed.count += 1 })
-        return (model, flushed)
+        let host = bench.host()
+        host.handOverEdits = { flushed.count += 1 }
+        return (MarfaSettingsModel(host: host), flushed)
     }
 
     @MainActor final class Counter {
@@ -61,7 +62,7 @@ import Testing
         #expect(model.key == "k", "what was typed is kept for another try")
         #expect(!model.isConnected)
         #expect(bench.servers.opened.isEmpty)
-        #expect(flushed.count == 1)
+        #expect(flushed.count == 0, "nothing changed, so nothing was handed over")
     }
 
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
@@ -96,15 +97,75 @@ import Testing
 
     // MARK: The connect review
 
-    /// A copy that cannot take the new key is closed and opened again, so the pages hand over their edits first.
-    @Test func replacingAKeyHandsOverEditsFirst() async throws {
+    /// A copy that cannot take the new key is closed and opened again, so the pages hand over their edits right
+    /// before it closes, after the wait on the server, when the person may have typed more.
+    @Test func aCopyClosedOnANewKeyTakesThePagesEditsRightBeforeItCloses() async throws {
         let bench = try HostBench()
-        let (model, flushed) = model(bench)
+        let (model, _) = model(bench)
         await connect(model)
-        let before = flushed.count
+        let source = try #require(bench.servers.last)
+        source.closesOn.withLock { $0 = ["key-2"] }
+        var seen: [[String]] = []
+        model.host.handOverEdits = { seen.append(source.calls) }
         model.newKey = "key-2"
         await model.replaceKey()
-        #expect(flushed.count == before + 1)
+        #expect(seen == [["refresh", "tryKey key-2"]])
+        #expect(source.calls == ["refresh", "tryKey key-2", "close"])
+    }
+
+    // MARK: Forgetting a new key the host holds
+
+    /// The old key was refused, so the new one is kept even though the copy closed on it; the field forgets it,
+    /// and the person is told the key is kept and the library open again.
+    @Test func aNewKeyKeptAsTheCopyOpensAgainIsForgottenAndToldAsKept() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        let source = try #require(bench.servers.last)
+        source.state.set(.keyRefused)
+        source.closesOn.withLock { $0 = ["key-2"] }
+        model.newKey = "key-2"
+        await model.replaceKey()
+
+        #expect(bench.keys.key(for: first) == "key-2")
+        #expect(model.host.source != nil)
+        #expect(model.newKey == "", "the host holds the key, so the form does not")
+        #expect(model.notice?.title == "Can’t Check the Key")
+        #expect(model.notice?.message == "MAPP kept the new key and opened your library again, but couldn’t check the key with the server. The copy closed.")
+    }
+
+    /// A key that works is kept, so a new key the copy closed on is not, and stays in the field for another try.
+    @Test func aNewKeyNotKeptStaysInTheFieldAndIsToldAsNotUsed() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        let source = try #require(bench.servers.last)
+        source.closesOn.withLock { $0 = ["key-2"] }
+        model.newKey = "key-2"
+        await model.replaceKey()
+
+        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(model.newKey == "key-2")
+        #expect(model.notice?.title == "Can’t Use the New Key")
+        #expect(model.notice?.message == "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again. The copy closed.")
+    }
+
+    /// With no copy open and no old key, the new key is kept though the copy still cannot be opened.
+    @Test func aNewKeyKeptWhileTheCopyCannotOpenIsForgotten() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        let (model, _) = model(bench)
+        await model.host.launch()
+        #expect(model.host.state == .keyRefused)
+        #expect(model.host.source == nil)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+
+        model.newKey = "key-2"
+        await model.replaceKey()
+        #expect(bench.keys.key(for: first) == "key-2")
+        #expect(model.newKey == "")
+        #expect(model.notice?.title == "Can’t Open the Library")
+        #expect(model.notice?.message == "MAPP kept the new key, but the copy of your library on this Mac can’t be opened. The store is damaged.")
     }
 
     /// A switch that is done but for removing the old server's key forgets the new key it was given, and says it

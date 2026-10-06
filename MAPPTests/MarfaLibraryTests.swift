@@ -1051,4 +1051,28 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.message == MarfaEngine.notKept)
         #expect(source.submitted.isEmpty)
     }
+
+    /// A page that hands over its text after the source closed, as one leaving while the copy opens again does,
+    /// gives the text to the app to tell, since the windows read another library by then.
+    @Test func textAClosedSourceWillNotTakeGoesToTheAppWithTheText() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        await source.close()
+        library.updateBody(of: LibraryFixture.n1, to: "Typed while the key changed")
+        #expect(told.map(\.text) == ["Typed while the key changed"])
+        #expect(library.failure == nil, "this library is shown nowhere, so it is not told here")
+    }
+
+    /// Text submitted just before the source closed is refused by it as it closes, and goes to the app too.
+    @Test func textRefusedAsTheSourceClosesGoesToTheAppWithTheText() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        library.updateBody(of: LibraryFixture.n1, to: "Typed as it closed")
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
+        #expect(await eventually { !told.isEmpty })
+        #expect(told.map(\.text) == ["Typed as it closed"])
+    }
 }

@@ -344,6 +344,26 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(!bench.hasCopy(first))
     }
 
+    /// Text a page hands over as the copy is left reaches the copy before it reads its queue and closes, so it is
+    /// asked about rather than lost.
+    @Test func editsHandedOverAsACopyIsLeftAreInItWhenItCloses() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        let source = try #require(bench.servers.last)
+        host.handOverEdits = { source.report.set(SyncReport(waiting: 1, queueRead: true)) }
+
+        await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        #expect(host.source === source)
+        #expect(!source.calls.contains("close"))
+
+        await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in
+            try await host.changeAddress(to: "http://second.test:8210", key: "k2")
+        }
+        #expect(host.connection == first)
+        #expect(!source.calls.contains("close"))
+    }
+
     @Test func refusedWritesCountAsWaiting() async throws {
         let bench = try HostBench()
         let host = bench.host()

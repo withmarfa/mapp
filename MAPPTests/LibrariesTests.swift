@@ -69,6 +69,25 @@ import Testing
         #expect(libraries.current == nil)
     }
 
+    /// A library the windows have left tells what it could not keep through the app, which gathers each text
+    /// until the window in front tells the person.
+    @Test func whatALeftLibraryCouldNotKeepIsGatheredForTheWindowInFront() async throws {
+        let bench = try HostBench()
+        let libraries = try libraries(bench)
+        try await libraries.host.connect(address: address, key: "key")
+        let library = try #require(libraries.current as? MarfaLibrary)
+        try await libraries.host.disconnect()
+
+        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Book the hotel"))
+        #expect(libraries.unkept?.title == "Couldn’t Save “Trip”")
+        #expect(libraries.unkept?.text == "Book the hotel")
+        #expect(libraries.unkept?.message == "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
+
+        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Plan”", text: "Pack"))
+        #expect(libraries.unkept?.title == "Some Changes Weren’t Saved")
+        #expect(libraries.unkept?.text == "Book the hotel\n\nPack")
+    }
+
     @Test func anotherServerIsAnotherLibrary() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)

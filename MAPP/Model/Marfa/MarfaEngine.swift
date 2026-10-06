@@ -64,6 +64,9 @@ actor MarfaEngine {
         String(localized: "This library is closed.")
     }
 
+    /// The code of the refusal a write gets when it reaches the engine after the copy closed.
+    nonisolated static let closedCode = "closed"
+
     /// A write that reached the source after it closed, which no queue holds.
     nonisolated static var notKept: String {
         String(localized: "This library was closed before the change could be kept.")
@@ -147,7 +150,7 @@ actor MarfaEngine {
         for await event in events {
             if closed {
                 if case .write(_, let id) = event {
-                    hub.publish(.answered(id, .refused(SyncProblem(code: "closed", message: Self.notKept))))
+                    hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
                 }
                 if case .flush(let done) = event { done.resume() }
                 if case .queued(let done) = event { done.resume() }
