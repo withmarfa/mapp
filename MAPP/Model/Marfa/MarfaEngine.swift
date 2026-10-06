@@ -571,18 +571,47 @@ actor MarfaEngine {
         }
     }
 
-    /// An edit read at the version the copy holds is an ordinary update; one read earlier is merged by the server
-    /// against what was read. Behind an edit of the same row still waiting, it goes on the held version and is moved
-    /// onto that edit's answer, since an edit said to be read earlier is never moved.
+    /// Only the first edit after a read is merged by the server against what was read, where the copy has moved
+    /// past it (queue-and-verdicts 43). Every later edit, and any behind an edit of the same row still waiting, is
+    /// laid over what the copy holds, so the person's own saves never meet each other as a conflict. Both are
+    /// decided on the copy as it is now, since the rows the engine last read can be behind it.
     private func edit(
         _ id: ItemID, _ properties: [String: JSONValue], base: ItemVersion, merge: BodyMerge
     ) async throws -> Marfa.QueuedWrite {
-        if merge == .asRead, let held = rows[id.rawValue]?.version, base.rawValue < held {
-            let waiting = queue.contains { $0.kind == .updateItem && $0.itemId == id.rawValue && $0.verdict == nil }
-            if waiting { return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: held)) }
+        switch merge {
+        case .ifUnchanged:
+            return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+        case .following:
+            return try await updateOnHeld(id, properties)
+        case .asRead:
+            let held = try await heldVersion(id)
+            let waiting = try await copy.queue.all().contains {
+                $0.kind == .updateItem && $0.itemId == id.rawValue && $0.verdict == nil
+            }
+            guard base.rawValue < held, !waiting else { return try await updateOnHeld(id, properties) }
             return try await copy.items.updateAsRead(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
         }
-        return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+    }
+
+    /// The copy can move between reading its version and queuing the edit, as an answer lands; the edit then goes
+    /// once more on the version it moved to.
+    private func updateOnHeld(_ id: ItemID, _ properties: [String: JSONValue]) async throws -> Marfa.QueuedWrite {
+        let held = try await heldVersion(id)
+        do {
+            return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: held))
+        } catch {
+            let now = try await heldVersion(id)
+            guard now != held else { throw error }
+            return try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: now))
+        }
+    }
+
+    private func heldVersion(_ id: ItemID) async throws -> Int64 {
+        if let row = try await copy.items.get(id.rawValue) { return row.version }
+        guard let row = rows[id.rawValue] else {
+            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
+        }
+        return row.version
     }
 
     private func itemType(of id: ItemID) throws -> TypeID {
