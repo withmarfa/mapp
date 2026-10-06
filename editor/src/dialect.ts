@@ -32,7 +32,7 @@ import {
 } from '@milkdown/kit/preset/gfm'
 import { $remark } from '@milkdown/kit/utils'
 import { autolinkInputRule } from './autolink'
-import { imageView } from './images'
+import { imageView, wikiEmbedView } from './embeds'
 import type { Heading, Link, Paragraph, Parents, PhrasingContent } from 'mdast'
 import { defaultHandlers, type Options as StringifyOptions } from 'mdast-util-to-markdown'
 import {
@@ -53,6 +53,12 @@ import { gfmStrikethrough } from 'micromark-extension-gfm-strikethrough'
 import { gfmTable } from 'micromark-extension-gfm-table'
 import { gfmTaskListItem } from 'micromark-extension-gfm-task-list-item'
 import type { Processor } from 'unified'
+import {
+  wikiEmbedFromMarkdown,
+  wikiEmbedSchema,
+  wikiEmbedSyntax,
+  wikiEmbedToMarkdown,
+} from './wikiembeds'
 
 const bareURL = /^https?:\/\/[^\s<>]+$/
 // The literal form stops at these, so a URL ending in one would come back shorter than it went out.
@@ -141,14 +147,17 @@ function remarkDialect(this: Processor) {
   add('micromarkExtensions', gfmTaskListItem())
   add('micromarkExtensions', gfmAutolinkLiteral())
   add('micromarkExtensions', gfmTable())
+  add('micromarkExtensions', wikiEmbedSyntax)
   add('fromMarkdownExtensions', gfmStrikethroughFromMarkdown())
   add('fromMarkdownExtensions', gfmTaskListItemFromMarkdown())
   add('fromMarkdownExtensions', gfmAutolinkLiteralFromMarkdown())
   add('fromMarkdownExtensions', gfmTableFromMarkdown())
+  add('fromMarkdownExtensions', wikiEmbedFromMarkdown)
   add('toMarkdownExtensions', gfmStrikethroughToMarkdown())
   add('toMarkdownExtensions', gfmTaskListItemToMarkdown())
   add('toMarkdownExtensions', gfmAutolinkLiteralToMarkdown())
   add('toMarkdownExtensions', tableToMarkdown)
+  add('toMarkdownExtensions', wikiEmbedToMarkdown)
   add('toMarkdownExtensions', { handlers: { link, paragraph, heading } })
 }
 
@@ -205,7 +214,9 @@ export const dialect: MilkdownPlugin[] = [
   wrapInTaskListInputRule,
   tables,
   remarkDialectPlugin,
+  wikiEmbedSchema,
   imageView,
+  wikiEmbedView,
 ].flat()
 
 // One output form, so a note written back unchanged is byte-stable.

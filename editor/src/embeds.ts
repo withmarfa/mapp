@@ -170,10 +170,7 @@ class EmbedView implements NodeView {
       if (!file) {
         const delay = retries[attempt]
         if (delay != null)
-          setTimeout(
-            () => this.key === key && this.show(described, request, attempt + 1),
-            delay,
-          )
+          setTimeout(() => this.key === key && this.show(described, request, attempt + 1), delay)
         return
       }
       shown.set(this.dom, request)
@@ -217,7 +214,10 @@ class EmbedView implements NodeView {
       element.playsInline = true
       if (this.width != null) element.style.width = `${this.width}px`
     }
-    element.addEventListener('error', () => this.dom.contains(element) && this.showCard(file, request))
+    element.addEventListener(
+      'error',
+      () => this.dom.contains(element) && this.showCard(file, request),
+    )
     this.image = undefined
     this.dom.className = `embed-${file.kind}`
     this.dom.replaceChildren(element)

@@ -527,7 +527,17 @@ test('spaces at the edges of a paragraph or heading are not written, so they nev
 test('an image is drawn at the width in its alt text, and shows its name without it', async () => {
   const webkit = window.webkit
   window.webkit = {
-    messageHandlers: { files: { postMessage: async () => 'data:image/png;base64,AAAA' } },
+    messageHandlers: {
+      embeds: {
+        postMessage: async () => ({
+          url: 'mapp-embed://file/a',
+          kind: 'image' as const,
+          name: 'a.png',
+          detail: '1 KB',
+          icon: 'mapp-embed://icon/a',
+        }),
+      },
+    },
   }
   try {
     await withNoteEditor(

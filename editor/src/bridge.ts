@@ -1,5 +1,19 @@
 import type { CaretState, FindState } from './editor'
 
+/** An embed as the note names it: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
+ *  does, for the app to resolve as Marfa's core does. */
+export type EmbedRequest = { item: string } & ({ path: string } | { name: string })
+
+/** A file an embed names, as the app serves it: `url` and `icon` load through the app's own scheme, and
+ *  `detail` is its size in the person's words. */
+export interface EmbeddedFile {
+  url: string
+  kind: 'image' | 'audio' | 'video' | 'pdf' | 'file'
+  name: string
+  detail: string
+  icon: string
+}
+
 export type EditorMessage =
   | { type: 'ready' }
   | { type: 'changed'; markdown: string; generation: number }
@@ -9,6 +23,8 @@ export type EditorMessage =
   | { type: 'copy'; text: string }
   | { type: 'escape' }
   | { type: 'pasteImages' }
+  | { type: 'openEmbed'; embed: EmbedRequest }
+  | { type: 'embedMenu'; embed: EmbedRequest | null }
   | ({ type: 'find' } & FindState)
 
 declare global {
@@ -16,8 +32,8 @@ declare global {
     webkit?: {
       messageHandlers?: {
         host?: { postMessage(message: EditorMessage): void }
-        /** Answers with a file of the notes folder, by its path there, as a data URL, or null. */
-        files?: { postMessage(path: string): Promise<string | null> }
+        /** Answers with what the app knows of a file a note embeds, or null when it has none. */
+        embeds?: { postMessage(request: EmbedRequest): Promise<EmbeddedFile | null> }
       }
     }
   }
