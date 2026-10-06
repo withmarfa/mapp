@@ -391,7 +391,8 @@ actor MarfaEngine {
     }
 
     /// Sends the queue once, tells each verdict to the app's write, and only then forgets the answered writes, so a
-    /// refused one is never cleared unseen. Refused writes that carried content stay queued until discarded.
+    /// refused write submitted since the source opened is never cleared unseen. Refused writes that carried content
+    /// stay queued until discarded.
     private func drain() async {
         if case .offline = hub.connection { return }
         do {

@@ -124,7 +124,8 @@ struct MarfaSourceOfflineTests {
 
 /// Runs against the test instance only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY` are in the environment
 /// (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and `TEST_RUNNER_MARFA_TEST_MAPP_KEY`). Every item it
-/// makes has a title starting `MAPPTEST ` and the tag `mapptest`, and is put in the bin before the test ends.
+/// makes has a title starting `MAPPTEST ` and the tag `mapptest`, and is put in the bin before the test ends. It
+/// stays in the server's bin, since the package cannot purge yet.
 @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
 struct MarfaSourceLiveTests {
     private static let note = TypeID("core.note")
