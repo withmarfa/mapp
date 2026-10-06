@@ -42,9 +42,9 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
     /// at most one item: first to one with both its file and its path, then its file alone where the item is
     /// still of its kind, then its path alone, then its file alone whatever the item now is. So a file renamed
     /// keeps its identifier even when another has taken its old name, while an editor's backup or temporary file,
-    /// which holds the note's old file under another name, never takes the note's identifier. What is matched is
-    /// brought up to date, what was not found is marked gone, and what has been gone longer than `retention` is
-    /// forgotten.
+    /// which holds the note's old file under another name, does not take the note's identifier when it is read
+    /// beside the note's new file. What is matched is brought up to date, what was not found is marked gone, and
+    /// what has been gone longer than `retention` is forgotten.
     mutating func identify(_ sightings: [Sighting], at now: Date, retention: TimeInterval = Self.retention) -> [UUID] {
         var ids = [UUID?](repeating: nil, count: sightings.count)
         var claimed = [Bool](repeating: false, count: entries.count)

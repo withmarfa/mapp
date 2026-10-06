@@ -180,4 +180,3 @@ struct IdentityLedgerTests {
         #expect(ledger.entries.allSatisfy { $0.fileID == nil })
     }
 }
-
