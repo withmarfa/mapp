@@ -145,6 +145,8 @@ extension NoteLibrary {
         return store?.fileURL(for: file.path)
     }
 
+    var folderURL: URL? { (store as? FolderStore)?.root }
+
     private func predicate(for place: SidebarItem) -> ((Item) -> Bool)? {
         switch place {
         case .inbox: return { $0.state == .active && $0.container == nil }

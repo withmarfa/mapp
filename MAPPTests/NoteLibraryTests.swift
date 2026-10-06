@@ -66,7 +66,7 @@ struct NoteLibraryTests {
 
     @Test func aNewItemIsWrittenAtOnceUnderItsTitleInTheFolderItWasMadeIn() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(home.id)))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(home.id)).flatMap { library.note($0) })
         #expect(note.folderID == home.id)
         #expect(note.path == "Home/Groceries.md")
         #expect(note.created == start + 60)
@@ -77,11 +77,11 @@ struct NoteLibraryTests {
 
     @Test func aNewItemMadeOutsideAFolderGoesToItsTypesFolder() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let note = try #require(library.createItem(typeID: "core.note", title: "Loose", in: .allNotes))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Loose", in: .allNotes).flatMap { library.note($0) })
         #expect(note.path == "Notes/Loose.md")
         #expect(library.folder(note.folderID!)?.name == "Notes")
         #expect(store.changes.contains(.createFolder(path: "Notes", id: try #require(note.folderID))))
-        let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(.mint())))
+        let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(.mint())).flatMap { library.note($0) })
         #expect(gone.path == "Notes/Also loose.md", "a folder that is gone takes nothing")
         #expect(gone.folderID == note.folderID)
     }
@@ -90,7 +90,7 @@ struct NoteLibraryTests {
         let (library, _, _, _, _) = makeLibrary()
         let manager = undoManager()
         var note: Note?
-        undoably(manager) { note = library.createItem(typeID: "core.note", title: "Fresh", undoManager: manager) }
+        undoably(manager) { note = library.createItem(typeID: "core.note", title: "Fresh", undoManager: manager).flatMap { library.note($0) } }
         let id = try #require(note?.id)
         #expect(manager.undoActionName == "New Item")
         manager.undo()
@@ -420,7 +420,7 @@ struct NoteLibraryTests {
 
     @Test func laterEditsToANewItemAreWrittenToItsFile() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)).flatMap { library.note($0) })
         library.updateBody(of: note.id, to: "Milk, eggs\n")
         #expect(store.changes.last == .write(path: "Work/Groceries.md", text: library.note(note.id)!.file.text))
         #expect(library.note(note.id)?.body == "Milk, eggs\n")
@@ -428,7 +428,7 @@ struct NoteLibraryTests {
 
     @Test func aNewItemKeepsItsTitleAndFileNameWhateverItsFirstLineBecomes() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)).flatMap { library.note($0) })
         library.updateBody(of: note.id, to: "Something else entirely\n")
         let changes = store.changes.count
         library.leave(note.id)

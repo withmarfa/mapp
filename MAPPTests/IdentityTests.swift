@@ -139,7 +139,7 @@ struct IdentityTests {
         first.renameNote(plan, to: "Plan B")
         first.move([shopping], to: work)
         first.rename(work, to: "Office")
-        let made = try #require(first.createItem(typeID: "core.note", title: "Ideas", body: "Ideas\n", in: .allNotes))
+        let made = try #require(first.createItem(typeID: "core.note", title: "Ideas", body: "Ideas\n", in: .allNotes).flatMap { first.note($0) })
         let folder = first.newFolder()
         first.updateBody(of: plan, to: "# Plan\n\nSecond draft\n")
         first.finish()
@@ -344,7 +344,7 @@ struct IdentityTests {
         let undo = UndoManager()
         undo.groupsByEvent = false
         undo.beginUndoGrouping()
-        let made = try #require(library.createItem(typeID: "aic.agent.session", title: "Run", body: "Run\n", in: .allNotes, undoManager: undo))
+        let made = try #require(library.createItem(typeID: "aic.agent.session", title: "Run", body: "Run\n", in: .allNotes, undoManager: undo).flatMap { library.note($0) })
         undo.endUndoGrouping()
         library.finish()
         #expect(made.path == "Agents/Sessions/Run.md")

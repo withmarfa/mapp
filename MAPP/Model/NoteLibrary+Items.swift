@@ -108,7 +108,7 @@ extension NoteLibrary {
     }
 
     @discardableResult
-    func createItem(typeID: String, title: String, body: String = "\n", parentID: ItemID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
+    func createItem(typeID: String, title: String, body: String = "\n", parentID: ItemID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> ItemID? {
         let title = NoteName.trimmed(title)
         guard let type = WorkbenchSchema.definition(typeID), !title.isEmpty,
               NoteText.fileSafe(title) == title,
@@ -142,7 +142,7 @@ extension NoteLibrary {
         perform(.create(path: note.path, text: note.file.text, id: note.id))
         let id = note.id
         registerUndo(undoManager, name: String(localized: "New Item")) { [weak undoManager] library in library.delete([id], undoManager: undoManager) }
-        return note
+        return id
     }
 
     private func validParent(_ parentID: ItemID, forType type: String) -> Bool {

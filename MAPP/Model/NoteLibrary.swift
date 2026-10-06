@@ -4,7 +4,7 @@ import Observation
 /// Every note and folder, held in memory for the views and kept in a store. Each change a person can make is
 /// made here at once, handed to the store to make on disk, and undoable through the undo manager it is given.
 @Observable
-final class NoteLibrary {
+final class NoteLibrary: ItemLibrary {
     var notes: [Note] { didSet { contentStamp &+= 1 } }
     var folders: [Folder]
     private(set) var files: [AppFile] = [] { didSet { contentStamp &+= 1 } }
@@ -49,6 +49,9 @@ final class NoteLibrary {
 
     /// How long a note stays in Recently Deleted.
     static let trashDays = 30
+    var trashDays: Int? { Self.trashDays }
+    /// A folder holds no archive, and its items move between folders.
+    var capabilities: SourceCapabilities { [.move, .purge] }
     private static let folderOrderKey = "folderOrder"
 
     /// A library of the notes given, loaded already; with a store, each change is also made there.
@@ -694,7 +697,7 @@ final class NoteLibrary {
 
     /// Writes files a note points at, such as images pasted into it, into the attachments folder, and gives the
     /// links to them from where the note is, as standard markdown writes a relative link.
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) -> [(link: String, name: String)] {
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) -> [Embed] {
         guard let store, let note = note(id), !note.isDeleted else { return [] }
         let depth = note.directory.split(separator: "/").count
         return files.map { file in
@@ -704,7 +707,7 @@ final class NoteLibrary {
                 $0.addingPercentEncoding(withAllowedCharacters: NoteText.linkPathAllowed) ?? String($0)
             }
             let link = (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
-            return (link, ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+            return Embed(link: link, name: ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
         }
     }
 
