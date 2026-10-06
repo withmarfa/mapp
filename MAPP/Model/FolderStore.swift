@@ -20,6 +20,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let location: OSAllocatedUnfairLock<URL>
     private let bin: URL
     private let now: @Sendable () -> Date
+    private let keepsFileIdentities: @Sendable (URL) -> Bool
     private let queue = DispatchQueue(label: "com.withmarfa.mapp.store")
     private let files = FileManager()
     // Set once, before the first change is queued.
@@ -35,16 +36,28 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private var making = 0
     /// Attachment paths handed out and not yet written, so two taken in a row are never the same.
     private let reservations = OSAllocatedUnfairLock(initialState: Set<String>())
-    /// Read on first use and written on the queue only. A change the person makes is kept at once; a note's
-    /// new text, which can come with every pause in typing, a moment later.
+    /// Read on first use and changed on the queue only. It is written a moment after a change, so a thousand notes
+    /// deleted at once or every pause in typing writes it once, and at the latest when the store is drained.
     private var ledger: IdentityLedger?
-    private var ledgerChanged = false
+    private var ledgerIsUnsaved = false
     private var ledgerSaveScheduled = false
 
-    init(root: URL, bin: URL, now: @escaping @Sendable () -> Date = { .now }) {
+    init(
+        root: URL,
+        bin: URL,
+        now: @escaping @Sendable () -> Date = { .now },
+        keepsFileIdentities: @escaping @Sendable (URL) -> Bool = FolderStore.volumeKeepsFileIdentities
+    ) {
         location = OSAllocatedUnfairLock(initialState: root)
         self.bin = bin
         self.now = now
+        self.keepsFileIdentities = keepsFileIdentities
+    }
+
+    /// FAT and exFAT give a deleted file's identifier to the next file made, and may change it when a file is
+    /// edited in place, so there an item is known by its path alone.
+    static func volumeKeepsFileIdentities(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.volumeSupportsPersistentIDsKey]).volumeSupportsPersistentIDs) == true
     }
 
     /// The notes folder was moved, in the Finder say: every change from now on, those already queued among them,
@@ -59,11 +72,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
         try queue.sync {
             var sightings: [IdentityLedger.Sighting] = []
             var folders: [String] = []
+            let identities = keepsFileIdentities(root)
+            func fileID(_ values: URLResourceValues) -> UInt64? { identities ? Self.fileID(values) : nil }
             let top = try files.contentsOfDirectory(at: root, includingPropertiesForKeys: Array(Self.readKeys))
             for url in top where !url.lastPathComponent.hasPrefix(".") && url.lastPathComponent != Self.attachments {
                 guard let values = try? url.resourceValues(forKeys: Self.readKeys), values.isDirectory == true else { continue }
                 folders.append(url.lastPathComponent)
-                sightings.append(.init(kind: .folder, path: url.lastPathComponent, fileID: Self.fileID(values)))
+                sightings.append(.init(kind: .folder, path: url.lastPathComponent, fileID: fileID(values)))
             }
             var found: [(url: URL, path: String, values: URLResourceValues)] = []
             if let walk = files.enumerator(at: root, includingPropertiesForKeys: Array(Self.readKeys), options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
@@ -74,13 +89,18 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
                           let values = try? url.resourceValues(forKeys: Self.readKeys), values.isRegularFile == true
                     else { continue }
                     found.append((url, path, values))
-                    sightings.append(.init(kind: Self.isNote(path) ? .note : .file, path: path, fileID: Self.fileID(values)))
+                    sightings.append(.init(kind: Self.isNote(path) ? .note : .file, path: path, fileID: fileID(values)))
                 }
             }
             let manifest = readManifest()
             sightings += manifest.map { .init(kind: .note, binID: $0.id) }
-            let ids = changeLedger { $0.identify(sightings, at: now()) }
-            saveLedger()
+            let before = ledger ?? readLedger()
+            var current = before
+            let ids = current.identify(sightings, at: now())
+            ledger = current
+            // The folder is read after every change in it, the app's own saves among them, so the ledger is
+            // written only when a reading changed it.
+            if current != before { ledgerChanged() }
 
             var library = StoredLibrary()
             library.folders = zip(ids, folders).map { StoredFolder(id: $0, name: $1) }
@@ -158,7 +178,6 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
                 let message = error.localizedDescription
                 Task { @MainActor in failed(path, message) }
             }
-            if case .write = change { saveLedgerSoon() } else { saveLedger() }
         }
     }
 
@@ -424,6 +443,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func fileID(of url: URL) -> UInt64? {
+        guard keepsFileIdentities(root) else { return nil }
         var url = url
         url.removeAllCachedResourceValues()
         return (try? url.resourceValues(forKeys: [.documentIdentifierKey, .fileIdentifierKey])).flatMap(Self.fileID)
@@ -431,13 +451,21 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
 
     private var ledgerURL: URL { bin.appending(path: "Identities.json") }
 
-    private func changeLedger<Result>(_ change: (inout IdentityLedger) -> Result) -> Result {
+    private func changeLedger(_ change: (inout IdentityLedger) -> Void) {
         var current = ledger ?? readLedger()
-        let before = current
-        let result = change(&current)
-        if current != before { ledgerChanged = true }
+        change(&current)
         ledger = current
-        return result
+        ledgerChanged()
+    }
+
+    private func ledgerChanged() {
+        ledgerIsUnsaved = true
+        guard !ledgerSaveScheduled else { return }
+        ledgerSaveScheduled = true
+        queue.asyncAfter(deadline: .now() + 1) { [self] in
+            ledgerSaveScheduled = false
+            saveLedger()
+        }
     }
 
     /// A ledger that cannot be read is made again from the folder; only the identifiers change, once.
@@ -452,22 +480,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     private func saveLedger() {
-        guard ledgerChanged, let ledger else { return }
+        guard ledgerIsUnsaved, let ledger else { return }
         do {
             try files.createDirectory(at: bin, withIntermediateDirectories: true)
             try JSONEncoder().encode(ledger).write(to: ledgerURL, options: .atomic)
-            ledgerChanged = false
+            ledgerIsUnsaved = false
         } catch {
             log.error("the identity list could not be kept: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func saveLedgerSoon() {
-        guard ledgerChanged, !ledgerSaveScheduled else { return }
-        ledgerSaveScheduled = true
-        queue.asyncAfter(deadline: .now() + 1) { [self] in
-            ledgerSaveScheduled = false
-            saveLedger()
         }
     }
 

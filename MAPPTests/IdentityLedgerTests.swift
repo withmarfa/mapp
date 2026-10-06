@@ -152,4 +152,32 @@ struct IdentityLedgerTests {
         let read = try JSONDecoder().decode(IdentityLedger.self, from: JSONEncoder().encode(ledger))
         #expect(read == ledger)
     }
+
+    /// vim's and Emacs's save: the note's file is renamed to a backup and a new file written at its path.
+    @Test func aBackupFileDoesNotTakeTheNotesIdentifier() {
+        var ledger = IdentityLedger()
+        let id = ledger.identify([note("Plan.md", 1)], at: start)[0]
+        let after = ledger.identify([Sighting(kind: .file, path: "Plan.md~", fileID: 1), note("Plan.md", 2)], at: start)
+        #expect(after[1] == id)
+        #expect(after[0] != id)
+    }
+
+    /// An editor's atomic save, read while its temporary file is in the folder.
+    @Test func aTemporaryFileMovedOverANoteDoesNotChangeItsIdentifier() {
+        var ledger = IdentityLedger()
+        let id = ledger.identify([note("Plan.md", 1)], at: start)[0]
+        _ = ledger.identify([note("Plan.md", 1), Sighting(kind: .file, path: "Plan.md.tmp", fileID: 2)], at: start)
+        #expect(ledger.identify([note("Plan.md", 2)], at: start)[0] == id)
+    }
+
+    /// FAT and exFAT hand a deleted file's identifier to the next file made, so the store gives none there.
+    @Test func withoutFileIdentitiesAReusedIdentifierFoolsNothing() {
+        var ledger = IdentityLedger()
+        let ids = ledger.identify([note("B.md", nil), note("C.md", nil)], at: start)
+        let after = ledger.identify([note("C.md", nil), note("D.md", nil)], at: start)
+        #expect(after[0] == ids[1])
+        #expect(!ids.contains(after[1]))
+        #expect(ledger.entries.allSatisfy { $0.fileID == nil })
+    }
 }
+

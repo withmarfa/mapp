@@ -97,8 +97,17 @@ final class NoteLibrary {
         completedImports[requestID] = nil
     }
 
+    /// A file takes the store's identifier unless a note here already has it, which only a note kept by its
+    /// path can, and then keeps the one it had.
     private func reconcileFiles(_ stored: [StoredFile]) {
-        files = stored.map { AppFile(id: $0.id, stored: $0, folderID: folderID(forPath: $0.path)) }
+        var taken = Set(notes.map(\.id))
+        let previous = Dictionary(files.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
+        files = stored.map { disk in
+            var id = disk.id
+            if taken.contains(id) { id = previous[disk.path].flatMap { taken.contains($0) ? nil : $0 } ?? UUID() }
+            taken.insert(id)
+            return AppFile(id: id, stored: disk, folderID: folderID(forPath: disk.path))
+        }
     }
 
     // MARK: Loading
@@ -145,8 +154,8 @@ final class NoteLibrary {
                 binID: trashed.id
             ))
         }
-        reconcileFiles(stored.files)
         notes = loaded
+        reconcileFiles(stored.files)
         isLoaded = true
         if needsRefresh { refresh() }
     }
@@ -209,9 +218,10 @@ final class NoteLibrary {
 
     /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added,
     /// renamed or taken away. The store knows a file renamed or moved, even while the app was closed, and it stays
-    /// the same note. The library and the store agree on every identifier unless a change failed to reach the
-    /// store, so what is at the same path stays itself then. None of this is undoable here, since it was not
-    /// done here.
+    /// the same note. A note here whose file the store knows under another identifier, as when a change the store
+    /// could not record wrote the file, stays itself by its path, and a note or file that would then share an
+    /// identifier gets one of its own. None of this is undoable here, since
+    /// it was not done here.
     private func reconcile(_ stored: StoredLibrary) {
         var unmatched = Dictionary(stored.folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var order: [Folder] = []
@@ -227,7 +237,6 @@ final class NoteLibrary {
             order.append(Folder(id: order.contains { $0.id == disk.id } ? UUID() : disk.id, name: disk.name))
         }
         if order != folders { folders = order }
-        reconcileFiles(stored.files)
 
         var updated = notes
         var onDisk = Dictionary(stored.notes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -288,6 +297,7 @@ final class NoteLibrary {
             return onDiskText[path] != note.file.text
         }
         if updated != notes { notes = updated }
+        reconcileFiles(stored.files)
     }
 
     // MARK: Reading

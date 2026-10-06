@@ -14,7 +14,8 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
     nonisolated struct Entry: Codable, Equatable, Sendable {
         var id: UUID
         var kind: Kind
-        /// The file's document identifier, or its file identifier where it has none.
+        /// The file's document identifier, or its file identifier where it has none; nil on a volume whose
+        /// identifiers do not last, where items are known by their paths alone.
         var fileID: UInt64?
         /// Where the item is, relative to the notes folder; nil while it is in the bin.
         var path: String?
@@ -37,10 +38,13 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
 
     private(set) var entries: [Entry] = []
 
-    /// The identifier of each item found, in the order given. Each entry goes to at most one item: first to one
-    /// with both its file and its path, then its file alone, then its path alone, so a file renamed keeps its
-    /// identifier even when another has taken its old name. What is matched is brought up to date, what was not
-    /// found is marked gone, and what has been gone longer than `retention` is forgotten.
+    /// The identifier of each item found, in the order given; no two items get the same one. Each entry goes to
+    /// at most one item: first to one with both its file and its path, then its file alone where the item is
+    /// still of its kind, then its path alone, then its file alone whatever the item now is. So a file renamed
+    /// keeps its identifier even when another has taken its old name, while an editor's backup or temporary file,
+    /// which holds the note's old file under another name, never takes the note's identifier. What is matched is
+    /// brought up to date, what was not found is marked gone, and what has been gone longer than `retention` is
+    /// forgotten.
     mutating func identify(_ sightings: [Sighting], at now: Date, retention: TimeInterval = Self.retention) -> [UUID] {
         var ids = [UUID?](repeating: nil, count: sightings.count)
         var claimed = [Bool](repeating: false, count: entries.count)
@@ -62,7 +66,7 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
             ids[sighting] = entries[entry].id
             let seen = sightings[sighting]
             entries[entry].kind = seen.kind
-            entries[entry].fileID = seen.fileID ?? entries[entry].fileID
+            entries[entry].fileID = seen.fileID
             entries[entry].path = seen.path
             entries[entry].binID = seen.binID
             entries[entry].missing = nil
@@ -83,11 +87,15 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
         }
         pass { sighting in
             guard sighting.binID == nil, let fileID = sighting.fileID else { return nil }
-            return free(byFile[Key(isFolder: sighting.kind == .folder, value: fileID)])
+            return free(byFile[Key(isFolder: sighting.kind == .folder, value: fileID)]) { $0.kind == sighting.kind }
         }
         pass { sighting in
             guard sighting.binID == nil, let path = sighting.path else { return nil }
             return free(byPath[Key(isFolder: sighting.kind == .folder, value: path)])
+        }
+        pass { sighting in
+            guard sighting.binID == nil, let fileID = sighting.fileID else { return nil }
+            return free(byFile[Key(isFolder: sighting.kind == .folder, value: fileID)])
         }
 
         var kept: [Entry] = []

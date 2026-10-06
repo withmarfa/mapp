@@ -20,8 +20,9 @@ struct IdentityTests {
     }
 
     /// The library as the app opens it at launch.
-    private func open(now: @escaping @Sendable () -> Date = { .now }) async -> NoteLibrary {
-        let library = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url, now: now), defaults: nil)
+    private func open(now: @escaping @Sendable () -> Date = { .now }, keepsFileIdentities: Bool = true) async -> NoteLibrary {
+        let store = FolderStore(root: root.url, bin: bin.url, now: now, keepsFileIdentities: { _ in keepsFileIdentities })
+        let library = NoteLibrary(loadingFrom: store, defaults: nil)
         library.missingGrace = 0.05
         await library.load()
         return library
@@ -230,6 +231,7 @@ struct IdentityTests {
     @Test func purgedNotesLeaveTheLedger() async throws {
         let first = await open()
         let plan = try id(at: "Work/Plan.md", in: first)
+        first.store?.drain()
         let before = try ledger().entries.count
         first.delete([plan])
         first.deletePermanently([plan])
@@ -252,6 +254,105 @@ struct IdentityTests {
             let path = note.path!.hasPrefix("Renamed/") ? "Folder 3/" + note.path!.dropFirst("Renamed/".count) : note.path!
             #expect(ids[path] == note.id)
         }
+        second.finish()
         #expect(try ledger().entries.count == 3003 + 1 + 21)
     }
+
+    /// vim's and Emacs's save: the note's file is renamed to a backup and a new file written at its path.
+    @Test func anEditorsBackupNeverTakesTheNotesIdentifier() async throws {
+        let first = await open()
+        let shopping = try id(at: "Shopping.md", in: first)
+        try move("Shopping.md", "Shopping.md~")
+        try root.write("Shopping\n\nEggs\n", to: "Shopping.md")
+        await first.reread()
+        #expect(try id(at: "Shopping.md", in: first) == shopping)
+        #expect(try id(at: "Shopping.md~", in: first) != shopping)
+        let ids = first.notes.map(\.id) + first.files.map(\.id)
+        #expect(Set(ids).count == ids.count)
+        try files.removeItem(at: root.url.appending(path: "Shopping.md~"))
+        await first.reread()
+        first.finish()
+        let second = await open()
+        #expect(try id(at: "Shopping.md", in: second) == shopping)
+    }
+
+    @Test func theSystemSaysWhetherAVolumeKeepsFileIdentities() {
+        #expect(FolderStore.volumeKeepsFileIdentities(root.url), "the temporary folder is on APFS")
+    }
+
+    /// On FAT and exFAT, file identifiers are handed on to new files, so items are known by their paths alone.
+    @Test func whereFileIdentitiesDoNotLastItemsAreKnownByPath() async throws {
+        let first = await open(keepsFileIdentities: false)
+        let plan = try id(at: "Work/Plan.md", in: first)
+        let shopping = try id(at: "Shopping.md", in: first)
+        first.updateBody(of: shopping, to: "Shopping\n\nMilk\n")
+        first.finish()
+        #expect(try ledger().entries.allSatisfy { $0.fileID == nil })
+        try move("Work/Plan.md", "Work/Plan B.md")
+        let second = await open(keepsFileIdentities: false)
+        #expect(try id(at: "Shopping.md", in: second) == shopping)
+        #expect(try id(at: "Work/Plan B.md", in: second) != plan, "a rename made while closed is a new item there")
+    }
+
+    @Test func aNewItemInANestedTypeFolderIsWrittenAndComesBackOnRedo() async throws {
+        let library = await open()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        let made = try #require(library.createItem(typeID: "aic.agent.session", title: "Run", body: "Run\n", in: .allNotes, undoManager: undo))
+        undo.endUndoGrouping()
+        library.finish()
+        #expect(made.path == "Agents/Sessions/Run.md")
+        #expect(root.exists("Agents/Sessions/Run.md"))
+        undo.undo()
+        library.finish()
+        #expect(!root.exists("Agents/Sessions/Run.md"))
+        try files.removeItem(at: root.url.appending(path: "Agents"))
+        undo.redo()
+        library.finish()
+        #expect(root.exists("Agents/Sessions/Run.md"))
+        let second = await open()
+        #expect(second.note(made.id)?.path == "Agents/Sessions/Run.md")
+    }
+
+    @Test func manyNotesDeletedAtOnceAllKeepTheirIdentifiersInTheBin() async throws {
+        for note in 0..<1000 { try root.write("Note \(note)\n", to: "Many/Note \(note).md") }
+        let first = await open()
+        let many = Set(first.notes.filter { $0.path!.hasPrefix("Many/") }.map(\.id))
+        first.delete(many)
+        first.finish()
+        let second = await open()
+        #expect(Set(second.notes(in: .recentlyDeleted).map(\.id)) == many)
+    }
+
+    /// When the store and the library disagree, the library still never gives two items one identifier.
+    @Test func aNoteKeptByItsPathNeverSharesItsIdentifierWithAFile() async {
+        let store = FixedStore()
+        let note = UUID()
+        store.library.notes = [StoredNote(id: note, path: "Plan.md", text: "Plan\n", created: .now, modified: .now)]
+        let library = NoteLibrary(loadingFrom: store, defaults: nil)
+        await library.load()
+        store.library.notes = [StoredNote(id: UUID(), path: "Plan.md", text: "Plan\n", created: .now, modified: .now)]
+        store.library.files = [StoredFile(id: note, path: "Plan.md~", created: .now, modified: .now, byteCount: 5)]
+        await library.reread()
+        #expect(library.notes.map(\.id) == [note])
+        #expect(library.files.count == 1)
+        #expect(library.files.first?.id != note)
+        let fileID = library.files.first?.id
+        await library.reread()
+        #expect(library.files.first?.id == fileID, "and the file keeps the one it was given")
+    }
+}
+
+/// A store that reads back whatever it is given.
+private final class FixedStore: NoteStore, @unchecked Sendable {
+    var library = StoredLibrary()
+    var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+    var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
+
+    func load() throws -> StoredLibrary { library }
+    func perform(_ change: StoreChange) {}
+    func drain() {}
+    func acknowledgeRelocation(of path: String) {}
+    func freeAttachmentPath(named name: String) -> String { "Attachments/\(name)" }
 }
