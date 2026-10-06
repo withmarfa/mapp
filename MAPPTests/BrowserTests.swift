@@ -177,6 +177,46 @@ struct BrowserTests {
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.items.first?.id == newer.id)
     }
 
+    @Test func aLibraryThatCannotPurgeIsNeverAskedToEraseWhatIsDeleted() {
+        let (library, older, newer, _) = makeFakeLibrary()
+        library.capabilities = []
+        library.delete([older.id], undoManager: nil)
+        Browser.delete([older.id, newer.id], in: library, undoManager: nil)
+        #expect(library.item(newer.id)?.state == .trashed, "what is live still goes to Recently Deleted")
+        #expect(library.item(older.id)?.state == .trashed)
+        #expect(library.notesToPurge.isEmpty)
+        library.capabilities = .purge
+        Browser.delete([older.id], in: library, undoManager: nil)
+        #expect(library.notesToPurge == [older.id])
+    }
+
+    @Test func dropsOnTheInboxAndFoldersNeedALibraryThatMoves() {
+        let (library, _, _, _) = makeFakeLibrary()
+        library.capabilities = []
+        #expect(!Browser.canDrop(on: .inbox, in: library))
+        #expect(!Browser.canDrop(on: .folder(work.id), in: library))
+        #expect(Browser.canDrop(on: .recentlyDeleted, in: library), "deleting needs no capability")
+        library.capabilities = .move
+        #expect(Browser.canDrop(on: .inbox, in: library))
+        #expect(Browser.canDrop(on: .folder(work.id), in: library))
+        for place: SidebarItem in [.allNotes, .favorites, .files, .marfaTypes, .itemType("core.note")] {
+            #expect(!Browser.canDrop(on: place, in: library))
+        }
+    }
+
+    @Test func aNewFolderIsMadeOnlyWhereTheLibraryEditsFolders() {
+        let (library, _, _, _) = makeFakeLibrary()
+        library.capabilities = []
+        let browser = Browser()
+        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
+        #expect(library.folders.count == 1)
+        #expect(browser.renamingFolder == nil)
+        library.capabilities = .folders
+        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
+        #expect(library.folders.count == 2)
+        #expect(browser.renamingFolder == library.folders.last?.id)
+    }
+
     @Test func deletingMovesLiveNotesAwayAndAsksBeforeErasingDeletedOnes() {
         let (library, older, _, _) = makeLibrary()
         Browser.delete([older.id], in: library, undoManager: nil)

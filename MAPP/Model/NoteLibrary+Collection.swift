@@ -145,6 +145,9 @@ extension NoteLibrary {
         return store?.fileURL(for: file.path)
     }
 
+    /// A file in the folder is always at hand.
+    func fileURL(of id: ItemID) async throws -> URL? { fileURL(for: id) }
+
     var folderURL: URL? { (store as? FolderStore)?.root }
 
     private func predicate(for place: SidebarItem) -> ((Item) -> Bool)? {

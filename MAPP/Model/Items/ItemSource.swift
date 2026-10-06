@@ -27,6 +27,11 @@ nonisolated struct SourceCapabilities: OptionSet, Hashable, Sendable {
     static let move = SourceCapabilities(rawValue: 1 << 2)
     static let retype = SourceCapabilities(rawValue: 1 << 3)
     static let retier = SourceCapabilities(rawValue: 1 << 4)
+    /// Rename Note gives an item's file a new name. A title is a property, which any library edits.
+    static let renameFiles = SourceCapabilities(rawValue: 1 << 5)
+    /// Folders can be made, renamed, deleted and reordered.
+    static let folders = SourceCapabilities(rawValue: 1 << 6)
+    static let importFiles = SourceCapabilities(rawValue: 1 << 7)
 }
 
 nonisolated enum SourceChange: Hashable, Sendable {

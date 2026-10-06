@@ -16,6 +16,7 @@ final class FakeItemLibrary: ItemLibrary {
     var capabilities: SourceCapabilities = []
     var trashDays: Int?
     var completedImports: [UUID: ItemID] = [:]
+    var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], folders: [Folder] = [], now: Date = .now) {
@@ -91,6 +92,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     var folderURL: URL? { nil }
     func fileURL(for id: ItemID) -> URL? { nil }
+    func fileURL(of id: ItemID) async throws -> URL? { nil }
     func path(of id: ItemID) -> String? { nil }
     func fileName(of id: ItemID) -> String? { nil }
     func imageBase(of id: ItemID) -> String? { nil }
@@ -118,6 +120,7 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func leave(_ id: ItemID) {}
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     func finish() {}
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool { false }
@@ -155,7 +158,7 @@ final class FakeItemLibrary: ItemLibrary {
         change([id]) { $0.title = name }
     }
 
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) -> [Embed] { [] }
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] { [] }
     func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) {}
     func consumeImportCompletion(_ requestID: UUID) { completedImports[requestID] = nil }
 

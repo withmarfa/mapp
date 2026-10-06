@@ -23,6 +23,8 @@ protocol ItemLibrary: AnyObject, Observable {
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
     var syncReport: SyncReport { get }
+    /// False where the action is not offered for the problem.
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
     var completedImports: [UUID: ItemID] { get }
     var now: () -> Date { get }
 
@@ -55,11 +57,13 @@ protocol ItemLibrary: AnyObject, Observable {
 
     /// The folder relative links in a note resolve within.
     var folderURL: URL? { get }
-    /// A file item's file, to show, share or open.
+    /// A file item's file, to show, share or open, where it is at hand.
     func fileURL(for id: ItemID) -> URL?
+    /// A file item's file, fetched first where it is not at hand.
+    func fileURL(of id: ItemID) async throws -> URL?
     /// Where the item is kept, relative to `folderURL`.
     func path(of id: ItemID) -> String?
-    /// The name Rename Note offers.
+    /// The name Rename Note offers; only where `capabilities` has `renameFiles`.
     func fileName(of id: ItemID) -> String?
     /// Where a note's relative links start, relative to `folderURL`.
     func imageBase(of id: ItemID) -> String?
@@ -87,13 +91,16 @@ protocol ItemLibrary: AnyObject, Observable {
     func deletePermanently(_ ids: Set<ItemID>)
     /// Into a folder, or out of every folder with nil; only where `capabilities` has `move`.
     func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager?)
+    /// Names the item's file; only where `capabilities` has `renameFiles`. A title is edited with `setItemProperty`.
     func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?)
-    /// Files the note points at, such as pasted images, with the links the page writes for them.
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) -> [Embed]
+    /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
+    /// sends them elsewhere may have to wait, and may fail.
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed]
+    /// Only where `capabilities` has `importFiles`.
     func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID)
     func consumeImportCompletion(_ requestID: UUID)
 
-    // MARK: Folders
+    // MARK: Folders, only where `capabilities` has `folders`
 
     @discardableResult
     func newFolder(undoManager: UndoManager?) -> Folder
@@ -103,6 +110,8 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
-    /// A library that sends nothing has nothing waiting.
-    var syncReport: SyncReport { SyncReport(queueRead: true) }
+    /// Whether Rename Note applies: it names a file, which a deleted note keeps as it is.
+    func canRenameFile(of item: Item?) -> Bool {
+        capabilities.contains(.renameFiles) && item?.isWritable == true
+    }
 }

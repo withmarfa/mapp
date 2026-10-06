@@ -38,12 +38,51 @@ struct ItemLibraryTests {
         #expect(!invalidates({ _ = library.folders }, when: { library.updateBody(of: note.id, to: "# Plan\n\nMore\n") }))
     }
 
-    @Test func theFilesLibraryMovesAndPurgesButNeitherArchivesNorSends() {
+    @Test func theFilesLibraryOffersEveryFilesCommandButNeitherArchivesNorSends() async throws {
         let library: any ItemLibrary = NoteLibrary(notes: [], now: { start })
-        #expect(library.capabilities == [.move, .purge])
+        #expect(library.capabilities == [.move, .purge, .renameFiles, .folders, .importFiles])
         #expect(library.trashDays == NoteLibrary.trashDays)
         #expect(library.syncReport.waiting == 0 && library.syncReport.problems.isEmpty && library.syncReport.queueRead)
+        #expect(try await !library.resolve(.write("w1"), by: .discard), "a folder has no problems to resolve")
         #expect(library.folderURL == nil, "a library with no folder store has no folder")
+    }
+
+    // MARK: What each library offers
+
+    static let everything: SourceCapabilities = [.archive, .purge, .move, .retype, .retier, .renameFiles, .folders, .importFiles]
+
+    @Test func renameNoteNamesAFileOnlyWhereTheLibraryHasFiles() {
+        let note = FakeItemLibrary.note("Plan", modified: start)
+        let trashed = FakeItemLibrary.note("Old", modified: start, state: .trashed)
+        let library = FakeItemLibrary(items: [note, trashed])
+        #expect(!library.canRenameFile(of: note), "a library without files offers no Rename Note")
+        library.capabilities = Self.everything
+        #expect(library.canRenameFile(of: note))
+        #expect(!library.canRenameFile(of: trashed), "a deleted note is not renamed")
+        #expect(!library.canRenameFile(of: nil))
+    }
+
+    @Test func aTitleIsEditedAsAPropertyWhereFilesCannotBeRenamed() throws {
+        let note = Note(body: "# Plan", path: "Plan.md", created: start)
+        let library = NoteLibrary(notes: [note], now: { start })
+        let item = try #require(library.item(note.id))
+        #expect(library.setItemProperty(note.id, key: "title", value: .string("Roadmap"), undoManager: nil))
+        #expect(library.item(note.id)?.title == "Roadmap")
+        #expect(item.isEditable, "retitling needs only an editable item, not the rename capability")
+    }
+
+    // MARK: Files
+
+    @Test func aFileItemsURLIsTheSameWhetherAskedAtOnceOrAwaited() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        try root.write("png", to: "Photo.png")
+        let files = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url), defaults: nil)
+        await files.load()
+        let library: any ItemLibrary = files
+        let file = try #require(library.items(in: .files).first)
+        let url = try #require(library.fileURL(for: file.id))
+        #expect(try await library.fileURL(of: file.id) == url)
     }
 
     @Test func aFolderStoreGivesTheLibraryItsFolder() throws {

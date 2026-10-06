@@ -50,8 +50,12 @@ final class NoteLibrary: ItemLibrary {
     /// How long a note stays in Recently Deleted.
     static let trashDays = 30
     var trashDays: Int? { Self.trashDays }
-    /// A folder holds no archive, and its items move between folders.
-    var capabilities: SourceCapabilities { [.move, .purge] }
+    /// A folder holds no archive, and its items are files that move between folders.
+    var capabilities: SourceCapabilities { [.move, .purge, .renameFiles, .folders, .importFiles] }
+    /// A folder sends nothing, so nothing waits and nothing goes wrong on the way.
+    var syncReport: SyncReport { SyncReport(queueRead: true) }
+
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     private static let folderOrderKey = "folderOrder"
 
     /// A library of the notes given, loaded already; with a store, each change is also made there.
@@ -697,7 +701,7 @@ final class NoteLibrary: ItemLibrary {
 
     /// Writes files a note points at, such as images pasted into it, into the attachments folder, and gives the
     /// links to them from where the note is, as standard markdown writes a relative link.
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) -> [Embed] {
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
         guard let store, let note = note(id), !note.isDeleted else { return [] }
         let depth = note.directory.split(separator: "/").count
         return files.map { file in

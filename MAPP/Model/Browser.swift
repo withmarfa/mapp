@@ -132,17 +132,27 @@ final class Browser {
     }
 
     func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
+        guard library.capabilities.contains(.folders) else { return }
         let folder = library.newFolder(undoManager: undoManager)
         show(.folder(folder.id), in: library, order: order)
         renamingFolder = folder.id
     }
 
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
-    /// person confirms, since that cannot be undone.
+    /// person confirms, since that cannot be undone, where the library can erase them.
     static func delete(_ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
-        if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
+        if !alreadyDeleted.isEmpty, library.capabilities.contains(.purge) { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
+    }
+
+    /// Dropped items move into a folder or the Inbox, where the library moves items, or go to Recently Deleted.
+    static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
+        switch place {
+        case .inbox, .folder: library.capabilities.contains(.move)
+        case .recentlyDeleted: true
+        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .marfaTypes: false
+        }
     }
 
     /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
