@@ -79,7 +79,7 @@ final class SettingsTests: XCTestCase {
 
     func testSettingsReturnsToTheTypesBrowser() {
         window.outlines["SidebarPlaces"].staticTexts["Marfa Types"].click()
-        let types = window.groups["MarfaTypes"].webViews.firstMatch
+        let types = window.descendants(matching: .any)["MarfaTypesList"]
         XCTAssertTrue(types.waitForExistence(timeout: 5))
         for _ in 0..<2 {
             app.typeKey(",", modifierFlags: .command)
