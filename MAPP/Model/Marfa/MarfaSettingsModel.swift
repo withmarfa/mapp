@@ -100,17 +100,20 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     func connect() async {
         guard canConnect else { return }
-        await run { () async throws(MarfaHost.Problem) in
+        let target = address
+        await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
             await beforeChange()
-            try await host.connect(address: address, key: key)
-            address = ""
-            key = ""
+            try await keepingNoKey(once: target, { address = ""; key = "" }) { () async throws(MarfaHost.Problem) in
+                try await host.connect(address: target, key: key)
+            }
         }
     }
 
     func replaceKey() async {
         guard canReplaceKey else { return }
-        await run { () async throws(MarfaHost.Problem) in
+        await run(.replacingKey) { () async throws(MarfaHost.Problem) in
+            // A copy that cannot take the key is closed and opened again, which the pages' edits must not miss.
+            await beforeChange()
             try await host.replaceKey(newKey)
             newKey = ""
         }
@@ -119,15 +122,35 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// Moves to another server, asking first what becomes of this one's copy if changes wait in it.
     func switchServer(_ choice: Choice? = nil) async {
         guard choice != nil || canSwitch else { return }
-        await run { () async throws(MarfaHost.Problem) in
+        let target = otherAddress
+        await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
             await beforeChange()
-            try await host.changeAddress(to: otherAddress, key: otherKey, choice: hostChoice(choice))
-            otherAddress = ""
-            otherKey = ""
+            try await keepingNoKey(once: target, { otherAddress = ""; otherKey = "" }) { () async throws(MarfaHost.Problem) in
+                try await host.changeAddress(to: target, key: otherKey, choice: hostChoice(choice))
+            }
             departure = nil
         } onWaiting: { [self] unsent in
             ask(.switchServer, unsent, askedAgain: choice != nil)
         }
+    }
+
+    /// Runs a step that gives the host a key and forgets what was typed once the host holds it: when the step
+    /// is done, and when it is done but for removing what the server left behind held.
+    private func keepingNoKey(
+        once address: String, _ forget: () -> Void, _ step: () async throws(MarfaHost.Problem) -> Void
+    ) async throws(MarfaHost.Problem) {
+        do {
+            try await step()
+        } catch {
+            if case .notRemoved = error, isConnected(to: address) { forget() }
+            throw error
+        }
+        forget()
+    }
+
+    private func isConnected(to address: String) -> Bool {
+        guard let target = try? MarfaConnection(address: address) else { return false }
+        return host.connection == target
     }
 
     /// A disconnect with nothing waiting is confirmed once, since it forgets the key. With changes waiting, the
@@ -142,7 +165,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     func disconnect(_ choice: Choice? = nil) async {
         guard !isWorking else { return }
-        await run { () async throws(MarfaHost.Problem) in
+        await run(.leaving) { () async throws(MarfaHost.Problem) in
             await beforeChange()
             try await host.disconnect(hostChoice(choice))
             departure = nil
@@ -167,9 +190,19 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     // MARK: Words
 
+    /// What a step that ran into a problem had done by then, which decides how some problems are told.
+    nonisolated enum Reached: Hashable, Sendable {
+        /// The server was left.
+        case left
+        /// The app now reads the other server.
+        case switched
+        /// No other server was opened.
+        case notOpened
+    }
+
     /// A problem in the app's words: what happened, and what to do. Nil for the question about changes that
     /// wait, which is asked rather than told.
-    static func notice(for problem: MarfaHost.Problem) -> Notice? {
+    static func notice(for problem: MarfaHost.Problem, reached: Reached = .left) -> Notice? {
         switch problem {
         case .changesWaiting:
             nil
@@ -198,7 +231,18 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
                 title: String(localized: "Can’t Reach the Server"),
                 message: String(localized: "MAPP couldn’t ask the server about the key. Check the address and your connection, then try again. The key you had is kept."))
         case .notRemoved(let key, let copy):
-            Notice(title: String(localized: "Disconnected, but Not Everything Was Removed"), message: removalMessage(key: key, copy: copy))
+            switch reached {
+            case .left:
+                Notice(title: String(localized: "Disconnected, but Not Everything Was Removed"), message: removalMessage(key: key, copy: copy))
+            case .switched:
+                Notice(
+                    title: String(localized: "Switched Servers, but Not Everything Was Removed"),
+                    message: previousRemovalMessage(key: key, copy: copy))
+            case .notOpened:
+                Notice(
+                    title: String(localized: "Can’t Open the Library"),
+                    message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again."))
+            }
         case .notConnected:
             Notice(title: String(localized: "Not connected"), message: String(localized: "Connect to a server first."))
         case .busy:
@@ -217,7 +261,25 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
+    private static func previousRemovalMessage(key: String?, copy: String?) -> String {
+        switch (key != nil, copy != nil) {
+        case (true, true):
+            String(localized: "The previous server’s key is still in your Keychain, and its copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.")
+        case (true, false):
+            String(localized: "The previous server’s key is still in your Keychain. Remove it in Keychain Access.")
+        default:
+            String(localized: "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again.")
+        }
+    }
+
     // MARK: Running a step
+
+    /// What a step sets out to do, so a problem is told against what it did.
+    private enum Step {
+        case reaching(String)
+        case replacingKey
+        case leaving
+    }
 
     private func hostChoice(_ choice: Choice?) -> MarfaHost.DisconnectChoice? {
         switch choice {
@@ -232,6 +294,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     private func run(
+        _ step: Step,
         _ work: () async throws(MarfaHost.Problem) -> Void,
         onWaiting: ((UnsentWrites?) -> Void)? = nil
     ) async {
@@ -247,8 +310,16 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             } else {
                 // A failure after the question was put to the person ends it, so it is not asked again.
                 departure = nil
-                notice = Self.notice(for: error)
+                notice = Self.notice(for: error, reached: reached(by: step))
             }
+        }
+    }
+
+    private func reached(by step: Step) -> Reached {
+        switch step {
+        case .leaving: .left
+        case .reaching(let address): isConnected(to: address) ? .switched : .notOpened
+        case .replacingKey: .notOpened
         }
     }
 

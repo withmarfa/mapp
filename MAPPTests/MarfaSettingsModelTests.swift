@@ -94,6 +94,47 @@ import Testing
         #expect(MarfaSettingsModel.notice(for: .changesWaiting(.fake(2))) == nil)
     }
 
+    // MARK: The connect review
+
+    /// A copy that cannot take the new key is closed and opened again, so the pages hand over their edits first.
+    @Test func replacingAKeyHandsOverEditsFirst() async throws {
+        let bench = try HostBench()
+        let (model, flushed) = model(bench)
+        await connect(model)
+        let before = flushed.count
+        model.newKey = "key-2"
+        await model.replaceKey()
+        #expect(flushed.count == before + 1)
+    }
+
+    /// A switch that is done but for removing the old server's key forgets the new key it was given, and says it
+    /// switched rather than disconnected.
+    @Test func aSwitchThatLeavesTheOldKeyBehindForgetsTheNewKeyAndSaysItSwitched() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        bench.keys.failsDelete.withLock { $0 = true }
+        model.otherAddress = "http://second.test:8210"
+        model.otherKey = "key-2"
+        await model.switchServer()
+
+        #expect(model.host.connection == second)
+        #expect(model.otherKey == "", "the key is held by the host, not the form")
+        #expect(model.otherAddress == "")
+        let notice = try #require(model.notice)
+        #expect(notice.title == "Switched Servers, but Not Everything Was Removed")
+        #expect(notice.message == "The previous server’s key is still in your Keychain. Remove it in Keychain Access.")
+    }
+
+    @Test func aCopyLeftBehindIsToldAgainstWhatTheStepDid() throws {
+        let problem = MarfaHost.Problem.notRemoved(key: nil, copy: "NSCocoaErrorDomain 513")
+        #expect(MarfaSettingsModel.notice(for: problem, reached: .left)?.title == "Disconnected, but Not Everything Was Removed")
+        #expect(MarfaSettingsModel.notice(for: problem, reached: .switched)?.title == "Switched Servers, but Not Everything Was Removed")
+        let notOpened = try #require(MarfaSettingsModel.notice(for: problem, reached: .notOpened))
+        #expect(notOpened.title == "Can’t Open the Library")
+        #expect(!notOpened.message.contains("NSCocoa"))
+    }
+
     // MARK: Leaving a copy
 
     @Test func disconnectingWithNothingWaitingAsksOnceThenRemovesTheCopy() async throws {

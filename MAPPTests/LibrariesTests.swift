@@ -37,9 +37,13 @@ import Testing
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .disconnected, isLaunching: false, isBusy: false) == .failed)
     }
 
-    /// Leaving a server detaches its copy a moment before its address is forgotten, which is not a failure.
-    @Test func leavingAServerGoesStraightToTheFolder() {
-        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .online, isLaunching: false, isBusy: true) == .files)
+    /// A copy closed to open again, as when a key is replaced, is waited for: the windows never show the notes
+    /// folder, nor say the library can't open, in between. Leaving a server forgets its address first, so the
+    /// folder follows at once.
+    @Test func aCopyBeingReopenedIsWaitedForNeverShownAsTheFolder() {
+        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
+            #expect(Libraries.mode(hasSource: false, isConfigured: true, state: state, isLaunching: false, isBusy: true) == .opening)
+        }
     }
 
     @Test func withNoServerSetNothingChangesAndTheHostIsNeverOpened() throws {

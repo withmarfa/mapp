@@ -1187,6 +1187,24 @@
     "Disconnected, but Not Everything Was Removed": {
       "extractionState": "manual"
     },
+    "This library was closed before the change could be kept.": {
+      "extractionState": "manual"
+    },
+    "Switched Servers, but Not Everything Was Removed": {
+      "extractionState": "manual"
+    },
+    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s key is still in your Keychain, and its copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s key is still in your Keychain. Remove it in Keychain Access.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again.": {
+      "extractionState": "manual"
+    },
     "Connect to a server first.": {
       "extractionState": "manual"
     },

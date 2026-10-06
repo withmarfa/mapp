@@ -51,18 +51,16 @@ import Observation
     }
 
     /// Which library the windows show. A server's copy is shown whenever it is open; a server set whose copy is
-    /// not open is never answered with the notes folder, which is not what the person asked to read. While the
-    /// app leaves a server, the folder is already what comes next.
+    /// not open is never answered with the notes folder, which is not what the person asked to read. Leaving a
+    /// server forgets its address first, so the folder is what comes next; a copy closed to open again, as when
+    /// a key is replaced, is waited for, never shown as the folder in between.
     nonisolated static func mode(hasSource: Bool, isConfigured: Bool, state: MarfaHost.State, isLaunching: Bool, isBusy: Bool) -> Mode {
         if hasSource { return .marfa }
         guard isConfigured else { return .files }
         switch state {
         case .connecting: return .opening
-        case .keyRefused, .unavailable: return .failed
-        case .disconnected, .online, .offline:
-            if isLaunching { return .opening }
-            // Leaving a server detaches its copy a moment before the address is forgotten.
-            return isBusy ? .files : .failed
+        case .keyRefused, .unavailable: return isBusy ? .opening : .failed
+        case .disconnected, .online, .offline: return isLaunching || isBusy ? .opening : .failed
         }
     }
 
