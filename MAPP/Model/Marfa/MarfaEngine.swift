@@ -44,7 +44,7 @@ actor MarfaEngine {
 
     /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
     /// version that edit was typed on, moved on by each answer to this device's writes of the item.
-    private nonisolated struct OwnText {
+    nonisolated struct OwnText: Equatable {
         var text: String
         var on: Int64
     }
@@ -974,23 +974,33 @@ actor MarfaEngine {
     /// sent as read on an older version, lands on whatever the server held, which the copy now shows with every
     /// answer taken so far. Any other answer leaves the item where it was.
     private func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
-        guard var own = ownText[id] else { return }
+        guard let own = ownText[id] else { return }
+        var taken = counted
+        ownText[id] = try await Self.counting(queue, for: id, own: own, counted: &taken, sentAsRead: sentAsRead) {
+            try await self.heldVersion(id)
+        }
+        counted.formUnion(taken)
+    }
+
+    /// `own` moved past the answers in `queue` not yet in `counted`. Each is put in `counted` only once its effect
+    /// is known, so an answer whose version cannot be read, as while the copy is hydrated again, is counted later.
+    nonisolated static func counting(
+        _ queue: [Marfa.QueuedWrite], for id: ItemID, own: OwnText, counted: inout Set<String>, sentAsRead: Set<String>,
+        held: () async throws -> Int64
+    ) async rethrows -> OwnText {
         let answered = queue.filter {
             $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict != nil
                 && !counted.contains($0.id)
         }
-        guard !answered.isEmpty else { return }
-        counted.formUnion(answered.map(\.id))
+        guard !answered.isEmpty else { return own }
         let landedElsewhere = answered.contains { write in
             if case .merged = write.verdict { return true }
             return write.verdict == .accepted && sentAsRead.contains(write.id)
         }
-        if landedElsewhere {
-            own.on = try await heldVersion(id)
-        } else {
-            own.on += Int64(answered.count { $0.verdict == .accepted })
-        }
-        ownText[id] = own
+        var own = own
+        own.on = landedElsewhere ? try await held() : own.on + Int64(answered.count { $0.verdict == .accepted })
+        counted.formUnion(answered.map(\.id))
+        return own
     }
 
     private func answeredWrites(of id: ItemID) async throws -> [String] {
@@ -1049,15 +1059,22 @@ actor MarfaEngine {
             answered(answer.id, outcome)
         }
         await reread(ids.union(await settledLinks()))
+        // An answer the person's text cannot yet be moved past stays in the queue, to be counted by the next save
+        // or the next answer, since forgetting it would leave the text on a version it has passed.
+        var uncounted = false
         if let queued = try? await copy.queue.all() {
-            for raw in Set(report.verdicts.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
-                try? await count(answers: queued, for: ItemID(raw))
+            for raw in Set(queued.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
+                do { try await count(answers: queued, for: ItemID(raw)) } catch { uncounted = true }
             }
+        } else {
+            uncounted = true
         }
-        do {
-            _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
-        } catch {
-            failures.append(Self.failure(error))
+        if !uncounted {
+            do {
+                _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
+            } catch {
+                failures.append(Self.failure(error))
+            }
         }
         if !leaving.isEmpty { await reread(leaving) }
         await readQueue()

@@ -336,6 +336,43 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// An answer moves the person's text on only once its effect is known. One that landed elsewhere needs the
+    /// version the copy holds, which an expired copy cannot read, so it stays to be counted again.
+    @Test func anAnswerIsCountedOnlyOnceTheVersionItNeedsIsRead() async throws {
+        struct Unreadable: Error {}
+        func write(_ id: String, _ verdict: Marfa.Verdict) -> Marfa.QueuedWrite {
+            Marfa.QueuedWrite(
+                id: id, kind: .updateItem, itemId: "item", idempotencyKey: id, verdict: verdict,
+                queuedAt: "2026-10-06T00:00:00Z")
+        }
+        let queue = [write("merged", .merged(fields: ["body"])), write("taken", .accepted)]
+        let own = MarfaEngine.OwnText(text: "Mine", on: 3)
+        var counted: Set<String> = []
+        await #expect(throws: Unreadable.self) {
+            _ = try await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
+                throw Unreadable()
+            }
+        }
+        #expect(counted.isEmpty)
+
+        let moved = await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
+            9
+        }
+        #expect(moved.on == 9)
+        #expect(counted == ["merged", "taken"])
+        // Counted once, the same answers move it no further.
+        let again = await MarfaEngine.counting(queue, for: ItemID("item"), own: moved, counted: &counted, sentAsRead: []) {
+            12
+        }
+        #expect(again == moved)
+        // Accepted on the version it was sent on, an answer moves the text one version on without reading.
+        var fresh: Set<String> = []
+        let accepted = try await MarfaEngine.counting(
+            [write("taken", .accepted)], for: ItemID("item"), own: own, counted: &fresh, sentAsRead: []
+        ) { throw Unreadable() }
+        #expect(accepted.on == 4)
+    }
+
     private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {
         _ = await LiveMarfa.until { ((try? await source.copy.edges.from(id.rawValue)) ?? []).contains { $0.edgeType == type } }
         return try? await source.copy.edges.from(id.rawValue).first { $0.edgeType == type }
