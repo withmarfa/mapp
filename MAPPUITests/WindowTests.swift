@@ -543,10 +543,13 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typesList.exists, "the sidebar comes back beside the types")
     }
 
-    func testPickingMarfaTypesAfterResizingTheSidebarWorks() {
+    func testPickingMarfaTypesAfterResizingTheSidebarWorks() throws {
         // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar resized.
-        let divider = window.splitters.firstMatch
-        XCTAssertTrue(divider.waitForExistence(timeout: 2))
+        XCTAssertTrue(window.splitters.firstMatch.waitForExistence(timeout: 2))
+        let divider = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min {
+            abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX)
+        })
+        XCTAssertLessThan(abs(divider.frame.midX - sidebar.frame.maxX), 8)
         let before = sidebar.frame.width
         let edge = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
