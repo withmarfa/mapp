@@ -130,19 +130,26 @@ struct ItemInspector: View {
                         .padding(.top, 8)
                     }
                 }
-                if let path {
+                if path != nil || item.isFile {
                     Divider()
                     DisclosureGroup("File") {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(path).font(.caption).textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if let path {
+                                Text(path).font(.caption).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                             if case .file(let contentType, let byteCount) = item.content {
                                 LabeledContent("Kind", value: contentType.localizedDescription ?? String(localized: "File"))
-                                LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
+                                // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
+                                if path != nil || byteCount > 0 {
+                                    LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
+                                }
                                 LabeledContent("Created", value: item.created.formatted(date: .abbreviated, time: .shortened))
                                 LabeledContent("Modified", value: item.modified.formatted(date: .abbreviated, time: .shortened))
-                                Text("File properties cannot be edited in this file-backed library.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                if path != nil {
+                                    Text("File properties cannot be edited in this file-backed library.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .font(.callout)
@@ -155,8 +162,8 @@ struct ItemInspector: View {
         }
     }
 
-    /// Every property the type does not name or show elsewhere, by key. A source that keeps no tags field still
-    /// shows the item's tags among them.
+    /// Every property the type does not name or show elsewhere, in the order the item holds them. A source that
+    /// keeps no tags field still shows the item's tags among them.
     private var otherProperties: [Property] {
         var shown = Set((type?.fields ?? []).map(\.key) + ["title", "type", "marfa_id", "marfa_version"])
         shown.formUnion(relationships.map(\.field))
@@ -164,6 +171,6 @@ struct ItemInspector: View {
         if !item.tags.isEmpty && item.value(of: "tags") == nil {
             properties.append(Property(key: "tags", value: .array(item.tags.sorted().map(PropertyValue.string))))
         }
-        return properties.sorted { $0.key < $1.key }
+        return properties
     }
 }
