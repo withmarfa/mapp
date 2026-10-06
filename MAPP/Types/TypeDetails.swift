@@ -127,9 +127,9 @@ extension EdgeTypeInfo {
 
     var cascadeWording: String {
         switch cascadeOnDelete {
-        case .cascade: String(localized: "The item at the other end is deleted too")
-        case .orphan: String(localized: "The item at the other end is kept")
-        case .block: String(localized: "Deleting is refused while the connection exists")
+        case .cascade: String(localized: "Deleting the item it points from also deletes the item it points to")
+        case .orphan: String(localized: "Deleting either item keeps the other")
+        case .block: String(localized: "Deleting either item is refused while the connection exists")
         }
     }
 }

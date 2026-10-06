@@ -31,7 +31,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     /// A files library's types have none.
     var version: Int64?
     var roles: [String] = []
-    /// The types this one is a structural superset of, so it can stand where they are accepted.
+    /// The types this one claims to be a structural superset of.
     var compatibleWith: [TypeID] = []
 }
 
@@ -40,7 +40,8 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
 
     enum Cardinality: Hashable, Sendable { case one, many }
 
-    /// What deleting an item does to the item at the other end of one of its edges.
+    /// What deleting an item does through an edge: `cascade` deletes the target when the source is deleted, `block`
+    /// refuses a delete of either end, and `orphan` keeps the other end.
     enum CascadeOnDelete: Hashable, Sendable { case cascade, orphan, block }
 
     let id: String

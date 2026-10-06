@@ -132,9 +132,9 @@ struct TypeDetailsTests {
         let references = try edge("references")
         #expect(parent.writtenAtWording == "The item it points to")
         #expect(references.writtenAtWording == "The item it points from")
-        #expect(parent.cascadeWording == "The item at the other end is deleted too")
-        #expect(references.cascadeWording == "The item at the other end is kept")
-        #expect(TypesFixtures.edge("x", cascade: .block).cascadeWording == "Deleting is refused while the connection exists")
+        #expect(parent.cascadeWording == "Deleting the item it points from also deletes the item it points to")
+        #expect(references.cascadeWording == "Deleting either item keeps the other")
+        #expect(TypesFixtures.edge("x", cascade: .block).cascadeWording == "Deleting either item is refused while the connection exists")
     }
 
     @Test func fieldKindsReadAsPlainWords() {

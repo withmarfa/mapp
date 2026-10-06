@@ -875,7 +875,7 @@
     "Date": {
       "extractionState": "manual"
     },
-    "Deleting is refused while the connection exists": {
+    "Deleting either item is refused while the connection exists": {
       "extractionState": "manual"
     },
     "Each can be pointed to by many items.": {
@@ -902,10 +902,10 @@
     "Other": {
       "extractionState": "manual"
     },
-    "The item at the other end is deleted too": {
+    "Deleting the item it points from also deletes the item it points to": {
       "extractionState": "manual"
     },
-    "The item at the other end is kept": {
+    "Deleting either item keeps the other": {
       "extractionState": "manual"
     },
     "The item it points from": {
@@ -923,7 +923,7 @@
     "^[%lld subtype](inflect: true)": {
       "extractionState": "manual"
     },
-    "A compatible type has every field of the other, so it can be used wherever the other is accepted.": {
+    "A type that is compatible with another claims to have at least the other’s fields.": {
       "extractionState": "manual"
     },
     "An edge points from one item to another.": {

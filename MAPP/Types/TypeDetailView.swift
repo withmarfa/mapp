@@ -84,7 +84,7 @@ private struct ItemTypePage: View {
                 } header: {
                     Text("Compatibility")
                 } footer: {
-                    Text("A compatible type has every field of the other, so it can be used wherever the other is accepted.")
+                    Text("A type that is compatible with another claims to have at least the other’s fields.")
                 }
             }
 
