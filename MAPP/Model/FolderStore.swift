@@ -25,7 +25,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private let files = FileManager()
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
-    var imported: @MainActor @Sendable (UUID, UUID) -> Void = { _, _ in }
+    var imported: @MainActor @Sendable (UUID, ItemID) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     /// Paths the library gave that were taken, and the paths used instead, for the changes the library queued
     /// before it heard of the new path; once it has, the old path is its own again. Read and written on the
@@ -317,7 +317,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             }
             if let error = coordinationError ?? failure { throw error }
             let actual = relativePath(of: target)
-            let itemID = UUID()
+            let itemID = ItemID.mint()
             changeLedger { $0.record(itemID, kind: Self.isNote(actual) ? .note : .file, path: actual, fileID: fileID(of: target)) }
             let imported = imported
             Task { @MainActor in imported(requestID, itemID) }

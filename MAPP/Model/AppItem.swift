@@ -10,7 +10,7 @@ nonisolated struct AppItem: Identifiable, Sendable {
         isDeleted = false
         projection = NoteProjection(id: file.id, file: NoteFile(text: ""), fallbackTitle: file.title, filePath: file.path)
     }
-    var id: UUID { projection.id }
+    var id: ItemID { projection.id }
     var title: String { projection.title }
     var type: ItemTypeDefinition? { if file != nil { return nil }; return WorkbenchSchema.definition(projection.declaredType ?? "core.note") }
     enum Content: Sendable { case markdown(NoteProjection), file(AppFile) }
@@ -25,9 +25,9 @@ nonisolated struct AppItem: Identifiable, Sendable {
 
 nonisolated struct ItemRelationshipTarget: Identifiable, Sendable {
     let title: String
-    let itemID: UUID?
+    let itemID: ItemID?
     let resolution: NoteReferenceResolution
-    var id: String { itemID?.uuidString ?? title }
+    var id: String { itemID?.rawValue ?? title }
 }
 
 nonisolated struct ItemRelationship: Identifiable, Sendable {

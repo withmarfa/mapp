@@ -5,10 +5,10 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case allNotes
     case favorites
     /// A shortcut to one favorite item, distinct from the collection containing every favorite.
-    case favoriteItem(UUID)
-    case folder(Folder.ID)
+    case favoriteItem(ItemID)
+    case folder(ItemID)
     case itemType(String)
-    case project(UUID)
+    case project(ItemID)
     case files
     case recentlyDeleted
     /// Marfa's types: a page of their own, in place of the list and the note, that holds no notes.

@@ -12,7 +12,7 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
     }
 
     nonisolated struct Entry: Codable, Equatable, Sendable {
-        var id: UUID
+        var id: ItemID
         var kind: Kind
         /// The file's document identifier, or its file identifier where it has none; nil on a volume whose
         /// identifiers do not last, where items are known by their paths alone.
@@ -45,8 +45,8 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
     /// which holds the note's old file under another name, does not take the note's identifier when it is read
     /// beside the note's new file. What is matched is brought up to date, what was not found is marked gone, and
     /// what has been gone longer than `retention` is forgotten.
-    mutating func identify(_ sightings: [Sighting], at now: Date, retention: TimeInterval = Self.retention) -> [UUID] {
-        var ids = [UUID?](repeating: nil, count: sightings.count)
+    mutating func identify(_ sightings: [Sighting], at now: Date, retention: TimeInterval = Self.retention) -> [ItemID] {
+        var ids = [ItemID?](repeating: nil, count: sightings.count)
         var claimed = [Bool](repeating: false, count: entries.count)
         var byBin: [UUID: Int] = [:]
         var byFile: [Key<UInt64>: [Int]] = [:]
@@ -112,7 +112,7 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
         return sightings.indices.map { index in
             if let id = ids[index] { return id }
             let sighting = sightings[index]
-            let entry = Entry(id: UUID(), kind: sighting.kind, fileID: sighting.fileID, path: sighting.path, binID: sighting.binID)
+            let entry = Entry(id: .mint(), kind: sighting.kind, fileID: sighting.fileID, path: sighting.path, binID: sighting.binID)
             entries.append(entry)
             return entry.id
         }
@@ -127,7 +127,7 @@ nonisolated struct IdentityLedger: Codable, Equatable, Sendable {
 
     /// An item the app made, under the identifier it gave it. Anything remembered as gone from the same place
     /// gives way to it.
-    mutating func record(_ id: UUID, kind: Kind, path: String, fileID: UInt64?) {
+    mutating func record(_ id: ItemID, kind: Kind, path: String, fileID: UInt64?) {
         let isFolder = kind == .folder
         entries.removeAll { $0.id == id || ($0.binID == nil && $0.path == path && ($0.kind == .folder) == isFolder) }
         entries.append(Entry(id: id, kind: kind, fileID: fileID, path: path))
