@@ -249,7 +249,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     func endEditing(_ item: ItemID) {}
 
     /// Returns once every write submitted before it has been queued and the queue drained where the server can
-    /// be reached.
+    /// be reached. The app never waits on the server like this; the tests that drive a server do.
     func flush() async {
         await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.flush(continuation)) { continuation.resume() }

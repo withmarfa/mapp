@@ -84,8 +84,6 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
         queued.withLock { $0 += 1 }
     }
 
-    func flush() async {}
-
     /// While set, closing waits, as a copy finishing its last step does.
     let closesSlowly = Mutex(false)
 

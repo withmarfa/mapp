@@ -165,7 +165,6 @@ nonisolated final class FailingSearchSource: ConnectedItemSource {
     }
     func endEditing(_ item: ItemID) {}
     func queueSubmitted() async {}
-    func flush() async {}
     func close() async {}
 }
 

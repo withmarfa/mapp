@@ -35,7 +35,6 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     let searches = Mutex(0)
     let searchFails = Mutex(false)
     let resolved = Mutex<[SyncAction]>([])
-    let flushes = Mutex(0)
     let queues = Mutex(0)
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
     let queuing = Mutex(false)
@@ -111,10 +110,6 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     func queueSubmitted() async {
         while queuing.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
         queues.withLock { $0 += 1 }
-    }
-
-    func flush() async {
-        flushes.withLock { $0 += 1 }
     }
 
     func close() async {

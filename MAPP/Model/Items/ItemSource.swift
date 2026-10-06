@@ -80,7 +80,5 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func endEditing(_ item: ItemID)
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
     func queueSubmitted() async
-    /// Returns once every write submitted before it is kept, and sent where the server can be reached.
-    func flush() async
     func close() async
 }

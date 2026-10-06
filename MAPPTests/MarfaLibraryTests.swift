@@ -763,7 +763,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.queuing.withLock { $0 = false }
         await finished.value
         #expect(source.queues.withLock { $0 } == 1)
-        #expect(source.flushes.withLock { $0 } == 0, "finishing never waits on the network")
     }
 }
 
