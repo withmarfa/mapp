@@ -439,7 +439,7 @@ extension LiveMarfaTests {
 
                 let first = WriteID(), second = WriteID()
                 source.submit(.editBody(id, "Two", base: version, merge: .asRead), as: first)
-                source.submit(.editBody(id, "Three", base: version, merge: .asRead), as: second)
+                source.submit(.editBody(id, "Three", base: version, merge: .following), as: second)
                 let answered = try #require(await log.wait {
                     $0.answer(to: first) != nil && $0.answer(to: second) != nil && $0.item(titled: title)?.sync == .settled
                 })

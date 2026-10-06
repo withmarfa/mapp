@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 import Synchronization
 import Testing
@@ -88,6 +89,40 @@ import Testing
         #expect(await eventually { library.failure != nil })
         try await Task.sleep(for: .milliseconds(200))
         #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
+    }
+
+    /// Queue-and-verdicts 43: text typed on version 1 but reported after the library took in another device's text
+    /// at version 2 is sent as typed on version 1, so the server keeps both. The library goes on holding the other
+    /// device's text, and what the person types on it next is the first save typed on version 2.
+    @Test func anEditTypedBeforeAnotherDevicesTextIsSentAsTypedOnTheOlderVersion() async throws {
+        let (library, source) = try await loaded()
+        var theirs = try #require(library.item(F.n1))
+        theirs.version = ItemVersion(2)
+        source.setBody("Theirs", of: F.n1, version: 2)
+        source.send(.upserted([theirs]))
+        #expect(await eventually { library.body(of: F.n1)?.text == "Theirs" })
+        library.updateBody(of: F.n1, to: "Note body, mine", readAt: ItemVersion(1))
+        #expect(source.writes.last == .editBody(F.n1, "Note body, mine", base: ItemVersion(1), merge: .asRead))
+        #expect(library.body(of: F.n1) == ItemBody(id: F.n1, text: "Theirs", version: ItemVersion(2)))
+        library.updateBody(of: F.n1, to: "Theirs, mine", readAt: ItemVersion(2))
+        #expect(source.writes.last == .editBody(F.n1, "Theirs, mine", base: ItemVersion(2), merge: .asRead))
+    }
+
+    /// A late report that continues the person's own saves follows them, so the source decides it against the
+    /// person's own last edit rather than against the other device's text.
+    @Test func aLateEditContinuingThePersonsOwnSavesFollowsThem() async throws {
+        let (library, source) = try await loaded()
+        library.updateBody(of: F.n1, to: "Mine", readAt: ItemVersion(1))
+        let write = try #require(source.submitted.last?.id)
+        var theirs = try #require(library.item(F.n1))
+        theirs.version = ItemVersion(3)
+        source.setBody("Theirs", of: F.n1, version: 3)
+        source.send(.answered(write, .accepted))
+        source.send(.upserted([theirs]))
+        #expect(await eventually { library.body(of: F.n1)?.text == "Theirs" })
+        library.updateBody(of: F.n1, to: "Mine more", readAt: ItemVersion(1))
+        #expect(source.writes.last == .editBody(F.n1, "Mine more", base: ItemVersion(1), merge: .following))
+        #expect(library.body(of: F.n1)?.text == "Theirs")
     }
 
     /// A search that fails is not shown as a search that found nothing.
@@ -190,6 +225,78 @@ extension LiveMarfaTests {
                 found.append("conflicted copy \(item.id.rawValue)")
             }
             return found
+        }
+
+        /// Another device writes the body through its own copy.
+        private func otherDevice(_ id: ItemID, sets text: String) async throws {
+            let root = URL.temporaryDirectory.appending(path: "MarfaLibraryReview-other-\(UUID().uuidString)", directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: root) }
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
+            let other = try await WorkingCopy.open(
+                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try #require(LiveMarfa.key)))
+            _ = try await other.hydrate(types: ["core.*"], tier: .library)
+            let row = try #require(try await other.items.get(id.rawValue))
+            _ = try await other.items.update(id.rawValue, Edit(properties: ["body": .string(text)], baseVersion: row.version))
+            let report = try await other.queue.drain()
+            await other.close()
+            try #require(report.verdicts.allSatisfy { $0.verdict == .accepted }, "the other device's write: \(report.verdicts)")
+        }
+
+        private func settle(_ library: MarfaLibrary, _ source: MarfaSource) async throws {
+            await source.flush()
+            try await Task.sleep(for: .seconds(3))
+            await source.flush()
+        }
+
+        /// The finding reproduced: the page reports typing made on "start" after the copy took in another device's
+        /// "theirs". The server keeps "theirs" on the item and the person's text on a conflicted copy beside it.
+        @Test(.timeLimit(.minutes(3)))
+        func aLateReportAfterAnotherDevicesTextKeepsBoth() async throws {
+            try await withLibrary { library, source, made in
+                let token = "zl" + UUID().uuidString.prefix(8).lowercased()
+                let id = try await make(library, source, made, token)
+                let read = try #require(library.body(of: id)?.version)
+                try await otherDevice(id, sets: "theirs")
+                try #require(await eventually(.seconds(30)) { library.body(of: id)?.text == "theirs" })
+                library.updateBody(of: id, to: "start, mine", readAt: read)
+                try await settle(library, source)
+                let held = try await source.body(of: id).text
+                let copies = library.items(in: .allNotes).filter {
+                    $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
+                }
+                Attachment.record("held: \(held)\ncopies: \(copies.map { library.body(of: $0.id)?.text ?? "" })", named: "LateReport.txt")
+                #expect(held == "theirs")
+                #expect(copies.count == 1)
+                #expect(copies.first.flatMap { library.body(of: $0.id)?.text } == "start, mine")
+            }
+        }
+
+        /// The person's first save is answered, another device's text comes in, and only then is their next save,
+        /// which follows the first, queued. It is sent as typed on the version the first was made on, so the server
+        /// keeps the other device's text and puts the person's on a conflicted copy, rather than writing it over.
+        @Test(.timeLimit(.minutes(3)))
+        func aFollowingSaveQueuedAfterAnotherDevicesTextDoesNotOverwriteIt() async throws {
+            try await withLibrary { library, source, made in
+                let token = "zf" + UUID().uuidString.prefix(8).lowercased()
+                let id = try await make(library, source, made, token)
+                let read = try #require(library.body(of: id)?.version)
+                source.submit(.editBody(id, "start, one", base: read, merge: .asRead), as: WriteID())
+                await source.flush()
+                try #require(await eventually(.seconds(20)) { library.item(id)?.sync == .settled })
+                try await otherDevice(id, sets: "theirs")
+                let caughtUp = await LiveMarfa.until(.seconds(30)) { (try? await source.body(of: id).text) == "theirs" }
+                try #require(caughtUp)
+                source.submit(.editBody(id, "start, one, two", base: read, merge: .following), as: WriteID())
+                try await settle(library, source)
+                let held = try await source.body(of: id).text
+                let copies = library.items(in: .allNotes).filter {
+                    $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
+                }
+                Attachment.record("held: \(held)\ncopies: \(copies.map { library.body(of: $0.id)?.text ?? "" })", named: "Following.txt")
+                #expect(held == "theirs")
+                #expect(copies.compactMap { library.body(of: $0.id)?.text } == ["start, one, two"])
+            }
         }
 
         /// The main actor is busy while the first save drains, as it is while a large list redraws; the person's

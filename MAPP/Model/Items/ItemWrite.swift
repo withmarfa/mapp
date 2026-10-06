@@ -28,10 +28,11 @@ nonisolated enum AttachmentSource: Hashable, Sendable {
 nonisolated enum BodyMerge: Hashable, Sendable {
     /// Refused unless the item is still at the base version.
     case ifUnchanged
-    /// Merged against the version the editor read, which may be older than the one the source now holds. Only the
-    /// first edit after a read is this.
+    /// Typed on the base version, which may be older than the one the source now holds, and merged against it.
+    /// The first edit typed on a version is this.
     case asRead
-    /// Laid over the person's own earlier edit, on whatever version the source holds.
+    /// Typed on the person's own earlier edit of the text: laid over it while the source holds only that edit
+    /// over the base, and otherwise merged against the version that edit was made on.
     case following
 }
 

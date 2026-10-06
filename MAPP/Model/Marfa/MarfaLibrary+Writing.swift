@@ -36,9 +36,9 @@ extension MarfaLibrary {
 
     // MARK: Text
 
-    func updateBody(of id: ItemID, to body: String) {
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         guard let item = item(id), item.isWritable, self.body(of: id)?.text != body else { return }
-        saveText(body, of: id, failing: String(localized: "Couldn’t Save “\(item.title)”"))
+        saveText(body, of: id, readAt: readAt, failing: String(localized: "Couldn’t Save “\(item.title)”"))
     }
 
     func leave(_ id: ItemID) {

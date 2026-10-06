@@ -47,9 +47,9 @@ import Observation
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
-    /// Items the person has saved text to since the library last gave out text it read from the copy. Only the
-    /// first save after that read is merged against what was read; the rest are laid over the person's own.
-    @ObservationIgnored private var savedSinceRead: Set<ItemID> = []
+    /// The version of the text the person's last save of each item was typed on. Only the first save typed on a
+    /// version is merged against it; the rest follow the person's own.
+    @ObservationIgnored private var savedOn: [ItemID: ItemVersion] = [:]
     /// Links removed only once the source has taken the links added in their place, by the link writes awaited.
     @ObservationIgnored private var replacements: [UUID: Replacement] = [:]
     @ObservationIgnored private var replacing: [WriteID: UUID] = [:]
@@ -233,7 +233,6 @@ import Observation
         for body in bodies where unsettledText[body.id] == nil {
             guard let record = records[body.id], record.body != body else { continue }
             record.body = body
-            savedSinceRead.remove(body.id)
         }
     }
 
@@ -293,7 +292,6 @@ import Observation
     /// The package's code for an item the copy does not hold.
     static let notHeldCode = "item_not_found"
 
-
     /// Every write the library makes goes through here, so a refusal reaches the person under `title`.
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String, notHeld: String? = nil) -> WriteID {
@@ -303,17 +301,21 @@ import Observation
         return id
     }
 
-    /// The person's text, edited from the version of the text last read. The first save after a read is merged
-    /// against that version where the copy has moved on; every later one is laid over the person's own, so their
-    /// saves never come back conflicted against each other. The text is held at once until the source answers.
-    func saveText(_ text: String, of id: ItemID, failing title: String) {
-        let base = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
-        let merge: BodyMerge = savedSinceRead.contains(id) ? .following : .asRead
-        let write = submit(.editBody(id, text, base: base, merge: merge), failing: title)
-        savedSinceRead.insert(id)
+    /// The person's text, typed on the text the library gave at `readAt`. The first save typed on a version is
+    /// merged against it where the copy has moved on; every later one follows the person's own, so their saves
+    /// never come back conflicted against each other. Text typed on the text the library holds is held at once
+    /// until the source answers. Text typed on older text, reported after the page took in newer text, is sent as
+    /// made on what it was typed on (queue-and-verdicts 43), so the server keeps both rather than this text
+    /// replacing what the person never saw, and the library goes on holding the newer text.
+    func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String) {
+        let held = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
+        let merge: BodyMerge = savedOn[id] == readAt ? .following : .asRead
+        let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         unsettledText[id, default: []].insert(write)
         textWrites[write] = id
-        records[id]?.body = ItemBody(id: id, text: text, version: base)
+        guard readAt == held else { return }
+        savedOn[id] = readAt
+        records[id]?.body = ItemBody(id: id, text: text, version: readAt)
     }
 
     // MARK: Reading

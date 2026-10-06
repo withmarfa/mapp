@@ -74,8 +74,10 @@ protocol ItemLibrary: AnyObject, Observable {
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID?
-    /// Typing is undone by the page that holds it, so this registers nothing.
-    func updateBody(of id: ItemID, to body: String)
+    /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
+    /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
+    /// undone by the page that holds it, so this registers nothing.
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion)
     /// The note is no longer on the page.
     func leave(_ id: ItemID)
     /// Every note being written is left and every change handed over, as the app quits or the library changes.

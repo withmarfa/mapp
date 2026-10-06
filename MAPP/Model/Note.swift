@@ -13,8 +13,13 @@ nonisolated struct Note: Identifiable, Hashable {
         didSet { refreshText() }
     }
     var file: NoteFile {
-        didSet { refreshText() }
+        didSet {
+            refreshText()
+            if file.body != oldValue.body { bodyRevision = revision }
+        }
     }
+    /// The revision at which the body last changed, so an edit typed on older text can be told apart.
+    private(set) var bodyRevision: Int64 = 0
     /// Read out of the file whenever it changes, so lists and sorting never parse markdown.
     private(set) var title: String
     private(set) var preview: String
@@ -52,6 +57,7 @@ nonisolated struct Note: Identifiable, Hashable {
         self.binID = binID
         namedLine = derivedNamedLine
         refreshText()
+        bodyRevision = revision
     }
 
     /// The line the file's name comes from, when it comes from the first line: the name is that line's and no

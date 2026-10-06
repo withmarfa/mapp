@@ -52,7 +52,7 @@ struct NoteWindow: View {
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {
             details.isPresented = storedDetailsPresented
-            editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
         }
         .onChange(of: library.isGone(id), initial: true) {
