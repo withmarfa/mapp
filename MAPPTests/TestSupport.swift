@@ -9,7 +9,7 @@ extension Note {
         path: String? = nil,
         created: Date,
         modified: Date? = nil,
-        folderID: Folder.ID? = nil,
+        folderID: ItemID? = nil,
         isFavorite: Bool = false,
         deleted: Date? = nil
     ) {

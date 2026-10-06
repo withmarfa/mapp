@@ -70,7 +70,7 @@ struct FileItemStoreTests {
         try source.write("PDF", to: "Report.pdf")
         try root.write("Existing", to: "Report.pdf")
         let store = FolderStore(root: root.url, bin: bin.url)
-        var imported: UUID?
+        var imported: ItemID?
         var failure: String?
         store.imported = { _, id in imported = id }
         store.failed = { _, message in failure = message }

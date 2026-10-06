@@ -42,7 +42,7 @@ struct BrowserTests {
 
     // MARK: Keeping the selection in the list
 
-    let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+    let a = ItemID.mint(), b = ItemID.mint(), c = ItemID.mint(), d = ItemID.mint()
 
     @Test func selectedNotesStillListedStaySelected() {
         #expect(Browser.selection([a, b], keptFrom: [a, b, c], in: [b, c]) == [b])
@@ -193,7 +193,7 @@ struct BrowserTests {
         saved.show(.inbox, in: library, order: NoteOrder())
         saved.selection = [older.id]
         let restored = Browser()
-        restored.restore(saved.snapshot(in: library), in: library, order: NoteOrder())
+        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
         #expect(restored.item == .inbox)
         #expect(restored.selection == [older.id])
     }
@@ -203,23 +203,65 @@ struct BrowserTests {
         let saved = Browser()
         saved.show(.marfaTypes, in: library, order: NoteOrder())
         let restored = Browser()
-        restored.restore(saved.snapshot(in: library), in: library, order: NoteOrder())
+        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
         #expect(restored.showsTypes)
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
         let (library, _, _, favorite) = makeLibrary()
-        let snapshot = Browser.Snapshot(sidebarItem: .folder("Gone"), selection: ["Gone.md"])
+        let snapshot = Browser.Snapshot(place: .folder(.mint()), selection: [.mint()])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
         #expect(browser.selection == [favorite.id])
     }
 
-    @Test func snapshotsSurviveEncoding() throws {
-        let snapshot = Browser.Snapshot(sidebarItem: .folder("Work"), selection: ["Work/Plan.md"])
+    @Test func snapshotsSurviveEncodingAsIdentifiers() throws {
+        let folder = ItemID("0198f2c4-7d1e-7a00-8000-000000000001")
+        let note = ItemID("0198f2c4-7d1e-7a00-8000-000000000002")
+        let snapshot = Browser.Snapshot(place: .folder(folder), selection: [note])
         let data = try JSONEncoder().encode(snapshot)
         #expect(try JSONDecoder().decode(Browser.Snapshot.self, from: data) == snapshot)
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["selection"] as? [String] == [note.rawValue], "an identifier is kept as its own string")
+    }
+
+    @Test func aRestoredWindowFindsItsFolderAndNotesByIdentifierAfterTheyAreRenamed() {
+        let (library, older, _, _) = makeLibrary()
+        let work = library.folders[0]
+        let saved = Browser()
+        saved.show(.folder(work.id), in: library, order: NoteOrder())
+        saved.selection = [older.id]
+        let snapshot = saved.snapshot()
+        library.rename(work.id, to: "Office")
+        library.move([older.id], to: work.id)
+        let restored = Browser()
+        restored.restore(snapshot, in: library, order: NoteOrder())
+        #expect(restored.item == .folder(work.id))
+        #expect(restored.selection == [older.id])
+    }
+
+    @Test(arguments: [
+        Data(#"{"sidebarItem":{"folder":{"_0":"Work"}},"selection":["Older.md"]}"#.utf8),
+        Data("not a snapshot".utf8),
+        nil,
+    ])
+    func aWindowKeptByPathBeforeIdentifiersOrNotAtAllOpensAtItsDefault(saved: Data?) {
+        let (library, _, _, favorite) = makeLibrary()
+        let browser = Browser()
+        browser.restore(from: saved, in: library, order: NoteOrder())
+        #expect(browser.item == .allNotes)
+        #expect(browser.selection == [favorite.id])
+    }
+
+    @Test func aDraggedNoteCarriesItsIdentifierAsAString() throws {
+        let id = ItemID("0198f2c4-7d1e-7a00-8000-000000000003")
+        let data = try JSONEncoder().encode(NoteReference(id: id, markdown: "# Plan"))
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["id"] as? String == id.rawValue)
+        let decoded = try JSONDecoder().decode(NoteReference.self, from: data)
+        #expect(decoded.id == id)
+        #expect(decoded.markdown == "# Plan")
     }
 
     @Test func turningOffDateGroupingListsNotesUnderOneHeadingAfterTheFavorites() {

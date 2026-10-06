@@ -114,7 +114,7 @@ struct IdentityLedgerTests {
 
     @Test func whatTheAppMakesKeepsTheIdentifierItWasGiven() {
         var ledger = IdentityLedger()
-        let id = UUID()
+        let id = ItemID.mint()
         _ = ledger.identify([note("Plan.md", 1)], at: start)
         _ = ledger.identify([], at: start + 1)
         ledger.record(id, kind: .note, path: "Plan.md", fileID: 5)

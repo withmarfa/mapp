@@ -28,7 +28,7 @@ struct IdentityTests {
         return library
     }
 
-    private func id(at path: String, in library: NoteLibrary) throws -> UUID {
+    private func id(at path: String, in library: NoteLibrary) throws -> ItemID {
         try #require(library.notes.first { $0.path == path && !$0.isDeleted }?.id ?? library.files.first { $0.path == path }?.id)
     }
 
@@ -42,14 +42,59 @@ struct IdentityTests {
         try JSONDecoder().decode(IdentityLedger.self, from: Data(contentsOf: bin.url.appending(path: "Identities.json")))
     }
 
+    // MARK: Windows, which keep their item's identifier
+
+    @Test func aWindowsItemIsFoundAfterItsFileIsRenamedOnDiskWhileTheAppIsOpen() async throws {
+        let library = await open()
+        let plan = try id(at: "Work/Plan.md", in: library)
+        try move("Work/Plan.md", "Home/Plan B.md")
+        await library.reread()
+        #expect(!library.isGone(plan))
+        #expect(library.note(plan)?.path == "Home/Plan B.md")
+    }
+
+    @Test func aWindowsItemIsFoundAgainAtTheNextLaunchAfterARenameWhileClosed() async throws {
+        let first = await open()
+        let kept = try JSONEncoder().encode([try id(at: "Work/Plan.md", in: first), try id(at: "Work/Report.pdf", in: first)])
+        first.finish()
+        try move("Work/Plan.md", "Plan B.md")
+        try move("Work/Report.pdf", "Reports/Report.pdf")
+        let second = await open()
+        let ids = try JSONDecoder().decode([ItemID].self, from: kept)
+        #expect(ids.allSatisfy { !second.isGone($0) })
+        #expect(second.note(ids[0])?.path == "Plan B.md")
+        #expect(second.files.first { $0.id == ids[1] }?.path == "Reports/Report.pdf")
+    }
+
+    @Test func aWindowWhoseItemWasDeletedForGoodHasNothingToShow() async throws {
+        let first = await open()
+        let shopping = try id(at: "Shopping.md", in: first)
+        first.delete([shopping])
+        #expect(!first.isGone(shopping), "a note in Recently Deleted still shows")
+        first.deletePermanently([shopping])
+        #expect(first.isGone(shopping))
+        #expect(first.idsForWindows([shopping]).isEmpty)
+        first.finish()
+        let second = await open()
+        #expect(second.isGone(shopping))
+    }
+
+    @Test func aWindowWaitsForTheFolderToBeReadBeforeItsItemCountsAsGone() async {
+        let library = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url), defaults: nil)
+        #expect(!library.isGone(.mint()))
+        await library.load()
+        #expect(library.isGone(.mint()))
+        #expect(library.isGone(nil))
+    }
+
     @Test func identifiersAreTheSameAtTheNextLaunch() async throws {
         let first = await open()
-        let notes = Dictionary(uniqueKeysWithValues: first.notes.map { ($0.path!, $0.id) })
+        let notes = Dictionary(uniqueKeysWithValues: first.notes.map { ($0.path, $0.id) })
         let folders = first.folders.map(\.id)
         let report = try id(at: "Work/Report.pdf", in: first)
         first.finish()
         let second = await open()
-        #expect(Dictionary(uniqueKeysWithValues: second.notes.map { ($0.path!, $0.id) }) == notes)
+        #expect(Dictionary(uniqueKeysWithValues: second.notes.map { ($0.path, $0.id) }) == notes)
         #expect(second.folders.map(\.id) == folders)
         #expect(try id(at: "Work/Report.pdf", in: second) == report)
         #expect(Set(notes.values).count == 3)
@@ -244,14 +289,14 @@ struct IdentityTests {
             for note in 0..<150 { try root.write("Note \(note)\n", to: "Folder \(folder)/Note \(note).md") }
         }
         let first = await open()
-        let ids = Dictionary(uniqueKeysWithValues: first.notes.map { ($0.path!, $0.id) })
+        let ids = Dictionary(uniqueKeysWithValues: first.notes.map { ($0.path, $0.id) })
         #expect(ids.count == 3003)
         #expect(Set(ids.values).count == ids.count)
         first.finish()
         try move("Folder 3", "Renamed")
         let second = await open()
         for note in second.notes {
-            let path = note.path!.hasPrefix("Renamed/") ? "Folder 3/" + note.path!.dropFirst("Renamed/".count) : note.path!
+            let path = note.path.hasPrefix("Renamed/") ? "Folder 3/" + note.path.dropFirst("Renamed/".count) : note.path
             #expect(ids[path] == note.id)
         }
         second.finish()
@@ -318,7 +363,7 @@ struct IdentityTests {
     @Test func manyNotesDeletedAtOnceAllKeepTheirIdentifiersInTheBin() async throws {
         for note in 0..<1000 { try root.write("Note \(note)\n", to: "Many/Note \(note).md") }
         let first = await open()
-        let many = Set(first.notes.filter { $0.path!.hasPrefix("Many/") }.map(\.id))
+        let many = Set(first.notes.filter { $0.path.hasPrefix("Many/") }.map(\.id))
         first.delete(many)
         first.finish()
         let second = await open()
@@ -328,11 +373,11 @@ struct IdentityTests {
     /// When the store and the library disagree, the library still never gives two items one identifier.
     @Test func aNoteKeptByItsPathNeverSharesItsIdentifierWithAFile() async {
         let store = FixedStore()
-        let note = UUID()
+        let note = ItemID.mint()
         store.library.notes = [StoredNote(id: note, path: "Plan.md", text: "Plan\n", created: .now, modified: .now)]
         let library = NoteLibrary(loadingFrom: store, defaults: nil)
         await library.load()
-        store.library.notes = [StoredNote(id: UUID(), path: "Plan.md", text: "Plan\n", created: .now, modified: .now)]
+        store.library.notes = [StoredNote(id: .mint(), path: "Plan.md", text: "Plan\n", created: .now, modified: .now)]
         store.library.files = [StoredFile(id: note, path: "Plan.md~", created: .now, modified: .now, byteCount: 5)]
         await library.reread()
         #expect(library.notes.map(\.id) == [note])
