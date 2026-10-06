@@ -11,24 +11,23 @@ struct NoteWindow: View {
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @Binding var id: ItemID?
 
-    private var note: Note? { id.flatMap { library.note($0) } }
-    private var item: AppItem? { id.flatMap { library.item($0) } }
+    private var item: Item? { id.flatMap { library.item($0) } }
 
     var body: some View {
         Group {
-            if let note {
-                NotePage(note: note, editor: editor, headerDrafts: details)
-                    .navigationTitle(item?.title ?? note.title)
+            if let item, !item.isFile {
+                NotePage(item: item, editor: editor, headerDrafts: details)
+                    .navigationTitle(item.title)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
-                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [note.id], undoManager: undoManager))
+                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
-                        NoteToolbar(browser: nil, notes: [note], editor: editor, details: details)
+                        NoteToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
-            } else if let item, let file = item.file, let url = library.fileURL(for: file.id) {
+            } else if let item, let url = library.fileURL(for: item.id) {
                 FileItemContent(url: url)
-                    .navigationTitle(file.title)
-                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [file.id], undoManager: undoManager))
+                    .navigationTitle(item.title)
+                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar {
                         ToolbarItem {
                             ShareLink(item: url)

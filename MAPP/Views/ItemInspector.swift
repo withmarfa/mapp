@@ -20,6 +20,8 @@ struct ItemInspectorHost: View {
             if let id = selectedID, let item = library.item(id) {
                 ItemInspector(
                     item: item,
+                    type: library.catalogue.itemTypes[item.type],
+                    path: library.path(of: id),
                     relationships: library.relationships(for: id),
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
@@ -61,10 +63,14 @@ struct ItemInspectorHost: View {
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable.
 struct ItemInspector: View {
-    let item: AppItem
+    let item: Item
+    /// Nil for a type the catalogue does not hold, which is shown by its name with no fields.
+    let type: ItemTypeInfo?
+    /// Where the item is kept, for a library of files.
+    var path: String? = nil
     let relationships: [ItemRelationship]
     let mentions: [ItemRelationshipTarget]
-    let onProperty: (String, NoteFieldValue?) -> Bool
+    let onProperty: (String, PropertyValue?) -> Bool
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
     var onRemove: ((ItemRelationship, ItemID) -> Bool)? = nil
@@ -75,20 +81,20 @@ struct ItemInspector: View {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 10) {
                     LabeledContent("Type") {
-                        if let type = item.type { Text(LocalizedStringKey(type.label)) }
-                        else { Text(item.projection.declaredType ?? String(localized: "File")) }
+                        if let type { Text(LocalizedStringKey(type.label)) }
+                        else { Text(item.type.rawValue) }
                     }
                     .font(.callout)
-                    if let message = item.validationMessage {
+                    if let message = item.problem?.message {
                         Label(message, systemImage: "exclamationmark.triangle")
                             .font(.callout).foregroundStyle(.red)
                     }
                 }
-                if !item.properties.isEmpty {
+                if let fields = type?.fields, !fields.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        ForEach(item.properties) { property in
-                            ItemPropertyRow(definition: property, value: item.fields[property.key], isEditable: item.isEditable,
-                                            onChange: { onProperty(property.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: property.key))
+                        ForEach(fields) { field in
+                            ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
+                                            onChange: { onProperty(field.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: field.key))
                         }
                     }
                 }
@@ -113,28 +119,28 @@ struct ItemInspector: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if !otherFields.isEmpty {
+                if !otherProperties.isEmpty {
                     DisclosureGroup("Other Properties") {
                         VStack(alignment: .leading, spacing: 8) {
-                            ForEach(otherFields, id: \.self) { key in
-                                LabeledContent(key, value: ItemValueText.string(item.fields[key]!))
+                            ForEach(otherProperties) { property in
+                                LabeledContent(property.key, value: ItemValueText.string(property.value))
                                     .textSelection(.enabled)
                             }
                         }
                         .padding(.top, 8)
                     }
                 }
-                if let path = item.projection.filePath {
+                if let path {
                     Divider()
                     DisclosureGroup("File") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(path).font(.caption).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            if let file = item.file {
-                                LabeledContent("Kind", value: file.contentType.localizedDescription ?? String(localized: "File"))
-                                LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: file.stored.byteCount, countStyle: .file))
-                                LabeledContent("Created", value: file.stored.created.formatted(date: .abbreviated, time: .shortened))
-                                LabeledContent("Modified", value: file.stored.modified.formatted(date: .abbreviated, time: .shortened))
+                            if case .file(let contentType, let byteCount) = item.content {
+                                LabeledContent("Kind", value: contentType.localizedDescription ?? String(localized: "File"))
+                                LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
+                                LabeledContent("Created", value: item.created.formatted(date: .abbreviated, time: .shortened))
+                                LabeledContent("Modified", value: item.modified.formatted(date: .abbreviated, time: .shortened))
                                 Text("File properties cannot be edited in this file-backed library.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
@@ -149,8 +155,13 @@ struct ItemInspector: View {
         }
     }
 
-    private var otherFields: [String] {
-        let displayed = Set(item.properties.map(\.key) + item.relationshipFields + ["title", "type", "marfa_id", "marfa_version"])
-        return item.fields.keys.filter { !displayed.contains($0) }.sorted()
+    /// Every property the type does not name or show elsewhere, by key, with the item's tags among them as
+    /// they are written beside the rest.
+    private var otherProperties: [Property] {
+        var shown = Set((type?.fields ?? []).map(\.key) + ["title", "type", "marfa_id", "marfa_version"])
+        shown.formUnion(relationships.map(\.field))
+        var properties = item.properties.filter { !shown.contains($0.key) }
+        if !item.tags.isEmpty { properties.append(Property(key: "tags", value: .array(item.tags.sorted().map(PropertyValue.string)))) }
+        return properties.sorted { $0.key < $1.key }
     }
 }

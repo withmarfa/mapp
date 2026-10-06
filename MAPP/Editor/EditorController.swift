@@ -107,11 +107,11 @@ final class EditorController: NSObject {
 
     /// Shows a note, with the caret at its end. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
-    func load(_ note: Note) {
-        if noteID != nil, noteID != note.id { flush() }
+    func load(_ item: Item) {
+        if noteID != nil, noteID != item.id { flush() }
         scrollOffset = 0
         isHeaderScrolledAway = false
-        show(note, as: "load")
+        show(item, as: "load")
     }
 
     func setHeaderHeight(_ height: CGFloat) {
@@ -123,23 +123,24 @@ final class EditorController: NSObject {
 
     /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
     /// text where the caret is.
-    func noteChanged(_ note: Note) {
-        guard note.id == noteID else { return load(note) }
-        guard note.body != markdown || note.isDeleted == isEditable else { return }
-        show(note, as: "reload")
+    func noteChanged(_ item: Item) {
+        guard item.id == noteID else { return load(item) }
+        guard library?.body(of: item.id)?.text ?? "" != markdown || item.isWritable != isEditable else { return }
+        show(item, as: "reload")
     }
 
-    private func show(_ note: Note, as function: String) {
-        noteID = note.id
-        markdown = note.body
-        isEditable = !note.isDeleted
+    private func show(_ item: Item, as function: String) {
+        let body = library?.body(of: item.id)?.text ?? ""
+        noteID = item.id
+        markdown = body
+        isEditable = item.isWritable
         guard isReady else { return }
-        call("setImageBase", json(note.directory))
+        call("setImageBase", json(library?.imageBase(of: item.id) ?? ""))
         generation += 1
         // A late report belongs to one of the last few loads, however quickly outside changes came in.
         notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
-        notesByGeneration[generation] = note.id
-        call(function, json(note.body), String(generation), String(isEditable))
+        notesByGeneration[generation] = item.id
+        call(function, json(body), String(generation), String(isEditable))
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -297,7 +298,7 @@ final class EditorController: NSObject {
 
     /// The note's title, which names a print job and an exported file.
     private var title: String {
-        noteID.flatMap { library?.note($0)?.title } ?? String(localized: "Note")
+        noteID.flatMap { library?.item($0)?.title } ?? String(localized: "Note")
     }
 
     /// Prints the note as the page shows it, laid out for paper, through the system's print panel.
@@ -428,7 +429,7 @@ final class EditorController: NSObject {
             applyStyle()
             call("setHeaderHeight", String(Double(headerHeight)))
             if let noteID {
-                if let note = library?.note(noteID) { call("setImageBase", json(note.directory)) }
+                if let base = library?.imageBase(of: noteID) { call("setImageBase", json(base)) }
                 generation += 1
                 notesByGeneration[generation] = noteID
                 call("load", json(markdown), String(generation), String(isEditable))
@@ -440,7 +441,7 @@ final class EditorController: NSObject {
             onChange(id, markdown)
             // An edit made before the note on the page was reloaded from outside lands after the reload. The
             // person's text wins, so the page takes it back, as the library now holds it.
-            if id == noteID, generation != self.generation, let note = library?.note(id) { noteChanged(note) }
+            if id == noteID, generation != self.generation, let item = library?.item(id) { noteChanged(item) }
         case .state(let state):
             if state != caret { caret = state }
         case .scrolled(let offset, let generation):

@@ -8,24 +8,25 @@ struct NoteDetail: View {
     let details: DetailsPresentation
 
     var body: some View {
-        let notes = browser.selection.compactMap { library.note($0) }
         if browser.selection.count > 1 {
             ContentUnavailableView("^[\(browser.selection.count) item](inflect: true) selected", systemImage: "note.text")
                 .onAppear { editor.close() }
-        } else if let id = browser.selection.first, let item = library.item(id), let file = item.file {
-            if let url = library.fileURL(for: file.id) {
-                FileItemContent(url: url)
-                    .onAppear { editor.close() }
+        } else if let id = browser.selection.first, let item = library.item(id) {
+            if item.isFile {
+                if let url = library.fileURL(for: id) {
+                    FileItemContent(url: url)
+                        .onAppear { editor.close() }
+                } else {
+                    ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+                        .onAppear { editor.close() }
+                }
             } else {
-                ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
-                    .onAppear { editor.close() }
+                NotePage(item: item, editor: editor, headerDrafts: details)
+                    .onAppear(perform: grantFocusRequest)
+                    .onChange(of: browser.focusRequest, grantFocusRequest)
             }
-        } else if let note = notes.first {
-            NotePage(note: note, editor: editor, headerDrafts: details)
-                .onAppear(perform: grantFocusRequest)
-                .onChange(of: browser.focusRequest, grantFocusRequest)
         } else {
-            UnselectedItemContent(hasItems: !browser.notes(in: library).isEmpty || !browser.files(in: library).isEmpty)
+            UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
                 // The page no longer shows the note it had, so that note is left.
                 .onAppear { editor.close() }
         }
@@ -69,8 +70,7 @@ private struct UnselectedItemContent: View {
 /// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
 /// text into a page that is already running.
 struct NotePage: View {
-    @Environment(NoteLibrary.self) private var library
-    let note: Note
+    let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
     let headerDrafts: DetailsPresentation
@@ -80,14 +80,14 @@ struct NotePage: View {
             ZStack(alignment: .top) {
                 NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
                     .ignoresSafeArea(.container, edges: .top)
-                if note.isDeleted {
+                if item.state == .trashed {
                     ScrollingPageHeader(editor: editor) {
-                        DeletedNoteBanner(id: note.id)
+                        DeletedNoteBanner(id: item.id)
                     }
-                } else if let item = library.item(note.id) {
+                } else {
                     ScrollingPageHeader(editor: editor) {
                         ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
-                            .id(note.id)
+                            .id(item.id)
                             .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
                             .padding(.top, 16)
                             .padding(.bottom, 8)
@@ -102,9 +102,9 @@ struct NotePage: View {
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { editor.setStyle(style) }
-        .onChange(of: note.id, initial: true) { editor.load(note) }
-        .onChange(of: note.body) { editor.noteChanged(note) }
-        .onChange(of: note.isDeleted) { editor.noteChanged(note) }
+        .onChange(of: item.id, initial: true) { editor.load(item) }
+        // Every change to the note takes a new version; the editor takes in only one to its text or its state.
+        .onChange(of: item.version) { editor.noteChanged(item) }
     }
 }
 

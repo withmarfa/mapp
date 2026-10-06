@@ -28,8 +28,10 @@ enum ItemPreviewFixtures {
         return details
     }
 
-    static var unresolved: AppItem {
-        AppItem(projection: NoteProjection(id: ticketID, file: NoteFile(text: "---\ntype: aic.ticket.task\ntitle: Review the findings\nstatus: unfamiliar_status\npriority: high\nchild-of: \"[[Missing project]]\"\ncustom_property: preserved\n---\nNotes\n"), fallbackTitle: "Review the findings"))
+    static var unresolved: Item {
+        NoteLibrary(notes: [
+            Note(id: ticketID, path: "Tickets/Review the findings.md", text: "---\ntype: aic.ticket.task\ntitle: Review the findings\nstatus: unfamiliar_status\npriority: high\nchild-of: \"[[Missing project]]\"\ncustom_property: preserved\n---\nNotes\n", created: date)
+        ], now: { date }).item(ticketID)!
     }
 }
 
@@ -48,6 +50,7 @@ enum ItemPreviewFixtures {
 
 #Preview("Missing and Unfamiliar Values") {
     ItemInspector(item: ItemPreviewFixtures.unresolved,
+                  type: WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")],
                   relationships: [.init(field: "child-of", label: "Parent", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
                   mentions: [], onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in })
         .frame(width: 330, height: 650)
@@ -57,6 +60,7 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     ItemRelationshipPicker(relationship: library.relationships(for: ItemPreviewFixtures.ticketID)[0],
                            candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: "child-of"), onSave: { _ in true })
+        .environment(library)
 }
 
 #Preview("New Item") {
@@ -76,7 +80,7 @@ enum ItemPreviewFixtures {
 
 #Preview("Unsaved Property Input") {
     Form {
-        ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text),
+        ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text, declaredBy: TypeID("aic.ticket.task")),
                         value: .string("Edit this value and press Return to see the save error."),
                         isEditable: true, onChange: { _ in false })
     }

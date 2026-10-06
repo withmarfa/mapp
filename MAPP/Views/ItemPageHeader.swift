@@ -5,7 +5,7 @@ struct ItemPageHeader: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
-    let item: AppItem
+    let item: Item
     let drafts: DetailsPresentation
     let onStartWriting: () -> Void
     @FocusState private var titleFocused: Bool
@@ -15,7 +15,7 @@ struct ItemPageHeader: View {
 
     private var titleDraft: ItemPropertyDraft { drafts.draft(for: item.id, key: "title") }
     private var parent: ItemRelationship? { library.relationships(for: item.id).first { $0.field == "child-of" } }
-    private var status: ItemPropertyDefinition? { item.properties.first { $0.key == "status" } }
+    private var status: ItemTypeInfo.Field? { library.catalogue.itemTypes[item.type]?.fields.first { $0.key == "status" } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -60,7 +60,7 @@ struct ItemPageHeader: View {
     }
 
     @ViewBuilder private var chips: some View {
-        if let type = item.type {
+        if let type = library.catalogue.itemTypes[item.type] {
             ItemChipLabel(title: Text(LocalizedStringKey(type.label)))
                 .itemChipStyle()
                 .accessibilityIdentifier("ItemTypeChip")
@@ -72,7 +72,7 @@ struct ItemPageHeader: View {
                     Button {
                         propertyError = !library.setItemProperty(item.id, key: status.key, value: .string(choice), undoManager: undoManager)
                     } label: {
-                        if item.fields[status.key]?.string == choice {
+                        if item.value(of: status.key)?.string == choice {
                             Label(LocalizedStringKey(ItemPropertyRow.choiceLabel(choice)), systemImage: "checkmark")
                         } else {
                             Text(LocalizedStringKey(ItemPropertyRow.choiceLabel(choice)))
@@ -80,7 +80,7 @@ struct ItemPageHeader: View {
                     }
                 }
             } label: {
-                ItemChipLabel(title: Text((item.fields[status.key]?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status")),
+                ItemChipLabel(title: Text((item.value(of: status.key)?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status")),
                               systemImage: "circle.lefthalf.filled")
             }
             .itemChipMenuStyle()

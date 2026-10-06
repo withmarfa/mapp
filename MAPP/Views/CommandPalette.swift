@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⌘P: the
 /// same field searching the text of every note, each found note shown with the words around what was found.
@@ -165,23 +166,27 @@ struct CommandPalette: View {
         return commands + places + (query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : notes)
     }
 
-    /// Notes whose text has what was typed, or the most recently edited before anything is.
+    /// Items whose text or title has what was typed, or the most recently edited before anything is.
     private var found: [Entry] {
         let isEmpty = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let notes = isEmpty ? library.notes(in: .allNotes) : library.notes(matching: query)
-        return notes.sorted { $0.modified > $1.modified }.prefix(isEmpty ? 12 : 50).map { note in
-            let folder = note.folderID.flatMap { library.folder($0)?.name } ?? String(localized: "Inbox")
-            // Found in the title, the note is known by its title, and its preview says more than the title again.
-            let inTitle = note.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-            let snippet = isEmpty || inTitle ? note.preview : NoteText.snippet(of: note.body, around: query) ?? note.preview
-            return Entry(id: "note:\(note.id)", title: note.title, detail: folder, snippet: snippet, systemImage: "note.text") {
-                reveal(note)
+        let items = isEmpty ? library.items(in: .allNotes) : library.items(matching: query)
+        return items.sorted { $0.modified > $1.modified }.prefix(isEmpty ? 12 : 50).map { item in
+            // Found in the title, the item is known by its title, and its preview says more than the title again.
+            let inTitle = item.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            let body = isEmpty || inTitle ? nil : library.body(of: item.id)
+            let snippet = body.flatMap { NoteText.snippet(of: $0.text, around: query) } ?? item.preview
+            return Entry(
+                id: "note:\(item.id)", title: item.title, detail: folderName(of: item), snippet: snippet.isEmpty ? nil : snippet,
+                systemImage: symbol(for: item)
+            ) {
+                reveal(item)
             }
         }
     }
 
     private var commands: [Entry] {
-        let selected = browser.selectedNotes(in: library)
+        // The note commands act on notes; a file selected takes none of them.
+        let selected = browser.selectedItems(in: library).filter { !$0.isFile }
         let ids = Set(selected.map(\.id))
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         var entries: [Entry] = []
@@ -204,7 +209,7 @@ struct CommandPalette: View {
             browser.palette = .search
         })
 
-        if let one, !one.isDeleted {
+        if let one, one.isWritable {
             if editor.hasNote, editor.noteID == one.id {
             for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                            .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
@@ -216,17 +221,17 @@ struct CommandPalette: View {
             add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
         }
 
-        if !selected.isEmpty, selected.allSatisfy(\.isDeleted) {
+        if !selected.isEmpty, selected.allSatisfy({ $0.state == .trashed }) {
             add(String(localized: "Recover"), "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-        } else if !selected.isEmpty, !selected.contains(where: \.isDeleted) {
+        } else if !selected.isEmpty, !selected.contains(where: { $0.state == .trashed }) {
             let allFavorites = selected.allSatisfy(\.isFavorite)
             add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
-            if !selected.allSatisfy({ $0.folderID == nil }) {
+            if !selected.allSatisfy({ $0.container == nil }) {
                 add(String(localized: "Move to Inbox"), "tray") { library.move(ids, to: nil, undoManager: undoManager) }
             }
-            for folder in library.folders where !selected.allSatisfy({ $0.folderID == folder.id }) {
+            for folder in library.folders where !selected.allSatisfy({ $0.container == ContainerID(folder.id) }) {
                 add(String(localized: "Move to \(folder.name)"), "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
             }
             add(String(localized: "Delete Note"), "trash") {
@@ -252,7 +257,7 @@ struct CommandPalette: View {
 
     private var places: [Entry] {
         var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.favorites, "star")]
-        items += library.items.filter { $0.type?.id == "aic.project" }.map { (.project($0.id), "square.stack") }
+        items += library.items(in: .itemType("aic.project")).map { (.project($0.id), "square.stack") }
         items += WorkbenchSchema.types.map { (.itemType($0.id), "doc.text") }
         items += [(.files, "doc")]
         items += library.folders.map { (.folder($0.id), "folder") }
@@ -265,23 +270,32 @@ struct CommandPalette: View {
         }
     }
 
-    /// Notes by title, most recently edited first, each shown where it is.
+    /// Items by title, most recently edited first, each shown where it is.
     private var notes: [Entry] {
-        library.notes.filter { !$0.isDeleted }.sorted { $0.modified > $1.modified }.map { note in
-            let folder = note.folderID.flatMap { library.folder($0)?.name } ?? String(localized: "Inbox")
-            return Entry(id: "note:\(note.id)", title: note.title, detail: folder, systemImage: "note.text") {
-                reveal(note)
+        library.items(in: .allNotes).sorted { $0.modified > $1.modified }.map { item in
+            Entry(id: "note:\(item.id)", title: item.title, detail: folderName(of: item), systemImage: symbol(for: item)) {
+                reveal(item)
             }
         }
     }
 
-    /// Selects the note where the list is, or in All Notes if the list does not show it, and opens it for writing.
-    private func reveal(_ note: Note) {
-        if !browser.notes(in: library).contains(where: { $0.id == note.id }) {
+    private func folderName(of item: Item) -> String {
+        library.folder(of: item)?.name ?? String(localized: "Inbox")
+    }
+
+    private func symbol(for item: Item) -> String {
+        guard case .file(let type, _) = item.content else { return "note.text" }
+        return type.conforms(to: .image) ? "photo" : "doc"
+    }
+
+    /// Selects the item where the list is, or in All Notes if the list does not show it, and opens a note for
+    /// writing.
+    private func reveal(_ item: Item) {
+        if !browser.items(in: library).contains(where: { $0.id == item.id }) {
             browser.show(.allNotes, in: library, order: order)
         }
-        browser.selection = [note.id]
-        browser.focusRequest = .page
+        browser.selection = [item.id]
+        browser.focusRequest = item.isFile ? .list : .page
     }
 
     /// Modifier keys as the menus write them.
