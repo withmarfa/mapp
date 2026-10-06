@@ -41,7 +41,7 @@ struct MainView: View {
                 if browser.showsTypes {
                     MarfaTypesView(part: types.list)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(library.name(of: .marfaTypes))
+                        .navigationTitle(settings.isPresented ? "" : library.name(of: .marfaTypes))
                         .toolbar(removing: !settings.isPresented && browser.isSearchExpanded ? .title : nil)
                         .toolbar {
                             if !settings.isPresented {

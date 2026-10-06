@@ -130,7 +130,7 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(title)
+        .navigationTitle(settingsPresented ? "" : title)
         .navigationSubtitle(settingsPresented ? Text("") : browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) item](inflect: true)"))
