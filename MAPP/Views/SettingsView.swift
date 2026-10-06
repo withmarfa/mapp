@@ -3,12 +3,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    @Environment(NotesFolder.self) private var folder
+    @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @Bindable var presentation: SettingsPresentation
     @State private var isChoosing = false
     @State private var isEmptying = false
     @FocusState private var isSearchFocused: Bool
+
+    private var folder: NotesFolder { libraries.folder }
 
     private var deleted: Set<ItemID> {
         library.map { Set($0.items(in: .recentlyDeleted).map(\.id)) } ?? []
@@ -50,6 +52,16 @@ struct SettingsView: View {
             // Open notes hand over their last edits to the folder they came from before it is changed.
             if case .success(let url) = result { EditorController.flushAll { folder.choose(url) } }
         }
+        // A question about changes that wait is put again when Settings is next opened, not answered by leaving.
+        .onDisappear { libraries.marfaSettings.cancelDeparture() }
+        .sheet(item: Binding { libraries.marfaSettings.departure } set: { if $0 == nil { libraries.marfaSettings.cancelDeparture() } }) { departure in
+            DepartureSheet(model: libraries.marfaSettings, departure: departure)
+        }
+        .confirmationDialog("Disconnect from this server?", isPresented: Bindable(libraries.marfaSettings).isConfirmingDisconnect) {
+            Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
+        } message: {
+            Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes. Your notes folder is used again.")
+        }
         .confirmationDialog(
             "^[Delete \(deleted.count) note](inflect: true) immediately?",
             isPresented: $isEmptying
@@ -90,6 +102,8 @@ struct SettingsView: View {
                     Section("Text") { TextOptions() }
                 case .library:
                     librarySettings
+                case .marfa:
+                    MarfaSettingsView(model: libraries.marfaSettings)
                 case .about:
                     Section("MAPP") {
                         LabeledContent("Version", value: Self.version)
@@ -108,17 +122,25 @@ struct SettingsView: View {
 
     private var librarySettings: some View {
         Group {
-            Section("Notes Folder") {
-                LabeledContent("Folder") {
-                    Text(folder.url.map { FileManager.default.displayName(atPath: $0.path) } ?? String(localized: "None"))
+            if libraries.mode == .marfa {
+                // A server's library needs no folder, which is kept for when the app is disconnected.
+                Section("Notes Folder") {
+                    Text("MAPP is reading your Marfa library, so it doesn’t need a notes folder. Your notes folder is used again if you disconnect.")
                         .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
                 }
-                HStack {
-                    if let url = folder.url {
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            } else {
+                Section("Notes Folder") {
+                    LabeledContent("Folder") {
+                        Text(folder.url.map { FileManager.default.displayName(atPath: $0.path) } ?? String(localized: "None"))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
-                    Button("Change…") { isChoosing = true }
+                    HStack {
+                        if let url = folder.url {
+                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                        }
+                        Button("Change…") { isChoosing = true }
+                    }
                 }
             }
             Section {
@@ -155,7 +177,11 @@ private enum SettingsPreview {
 
 #Preview("Settings") {
     SettingsView(presentation: SettingsPresentation())
-        .environment(NotesFolder(defaults: SettingsPreview.defaults))
+        .environment(Libraries(
+            folder: NotesFolder(defaults: SettingsPreview.defaults),
+            host: MarfaHost(
+                defaults: SettingsPreview.defaults, keys: MemoryKeyStore(),
+                location: try! MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "SettingsPreview")))))
         .defaultAppStorage(SettingsPreview.defaults)
         .frame(width: 1100, height: 720)
 }
