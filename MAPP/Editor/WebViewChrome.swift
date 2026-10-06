@@ -50,7 +50,16 @@ class WebViewContainer: NSView {
         self.webView = webView
         runsUnderToolbar = webView.fadesUnderToolbar()
         super.init(frame: .zero)
+        clipsToBounds = true
         addSubview(webView)
+    }
+
+    nonisolated override var isOpaque: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        // The transparent page needs backing in its own column, including the region below the toolbar.
+        NSColor.windowBackgroundColor.setFill()
+        bounds.fill()
     }
 
     @available(*, unavailable)

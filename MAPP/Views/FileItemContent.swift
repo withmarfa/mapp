@@ -15,7 +15,7 @@ struct FileItemContent: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(url.lastPathComponent).font(.headline).lineLimit(1)
+                Text(url.lastPathComponent).interfaceFont(.headline).lineLimit(1)
                 Spacer()
                 if type.conforms(to: .image) {
                     Button("Zoom Out", systemImage: "minus.magnifyingglass") { zoom = max(0.25, zoom - 0.25) }

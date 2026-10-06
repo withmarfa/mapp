@@ -38,14 +38,14 @@ struct ItemPageHeader: View {
             .onChange(of: titleFocused) { if !titleFocused { _ = commitTitle() } }
             if titleDraft.rejected {
                 Text("The title could not be saved. Use a unique file name without slashes or line breaks.")
-                    .font(.caption).foregroundStyle(.red)
+                    .interfaceFont(.caption).foregroundStyle(.red)
                 Button("Discard Changes") { titleDraft.isDirty = false; titleDraft.rejected = false }
-                    .font(.caption)
+                    .interfaceFont(.caption)
             }
             ItemChipLayout { chips }
             if propertyError {
                 Text("The value could not be saved. Please try again.")
-                    .font(.caption).foregroundStyle(.red)
+                    .interfaceFont(.caption).foregroundStyle(.red)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

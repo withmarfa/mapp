@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Bindable var presentation: SettingsPresentation
     @State private var isChoosing = false
     @State private var isEmptying = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @FocusState private var isSearchFocused: Bool
 
     private var folder: NotesFolder { libraries.folder }
@@ -17,27 +18,30 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .toolbar {
+                    ToolbarItem { backButton }
+                    DefaultToolbarItem(kind: .sidebarToggle)
+                }
         } detail: {
             detail
                 .navigationSplitViewColumnWidth(min: 360, ideal: 640)
         }
         .searchable(text: $presentation.query, placement: .sidebar, prompt: "Search Settings")
         .searchFocused($isSearchFocused)
+        .toolbar(removing: .title)
         .toolbar {
+            if columnVisibility == .detailOnly {
+                ToolbarItem(placement: .navigation) { backButton }
+            }
             ToolbarItem(placement: .principal) {
                 Text(presentation.title)
-                    .font(.headline)
+                    .interfaceFont(.headline)
                     .accessibilityIdentifier("SettingsTitle")
             }
             .sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .navigation) {
-                Button("Back to MAPP", systemImage: "chevron.left") { presentation.close() }
-                    .help("Back to MAPP")
-                    .accessibilityIdentifier("SettingsBack")
-            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SettingsWorkspace")
@@ -74,16 +78,25 @@ struct SettingsView: View {
         }
     }
 
+    private var backButton: some View {
+        Button("Back to MAPP", systemImage: "chevron.left") { presentation.close() }
+            .help("Back to MAPP")
+            .accessibilityIdentifier("SettingsBack")
+    }
+
     private var sidebar: some View {
         List(selection: $presentation.pane) {
             ForEach(presentation.matchingPanes) { pane in
-                Label(pane.title, systemImage: pane.symbol)
+                Label {
+                    Text(pane.title).interfaceFont(.body)
+                } icon: {
+                    Image(systemName: pane.symbol).interfaceFont(.body)
+                }
                     .tag(pane)
                     .accessibilityIdentifier("SettingsPane-\(pane.rawValue)")
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsSidebar")
     }
 
@@ -92,6 +105,13 @@ struct SettingsView: View {
             Form {
                 switch pane {
                 case .appearance:
+                    Section {
+                        InterfaceTextOptions()
+                    } header: {
+                        Text("Text")
+                    } footer: {
+                        Text("Changes text in the sidebar, lists, and controls. Note text size is set in Editor.")
+                    }
                     Section("Notes List") {
                         OrderOptions()
                         ListPreviewOptions()

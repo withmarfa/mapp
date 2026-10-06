@@ -42,7 +42,7 @@ struct CommandPalette: View {
                     .foregroundStyle(.secondary)
                 TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
                     .textFieldStyle(.plain)
-                    .font(.title3)
+                    .interfaceFont(.title3)
                     .focused($isFieldFocused)
                     .onSubmit { run(entries) }
                     .onExitCommand { close() }
@@ -118,7 +118,7 @@ struct CommandPalette: View {
                 }
                 if let snippet = entry.snippet {
                     Text(snippet)
-                        .font(.callout)
+                        .interfaceFont(.callout)
                         .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
                         .lineLimit(1)
                 }

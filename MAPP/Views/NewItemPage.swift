@@ -63,7 +63,7 @@ struct NewItemPage: View {
             }
             if rejected {
                 Text("Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here.")
-                    .font(.callout).foregroundStyle(.red)
+                    .interfaceFont(.callout).foregroundStyle(.red)
                 Button("Start Writing") { startWriting() }
             }
             Button(action: startWriting) {

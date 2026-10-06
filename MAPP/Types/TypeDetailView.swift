@@ -55,7 +55,7 @@ private struct ItemTypePage: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(detail.titleProperty).monospaced()
                         if !detail.declaresTitle {
-                            Text("Not a field of this type").font(.caption).foregroundStyle(.secondary)
+                            Text("Not a field of this type").interfaceFont(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -63,7 +63,7 @@ private struct ItemTypePage: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(detail.bodyProperty).monospaced()
                         if !detail.declaresBody {
-                            Text("Not a field of this type").font(.caption).foregroundStyle(.secondary)
+                            Text("Not a field of this type").interfaceFont(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -116,16 +116,16 @@ private struct FieldRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.field.label)
                 Text(row.field.key)
-                    .font(.caption.monospaced())
+                    .interfaceFont(.caption.monospaced())
                     .foregroundStyle(.secondary)
                 if let description = row.field.description {
                     Text(description)
-                        .font(.caption)
+                        .interfaceFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 if case .choice(let values) = row.field.kind, !values.isEmpty {
                     Text(values.formatted(.list(type: .or, width: .narrow)))
-                        .font(.caption)
+                        .interfaceFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -133,14 +133,14 @@ private struct FieldRowView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(row.field.kind.wording)
                 if row.field.required {
-                    Text("Required").font(.caption).foregroundStyle(.secondary)
+                    Text("Required").interfaceFont(.caption).foregroundStyle(.secondary)
                 }
                 if let source = row.inheritedFrom {
                     HStack(spacing: 2) {
                         Text("Inherited from")
                         TypeLink(reference: source, browser: browser)
                     }
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                 }
             }
@@ -160,7 +160,7 @@ private struct EdgeLinkRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(link.role.wording)
                 if let reverse = link.edge.reverseName {
-                    Text("Reverse name: \(reverse)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text("Reverse name: \(reverse)").interfaceFont(.caption.monospaced()).foregroundStyle(.secondary)
                 }
             }
         } label: {
@@ -236,7 +236,7 @@ private struct EndRow: View {
                         Text(roleWording(role))
                     }
                 }
-                Text(wording).font(.caption).foregroundStyle(.secondary)
+                Text(wording).interfaceFont(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -249,15 +249,15 @@ private struct PropertyRow: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(property.label)
-                Text(property.key).font(.caption.monospaced()).foregroundStyle(.secondary)
+                Text(property.key).interfaceFont(.caption.monospaced()).foregroundStyle(.secondary)
                 if let description = property.description {
-                    Text(description).font(.caption).foregroundStyle(.secondary)
+                    Text(description).interfaceFont(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 12)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(property.kind.wording)
-                if property.required { Text("Required").font(.caption).foregroundStyle(.secondary) }
+                if property.required { Text("Required").interfaceFont(.caption).foregroundStyle(.secondary) }
             }
         }
         .accessibilityElement(children: .combine)
@@ -274,9 +274,9 @@ private struct TypeHeader: View {
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
-                Text(label).font(.title.bold())
+                Text(label).interfaceFont(.title.bold())
                     .accessibilityAddTraits(.isHeader)
-                Text(id).font(.body.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(id).interfaceFont(.body.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                     .accessibilityIdentifier("MarfaTypeID")
                 if let description {
                     Text(description).padding(.top, 4)

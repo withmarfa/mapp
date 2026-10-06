@@ -9,6 +9,7 @@ struct MAPPApp: App {
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
+                .interfaceTextStyle()
                 .unkeptChanges(libraries)
                 .environment(libraries)
                 .environment(libraries.folder)
@@ -38,6 +39,8 @@ struct MAPPApp: App {
                     ClosingView()
                 }
             }
+            .interfaceTextStyle()
+            .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .unkeptChanges(libraries)
         }
         .defaultSize(width: 640, height: 720)
@@ -51,10 +54,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // The sample folder starts as a person's first launch does, whatever an earlier run chose, so no UI test
         // inherits another's settings, a hidden sidebar or a dragged column among them, which the window keeps.
-        if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
+        if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder"),
+           !ProcessInfo.processInfo.arguments.contains("-MAPPKeepSampleSettings") {
             let defaults = UserDefaults.standard
             let columns = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("NSSplitView Subview Frames") }
-            for key in OrderKey.all + PageKey.all + ListKey.all + columns { defaults.removeObject(forKey: key) }
+            for key in OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all + columns { defaults.removeObject(forKey: key) }
         }
         #endif
         super.init()

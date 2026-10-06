@@ -549,7 +549,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(divider.waitForExistence(timeout: 2))
         let before = sidebar.frame.width
         let edge = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
+        edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
         XCTAssertGreaterThan(sidebar.frame.width, before + 30, "the sidebar is wider")
         let column = list.frame
         sidebarItem("Marfa Types").click()
@@ -559,7 +559,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         let width = sidebar.frame.width
         let moved = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        moved.press(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
+        moved.click(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
         XCTAssertLessThan(sidebar.frame.width, width - 30, "the sidebar is narrower")
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesList.waitForExistence(timeout: 5))

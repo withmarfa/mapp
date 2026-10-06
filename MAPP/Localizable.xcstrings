@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Base Text Size" : {
+
+    },
+    "Changes text in the sidebar, lists, and controls. Note text size is set in Editor." : {
+
+    },
+    "Base Text Size Font Sidebar Sort By Group by Date List Preview Notes List" : {
+
+    },
     "Add Attachment…" : {
 
     },
@@ -38,9 +47,6 @@
 
     },
     "Folder" : {
-
-    },
-    "Sort By Group by Date List Preview Notes List" : {
 
     },
     "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing" : {

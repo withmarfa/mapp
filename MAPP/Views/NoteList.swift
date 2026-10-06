@@ -8,7 +8,6 @@ struct NoteList: View {
     @Bindable var browser: Browser
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
-    var settingsPresented = false
     @State private var daysSeen = 0
     @State private var width: CGFloat = 340
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
@@ -28,7 +27,7 @@ struct NoteList: View {
                 switch line {
                 case .heading(let group, let isFirst):
                     Text(group.title())
-                        .font(.subheadline.weight(.semibold))
+                        .interfaceFont(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .padding(.top, isFirst ? 0 : 10)
                         .accessibilityAddTraits(.isHeader)
@@ -72,22 +71,20 @@ struct NoteList: View {
             return .handled
         }
         .toolbar {
-            if !settingsPresented {
-                ColumnSearch(
-                    isExpanded: $browser.isSearchExpanded,
-                    text: $browser.searchText,
-                    prompt: String(localized: "Search"),
-                    columnWidth: width,
-                    focusRequests: browser.searchFocusRequests,
-                    onDown: { browser.focusRequest = .list }
-                ) {
-                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                        OrderOptions()
-                            .pickerStyle(.inline)
-                    }
-                    .menuIndicator(.hidden)
-                    .help("Sort")
+            ColumnSearch(
+                isExpanded: $browser.isSearchExpanded,
+                text: $browser.searchText,
+                prompt: String(localized: "Search"),
+                columnWidth: width,
+                focusRequests: browser.searchFocusRequests,
+                onDown: { browser.focusRequest = .list }
+            ) {
+                Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                    OrderOptions()
+                        .pickerStyle(.inline)
                 }
+                .menuIndicator(.hidden)
+                .help("Sort")
             }
         }
         .task {
@@ -120,12 +117,12 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(settingsPresented ? "" : title)
-        .navigationSubtitle(settingsPresented ? Text("") : browser.isSearching
+        .navigationTitle(title)
+        .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) item](inflect: true)"))
         // The search field takes the title's place while it is out.
-        .toolbar(removing: !settingsPresented && browser.isSearchExpanded ? .title : nil)
+        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.
@@ -154,11 +151,11 @@ struct ItemRow: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(item.title)
-                    .font(.headline)
+                    .interfaceFont(.headline)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(dateLabel)
-                    .font(.subheadline)
+                    .interfaceFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .layoutPriority(1)
@@ -171,13 +168,13 @@ struct ItemRow: View {
                         Text(item.preview)
                     }
                 }
-                .font(.subheadline)
+                .interfaceFont(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(previewLines, reservesSpace: true)
             }
             if let folderName {
                 Label(folderName, systemImage: "folder")
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .labelStyle(.titleAndIcon)
             }

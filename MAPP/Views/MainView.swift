@@ -11,6 +11,10 @@ struct MainView: View {
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var sidebarWidth: CGFloat = 220
+    @State private var listWidth: CGFloat = 340
+    @State private var measuredWidths = ColumnWidths()
     @State private var typesListWidth: CGFloat = 340
     @State private var noteName = ""
     @State private var takenNoteName: String?
@@ -27,44 +31,75 @@ struct MainView: View {
         self.restoresWindow = restoresWindow
     }
 
-    var body: some View { renamingWindow }
+    var body: some View { lifecycleWindow }
+
+    private var activeWindow: some View {
+        Group {
+            if settings.isPresented {
+                SettingsView(presentation: settings)
+            } else {
+                renamingWindow
+            }
+        }
+        .onChange(of: settings.isPresented) {
+            if settings.isPresented {
+                // Changing the ideal during a resize feeds transient layout sizes back into the split view.
+                sidebarWidth = measuredWidths.sidebar
+                listWidth = measuredWidths.list
+                editor.flush()
+                browser.palette = nil
+                pane = nil
+            }
+        }
+    }
 
     private var splitView: some View {
         // Every place keeps the same three columns, Marfa Types among them: AppKit crashed laying out the toolbar
         // as the columns changed with the sidebar hidden or resized.
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     SyncStatusBar { settings.show(.marfa) }
                 }
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                    if $0 >= 180 { measuredWidths.sidebar = $0 }
+                }
+                .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
+                .toolbar {
+                    ToolbarItem {
+                        Button("Settings…", systemImage: "gearshape") { settings.show() }
+                            .help("Settings")
+                            .accessibilityIdentifier("SettingsToolbar")
+                    }
+                }
         } content: {
             Group {
                 if browser.showsTypes {
                     TypesListView(browser: browser.types, pane: $pane)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(settings.isPresented ? "" : library.name(of: .marfaTypes))
-                        .toolbar(removing: !settings.isPresented && browser.isSearchExpanded ? .title : nil)
+                        .navigationTitle(library.name(of: .marfaTypes))
+                        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
                         .toolbar {
-                            if !settings.isPresented {
-                                ColumnSearch(
-                                    isExpanded: $browser.isSearchExpanded,
-                                    text: Bindable(browser.types).searchText,
-                                    prompt: String(localized: "Search"),
-                                    columnWidth: typesListWidth,
-                                    focusRequests: browser.searchFocusRequests,
-                                    onSubmit: browser.types.selectFirstMatch,
-                                    onDown: { browser.focusRequest = .list }
-                                ) {}
-                            }
+                            ColumnSearch(
+                                isExpanded: $browser.isSearchExpanded,
+                                text: Bindable(browser.types).searchText,
+                                prompt: String(localized: "Search"),
+                                columnWidth: typesListWidth,
+                                focusRequests: browser.searchFocusRequests,
+                                onSubmit: browser.types.selectFirstMatch,
+                                onDown: { browser.focusRequest = .list }
+                            ) {}
                         }
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane, settingsPresented: settings.isPresented)
+                    NoteList(browser: browser, order: order, pane: $pane)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                if $0 >= 280 { measuredWidths.list = $0 }
+            }
+            .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
         } detail: {
             Group {
                 if browser.isCreatingItem, let draft = browser.itemDraft {
@@ -80,21 +115,18 @@ struct MainView: View {
                 }
             }
             .toolbar(id: "main") {
-                if !settings.isPresented {
-                    NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
-                }
+                NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
             }
         }
-        .toolbar(removing: settings.isPresented ? .sidebarToggle : nil)
     }
 
     private var presentedWindow: some View {
         splitView
-        .inspector(isPresented: Binding { details.isPresented && !settings.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { if !settings.isPresented { details.isPresented = $0 } }) {
+        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
-        .focusedSceneValue(\.detailsPresentation, settings.isPresented ? nil : details)
+        .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
         .overlay(alignment: .top) {
@@ -114,24 +146,19 @@ struct MainView: View {
                 }
             }
         }
-        .focusedSceneValue(\.browser, settings.isPresented ? nil : browser)
-        .focusedSceneValue(\.editor, settings.isPresented ? nil : editor)
-        .focusedSceneValue(\.focusedNotes, settings.isPresented ? nil : FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
+        .focusedSceneValue(\.browser, browser)
+        .focusedSceneValue(\.editor, editor)
+        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
-        presentedWindow
-        .onChange(of: settings.isPresented) {
-            if settings.isPresented {
-                editor.flush()
-                browser.palette = nil
-                pane = nil
-            }
-        }
+        activeWindow
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
         .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.folderRemoved(in: library, order: order) }
+        .onChange(of: library.items(in: .allNotes).map(\.id), revealImportedItem)
+        .onChange(of: completedImportID, revealImportedItem)
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot()) { _, snapshot in
@@ -159,7 +186,7 @@ struct MainView: View {
     }
 
     private var importingWindow: some View {
-        lifecycleWindow
+        presentedWindow
         .onChange(of: browser.sidebarItem) { browser.isCreatingItem = false }
         .onChange(of: browser.selection) { browser.isCreatingItem = false }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
@@ -169,8 +196,6 @@ struct MainView: View {
                 library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
             }
         }
-        .onChange(of: library.items(in: .allNotes).map(\.id), revealImportedItem)
-        .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
     }
 
@@ -201,6 +226,7 @@ struct MainView: View {
     private func revealImportedItem() {
         guard let requestID = importRequestID, let id = completedImportID,
               library.item(id) != nil else { return }
+        browser.isCreatingItem = false
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]
@@ -238,4 +264,10 @@ struct MainView: View {
             library.renameNote(id, to: name, undoManager: undoManager)
         }
     }
+}
+
+// Measuring a drag must not invalidate the view and reapply its preferred column widths.
+private final class ColumnWidths {
+    var sidebar: CGFloat = 220
+    var list: CGFloat = 340
 }

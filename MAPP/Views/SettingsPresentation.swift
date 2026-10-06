@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// Settings belongs to one main window; opening it leaves that window's workspace in place.
+/// Settings belongs to one main window; its browser and editor state are retained while Settings is shown.
 @Observable
 final class SettingsPresentation {
     var isPresented = false
@@ -67,7 +67,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
     private var searchTerms: String {
         switch self {
-        case .appearance: String(localized: "Sort By Group by Date List Preview Notes List")
+        case .appearance: String(localized: "Base Text Size Font Sidebar Sort By Group by Date List Preview Notes List")
         case .editor: String(localized: "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing")
         case .library: String(localized: "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete")
         case .marfa: String(localized: "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting")

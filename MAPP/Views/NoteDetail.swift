@@ -48,7 +48,6 @@ private struct UnselectedItemContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.windowBackground)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     }
 }
 
@@ -103,7 +102,11 @@ struct NotePage: View {
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { editor.setStyle(style) }
-        .onChange(of: item.id, initial: true) { editor.load(item) }
+        .onChange(of: item.id, initial: true) {
+            // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
+            if editor.noteID == item.id { editor.noteChanged(item) }
+            else { editor.load(item) }
+        }
         // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
         // Marfa server that keeps its own text over the person's changes the text without a new version.
         .onChange(of: item.version) { editor.noteChanged(item) }
@@ -147,7 +150,7 @@ private struct SavedAsCopyBanner: View {
             Spacer()
             Button("Open Copy") { openWindow(value: copy) }
         }
-        .font(.callout)
+        .interfaceFont(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.bar)
@@ -167,7 +170,7 @@ private struct DeletedNoteBanner: View {
             Spacer()
             Button("Recover") { library.recover([id], undoManager: undoManager) }
         }
-        .font(.callout)
+        .interfaceFont(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.bar)

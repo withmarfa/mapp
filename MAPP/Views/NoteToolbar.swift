@@ -17,7 +17,7 @@ struct NoteToolbar: CustomizableToolbarContent {
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: "scrolledTitle") {
             Text(notes.first?.title ?? "")
-                .font(.headline)
+                .interfaceFont(.headline)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: 220, alignment: .leading)

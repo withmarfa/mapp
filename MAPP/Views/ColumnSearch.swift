@@ -39,6 +39,7 @@ struct ColumnSearch<Leading: View>: ToolbarContent {
 
 /// The system search field, which takes the keyboard as it appears.
 struct ColumnSearchField: NSViewRepresentable {
+    @Environment(\.interfaceTextSize) private var textSize
     @Binding var text: String
     let prompt: String
     let focusRequests: Int
@@ -50,6 +51,7 @@ struct ColumnSearchField: NSViewRepresentable {
         let view = ClosableSearchField()
         let field = view.field
         field.placeholderString = prompt
+        field.font = InterfaceStyle.font(.body, textSize: textSize)
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
         field.setAccessibilityIdentifier("ColumnSearch")
@@ -63,6 +65,7 @@ struct ColumnSearchField: NSViewRepresentable {
         if field.stringValue != text { field.stringValue = text }
         field.placeholderString = prompt
         view.onClose = onEnd
+        field.font = InterfaceStyle.font(.body, textSize: textSize)
         if context.coordinator.focusRequests != focusRequests {
             context.coordinator.focusRequests = focusRequests
             DispatchQueue.main.async { field.window?.makeFirstResponder(field) }

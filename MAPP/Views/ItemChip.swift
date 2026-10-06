@@ -18,10 +18,10 @@ extension View {
     /// The shape sits outside native controls so they cannot strip its styling from their label.
     func itemChipStyle() -> some View {
         self
-            .font(.system(size: 13))
+            .interfaceFont(.body)
             .foregroundStyle(.primary)
             .padding(.horizontal, 10)
-            .frame(height: 26)
+            .padding(.vertical, 5)
             .background(.quaternary, in: .rect(cornerRadius: 10))
             .contentShape(.rect(cornerRadius: 10))
     }
