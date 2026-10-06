@@ -54,12 +54,18 @@ final class SettingsTests: XCTestCase {
         let sidebar = window.outlines["SettingsSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
         XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
-        for pane in ["editor", "library", "about", "appearance"] {
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3), "the native sidebar toggle targets Settings")
+        XCTAssertTrue(back.exists)
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
+        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("about", "About"), ("appearance", "Appearance")] {
             let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
             XCTAssertTrue(category.exists)
             category.click()
             XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0).exists)
             attachScreenshot("NativeSettings-\(pane)")
+            XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the active pane has a native toolbar title")
         }
         back.click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -94,6 +100,22 @@ final class SettingsTests: XCTestCase {
         attachScreenshot("NativeSettings-no-item-selected")
         window.buttons["SettingsBack"].click()
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
+    }
+
+    func testSettingsKeepsExpandedColumnSearchForReturning() {
+        app.typeKey("f", modifierFlags: [.command, .option])
+        let search = window.searchFields["ColumnSearch"]
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        search.typeText("Lisbon")
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertFalse(search.exists)
+        XCTAssertTrue(window.toolbars.staticTexts["Appearance"].waitForExistence(timeout: 3))
+        attachScreenshot("NativeSettings-from-column-search")
+        window.buttons["SettingsBack"].click()
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        XCTAssertEqual(search.value as? String, "Lisbon")
+        window.buttons["CloseColumnSearch"].click()
     }
 
     func testSettingsSearchFindsControlsAndHandlesNoMatches() {
