@@ -1,7 +1,12 @@
 import Foundation
+import Synchronization
 
+/// Two notes are equal when one is an unchanged copy of the other: every change takes a revision no other note
+/// has had, so comparing notes never compares their text.
 nonisolated struct Note: Identifiable, Hashable {
     let id: ItemID
+    /// Also the item's version.
+    private(set) var revision = SessionRevision.next()
     /// Where the note's file is, relative to the notes folder, with `/` between components. A deleted note keeps
     /// the path it had.
     var path: String {
@@ -13,12 +18,12 @@ nonisolated struct Note: Identifiable, Hashable {
     /// Read out of the file whenever it changes, so lists and sorting never parse markdown.
     private(set) var title: String
     private(set) var preview: String
-    var created: Date
-    var modified: Date
+    var created: Date { didSet { revise() } }
+    var modified: Date { didSet { revise() } }
     /// A note with no folder is in the Inbox.
-    var folderID: ItemID?
+    var folderID: ItemID? { didSet { revise() } }
     /// When the note went to Recently Deleted, and its place in the bin there.
-    var deleted: Date?
+    var deleted: Date? { didSet { revise() } }
     var binID: UUID?
     /// The first line the note's name was taken from, while the note still goes by it; nil for a note named
     /// otherwise, which keeps its name whatever its first line says.
@@ -90,5 +95,29 @@ nonisolated struct Note: Identifiable, Hashable {
         let line = NoteText.firstLine(of: file.body)
         title = (followsFirstLine ? line : nil) ?? file.title ?? fileTitle
         preview = NoteText.preview(of: file.body, title: title)
+        revise()
+    }
+
+    private mutating func revise() {
+        revision = SessionRevision.next()
+    }
+
+    static func == (lhs: Note, rhs: Note) -> Bool {
+        lhs.id == rhs.id && lhs.revision == rhs.revision
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(revision)
+    }
+}
+
+/// One counter for the session, so a revision taken from it is never another value's, whichever note or file it
+/// was taken for.
+nonisolated enum SessionRevision {
+    private static let counter = Atomic<Int64>(0)
+
+    static func next() -> Int64 {
+        counter.add(1, ordering: .relaxed).newValue
     }
 }

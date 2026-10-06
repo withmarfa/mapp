@@ -167,11 +167,11 @@ nonisolated struct NoteFile: Hashable, Sendable {
     }
 
     /// Encodes only the changed field; the remaining envelope keeps its original spelling.
-    mutating func setField(_ key: String, _ value: NoteFieldValue?) {
+    mutating func setField(_ key: String, _ value: PropertyValue?) {
         setProperty(key, yaml: value.map(Self.fieldYAML))
     }
 
-    private static func fieldYAML(_ value: NoteFieldValue) -> String {
+    private static func fieldYAML(_ value: PropertyValue) -> String {
         switch value {
         case .null: "null"
         case .bool(let flag): flag ? "true" : "false"

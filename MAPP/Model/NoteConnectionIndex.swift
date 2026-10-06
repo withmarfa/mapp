@@ -39,12 +39,14 @@ nonisolated struct NoteConnectionEdge: Hashable, Sendable {
 nonisolated struct NoteConnectionIssue: Equatable, Sendable {
     let sourceID: ItemID
     let field: String
-    let value: NoteFieldValue
+    let value: PropertyValue
 }
 
 /// A snapshot rebuilt from files. Body references are lexical mentions, never semantic header edges.
 nonisolated struct NoteConnectionIndex: Sendable {
     let references: [NoteIndexedReference]
+    /// The references each record makes, in the order it makes them.
+    let referencesBySource: [ItemID: [NoteIndexedReference]]
     let edges: Set<NoteConnectionEdge>
     /// Configured fields containing malformed target references.
     let issues: [NoteConnectionIssue]
@@ -94,7 +96,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
             let type = record.declaredType ?? "core.note"
             for rule in rulesByType[type, default: []] {
                 guard let field = fields[rule.field] else { continue }
-                let values: [NoteFieldValue]
+                let values: [PropertyValue]
                 if case .array(let array) = field { values = array } else { values = [field] }
                 for value in values {
                     guard let string = value.string, let title = Self.typedTarget(string) else {
@@ -112,6 +114,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
             }
         }
         self.references = references
+        referencesBySource = Dictionary(grouping: references, by: \.sourceID)
         self.edges = edges
         self.issues = issues
     }
@@ -151,6 +154,32 @@ nonisolated struct NoteConnectionIndex: Sendable {
               !title.unicodeScalars.contains(where: { $0 == "[" || $0 == "]" || $0 == "\n" || $0 == "\r" }) else { return nil }
         guard !baseName(title).isEmpty else { return nil }
         return title
+    }
+
+    /// The lines of a body that could hold a reference. A reference never crosses a line, so while these stay
+    /// the same, so do the body's references, and finding them takes one pass over the bytes rather than a match.
+    static func referenceLines(in body: String) -> [Substring] {
+        var lines: [Substring] = []
+        let bytes = body.utf8
+        var lineStart = bytes.startIndex
+        var holdsOpening = false
+        var previous: UInt8 = 0
+        var index = bytes.startIndex
+        while index != bytes.endIndex {
+            let byte = bytes[index]
+            if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") {
+                if holdsOpening { lines.append(body[lineStart..<index]) }
+                holdsOpening = false
+                lineStart = bytes.index(after: index)
+                previous = 0
+            } else {
+                if byte == UInt8(ascii: "[") && previous == UInt8(ascii: "[") { holdsOpening = true }
+                previous = byte
+            }
+            index = bytes.index(after: index)
+        }
+        if holdsOpening { lines.append(body[lineStart..<bytes.endIndex]) }
+        return lines
     }
 
     private static func bodyTargets(_ body: String) -> [String] {

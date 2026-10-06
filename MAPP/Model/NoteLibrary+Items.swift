@@ -3,39 +3,16 @@ import Foundation
 extension NoteLibrary {
     // MARK: Typed items
 
-    func item(_ id: ItemID) -> AppItem? {
-        if let note = note(id) { return AppItem(projection: itemProjection(note), isDeleted: note.isDeleted) }
-        return files.first { $0.id == id }.map(AppItem.init(file:))
-    }
-
-    var items: [AppItem] { notes.filter { !$0.isDeleted }.map { AppItem(projection: itemProjection($0)) } + files.map(AppItem.init(file:)) }
-
-    func itemProjection(_ note: Note) -> NoteProjection {
-        if let cached = cachedItemProjections[note.id], cached.file == note.file,
-           cached.filePath == note.path, cached.title == note.title { return cached }
-        let projection = NoteProjection(note: note)
-        cachedItemProjections[note.id] = projection
-        return projection
-    }
-
-    var connectionIndex: NoteConnectionIndex {
-        // Read observable sources on cache hits too, so views keep their dependencies.
-        let sourceNotes = notes
-        let sourceFiles = files
-        if let cachedConnectionIndex { return cachedConnectionIndex }
-        let records = sourceNotes.filter { !$0.isDeleted }.map(itemProjection) + sourceFiles.map { AppItem(file: $0).projection }
-        let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
-        cachedConnectionIndex = index
-        return index
+    /// The fields the item's type names its relationships under, in the schema's order.
+    func relationshipFields(of item: Item) -> [String] {
+        WorkbenchSchema.definition(item.type.rawValue)?.relationshipFields ?? []
     }
 
     func relationships(for id: ItemID) -> [ItemRelationship] {
         guard let item = item(id) else { return [] }
         let index = connectionIndex
-        var results = item.relationshipFields.map { field in
-            let targets = index.references.filter { reference in
-                reference.sourceID == id && reference.origin == .header(field)
-            }.map { reference in
+        var results = relationshipFields(of: item).map { field in
+            let targets = (index.referencesBySource[id] ?? []).filter { $0.origin == .header(field) }.map { reference in
                 let targetID: ItemID? = if case .resolved(let target) = reference.resolution { target } else { nil }
                 return ItemRelationshipTarget(title: targetID.flatMap { self.item($0)?.title } ?? reference.targetTitle, itemID: targetID, resolution: reference.resolution)
             }
@@ -53,27 +30,30 @@ extension NoteLibrary {
         return results
     }
 
-    func relationshipCandidates(for id: ItemID, field: String) -> [AppItem] {
-        let candidates = notes.filter { note in
-            guard note.id != id, !note.isDeleted else { return false }
+    func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
+        let type = item(id)?.type.rawValue ?? "core.note"
+        let candidates = allItems.filter { candidate in
+            guard candidate.id != id, candidate.state == .active else { return false }
+            if candidate.isFile { return field == "about" || field == "derived-from" }
             if field.hasPrefix("inverse:") {
                 let ownerField = field == "inverse:parent-of" ? "child-of" : String(field.dropFirst("inverse:".count))
-                return item(note.id)?.relationshipFields.contains(ownerField) == true && (ownerField != "child-of" || validParent(id, forType: item(note.id)?.type?.id ?? "core.note"))
+                return relationshipFields(of: candidate).contains(ownerField)
+                    && (ownerField != "child-of" || validParent(id, forType: candidate.type.rawValue))
             }
-            return field != "child-of" || validParent(note.id, forType: item(id)?.type?.id ?? "core.note")
-        }.map { AppItem(projection: itemProjection($0)) } + ((field == "about" || field == "derived-from") ? files.map(AppItem.init(file:)) : [])
+            return field != "child-of" || validParent(candidate.id, forType: type)
+        }
         return candidates.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] {
-        connectionIndex.references.filter { $0.sourceID == id && $0.origin == .body }.map { reference in
+        (connectionIndex.referencesBySource[id] ?? []).filter { $0.origin == .body }.map { reference in
             let targetID: ItemID? = if case .resolved(let target) = reference.resolution { target } else { nil }
             return .init(title: reference.targetTitle, itemID: targetID, resolution: reference.resolution)
         }
     }
 
     @discardableResult
-    func setItemProperty(_ id: ItemID, key: String, value: NoteFieldValue?, undoManager: UndoManager? = nil) -> Bool {
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager? = nil) -> Bool {
         if key == "title" {
             guard let title = value?.string, let item = item(id), item.isEditable, !title.isEmpty,
                   NoteText.fileSafe(title) == title, !isNoteNameTaken(title, for: id) else { return false }
@@ -82,7 +62,7 @@ extension NoteLibrary {
         }
         guard let index = notes.firstIndex(where: { $0.id == id && !$0.isDeleted }),
               let item = item(id), item.isEditable,
-              let definition = item.properties.first(where: { $0.key == key }) else { return false }
+              let definition = catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == key }) else { return false }
         if let value, !Self.valid(value, for: definition.kind) {
             failure = (String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
             return false
@@ -93,7 +73,7 @@ extension NoteLibrary {
         return self.note(id)?.file == file
     }
 
-    private static func valid(_ value: NoteFieldValue, for kind: ItemPropertyDefinition.Kind) -> Bool {
+    private static func valid(_ value: PropertyValue, for kind: ItemTypeInfo.Field.Kind) -> Bool {
         switch (kind, value) {
         case (.text, .string): true
         case (.choice(let choices), .string(let string)): choices.contains(string)
@@ -106,7 +86,7 @@ extension NoteLibrary {
 
     private func reference(to targetID: ItemID) -> String? {
         guard let target = item(targetID) else { return nil }
-        let candidates = [target.title, target.projection.filePath, target.fields["marfa_id"]?.string].compactMap { $0 }
+        let candidates = [target.title, path(of: targetID), target.value(of: "marfa_id")?.string].compactMap { $0 }
         for candidate in candidates {
             let spelling = "[[\(candidate)]]"
             var file = NoteFile(text: "")
@@ -114,7 +94,7 @@ extension NoteLibrary {
             file.setProperty("about", spelling)
             let probeID = ItemID.mint()
             let probe = NoteProjection(id: probeID, file: file, fallbackTitle: probeID.rawValue)
-            let records = notes.filter { !$0.isDeleted }.map(itemProjection) + files.map { AppItem(file: $0).projection } + [probe]
+            let records = connectionRecords() + [probe]
             let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
             if index.references.contains(where: { $0.sourceID == probeID && $0.resolution == .resolved(targetID) }) { return spelling }
         }
@@ -122,12 +102,17 @@ extension NoteLibrary {
         return nil
     }
 
+    /// Whether a note not deleted already goes by the title, ignoring case, which a new item may not take.
+    func isItemTitleTaken(_ title: String) -> Bool {
+        notes.contains { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }
+    }
+
     @discardableResult
     func createItem(typeID: String, title: String, body: String = "\n", parentID: ItemID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
         let title = NoteName.trimmed(title)
         guard let type = WorkbenchSchema.definition(typeID), !title.isEmpty,
               NoteText.fileSafe(title) == title,
-              !notes.contains(where: { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }) else {
+              !isItemTitleTaken(title) else {
             failure = (String(localized: "Can’t Create Item"), String(localized: "Choose a unique title without characters that cannot be used in a file name."))
             return nil
         }
@@ -162,7 +147,7 @@ extension NoteLibrary {
 
     private func validParent(_ parentID: ItemID, forType type: String) -> Bool {
         guard let parent = note(parentID), !parent.isDeleted else { return false }
-        let parentType = NoteProjection(note: parent).declaredType
+        let parentType = itemProjection(parent).declaredType
         if parentType == "aic.project" { return true }
         if type == "aic.project" || type == "aic.epic" { return false }
         if parentType == "aic.epic" { return true }
@@ -186,8 +171,8 @@ extension NoteLibrary {
             let existing = relationships(for: id).first { $0.field == field }?.targets.compactMap(\.itemID) ?? []
             var files: [ItemID: NoteFile] = [:]
             for ownerID in Set(existing + targetIDs) {
-                guard let owner = item(ownerID), owner.isEditable, owner.relationshipFields.contains(ownerField), let source = note(ownerID) else { return false }
-                if ownerField == "child-of" && targetIDs.contains(ownerID) && !validParent(id, forType: owner.type?.id ?? "core.note") { return false }
+                guard let owner = item(ownerID), owner.isEditable, relationshipFields(of: owner).contains(ownerField), let source = note(ownerID) else { return false }
+                if ownerField == "child-of" && targetIDs.contains(ownerID) && !validParent(id, forType: owner.type.rawValue) { return false }
                 if ownerField == "child-of", targetIDs.contains(ownerID) {
                     var seen: Set<ItemID> = [ownerID]
                     var cursor: ItemID? = id
@@ -206,20 +191,20 @@ extension NoteLibrary {
                 var file = source.file
                 let references = targets.compactMap { reference(to: $0) }
                 guard references.count == targets.count else { return false }
-                let values = references.map(NoteFieldValue.string)
+                let values = references.map(PropertyValue.string)
                 file.setField(ownerField, values.isEmpty ? nil : ownerField == "about" ? .array(values) : values.first)
                 files[ownerID] = file
             }
             applyItemFieldFiles(files, key: ownerField, undoManager: undoManager, name: String(localized: "Edit Relationship"))
             return files.allSatisfy { self.note($0.key)?.file == $0.value }
         }
-        guard let item = item(id), item.isEditable, item.relationshipFields.contains(field),
+        guard let item = item(id), item.isEditable, relationshipFields(of: item).contains(field),
               let note = note(id), !note.isDeleted,
               Set(targetIDs).count == targetIDs.count,
               field == "about" || targetIDs.count <= 1 else { return false }
         for targetID in targetIDs {
             guard targetID != id, self.item(targetID) != nil, self.note(targetID)?.isDeleted != true else { return false }
-            if field == "child-of" && !validParent(targetID, forType: item.type?.id ?? "core.note") { return false }
+            if field == "child-of" && !validParent(targetID, forType: item.type.rawValue) { return false }
         }
         if field == "child-of", let parent = targetIDs.first {
             var seen: Set<ItemID> = [id]
@@ -243,14 +228,14 @@ extension NoteLibrary {
         var file = note.file
         let unresolved = connectionIndex.references.filter {
             $0.sourceID == id && $0.origin == .header(field) && { if case .resolved = $0.resolution { false } else { true } }($0)
-        }.map { NoteFieldValue.string("[[\($0.targetTitle)]]") }
+        }.map { PropertyValue.string("[[\($0.targetTitle)]]") }
         guard unresolved.isEmpty || field == "about" else {
             failure = (String(localized: "Unresolved Relationship"), String(localized: "Resolve the existing target before replacing this relationship."))
             return false
         }
         let references = targetIDs.compactMap { reference(to: $0) }
         guard references.count == targetIDs.count else { return false }
-        let targets = references.map(NoteFieldValue.string) + unresolved
+        let targets = references.map(PropertyValue.string) + unresolved
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return self.note(id)?.file == file
@@ -259,7 +244,7 @@ extension NoteLibrary {
     private func applyItemFieldFiles(_ files: [ItemID: NoteFile], key: String, undoManager: UndoManager?, name: String) {
         let previous = Dictionary(uniqueKeysWithValues: files.keys.compactMap { id in note(id).map { (id, $0.file) } })
         guard files.allSatisfy({ id, file in
-            let old = note(id).map(NoteProjection.init)?.fields ?? [:]
+            let old = note(id).map(itemProjection)?.fields ?? [:]
             let projection = NoteProjection(id: id, file: file, fallbackTitle: "")
             if case .invalid = projection.frontMatter { return false }
             let proposed = projection.fields ?? [:]
@@ -280,8 +265,8 @@ extension NoteLibrary {
         }
     }
 
-    func creationParentCandidates(typeID: String) -> [AppItem] {
-        notes.filter { validParent($0.id, forType: typeID) }.map { AppItem(projection: itemProjection($0)) }
+    func creationParentCandidates(typeID: String) -> [Item] {
+        notes.filter { validParent($0.id, forType: typeID) }.compactMap { item($0.id) }
     }
 
     func applyItemFiles(_ files: [ItemID: NoteFile], undoManager: UndoManager?, name: String) {
