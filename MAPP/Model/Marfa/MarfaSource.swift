@@ -4,9 +4,25 @@ import Synchronization
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
-nonisolated struct UnsentWrites: Hashable, Sendable {
+nonisolated struct UnsentWrites: Sendable {
+    /// What the person wrote in one of the writes, to show before they agree to lose it.
+    nonisolated struct Text: Hashable, Sendable, Identifiable {
+        let id: String
+        var change: SyncProblemEntry.Change
+        var content: SyncContent
+        var date: Date
+    }
+
     var ids: Set<String>
+    /// The writes that carried content, oldest first. Shown, never compared: two reads of the same queue agree
+    /// on what is not sent by its ids alone.
+    var texts: [Text] = []
     var count: Int { ids.count }
+}
+
+nonisolated extension UnsentWrites: Hashable {
+    static func == (lhs: UnsentWrites, rhs: UnsentWrites) -> Bool { lhs.ids == rhs.ids }
+    func hash(into hasher: inout Hasher) { hasher.combine(ids) }
 }
 
 nonisolated enum CloseOutcome: Hashable, Sendable {

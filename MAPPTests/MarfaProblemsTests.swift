@@ -224,3 +224,57 @@ struct MarfaProblemsTests {
         #expect(report.problems.map(\.id) == [.write("early"), .write("late")])
     }
 }
+
+/// What the person wrote in the writes that would be lost with a copy.
+struct UnsentTextsTests {
+    private static let catalogue = MarfaMapping.catalogue(
+        itemTypes: [
+            ItemType(
+                id: "core.note", label: "Note",
+                fields: [
+                    TypeField(name: "title", type: "string", declaredBy: "core.note"),
+                    TypeField(name: "body", type: "string", declaredBy: "core.note")
+                ],
+                titleField: "title", bodyField: "body")
+        ],
+        edgeTypes: [])
+
+    private static func write(
+        _ id: String, _ verdict: Verdict? = nil, kind: WriteKind = .updateItem, body: JSONObject = [:], at time: String
+    ) -> QueuedWrite {
+        QueuedWrite(
+            id: id, kind: kind, itemId: "item", idempotencyKey: id, dependsOn: [], verdict: verdict, body: body, queuedAt: time)
+    }
+
+    @Test func eachWriteNotSentThatCarriedTextIsShownOldestFirst() {
+        let queue = [
+            Self.write("late", kind: .updateItem, body: ["properties": ["body": "Second thought"]], at: "2026-10-06T10:05:00Z"),
+            Self.write(
+                "early", kind: .createItem, body: ["type": "core.note", "properties": ["title": "Trip", "body": "Book the hotel"]],
+                at: "2026-10-06T10:00:00Z"),
+            Self.write("taken", .accepted, body: ["properties": ["body": "Already on the server"]], at: "2026-10-06T10:01:00Z"),
+            Self.write("tag", kind: .addTag, body: ["tags": ["favorite"]], at: "2026-10-06T10:02:00Z")
+        ]
+        let texts = MarfaProblems.unsentTexts(queue, catalogue: Self.catalogue, types: ["item": TypeID("core.note")])
+        #expect(texts.map(\.id) == ["early", "late"])
+        #expect(texts.map(\.change) == [.create, .edit])
+        #expect(texts.map(\.content.plainText) == ["Trip\n\nBook the hotel", "Second thought"])
+    }
+
+    @Test func aRefusedWriteIsStillNotSentAndItsTextStillShown() {
+        let refused = Self.write(
+            "refused", .refused(Refusal(reason: "validation_error")), body: ["properties": ["body": "Kept"]], at: "2026-10-06T10:00:00Z")
+        let texts = MarfaProblems.unsentTexts([refused], catalogue: Self.catalogue, types: ["item": TypeID("core.note")])
+        #expect(texts.map(\.id) == ["refused"])
+    }
+
+    @Test func aWriteWithNothingWrittenInItShowsNothing() {
+        let empty = Self.write("empty", body: ["properties": ["body": .null]], at: "2026-10-06T10:00:00Z")
+        #expect(MarfaProblems.unsentTexts([empty], catalogue: Self.catalogue).isEmpty)
+    }
+
+    @Test func whatIsShownDoesNotChangeWhatTheyAgreedTo() {
+        #expect(UnsentWrites(ids: ["a"], texts: []) == UnsentWrites(ids: ["a"]))
+        #expect(UnsentWrites(ids: ["a"]) != UnsentWrites(ids: ["a", "b"]))
+    }
+}

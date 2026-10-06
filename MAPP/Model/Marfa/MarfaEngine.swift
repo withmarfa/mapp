@@ -178,7 +178,10 @@ actor MarfaEngine {
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
     private func unsentWrites() async -> UnsentWrites? {
         guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
-        return UnsentWrites(ids: MarfaProblems.unsent(queue))
+        let named = Set(queue.compactMap(\.itemId))
+        let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
+        return UnsentWrites(
+            ids: MarfaProblems.unsent(queue), texts: MarfaProblems.unsentTexts(queue, catalogue: catalogue, types: types))
     }
 
     private func shutDown() async {

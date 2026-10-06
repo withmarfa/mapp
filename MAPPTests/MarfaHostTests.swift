@@ -42,10 +42,18 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
         return verdicts.withLock { $0[key] } ?? .accepted
     }
 
+    /// The text of the first writes the report counts, as the copy reads it from its queue.
+    let unsentTexts = Mutex<[SyncContent]>([])
+
     /// One write for each the report counts.
     func unsentWrites() async -> UnsentWrites? {
         let report = report.value
-        return report.queueRead ? .fake(report.changesNotSent) : nil
+        guard report.queueRead else { return nil }
+        var unsent = UnsentWrites.fake(report.changesNotSent)
+        unsent.texts = unsentTexts.withLock { $0 }.enumerated().map { index, content in
+            UnsentWrites.Text(id: "w\(index)", change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
+        }
+        return unsent
     }
 
     func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
