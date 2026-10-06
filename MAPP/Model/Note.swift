@@ -20,8 +20,6 @@ nonisolated struct Note: Identifiable, Hashable {
     /// When the note went to Recently Deleted, and its place in the bin there.
     var deleted: Date?
     var binID: UUID?
-    /// The file's identity when last read, to know it again if another app renames it.
-    var fileID: UInt64?
     /// The first line the note's name was taken from, while the note still goes by it; nil for a note named
     /// otherwise, which keeps its name whatever its first line says.
     var namedLine: String? {

@@ -150,12 +150,11 @@ extension NoteLibrary {
         else {
             let top = directory.components(separatedBy: "/").first!
             if let folder = folders.first(where: { $0.name == top }) { note.folderID = folder.id }
-            else { let folder = Folder(name: top); folders.append(folder); note.folderID = folder.id; perform(.createFolder(path: directory)) }
+            else { let folder = Folder(name: top); folders.append(folder); note.folderID = folder.id; perform(.createFolder(path: top, id: folder.id)) }
         }
-        perform(.createFolder(path: directory))
         note.path = uniquePath(title, in: directory, except: nil)
         notes.append(note)
-        perform(.create(path: note.path!, text: note.file.text))
+        perform(.create(path: note.path!, text: note.file.text, id: note.id))
         let id = note.id
         registerUndo(undoManager, name: String(localized: "New Item")) { [weak undoManager] library in library.delete([id], undoManager: undoManager) }
         return note

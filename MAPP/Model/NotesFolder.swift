@@ -92,9 +92,10 @@ final class NotesFolder {
         }
     }
 
-    /// Where a folder's trashed notes wait, in the app's own storage, outside any notes folder. Each folder has
-    /// its own, so a note trashed from one never comes back into another, known by the folder's identity on its
-    /// volume rather than its path, so the bin stays the folder's when the folder is moved or renamed.
+    /// Where a folder's trashed notes wait and its items' identities are kept, in the app's own storage, outside
+    /// any notes folder. Each folder has its own, so a note trashed from one never comes back into another, known
+    /// by the folder's identity on its volume rather than its path, so the bin stays the folder's when the folder
+    /// is moved or renamed.
     private static func bin(for url: URL) -> URL {
         let values = try? url.resourceValues(forKeys: [.volumeUUIDStringKey, .fileIdentifierKey])
         let identity = values.flatMap { values in
