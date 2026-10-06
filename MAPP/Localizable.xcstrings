@@ -199,7 +199,13 @@
     "Cancel" : {
 
     },
+    "Can’t Add to Favorites" : {
+
+    },
     "Can’t Read the Notes Folder" : {
+
+    },
+    "Can’t Remove from Favorites" : {
 
     },
     "Change…" : {
@@ -500,6 +506,9 @@
     "Show in Finder" : {
 
     },
+    "Some notes have tags that can’t be read or changed safely, so their files were left unchanged." : {
+
+    },
     "Sort" : {
 
     },
@@ -522,6 +531,12 @@
 
     },
     "Text Size" : {
+
+    },
+    "The tags of “%@” are written in a form that can’t be changed safely, so its file was left unchanged." : {
+
+    },
+    "The tags of “%@” can’t be read, so its file was left unchanged." : {
 
     },
     "The note’s file takes the new name." : {

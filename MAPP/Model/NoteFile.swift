@@ -231,7 +231,7 @@ nonisolated struct NoteFile: Hashable, Sendable {
     /// commas, or nothing, each trimmed, none empty, a repeat dropped. Nil where Marfa would refuse the value, or
     /// the front matter that holds it.
     private static func marfaTags(in frontMatter: String) -> [String]? {
-        // Every spelling of the key contains these letters, and most notes have no tags.
+        // Most notes have no tags, so they skip the parse; only a key spelled with escapes, such as `"t\x61gs"`, is missed.
         guard frontMatter.contains("tags") else { return [] }
         let root: Node?
         do { root = try composed(frontMatter) } catch { return nil }

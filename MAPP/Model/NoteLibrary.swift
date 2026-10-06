@@ -515,7 +515,7 @@ final class NoteLibrary {
             let title = isFavorite ? String(localized: "Can’t Add to Favorites") : String(localized: "Can’t Remove from Favorites")
             let message = switch (refused.count, first.error) {
             case (1, .unreadable):
-                String(localized: "The front matter of “\(first.title)” can’t be read, so its tags were left unchanged.")
+                String(localized: "The tags of “\(first.title)” can’t be read, so its file was left unchanged.")
             case (1, .unsafe):
                 String(localized: "The tags of “\(first.title)” are written in a form that can’t be changed safely, so its file was left unchanged.")
             default:
