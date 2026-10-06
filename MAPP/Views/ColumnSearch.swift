@@ -46,21 +46,23 @@ struct ColumnSearchField: NSViewRepresentable {
     let onDown: () -> Void
     let onEnd: () -> Void
 
-    func makeNSView(context: Context) -> FocusingSearchField {
-        let field = FocusingSearchField()
+    func makeNSView(context: Context) -> ClosableSearchField {
+        let view = ClosableSearchField()
+        let field = view.field
         field.placeholderString = prompt
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
-        field.onClose = onEnd
         field.setAccessibilityIdentifier("ColumnSearch")
-        return field
+        view.onClose = onEnd
+        return view
     }
 
-    func updateNSView(_ field: FocusingSearchField, context: Context) {
+    func updateNSView(_ view: ClosableSearchField, context: Context) {
+        let field = view.field
         context.coordinator.parent = self
         if field.stringValue != text { field.stringValue = text }
         field.placeholderString = prompt
-        field.onClose = onEnd
+        view.onClose = onEnd
         if context.coordinator.focusRequests != focusRequests {
             context.coordinator.focusRequests = focusRequests
             DispatchQueue.main.async { field.window?.makeFirstResponder(field) }
@@ -104,22 +106,16 @@ struct ColumnSearchField: NSViewRepresentable {
     }
 }
 
-final class FocusingSearchField: NSSearchField {
-    private var hasAppeared = false
+/// The search field with a close button over its trailing edge. The button is the field's sibling rather than its
+/// subview: NSSearchField does not report subviews to accessibility, and adding the button to the field's
+/// accessibility children crashed the app whenever its accessibility tree was read.
+final class ClosableSearchField: NSView {
+    let field = FocusingSearchField()
     var onClose: () -> Void = {}
     private let closeButton = NSButton()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        cell = ClosingSearchFieldCell(textCell: "")
-        isEditable = true
-        isSelectable = true
-        isBezeled = true
-        bezelStyle = .roundedBezel
-        controlSize = .large
-        // NSSearchField hides its cancel button when empty; an expanded column still needs a way to close.
-        // Only that accessory is supplied here. AppKit draws and edits the search field itself.
-        (cell as? NSSearchFieldCell)?.cancelButtonCell = nil
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: String(localized: "Close Search"))
         closeButton.imagePosition = .imageOnly
         closeButton.isBordered = false
@@ -129,23 +125,44 @@ final class FocusingSearchField: NSSearchField {
         closeButton.action = #selector(closeSearch)
         closeButton.setAccessibilityLabel(String(localized: "Close Search"))
         closeButton.setAccessibilityIdentifier("CloseColumnSearch")
+        addSubview(field)
         addSubview(closeButton)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: field.intrinsicContentSize.height)
+    }
+
     override func layout() {
         super.layout()
+        field.frame = bounds
         closeButton.frame = NSRect(x: bounds.maxX - 28, y: (bounds.height - 20) / 2, width: 20, height: 20)
     }
 
-    // NSSearchField exposes its cell accessories rather than arbitrary subviews.
-    override func accessibilityChildren() -> [Any]? {
-        (super.accessibilityChildren() ?? []) + [closeButton]
+    @objc private func closeSearch() { onClose() }
+}
+
+final class FocusingSearchField: NSSearchField {
+    private var hasAppeared = false
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        cell = ClosingSearchFieldCell(textCell: "")
+        isEditable = true
+        isSelectable = true
+        isBezeled = true
+        bezelStyle = .roundedBezel
+        controlSize = .large
+        // NSSearchField hides its cancel button when empty; an expanded column still needs a way to close, which
+        // the close button over the field's trailing edge gives. AppKit draws and edits the search field itself.
+        (cell as? NSSearchFieldCell)?.cancelButtonCell = nil
     }
 
-    @objc private func closeSearch() { onClose() }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
 
     // Once only: the toolbar moves its items between windows (full screen, Customize Toolbar, overflow), and an
     // open field should not take the keyboard from the page each time.

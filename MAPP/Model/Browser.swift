@@ -21,8 +21,8 @@ final class Browser {
     var palette: Palette?
     /// Whether the list's search is out as a field, rather than a button beside Sort.
     var isSearchExpanded = false
-    /// What Marfa Types' page is searched for.
-    var typesQuery = ""
+    /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
+    let types = TypesBrowser()
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
     var isCreatingItem = false
@@ -35,7 +35,7 @@ final class Browser {
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
-        /// The search of Marfa Types, which searches its page rather than the notes.
+        /// The search of Marfa Types, which searches the types rather than the notes.
         case typesSearch
     }
 
@@ -87,7 +87,7 @@ final class Browser {
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         isCreatingItem = false
         searchText = ""
-        typesQuery = ""
+        types.searchText = ""
         isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)

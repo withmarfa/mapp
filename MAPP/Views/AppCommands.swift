@@ -8,7 +8,6 @@ struct AppCommands: Commands {
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
-    @FocusedValue(\.marfaTypes) private var marfaTypes
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
@@ -89,7 +88,7 @@ struct AppCommands: Commands {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1 || marfaTypes != nil)
+            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1 || browser?.showsTypes == true)
             Divider()
             OrderOptions()
             Divider()
@@ -112,6 +111,9 @@ struct AppCommands: Commands {
 
 extension AppCommands {
     private var editsFolders: Bool { library?.capabilities.contains(.folders) == true }
+
+    /// Marfa Types, while the window in front shows it, for Back and Forward.
+    private var marfaTypes: TypesBrowser? { browser?.showsTypes == true ? browser?.types : nil }
 
     /// Opens a palette over the window in front, or puts it away if that palette is already out.
     private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {

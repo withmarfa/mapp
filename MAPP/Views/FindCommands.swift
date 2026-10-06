@@ -4,7 +4,7 @@ import SwiftUI
 /// Edit > Find, as TextEdit and Notes lay it out, acting on the note whose page the window shows through the
 /// system find bar. Search List leads it with ⌥⌘F, as Search Notes does in Notes, so Find and Replace has no
 /// shortcut of its own.
-/// Over Marfa Types, Find goes to the toolbar's search, which searches that page.
+/// Over Marfa Types, Find goes to the list column's search, which searches the types.
 struct FindCommands: Commands {
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.browser) private var browser

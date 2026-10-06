@@ -76,6 +76,7 @@ extension Catalogue {
 
 private struct TypesPreview: View {
     @State private var browser: TypesBrowser
+    @FocusState private var pane: Browser.Pane?
 
     init(selection: TypeSelection?, search: String = "") {
         let browser = TypesBrowser(catalogue: .typesSample)
@@ -88,7 +89,7 @@ private struct TypesPreview: View {
         NavigationSplitView {
             Color.clear
         } content: {
-            TypesListView(browser: browser)
+            TypesListView(browser: browser, pane: $pane)
                 .navigationSplitViewColumnWidth(min: 280, ideal: 300, max: 480)
         } detail: {
             TypeDetailView(browser: browser)

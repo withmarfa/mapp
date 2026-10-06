@@ -8,7 +8,6 @@ struct MainView: View {
     @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
-    @State private var types = MarfaTypesPage()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
@@ -31,8 +30,8 @@ struct MainView: View {
     var body: some View { renamingWindow }
 
     private var splitView: some View {
-        // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
-        // the window never changes its columns (see MarfaTypesPage).
+        // Every place keeps the same three columns, Marfa Types among them: AppKit crashed laying out the toolbar
+        // as the columns changed with the sidebar hidden or resized.
         NavigationSplitView {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
@@ -41,18 +40,19 @@ struct MainView: View {
         } content: {
             Group {
                 if browser.showsTypes {
-                    MarfaTypesView(part: types.list)
+                    TypesListView(browser: browser.types, pane: $pane)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
                         .navigationTitle(settings.isPresented ? String(localized: "Settings") : library.name(of: .marfaTypes))
                         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
                         .toolbar {
                             ColumnSearch(
                                 isExpanded: $browser.isSearchExpanded,
-                                text: $browser.typesQuery,
-                                prompt: String(localized: "Search Types"),
+                                text: Bindable(browser.types).searchText,
+                                prompt: String(localized: "Search"),
                                 columnWidth: typesListWidth,
                                 focusRequests: browser.searchFocusRequests,
-                                onSubmit: types.openFirstMatch
+                                onSubmit: browser.types.selectFirstMatch,
+                                onDown: { browser.focusRequest = .list }
                             ) {}
                         }
                 } else {
@@ -66,7 +66,7 @@ struct MainView: View {
                     NewItemPage(browser: browser, draft: draft)
                         .onAppear { editor.close() }
                 } else if browser.showsTypes {
-                    MarfaTypesView(part: types.content)
+                    TypeDetailView(browser: browser.types)
                         // The note that was on the page is out of sight, so it is left.
                         .onAppear { editor.close() }
                 } else {
@@ -87,7 +87,7 @@ struct MainView: View {
         }
         .focusedSceneValue(\.detailsPresentation, settings.isPresented ? nil : details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
-        .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
+        .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 ZStack(alignment: .top) {
@@ -96,7 +96,7 @@ struct MainView: View {
                         .contentShape(.rect)
                         .onTapGesture {
                             browser.palette = nil
-                            browser.focusRequest = browser.showsTypes ? .sidebar : .list
+                            browser.focusRequest = .list
                         }
                     CommandPalette(browser: browser, editor: editor, settings: settings, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
@@ -107,7 +107,6 @@ struct MainView: View {
         }
         .focusedSceneValue(\.browser, settings.isPresented ? nil : browser)
         .focusedSceneValue(\.editor, settings.isPresented ? nil : editor)
-        .focusedSceneValue(\.marfaTypes, !settings.isPresented && browser.showsTypes ? types : nil)
         .focusedSceneValue(\.focusedNotes, settings.isPresented ? nil : FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
@@ -135,7 +134,6 @@ struct MainView: View {
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
-            types.onFind = { [browser] in browser.focusRequest = .typesSearch }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
@@ -191,8 +189,8 @@ struct MainView: View {
         importRequestID = nil
     }
 
-    /// The list's search comes out as a field, which takes the keyboard; asked for over Marfa Types, it searches
-    /// All Notes, since that page has a search of its own.
+    /// The list's search comes out as a field, which takes the keyboard. Search List over Marfa Types searches
+    /// All Notes, since Find there searches the types.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
@@ -202,7 +200,10 @@ struct MainView: View {
         case .typesSearch:
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
-        case .sidebar, .list: pane = browser.focusRequest
+        case .sidebar, .list:
+            // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
+            let request = browser.focusRequest
+            Task { pane = request }
         case .page, nil: return
         }
         browser.focusRequest = nil

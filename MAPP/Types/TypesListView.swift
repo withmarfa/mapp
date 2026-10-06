@@ -4,6 +4,8 @@ import SwiftUI
 /// Searching shows the tree open throughout and flat, since a match under a closed parent would be out of sight.
 struct TypesListView: View {
     @Bindable var browser: TypesBrowser
+    /// The window's keyboard focus, which the list takes when the window asks, as the note list does.
+    var pane: FocusState<Browser.Pane?>.Binding
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -33,6 +35,7 @@ struct TypesListView: View {
                 }
             }
             .listStyle(.inset)
+            .focused(pane, equals: .list)
             // The rows a choice opens are not laid out until the change has been drawn.
             .onChange(of: browser.selection) { _, selection in
                 guard let selection else { return }
