@@ -28,7 +28,9 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 ## Versions
 
-- A version exists only as a git tag, and tags are the maintainer's. Agents never create a tag or write a version into a file; `MARKETING_VERSION` stays `0.0.0`.
+- A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Agents create the tag when a release is called.
+- Every version is `0.0.x` until the first public release, because WithMarfa keeps every version inside its code at 0 until then. Each release is the previous tag plus `0.0.1`; the next TestFlight build is `0.0.5`, after `0.0.4`.
+- Agents never write a version into a file: `MARKETING_VERSION` stays `0.0.0` in the repository, since `ci_scripts/ci_post_clone.sh` sets it from the tag in the cloud copy only.
 
 ## Layout
 
@@ -52,7 +54,8 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 ## Releases
 
-- Builds reach TestFlight through Xcode Cloud: a workflow started by the maintainer's tag archives the app and gives it to internal testers. There is no other distribution, so no Sparkle and no notarisation.
+- Builds reach TestFlight through Xcode Cloud: a workflow started by a tag beginning with `v` archives the app and gives it to internal testers. There is no other distribution, so no Sparkle and no notarization.
+- To release, an agent tags the merged commit on `main` with the next version (see Versions) and pushes the tag. Agents cannot see Xcode Cloud, so the release is checked in App Store Connect: the build for the tag's version appears under TestFlight.
 - `ci_scripts/ci_post_clone.sh` runs in the cloud checkout: it writes `Config/Local.xcconfig` from the workflow's secret `MAPP_DEVELOPMENT_TEAM`, and sets `MARKETING_VERSION` from the tag (`1.2.3` or `v1.2.3`) in that copy only. Xcode Cloud numbers the builds. The repository still never holds a team or a version.
 
 ## Commands

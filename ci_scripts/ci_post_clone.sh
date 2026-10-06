@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Xcode Cloud runs this after it clones the repository. The repository carries no signing team and no version:
-# the workflow supplies the team as the secret MAPP_DEVELOPMENT_TEAM, and the version is the maintainer's tag
-# that started the build. Nothing written here is committed.
+# the workflow supplies the team as the secret MAPP_DEVELOPMENT_TEAM, and the version is the tag that
+# started the build. Nothing written here is committed.
 set -euo pipefail
 cd "${0:a:h}/.."
 
