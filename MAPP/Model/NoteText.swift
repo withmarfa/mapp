@@ -36,18 +36,6 @@ nonisolated enum NoteText {
         return (start > text.startIndex ? "…" : "") + stretch + (end < text.endIndex ? "…" : "")
     }
 
-    /// Whether the note's first line is finished, which shows once something is written on a line after it.
-    /// The page writes every note with a closing line break, so one alone says nothing.
-    static func hasCompleteFirstLine(_ body: String) -> Bool {
-        body.trimmingCharacters(in: .whitespacesAndNewlines).contains("\n")
-    }
-
-    /// Whether a note holds nothing worth keeping: no words and nothing else, only markers such as an empty
-    /// checklist item or a heading with no text.
-    static func isBlank(_ body: String) -> Bool {
-        body.split(whereSeparator: \.isNewline).allSatisfy { $0.wholeMatch(of: bareMarkers) != nil }
-    }
-
     /// The name a note's file takes from its first line.
     static func fileName(for body: String) -> String {
         name(for: firstLine(of: body) ?? "")
@@ -92,8 +80,6 @@ nonisolated enum NoteText {
     }
 
     private nonisolated(unsafe) static let unsafeInName = /[\/\\:\x00-\x1F\x7F]/
-    /// A line holding only block markers, or nothing.
-    private nonisolated(unsafe) static let bareMarkers = /\s*(?:(?:>|#{1,6}|[-*+]|\d{1,9}[.)])\s*)*(?:\[[ xX]\]\s*)?/
 
     /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
     static func fitted(_ name: String, room: Int = 0) -> String {

@@ -40,7 +40,7 @@ nonisolated enum NoteFrontMatter: Equatable, Sendable {
 nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
     let id: UUID
     let file: NoteFile
-    /// The source file path, relative to the notes folder; drafts have none.
+    /// The source file path, relative to the notes folder; nil for a projection made without a file.
     let filePath: String?
     let frontMatter: NoteFrontMatter
     let title: String

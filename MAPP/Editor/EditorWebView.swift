@@ -58,7 +58,7 @@ final class EditorWebView: WKWebView {
 
     override var undoManager: UndoManager? { pageUndoManager }
 
-    /// The window's undo manager, which holds the app's actions such as New Note and Delete.
+    /// The window's undo manager, which holds the app's actions such as New Item and Delete.
     private var windowUndoManager: UndoManager? { window?.undoManager }
 
     // The page's history comes first, as a text view's does; once it is spent, Undo reaches the window's.

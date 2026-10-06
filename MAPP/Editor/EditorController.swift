@@ -134,7 +134,7 @@ final class EditorController: NSObject {
         markdown = note.body
         isEditable = !note.isDeleted
         guard isReady else { return }
-        call("setImageBase", json(library?.directory(of: note) ?? note.directory))
+        call("setImageBase", json(note.directory))
         generation += 1
         // A late report belongs to one of the last few loads, however quickly outside changes came in.
         notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
@@ -428,7 +428,7 @@ final class EditorController: NSObject {
             applyStyle()
             call("setHeaderHeight", String(Double(headerHeight)))
             if let noteID {
-                if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? note.directory)) }
+                if let note = library?.note(noteID) { call("setImageBase", json(note.directory)) }
                 generation += 1
                 notesByGeneration[generation] = noteID
                 call("load", json(markdown), String(generation), String(isEditable))
