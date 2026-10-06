@@ -9,8 +9,18 @@ nonisolated struct ItemID: RawRepresentable, Hashable, Codable, Sendable {
     init(rawValue: String) { self.rawValue = rawValue }
     init(_ rawValue: String) { self.rawValue = rawValue }
 
-    /// The app names an item before its source answers, and Marfa keeps an id its client mints.
-    static func mint() -> ItemID { ItemID(UUID().uuidString.lowercased()) }
+    /// The app names an item before its source answers, and Marfa keeps an id its client mints, if it is a
+    /// lowercase UUIDv7: the time in milliseconds, then randomness.
+    static func mint(at date: Date = .now) -> ItemID {
+        var bytes = UUID().uuid
+        let milliseconds = UInt64(max(0, date.timeIntervalSince1970 * 1000))
+        withUnsafeMutableBytes(of: &bytes) { raw in
+            for index in 0..<6 { raw[index] = UInt8(truncatingIfNeeded: milliseconds >> (8 * (5 - UInt64(index)))) }
+            raw[6] = raw[6] & 0x0F | 0x70
+            raw[8] = raw[8] & 0x3F | 0x80
+        }
+        return ItemID(UUID(uuid: bytes).uuidString.lowercased())
+    }
 }
 
 nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
