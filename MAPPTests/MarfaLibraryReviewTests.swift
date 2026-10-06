@@ -77,6 +77,19 @@ import Testing
         #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
     }
 
+    /// Choosing one item in place of another on a field that holds many adds the new link first and removes the old
+    /// one only once the new one is taken, so a refusal never leaves the field with neither.
+    @Test func aRefusedLinkInAReplacementKeepsTheOldLink() async throws {
+        let (library, source) = try await loaded()
+        #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
+        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
+        let link = try #require(source.submitted.last?.id)
+        source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
+        #expect(await eventually { library.failure != nil })
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
+    }
+
     /// A search that fails is not shown as a search that found nothing.
     @Test func aSearchThatFailsIsNotNothingFound() async throws {
         let source = FailingSearchSource()

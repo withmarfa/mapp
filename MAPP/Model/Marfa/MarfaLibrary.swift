@@ -50,6 +50,9 @@ import Observation
     /// Items the person has saved text to since the library last gave out text it read from the copy. Only the
     /// first save after that read is merged against what was read; the rest are laid over the person's own.
     @ObservationIgnored private var savedSinceRead: Set<ItemID> = []
+    /// Links removed only once the source has taken the links added in their place, by the link writes awaited.
+    @ObservationIgnored private var replacements: [UUID: Replacement] = [:]
+    @ObservationIgnored private var replacing: [WriteID: UUID] = [:]
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
@@ -67,6 +70,11 @@ import Observation
         var title: String
         /// Said instead of the source's words when the copy no longer holds the item.
         var notHeld: String?
+    }
+
+    private nonisolated struct Replacement {
+        var awaiting: Set<WriteID>
+        var unlinks: [EdgeDraft]
     }
 
     private nonisolated struct Search {
@@ -247,6 +255,7 @@ import Observation
             let message = problem.code == Self.notHeldCode ? refusal.notHeld ?? problem.message : problem.message
             failure = (refusal.title, message ?? String(localized: "The Marfa server refused this change."))
         }
+        settleReplacement(id, outcome)
         guard let item = textWrites.removeValue(forKey: id) else { return }
         unsettledText[item]?.remove(id)
         guard unsettledText[item]?.isEmpty == true else { return }
@@ -257,8 +266,33 @@ import Observation
 
     // MARK: Writing through the source
 
+    func awaitLinks(_ links: Set<WriteID>, thenUnlink unlinks: [EdgeDraft]) {
+        let group = UUID()
+        replacements[group] = Replacement(awaiting: links, unlinks: unlinks)
+        for link in links { replacing[link] = group }
+    }
+
+    /// A link refused or held drops the removal, which leaves the old link beside any new one taken.
+    private func settleReplacement(_ id: WriteID, _ outcome: WriteOutcome) {
+        guard let group = replacing.removeValue(forKey: id), var replacement = replacements[group] else { return }
+        switch outcome {
+        case .accepted, .merged:
+            replacement.awaiting.remove(id)
+            guard replacement.awaiting.isEmpty else {
+                replacements[group] = replacement
+                return
+            }
+            replacements[group] = nil
+            unlink(replacement.unlinks)
+        case .conflicted, .refused, .blocked, .dead:
+            replacements[group] = nil
+            for link in replacement.awaiting { replacing[link] = nil }
+        }
+    }
+
     /// The package's code for an item the copy does not hold.
     static let notHeldCode = "item_not_found"
+
 
     /// Every write the library makes goes through here, so a refusal reaches the person under `title`.
     @discardableResult

@@ -224,16 +224,28 @@ extension MarfaLibrary {
         return true
     }
 
+    /// Where links are both added and removed, as when one item is chosen in place of another, the new links go
+    /// first and the old ones are removed only once the source has taken every new one, so a refusal leaves the
+    /// field as it was rather than with the old link gone and the new one missing.
     private func relink(adding: [EdgeDraft], removing: [EdgeDraft], name: String, undoManager: UndoManager?) {
         let title = String(localized: "Can’t Change This Relationship")
-        for draft in removing {
+        let links = adding.map { submit(.link($0, undoing: nil), failing: title) }
+        if links.isEmpty {
+            unlink(removing)
+        } else if !removing.isEmpty {
+            awaitLinks(Set(links), thenUnlink: removing)
+        }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.relink(adding: removing, removing: adding, name: name, undoManager: undoManager)
+        }
+    }
+
+    func unlink(_ drafts: [EdgeDraft]) {
+        let title = String(localized: "Can’t Change This Relationship")
+        for draft in drafts {
             if let link = index.link(type: draft.type, source: draft.source, target: draft.target) {
                 submit(.unlink(link.id), failing: title)
             }
-        }
-        for draft in adding { submit(.link(draft, undoing: nil), failing: title) }
-        registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.relink(adding: removing, removing: adding, name: name, undoManager: undoManager)
         }
     }
 }

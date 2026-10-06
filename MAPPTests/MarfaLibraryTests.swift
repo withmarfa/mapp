@@ -526,7 +526,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // A field that holds many adds and removes in one change.
         source.clearWrites()
         #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
-        #expect(source.writes == [.unlink(EdgeID("a1")), .link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
+        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
+        // The old link goes once the source has taken the new one.
+        source.send(.answered(try #require(source.submitted.last?.id), .accepted))
+        #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
     }
 
     @Test func anItemPointedAtOnlyOnceKeepsItsOne() async throws {
