@@ -805,6 +805,36 @@
     },
     "Discard Changes": {
       "extractionState": "manual"
+    },
+    "All Items": {
+      "extractionState": "manual"
+    },
+    "There’s no key for this Marfa server.": {
+      "extractionState": "manual"
+    },
+    "This change can’t be made in a Marfa library yet.": {
+      "extractionState": "manual"
+    },
+    "This item has no file.": {
+      "extractionState": "manual"
+    },
+    "This item isn’t in the library.": {
+      "extractionState": "manual"
+    },
+    "This kind of item has no text to edit.": {
+      "extractionState": "manual"
+    },
+    "This library is already open in MAPP or another app.": {
+      "extractionState": "manual"
+    },
+    "The item was made, but it couldn’t be put under its parent: %@": {
+      "extractionState": "manual"
+    },
+    "This library is being brought up to date. Try again in a moment.": {
+      "extractionState": "manual"
+    },
+    "The Marfa server refused this library’s key. Check the key in Settings.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

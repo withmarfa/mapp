@@ -171,3 +171,19 @@ struct ItemLayerTests {
         #expect(WriteOutcome.dead.syncState == .blocked(SyncProblem(code: "dead")))
     }
 }
+
+struct ItemIDTests {
+    @Test func aMintedIDIsALowercaseUUIDv7InTimeOrder() throws {
+        let early = ItemID.mint(at: Date(timeIntervalSince1970: 1_791_247_942.021))
+        let late = ItemID.mint(at: Date(timeIntervalSince1970: 1_791_247_943))
+        let text = early.rawValue
+        #expect(text == text.lowercased())
+        #expect(UUID(uuidString: text) != nil)
+        let characters = Array(text)
+        #expect(characters[14] == "7")
+        #expect("89ab".contains(characters[19]))
+        #expect(text.hasPrefix("01a10eb2-8185-7"))
+        #expect(early.rawValue < late.rawValue)
+        #expect(ItemID.mint() != ItemID.mint())
+    }
+}
