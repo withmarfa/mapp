@@ -253,12 +253,12 @@ nonisolated enum MarfaMapping {
         }
     }
 
-    /// Each item the queue holds a write for, or that a drain answered `conflicted` (which the queue forgets),
-    /// with what most needs the person: a stopped write, then a refused one, then a conflict, then the count
-    /// still waiting. An item missing from the answer is settled.
-    static func syncStates(queue: [Marfa.QueuedWrite], conflicts: [ItemID: SyncState] = [:]) -> [ItemID: SyncState] {
+    /// Each item the queue holds a write for, or that a drain answered `refused` or `conflicted` (which the queue
+    /// forgets unless the write carried content), with what most needs the person: a stopped write, then a refused
+    /// one, then a conflict, then the count still waiting. An item missing from the answer is settled.
+    static func syncStates(queue: [Marfa.QueuedWrite], remembered: [ItemID: SyncState] = [:]) -> [ItemID: SyncState] {
         var waiting: [ItemID: Int] = [:]
-        var answered: [ItemID: SyncState] = conflicts
+        var answered: [ItemID: SyncState] = remembered
         for write in queue {
             guard let itemID = write.itemId else { continue }
             let id = ItemID(itemID)

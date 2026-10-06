@@ -209,7 +209,7 @@ struct MarfaMappingTests {
             Self.write("8", on: "e", .blocked(reason: .awaitingDependency))
         ]
         let conflict = SyncState.conflicted(sibling: ItemID("copy"), fields: ["body"])
-        let states = MarfaMapping.syncStates(queue: queue, conflicts: [ItemID("f"): conflict])
+        let states = MarfaMapping.syncStates(queue: queue, remembered: [ItemID("f"): conflict])
         #expect(states[ItemID("a")] == .waiting(writes: 2))
         #expect(states[ItemID("b")] == .refused(SyncProblem(code: "type_not_permitted")))
         #expect(states[ItemID("c")] == nil)

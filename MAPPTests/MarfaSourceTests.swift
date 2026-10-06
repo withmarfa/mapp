@@ -97,8 +97,10 @@ struct MarfaSourceOfflineTests {
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
 
         let write = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST offline", body: "Kept")), as: write)
+        let id = ItemID.mint()
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST offline", body: "Kept")), as: write)
         let queued = try #require(await log.wait { $0.item(titled: "MAPPTEST offline") != nil })
+        #expect(queued.item(titled: "MAPPTEST offline")?.id == id)
         #expect(queued.item(titled: "MAPPTEST offline")?.sync == .waiting(writes: 1))
         #expect(queued.answer(to: write) == nil)
         await source.flush()
@@ -120,12 +122,113 @@ struct MarfaSourceOfflineTests {
             _ = try await MarfaSource.open(connection, keys: MemoryKeyStore(), location: try MarfaStoreLocation(root: scratch()))
         }
     }
+
+    private func open(_ root: URL, at address: String = "http://127.0.0.1:9") async throws -> MarfaSource {
+        let connection = try MarfaConnection(address: address)
+        return try await MarfaSource.open(
+            connection, keys: MemoryKeyStore([connection: "unused"]), location: try MarfaStoreLocation(root: root))
+    }
+
+    /// An address nothing answers holds a connection open until it times out, which must not hold up a write.
+    @Test(.timeLimit(.minutes(3)))
+    func aWriteIsQueuedAtOnceWhileTheServerHangs() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root, at: "http://10.255.255.1:8210")
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        source.refresh()
+        try await Task.sleep(for: .milliseconds(200))
+        let clock = ContinuousClock()
+        let start = clock.now
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST hanging", body: "Queued")), as: WriteID())
+        let shown = await log.wait(for: .seconds(2)) { $0.item(titled: "MAPPTEST hanging") != nil }
+        #expect(shown != nil, "the write waited \(clock.now - start) behind the network")
+        #expect(source.connectionState == .connecting)
+        await source.close()
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aSecondOpenerOfTheSameCopyIsRefused() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = try await open(root)
+        await #expect(throws: SourceFailure.self) { _ = try await open(root) }
+        await first.close()
+        let again = try await open(root)
+        await again.close()
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aBodyForATypeWithoutABodyFieldIsRefused() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        let painted = try #require(await log.wait { $0.snapshot != nil })
+        let entity = try #require(painted.snapshot?.catalogue.itemTypes[TypeID("core.entity")])
+        #expect(entity.bodyField == nil)
+        let write = WriteID()
+        source.submit(.create(id: .mint(), ItemDraft(type: entity.id, title: "Ada", body: "Typed text")), as: write)
+        let answered = try #require(await log.wait { $0.answer(to: write) != nil })
+        #expect(answered.answer(to: write) == .refused(SyncProblem(code: "unsupported", message: MarfaEngine.noText)))
+        #expect(try await source.copy.queue.all().isEmpty)
+        await source.close()
+    }
+
+    /// The child is queued and answered as itself; a parent link that cannot be made is told on its own.
+    @Test(.timeLimit(.minutes(1)))
+    func aCreateIsKeptWhateverBecomesOfItsParentLink() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let write = WriteID()
+        let child = ItemID.mint()
+        source.submit(
+            .create(id: child, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST child", body: "Queued", parent: ItemID("not-an-item"))),
+            as: write)
+        let queued = try #require(await log.wait { $0.item(titled: "MAPPTEST child") != nil })
+        #expect(queued.item(titled: "MAPPTEST child")?.id == child)
+        #expect(queued.answer(to: write) == nil)
+        let creates = try await source.copy.queue.all().filter { $0.kind == .createItem }
+        #expect(creates.map(\.itemId) == [child.rawValue])
+        await source.close()
+    }
+
+    /// A read that fails says so and keeps what was shown, rather than emptying the library or settling it.
+    @Test(.timeLimit(.minutes(1)))
+    func aReadThatFailsKeepsWhatWasShown() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Queued")), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
+
+        await source.copy.close()
+        source.events.yield(.change(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil)))
+        let failed = try #require(await log.wait { state in
+            state.changes.contains { if case .unavailable = $0 { true } else { false } }
+        })
+        #expect(failed.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1))
+        await source.close()
+    }
+
+    @Test func aRetryWaitsLongerAfterEachFailureUpToFiveMinutes() {
+        #expect(MarfaSync.delay(after: 1) == .seconds(5))
+        #expect(MarfaSync.delay(after: 2) == .seconds(10))
+        #expect(MarfaSync.delay(after: 7) == .seconds(300))
+        #expect(MarfaSync.delay(after: 100) == .seconds(300))
+    }
 }
 
 /// Runs against the test instance only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY` are in the environment
 /// (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and `TEST_RUNNER_MARFA_TEST_MAPP_KEY`). Every item it
-/// makes has a title starting `MAPPTEST ` and the tag `mapptest`, and is put in the bin before the test ends. It
-/// stays in the server's bin, since the package cannot purge yet.
+/// makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
+/// `items.purge`, since the package cannot purge yet.
 @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
 struct MarfaSourceLiveTests {
     private static let note = TypeID("core.note")
@@ -135,6 +238,30 @@ struct MarfaSourceLiveTests {
         return try await MarfaSource.open(
             connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
             location: try MarfaStoreLocation(root: root))
+    }
+
+    /// Runs `body` with a fresh copy, already refreshed, and purges every id it mints, however it ends.
+    private func withSource(
+        _ body: (MarfaSource, ChangeLog, LiveMarfa.Made) async throws -> Void
+    ) async throws {
+        let root = scratch()
+        let made = LiveMarfa.Made()
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        do {
+            source.refresh()
+            #expect(await waitForConnection(source) { $0 == .online })
+            _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
+            try await body(source, log, made)
+        } catch {
+            await source.close()
+            await LiveMarfa.purge(made.ids)
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+        await source.close()
+        await LiveMarfa.purge(made.ids)
+        try? FileManager.default.removeItem(at: root)
     }
 
     @Test(.timeLimit(.minutes(2)))
@@ -190,92 +317,126 @@ struct MarfaSourceLiveTests {
 
     @Test(.timeLimit(.minutes(2)))
     func favoritesEditsArchivesAndBinsItsOwnItem() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root)
-        let log = ChangeLog(source)
-        source.refresh()
-        #expect(await waitForConnection(source) { $0 == .online })
-        _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
+        try await withSource { source, log, made in
+            let title = "MAPPTEST favorite \(UUID().uuidString.prefix(8))"
+            let created = WriteID()
+            let id = made.mint()
+            source.submit(
+                .create(id: id, ItemDraft(type: Self.note, title: title, body: "Made by the MAPP tests.", tags: ["mapptest"])),
+                as: created)
+            let answered = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
+            #expect(answered.answer(to: created) == .accepted)
+            let item = try #require(answered.item(titled: title))
+            #expect(item.id == id)
+            #expect(item.tags == ["mapptest"])
+            #expect(item.properties.map(\.key) == ["title"])
 
-        let title = "MAPPTEST favorite \(UUID().uuidString.prefix(8))"
-        let created = WriteID()
-        source.submit(
-            .create(id: .mint(), ItemDraft(type: Self.note, title: title, body: "Made by the MAPP tests.", tags: ["mapptest"])),
-            as: created)
-        let made = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
-        #expect(made.answer(to: created) == .accepted)
-        let item = try #require(made.item(titled: title))
-        #expect(item.tags == ["mapptest"])
-        #expect(item.properties.map(\.key) == ["title"])
+            func apply(_ write: ItemWrite) async throws -> ChangeLog.State {
+                let id = WriteID()
+                source.submit(write, as: id)
+                let answered = try #require(await log.wait { $0.answer(to: id) != nil })
+                #expect(answered.answer(to: id) == .accepted, "\(write)")
+                return try #require(await log.wait { $0.item(titled: title)?.sync == .settled })
+            }
 
-        func apply(_ write: ItemWrite) async throws -> ChangeLog.State {
-            let id = WriteID()
-            source.submit(write, as: id)
-            let answered = try #require(await log.wait { $0.answer(to: id) != nil })
-            #expect(answered.answer(to: id) == .accepted, "\(write)")
-            return try #require(await log.wait { $0.item(titled: title)?.sync == .settled })
+            var state = try await apply(.tag(item.id, ItemTag.favorite, on: true))
+            #expect(state.item(titled: title)?.isFavorite == true)
+            let favorites = try #require(state.snapshot?.places.first { $0.id == .favorites }?.query)
+            let favorite = try #require(state.item(titled: title))
+            #expect(favorites.matches(favorite, catalogue: try #require(state.snapshot?.catalogue)))
+
+            state = try await apply(.editBody(item.id, "Edited by the MAPP tests.", base: favorite.version, merge: .ifUnchanged))
+            #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")
+
+            state = try await apply(.tag(item.id, ItemTag.favorite, on: false))
+            #expect(state.item(titled: title)?.isFavorite == false)
+
+            state = try await apply(.transition(item.id, .archived))
+            #expect(state.item(titled: title)?.state == .archived)
+            state = try await apply(.transition(item.id, .active))
+            #expect(state.item(titled: title)?.state == .active)
+
+            let unsupported = WriteID()
+            source.submit(.retype(item.id, TypeID("core.task"), base: item.version), as: unsupported)
+            let refused = try #require(await log.wait { $0.answer(to: unsupported) != nil })
+            guard case .refused(let problem) = refused.answer(to: unsupported) else {
+                Issue.record("a retype was not refused")
+                return
+            }
+            #expect(problem.code == "unsupported")
+
+            // Marfa cannot list or restore the bin once the delete is sent, so the item leaves the copy.
+            let binned = WriteID()
+            source.submit(.transition(item.id, .trashed), as: binned)
+            let gone = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title) == nil })
+            #expect(gone.answer(to: binned) == .accepted)
         }
+    }
 
-        var state = try await apply(.tag(item.id, ItemTag.favorite, on: true))
-        #expect(state.item(titled: title)?.isFavorite == true)
-        let favorites = try #require(state.snapshot?.places.first { $0.id == .favorites }?.query)
-        let favorite = try #require(state.item(titled: title))
-        #expect(favorites.matches(favorite, catalogue: try #require(state.snapshot?.catalogue)))
+    /// An editor that read the item before another device's edit arrived saves twice from that read: the first is
+    /// merged against what it read, and the second follows the first rather than conflicting with it.
+    @Test(.timeLimit(.minutes(2)))
+    func editsReadBeforeAnotherDevicesEditAreMerged() async throws {
+        try await withSource { source, log, made in
+            let title = "MAPPTEST as read \(UUID().uuidString.prefix(8))"
+            let id = made.mint()
+            let created = WriteID()
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: title, body: "One")), as: created)
+            let read = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
+            let version = try #require(read.item(titled: title)?.version)
 
-        state = try await apply(.editBody(item.id, "Edited by the MAPP tests.", base: favorite.version, merge: .ifUnchanged))
-        #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")
+            let otherRoot = scratch()
+            defer { try? FileManager.default.removeItem(at: otherRoot) }
+            try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
+            let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
+            let key = try #require(LiveMarfa.key)
+            let other = try await WorkingCopy.open(
+                store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
+            _ = try await other.hydrate(types: ["core.*"], tier: .library)
+            let row = try #require(try await other.items.get(id.rawValue))
+            _ = try await other.items.update(id.rawValue, Edit(properties: ["description": "From another device"], baseVersion: row.version))
+            _ = try await other.queue.drain()
+            await other.close()
+            _ = try #require(await log.wait { ($0.item(titled: title)?.version ?? version) > version })
 
-        state = try await apply(.tag(item.id, ItemTag.favorite, on: false))
-        #expect(state.item(titled: title)?.isFavorite == false)
-
-        state = try await apply(.transition(item.id, .archived))
-        #expect(state.item(titled: title)?.state == .archived)
-        state = try await apply(.transition(item.id, .active))
-        #expect(state.item(titled: title)?.state == .active)
-
-        let unsupported = WriteID()
-        source.submit(.retype(item.id, TypeID("core.task"), base: item.version), as: unsupported)
-        let refused = try #require(await log.wait { $0.answer(to: unsupported) != nil })
-        guard case .refused(let problem) = refused.answer(to: unsupported) else {
-            Issue.record("a retype was not refused")
-            return
+            let first = WriteID(), second = WriteID()
+            source.submit(.editBody(id, "Two", base: version, merge: .asRead), as: first)
+            source.submit(.editBody(id, "Three", base: version, merge: .asRead), as: second)
+            let answered = try #require(await log.wait {
+                $0.answer(to: first) != nil && $0.answer(to: second) != nil && $0.item(titled: title)?.sync == .settled
+            })
+            for write in [first, second] {
+                switch answered.answer(to: write) {
+                case .accepted, .merged: break
+                case let other: Issue.record("an edit read earlier was answered \(String(describing: other))")
+                }
+            }
+            #expect(try await source.body(of: id).text == "Three")
+            #expect(answered.item(titled: title)?.value(of: "description") == .string("From another device"))
+            source.submit(.transition(id, .trashed), as: WriteID())
+            await source.flush()
         }
-        #expect(problem.code == "unsupported")
-
-        // Marfa cannot list or restore the bin once the delete is sent, so the item leaves the copy.
-        let binned = WriteID()
-        source.submit(.transition(item.id, .trashed), as: binned)
-        let gone = try #require(await log.wait { $0.answer(to: binned) != nil && $0.item(titled: title) == nil })
-        #expect(gone.answer(to: binned) == .accepted)
-        await source.close()
     }
 
     @Test(.timeLimit(.minutes(1)))
     func aRefusedWriteIsReportedAndKept() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root)
-        let log = ChangeLog(source)
-        source.refresh()
-        #expect(await waitForConnection(source) { $0 == .online })
-
-        // The server makes no items of its own reserved types, so this is refused and nothing is made.
-        let write = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST refused")), as: write)
-        let answered = try #require(await log.wait { $0.answer(to: write) != nil })
-        guard case .refused(let problem) = answered.answer(to: write) else {
-            Issue.record("the create was not refused: \(String(describing: answered.answer(to: write)))")
-            return
+        try await withSource { source, log, made in
+            // The server makes no items of its own reserved types, so this is refused and nothing is made.
+            let write = WriteID()
+            source.submit(.create(id: made.mint(), ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST refused")), as: write)
+            let answered = try #require(await log.wait { $0.answer(to: write) != nil })
+            guard case .refused(let problem) = answered.answer(to: write) else {
+                Issue.record("the create was not refused: \(String(describing: answered.answer(to: write)))")
+                return
+            }
+            #expect(problem.code == "type_not_permitted")
+            let held = try await source.copy.queue.all().filter { write in
+                if case .refused = write.verdict { write.kind == .createItem } else { false }
+            }
+            #expect(held.count == 1)
+            #expect(held.first?.body.isEmpty == false)
+            for write in held { _ = try await source.copy.queue.discard(write.id) }
         }
-        #expect(problem.code == "type_not_permitted")
-        let held = try await source.copy.queue.all().filter { write in
-            if case .refused = write.verdict { write.kind == .createItem } else { false }
-        }
-        #expect(held.count == 1)
-        #expect(held.first?.body.isEmpty == false)
-        for write in held { _ = try await source.copy.queue.discard(write.id) }
-        await source.close()
     }
 }
 
@@ -283,4 +444,34 @@ nonisolated enum LiveMarfa {
     static var address: String? { ProcessInfo.processInfo.environment["MARFA_TEST_URL"].flatMap { $0.isEmpty ? nil : $0 } }
     static var key: String? { ProcessInfo.processInfo.environment["MARFA_TEST_MAPP_KEY"].flatMap { $0.isEmpty ? nil : $0 } }
     static var isConfigured: Bool { address != nil && key != nil }
+
+    /// The ids a test minted, each of which is purged when it ends.
+    final class Made: Sendable {
+        private let minted = Mutex<[ItemID]>([])
+
+        var ids: [ItemID] { minted.withLock { $0 } }
+
+        func mint() -> ItemID {
+            let id = ItemID.mint()
+            minted.withLock { $0.append(id) }
+            return id
+        }
+    }
+
+    /// Bins and then purges each item over HTTP. An item never made answers 404, which is fine.
+    static func purge(_ ids: [ItemID]) async {
+        guard let address, let key, let base = URL(string: address) else { return }
+        for id in ids {
+            for (method, path) in [("DELETE", "items/\(id.rawValue)"), ("POST", "items/\(id.rawValue)/purge")] {
+                var request = URLRequest(url: base.appending(path: path))
+                request.httpMethod = method
+                request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+                let status = (try? await URLSession.shared.data(for: request))
+                    .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+                if method == "POST", let status, ![200, 204, 404].contains(status) {
+                    Issue.record("purging a test item answered \(status)")
+                }
+            }
+        }
+    }
 }

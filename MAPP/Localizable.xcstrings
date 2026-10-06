@@ -823,6 +823,12 @@
     },
     "This kind of item has no text to edit.": {
       "extractionState": "manual"
+    },
+    "This library is already open in MAPP or another app.": {
+      "extractionState": "manual"
+    },
+    "The item was made, but it couldn’t be put under its parent: %@": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
