@@ -673,10 +673,18 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.message == "The copy can’t be read.")
     }
 
-    @Test func finishingFlushesTheSource() async throws {
+    /// Finishing waits until the source has queued every write, and not for the server, so quitting offline is
+    /// not held up and quitting at once loses nothing.
+    @Test func finishingWaitsUntilTheSourceHasQueuedEveryWriteButNotForTheServer() async throws {
         let (library, source) = try await loaded()
-        library.finish()
-        #expect(await eventually { source.flushes.withLock { $0 } == 1 })
+        source.queuing.withLock { $0 = true }
+        let finished = Task { await library.finish() }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(source.queues.withLock { $0 } == 0, "finishing returned before the source had queued its writes")
+        source.queuing.withLock { $0 = false }
+        await finished.value
+        #expect(source.queues.withLock { $0 } == 1)
+        #expect(source.flushes.withLock { $0 } == 0, "finishing never waits on the network")
     }
 }
 
@@ -905,5 +913,64 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(attachments.targets.map(\.itemID) == [F.f1])
         let attachedTo = try #require(library.relationships(for: F.f1).first { $0.field == "attached-to" })
         #expect(attachedTo.targets.map(\.itemID) == [F.n1])
+    }
+}
+
+/// The connect review's findings for the Marfa library, each failing on the code before its fix.
+@MainActor
+@Suite struct MarfaLibraryConnectReviewTests {
+    /// A create refused before it was queued, as one made while the copy is brought up to date, has no problem in
+    /// the queue to show; the library says so, and the window's draft is given back to edit and send again.
+    @Test func aCreateRefusedBeforeItIsQueuedGivesTheDraftBackAndSaysWhy() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        browser.startItemDraft()
+        browser.itemDraft?.title = "Trip"
+        browser.itemDraft?.body = "Book the hotel"
+        let id = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(browser.isAwaitingCreation)
+
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: "hydration_incomplete", message: MarfaEngine.notCurrent))))
+        #expect(await eventually { library.wasRefused(creating: id) })
+        #expect(browser.isCreationSettled(in: library))
+        browser.finishCreation(in: library)
+
+        #expect(!browser.isAwaitingCreation, "the draft can be edited and sent again")
+        #expect(browser.isCreatingItem)
+        #expect(browser.itemDraft?.title == "Trip")
+        #expect(browser.itemDraft?.body == "Book the hotel")
+        #expect(library.failure?.title == "Can’t Create Item")
+        #expect(library.failure?.message == MarfaEngine.notCurrent)
+
+        let again = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(again != id, "a second Return sends the draft again rather than naming the refused item")
+    }
+
+    /// A refused create whose draft was carried to another library is kept there, since no queue holds its text.
+    @Test func aRefusedCreateIsCarriedToTheNextLibrary() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        browser.startItemDraft()
+        browser.itemDraft?.title = "Trip"
+        _ = try #require(browser.createDraft(in: library, undoManager: nil))
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: "invalid", message: "No."))))
+        #expect(await eventually { library.failure != nil })
+
+        browser.adopt(FakeItemLibrary())
+        #expect(browser.itemDraft?.title == "Trip")
+        #expect(browser.isCreatingItem)
+    }
+
+    /// A write made after the source closed is kept nowhere, so the person is told rather than left to find it gone.
+    @Test func aWriteMadeAfterTheSourceClosedSaysItWasNotKept() async throws {
+        let (library, source) = try await loaded()
+        await source.close()
+        library.setFavorite([LibraryFixture.n1], false, undoManager: nil)
+        #expect(library.failure?.message == MarfaEngine.notKept)
+        #expect(source.submitted.isEmpty)
     }
 }

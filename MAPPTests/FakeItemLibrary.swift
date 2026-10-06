@@ -142,7 +142,10 @@ final class FakeItemLibrary: ItemLibrary {
 
     func leave(_ id: ItemID) {}
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
+    /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
+    var refusedCreations: Set<ItemID> = []
     func finish() {}
+    func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool { false }
 

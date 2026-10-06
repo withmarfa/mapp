@@ -56,6 +56,11 @@ import Observation
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
+    /// The item each create names, until the source answers it.
+    @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
+    /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
+    /// so the draft it came from is the person's to send again.
+    private(set) var refusedCreations: Set<ItemID> = []
 
     /// A place's order changes only with what it holds, so a change to one item maps the items again without
     /// sorting them.
@@ -252,6 +257,9 @@ import Observation
         if case .refused(let problem) = outcome, let refusal {
             failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
         }
+        if let created = creating.removeValue(forKey: id), case .refused = outcome, records[created] == nil {
+            refusedCreations.insert(created)
+        }
         settleReplacement(id, outcome)
         guard let item = textWrites.removeValue(forKey: id) else { return }
         unsettledText[item]?.remove(id)
@@ -287,13 +295,23 @@ import Observation
         }
     }
 
-    /// Every write the library makes goes through here, so a refusal reaches the person under `title`.
+    /// Every write the library makes goes through here, so a refusal reaches the person under `title`, as does
+    /// a write made after the source closed, which nothing keeps.
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
         refusals[id] = Refusal(title: title)
-        source.submit(write, as: id)
+        if !source.submit(write, as: id) {
+            refusals[id] = nil
+            failure = (title, MarfaEngine.notKept)
+        }
         return id
+    }
+
+    /// A create is followed to its answer, so one refused before the source holds the item gives its draft back.
+    func submitCreate(_ id: ItemID, _ draft: ItemDraft, failing title: String) {
+        let write = submit(.create(id: id, draft), failing: title)
+        if refusals[write] != nil { creating[write] = id } else { refusedCreations.insert(id) }
     }
 
     /// The person's text, typed on the text the library gave at `readAt`. The first save typed on a version is

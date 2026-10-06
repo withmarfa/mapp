@@ -85,12 +85,40 @@ import Observation
         return library
     }
 
-    /// Hands every open page's last edit to the library it came from, and the library's writes on. Run before
-    /// anything changes which library the windows read.
+    /// Hands every open page's last edit to the library it came from, and returns once each library keeps its
+    /// writes on this Mac, never waiting on a server. Run before anything changes which library the windows read,
+    /// and before quitting.
     func flushEditors() async {
         await Self.flush()
         folder.library?.finish()
-        marfaLibrary?.finish()
+        await marfaLibrary?.finish()
+    }
+
+    /// As `flushEditors`, for quitting: waits at most `limit`, so a library that cannot finish never keeps the app
+    /// from quitting. False where it did not finish in time.
+    func flushEditors(within limit: Duration) async -> Bool {
+        let first = FirstOf()
+        return await withCheckedContinuation { continuation in
+            Task {
+                await flushEditors()
+                first.resume(continuation, with: true)
+            }
+            Task {
+                try? await Task.sleep(for: limit)
+                first.resume(continuation, with: false)
+            }
+        }
+    }
+
+    /// Resumes once, with whichever answer comes first.
+    private final class FirstOf {
+        private var done = false
+
+        func resume(_ continuation: CheckedContinuation<Bool, Never>, with value: Bool) {
+            guard !done else { return }
+            done = true
+            continuation.resume(returning: value)
+        }
     }
 
     /// The pages first, since an edit still in a page reaches a library only by being handed over.

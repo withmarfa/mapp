@@ -61,11 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await libraries.launch() }
     }
 
-    /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
-    /// get their files, and the store finishes writing, before the app goes.
+    /// Nothing typed is lost to quitting: each page hands over its last edit and each library keeps its writes on
+    /// this Mac, the folder's on disk and a server's in its copy's queue, before the app goes. The server is not
+    /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        EditorController.flushAll { [libraries] in
-            libraries.current?.finish()
+        Task { [libraries] in
+            _ = await libraries.flushEditors(within: .seconds(5))
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

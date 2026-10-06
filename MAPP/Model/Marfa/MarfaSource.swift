@@ -114,8 +114,10 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         Task { [engine] in await engine.sync.refresh() }
     }
 
-    func submit(_ write: ItemWrite, as id: WriteID) {
-        events.yield(.write(write, id))
+    @discardableResult
+    func submit(_ write: ItemWrite, as id: WriteID) -> Bool {
+        if case .terminated = events.yield(.write(write, id)) { return false }
+        return true
     }
 
     /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
@@ -251,6 +253,14 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     func flush() async {
         await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.flush(continuation)) { continuation.resume() }
+        }
+    }
+
+    /// Returns once every write submitted before it is in the queue, or refused, without waiting on the network,
+    /// so a quit while offline keeps every write and does not wait for a server.
+    func queueSubmitted() async {
+        await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.queued(continuation)) { continuation.resume() }
         }
     }
 

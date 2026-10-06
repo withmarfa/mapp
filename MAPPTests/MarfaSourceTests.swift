@@ -702,3 +702,60 @@ nonisolated enum LiveMarfa {
         }
     }
 }
+
+/// Quitting and closing over a real copy whose server refuses every connection: each test failed on the code
+/// before the connect review's fixes.
+@Suite(.serialized)
+struct MarfaSourceClosingTests {
+    private func open() async throws -> (MarfaSource, MarfaConnection, MemoryKeyStore, MarfaStoreLocation, URL) {
+        let root = scratch()
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        return (source, connection, keys, location, root)
+    }
+
+    /// A write made the moment before quitting is in the queue once `queueSubmitted` returns, which never waits
+    /// for the server, so it is there at the next launch.
+    @Test(.timeLimit(.minutes(1)))
+    func aWriteMadeJustBeforeQuittingIsKept() async throws {
+        let (source, connection, keys, location, root) = try await open()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = ItemID.mint()
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST quit", body: "Typed at once")), as: WriteID())
+        await source.queueSubmitted()
+        await source.close()
+
+        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        let log = ChangeLog(reopened)
+        let painted = try #require(await log.wait { $0.snapshot != nil })
+        let kept = try #require(painted.item(titled: "MAPPTEST quit"))
+        #expect(kept.id == id)
+        #expect(try await reopened.body(of: id).text == "Typed at once")
+        await reopened.close()
+    }
+
+    /// A write that reaches the source after it closed is kept nowhere, and says so rather than vanishing.
+    @Test(.timeLimit(.minutes(1)))
+    func aWriteAfterClosingIsToldItWasNotKept() async throws {
+        let (source, _, _, _, root) = try await open()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+
+        // Closed, with the stream still taking events, as while a close that read the queue is finishing.
+        await withCheckedContinuation { source.events.yield(.close($0)) }
+        let late = WriteID()
+        #expect(source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Late", body: "")), as: late))
+        let told = try #require(await log.wait(for: .seconds(5)) { $0.answer(to: late) != nil })
+        guard case .refused(let problem) = told.answer(to: late) else {
+            Issue.record("a late write was answered \(String(describing: told.answer(to: late)))")
+            return
+        }
+        #expect(problem.message == MarfaEngine.notKept)
+
+        source.events.finish()
+        #expect(!source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Later", body: "")), as: WriteID()))
+    }
+}
