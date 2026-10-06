@@ -65,10 +65,23 @@ struct ItemCollectionTests {
             """)
         let library = await load(notes: [task])
         let item = try #require(library.item(task.id))
-        #expect(item.properties.map(\.key) == ["status", "priority", "alpha", "title", "zeta"])
+        #expect(item.properties.map(\.key) == ["status", "priority", "alpha", "tags", "title", "zeta"])
         #expect(item.value(of: "status") == .string("pending"))
         #expect(item.value(of: "type") == nil, "the type is the item's own")
-        #expect(item.value(of: "tags") == nil, "the tags are the item's own")
+    }
+
+    @Test func theTagsFieldStaysAsWrittenBesideTheTagsMarfaReadsFromIt() async throws {
+        let ordered = note("Ordered.md", "---\ntags: [work, favorite, alpha]\n---\nOrdered\n")
+        let unreadable = note("Unreadable.md", "---\ntags: 5\n---\nUnreadable\n")
+        let object = note("Object.md", "---\ntags:\n  one: two\n---\nObject\n")
+        let library = await load(notes: [ordered, unreadable, object])
+        let item = try #require(library.item(ordered.id))
+        #expect(item.tags == ["work", "favorite", "alpha"])
+        #expect(item.value(of: "tags") == .array([.string("work"), .string("favorite"), .string("alpha")]))
+        let number = try #require(library.item(unreadable.id))
+        #expect(number.tags.isEmpty)
+        #expect(number.value(of: "tags") == .number(5))
+        #expect(library.item(object.id)?.value(of: "tags") == .object(["one": .string("two")]))
     }
 
     @Test func aDeletedNoteIsTrashedAndKeepsWhereItWas() async throws {

@@ -155,13 +155,15 @@ struct ItemInspector: View {
         }
     }
 
-    /// Every property the type does not name or show elsewhere, by key, with the item's tags among them as
-    /// they are written beside the rest.
+    /// Every property the type does not name or show elsewhere, by key. A source that keeps no tags field still
+    /// shows the item's tags among them.
     private var otherProperties: [Property] {
         var shown = Set((type?.fields ?? []).map(\.key) + ["title", "type", "marfa_id", "marfa_version"])
         shown.formUnion(relationships.map(\.field))
         var properties = item.properties.filter { !shown.contains($0.key) }
-        if !item.tags.isEmpty { properties.append(Property(key: "tags", value: .array(item.tags.sorted().map(PropertyValue.string)))) }
+        if !item.tags.isEmpty && item.value(of: "tags") == nil {
+            properties.append(Property(key: "tags", value: .array(item.tags.sorted().map(PropertyValue.string))))
+        }
         return properties.sorted { $0.key < $1.key }
     }
 }
