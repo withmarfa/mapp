@@ -239,16 +239,18 @@ extension NoteLibrary {
         let projection = itemProjection(note)
         let type = TypeID(projection.declaredType ?? "core.note")
         var fields = projection.fields ?? [:]
-        // The item carries these itself.
+        // The item carries its type itself. The tags field stays as written, since Marfa may not read it, and
+        // its order and spelling are the person's.
         fields["type"] = nil
-        fields["tags"] = nil
         let problem: ItemProblem? = if case .invalid(let error) = projection.frontMatter {
             ItemProblem(message: error.message)
         } else {
             nil
         }
         return Item(
-            id: note.id, type: type, title: projection.title,
+            // A note following its first line goes by the line as it is typed, as the list always showed it;
+            // references resolve against the projection's title, which takes the line once the note is left.
+            id: note.id, type: type, title: note.followsFirstLine ? note.title : projection.title,
             titleRule: note.file.title != nil ? .property("title") : .firstLine,
             properties: catalogue.ordered(fields, for: type), preview: note.preview, content: .markdown,
             state: note.isDeleted ? .trashed : .active, tier: .library, container: note.folderID.map(ContainerID.init),
@@ -303,7 +305,7 @@ extension NoteLibrary {
             return current.index
         }
         var keys: [ItemID: (revision: Int64, key: Connections.Key)] = [:]
-        for note in notes where !note.isDeleted { keys[note.id] = (note.revision, Self.key(of: note)) }
+        for note in notes where !note.isDeleted { keys[note.id] = (note.revision, key(of: note)) }
         for file in files { keys[file.id] = (file.revision, Self.key(of: file)) }
         let index = NoteConnectionIndex(records: connectionRecords(), rulesByType: WorkbenchSchema.rulesByType)
         connections = Connections(index: index, generation: (connections?.generation ?? 0) + 1, stamp: contentStamp, keys: keys)
@@ -326,9 +328,9 @@ extension NoteLibrary {
             records += 1
             guard let held = keys[note.id] else { return nil }
             guard held.revision != note.revision else { continue }
-            let key = Self.key(of: note)
-            guard key == held.key else { return nil }
-            keys[note.id] = (note.revision, key)
+            let current = key(of: note)
+            guard current == held.key else { return nil }
+            keys[note.id] = (note.revision, current)
         }
         for file in files {
             records += 1
@@ -341,9 +343,10 @@ extension NoteLibrary {
         return records == keys.count ? keys : nil
     }
 
-    private static func key(of note: Note) -> Connections.Key {
+    /// The title is the one the index names the note by, so a line typed under a `title` property remakes nothing.
+    private func key(of note: Note) -> Connections.Key {
         Connections.Key(
-            title: note.title, path: note.path, frontMatter: note.file.frontMatter,
+            title: itemProjection(note).title, path: note.path, frontMatter: note.file.frontMatter,
             referenceLines: NoteConnectionIndex.referenceLines(in: note.body))
     }
 

@@ -212,9 +212,13 @@ struct ItemCacheTests {
         let kept = note("Plan.md", "---\ntitle: Plan\n---\nPlan\n\nText\n")
         let (library, _, _, _) = makeLibrary(extra: [kept])
         #expect(library.note(kept.id)?.followsFirstLine == true)
+        let generation = try #require(library.connections?.generation)
         library.updateBody(of: kept.id, to: "Plan B\n\nText\n")
-        // What the list shows is what references resolve against, which is the property until the note is left.
-        #expect(library.item(kept.id)?.title == library.note(kept.id).map { NoteProjection(note: $0).title })
+        // The list follows the line as it is typed; references resolve against the property until the note is
+        // left, so typing the line remakes no connections.
+        #expect(library.item(kept.id)?.title == "Plan B")
+        #expect(library.connections?.generation == generation)
+        expectCurrent(library, "typed")
         library.leave(kept.id)
         expectCurrent(library, "left")
         #expect(library.item(kept.id)?.title == "Plan B")
