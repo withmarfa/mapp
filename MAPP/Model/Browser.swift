@@ -27,7 +27,19 @@ final class Browser {
     var searchFocusRequests = 0
     var isCreatingItem = false
     var itemDraft: NewItemDraft?
+    /// The item made from the draft, until the library shows it: a Marfa library answers a create only when its
+    /// source says so, so the draft stays on the page, as typed, until then.
+    private(set) var creation: Creation?
     var isImportingFiles = false
+    /// A file the library had to fetch to show, so the commands that share it have its location too.
+    private(set) var fetchedFile: (id: ItemID, url: URL)?
+    /// The library this window was last shown, so a different one starts the window afresh.
+    @ObservationIgnored private var libraryID: ObjectIdentifier?
+
+    struct Creation: Hashable {
+        let id: ItemID
+        let typeID: String
+    }
 
     nonisolated enum Palette: Hashable {
         case commands, search
@@ -105,8 +117,12 @@ final class Browser {
         focusRequest = .page
     }
 
-    /// Blank titles receive a unique name without requiring a naming dialog before typing.
+    /// Blank titles receive a unique name without requiring a naming dialog before typing. A library that shows
+    /// the new item at once hands over to it here; one that shows it later, as a Marfa library does when its
+    /// source answers, keeps the draft until `finishCreation` finds the item.
     func createDraft(in library: any ItemLibrary, undoManager: UndoManager?) -> ItemID? {
+        // A second Return while the first is awaited makes nothing more.
+        if let creation { return creation.id }
         guard let draft = itemDraft else { return nil }
         var title = NoteName.trimmed(draft.title)
         if title.isEmpty {
@@ -119,16 +135,68 @@ final class Browser {
             }
         }
         guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
+        creation = Creation(id: id, typeID: draft.typeID)
+        finishCreation(in: library)
+        return id
+    }
+
+    /// Hands the window over to the item made from the draft once the library holds it. The draft is kept until
+    /// then, and kept for good if the server refuses the item, whose text the refusal also holds.
+    func finishCreation(in library: any ItemLibrary) {
+        guard let creation else { return }
+        guard library.item(creation.id) != nil else {
+            if library.syncReport.problems.contains(where: { $0.itemID == creation.id }) { self.creation = nil }
+            return
+        }
+        self.creation = nil
         isCreatingItem = false
         itemDraft = nil
         searchText = ""
         isSearchExpanded = false
-        if !library.items(in: item).contains(where: { $0.id == id }) {
-            sidebarItem = .itemType(draft.typeID)
+        if !library.items(in: item).contains(where: { $0.id == creation.id }) {
+            sidebarItem = .itemType(creation.typeID)
         }
-        selection = [id]
+        selection = [creation.id]
         focusRequest = .page
-        return id
+    }
+
+    /// Whether the draft has been sent and is waiting to be shown.
+    var isAwaitingCreation: Bool { creation != nil }
+
+    /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
+    /// it selected, searched or was renaming named items the new library may not have. A draft is kept, since it
+    /// is the person's text, unless it was already sent, when it is in the library's own queue.
+    func adopt(_ library: any ItemLibrary) {
+        let id = ObjectIdentifier(library)
+        guard libraryID != id else { return }
+        let isFirst = libraryID == nil
+        libraryID = id
+        guard !isFirst else { return }
+        selection = []
+        sidebarItem = .allNotes
+        searchText = ""
+        isSearchExpanded = false
+        renamingNote = nil
+        renamingFolder = nil
+        folderToDelete = nil
+        palette = nil
+        fetchedFile = nil
+        types.searchText = ""
+        if creation != nil {
+            creation = nil
+            itemDraft = nil
+            isCreatingItem = false
+        }
+        itemDraft?.adopt(library)
+    }
+
+    func fileFetched(_ id: ItemID, at url: URL?) {
+        fetchedFile = url.map { (id, $0) }
+    }
+
+    /// Where an item's file is, for sharing: the library's own answer, or the file it fetched to show.
+    func fileURL(of id: ItemID, in library: any ItemLibrary) -> URL? {
+        library.fileURL(for: id) ?? fetchedFile.flatMap { $0.id == id ? $0.url : nil }
     }
 
     func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
@@ -240,5 +308,12 @@ final class NewItemDraft {
         self.place = place
         if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
         if case .project(let id) = place { parentID = id }
+    }
+
+    /// A draft carried to another library keeps its text and what the new library can still hold: a parent it
+    /// does not have is dropped, and a kind it does not know gives way to a note.
+    func adopt(_ library: any ItemLibrary) {
+        if let parentID, library.item(parentID) == nil { self.parentID = nil }
+        if library.isLoaded, library.catalogue.itemTypes[TypeID(typeID)] == nil { typeID = "core.note" }
     }
 }

@@ -4,16 +4,18 @@ import SwiftUI
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()
-    private var folder: NotesFolder { delegate.folder }
+    private var libraries: Libraries { delegate.libraries }
 
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
-                .environment(folder)
+                .environment(libraries)
+                .environment(libraries.folder)
+                .environment(libraries.host)
         }
         .defaultSize(width: 1100, height: 720)
         .commands {
-            AppCommands(library: folder.library)
+            AppCommands(library: libraries.current)
             FindCommands()
             FormatCommands()
             ToolbarCommands()
@@ -21,12 +23,16 @@ struct MAPPApp: App {
         }
 
         WindowGroup("Item", for: ItemID.self) { $id in
-            if let library = folder.library {
+            if let library = libraries.current {
                 NoteWindow(library: library, id: $id)
                     .environment(\.library, library)
+            } else if libraries.mode == .opening {
+                // A window restored while the server's copy opens waits for it rather than closing.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // An item's window has nothing to show without a notes folder, as when one is restored before
-                // any is chosen.
+                // An item's window has nothing to show without a library, as when one is restored before a notes
+                // folder is chosen, or after the server's copy could not be opened.
                 ClosingView()
             }
         }
@@ -35,7 +41,7 @@ struct MAPPApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let folder = NotesFolder()
+    let libraries = Libraries.standard()
 
     override init() {
         #if DEBUG
@@ -50,11 +56,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // The saved server's copy opens and paints before the network is asked anything.
+        Task { await libraries.launch() }
+    }
+
     /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
     /// get their files, and the store finishes writing, before the app goes.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        EditorController.flushAll { [folder] in
-            folder.library?.finish()
+        EditorController.flushAll { [libraries] in
+            libraries.current?.finish()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

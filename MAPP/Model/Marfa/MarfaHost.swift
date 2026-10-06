@@ -106,6 +106,12 @@ extension MarfaSource: MarfaHostedSource {}
         self.opener = opener
     }
 
+    /// The server the app is set to read from: the one connected to, or the one saved by an earlier launch before
+    /// its copy is opened, so a window can say it is opening a library rather than show another.
+    var configuredConnection: MarfaConnection? {
+        connection ?? defaults.string(forKey: Self.addressKey).flatMap { try? MarfaConnection(address: $0) }
+    }
+
     /// Writes in the copy that the server has not taken, problems included, as last reported, for showing; nil
     /// where no open copy can say. Leaving a copy asks the copy itself.
     var waitingChanges: Int? {

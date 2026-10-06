@@ -36,6 +36,9 @@ struct MainView: View {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    SyncStatusBar { settings.show(.marfa) }
+                }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } content: {
             Group {
@@ -66,6 +69,7 @@ struct MainView: View {
             Group {
                 if browser.isCreatingItem, let draft = browser.itemDraft {
                     NewItemPage(browser: browser, draft: draft)
+                        .disabled(browser.isAwaitingCreation)
                         .onAppear { editor.close() }
                 } else if browser.showsTypes {
                     TypeDetailView(browser: browser.types)
@@ -140,9 +144,17 @@ struct MainView: View {
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
         }
-        // A window restores what it showed once the folder has been read, since before then nothing is there.
+        // A window restores what it showed once the folder has been read, since before then nothing is there. A
+        // window carried to another library starts afresh with it, keeping only a draft the person was writing.
         .onChange(of: library.isLoaded, initial: true) {
-            if library.isLoaded && restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
+            browser.adopt(library)
+            guard library.isLoaded else { return }
+            browser.itemDraft?.adopt(library)
+            if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
+        }
+        // A new item reaches a server's library when its source says so, which the draft page waits for.
+        .onChange(of: creationIsSettled) {
+            if creationIsSettled { browser.finishCreation(in: library) }
         }
     }
 
@@ -178,6 +190,12 @@ struct MainView: View {
         } message: {
             Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
         }
+    }
+
+    /// Whether the item made from the draft is now held by the library, or was refused, and so is to be handed over to.
+    private var creationIsSettled: Bool {
+        guard let creation = browser.creation else { return false }
+        return library.item(creation.id) != nil || library.syncReport.problems.contains { $0.itemID == creation.id }
     }
 
     private var completedImportID: ItemID? {

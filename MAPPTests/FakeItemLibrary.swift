@@ -93,8 +93,16 @@ final class FakeItemLibrary: ItemLibrary {
     // MARK: Files
 
     var folderURL: URL? { nil }
-    func fileURL(for id: ItemID) -> URL? { nil }
-    func fileURL(of id: ItemID) async throws -> URL? { nil }
+    /// Files at hand, as a folder's are; `fetchable` are those that arrive only when asked for, as a server's do.
+    var files: [ItemID: URL] = [:]
+    var fetchable: [ItemID: URL] = [:]
+    var fetchFails = false
+
+    func fileURL(for id: ItemID) -> URL? { files[id] }
+    func fileURL(of id: ItemID) async throws -> URL? {
+        if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }
+        return files[id] ?? fetchable[id]
+    }
     func path(of id: ItemID) -> String? { nil }
     func fileName(of id: ItemID) -> String? { nil }
     func imageBase(of id: ItemID) -> String? { nil }
@@ -109,9 +117,20 @@ final class FakeItemLibrary: ItemLibrary {
         let item = Item(
             id: .mint(), type: TypeID(typeID), title: title, titleRule: .property("title"), container: container,
             version: ItemVersion(1), created: now(), modified: now())
-        items.append(item)
         bodies[item.id] = body
+        created.append(item)
+        if !holdsCreations { deliverCreated() }
         return item.id
+    }
+
+    /// Made, and not yet held, as a created item is until a server's source says so.
+    private(set) var created: [Item] = []
+    /// While set, a created item reaches the library only when `deliverCreated` is called.
+    var holdsCreations = false
+
+    func deliverCreated() {
+        items += created
+        created = []
     }
 
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
