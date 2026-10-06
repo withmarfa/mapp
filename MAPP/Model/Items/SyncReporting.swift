@@ -39,7 +39,7 @@ nonisolated struct SyncReport: Hashable, Sendable {
 nonisolated enum SyncAction: Hashable, Sendable, CaseIterable {
     /// Takes a refused write out of the queue; for a conflicted copy, moves the copy to the bin.
     case discard
-    /// Sends a stopped write again under a fresh key.
+    /// Sends a stopped write again under a fresh idempotency key.
     case tryAgain
     /// Takes a write the server will never take out of the queue, and puts the item back as the server holds it.
     /// It reads the server first, so it needs the server.
