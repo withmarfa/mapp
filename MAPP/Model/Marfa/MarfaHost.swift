@@ -10,11 +10,12 @@ nonisolated protocol MarfaHostedSource: ItemSource, SyncReporting {
     func refresh()
     /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
     func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck
-    /// The report once every write submitted before the call is in the queue.
-    func settledReport() async -> SyncReport
-    /// Closes only if no more than `limit` writes are not sent once every write submitted before the call is in
-    /// the queue, deciding and closing in one step; otherwise answers the report that kept it open.
-    func close(unlessUnsentExceeds limit: Int) async -> SyncReport?
+    /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
+    /// cannot be read.
+    func unsentWrites() async -> UnsentWrites?
+    /// Closes only if every write not sent, read in the same step, is one of `agreed` (nil agrees to whatever
+    /// the copy holds); otherwise stays open and answers what is not sent.
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome
 }
 
 extension MarfaSource: MarfaHostedSource {}
@@ -42,17 +43,20 @@ extension MarfaSource: MarfaHostedSource {}
     nonisolated enum DisconnectChoice: Hashable, Sendable {
         /// Left on disk, so connecting the same address again goes on from it and sends what waits.
         case keepCopy
-        /// Removed with every write it holds.
-        case discardCopy
+        /// Removed with the writes the person was shown in `changesWaiting`, which they agreed to lose. A write
+        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil agrees to
+        /// whatever a copy that could not be read holds.
+        case discardCopy(UnsentWrites?)
     }
 
     nonisolated enum Problem: Error, Hashable, Sendable {
         case notAServer
         /// None was given, or the key store holds none for the address.
         case noKey
-        /// Writes still wait in the copy being left, so the person chooses what becomes of them; asked again when
-        /// more arrive after the choice. Nil where the copy could not be read and may hold some.
-        case changesWaiting(Int?)
+        /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
+        /// to discard names these; asked again when others arrive after it. Nil where the copy could not be
+        /// read and may hold some.
+        case changesWaiting(UnsentWrites?)
         /// The copy could not be opened or read.
         case unavailable(message: String)
         /// The key store would not take or give the key.
@@ -61,11 +65,10 @@ extension MarfaSource: MarfaHostedSource {}
         case keyRefused
         /// The server could not be asked whether it takes the key given, so the key that was there is kept.
         case serverUnreachable(reason: String?)
-        /// The connection was left, but its key is still in the key store.
-        case keyNotRemoved(message: String)
-        /// The copy the person discarded is still on disk. It is never opened as it is: connecting its address
-        /// again removes it first, or fails with this.
-        case copyNotRemoved(message: String)
+        /// The connection was left, but its key is still in the key store, or the copy the person discarded is
+        /// still on disk, or both; each message says why. A discarded copy is never opened as it is:
+        /// connecting its address again removes it first, or fails with this.
+        case notRemoved(key: String?, copy: String?)
         case notConnected
         /// Another connect, disconnect or change of key is under way.
         case busy
@@ -152,7 +155,7 @@ extension MarfaSource: MarfaHostedSource {}
             throw .changesWaiting(nil)
         }
         detach()
-        let problem = await finishLeaving(connection, choice ?? .discardCopy)
+        let problem = await finishLeaving(connection, discarding: choice != .keepCopy)
         defaults.removeObject(forKey: Self.addressKey)
         self.connection = nil
         state = .disconnected
@@ -188,24 +191,40 @@ extension MarfaSource: MarfaHostedSource {}
         do {
             check = try await source.tryKey(key)
         } catch {
-            // A copy that could not take the key closed; it opens again with the key that is stored.
-            detach()
-            await source.close()
             if oldRefused { try await save(key, for: connection) }
-            try await open(connection)
-            throw .unavailable(message: (error as? SourceFailure)?.message ?? error.localizedDescription)
+            try await reopen(source, connection, after: error)
         }
         switch check {
         case .accepted:
             try await save(key, for: connection)
         case .refused:
-            if let old { _ = try? await source.tryKey(old) }
+            try await giveBack(old, to: source, connection)
             throw .keyRefused
         case .unanswered(let reason):
             if oldRefused { return try await save(key, for: connection) }
-            if let old { _ = try? await source.tryKey(old) }
+            try await giveBack(old, to: source, connection)
             throw .serverUnreachable(reason: reason)
         }
+    }
+
+    /// Whatever the server makes of the old key, the copy goes on with it; a copy that closes on it is opened
+    /// again, as one that closed on the new key is.
+    private func giveBack(_ old: String?, to source: any MarfaHostedSource, _ connection: MarfaConnection) async throws(Problem) {
+        guard let old else { return }
+        do {
+            _ = try await source.tryKey(old)
+        } catch {
+            try await reopen(source, connection, after: error)
+        }
+    }
+
+    /// A copy that could not take a key is closed for good; it opens again with the key that is stored, and the
+    /// person is told why.
+    private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
+        detach()
+        await source.close()
+        try await open(connection)
+        throw .unavailable(message: Self.message(error))
     }
 
     /// Moves to another server's library. Another address is another copy, so writes waiting in this one need
@@ -218,15 +237,13 @@ extension MarfaSource: MarfaHostedSource {}
         try begin()
         defer { isBusy = false }
         let current = source
-        var allowed = Int.max
-        if let current, choice != .keepCopy {
-            let seen = await current.settledReport()
-            let unsent = seen.queueRead ? seen.changesNotSent : nil
-            if choice == nil, unsent != 0 { throw .changesWaiting(unsent) }
-            allowed = choice == nil ? 0 : unsent ?? .max
+        if let current, choice == nil {
+            let unsent = await current.unsentWrites()
+            if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
         } else if current == nil, choice == nil, hasCopy(old) {
             throw .changesWaiting(nil)
         }
+        let fresh = !hasCopy(connection)
         try await save(key, for: connection)
         let opened: any MarfaHostedSource
         do {
@@ -238,15 +255,17 @@ extension MarfaSource: MarfaHostedSource {}
         }
         if let current {
             do {
-                try await close(current, for: choice, allowing: allowed)
+                try await close(current, for: choice)
             } catch {
+                // The move is abandoned, so the copy made for it goes too.
                 await opened.close()
                 try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+                if fresh { try? await removeCopy(connection) }
                 throw error
             }
         }
         detach()
-        let problem = await finishLeaving(old, choice ?? .discardCopy)
+        let problem = await finishLeaving(old, discarding: choice != .keepCopy)
         remember(connection)
         attach(opened)
         if let problem { throw problem }
@@ -284,29 +303,23 @@ extension MarfaSource: MarfaHostedSource {}
         do {
             try await Self.offMain { [keys] in try keys.save(key, for: connection) }
         } catch {
-            throw .keyStore(message: error.localizedDescription)
+            throw .keyStore(message: Self.message(error))
         }
     }
 
-    /// Closes `source` as `choice` allows: a kept copy loses nothing, so it closes whatever waits; otherwise it
-    /// closes only if no more than `allowing` writes are not sent, counted by the copy once the writes submitted
-    /// before now are queued, so a write made a moment ago is never discarded unasked.
-    private func close(
-        _ source: any MarfaHostedSource, for choice: DisconnectChoice?, allowing limit: Int? = nil
-    ) async throws(Problem) {
-        if choice == .keepCopy {
+    /// Closes `source` as `choice` allows. A kept copy loses nothing, so it closes whatever waits. Otherwise the
+    /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
+    /// only if every write not sent is one the person agreed to lose: none, without a choice.
+    private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
+        let agreed: UnsentWrites?
+        switch choice {
+        case .keepCopy:
             await source.close()
             return
+        case .discardCopy(let shown): agreed = shown
+        case nil: agreed = UnsentWrites(ids: [])
         }
-        var allowed = limit ?? 0
-        if limit == nil, choice == .discardCopy {
-            let seen = await source.settledReport()
-            allowed = seen.queueRead ? seen.changesNotSent : .max
-        }
-        if let kept = await source.close(unlessUnsentExceeds: allowed) {
-            report = kept
-            throw .changesWaiting(kept.queueRead ? kept.changesNotSent : nil)
-        }
+        if case .waiting(let unsent) = await source.close(agreeing: agreed) { throw .changesWaiting(unsent) }
     }
 
     /// Opens the copy and paints from it; the server is asked only after.
@@ -335,7 +348,7 @@ extension MarfaSource: MarfaHostedSource {}
             if failure.kind == .denied { throw .noKey }
             throw .unavailable(message: failure.message)
         } catch {
-            throw .unavailable(message: error.localizedDescription)
+            throw .unavailable(message: Self.message(error))
         }
     }
 
@@ -364,40 +377,47 @@ extension MarfaSource: MarfaHostedSource {}
         source = nil
     }
 
-    /// Removes the key, and the copy where it was discarded, once the copy is closed. A copy that cannot be
-    /// removed is remembered, so it is never opened again as it was.
-    private func finishLeaving(_ connection: MarfaConnection, _ choice: DisconnectChoice) async -> Problem? {
-        var problem: Problem?
+    /// Removes the key, and the copy where it was discarded, once the copy is closed. A discarded copy is marked
+    /// before anything is removed and unmarked only once it is gone, so neither a removal that fails nor a quit
+    /// part way lets it be opened again as it was.
+    private func finishLeaving(_ connection: MarfaConnection, discarding: Bool) async -> Problem? {
+        if discarding { markDiscarded(connection, true) }
+        var key: String?
+        var copy: String?
         do {
             try await Self.offMain { [keys] in try keys.delete(for: connection) }
         } catch {
-            problem = .keyNotRemoved(message: error.localizedDescription)
+            key = Self.message(error)
         }
-        guard choice == .discardCopy else { return problem }
-        do {
-            try await removeCopy(connection)
-        } catch {
-            var discarded = defaults.stringArray(forKey: Self.discardedKey) ?? []
-            if !discarded.contains(connection.address.absoluteString) {
-                discarded.append(connection.address.absoluteString)
+        if discarding {
+            do {
+                try await removeCopy(connection)
+                markDiscarded(connection, false)
+            } catch {
+                copy = Self.message(error)
             }
-            defaults.set(discarded, forKey: Self.discardedKey)
-            return .copyNotRemoved(message: error.localizedDescription)
         }
-        return problem
+        return key == nil && copy == nil ? nil : .notRemoved(key: key, copy: copy)
+    }
+
+    private func markDiscarded(_ connection: MarfaConnection, _ marked: Bool) {
+        let address = connection.address.absoluteString
+        var discarded = defaults.stringArray(forKey: Self.discardedKey) ?? []
+        discarded.removeAll { $0 == address }
+        if marked { discarded.append(address) }
+        defaults.set(discarded, forKey: Self.discardedKey)
     }
 
     /// A copy the person discarded is removed before its address is opened again, or not opened at all.
     private func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
-        var discarded = defaults.stringArray(forKey: Self.discardedKey) ?? []
-        guard discarded.contains(connection.address.absoluteString) else { return }
+        guard (defaults.stringArray(forKey: Self.discardedKey) ?? []).contains(connection.address.absoluteString)
+        else { return }
         do {
             try await removeCopy(connection)
         } catch {
-            throw .copyNotRemoved(message: error.localizedDescription)
+            throw .notRemoved(key: nil, copy: Self.message(error))
         }
-        discarded.removeAll { $0 == connection.address.absoluteString }
-        defaults.set(discarded, forKey: Self.discardedKey)
+        markDiscarded(connection, false)
     }
 
     private func removeCopy(_ connection: MarfaConnection) async throws {
@@ -407,6 +427,10 @@ extension MarfaSource: MarfaHostedSource {}
                 try FileManager.default.removeItem(at: directory)
             }
         }
+    }
+
+    private static func message(_ error: any Error) -> String {
+        (error as? SourceFailure)?.message ?? error.localizedDescription
     }
 
     private static func state(_ state: MarfaConnectionState) -> State {

@@ -31,19 +31,29 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
     func connectionStates() -> AsyncStream<MarfaConnectionState> { state.values() }
     func refresh() { record("refresh") }
 
+    /// Keys the copy closes on, as one that cannot open its store again does.
+    let closesOn = Mutex<Set<String>>([])
+
     func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
         record("tryKey \(key)")
-        if refusesKeys.withLock({ $0 }) { throw SourceFailure(kind: .missing, message: "The copy closed.") }
+        if refusesKeys.withLock({ $0 }) || closesOn.withLock({ $0.contains(key) }) {
+            throw SourceFailure(kind: .missing, message: "The copy closed.")
+        }
         return verdicts.withLock { $0[key] } ?? .accepted
     }
 
-    func settledReport() async -> SyncReport { report.value }
-
-    func close(unlessUnsentExceeds limit: Int) async -> SyncReport? {
+    /// One write for each the report counts.
+    func unsentWrites() async -> UnsentWrites? {
         let report = report.value
-        if (report.queueRead ? report.changesNotSent : .max) > limit { return report }
+        return report.queueRead ? .fake(report.changesNotSent) : nil
+    }
+
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+        let unsent = await unsentWrites()
+        let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
+        guard covered else { return .waiting(unsent) }
         record("close")
-        return nil
+        return .closed
     }
 
     var syncReport: SyncReport { report.value }
@@ -58,6 +68,12 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
     func endEditing(_ item: ItemID) {}
     func flush() async {}
     func close() async { record("close") }
+}
+
+nonisolated extension UnsentWrites {
+    static func fake(_ count: Int) -> UnsentWrites {
+        UnsentWrites(ids: Set((0..<count).map { "w\($0)" }))
+    }
 }
 
 /// Opens a fake library for each address, as `MarfaSource.open` would: refused without a key, and making the
@@ -92,6 +108,8 @@ nonisolated final class FakeServers: Sendable {
 nonisolated final class TestKeyStore: KeyStore {
     private let keys = Mutex<[MarfaConnection: String]>([:])
     let failsDelete = Mutex(false)
+    /// Run as each delete begins.
+    let onDelete = Mutex<(@Sendable () -> Void)?>(nil)
 
     func save(_ key: String, for connection: MarfaConnection) {
         keys.withLock { $0[connection] = key }
@@ -102,6 +120,7 @@ nonisolated final class TestKeyStore: KeyStore {
     }
 
     func delete(for connection: MarfaConnection) throws {
+        onDelete.withLock { $0 }?()
         if failsDelete.withLock({ $0 }) { throw SourceFailure(kind: .denied, message: "The keychain refused.") }
         _ = keys.withLock { $0.removeValue(forKey: connection) }
     }
@@ -280,7 +299,7 @@ nonisolated final class TestKeyStore: KeyStore {
         source.report.set(SyncReport(waiting: 2, queueRead: true))
         #expect(await eventually { host.waitingChanges == 2 })
 
-        await expect(.changesWaiting(2)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        await expect(.changesWaiting(.fake(2))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         #expect(host.connection == first)
         #expect(host.source === source)
         #expect(!source.calls.contains("close"))
@@ -298,7 +317,7 @@ nonisolated final class TestKeyStore: KeyStore {
         try await host.connect(address: "http://first.test:8210", key: "k")
         try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
         #expect(await eventually { host.waitingChanges == 2 })
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(.fake(2)))
         #expect(!bench.hasCopy(first))
     }
 
@@ -311,7 +330,7 @@ nonisolated final class TestKeyStore: KeyStore {
             content: SyncContent(title: "Kept"), actions: [.discard])
         try #require(bench.servers.last).report.set(SyncReport(problems: [refused], queueRead: true))
         #expect(await eventually { host.report.problems == [refused] })
-        await expect(.changesWaiting(1)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
     }
 
     @Test func leavingWithNothingWaitingRemovesTheCopy() async throws {
@@ -342,10 +361,10 @@ nonisolated final class TestKeyStore: KeyStore {
         old.report.set(SyncReport(waiting: 1, queueRead: true))
         #expect(await eventually { host.waitingChanges == 1 })
 
-        await expect(.changesWaiting(1)) { () throws(MarfaHost.Problem) in
+        await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in
             try await host.changeAddress(to: "http://second.test:8210", key: "two")
         }
-        await expect(.changesWaiting(1)) { () throws(MarfaHost.Problem) in
+        await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://second.test:8210", key: "two")
         }
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
@@ -430,7 +449,7 @@ nonisolated final class TestKeyStore: KeyStore {
             Issue.record("left the old copy with a write waiting")
             return
         }
-        #expect(error as? MarfaHost.Problem == .changesWaiting(1))
+        #expect(error as? MarfaHost.Problem == .changesWaiting(.fake(1)))
         #expect(host.connection == first)
         #expect(host.source === old)
         #expect(bench.hasCopy(first))
@@ -460,7 +479,7 @@ nonisolated final class TestKeyStore: KeyStore {
         try await host.connect(address: "http://first.test:8210", key: "k")
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: bench.root.path)
         do {
-            try await host.disconnect(.discardCopy)
+            try await host.disconnect(.discardCopy(nil))
             Issue.record("said the copy was removed")
         } catch {}
         #expect(bench.hasCopy(first))
@@ -475,10 +494,100 @@ nonisolated final class TestKeyStore: KeyStore {
     }
 }
 
+/// The second review's findings, each first seen failing on the code before its fix.
+@MainActor struct MarfaHostSecondReviewTests {
+    private let first = try! MarfaConnection(address: "http://first.test:8210")
+
+    @Test(.timeLimit(.minutes(1)))
+    func aRetryInACancelledTaskStops() async throws {
+        let hub = MarfaHub()
+        hub.changingKey(true)
+        let attempts = Mutex(0)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await MarfaEngine.asking(hub) { () async throws -> Int in
+                let count = attempts.withLock { count in
+                    count += 1
+                    return count
+                }
+                if count >= 10_000 { return count }
+                throw MarfaError.invalid(message: "this working copy is changing its key; ask again")
+            }
+        }
+        let result = await task.result
+        #expect(attempts.withLock { $0 } < 10, "\(attempts.withLock { $0 }) attempts")
+        guard case .failure = result else {
+            Issue.record("went on retrying in a cancelled task")
+            return
+        }
+    }
+
+    /// Giving the old key back can close the copy too, which is then opened again rather than kept attached.
+    @Test func aCopyThatClosesWhileTheOldKeyGoesBackIsOpenedAgain() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "good")
+        let source = try #require(bench.servers.last)
+        source.state.set(.online)
+        source.verdicts.withLock { $0["typo"] = .refused }
+        source.closesOn.withLock { $0 = ["good"] }
+        do {
+            try await host.replaceKey("typo")
+            Issue.record("took a key the server refuses")
+        } catch {}
+        #expect(source.calls == ["refresh", "tryKey typo", "tryKey good", "close"])
+        #expect(bench.servers.opened.count == 2)
+        #expect(host.source === bench.servers.last)
+        #expect(bench.keys.key(for: first) == "good")
+    }
+
+    /// The copy is marked discarded before anything is removed, so a launch after a crash part way never sends
+    /// what the person chose to discard.
+    @Test func aCopyIsMarkedDiscardedBeforeItIsRemoved() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        let suite = bench.suite
+        let seen = Mutex<[String]?>(nil)
+        bench.keys.onDelete.withLock {
+            $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.stringArray(forKey: "MarfaDiscardedCopies") ?? [] } }
+        }
+        try await host.disconnect()
+        #expect(seen.withLock { $0 } == ["http://first.test:8210"])
+        #expect(bench.defaults.stringArray(forKey: "MarfaDiscardedCopies") ?? [] == [])
+        #expect(!bench.hasCopy(first))
+    }
+
+    @Test func aKeyAndACopyThatCannotBeRemovedAreBothReported() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        bench.keys.failsDelete.withLock { $0 = true }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: bench.root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bench.root.path) }
+        do {
+            try await host.disconnect()
+            Issue.record("said the key and the copy were removed")
+        } catch {
+            #expect("\(error)".contains("The keychain refused."), "\(error)")
+            #expect("\(error)".contains("copy"), "\(error)")
+        }
+    }
+}
+
 /// The host over a real copy whose server refuses every connection.
 @MainActor @Suite(.serialized)
 struct MarfaHostOfflineTests {
     private let address = "http://127.0.0.1:9"
+
+    /// The choice the person makes after being shown `problem`.
+    private static func discard(after problem: MarfaHost.Problem?) -> MarfaHost.DisconnectChoice {
+        if case .changesWaiting(let shown) = problem { .discardCopy(shown ?? UnsentWrites(ids: [])) } else { .discardCopy(UnsentWrites(ids: [])) }
+    }
+
+    private static func count(_ problem: MarfaHost.Problem) -> Int? {
+        if case .changesWaiting(let unsent) = problem { unsent?.count } else { nil }
+    }
 
     @Test(.timeLimit(.minutes(1)))
     func aKeptCopyGoesOnWhereItWasLeft() async throws {
@@ -496,7 +605,7 @@ struct MarfaHostOfflineTests {
             try await host.disconnect()
             Issue.record("left a copy with a write waiting")
         } catch {
-            #expect(error == .changesWaiting(1))
+            #expect(Self.count(error) == 1, "\(error)")
         }
         try await host.disconnect(.keepCopy)
         #expect(bench.hasCopy(connection))
@@ -506,7 +615,7 @@ struct MarfaHostOfflineTests {
         let log = ChangeLog(try #require(host.source as? MarfaSource))
         #expect(await log.wait { $0.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1) } != nil)
 
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
         #expect(!bench.hasCopy(connection))
     }
 
@@ -529,7 +638,7 @@ struct MarfaHostOfflineTests {
         #expect(bench.keys.key(for: try MarfaConnection(address: address)) == "given")
         // Hydrating again against a closed port fails at once, which shows the new key was tried.
         #expect(await eventually { if case .offline = host.state { true } else { false } }, "\(host.state)")
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
     }
 
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
@@ -546,11 +655,71 @@ struct MarfaHostOfflineTests {
             try await host.disconnect()
             Issue.record("left a copy with a write waiting")
         } catch {
-            #expect(error == .changesWaiting(1))
+            #expect(Self.count(error) == 1, "\(error)")
         }
         #expect(bench.hasCopy(connection))
         #expect(host.source != nil)
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
+    }
+
+    /// A write that lands while the person is being asked, such as an editor's late save, is not discarded with
+    /// what they were shown.
+    @Test(.timeLimit(.minutes(1)))
+    func aWriteMadeAfterThePersonWasAskedIsNotDiscarded() async throws {
+        let bench = try HostBench()
+        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let connection = try MarfaConnection(address: address)
+        try await host.connect(address: address, key: "unused")
+        #expect(await eventually { host.report.queueRead })
+        let source = try #require(host.source)
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST shown", body: "One")), as: WriteID())
+        var shown: MarfaHost.Problem?
+        do {
+            try await host.disconnect()
+        } catch {
+            shown = error
+        }
+        #expect(shown != nil)
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST late", body: "Two")), as: WriteID())
+        do {
+            try await host.disconnect(Self.discard(after: shown))
+            Issue.record("discarded a write made after the person was asked")
+        } catch {
+            #expect(Self.count(error) == 2, "\(error)")
+        }
+        #expect(bench.hasCopy(connection))
+        #expect(host.source != nil)
+        try await host.disconnect(.keepCopy)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aWriteMadeWhileMovingAddressAfterThePersonWasAskedIsNotDiscarded() async throws {
+        let bench = try HostBench()
+        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let connection = try MarfaConnection(address: address)
+        let other = "http://127.0.0.1:10"
+        try await host.connect(address: address, key: "unused")
+        #expect(await eventually { host.report.queueRead })
+        let source = try #require(host.source)
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST shown", body: "One")), as: WriteID())
+        var shown: MarfaHost.Problem?
+        do {
+            try await host.changeAddress(to: other, key: "unused")
+        } catch {
+            shown = error
+        }
+        #expect(shown != nil)
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST late", body: "Two")), as: WriteID())
+        do {
+            try await host.changeAddress(to: other, key: "unused", choice: Self.discard(after: shown))
+            Issue.record("discarded a write made after the person was asked")
+        } catch {
+            #expect(Self.count(error) == 2, "\(error)")
+        }
+        #expect(host.connection == connection)
+        #expect(bench.hasCopy(connection))
+        #expect(!bench.hasCopy(try MarfaConnection(address: other)))
+        try await host.disconnect(.keepCopy)
     }
 
     /// The package refuses every call while the copy changes key, and asks for it again.
@@ -578,7 +747,7 @@ struct MarfaHostOfflineTests {
         #expect(refused.isEmpty, "\(refused.count) refused, such as \(String(describing: refused.first))")
         #expect(unavailable.isEmpty, "\(String(describing: unavailable.first))")
         #expect(await eventually { host.report.waiting == count }, "\(host.report.waiting)")
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -623,7 +792,7 @@ struct MarfaHostLiveTests {
             throw error
         }
         await LiveMarfa.purge(made.ids)
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
     }
 
     private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
@@ -668,7 +837,7 @@ struct MarfaHostLiveTests {
         } catch {}
         #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
         #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
     }
 
     /// What the person typed after a create the server refused is shown, and copied, with it.
@@ -719,6 +888,6 @@ struct MarfaHostLiveTests {
         #expect(await eventually(.seconds(30)) { host.state == .keyRefused }, "\(host.state)")
         try await host.replaceKey(try #require(LiveMarfa.key))
         #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
-        try await host.disconnect(.discardCopy)
+        try await host.disconnect(.discardCopy(nil))
     }
 }

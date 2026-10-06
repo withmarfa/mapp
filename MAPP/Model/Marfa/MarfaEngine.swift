@@ -18,11 +18,12 @@ actor MarfaEngine {
         case discard(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
         /// Sends a stopped write again.
         case release(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
-        /// Answers the report once every event before it is taken, so every write submitted before it counts.
-        case settle(CheckedContinuation<SyncReport, Never>)
-        /// Closes, as `close` does, only if no more than the limit of writes are not sent once every event before
-        /// it is taken; otherwise answers the report that kept it open.
-        case closeIfUnsent(atMost: Int, CheckedContinuation<SyncReport?, Never>)
+        /// The writes not sent, read from the queue once every event before it is taken, so every write
+        /// submitted before it counts; nil where the queue cannot be read.
+        case unsent(CheckedContinuation<UnsentWrites?, Never>)
+        /// Closes, as `close` does, only if every write not sent, read from the queue in the same step, is one
+        /// of those agreed to; nil agrees to whatever the copy holds.
+        case closeAgreeing(UnsentWrites?, CheckedContinuation<CloseOutcome, Never>)
     }
 
     /// A write the package does not offer yet, or this source does not make yet.
@@ -99,8 +100,8 @@ actor MarfaEngine {
                 if case .drained(_, let taken) = event { taken.resume() }
                 if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
                 if case .release(_, let done) = event { done.resume(returning: .success(false)) }
-                if case .settle(let done) = event { done.resume(returning: hub.report.value) }
-                if case .closeIfUnsent(_, let done) = event { done.resume(returning: nil) }
+                if case .unsent(let done) = event { done.resume(returning: nil) }
+                if case .closeAgreeing(_, let done) = event { done.resume(returning: .closed) }
                 continue
             }
             switch event {
@@ -120,21 +121,28 @@ actor MarfaEngine {
                 }
             case .discard(let id, let done): done.resume(returning: await discard(id))
             case .release(let id, let done): done.resume(returning: await release(id))
-            case .settle(let done):
-                done.resume(returning: hub.report.value)
-            case .closeIfUnsent(let limit, let done):
-                let report = hub.report.value
-                if (report.queueRead ? report.changesNotSent : .max) > limit {
-                    done.resume(returning: report)
-                } else {
+            case .unsent(let done):
+                done.resume(returning: await unsentWrites())
+            case .closeAgreeing(let agreed, let done):
+                let unsent = await unsentWrites()
+                let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
+                if covered {
                     await shutDown()
-                    done.resume(returning: nil)
+                    done.resume(returning: .closed)
+                } else {
+                    done.resume(returning: .waiting(unsent))
                 }
             case .close(let done):
                 await shutDown()
                 done.resume()
             }
         }
+    }
+
+    /// Read from the queue itself, since the last report can hold a count from before a read that failed.
+    private func unsentWrites() async -> UnsentWrites? {
+        guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
+        return UnsentWrites(ids: MarfaProblems.unsent(queue))
     }
 
     private func shutDown() async {
@@ -154,7 +162,8 @@ actor MarfaEngine {
                 return try await work()
             } catch let error as MarfaError {
                 guard case .invalid = error, hub.keyChanged(since: mark) else { throw error }
-                try? await Task.sleep(for: .milliseconds(20))
+                // Throws once the task is cancelled, which ends the asking.
+                try await Task.sleep(for: .milliseconds(20))
             }
         }
     }

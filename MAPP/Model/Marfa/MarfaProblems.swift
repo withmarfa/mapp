@@ -57,6 +57,17 @@ nonisolated enum MarfaProblems {
             problems: problems, queueRead: true)
     }
 
+    /// Every write the queue holds that the server has not taken: waiting, stopped or refused. Removing the
+    /// copy loses each of them.
+    static func unsent(_ queue: [QueuedWrite]) -> Set<String> {
+        Set(queue.filter { write in
+            switch write.verdict {
+            case .accepted, .merged, .conflicted: false
+            case nil, .refused, .blocked, .dead: true
+            }
+        }.map(\.id))
+    }
+
     /// A write the queue refused without sending, because a write it waits on was refused, died or is blocked,
     /// is shown with that write: discarding a refusal takes it too, and releasing a stopped write releases it.
     static func foldedRoots(_ stopped: [QueuedWrite]) -> [String: String] {

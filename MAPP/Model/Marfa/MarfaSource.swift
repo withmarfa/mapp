@@ -2,6 +2,19 @@ import Foundation
 import Marfa
 import Synchronization
 
+/// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
+/// covers those and no write that arrives after.
+nonisolated struct UnsentWrites: Hashable, Sendable {
+    var ids: Set<String>
+    var count: Int { ids.count }
+}
+
+nonisolated enum CloseOutcome: Hashable, Sendable {
+    case closed
+    /// Kept open for writes not agreed to; nil where the queue could not be read.
+    case waiting(UnsentWrites?)
+}
+
 /// What the source knows of its server, for the app to show beside the library.
 nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// Showing what the copy holds, not yet heard from the server.
@@ -196,24 +209,25 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
     }
 
-    /// The report once every write submitted before this call is in the queue.
-    func settledReport() async -> SyncReport {
+    /// The writes not sent once every write submitted before this call is in the queue; nil where the queue
+    /// cannot be read.
+    func unsentWrites() async -> UnsentWrites? {
         await withCheckedContinuation { continuation in
-            if case .terminated = events.yield(.settle(continuation)) { continuation.resume(returning: hub.report.value) }
+            if case .terminated = events.yield(.unsent(continuation)) { continuation.resume(returning: nil) }
         }
     }
 
-    /// Closes, as `close()` does, only if no more than `limit` writes are not sent once every write submitted
-    /// before this call is in the queue, deciding and closing in one step; otherwise it stays open and answers
-    /// the report that kept it so.
-    func close(unlessUnsentExceeds limit: Int) async -> SyncReport? {
-        let kept = await withCheckedContinuation { continuation in
-            if case .terminated = events.yield(.closeIfUnsent(atMost: limit, continuation)) {
-                continuation.resume(returning: nil)
+    /// Closes, as `close()` does, only if every write not sent, once every write submitted before this call is
+    /// in the queue, is one of `agreed`, deciding and closing in one step; nil agrees to whatever the copy
+    /// holds. Otherwise it stays open and answers what is not sent.
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+        let outcome = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.closeAgreeing(agreed, continuation)) {
+                continuation.resume(returning: .closed)
             }
         }
-        if kept == nil { events.finish() }
-        return kept
+        if outcome == .closed { events.finish() }
+        return outcome
     }
 
     /// Nothing submitted after this is taken, and a flush still waiting returns.
