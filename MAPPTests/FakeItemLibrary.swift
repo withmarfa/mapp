@@ -18,6 +18,8 @@ final class FakeItemLibrary: ItemLibrary {
     var completedImports: [UUID: ItemID] = [:]
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
+    /// What `attach` answers, which may wait or throw; nil attaches nothing.
+    var attaching: (() async throws -> [Embed])?
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], folders: [Folder] = [], now: Date = .now) {
         self.items = items
@@ -158,7 +160,9 @@ final class FakeItemLibrary: ItemLibrary {
         change([id]) { $0.title = name }
     }
 
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] { [] }
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
+        try await attaching?() ?? []
+    }
     func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) {}
     func consumeImportCompletion(_ requestID: UUID) { completedImports[requestID] = nil }
 

@@ -71,6 +71,24 @@ struct ItemLibraryTests {
         #expect(item.isEditable, "retitling needs only an editable item, not the rename capability")
     }
 
+    @Test func anEraseConfirmedAfterTheLibraryCanNoLongerEraseLeavesTheItemsAndSaysSo() {
+        let trashed = FakeItemLibrary.note("Old", modified: start, state: .trashed)
+        let library = FakeItemLibrary(items: [trashed])
+        library.capabilities = .purge
+        Browser.delete([trashed.id], in: library, undoManager: nil)
+        #expect(library.notesToPurge == [trashed.id], "the person is asked while the library can erase")
+        library.capabilities = []
+        library.deletePermanentlyOnConfirm([trashed.id])
+        #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")
+        #expect(library.failure?.title == "Can’t Delete Immediately")
+        #expect(library.failure?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
+        library.failure = nil
+        library.capabilities = .purge
+        library.deletePermanentlyOnConfirm([trashed.id])
+        #expect(library.item(trashed.id) == nil)
+        #expect(library.failure == nil)
+    }
+
     // MARK: Files
 
     @Test func aFileItemsURLIsTheSameWhetherAskedAtOnceOrAwaited() async throws {
