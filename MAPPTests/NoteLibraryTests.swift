@@ -350,6 +350,20 @@ struct NoteLibraryTests {
         #expect(library.notes.map(\.file.text) == [unreadable.file.text, folded.file.text])
     }
 
+    @Test func anUndoThatCannotChangeTheTagsSafelyTellsThePerson() {
+        let note = Note(path: "Odd.md", text: "---\ntags: [a]\n---\n# Odd", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
+        let folded = Note(path: "Odd.md", text: "---\ntags: >\n  favorite\ntitle: x\n---\n# Odd", created: start)
+        library.notes[0].file = folded.file
+        store.changes.removeAll()
+        manager.undo()
+        #expect(store.changes.isEmpty)
+        #expect(library.failure?.title == "Can’t Remove from Favorites")
+        #expect(library.failure?.message.contains("Odd") == true)
+    }
+
     /// Undo puts back the very bytes the file had, which turning the favorite back would not.
     @Test(arguments: [
         ("---\ntags:\n  - favorite\ntitle: x\n---\n# Note", false),

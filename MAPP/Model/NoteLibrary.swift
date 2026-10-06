@@ -539,6 +539,7 @@ final class NoteLibrary {
     /// body under its old front matter; one whose front matter changed since has only its favorite changed back.
     private func revertFavorites(_ changes: [Note.ID: FileChange], wereSetTo isFavorite: Bool, name: String, undoManager: UndoManager?) {
         var reverted: [Note.ID: FileChange] = [:]
+        var refused: [String] = []
         for index in notes.indices {
             guard let change = changes[notes[index].id], !notes[index].isDeleted else { continue }
             let current = notes[index].file
@@ -548,12 +549,24 @@ final class NoteLibrary {
             } else if current.frontMatter == change.after.frontMatter {
                 restored.restoreFrontMatter(from: change.before)
             } else if current.isFavorite == isFavorite {
-                do { try restored.setFavorite(!isFavorite) } catch { continue }
+                do {
+                    try restored.setFavorite(!isFavorite)
+                } catch {
+                    refused.append(notes[index].title)
+                    continue
+                }
             }
             guard restored != current else { continue }
             reverted[notes[index].id] = FileChange(before: current, after: restored)
             notes[index].file = restored
             if let path = notes[index].path { perform(.write(path: path, text: restored.text)) }
+        }
+        if let first = refused.first {
+            let title = isFavorite ? String(localized: "Can’t Remove from Favorites") : String(localized: "Can’t Add to Favorites")
+            let message = refused.count == 1
+                ? String(localized: "The tags of “\(first)” are written in a form that can’t be changed safely, so its file was left unchanged.")
+                : String(localized: "Some notes have tags that can’t be read or changed safely, so their files were left unchanged.")
+            failure = (title, message)
         }
         guard !reverted.isEmpty else { return }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
