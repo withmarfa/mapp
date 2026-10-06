@@ -374,6 +374,49 @@ struct MarfaSourceOfflineTests {
         #expect(MarfaSync.report(answeredIn: []).verdicts.isEmpty)
     }
 
+    /// The package names the item a conflicted copy was made from, from the copy alone, so the two know each other
+    /// without a server and without the verdict that made the copy.
+    @Test(.timeLimit(.minutes(1)))
+    func aConflictedCopyIsShownBesideItsOriginal() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let original = ItemID.mint(), copy = ItemID.mint(), bystander = ItemID.mint()
+        for (id, title) in [(original, "original"), (bystander, "bystander")] {
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST \(title)", body: "Queued")), as: WriteID())
+        }
+        source.submit(
+            .create(id: copy, ItemDraft(
+                type: Self.note, title: "MAPPTEST original (conflicted copy)", body: "Mine", tags: [MarfaProblems.conflictedCopyTag])),
+            as: WriteID())
+        // Tagged, but not yet linked: no original is known.
+        _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == copy } != nil })
+        #expect(log.current.snapshot?.items.first { $0.id == original }?.sync != .conflicted(sibling: copy, fields: []))
+        source.submit(.link(EdgeDraft(type: "derived-from", source: copy, target: original), undoing: nil), as: WriteID())
+        let linked = try #require(await log.wait { state in
+            if case .conflicted(let sibling, _)? = state.snapshot?.items.first(where: { $0.id == original })?.sync {
+                sibling == copy
+            } else {
+                false
+            }
+        })
+        // Another item the copy was not made from is untouched.
+        #expect(linked.snapshot?.items.first { $0.id == bystander }?.sync != nil)
+        if case .conflicted? = linked.snapshot?.items.first(where: { $0.id == bystander })?.sync {
+            Issue.record("an item the copy was not made from shows a conflict")
+        }
+        #expect(await LiveMarfa.until {
+            source.syncReport.problems.contains { entry in
+                if case .conflicted(let sibling, let from) = entry.kind { sibling == copy && from == original } else { false }
+            }
+        })
+        #expect(try await source.copy.items.original(ofConflictedCopy: copy.rawValue) == original.rawValue)
+        #expect(try await source.copy.items.conflictedCopies(of: original.rawValue).map(\.id) == [copy.rawValue])
+        await source.close()
+    }
+
     @Test func aWriteToACopyBeingBroughtUpToDateIsRefusedPlainly() {
         for error in [
             MarfaError.hydrationIncomplete(message: "hydration did not complete; hydrate again before reading"),
@@ -728,6 +771,24 @@ extension LiveMarfaTests {
                 return
             }
             await source.close()
+
+            // The answer is forgotten by now; the copy and its original still know each other, from the copy alone.
+            let relaunched = try await MarfaSource.open(connection, keys: keys, location: location)
+            let relaunchedLog = ChangeLog(relaunched)
+            let painted = try #require(await relaunchedLog.wait { $0.snapshot != nil })
+            guard case .conflicted(let copy?, _)? = painted.snapshot?.items.first(where: { $0.id == a })?.sync else {
+                Issue.record("the original does not show its copy after the answer was forgotten")
+                await relaunched.close()
+                return
+            }
+            #expect(copy.rawValue == sibling)
+            #expect(try await relaunched.copy.items.original(ofConflictedCopy: copy.rawValue) == a.rawValue)
+            #expect(await LiveMarfa.until {
+                relaunched.syncReport.problems.contains { entry in
+                    if case .conflicted(let shown, let from) = entry.kind { shown == copy && from == a } else { false }
+                }
+            })
+            await relaunched.close()
         }
 
         /// A second drain forgetting answers the engine has not taken yet could lose them, so the next drain waits.

@@ -97,8 +97,13 @@ actor MarfaEngine {
     /// Refused writes as last read, kept once the queue forgets those that carried no content, so each stays
     /// before the person until they discard it or a later write of its kind lands.
     private var refusals: [String: Marfa.QueuedWrite] = [:]
-    /// The item each conflicted copy was made from, as its verdict named it.
+    /// The item each conflicted copy was made from, as its verdict named it, which is known before the copy's link has reached the copy.
     private var originals: [String: String] = [:]
+    /// The item each conflicted copy was made from, and the copies each original has that are not in the bin, as
+    /// the package reads the copy's `derived-from` link: a copy and its original know each other from the copy
+    /// alone, offline and after a relaunch.
+    private var linkedOriginals: [String: String] = [:]
+    private var linkedCopies: [String: [String]] = [:]
     /// The items an edge move touched, read again once its answer is taken: the two ends it left and the one it went
     /// to, since a refusal puts the edge back and the answer names only its source.
     private var movedEnds: [String: Set<String>] = [:]
@@ -259,6 +264,7 @@ actor MarfaEngine {
         for row in departed { await left(row) }
         bodyLinks = [:]
         for row in rows.values where Self.mayName(row, catalogue: catalogue) { await readLinks(of: row) }
+        await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
         await readQueue()
         publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
     }
@@ -338,8 +344,39 @@ actor MarfaEngine {
         } catch {
             failures.append(Self.failure(error))
         }
+        await readConflictLinks(affected)
         await readQueue()
         publish(affected.map { ItemID($0) })
+    }
+
+    /// Asks the package which item each of these rows, if a conflicted copy, was made from, and which copies each
+    /// of those originals has. A copy kept or binned, or one that left the copy, no longer links its original.
+    private func readConflictLinks(_ ids: Set<String>) async {
+        var originalsToRead: Set<String> = []
+        for id in ids {
+            guard let row = rows[id], row.state == .active, row.tags.contains(MarfaProblems.conflictedCopyTag) else {
+                if let previous = linkedOriginals.removeValue(forKey: id) { originalsToRead.insert(previous) }
+                continue
+            }
+            do {
+                let original = try await Self.asking(hub) { try await copy.items.original(ofConflictedCopy: id) }
+                if let previous = linkedOriginals[id], previous != original { originalsToRead.insert(previous) }
+                linkedOriginals[id] = original
+                if let original { originalsToRead.insert(original) }
+            } catch {
+                // What was read before stands.
+                continue
+            }
+        }
+        for original in originalsToRead {
+            do {
+                let copies = try await Self.asking(hub) { try await copy.items.conflictedCopies(of: original) }.map(\.id)
+                linkedCopies[original] = copies.isEmpty ? nil : copies
+            } catch {
+                continue
+            }
+        }
+        if !originalsToRead.isEmpty { restate() }
     }
 
     /// The server's bin, as the copy last said it: what it holds is the copy's to say, so only the rest is kept,
@@ -390,7 +427,11 @@ actor MarfaEngine {
     }
 
     private func restate() {
-        let states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
+        var states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
+        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch.
+        for (original, copies) in linkedCopies where states[ItemID(original)] == nil {
+            if let first = copies.first { states[ItemID(original)] = .conflicted(sibling: ItemID(first), fields: []) }
+        }
         changedSync.formUnion(Set(states.keys).union(syncStates.keys).filter { states[$0] != syncStates[$0] })
         syncStates = states
     }
@@ -462,9 +503,7 @@ actor MarfaEngine {
 
     private func conflictedCopies() -> [MarfaProblems.ConflictedCopy] {
         rows.values.filter { $0.state == .active && $0.tags.contains(MarfaProblems.conflictedCopyTag) }.map { row in
-            let derived = (edgesByItem[row.id] ?? []).compactMap { edges[$0] }
-                .first { $0.edgeType == MarfaProblems.derivedFromEdge && $0.sourceId == row.id }?.targetId
-            return MarfaProblems.ConflictedCopy(row: row, original: (originals[row.id] ?? derived).map { ItemID($0) })
+            MarfaProblems.ConflictedCopy(row: row, original: (linkedOriginals[row.id] ?? originals[row.id]).map { ItemID($0) })
         }
     }
 
