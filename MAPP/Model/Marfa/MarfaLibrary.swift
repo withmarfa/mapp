@@ -1,0 +1,429 @@
+import Foundation
+import Observation
+
+/// One item as the views read it, observed on its own, so a change to one item redraws only what shows it.
+@Observable final class ItemRecord {
+    var item: Item
+    /// Nil for an item with no text, and until its text is read.
+    var body: ItemBody?
+    /// False once the source no longer holds the item, which tells the views that read only this record.
+    var isHeld = true
+
+    init(_ item: Item) {
+        self.item = item
+    }
+}
+
+/// A library read from a Marfa server's working copy through its source. It holds what the source last said and
+/// changes nothing on its own: every write goes to the source, which applies it to its copy at once and says what
+/// changed. Undo is kept here, as writes that put back what a write changed, made at the version current when
+/// the undo runs.
+@Observable final class MarfaLibrary: ItemLibrary {
+    private(set) var isLoaded = false
+    var failure: (title: String, message: String)?
+    var notesToPurge: Set<ItemID> = []
+    private(set) var catalogue = Catalogue()
+    private(set) var syncReport: SyncReport
+    /// How the server stands, for the app to show beside the library.
+    private(set) var connection: MarfaHost.State
+    let now: () -> Date
+
+    /// Bumped when any item changes, for the lists and search.
+    private var contentRevision = 0
+    /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
+    private var membershipRevision = 0
+    private var searchRevision = 0
+
+    @ObservationIgnored let source: any ConnectedItemSource
+    @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
+    @ObservationIgnored private(set) var index = MarfaItemIndex()
+    @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
+    @ObservationIgnored private var counted: [SidebarItem: (revision: Int, count: Int)] = [:]
+    @ObservationIgnored private var searches: [String: Search] = [:]
+    @ObservationIgnored private var searchOrder: [String] = []
+    /// What the last search to finish found, shown while the next one runs so the list does not empty per key.
+    @ObservationIgnored private var lastFound: [ItemSearchHit] = []
+    /// Text writes the source has not answered, by item. While any wait, the text the person gave is what the
+    /// library holds, since a read that raced the write could give older text.
+    @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
+    @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
+    /// What to tell the person if the source refuses each write the library made.
+    @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
+    @ObservationIgnored private var following: [Task<Void, Never>] = []
+
+    /// A place's order changes only with what it holds, so a change to one item maps the items again without
+    /// sorting them.
+    private nonisolated struct Listing {
+        var membership: Int
+        var content = -1
+        var ids: [ItemID]
+        var items: [Item] = []
+    }
+
+    private nonisolated struct Refusal {
+        var title: String
+        /// Said instead of the source's words when the copy no longer holds the item.
+        var notHeld: String?
+    }
+
+    private nonisolated struct Search {
+        var revision: Int
+        var hits: [ItemSearchHit]
+        var running: Bool
+    }
+
+    /// Searches keep the items not in the bin, as the files library's do.
+    static let searchScope = ItemQuery(states: [.active, .archived])
+
+    init(source: any ConnectedItemSource, now: @escaping () -> Date = Date.init) {
+        self.source = source
+        self.now = now
+        syncReport = source.syncReport
+        connection = MarfaHost.state(source.connectionState)
+        let changes = source.changes()
+        let reports = source.syncReports()
+        let states = source.connectionStates()
+        following = [
+            Task { [weak self] in
+                for await change in changes {
+                    guard let self else { return }
+                    await take(change)
+                }
+            },
+            Task { [weak self] in
+                for await report in reports { self?.syncReport = report }
+            },
+            Task { [weak self] in
+                for await state in states { self?.connection = MarfaHost.state(state) }
+            }
+        ]
+    }
+
+    isolated deinit {
+        for task in following { task.cancel() }
+    }
+
+    /// Purge needs the server, so it is offered only while the server can be reached. Moving, renaming files,
+    /// folders and importing are a files library's.
+    var capabilities: SourceCapabilities {
+        var offered = source.capabilities.intersection([.archive, .retype, .retier, .purge])
+        if connection != .online { offered.remove(.purge) }
+        return offered
+    }
+
+    /// The server keeps the bin, and its own rules for how long.
+    var trashDays: Int? { nil }
+    var folders: [Folder] { [] }
+    var completedImports: [UUID: ItemID] { [:] }
+
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
+        try await source.resolve(problem, by: action)
+    }
+
+    // MARK: Following the source
+
+    private func take(_ change: SourceChange) async {
+        switch change {
+        case .loaded(let snapshot):
+            let bodies = await readBodies(Set(snapshot.items.map(\.id)))
+            load(snapshot, bodies: bodies)
+        case .upserted(let items):
+            // A body is read before an item whose version moved is shown, so the version and the text the page
+            // reads agree; a local write keeps the version, and its text comes with `.bodyChanged`.
+            let moved = items.filter { item in records[item.id].map { $0.item.version != item.version } ?? true }
+            let bodies = moved.isEmpty ? [] : await readBodies(Set(moved.map(\.id)))
+            upsert(items, bodies: bodies)
+        case .removed(let ids):
+            remove(ids)
+        case .bodyChanged(let id, _):
+            hold(await readBodies([id]))
+        case .answered(let id, let outcome):
+            await answered(id, outcome)
+        case .catalogue(let catalogue):
+            self.catalogue = catalogue
+            reindex()
+        case .places:
+            // The sidebar's places are still the app's own; the source's are for when places drive it.
+            break
+        case .unavailable(let failure):
+            self.failure = (String(localized: "Can’t Read This Library"), failure.message)
+        }
+    }
+
+    private func readBodies(_ ids: Set<ItemID>) async -> [ItemBody] {
+        do {
+            return try await source.bodies(of: ids)
+        } catch {
+            failure = (String(localized: "Can’t Read This Library"), error.localizedDescription)
+            return []
+        }
+    }
+
+    /// Keeps the records the views already observe, so a second load tells each of them what changed.
+    private func load(_ snapshot: SourceSnapshot, bodies: [ItemBody]) {
+        catalogue = snapshot.catalogue
+        let present = Set(snapshot.items.map(\.id))
+        for (id, record) in records where !present.contains(id) {
+            record.isHeld = false
+            records[id] = nil
+        }
+        for item in snapshot.items {
+            if let record = records[item.id] {
+                if record.item != item { record.item = item }
+            } else {
+                records[item.id] = ItemRecord(item)
+            }
+        }
+        hold(bodies)
+        reindex()
+        isLoaded = true
+    }
+
+    private func upsert(_ items: [Item], bodies: [ItemBody]) {
+        var changed = false
+        var moved = false
+        for item in items {
+            if let record = records[item.id] {
+                let old = record.item
+                guard old != item else { continue }
+                index.remove(old)
+                record.item = item
+                index.insert(item, catalogue: catalogue)
+                if Self.placesDiffer(old, item) { moved = true }
+            } else {
+                records[item.id] = ItemRecord(item)
+                index.insert(item, catalogue: catalogue)
+                moved = true
+            }
+            changed = true
+        }
+        hold(bodies)
+        if changed { contentRevision += 1 }
+        if moved { membershipRevision += 1 }
+    }
+
+    private func remove(_ ids: [ItemID]) {
+        var changed = false
+        for id in ids {
+            guard let record = records.removeValue(forKey: id) else { continue }
+            index.remove(record.item)
+            record.isHeld = false
+            changed = true
+        }
+        guard changed else { return }
+        contentRevision += 1
+        membershipRevision += 1
+    }
+
+    /// Text read while the person's own text is still on its way is older than what the library holds.
+    private func hold(_ bodies: [ItemBody]) {
+        for body in bodies where unsettledText[body.id] == nil {
+            if let record = records[body.id], record.body != body { record.body = body }
+        }
+    }
+
+    private func reindex() {
+        index = MarfaItemIndex()
+        for record in records.values { index.insert(record.item, catalogue: catalogue) }
+        contentRevision += 1
+        membershipRevision += 1
+    }
+
+    private static func placesDiffer(_ old: Item, _ new: Item) -> Bool {
+        old.state != new.state || old.tier != new.tier || old.tags != new.tags || old.type != new.type
+            || old.edgesOut != new.edgesOut
+    }
+
+    private func answered(_ id: WriteID, _ outcome: WriteOutcome) async {
+        let refusal = refusals.removeValue(forKey: id)
+        if case .refused(let problem) = outcome, let refusal {
+            let message = problem.code == Self.notHeldCode ? refusal.notHeld ?? problem.message : problem.message
+            failure = (refusal.title, message ?? String(localized: "The Marfa server refused this change."))
+        }
+        guard let item = textWrites.removeValue(forKey: id) else { return }
+        unsettledText[item]?.remove(id)
+        guard unsettledText[item]?.isEmpty == true else { return }
+        unsettledText[item] = nil
+        // The server may have merged the text, or kept its own and put the person's on a copy.
+        hold(await readBodies([item]))
+    }
+
+    // MARK: Writing through the source
+
+    /// The package's code for an item the copy does not hold.
+    static let notHeldCode = "item_not_found"
+
+    /// Every write the library makes goes through here, so a refusal reaches the person under `title`.
+    @discardableResult
+    func submit(_ write: ItemWrite, failing title: String, notHeld: String? = nil) -> WriteID {
+        let id = WriteID()
+        refusals[id] = Refusal(title: title, notHeld: notHeld)
+        source.submit(write, as: id)
+        return id
+    }
+
+    /// The text the person gave is held at once, at the version it was edited from, until the source answers.
+    func holdText(_ text: String, of id: ItemID, base: ItemVersion, write: WriteID) {
+        unsettledText[id, default: []].insert(write)
+        textWrites[write] = id
+        records[id]?.body = ItemBody(id: id, text: text, version: base)
+    }
+
+    // MARK: Reading
+
+    func item(_ id: ItemID) -> Item? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        return record.isHeld ? record.item : nil
+    }
+
+    /// The items held among `ids`, observed as the lists are, for reads that gather many items at once.
+    func heldItems(_ ids: some Sequence<ItemID>) -> [Item] {
+        _ = contentRevision
+        return ids.compactMap { records[$0]?.item }
+    }
+
+    func items(in place: SidebarItem) -> [Item] {
+        let content = contentRevision
+        let membership = membershipRevision
+        if let held = listed[place], held.content == content { return held.items }
+        var listing = listed[place].flatMap { $0.membership == membership ? $0 : nil }
+            ?? Listing(membership: membership, ids: Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id))
+        listing.content = content
+        listing.items = listing.ids.compactMap { records[$0]?.item }
+        listed[place] = listing
+        return listing.items
+    }
+
+    func count(in place: SidebarItem) -> Int {
+        let revision = membershipRevision
+        if let held = counted[place], held.revision == revision { return held.count }
+        let count = members(of: place).count
+        counted[place] = (revision, count)
+        return count
+    }
+
+    /// Newest first, as the source paints them; the views sort as the person chose.
+    static func ordered(_ items: [Item]) -> [Item] {
+        items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
+    }
+
+    /// The Inbox is the feed tier. All Items is every active item in either tier, files among them, as All Notes
+    /// is in a folder. A type's place holds its subtypes too.
+    private func members(of place: SidebarItem) -> Set<ItemID> {
+        switch place {
+        case .inbox: return index.feed
+        case .allNotes: return index.ids(in: .active)
+        case .favorites: return index.favorites
+        case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
+        case .itemType(let type): return active(ofType: TypeID(type))
+        case .files: return active(ofType: MarfaMapping.fileType)
+        case .project(let id):
+            let active = index.ids(in: .active)
+            return index.reachable(from: id, type: MarfaMapping.parentEdge).union([id]).intersection(active)
+        case .recentlyDeleted: return index.ids(in: .trashed)
+        case .folder, .marfaTypes: return []
+        }
+    }
+
+    private func active(ofType type: TypeID) -> Set<ItemID> {
+        catalogue.descendants(of: type).union([type]).reduce(into: Set<ItemID>()) { found, type in
+            found.formUnion(index.activeByType[type] ?? [])
+        }
+    }
+
+    func name(of place: SidebarItem) -> String {
+        switch place {
+        case .inbox: String(localized: "Inbox")
+        case .allNotes: String(localized: "All Items")
+        case .favorites: String(localized: "Favorites")
+        case .favoriteItem(let id), .project(let id): item(id)?.title ?? ""
+        case .folder: ""
+        case .itemType(let type) where TypeID(type) == MarfaMapping.projectType: String(localized: "Projects")
+        case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
+        case .files: String(localized: "Files")
+        case .recentlyDeleted: String(localized: "Recently Deleted")
+        case .marfaTypes: String(localized: "Marfa Types")
+        }
+    }
+
+    func folder(_ id: ItemID) -> Folder? { nil }
+    func folder(of item: Item) -> Folder? { nil }
+
+    func isGone(_ id: ItemID?) -> Bool {
+        isLoaded && id.flatMap { item($0) } == nil
+    }
+
+    func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID] {
+        ids.filter { item($0) != nil }
+    }
+
+    func body(of id: ItemID) -> ItemBody? {
+        guard let record = records[id] else {
+            _ = membershipRevision
+            return nil
+        }
+        return record.isHeld ? record.body : nil
+    }
+
+    /// Marfa does not ask titles to differ.
+    func isItemTitleTaken(_ title: String) -> Bool { false }
+    func isNoteNameTaken(_ name: String, for id: ItemID) -> Bool { false }
+    func isFolderNameTaken(_ name: String, except id: ItemID?) -> Bool { false }
+
+    // MARK: Search
+
+    /// Answers from the copy's own search, which runs beside the views: until it returns, the last results stand,
+    /// and the views are told when the new ones arrive. A change to the items runs the search again.
+    func items(matching query: String) -> [Item] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        _ = searchRevision
+        let revision = contentRevision
+        let held = searches[query]
+        if held.map({ $0.revision != revision && !$0.running }) ?? true { startSearch(query, at: revision) }
+        return (held?.hits ?? lastFound).compactMap { hit in
+            records[hit.id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
+        }
+    }
+
+    func search(_ query: String) async throws -> [SearchMatch] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        return try await source.search(query, in: Self.searchScope).compactMap { hit in
+            guard let item = item(hit.id), item.state != .trashed else { return nil }
+            return SearchMatch(item: item, snippet: hit.snippet.isEmpty ? item.preview : hit.snippet)
+        }
+    }
+
+    private func startSearch(_ query: String, at revision: Int) {
+        searches[query, default: Search(revision: revision, hits: [], running: true)].running = true
+        searchOrder.removeAll { $0 == query }
+        searchOrder.append(query)
+        while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
+        Task { [weak self, source] in
+            let hits = (try? await source.search(query, in: Self.searchScope)) ?? []
+            guard let self else { return }
+            searches[query] = Search(revision: revision, hits: hits, running: false)
+            lastFound = hits
+            searchRevision += 1
+        }
+    }
+
+    // MARK: Files
+
+    var folderURL: URL? { nil }
+    /// A file's bytes come from the server's blobs, so they are never at hand without asking.
+    func fileURL(for id: ItemID) -> URL? { nil }
+
+    func fileURL(of id: ItemID) async throws -> URL? {
+        guard item(id)?.isFile == true else { return nil }
+        return try await source.fileURL(of: id)
+    }
+
+    func path(of id: ItemID) -> String? { nil }
+    func fileName(of id: ItemID) -> String? { nil }
+    func imageBase(of id: ItemID) -> String? { nil }
+}

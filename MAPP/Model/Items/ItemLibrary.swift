@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Everything the views, the commands and the editor use of a library, so none of them knows which kind holds the
-/// items. `NoteLibrary` is the folder of markdown files; a Marfa library is to be another.
+/// items. `NoteLibrary` is the folder of markdown files; `MarfaLibrary` is a Marfa server's working copy.
 ///
 /// Members that only make sense for files answer nil, or nothing, in a library whose items are not files, and a
 /// write a library cannot make is left out of its `capabilities`, so a view dims the command rather than asking.
@@ -34,6 +34,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func items(in place: SidebarItem) -> [Item]
     /// Every item not deleted whose title or text has the query.
     func items(matching query: String) -> [Item]
+    /// What `items(matching:)` finds, best match first, each with the words around what was found.
+    func search(_ query: String) async throws -> [SearchMatch]
     func count(in place: SidebarItem) -> Int
     func name(of place: SidebarItem) -> String
     func folder(_ id: ItemID) -> Folder?
@@ -111,7 +113,22 @@ protocol ItemLibrary: AnyObject, Observable {
     func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager?)
 }
 
+/// An item a search found, and the words around what was found, or its preview where the search found it by
+/// its title.
+nonisolated struct SearchMatch: Hashable, Sendable {
+    let item: Item
+    let snippet: String
+}
+
 extension ItemLibrary {
+    /// A library that holds every text answers from them, in its own order.
+    func search(_ query: String) async throws -> [SearchMatch] {
+        items(matching: query).map { item in
+            let snippet = body(of: item.id).flatMap { NoteText.snippet(of: $0.text, around: query) }
+            return SearchMatch(item: item, snippet: snippet ?? item.preview)
+        }
+    }
+
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {

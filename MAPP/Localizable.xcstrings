@@ -982,6 +982,84 @@
     },
     "Yes or no": {
       "extractionState": "manual"
+    },
+    "Invalid Property": {
+      "extractionState": "manual"
+    },
+    "The value does not match this property's type.": {
+      "extractionState": "manual"
+    },
+    "Edit Property": {
+      "extractionState": "manual"
+    },
+    "Can’t Link This Item": {
+      "extractionState": "manual"
+    },
+    "The item's title and path cannot be represented as an unambiguous file link.": {
+      "extractionState": "manual"
+    },
+    "Can’t Create Item": {
+      "extractionState": "manual"
+    },
+    "Choose a unique title without characters that cannot be used in a file name.": {
+      "extractionState": "manual"
+    },
+    "Edit Relationship": {
+      "extractionState": "manual"
+    },
+    "Unresolved Relationship": {
+      "extractionState": "manual"
+    },
+    "Resolve the existing target before replacing this relationship.": {
+      "extractionState": "manual"
+    },
+    "Can’t Edit This Property": {
+      "extractionState": "manual"
+    },
+    "This metadata uses a form that cannot be safely changed. Your file has been left unchanged.": {
+      "extractionState": "manual"
+    },
+    "An item can’t be linked to itself.": {
+      "extractionState": "manual"
+    },
+    "This kind of item can’t be linked here.": {
+      "extractionState": "manual"
+    },
+    "This would link the item back to itself through the items between them.": {
+      "extractionState": "manual"
+    },
+    "Can’t Change This Relationship": {
+      "extractionState": "manual"
+    },
+    "Only one item can be chosen here.": {
+      "extractionState": "manual"
+    },
+    "The item chosen is already linked this way, and can be only once.": {
+      "extractionState": "manual"
+    },
+    "Choose a kind of item and give it a title.": {
+      "extractionState": "manual"
+    },
+    "This item’s title is the first line of its text.": {
+      "extractionState": "manual"
+    },
+    "Can’t Recover": {
+      "extractionState": "manual"
+    },
+    "It’s in the Marfa server’s bin, which this Mac can’t bring items back from yet.": {
+      "extractionState": "manual"
+    },
+    "Couldn’t Make This Change": {
+      "extractionState": "manual"
+    },
+    "Can’t Read This Library": {
+      "extractionState": "manual"
+    },
+    "The Marfa server refused this change.": {
+      "extractionState": "manual"
+    },
+    "Files": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
