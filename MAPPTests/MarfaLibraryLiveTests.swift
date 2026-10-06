@@ -131,11 +131,28 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually(.seconds(20)) { library.item(child)?.title == title })
 
-                // A new parent replaces the one link a child holds, which waits for the package to have a call that
-                // moves an edge.
-                #expect(!library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo))
-                #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
-                library.failure = nil
+                // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
+                // holds none, and a refusal would leave it where it was.
+                step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
+                #expect(await eventually(.seconds(20)) {
+                    library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
+                })
+                #expect(library.failure == nil)
+                #expect(await eventually(.seconds(20)) {
+                    library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
+                })
+                // The server took the move of a source, which expires the copy and hydrates it again; nothing queued
+                // is lost, and the child is still under its new parent.
+                await source.flush()
+                #expect(await eventually(.seconds(30)) {
+                    library.relationships(for: parent).first { $0.field == "inverse:parent-of" } == nil
+                        && library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
+                })
+                #expect(await eventually(.seconds(20)) { library.syncReport.waiting == 0 })
+                undo.undo()
+                #expect(await eventually(.seconds(20)) {
+                    library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
+                })
                 // Without a parent, then under another, each seen from both ends, and undone.
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [], undoManager: undo)) }
                 #expect(await eventually(.seconds(20)) {

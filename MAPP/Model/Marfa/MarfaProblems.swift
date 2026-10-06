@@ -5,9 +5,8 @@ import Marfa
 /// the rules are tested on values made by hand.
 nonisolated enum MarfaProblems {
     /// The server tags each conflicted copy it makes, and the tag stays until the person keeps or bins the copy.
+    /// Which item a copy was made from is the package's to say (`Items.original(ofConflictedCopy:)`).
     static let conflictedCopyTag = "conflicted-copy"
-    /// Written from a conflicted copy to the item it was made from, so the original is known after a restart.
-    static let derivedFromEdge = "derived-from"
 
     nonisolated struct ConflictedCopy: Hashable, Sendable {
         var row: Marfa.Item

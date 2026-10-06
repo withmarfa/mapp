@@ -534,19 +534,34 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
     }
 
-    @Test func aLinkIsAddedAndRemovedButNotReplacedYet() async throws {
+    @Test func aLinkIsAddedRemovedAndReplacedByAMove() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         undo.groupsByEvent = false
-        let notYet = String(localized: "Changing this link isn’t available yet in a Marfa library.")
-        // A new parent, or a child taken from the parent it has, would replace the one link that end holds.
-        #expect(!library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
-        #expect(library.failure?.message == notYet)
-        library.failure = nil
-        #expect(!library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
-        #expect(library.failure?.message == notYet)
-        #expect(source.writes.isEmpty)
-        #expect(!undo.canUndo)
+        // A new parent replaces the one link a child holds: one move of the edge's source, which keeps its id.
+        undo.beginUndoGrouping()
+        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        undo.endUndoGrouping()
+        #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)])
+        #expect(library.failure == nil)
+        // The undo moves it back, to the parent it had.
+        source.clearWrites()
+        undo.undo()
+        #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.e1)])
+        undo.redo()
+        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .source, to: F.p1))
+
+        // A child chosen under a project from the project's side is taken from the parent it has, in one move.
+        source.clearWrites()
+        undo.beginUndoGrouping()
+        #expect(library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
+        undo.endUndoGrouping()
+        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)])
+        source.clearWrites()
+        undo.undo()
+        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p1)])
+        #expect(library.failure == nil)
+        source.clearWrites()
 
         // Removing the parent, then choosing one for an end that holds none, are each one write.
         undo.beginUndoGrouping()
@@ -586,15 +601,79 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         ])
         let (library, source) = try await loaded(F.items + [bug2])
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
-        // The first bug is already superseded by the second, and can be only once.
-        #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
-        #expect(library.failure?.title == String(localized: "Can’t Change This Relationship"))
         #expect(!library.setItemRelationship(F.t1, field: "inverse:supersedes", targetIDs: [F.e1, bug2.id], undoManager: nil))
-        // Chosen from the other end, the second bug would give up what it superseded: a replacement, not made yet.
-        library.failure = nil
-        #expect(!library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
-        #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
+        #expect(library.failure?.message == String(localized: "Only one item can be chosen here."))
         #expect(source.writes.isEmpty)
+
+        // The first bug is already superseded by the second. That link is the second bug's own, so the task does
+        // not take it: the person is told which item holds it, and nothing is sent.
+        library.failure = nil
+        #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
+        #expect(library.failure?.message
+            == String(localized: "“\("Bug two")” already holds this link to “\("Bug one")”. Remove it there first."))
+        #expect(source.writes.isEmpty)
+        #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.targets.map(\.itemID) == [bug2.id])
+        // Chosen from the other end, the second bug's own link changes from the first bug to the task: the edge's
+        // target moves.
+        library.failure = nil
+        #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
+        #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)])
+        #expect(library.failure == nil)
+    }
+
+    /// Both ends hold one link of their type, so the one move cannot also free the end it takes from.
+    @Test func aMoveThatNeedsTwoEdgesToChangeIsToldAndNotSent() async throws {
+        func bug(_ id: String, supersedes target: ItemID? = nil, edge: String = "") -> MAPP.Item {
+            F.item(ItemID(id), F.bug, "Bug \(id)", age: 0, edges: target.map {
+                [Edge(id: EdgeID(edge), type: "supersedes", source: ItemID(id), target: .item($0), origin: .property("supersedes"))]
+            } ?? [])
+        }
+        let (library, source) = try await loaded(F.items + [bug("a"), bug("b"), bug("c", supersedes: ItemID("a"), edge: "s1"),
+            bug("d", supersedes: ItemID("b"), edge: "s2")])
+        // `a`, superseded by `c`, would be superseded by `d` instead, which supersedes `b`: two edges would change.
+        #expect(!library.setItemRelationship(ItemID("a"), field: "inverse:supersedes", targetIDs: [ItemID("d")], undoManager: nil))
+        #expect(library.failure?.message
+            == String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
+        #expect(source.writes.isEmpty)
+        // From `c`'s own side, `b` is held by `d` as its own link, which is never taken from it.
+        library.failure = nil
+        #expect(!library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil))
+        #expect(library.failure?.message
+            == String(localized: "“\("Bug d")” already holds this link to “\("Bug b")”. Remove it there first."))
+        #expect(source.writes.isEmpty)
+        // Replacing its own link for an item that holds none is one move of the end that goes.
+        library.failure = nil
+        #expect(library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [F.t1], undoManager: nil))
+        #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)])
+    }
+
+    /// A refusal that turns on rows the copy may not hold, such as a longer cycle, is the server's: it is told in the
+    /// server's words, and the link stays where it was.
+    @Test func aMoveTheServerRefusesIsToldAndLeavesTheOldLink() async throws {
+        let (library, source) = try await loaded()
+        library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: nil)
+        let move = try #require(source.submitted.last?.id)
+        source.send(.answered(move, .refused(SyncProblem(code: "edge_cycle", message: "That would close a cycle."))))
+        #expect(await eventually { library.failure != nil })
+        #expect(library.failure?.title == String(localized: "Can’t Change This Relationship"))
+        #expect(library.failure?.message == "That would close a cycle.")
+        #expect(library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.e1])
+        #expect(source.writes.count == 1)
+    }
+
+    /// The contract's cycle rule is kept before anything is sent, and a move that would close one leaves the old link.
+    @Test func aMoveThatWouldCloseACycleIsToldAndLeavesTheOldLink() async throws {
+        let (library, source) = try await loaded()
+        let cycle = String(localized: "This would link the item back to itself through the items between them.")
+        // The task's child is below it, so it cannot become the task's parent.
+        #expect(!library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.t1], undoManager: nil))
+        #expect(library.failure?.message == cycle)
+        // Nor can the project take its own grandchild as its parent from the other end.
+        library.failure = nil
+        #expect(!library.setItemRelationship(F.t1, field: "inverse:parent-of", targetIDs: [F.p1], undoManager: nil))
+        #expect(library.failure?.message == cycle)
+        #expect(source.writes.isEmpty)
+        #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.p1])
     }
 
     @Test func aRelationshipTheContractRefusesIsToldAndNotSent() async throws {
