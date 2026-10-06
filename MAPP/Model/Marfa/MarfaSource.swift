@@ -86,10 +86,11 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         events.yield(.write(write, id))
     }
 
-    /// Takes the new key between server calls; the follow and the drain go on with it.
-    func useKey(_ key: String) async throws {
+    /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
+    /// with it whatever the answer, so a caller that keeps another key gives that one back.
+    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
         do {
-            try await engine.sync.useKey(key)
+            return try await engine.sync.tryKey(key)
         } catch let error as MarfaError {
             // A copy that could not open its store again is closed for good, and is opened again.
             if case .closed = error { throw SourceFailure(kind: .missing, message: error.message) }
@@ -117,7 +118,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
             // copy announces the withdrawal, which the engine reads again.
             do {
-                return try await copy.queue.withdraw(id)
+                return try await MarfaEngine.asking(hub) { try await copy.queue.withdraw(id) }
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: error.message)
             }
@@ -153,7 +154,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
         do {
-            return try await copy.blobs.get(hash)
+            return try await MarfaEngine.asking(hub) { try await copy.blobs.get(hash) }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -171,7 +172,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
         let hits: [SearchHit]
         do {
-            hits = try await copy.search(text, filters: filters, limit: 500)
+            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500) }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -195,6 +196,26 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
     }
 
+    /// The report once every write submitted before this call is in the queue.
+    func settledReport() async -> SyncReport {
+        await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.settle(continuation)) { continuation.resume(returning: hub.report.value) }
+        }
+    }
+
+    /// Closes, as `close()` does, only if no more than `limit` writes are not sent once every write submitted
+    /// before this call is in the queue, deciding and closing in one step; otherwise it stays open and answers
+    /// the report that kept it so.
+    func close(unlessUnsentExceeds limit: Int) async -> SyncReport? {
+        let kept = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.closeIfUnsent(atMost: limit, continuation)) {
+                continuation.resume(returning: nil)
+            }
+        }
+        if kept == nil { events.finish() }
+        return kept
+    }
+
     /// Nothing submitted after this is taken, and a flush still waiting returns.
     func close() async {
         await withCheckedContinuation { continuation in
@@ -207,10 +228,11 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     /// A row in the bin is not answered by `get`, only by a list of the bin.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
-            if let row = try await copy.items.get(id.rawValue) { return row }
-            if let row = try await copy.items.list(ListFilters(state: .trashed)).first(where: { $0.id == id.rawValue }) {
-                return row
+            let row = try await MarfaEngine.asking(hub) { () async throws -> Marfa.Item? in
+                if let row = try await copy.items.get(id.rawValue) { return row }
+                return try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue }
             }
+            if let row { return row }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -236,10 +258,26 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     private let state = Mutex(State())
+    private let keyChange = Mutex((changing: false, count: 0))
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())
 
     var connection: MarfaConnectionState { connectionState.value }
+
+    /// Counts each start and end of a change of key, so a call refused during one is told from one refused for
+    /// its own sake.
+    var keyChanges: Int { keyChange.withLock { $0.count } }
+
+    func keyChanged(since mark: Int) -> Bool {
+        keyChange.withLock { $0.changing || $0.count != mark }
+    }
+
+    func changingKey(_ changing: Bool) {
+        keyChange.withLock {
+            $0.changing = changing
+            $0.count += 1
+        }
+    }
     var catalogue: Catalogue { state.withLock { $0.snapshot?.catalogue ?? Catalogue() } }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {

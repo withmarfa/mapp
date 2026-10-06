@@ -18,6 +18,11 @@ actor MarfaEngine {
         case discard(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
         /// Sends a stopped write again.
         case release(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
+        /// Answers the report once every event before it is taken, so every write submitted before it counts.
+        case settle(CheckedContinuation<SyncReport, Never>)
+        /// Closes, as `close` does, only if no more than the limit of writes are not sent once every event before
+        /// it is taken; otherwise answers the report that kept it open.
+        case closeIfUnsent(atMost: Int, CheckedContinuation<SyncReport?, Never>)
     }
 
     /// A write the package does not offer yet, or this source does not make yet.
@@ -94,6 +99,8 @@ actor MarfaEngine {
                 if case .drained(_, let taken) = event { taken.resume() }
                 if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
                 if case .release(_, let done) = event { done.resume(returning: .success(false)) }
+                if case .settle(let done) = event { done.resume(returning: hub.report.value) }
+                if case .closeIfUnsent(_, let done) = event { done.resume(returning: nil) }
                 continue
             }
             switch event {
@@ -113,13 +120,41 @@ actor MarfaEngine {
                 }
             case .discard(let id, let done): done.resume(returning: await discard(id))
             case .release(let id, let done): done.resume(returning: await release(id))
+            case .settle(let done):
+                done.resume(returning: hub.report.value)
+            case .closeIfUnsent(let limit, let done):
+                let report = hub.report.value
+                if (report.queueRead ? report.changesNotSent : .max) > limit {
+                    done.resume(returning: report)
+                } else {
+                    await shutDown()
+                    done.resume(returning: nil)
+                }
             case .close(let done):
-                closed = true
-                following?.cancel()
-                await sync.stop()
-                await copy.close()
-                hub.finish()
+                await shutDown()
                 done.resume()
+            }
+        }
+    }
+
+    private func shutDown() async {
+        closed = true
+        following?.cancel()
+        await sync.stop()
+        await copy.close()
+        hub.finish()
+    }
+
+    /// The package refuses every call while the copy changes its key, as `invalid`, and asks for it again; that
+    /// is a wait, never a refusal or a failure to show. `invalid` at any other time is the call's own fault.
+    nonisolated static func asking<T>(_ hub: MarfaHub, _ work: () async throws -> T) async throws -> T {
+        while true {
+            let mark = hub.keyChanges
+            do {
+                return try await work()
+            } catch let error as MarfaError {
+                guard case .invalid = error, hub.keyChanged(since: mark) else { throw error }
+                try? await Task.sleep(for: .milliseconds(20))
             }
         }
     }
@@ -142,14 +177,19 @@ actor MarfaEngine {
     /// Reads the catalogue, every row in every state, their edges and the queue, and publishes what differs. A
     /// copy that cannot be read keeps showing what it last held, and says why.
     private func reload() async {
-        var rows: [String: Marfa.Item] = [:]
-        var edges: [Marfa.Edge] = []
+        let rows: [String: Marfa.Item]
+        let edges: [Marfa.Edge]
         let catalogue: Catalogue
         do {
-            catalogue = try await MarfaMapping.catalogue(
-                itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
-            for row in try await copy.items.list(ListFilters(allStates: true)) { rows[row.id] = row }
-            for type in catalogue.edgeTypes.keys { edges += try await copy.edges.ofType(type) }
+            (catalogue, rows, edges) = try await Self.asking(hub) {
+                let catalogue = try await MarfaMapping.catalogue(
+                    itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
+                var rows: [String: Marfa.Item] = [:]
+                var edges: [Marfa.Edge] = []
+                for row in try await copy.items.list(ListFilters(allStates: true)) { rows[row.id] = row }
+                for type in catalogue.edgeTypes.keys { edges += try await copy.edges.ofType(type) }
+                return (catalogue, rows, edges)
+            }
         } catch {
             failures.append(Self.failure(error))
             publish([])
@@ -170,12 +210,14 @@ actor MarfaEngine {
         var affected = Set(ids)
         do {
             for id in ids {
-                var row = try await copy.items.get(id)
-                if row == nil {
-                    row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
+                let (row, held) = try await Self.asking(hub) {
+                    var row = try await copy.items.get(id)
+                    if row == nil {
+                        row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
+                    }
+                    return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
                 }
                 rows[id] = row
-                let held = row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id)
                 for edgeID in edgesByItem[id] ?? [] {
                     if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
                 }
@@ -194,7 +236,7 @@ actor MarfaEngine {
     /// A queue that cannot be read leaves each item's sync as it was, rather than settling it.
     private func readQueue() async {
         do {
-            queue = try await copy.queue.all()
+            queue = try await Self.asking(hub) { try await copy.queue.all() }
         } catch {
             failures.append(Self.failure(error))
             return
@@ -330,7 +372,7 @@ actor MarfaEngine {
         do {
             for write in entry.dependents + [id] {
                 if held.contains(write) {
-                    guard try await copy.queue.discard(write) else { continue }
+                    guard try await Self.asking(hub, { try await copy.queue.discard(write) }) else { continue }
                 }
                 refusals[write] = nil
             }
@@ -351,7 +393,7 @@ actor MarfaEngine {
         guard let entry = entry(id), entry.actions.contains(.tryAgain) else { return .success(false) }
         let released: Bool
         do {
-            released = try await copy.queue.release(id)
+            released = try await Self.asking(hub) { try await copy.queue.release(id) }
         } catch {
             return .failure(Self.failure(error))
         }
@@ -402,7 +444,7 @@ actor MarfaEngine {
         do {
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
-                let created = try await create(itemID, draft)
+                let created = try await Self.asking(hub) { try await create(itemID, draft) }
                 record(id, [created])
                 touched = [itemID.rawValue]
                 if let parent = draft.parent {
@@ -410,7 +452,7 @@ actor MarfaEngine {
                     touched.insert(parent.rawValue)
                 }
             } else {
-                let queued = try await queue(write)
+                let queued = try await Self.asking(hub) { try await queue(write) }
                 record(id, queued)
                 touched = Set(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
             }
@@ -498,7 +540,9 @@ actor MarfaEngine {
     /// trying the create again makes no second item.
     private func place(_ child: ItemID, under parent: ItemID) async {
         do {
-            _ = try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)
+            _ = try await Self.asking(hub) {
+                try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)
+            }
         } catch {
             let reason = Self.failure(error).message
             failures.append(SourceFailure(
@@ -547,7 +591,7 @@ actor MarfaEngine {
         }
         await reread(ids)
         do {
-            _ = try await copy.queue.forgetAnswered()
+            _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
         } catch {
             failures.append(Self.failure(error))
         }

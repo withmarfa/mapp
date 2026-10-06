@@ -165,6 +165,27 @@ struct MarfaProblemsTests {
         #expect(report.problems[2].actions == [.discard])
     }
 
+    /// Each later write's values win, field by field, as the queue would have sent them.
+    @Test func whatWasTypedAfterARefusedCreateIsPartOfIt() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let unsent = Refusal(reason: "the create_item it waits for was refused")
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: [
+                "type": "core.task", "id": "item", "properties": ["title": "Plan", "body": "First words", "status": "open"]
+            ], at: "2026-10-06T08:00:00Z"),
+            Self.write("edit", .refused(unsent), body: [
+                "properties": ["body": "First words, then everything typed after"], "version": 0
+            ], dependsOn: ["create"], at: "2026-10-06T08:01:00Z"),
+            Self.write("later", .refused(unsent), body: ["properties": ["status": "done"], "version": 0],
+                dependsOn: ["create"], at: "2026-10-06T08:02:00Z"),
+            Self.write("tag", .refused(unsent), kind: .addTag, body: ["tags": ["favorite"]], dependsOn: ["create"],
+                at: "2026-10-06T08:03:00Z")
+        ])
+        let entry = try #require(report.problems.first)
+        #expect(report.problems.count == 1)
+        #expect(entry.copyText == "Plan\n\nFirst words, then everything typed after\n\nStatus: done\nTags: favorite")
+    }
+
     @Test func refusalsTheQueueForgotAreKept() {
         let refusal = Refusal(reason: "item_not_found", code: "item_not_found", trashed: true)
         let forgotten = Self.write("gone", .refused(refusal), kind: .addTag, body: ["tags": ["a"]])

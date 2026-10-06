@@ -38,14 +38,15 @@ nonisolated enum MarfaProblems {
         }
 
         let roots = foldedRoots(stopped)
-        var dependents: [String: [String]] = [:]
+        var dependents: [String: [QueuedWrite]] = [:]
         for write in stopped {
-            if let root = roots[write.id] { dependents[root, default: []].append(write.id) }
+            if let root = roots[write.id] { dependents[root, default: []].append(write) }
         }
         var problems = stopped.filter { roots[$0.id] == nil }.compactMap { write -> SyncProblemEntry? in
             let type = write.body["type"]?.string.map { TypeID($0) } ?? write.itemId.flatMap { types[$0] }
-            var entry = entry(for: write, type: type, catalogue: catalogue)
-            entry?.dependents = dependents[write.id] ?? []
+            let folded = dependents[write.id] ?? []
+            var entry = entry(for: write, body: merged(write, with: folded), type: type, catalogue: catalogue)
+            entry?.dependents = folded.map(\.id)
             return entry
         }
         problems += conflictedCopies.map { entry(for: $0, catalogue: catalogue) }
@@ -78,12 +79,38 @@ nonisolated enum MarfaProblems {
         return roots
     }
 
+    /// What the person last wrote to the item across a write and those that went only with it, in the order
+    /// they were queued: each later value wins, field by field, and tags add up. An edge's properties are the
+    /// edge's, not the item's.
+    static func merged(_ root: QueuedWrite, with folded: [QueuedWrite]) -> [String: JSONValue] {
+        var body = root.body
+        var properties: [String: JSONValue] = [:]
+        if case .object(let written) = body["properties"] { properties = written }
+        var tags: [JSONValue] = []
+        if case .array(let written) = body["tags"] { tags = written }
+        for write in folded where write.itemId == root.itemId {
+            switch write.kind {
+            case .createItem, .updateItem:
+                if case .object(let written) = write.body["properties"] { properties.merge(written) { _, later in later } }
+            case .addTag:
+                if case .array(let written) = write.body["tags"] { tags += written.filter { !tags.contains($0) } }
+            default:
+                continue
+            }
+        }
+        if !properties.isEmpty { body["properties"] = .object(properties) }
+        if !tags.isEmpty { body["tags"] = .array(tags) }
+        return body
+    }
+
     /// The queue's own refusal carries only its reason; the server's carries its code.
     private static func isRefusedUnsent(_ write: QueuedWrite) -> Bool {
         if case .refused(let refusal) = write.verdict { refusal.code == nil } else { false }
     }
 
-    static func entry(for write: QueuedWrite, type: TypeID?, catalogue: Catalogue) -> SyncProblemEntry? {
+    static func entry(
+        for write: QueuedWrite, body: [String: JSONValue]? = nil, type: TypeID?, catalogue: Catalogue
+    ) -> SyncProblemEntry? {
         let kind: SyncProblemEntry.Kind
         let reason: SyncProblem
         switch write.verdict {
@@ -104,7 +131,7 @@ nonisolated enum MarfaProblems {
         }
         return SyncProblemEntry(
             id: .write(write.id), itemID: write.itemId.map { ItemID($0) }, kind: kind, change: change(write.kind),
-            reason: reason, content: content(of: write.body, type: type, catalogue: catalogue),
+            reason: reason, content: content(of: body ?? write.body, type: type, catalogue: catalogue),
             actions: actions(for: kind), date: MarfaMapping.date(write.queuedAt))
     }
 

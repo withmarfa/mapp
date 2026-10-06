@@ -124,9 +124,18 @@ actor MarfaSync {
         .seconds(min(5 * (1 << min(max(failures, 1) - 1, 10)), 300))
     }
 
-    /// Gives the copy a new key between server calls. Writes a refused key parked clear on their own at the
-    /// next drain, which the refresh after it sends, so nothing is released here.
-    func useKey(_ key: String) async throws {
+    /// What the server made of a key the copy was given.
+    nonisolated enum KeyCheck: Hashable, Sendable {
+        case accepted
+        case refused
+        /// The server could not be asked; the copy goes on with the key and asks again later.
+        case unanswered(String?)
+    }
+
+    /// Gives the copy `key` between server calls and refreshes with it at once, so the caller learns whether the
+    /// server takes it. Writes made meanwhile wait for the copy rather than fail. Writes a refused key parked
+    /// clear on their own at the next drain, which follows an accepted key, so nothing is released here.
+    func tryKey(_ key: String) async throws -> KeyCheck {
         paused = true
         retry?.cancel()
         retry = nil
@@ -135,9 +144,38 @@ actor MarfaSync {
             paused = false
             work()
         }
-        try await copy.useKey(key)
+        hub.changingKey(true)
+        do {
+            try await copy.useKey(key)
+        } catch {
+            hub.changingKey(false)
+            throw error
+        }
+        hub.changingKey(false)
         failures = 0
-        wantsRefresh = true
+        if hub.connection != .online { hub.set(.connecting) }
+        do {
+            try await refreshNow()
+            refreshed = true
+            succeeded()
+            wantsDrain = true
+            return .accepted
+        } catch let error as MarfaError where Self.refusesKey(error) {
+            if case .copyExpired = error { refreshed = false }
+            hub.set(.keyRefused)
+            return .refused
+        } catch {
+            await failed(error, retrying: .refresh)
+            return .unanswered((error as? MarfaError)?.message ?? error.localizedDescription)
+        }
+    }
+
+    nonisolated static func refusesKey(_ error: MarfaError) -> Bool {
+        switch error {
+        case .unauthorized, .forbidden, .signedOut: true
+        case .copyExpired(let reason, _): reason == credentialEnded
+        default: false
+        }
     }
 
     private func work() {
@@ -169,20 +207,24 @@ actor MarfaSync {
     private func runRefresh() async {
         if hub.connection != .online { hub.set(.connecting) }
         do {
-            let status = try await copy.status()
-            if status.hydration == .complete {
-                _ = try await copy.catchUp()
-                if Set(MarfaMapping.namespaces(of: try await catalogue())) != Set(status.sliceTypes) {
-                    try await hydrate()
-                }
-            } else {
-                try await hydrate()
-            }
+            try await refreshNow()
             refreshed = true
             succeeded()
             wantsDrain = true
         } catch {
             await failed(error, retrying: .refresh)
+        }
+    }
+
+    private func refreshNow() async throws {
+        let status = try await copy.status()
+        if status.hydration == .complete {
+            _ = try await copy.catchUp()
+            if Set(MarfaMapping.namespaces(of: try await catalogue())) != Set(status.sliceTypes) {
+                try await hydrate()
+            }
+        } else {
+            try await hydrate()
         }
     }
 
@@ -267,13 +309,10 @@ actor MarfaSync {
         case .network, .io, .unnamed, .redirected, .rateLimited:
             hub.set(.offline(reason: error.message))
             schedule(kind)
-        case .unauthorized, .forbidden, .signedOut:
-            hub.set(.keyRefused)
-            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
-        case .copyExpired(let reason, _) where reason == Self.credentialEnded:
-            // The key was refused for good, which expires the copy; hydrating again before a new key is given
-            // would only be refused again.
-            refreshed = false
+        case _ where Self.refusesKey(error):
+            // A key refused for good also expires the copy; hydrating again before a new key is given would only
+            // be refused again.
+            if case .copyExpired = error { refreshed = false }
             hub.set(.keyRefused)
             _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
         case .copyExpired:
