@@ -11,7 +11,7 @@ extension View {
 
     /// Tells changes a library closed before keeping, in whichever window is in front, since the library that
     /// refused them is no longer shown anywhere. Their text goes to the clipboard as the person is told, so it
-    /// outlives the alert.
+    /// outlives the alert; a later refusal adds to the alert and the clipboard until the person answers.
     func unkeptChanges(_ libraries: Libraries) -> some View {
         modifier(UnkeptChanges(libraries: libraries))
     }
@@ -28,7 +28,12 @@ private struct UnkeptChanges: ViewModifier {
             .onChange(of: appearsActive, take)
             .alert(
                 shown?.title ?? "",
-                isPresented: Binding { shown != nil } set: { if !$0 { shown = nil } },
+                isPresented: Binding { shown != nil } set: {
+                    if !$0 {
+                        shown = nil
+                        libraries.unkept = nil
+                    }
+                },
                 presenting: shown
             ) { _ in
             } message: { unkept in
@@ -38,7 +43,8 @@ private struct UnkeptChanges: ViewModifier {
 
     private func take() {
         guard appearsActive, let unkept = libraries.unkept else { return }
-        libraries.unkept = nil
+        // Kept until the person has answered, so text refused while the alert is up is added to it and to the
+        // clipboard rather than replacing what the first refusal left there.
         if let text = unkept.text {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
