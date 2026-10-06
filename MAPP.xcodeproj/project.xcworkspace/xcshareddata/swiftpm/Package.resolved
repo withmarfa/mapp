@@ -1,6 +1,33 @@
 {
-  "originHash" : "00fc82b0de716b0b6fae8646fae1c289e5b4679f93a4b0a9aca7e47cd71f9315",
+  "originHash" : "94729fb8e9f5e8211179cf41647988bbb9eb40295dfa5ecbcbed5c86c03e5b94",
   "pins" : [
+    {
+      "identity" : "marfa-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/withmarfa/marfa-swift",
+      "state" : {
+        "revision" : "9e3935995f741bfde967a3bade430b0970581141",
+        "version" : "0.0.4"
+      }
+    },
+    {
+      "identity" : "swift-http-types",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-http-types",
+      "state" : {
+        "revision" : "bff4b6903cdc99dda49649dd52f46c11cfd3ed50",
+        "version" : "1.8.0"
+      }
+    },
+    {
+      "identity" : "swift-openapi-runtime",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-runtime",
+      "state" : {
+        "revision" : "62595194f7d5951ef32129b15c0790ef24886867",
+        "version" : "1.12.2"
+      }
+    },
     {
       "identity" : "yams",
       "kind" : "remoteSourceControl",
