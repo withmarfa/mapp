@@ -54,6 +54,12 @@ importers:
       jsdom:
         specifier: ^30.1.0
         version: 30.1.0
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3
+      micromark-util-types:
+        specifier: ^2.0.2
+        version: 2.0.2
       prettier:
         specifier: ^3.9.8
         version: 3.9.8

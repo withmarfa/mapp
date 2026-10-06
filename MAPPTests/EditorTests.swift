@@ -10,16 +10,22 @@ import WebKit
 struct EditorTests {
     /// An editor whose page has loaded, reporting each change it makes.
     final class Harness {
-        let editor = EditorController()
+        /// The editor holds its library weakly, so the harness keeps the one it loads from.
+        let library: NoteLibrary
+        let editor: EditorController
         var changes: [String] = []
 
-        init() async throws {
-            editor.onChange = { [unowned self] _, markdown in changes.append(markdown) }
+        init(library: NoteLibrary = NoteLibrary()) async throws {
+            self.library = library
+            editor = EditorController(library: library)
+            editor.onChange = { [unowned self] _, markdown, _ in changes.append(markdown) }
             try await wait { self.editor.isReady }
         }
 
         func load(_ body: String, deleted: Bool = false) async throws {
-            editor.load(Note(body: body, created: .now, deleted: deleted ? .now : nil))
+            let note = Note(body: body, created: .now, deleted: deleted ? .now : nil)
+            library.notes.append(note)
+            editor.load(try #require(library.item(note.id)))
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
         }
@@ -31,6 +37,17 @@ struct EditorTests {
 
         func run(_ script: String) async throws {
             _ = try await editor.webView.evaluateJavaScript("\(script); 0")
+        }
+
+        /// The page's text, once it reads `expected` or after a couple of seconds.
+        func shownText(until expected: String) async throws -> String {
+            var shown = ""
+            for _ in 0..<40 {
+                shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
+                if shown == expected { break }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            return shown
         }
 
         /// Waits for something the page does in its own time, such as reporting an edit after a pause.
@@ -144,43 +161,99 @@ struct EditorTests {
         #expect(page.changes == ["# Draft\n"])
     }
 
+    @Test func aNoteWhoseTextCannotBeReadIsNotOpenedForWriting() async throws {
+        let page = try await Harness()
+        try await page.load("Kept\n")
+        let note = Note(body: "Plan\n", created: .now)
+        let item = try #require(NoteLibrary(notes: [note]).item(note.id))
+        // The editor's library has no text for this item, so the page must not open an empty note to type into.
+        page.editor.load(item)
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.noteID != item.id)
+        page.editor.noteChanged(item)
+        #expect(page.editor.noteID != item.id)
+    }
+
     @Test func aFirstLineTypedWithASpaceAtItsEndNamesTheFileWithoutIt() async throws {
         let store = RecordingStore()
-        let library = NoteLibrary(store: store)
-        let note = library.newNote(in: .inbox)
-        let page = try await Harness()
-        page.editor.library = library
-        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
-        page.editor.load(try #require(library.note(note.id)))
+        let note = Note(body: "Plan\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: store)
+        let page = try await Harness(library: library)
+        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        page.editor.onLeave = { library.leave($0) }
+        page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'R&D plan ')")
-        // Leaving the note writes it, named after its first line.
+        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, 'R&D plan ')")
+        // Leaving the note renames its file after its first line.
         page.editor.flush()
-        try await page.wait { library.note(note.id)?.path != nil }
+        try await page.wait { library.note(note.id)?.path != "Plan.md" }
         #expect(library.note(note.id)?.path == "R&D plan.md")
         #expect(library.note(note.id)?.title == "R&D plan")
     }
 
-    @Test func anEditOverlappingAnOutsideChangeWinsOnThePageAsInTheFile() async throws {
+    /// An edit still waiting to be reported when another change to the note is taken in was typed on the text
+    /// before that change. Laid over the note it would replace text the person never saw, so it is kept beside the
+    /// note as a copy, and the note and the page keep the other change.
+    @Test func anEditOverlappingAnOutsideChangeIsKeptAsACopy() async throws {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
-        let page = try await Harness()
-        page.editor.library = library
-        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
-        page.editor.load(note)
+        let page = try await Harness(library: library)
+        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        // The person's edit is still waiting to be reported when another app's change is taken in.
         page.editor.format(.checklist)
+        // Another window's text, typed on the text it held.
         library.updateBody(of: note.id, to: "Outside\n")
-        page.editor.noteChanged(try #require(library.note(note.id)))
-        try await page.wait { library.note(note.id)?.body == "- [ ] Milk\n" }
+        page.editor.noteChanged(try #require(library.item(note.id)))
+        try await page.wait { library.notes.count == 2 }
+        #expect(library.note(note.id)?.body == "Outside\n")
+        let copy = try #require(library.notes.first { $0.id != note.id })
+        #expect(copy.body == "- [ ] Milk\n")
+        #expect(copy.path == "Milk (Conflicted Copy).md")
+        #expect(library.failure?.title == String(localized: "Saved as a Copy"))
+        #expect(try await page.shownText(until: "Outside") == "Outside")
+    }
+
+    /// The same in a Marfa library: the edit is sent as typed on the version before the other device's text, so the
+    /// server keeps both, and the page shows the other device's text rather than taking the edit back over it.
+    @Test func anEditOverlappingAnotherDevicesTextIsSentAsTypedOnTheOlderVersion() async throws {
+        typealias F = LibraryFixture
+        let source = FakeItemSource()
+        for (id, text) in F.texts { source.setBody(text, of: id) }
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let editor = EditorController(library: library)
+        editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        try #require(await eventually { editor.isReady })
+        let item = try #require(library.item(F.n1))
+        editor.load(item)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        editor.format(.checklist)
+        var theirs = item
+        theirs.version = ItemVersion(2)
+        source.setBody("Theirs", of: F.n1, version: 2)
+        source.send(.upserted([theirs]))
+        try #require(await eventually { library.body(of: F.n1)?.text == "Theirs" })
+        editor.noteChanged(try #require(library.item(F.n1)))
+        let typed = await eventually {
+            source.writes.contains { if case .editBody = $0 { true } else { false } }
+        }
+        try #require(typed)
+        guard case .editBody(F.n1, let text, let base, let merge) = source.writes.last else {
+            Issue.record("sent \(source.writes)")
+            return
+        }
+        #expect(text.contains("[ ] Note body"))
+        #expect(base == ItemVersion(1))
+        #expect(merge == .asRead)
+        #expect(library.body(of: F.n1)?.text == "Theirs")
         var shown = ""
-        for _ in 0..<40 {
-            shown = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
-            if shown == "Milk" { break }
+        for _ in 0..<20 {
+            shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(shown == "Milk")
+        #expect(shown == "Theirs")
     }
 
     @Test func anImageInTheNotesFolderShowsAndOneLinkedFromOutsideDoesNot() async throws {
@@ -199,9 +272,8 @@ struct EditorTests {
         )
         let note = Note(body: "![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n", created: .now)
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness()
-        page.editor.library = library
-        page.editor.load(note)
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(note.id)))
         var widths: [Int] = []
         for _ in 0..<40 {
             widths = try await page.editor.webView.evaluateJavaScript(
@@ -215,6 +287,203 @@ struct EditorTests {
             "[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)"
         ) as? [String]
         #expect(absent == ["b"])
+    }
+
+    // MARK: Embedded files of any kind
+
+    /// Evaluates a script until it answers what `done` accepts, as a page loading files takes its own time.
+    func settle<T>(_ editor: EditorController, _ script: String, as: T.Type = T.self, until done: (T?) -> Bool) async throws -> T? {
+        var value: T?
+        for _ in 0..<100 {
+            value = try await editor.webView.evaluateJavaScript(script) as? T
+            if done(value) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        return value
+    }
+
+    @Test func eachKindOfEmbeddedFileShowsAsWhatItIs() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let attachments = root.url.appending(path: "Attachments")
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        try EmbedFixtures.png(width: 5, height: 2).write(to: attachments.appending(path: "Photo.png"))
+        try EmbedFixtures.wav().write(to: attachments.appending(path: "Tone.wav"))
+        try EmbedFixtures.movie(to: attachments.appending(path: "Clip.mov"))
+        try EmbedFixtures.pdf(to: attachments.appending(path: "Plan.pdf"))
+        try Data("Item,Cost\nOak,11850\n".utf8).write(to: attachments.appending(path: "Budget.csv"))
+        let body = """
+        ![[Photo.png|3]] ![](../Attachments/Tone.wav)
+
+        ![[Clip.mov]]
+
+        ![[Plan.pdf]]
+
+        ![[Budget.csv]] ![[Missing.zip]] ![far](../../outside.png) ![[A note]]
+
+        """
+        let note = Note(path: "Projects/Embeds.md", text: body, created: .now)
+        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
+        let page = try await Harness(library: library)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        page.editor.load(try #require(library.item(note.id)))
+        let editor = page.editor
+
+        let image = try await settle(editor, "(() => { const i = document.querySelector('.image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
+        #expect(image == [5, 3], "the image loads through the scheme at the width its embed gives")
+
+        let audio = try await settle(editor, "(() => { const a = document.querySelector('.embed-audio audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
+        #expect(abs((audio ?? 0) - 0.5) < 0.05, "the sound's length is read through ranges of the file")
+
+        let video = try await settle(editor, "(() => { const v = document.querySelector('.embed-video video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
+        #expect(video == [64, 64])
+
+        let frame = try await settle(editor, "document.querySelector('.embed-pdf iframe')?.src ?? ''", as: String.self) { $0?.isEmpty == false }
+        #expect(frame?.hasPrefix("mapp-embed://file/") == true)
+
+        let card = try await settle(editor, "(() => { const c = document.querySelector('.embed-card'); const i = c?.querySelector('img'); return c && i?.complete && i.naturalWidth > 0 ? [c.querySelector('.embed-name').textContent, c.querySelector('.embed-detail').textContent] : [] })()", as: [String].self) { $0?.count == 2 }
+        #expect(card?.first == "Budget.csv")
+        #expect(card?.last?.isEmpty == false, "the card says how large the file is")
+
+        let absent = try await editor.webView.evaluateJavaScript("[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)") as? [String]
+        #expect(absent == ["Missing.zip", "far"])
+        let text = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String
+        #expect(text?.contains("![[A note]]") == true, "an embedded note is text")
+
+        // WebKit draws a PDF in a frame from the app's scheme: the red page shows where the frame is.
+        let rect = try #require(try await editor.webView.evaluateJavaScript(
+            "(() => { const r = document.querySelector('.embed-pdf iframe').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()"
+        ) as? [Double])
+        var red = false
+        for _ in 0..<60 where !red {
+            try await Task.sleep(for: .milliseconds(100))
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3])
+            configuration.afterScreenUpdates = true
+            guard let snapshot = try? await editor.webView.takeSnapshot(configuration: configuration),
+                  let bitmap = snapshot.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) else { continue }
+            let center = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB)
+            red = (center?.redComponent ?? 0) > 0.8 && (center?.greenComponent ?? 1) < 0.3
+        }
+        #expect(red, "the PDF is drawn inside its frame")
+
+        #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
+    }
+
+    @Test func aVideoLargerThanOneAnswerPlaysToItsEnd() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        let movie = root.url.appending(path: "Long.mov")
+        try EmbedFixtures.longMovie(to: movie, padding: Int(2 * EmbeddedFiles.window))
+        let size = try #require(try movie.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        try #require(UInt64(size) > 2 * EmbeddedFiles.window, "the movie is \(size) bytes")
+        let note = Note(path: "Embeds.md", text: "![[Long.mov]]\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
+        let page = try await Harness(library: library)
+        // WebKit loads no media for a page outside a window.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        page.editor.load(try #require(library.item(note.id)))
+        let duration = try await settle(page.editor, "(() => { const v = document.querySelector('video'); return v && v.readyState >= 1 ? v.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
+        try #require((duration ?? 0) > 3)
+        try await page.run("const v = document.querySelector('video'); v.currentTime = v.duration - 0.1")
+        let shown = try await settle(page.editor, "(() => { const v = document.querySelector('video'); return !v.seeking && v.readyState >= 2 && v.currentTime > v.duration - 0.5 })()", as: Bool.self) { $0 == true }
+        #expect(shown == true, "the frames past the first answer load")
+    }
+
+    @Test func theContextMenuOverAnEmbeddedFileKnowsWhichFile() async throws {
+        let root = try TemporaryFolder()
+        let bin = try TemporaryFolder()
+        try FileManager.default.createDirectory(at: root.url.appending(path: "Attachments"), withIntermediateDirectories: true)
+        try Data("a,b\n".utf8).write(to: root.url.appending(path: "Attachments/Budget.csv"))
+        let note = Note(path: "Embeds.md", text: "A sheet: ![[Budget.csv]]\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(note.id)))
+        _ = try await settle(page.editor, "!!document.querySelector('.embed-card')", as: Bool.self) { $0 == true }
+        try await page.run("document.querySelector('.embed-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        try await page.wait { page.editor.menuEmbed != nil }
+        #expect(page.editor.menuEmbed?.item == note.id)
+        #expect(page.editor.menuEmbed?.reference == .name("Budget.csv"))
+        #expect(await library.embeddedFile(.name("Budget.csv"), in: note.id)?.lastPathComponent == "Budget.csv")
+        _ = page.editor.takeMenuEmbed()
+        try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.menuEmbed == nil, "a menu elsewhere offers no file")
+    }
+
+    // MARK: Attaching images through any library
+
+    /// An editor over a library held in memory, showing `notes[0]` once its page has loaded.
+    func attachingEditor(_ library: FakeItemLibrary) async throws -> EditorController {
+        let editor = EditorController(library: library)
+        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(editor.isReady)
+        editor.load(library.items[0])
+        _ = try await editor.webView.evaluateJavaScript("1")
+        return editor
+    }
+
+    static let pasted = [PastedImages.Source.data(name: "Photo.png", Data("png".utf8))]
+
+    /// What the page would save once the images have had time to land, or nil while it is as loaded.
+    func settledMarkdown(_ editor: EditorController) async throws -> String? {
+        try await Task.sleep(for: .milliseconds(300))
+        return try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
+    }
+
+    @Test func attachedImagesAreInsertedIntoTheNote() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { [Embed(link: "Attachments/Photo.png", name: "Photo")] }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(try await settledMarkdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true)
+        #expect(library.failure == nil)
+    }
+
+    @Test func imagesTheLibraryCannotKeepAreReportedInThePersonsWords() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { throw SourceFailure(kind: .failed, message: "The server is out of space.") }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(try await settledMarkdown(editor) == nil, "nothing is inserted")
+        #expect(library.failure?.title == "Can’t Attach Images")
+        #expect(library.failure?.message == "The images weren’t added to the note. The server is out of space.")
+    }
+
+    @Test func imagesAttachedAfterTheNoteChangesAreNotInsertedIntoTheNextOne() async throws {
+        let first = FakeItemLibrary.note("Plan", modified: .now)
+        let second = FakeItemLibrary.note("Other", modified: .now)
+        let library = FakeItemLibrary(items: [first, second])
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        var started = false
+        library.attaching = {
+            started = true
+            for await _ in gate { break }
+            return [Embed(link: "Attachments/Photo.png", name: "Photo")]
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        for _ in 0..<100 where !started { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(started)
+        editor.load(second)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        open.yield()
+        open.finish()
+        #expect(try await settledMarkdown(editor) == nil, "the note now on the page takes nothing")
+        #expect(editor.noteID == second.id)
+        #expect(library.failure == nil)
     }
 
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {

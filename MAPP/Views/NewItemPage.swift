@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The blank page starts in the window; its metadata becomes a file when writing begins.
 struct NewItemPage: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     @Bindable var draft: NewItemDraft
@@ -87,7 +87,7 @@ struct NewItemPage: View {
         .accessibilityIdentifier("NewItemPage")
     }
 
-    private var parents: [AppItem] { library.creationParentCandidates(typeID: draft.typeID) }
+    private var parents: [Item] { library.creationParentCandidates(typeID: draft.typeID) }
 
     private func startWriting() {
         guard browser.isCreatingItem else { return }

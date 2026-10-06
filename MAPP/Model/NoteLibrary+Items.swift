@@ -3,40 +3,17 @@ import Foundation
 extension NoteLibrary {
     // MARK: Typed items
 
-    func item(_ id: UUID) -> AppItem? {
-        if let note = note(id) { return AppItem(projection: itemProjection(note), isDeleted: note.isDeleted) }
-        return files.first { $0.id == id }.map(AppItem.init(file:))
+    /// The fields the item's type names its relationships under, in the schema's order.
+    func relationshipFields(of item: Item) -> [String] {
+        WorkbenchSchema.definition(item.type.rawValue)?.relationshipFields ?? []
     }
 
-    var items: [AppItem] { notes.filter { !$0.isDeleted }.map { AppItem(projection: itemProjection($0)) } + files.map(AppItem.init(file:)) }
-
-    func itemProjection(_ note: Note) -> NoteProjection {
-        if let cached = cachedItemProjections[note.id], cached.file == note.file,
-           cached.filePath == note.path, cached.title == note.title { return cached }
-        let projection = NoteProjection(note: note)
-        cachedItemProjections[note.id] = projection
-        return projection
-    }
-
-    var connectionIndex: NoteConnectionIndex {
-        // Read observable sources on cache hits too, so views keep their dependencies.
-        let sourceNotes = notes
-        let sourceFiles = files
-        if let cachedConnectionIndex { return cachedConnectionIndex }
-        let records = sourceNotes.filter { !$0.isDeleted }.map(itemProjection) + sourceFiles.map { AppItem(file: $0).projection }
-        let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
-        cachedConnectionIndex = index
-        return index
-    }
-
-    func relationships(for id: UUID) -> [ItemRelationship] {
+    func relationships(for id: ItemID) -> [ItemRelationship] {
         guard let item = item(id) else { return [] }
         let index = connectionIndex
-        var results = item.relationshipFields.map { field in
-            let targets = index.references.filter { reference in
-                reference.sourceID == id && reference.origin == .header(field)
-            }.map { reference in
-                let targetID: UUID? = if case .resolved(let target) = reference.resolution { target } else { nil }
+        var results = relationshipFields(of: item).map { field in
+            let targets = (index.referencesBySource[id] ?? []).filter { $0.origin == .header(field) }.map { reference in
+                let targetID: ItemID? = if case .resolved(let target) = reference.resolution { target } else { nil }
                 return ItemRelationshipTarget(title: targetID.flatMap { self.item($0)?.title } ?? reference.targetTitle, itemID: targetID, resolution: reference.resolution)
             }
             return ItemRelationship(field: field, label: WorkbenchSchema.label(for: field), targets: targets, isEditable: item.isEditable, allowsMultiple: field == "about")
@@ -53,27 +30,30 @@ extension NoteLibrary {
         return results
     }
 
-    func relationshipCandidates(for id: UUID, field: String) -> [AppItem] {
-        let candidates = notes.filter { note in
-            guard note.id != id, !note.isDeleted else { return false }
+    func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
+        let type = item(id)?.type.rawValue ?? "core.note"
+        let candidates = allItems.filter { candidate in
+            guard candidate.id != id, candidate.state == .active else { return false }
+            if candidate.isFile { return field == "about" || field == "derived-from" }
             if field.hasPrefix("inverse:") {
                 let ownerField = field == "inverse:parent-of" ? "child-of" : String(field.dropFirst("inverse:".count))
-                return item(note.id)?.relationshipFields.contains(ownerField) == true && (ownerField != "child-of" || validParent(id, forType: item(note.id)?.type?.id ?? "core.note"))
+                return relationshipFields(of: candidate).contains(ownerField)
+                    && (ownerField != "child-of" || validParent(id, forType: candidate.type.rawValue))
             }
-            return field != "child-of" || validParent(note.id, forType: item(id)?.type?.id ?? "core.note")
-        }.map { AppItem(projection: itemProjection($0)) } + ((field == "about" || field == "derived-from") ? files.map(AppItem.init(file:)) : [])
+            return field != "child-of" || validParent(candidate.id, forType: type)
+        }
         return candidates.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    func bodyMentions(for id: UUID) -> [ItemRelationshipTarget] {
-        connectionIndex.references.filter { $0.sourceID == id && $0.origin == .body }.map { reference in
-            let targetID: UUID? = if case .resolved(let target) = reference.resolution { target } else { nil }
+    func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] {
+        (connectionIndex.referencesBySource[id] ?? []).filter { $0.origin == .body }.map { reference in
+            let targetID: ItemID? = if case .resolved(let target) = reference.resolution { target } else { nil }
             return .init(title: reference.targetTitle, itemID: targetID, resolution: reference.resolution)
         }
     }
 
     @discardableResult
-    func setItemProperty(_ id: UUID, key: String, value: NoteFieldValue?, undoManager: UndoManager? = nil) -> Bool {
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager? = nil) -> Bool {
         if key == "title" {
             guard let title = value?.string, let item = item(id), item.isEditable, !title.isEmpty,
                   NoteText.fileSafe(title) == title, !isNoteNameTaken(title, for: id) else { return false }
@@ -82,8 +62,8 @@ extension NoteLibrary {
         }
         guard let index = notes.firstIndex(where: { $0.id == id && !$0.isDeleted }),
               let item = item(id), item.isEditable,
-              let definition = item.properties.first(where: { $0.key == key }) else { return false }
-        if let value, !Self.valid(value, for: definition.kind) {
+              let definition = catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == key }) else { return false }
+        if let value, !definition.kind.accepts(value) {
             failure = (String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
             return false
         }
@@ -93,28 +73,17 @@ extension NoteLibrary {
         return self.note(id)?.file == file
     }
 
-    private static func valid(_ value: NoteFieldValue, for kind: ItemPropertyDefinition.Kind) -> Bool {
-        switch (kind, value) {
-        case (.text, .string): true
-        case (.choice(let choices), .string(let string)): choices.contains(string)
-        case (.date, .string(let string)):
-            string.isEmpty || ISO8601DateFormatter().date(from: string) != nil || DateFormatter.itemDay.date(from: string) != nil
-        case (.boolean, .bool), (.number, .number): true
-        default: false
-        }
-    }
-
-    private func reference(to targetID: UUID) -> String? {
+    private func reference(to targetID: ItemID) -> String? {
         guard let target = item(targetID) else { return nil }
-        let candidates = [target.title, target.projection.filePath, target.fields["marfa_id"]?.string].compactMap { $0 }
+        let candidates = [target.title, path(of: targetID), target.value(of: "marfa_id")?.string].compactMap { $0 }
         for candidate in candidates {
             let spelling = "[[\(candidate)]]"
             var file = NoteFile(text: "")
             file.setProperty("type", "aic.agent.log")
             file.setProperty("about", spelling)
-            let probeID = UUID()
-            let probe = NoteProjection(id: probeID, file: file, fallbackTitle: probeID.uuidString)
-            let records = notes.filter { !$0.isDeleted }.map(itemProjection) + files.map { AppItem(file: $0).projection } + [probe]
+            let probeID = ItemID.mint()
+            let probe = NoteProjection(id: probeID, file: file, fallbackTitle: probeID.rawValue)
+            let records = connectionRecords() + [probe]
             let index = NoteConnectionIndex(records: records, rulesByType: WorkbenchSchema.rulesByType)
             if index.references.contains(where: { $0.sourceID == probeID && $0.resolution == .resolved(targetID) }) { return spelling }
         }
@@ -122,12 +91,17 @@ extension NoteLibrary {
         return nil
     }
 
+    /// Whether a note not deleted already goes by the title, ignoring case, which a new item may not take.
+    func isItemTitleTaken(_ title: String) -> Bool {
+        notes.contains { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }
+    }
+
     @discardableResult
-    func createItem(typeID: String, title: String, body: String = "\n", parentID: UUID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> Note? {
+    func createItem(typeID: String, title: String, body: String = "\n", parentID: ItemID? = nil, in place: SidebarItem = .allNotes, undoManager: UndoManager? = nil) -> ItemID? {
         let title = NoteName.trimmed(title)
         guard let type = WorkbenchSchema.definition(typeID), !title.isEmpty,
               NoteText.fileSafe(title) == title,
-              !notes.contains(where: { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }) else {
+              !isItemTitleTaken(title) else {
             failure = (String(localized: "Can’t Create Item"), String(localized: "Choose a unique title without characters that cannot be used in a file name."))
             return nil
         }
@@ -144,26 +118,25 @@ extension NoteLibrary {
         if typeID == "aic.decision" { file.setProperty("occurred_at", DateFormatter.itemDay.string(from: now())) }
         if typeID == "aic.agent.session" { file.setProperty("starts_at", ISO8601DateFormatter().string(from: now())); file.setProperty("ends_at", "") }
         file.body = body
-        var note = Note(text: file.text, created: now())
         var directory = type.folder
-        if case .folder(let id) = place, let folder = folder(id) { directory = folder.name; note.folderID = id }
+        let folderID: ItemID
+        if case .folder(let id) = place, let folder = folder(id) { directory = folder.name; folderID = id }
         else {
             let top = directory.components(separatedBy: "/").first!
-            if let folder = folders.first(where: { $0.name == top }) { note.folderID = folder.id }
-            else { let folder = Folder(name: top); folders.append(folder); note.folderID = folder.id; perform(.createFolder(path: directory)) }
+            if let folder = folders.first(where: { $0.name == top }) { folderID = folder.id }
+            else { let folder = Folder(name: top); folders.append(folder); folderID = folder.id; perform(.createFolder(path: top, id: folder.id)) }
         }
-        perform(.createFolder(path: directory))
-        note.path = uniquePath(title, in: directory, except: nil)
+        let note = Note(path: uniquePath(title, in: directory, except: nil), text: file.text, created: now(), folderID: folderID)
         notes.append(note)
-        perform(.create(path: note.path!, text: note.file.text))
+        perform(.create(path: note.path, text: note.file.text, id: note.id))
         let id = note.id
         registerUndo(undoManager, name: String(localized: "New Item")) { [weak undoManager] library in library.delete([id], undoManager: undoManager) }
-        return note
+        return id
     }
 
-    private func validParent(_ parentID: UUID, forType type: String) -> Bool {
+    private func validParent(_ parentID: ItemID, forType type: String) -> Bool {
         guard let parent = note(parentID), !parent.isDeleted else { return false }
-        let parentType = NoteProjection(note: parent).declaredType
+        let parentType = itemProjection(parent).declaredType
         if parentType == "aic.project" { return true }
         if type == "aic.project" || type == "aic.epic" { return false }
         if parentType == "aic.epic" { return true }
@@ -171,27 +144,27 @@ extension NoteLibrary {
     }
 
     @discardableResult
-    func setItemRelationship(_ id: UUID, field: String, targetIDs: [UUID], undoManager: UndoManager? = nil) -> Bool {
+    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager? = nil) -> Bool {
         if field.hasPrefix("inverse:") {
             let name = String(field.dropFirst("inverse:".count))
             let ownerField = name == "parent-of" ? "child-of" : name
             guard name != "supersedes" || targetIDs.count <= 1 else { return false }
             if name == "supersedes", let owner = targetIDs.first {
-                var seen: Set<UUID> = [owner]
-                var cursor: UUID? = id
+                var seen: Set<ItemID> = [owner]
+                var cursor: ItemID? = id
                 while let next = cursor {
                     guard seen.insert(next).inserted else { return false }
                     cursor = connectionIndex.edges.first { $0.name == "supersedes" && $0.sourceID == next }?.targetID
                 }
             }
             let existing = relationships(for: id).first { $0.field == field }?.targets.compactMap(\.itemID) ?? []
-            var files: [UUID: NoteFile] = [:]
+            var files: [ItemID: NoteFile] = [:]
             for ownerID in Set(existing + targetIDs) {
-                guard let owner = item(ownerID), owner.isEditable, owner.relationshipFields.contains(ownerField), let source = note(ownerID) else { return false }
-                if ownerField == "child-of" && targetIDs.contains(ownerID) && !validParent(id, forType: owner.type?.id ?? "core.note") { return false }
+                guard let owner = item(ownerID), owner.isEditable, relationshipFields(of: owner).contains(ownerField), let source = note(ownerID) else { return false }
+                if ownerField == "child-of" && targetIDs.contains(ownerID) && !validParent(id, forType: owner.type.rawValue) { return false }
                 if ownerField == "child-of", targetIDs.contains(ownerID) {
-                    var seen: Set<UUID> = [ownerID]
-                    var cursor: UUID? = id
+                    var seen: Set<ItemID> = [ownerID]
+                    var cursor: ItemID? = id
                     while let next = cursor {
                         guard seen.insert(next).inserted else { return false }
                         cursor = connectionIndex.edges.first { $0.name == "parent-of" && $0.targetID == next }?.sourceID
@@ -207,24 +180,24 @@ extension NoteLibrary {
                 var file = source.file
                 let references = targets.compactMap { reference(to: $0) }
                 guard references.count == targets.count else { return false }
-                let values = references.map(NoteFieldValue.string)
+                let values = references.map(PropertyValue.string)
                 file.setField(ownerField, values.isEmpty ? nil : ownerField == "about" ? .array(values) : values.first)
                 files[ownerID] = file
             }
             applyItemFieldFiles(files, key: ownerField, undoManager: undoManager, name: String(localized: "Edit Relationship"))
             return files.allSatisfy { self.note($0.key)?.file == $0.value }
         }
-        guard let item = item(id), item.isEditable, item.relationshipFields.contains(field),
+        guard let item = item(id), item.isEditable, relationshipFields(of: item).contains(field),
               let note = note(id), !note.isDeleted,
               Set(targetIDs).count == targetIDs.count,
               field == "about" || targetIDs.count <= 1 else { return false }
         for targetID in targetIDs {
             guard targetID != id, self.item(targetID) != nil, self.note(targetID)?.isDeleted != true else { return false }
-            if field == "child-of" && !validParent(targetID, forType: item.type?.id ?? "core.note") { return false }
+            if field == "child-of" && !validParent(targetID, forType: item.type.rawValue) { return false }
         }
         if field == "child-of", let parent = targetIDs.first {
-            var seen: Set<UUID> = [id]
-            var cursor: UUID? = parent
+            var seen: Set<ItemID> = [id]
+            var cursor: ItemID? = parent
             let edges = connectionIndex.edges
             while let next = cursor {
                 guard seen.insert(next).inserted else { return false }
@@ -234,8 +207,8 @@ extension NoteLibrary {
         if field == "supersedes", let target = targetIDs.first {
             let edges = connectionIndex.edges.filter { $0.name == "supersedes" }
             guard !edges.contains(where: { $0.targetID == target && $0.sourceID != id }) else { return false }
-            var seen: Set<UUID> = [id]
-            var cursor: UUID? = target
+            var seen: Set<ItemID> = [id]
+            var cursor: ItemID? = target
             while let next = cursor {
                 guard seen.insert(next).inserted else { return false }
                 cursor = edges.first { $0.sourceID == next }?.targetID
@@ -244,23 +217,23 @@ extension NoteLibrary {
         var file = note.file
         let unresolved = connectionIndex.references.filter {
             $0.sourceID == id && $0.origin == .header(field) && { if case .resolved = $0.resolution { false } else { true } }($0)
-        }.map { NoteFieldValue.string("[[\($0.targetTitle)]]") }
+        }.map { PropertyValue.string("[[\($0.targetTitle)]]") }
         guard unresolved.isEmpty || field == "about" else {
             failure = (String(localized: "Unresolved Relationship"), String(localized: "Resolve the existing target before replacing this relationship."))
             return false
         }
         let references = targetIDs.compactMap { reference(to: $0) }
         guard references.count == targetIDs.count else { return false }
-        let targets = references.map(NoteFieldValue.string) + unresolved
+        let targets = references.map(PropertyValue.string) + unresolved
         file.setField(field, targets.isEmpty ? nil : field == "about" ? .array(targets) : targets.first)
         applyItemFieldFiles([id: file], key: field, undoManager: undoManager, name: String(localized: "Edit Relationship"))
         return self.note(id)?.file == file
     }
 
-    private func applyItemFieldFiles(_ files: [UUID: NoteFile], key: String, undoManager: UndoManager?, name: String) {
+    private func applyItemFieldFiles(_ files: [ItemID: NoteFile], key: String, undoManager: UndoManager?, name: String) {
         let previous = Dictionary(uniqueKeysWithValues: files.keys.compactMap { id in note(id).map { (id, $0.file) } })
         guard files.allSatisfy({ id, file in
-            let old = note(id).map(NoteProjection.init)?.fields ?? [:]
+            let old = note(id).map(itemProjection)?.fields ?? [:]
             let projection = NoteProjection(id: id, file: file, fallbackTitle: "")
             if case .invalid = projection.frontMatter { return false }
             let proposed = projection.fields ?? [:]
@@ -271,7 +244,7 @@ extension NoteLibrary {
         }
         applyItemFiles(files, undoManager: nil, name: name)
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            var restored: [UUID: NoteFile] = [:]
+            var restored: [ItemID: NoteFile] = [:]
             for (id, original) in previous {
                 guard var current = library.note(id)?.file else { continue }
                 current.restoreField(key, from: original)
@@ -281,31 +254,21 @@ extension NoteLibrary {
         }
     }
 
-    func creationParentCandidates(typeID: String) -> [AppItem] {
-        notes.filter { validParent($0.id, forType: typeID) }.map { AppItem(projection: itemProjection($0)) }
+    func creationParentCandidates(typeID: String) -> [Item] {
+        notes.filter { validParent($0.id, forType: typeID) }.compactMap { item($0.id) }
     }
 
-    func applyItemFiles(_ files: [UUID: NoteFile], undoManager: UndoManager?, name: String) {
-        var previous: [UUID: NoteFile] = [:]
+    func applyItemFiles(_ files: [ItemID: NoteFile], undoManager: UndoManager?, name: String) {
+        var previous: [ItemID: NoteFile] = [:]
         for index in notes.indices {
             guard let file = files[notes[index].id], !notes[index].isDeleted, file != notes[index].file else { continue }
             previous[notes[index].id] = notes[index].file
             notes[index].file = file
             notes[index].modified = now()
-            if let path = notes[index].path { perform(.write(path: path, text: file.text)) }
+            perform(.write(path: notes[index].path, text: file.text))
         }
         guard !previous.isEmpty else { return }
         registerUndo(undoManager, name: name) { [weak undoManager] library in library.applyItemFiles(previous, undoManager: undoManager, name: name) }
     }
 
-}
-
-private extension DateFormatter {
-    static var itemDay: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.isLenient = false
-        return formatter
-    }
 }

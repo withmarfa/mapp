@@ -47,5 +47,50 @@ nonisolated enum WorkbenchSchema {
             })
         })
     }
-}
 
+    /// Files are items too, typed as Marfa's core types name them; an image or a PDF is a kind of file.
+    static let fileType = TypeID("core.file")
+    static let projectType = TypeID("aic.project")
+    static let imageType = TypeID("core.image")
+    static let pdfType = TypeID("core.pdf")
+
+    /// The schema as the item layer reads it, which a Marfa library's catalogue takes the place of.
+    static let catalogue: Catalogue = {
+        let itemTypes = types.map { type in
+            ItemTypeInfo(
+                id: TypeID(type.id), label: type.label,
+                fields: type.properties.map { property in
+                    ItemTypeInfo.Field(key: property.key, label: property.label, kind: kind(property.kind), declaredBy: TypeID(type.id))
+                },
+                titleField: "title", bodyField: nil, parent: nil)
+        } + [
+            ItemTypeInfo(id: fileType, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil),
+            ItemTypeInfo(id: imageType, label: "Image", fields: [], titleField: nil, bodyField: nil, parent: fileType),
+            ItemTypeInfo(id: pdfType, label: "PDF", fields: [], titleField: nil, bodyField: nil, parent: fileType)
+        ]
+        var fields: [String] = []
+        for field in types.flatMap(\.relationshipFields) where !fields.contains(field) { fields.append(field) }
+        let edgeTypes = fields.map { field in
+            let holders = Set(types.filter { $0.relationshipFields.contains(field) }.map { TypeID($0.id) })
+            // A child names its parent, so `parent-of` is written at its target, under its reverse name.
+            return field == "child-of"
+                ? EdgeTypeInfo(
+                    id: "parent-of", label: label(for: field), reverseName: field, cardinality: .one, writtenAt: .target,
+                    sourceTypes: [], targetTypes: holders)
+                : EdgeTypeInfo(
+                    id: field, label: label(for: field), reverseName: nil, cardinality: field == "about" ? .many : .one,
+                    writtenAt: .source, sourceTypes: holders, targetTypes: [])
+        }
+        return Catalogue(itemTypes: itemTypes, edgeTypes: edgeTypes)
+    }()
+
+    private static func kind(_ kind: ItemPropertyDefinition.Kind) -> ItemTypeInfo.Field.Kind {
+        switch kind {
+        case .text: .text
+        case .choice(let choices): .choice(choices)
+        case .date: .date
+        case .boolean: .boolean
+        case .number: .number
+        }
+    }
+}

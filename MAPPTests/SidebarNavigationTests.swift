@@ -5,88 +5,93 @@ import Testing
 struct SidebarNavigationTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    @Test func aPinnedShortcutSelectsTheActualItemInsteadOfTheFirstPin() {
-        let first = Note(body: "# First pin", created: date, isPinned: true)
-        let second = Note(body: "# Second pin", created: date - 100, isPinned: true)
+    @Test func aFavoriteShortcutSelectsTheActualItemInsteadOfTheFirstFavorite() {
+        let first = Note(body: "# First favorite", created: date, isFavorite: true)
+        let second = Note(body: "# Second favorite", created: date - 100, isFavorite: true)
         let library = NoteLibrary(notes: [first, second], now: { date })
         let browser = Browser()
         browser.searchText = "First"
-        browser.show(.pinnedItem(second.id), in: library, order: NoteOrder())
-        #expect(browser.item == .pinnedItem(second.id))
+        browser.show(.favoriteItem(second.id), in: library, order: NoteOrder())
+        #expect(browser.item == .favoriteItem(second.id))
         #expect(browser.selection == [second.id])
-        #expect(browser.notes(in: library).map(\.id) == [second.id])
+        #expect(browser.items(in: library).map(\.id) == [second.id])
         #expect(browser.searchText.isEmpty)
-        #expect(library.name(of: browser.item) == "Second pin")
-        #expect(browser.sections(in: library, order: NoteOrder(), now: date).first?.group != .pinned)
+        #expect(library.name(of: browser.item) == "Second favorite")
+        #expect(browser.sections(in: library, order: NoteOrder(), now: date).first?.group != .favorites)
     }
 
-    @Test func anUnpinnedShortcutFallsBackToTheRemainingPins() {
-        let first = Note(body: "# First pin", created: date, isPinned: true)
-        let second = Note(body: "# Second pin", created: date - 100, isPinned: true)
+    @Test func aShortcutToAnItemNoLongerFavoriteFallsBackToTheRemainingFavorites() {
+        let first = Note(body: "# First favorite", created: date, isFavorite: true)
+        let second = Note(body: "# Second favorite", created: date - 100, isFavorite: true)
         let library = NoteLibrary(notes: [first, second], now: { date })
         let browser = Browser()
-        browser.show(.pinnedItem(first.id), in: library, order: NoteOrder())
-        library.setPinned([first.id], false)
+        browser.show(.favoriteItem(first.id), in: library, order: NoteOrder())
+        library.setFavorite([first.id], false)
         browser.folderRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .pinned)
+        #expect(browser.item == .favorites)
         #expect(browser.selection == [second.id])
-        #expect(library.notes(in: .pinnedItem(first.id)).isEmpty)
+        #expect(library.items(in: .favoriteItem(first.id)).isEmpty)
     }
 
-    @Test func aDeletedPinnedShortcutLeavesAnEmptyPinnedCollection() {
-        let pin = Note(body: "# Only pin", created: date, isPinned: true)
-        let library = NoteLibrary(notes: [pin], now: { date })
+    @Test func aDeletedFavoriteShortcutLeavesAnEmptyFavoritesCollection() {
+        let favorite = Note(body: "# Only favorite", created: date, isFavorite: true)
+        let library = NoteLibrary(notes: [favorite], now: { date })
         let browser = Browser()
-        browser.show(.pinnedItem(pin.id), in: library, order: NoteOrder())
-        library.delete([pin.id])
+        browser.show(.favoriteItem(favorite.id), in: library, order: NoteOrder())
+        library.delete([favorite.id])
         browser.folderRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .pinned)
+        #expect(browser.item == .favorites)
         #expect(browser.selection.isEmpty)
-        #expect(library.notes(in: .pinnedItem(pin.id)).isEmpty)
+        #expect(library.items(in: .favoriteItem(favorite.id)).isEmpty)
     }
 
-    @Test func aPinnedShortcutRestoresByFilePathAcrossItemIdentities() throws {
-        let pin = Note(body: "# Pin", path: "Notes/Pin.md", created: date, isPinned: true)
-        let library = NoteLibrary(notes: [pin], now: { date })
+    @Test func aFavoriteShortcutRestoresByItsIdentifierWhereverItsFileIsNow() throws {
+        let favorite = Note(body: "# Favorite", path: "Notes/Favorite.md", created: date, isFavorite: true)
+        let library = NoteLibrary(notes: [favorite], now: { date })
         let browser = Browser()
-        browser.show(.pinnedItem(pin.id), in: library, order: NoteOrder())
-        let data = try JSONEncoder().encode(browser.snapshot(in: library))
+        browser.show(.favoriteItem(favorite.id), in: library, order: NoteOrder())
+        let data = try JSONEncoder().encode(browser.snapshot())
         let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: data)
-        let reloaded = Note(body: "# Pin", path: "Notes/Pin.md", created: date, isPinned: true)
+        let reloaded = Note(id: favorite.id, path: "Elsewhere/Renamed.md", text: favorite.file.text, created: date)
         let restoredLibrary = NoteLibrary(notes: [reloaded], now: { date })
         let restored = Browser()
         restored.restore(snapshot, in: restoredLibrary, order: NoteOrder())
-        #expect(restored.item == .pinnedItem(reloaded.id))
-        #expect(restored.selection == [reloaded.id])
-        #expect(snapshot.sidebarItem == .pinnedItem("Notes/Pin.md"))
+        #expect(restored.item == .favoriteItem(favorite.id))
+        #expect(restored.selection == [favorite.id])
+        #expect(snapshot.place == .favoriteItem(favorite.id))
     }
 
-    @Test func restoringAnUnpinnedShortcutReturnsToThePinnedCollection() {
-        let note = Note(body: "# Former pin", path: "Notes/Former pin.md", created: date)
+    @Test func aSnapshotSavedBeforeFavoritesFailsToDecodeSoTheWindowOpensAtItsDefault() {
+        let saved = Data(#"{"sidebarItem":{"pinned":{}},"selection":[]}"#.utf8)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(Browser.Snapshot.self, from: saved) }
+    }
+
+    @Test func restoringAShortcutToAnItemNoLongerFavoriteReturnsToFavorites() {
+        let note = Note(body: "# Former favorite", path: "Notes/Former favorite.md", created: date)
         let library = NoteLibrary(notes: [note], now: { date })
         let browser = Browser()
-        browser.restore(.init(sidebarItem: .pinnedItem("Notes/Former pin.md"), selection: ["Notes/Former pin.md"]), in: library, order: NoteOrder())
-        #expect(browser.item == .pinned)
+        browser.restore(.init(place: .favoriteItem(note.id), selection: [note.id]), in: library, order: NoteOrder())
+        #expect(browser.item == .favorites)
         #expect(browser.selection.isEmpty)
     }
 
-    @Test func aProjectPinAndItsProjectCollectionHaveDistinctDestinations() throws {
+    @Test func aProjectFavoriteAndItsProjectCollectionHaveDistinctDestinations() throws {
         let library = NoteLibrary(notes: [], now: { date })
-        let project = try #require(library.createItem(typeID: "aic.project", title: "Field research"))
-        let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id))
-        library.setPinned([project.id], true)
-        #expect(SidebarItem.project(project.id) != .pinnedItem(project.id))
-        #expect(Set(library.notes(in: .project(project.id)).map(\.id)) == [project.id, child.id])
-        #expect(library.notes(in: .pinnedItem(project.id)).map(\.id) == [project.id])
-        #expect(library.notes(in: .itemType("aic.project")).map(\.id) == [project.id])
+        let project = try #require(library.createItem(typeID: "aic.project", title: "Field research").flatMap { library.note($0) })
+        let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id).flatMap { library.note($0) })
+        library.setFavorite([project.id], true)
+        #expect(SidebarItem.project(project.id) != .favoriteItem(project.id))
+        #expect(Set(library.items(in: .project(project.id)).map(\.id)) == [project.id, child.id])
+        #expect(library.items(in: .favoriteItem(project.id)).map(\.id) == [project.id])
+        #expect(library.items(in: .itemType("aic.project")).map(\.id) == [project.id])
         #expect(library.name(of: .itemType("aic.project")) == "Projects")
     }
 
     @Test func shortcutAndProjectTitlesUseTheSharedItemProjection() {
-        let project = Note(path: "Projects/Folded.md", text: "---\ntype: aic.project\ntitle: >-\n  Folded\n  project\npinned: true\n---\nProject content.\n", created: date)
+        let project = Note(path: "Projects/Folded.md", text: "---\ntype: aic.project\ntitle: >-\n  Folded\n  project\ntags: [favorite]\n---\nProject content.\n", created: date)
         let library = NoteLibrary(notes: [project], now: { date })
         #expect(library.item(project.id)?.title == "Folded project")
-        #expect(library.name(of: .pinnedItem(project.id)) == "Folded project")
+        #expect(library.name(of: .favoriteItem(project.id)) == "Folded project")
         #expect(library.name(of: .project(project.id)) == "Folded project")
     }
 }

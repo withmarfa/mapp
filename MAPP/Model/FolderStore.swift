@@ -6,7 +6,8 @@ nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: 
 
 /// Notes as markdown files in a folder, as Marfa's folders keep them: each `.md` file is a note, each directory
 /// at the top a folder, and anything whose name starts with a dot, such as Marfa's own `.marfa`, is not
-/// MAPP's. The trash is kept apart from the folder, so a note trashed leaves the folder as a deleted file does.
+/// MAPP's. The trash is kept apart from the folder, so a note trashed leaves the folder as a deleted file does,
+/// and so is the identity of every item (`IdentityLedger`), which the folder's files have no place for.
 ///
 /// Changes are made one at a time on a queue of the store's own, coordinated with any other app that
 /// coordinates, and a file is only ever replaced whole, so another reader never sees half a note.
@@ -18,11 +19,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     var root: URL { location.withLock { $0 } }
     private let location: OSAllocatedUnfairLock<URL>
     private let bin: URL
+    private let now: @Sendable () -> Date
+    private let keepsFileIdentities: @Sendable (URL) -> Bool
     private let queue = DispatchQueue(label: "com.withmarfa.mapp.store")
     private let files = FileManager()
     // Set once, before the first change is queued.
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
-    var imported: @MainActor @Sendable (UUID, String) -> Void = { _, _ in }
+    var imported: @MainActor @Sendable (UUID, ItemID) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     /// Paths the library gave that were taken, and the paths used instead, for the changes the library queued
     /// before it heard of the new path; once it has, the old path is its own again. Read and written on the
@@ -33,10 +36,28 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     private var making = 0
     /// Attachment paths handed out and not yet written, so two taken in a row are never the same.
     private let reservations = OSAllocatedUnfairLock(initialState: Set<String>())
+    /// Read on first use and changed on the queue only. It is written a moment after a change, so a thousand notes
+    /// deleted at once or every pause in typing writes it once, and at the latest when the store is drained.
+    private var ledger: IdentityLedger?
+    private var ledgerIsUnsaved = false
+    private var ledgerSaveScheduled = false
 
-    init(root: URL, bin: URL) {
+    init(
+        root: URL,
+        bin: URL,
+        now: @escaping @Sendable () -> Date = { .now },
+        keepsFileIdentities: @escaping @Sendable (URL) -> Bool = FolderStore.volumeKeepsFileIdentities
+    ) {
         location = OSAllocatedUnfairLock(initialState: root)
         self.bin = bin
+        self.now = now
+        self.keepsFileIdentities = keepsFileIdentities
+    }
+
+    /// FAT and exFAT give a deleted file's identifier to the next file made, and may change it when a file is
+    /// edited in place, so there an item is known by its path alone.
+    static func volumeKeepsFileIdentities(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.volumeSupportsPersistentIDsKey]).volumeSupportsPersistentIDs) == true
     }
 
     /// The notes folder was moved, in the Finder say: every change from now on, those already queued among them,
@@ -49,37 +70,70 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
 
     func load() throws -> StoredLibrary {
         try queue.sync {
-            var library = StoredLibrary()
-            let keys: [URLResourceKey] = [.isDirectoryKey, .creationDateKey, .contentModificationDateKey]
-            let top = try files.contentsOfDirectory(at: root, includingPropertiesForKeys: keys)
+            var sightings: [IdentityLedger.Sighting] = []
+            var folders: [String] = []
+            let identities = keepsFileIdentities(root)
+            func fileID(_ values: URLResourceValues) -> UInt64? { identities ? Self.fileID(values) : nil }
+            let top = try files.contentsOfDirectory(at: root, includingPropertiesForKeys: Array(Self.readKeys))
             for url in top where !url.lastPathComponent.hasPrefix(".") && url.lastPathComponent != Self.attachments {
-                if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                    library.folders.append(url.lastPathComponent)
+                guard let values = try? url.resourceValues(forKeys: Self.readKeys), values.isDirectory == true else { continue }
+                folders.append(url.lastPathComponent)
+                sightings.append(.init(kind: .folder, path: url.lastPathComponent, fileID: fileID(values)))
+            }
+            var found: [(url: URL, path: String, values: URLResourceValues)] = []
+            if let walk = files.enumerator(at: root, includingPropertiesForKeys: Array(Self.readKeys), options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
+                for case let url as URL in walk {
+                    let path = relativePath(of: url)
+                    if path == Self.attachments { walk.skipDescendants(); continue }
+                    guard let safe = fileURL(for: path), safe == url.standardizedFileURL,
+                          let values = try? url.resourceValues(forKeys: Self.readKeys), values.isRegularFile == true
+                    else { continue }
+                    found.append((url, path, values))
+                    sightings.append(.init(kind: Self.isNote(path) ? .note : .file, path: path, fileID: fileID(values)))
                 }
             }
-            guard let walk = files.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants])
-            else { return library }
-            for case let url as URL in walk {
-                let path = relativePath(of: url)
-                if path == Self.attachments { walk.skipDescendants(); continue }
-                guard let safe = fileURL(for: path), safe == url.standardizedFileURL else { continue }
-                if url.pathExtension.lowercased() == "md" {
-                    if let note = read(url, path: path) { library.notes.append(note) }
-                } else if let file = readFile(url, path: path) {
-                    library.files.append(file)
+            let manifest = readManifest()
+            sightings += manifest.map { .init(kind: .note, binID: $0.id) }
+            let before = ledger ?? readLedger()
+            var current = before
+            let ids = current.identify(sightings, at: now())
+            ledger = current
+            // The folder is read after every change in it, the app's own saves among them, so the ledger is
+            // written only when a reading changed it.
+            if current != before { ledgerChanged() }
+
+            var library = StoredLibrary()
+            library.folders = zip(ids, folders).map { StoredFolder(id: $0, name: $1) }
+            for (id, item) in zip(ids.dropFirst(folders.count), found) {
+                let modified = item.values.contentModificationDate ?? .now
+                let created = item.values.creationDate ?? modified
+                if Self.isNote(item.path) {
+                    guard let text = readText(item.url) else { continue }
+                    library.notes.append(StoredNote(id: id, path: item.path, text: text, created: created, modified: modified))
+                } else {
+                    library.files.append(StoredFile(id: id, path: item.path, created: created, modified: modified,
+                                                    byteCount: Int64(item.values.fileSize ?? 0)))
                 }
             }
-            library.trash = readManifest().compactMap { entry in
-                let url = binURL(entry.id)
-                guard let text = readText(url) else { return nil }
-                return TrashedNote(
+            for (id, entry) in zip(ids.dropFirst(folders.count + found.count), manifest) {
+                guard let text = readText(binURL(entry.id)) else { continue }
+                library.trash.append(TrashedNote(
                     id: entry.id,
-                    note: StoredNote(path: entry.path, text: text, created: entry.created, modified: entry.modified),
+                    note: StoredNote(id: id, path: entry.path, text: text, created: entry.created, modified: entry.modified),
                     trashed: entry.trashed
-                )
+                ))
             }
             return library
         }
+    }
+
+    private static let readKeys: Set<URLResourceKey> = [
+        .isDirectoryKey, .isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey,
+        .documentIdentifierKey, .fileIdentifierKey,
+    ]
+
+    private static func isNote(_ path: String) -> Bool {
+        (path as NSString).pathExtension.lowercased() == "md"
     }
 
     func fileURL(for path: String) -> URL? {
@@ -91,28 +145,6 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
               let values = try? target.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
               values.isRegularFile == true, values.isSymbolicLink != true else { return nil }
         return target
-    }
-
-    private func readFile(_ url: URL, path: String) -> StoredFile? {
-        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey, .documentIdentifierKey, .fileIdentifierKey]),
-              values.isRegularFile == true else { return nil }
-        let modified = values.contentModificationDate ?? .now
-        return StoredFile(path: path, created: values.creationDate ?? modified, modified: modified,
-                          byteCount: Int64(values.fileSize ?? 0),
-                          fileID: values.documentIdentifier.map { UInt64(truncatingIfNeeded: $0) } ?? values.fileIdentifier)
-    }
-
-    private func read(_ url: URL, path: String) -> StoredNote? {
-        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey, .documentIdentifierKey, .fileIdentifierKey]),
-              values.isDirectory != true,
-              let text = readText(url)
-        else { return nil }
-        let modified = values.contentModificationDate ?? .now
-        return StoredNote(
-            path: path, text: text, created: values.creationDate ?? modified, modified: modified,
-            // A document identifier outlasts a safe save, and a file identifier stands in where there is none.
-            fileID: values.documentIdentifier.map { UInt64(truncatingIfNeeded: $0) } ?? values.fileIdentifier
-        )
     }
 
     private func relativePath(of url: URL) -> String {
@@ -150,7 +182,7 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
     }
 
     func drain() {
-        queue.sync {}
+        queue.sync { saveLedger() }
     }
 
     /// The path a change queued now means: the path used instead, while the change was queued before the
@@ -199,10 +231,11 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: root.path])
         }
         switch change {
-        case .create(let path, let text):
+        case .create(let path, let text, let id):
             aliases[path] = nil
             let target = available(url(path))
             try writeNew(Data(text.utf8), to: target)
+            changeLedger { $0.record(id, kind: .note, path: relativePath(of: target), fileID: fileID(of: target)) }
             report(path, target)
         case .write(let path, let text):
             let target = url(path)
@@ -210,11 +243,13 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             guard files.fileExists(atPath: target.path) else { return try writeNew(data, to: target) }
             guard (try? Data(contentsOf: target)) != data else { return }
             try replace(target, with: data)
+            changeLedger { $0.update(relativePath(of: target), fileID: fileID(of: target)) }
         case .move(let from, let to):
             let source = url(from)
             aliases[from] = nil
             aliases[to] = nil
             let target = available(url(to), besides: source)
+            let old = relativePath(of: source)
             do {
                 try move(source, to: target)
             } catch {
@@ -223,24 +258,31 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
                 report(to, source)
                 throw error
             }
+            changeLedger { $0.move(from: old, to: relativePath(of: target)) }
             report(to, target)
         case .trash(let path, let id, let date):
             let source = url(path)
-            guard let note = read(source, path: path) else { return }
+            guard let values = try? source.resourceValues(forKeys: [.isDirectoryKey, .creationDateKey, .contentModificationDateKey]),
+                  values.isDirectory != true, readText(source) != nil
+            else { return }
+            let modified = values.contentModificationDate ?? .now
+            let old = relativePath(of: source)
             // The entry is written first, so a file in the bin is never there without one saying where it was.
             let manifest = readManifest()
-            try writeManifest(manifest + [BinEntry(id: id, path: path, trashed: date, created: note.created, modified: note.modified)])
+            try writeManifest(manifest + [BinEntry(id: id, path: path, trashed: date, created: values.creationDate ?? modified, modified: modified)])
             do {
                 try move(source, to: binURL(id))
             } catch {
                 try? writeManifest(manifest)
                 throw error
             }
+            changeLedger { $0.trash(old, binID: id) }
         case .restore(let id, let path):
             aliases[path] = nil
             let target = available(url(path))
             try move(binURL(id), to: target)
             try writeManifest(readManifest().filter { $0.id != id })
+            changeLedger { $0.restore(id, to: relativePath(of: target), fileID: fileID(of: target)) }
             report(path, target)
         case .importFile(let path, let source, let requestID):
             guard !path.isEmpty, !path.hasPrefix("/"), !path.split(separator: "/").contains(".."),
@@ -275,24 +317,31 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             }
             if let error = coordinationError ?? failure { throw error }
             let actual = relativePath(of: target)
+            let itemID = ItemID.mint()
+            changeLedger { $0.record(itemID, kind: Self.isNote(actual) ? .note : .file, path: actual, fileID: fileID(of: target)) }
             let imported = imported
-            Task { @MainActor in imported(requestID, actual) }
+            Task { @MainActor in imported(requestID, itemID) }
         case .attach(let path, let data):
             defer { reservations.withLock { _ = $0.remove(path.lowercased()) } }
             try writeNew(data, to: root.appending(path: path))
         case .purge(let id):
             try? files.removeItem(at: binURL(id))
             try writeManifest(readManifest().filter { $0.id != id })
+            changeLedger { $0.purge([id]) }
         case .purgeTrash(let date):
             let manifest = readManifest()
             let expired = manifest.filter { $0.trashed < date }
             guard !expired.isEmpty else { return }
             for entry in expired { try? files.removeItem(at: binURL(entry.id)) }
             try writeManifest(manifest.filter { $0.trashed >= date })
-        case .createFolder(let path):
-            try files.createDirectory(at: root.appending(path: path, directoryHint: .isDirectory), withIntermediateDirectories: true)
+            changeLedger { $0.purge(Set(expired.map(\.id))) }
+        case .createFolder(let path, let id):
+            let folder = root.appending(path: path, directoryHint: .isDirectory)
+            try files.createDirectory(at: folder, withIntermediateDirectories: true)
+            changeLedger { $0.record(id, kind: .folder, path: path, fileID: fileID(of: folder)) }
         case .moveFolder(let from, let to):
             try move(root.appending(path: from, directoryHint: .isDirectory), to: root.appending(path: to, directoryHint: .isDirectory))
+            changeLedger { $0.move(from: from, to: to, isFolder: true) }
         case .removeFolder(let path):
             let folder = root.appending(path: path, directoryHint: .isDirectory)
             guard holdsNothing(folder) else { return }
@@ -384,6 +433,61 @@ nonisolated final class FolderStore: NoteStore, @unchecked Sendable {
             do { try body(url) } catch { failure = error }
         }
         if let error = coordinationError ?? failure { throw error }
+    }
+
+    // MARK: Identities
+
+    private static func fileID(_ values: URLResourceValues) -> UInt64? {
+        // A document identifier outlasts a safe save, and a file identifier stands in where there is none.
+        values.documentIdentifier.map { UInt64(truncatingIfNeeded: $0) } ?? values.fileIdentifier
+    }
+
+    private func fileID(of url: URL) -> UInt64? {
+        guard keepsFileIdentities(root) else { return nil }
+        var url = url
+        url.removeAllCachedResourceValues()
+        return (try? url.resourceValues(forKeys: [.documentIdentifierKey, .fileIdentifierKey])).flatMap(Self.fileID)
+    }
+
+    private var ledgerURL: URL { bin.appending(path: "Identities.json") }
+
+    private func changeLedger(_ change: (inout IdentityLedger) -> Void) {
+        var current = ledger ?? readLedger()
+        change(&current)
+        ledger = current
+        ledgerChanged()
+    }
+
+    private func ledgerChanged() {
+        ledgerIsUnsaved = true
+        guard !ledgerSaveScheduled else { return }
+        ledgerSaveScheduled = true
+        queue.asyncAfter(deadline: .now() + 1) { [self] in
+            ledgerSaveScheduled = false
+            saveLedger()
+        }
+    }
+
+    /// A ledger that cannot be read is made again from the folder; only the identifiers change, once.
+    private func readLedger() -> IdentityLedger {
+        guard let data = try? Data(contentsOf: ledgerURL) else { return IdentityLedger() }
+        do {
+            return try JSONDecoder().decode(IdentityLedger.self, from: data)
+        } catch {
+            log.error("the identity list could not be read; it is made again: \(error.localizedDescription, privacy: .public)")
+            return IdentityLedger()
+        }
+    }
+
+    private func saveLedger() {
+        guard ledgerIsUnsaved, let ledger else { return }
+        do {
+            try files.createDirectory(at: bin, withIntermediateDirectories: true)
+            try JSONEncoder().encode(ledger).write(to: ledgerURL, options: .atomic)
+            ledgerIsUnsaved = false
+        } catch {
+            log.error("the identity list could not be kept: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: The trash

@@ -18,6 +18,8 @@ struct RootView: View {
                 SettingsView(presentation: settings)
             }
         }
+        // Settings reads the library too, so it is given to both.
+        .environment(\.library, folder.library)
         .focusedSceneValue(\.settingsPresentation, settings)
         .onAppear {
             if settingsRequest.isPending {
@@ -29,8 +31,7 @@ struct RootView: View {
 
     @ViewBuilder private var workspace: some View {
         if let library = folder.library {
-            MainView(settings: settings)
-                .environment(library)
+            MainView(library: library, settings: settings)
                 // A different folder is a different library, and the window starts afresh with it.
                 .id(ObjectIdentifier(library))
         } else {

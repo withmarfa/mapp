@@ -42,6 +42,29 @@ struct OutsideChangeTests {
         #expect(library.folder(try #require(moved.folderID))?.name == "Home")
     }
 
+    @Test func aFileRenamedOutsideKeepsItsIdentifierWhenAnotherTakesItsName() async throws {
+        let shopping = try #require(note(at: "Shopping.md"))
+        try FileManager.default.moveItem(at: root.url.appending(path: "Shopping.md"), to: root.url.appending(path: "Groceries.md"))
+        try root.write("A new list\n", to: "Shopping.md")
+        await library.reread()
+        #expect(library.note(shopping.id)?.path == "Groceries.md")
+        #expect(library.note(shopping.id)?.body == "Shopping\n")
+        let newcomer = try #require(note(at: "Shopping.md"))
+        #expect(newcomer.id != shopping.id)
+        #expect(newcomer.body == "A new list\n")
+    }
+
+    @Test func aFolderRenamedOutsideKeepsItsIdentifierAndItsNotes() async throws {
+        let plan = try #require(note(at: "Work/Plan.md"))
+        let work = try #require(library.folders.first { $0.name == "Work" })
+        try FileManager.default.moveItem(at: root.url.appending(path: "Work"), to: root.url.appending(path: "Office"))
+        await library.reread()
+        #expect(library.folders.map(\.id) == [work.id])
+        #expect(library.folder(work.id)?.name == "Office")
+        #expect(library.note(plan.id)?.path == "Office/Plan.md")
+        #expect(library.note(plan.id)?.folderID == work.id)
+    }
+
     @Test func filesAddedAndDeletedOutsideComeAndGo() async throws {
         let shopping = try #require(note(at: "Shopping.md"))
         try root.write("Written by an agent\n", to: "Agent.md")
@@ -49,7 +72,7 @@ struct OutsideChangeTests {
         await library.reread()
         #expect(library.note(shopping.id) == nil)
         #expect(note(at: "Agent.md")?.body == "Written by an agent\n")
-        #expect(library.notes(in: .recentlyDeleted).isEmpty, "a file deleted outside is gone, not trashed")
+        #expect(library.items(in: .recentlyDeleted).isEmpty, "a file deleted outside is gone, not trashed")
     }
 
     @Test func foldersMadeAndRemovedOutsideAppearAndGo() async throws {
@@ -60,17 +83,38 @@ struct OutsideChangeTests {
         #expect(note(at: "Work/Plan.md") == nil)
     }
 
+    /// Text the page typed on what a note held before another app rewrote it, reported once the rewrite was taken
+    /// in, is kept beside the note as a copy, so neither the other app's text nor the person's is lost.
+    @Test func textTypedBeforeAnOutsideRewriteIsKeptAsACopy() async throws {
+        let plan = try #require(note(at: "Work/Plan.md"))
+        let read = try #require(library.body(of: plan.id)?.version)
+        try root.write("# Plan\n\nRewritten elsewhere\n", to: "Work/Plan.md")
+        await library.reread()
+        #expect(note(at: "Work/Plan.md")?.body == "# Plan\n\nRewritten elsewhere\n")
+        library.updateBody(of: plan.id, to: "# Plan\n\nFirst draft, typed\n", readAt: read)
+        await library.reread()
+        #expect(root.read("Work/Plan.md") == "# Plan\n\nRewritten elsewhere\n")
+        #expect(root.read("Work/Plan (Conflicted Copy).md") == "# Plan\n\nFirst draft, typed\n")
+        #expect(library.note(plan.id)?.body == "# Plan\n\nRewritten elsewhere\n")
+        #expect(library.failure?.title == String(localized: "Saved as a Copy"))
+        // Typing on the rewritten text is saved over it as usual.
+        let now = try #require(library.body(of: plan.id)?.version)
+        library.updateBody(of: plan.id, to: "# Plan\n\nRewritten elsewhere, typed\n", readAt: now)
+        await library.reread()
+        #expect(root.read("Work/Plan.md") == "# Plan\n\nRewritten elsewhere, typed\n")
+    }
+
     @Test func theLibrarysOwnChangesAreNotTakenForAnothersOnceMade() async throws {
         let plan = try #require(note(at: "Work/Plan.md"))
         library.updateBody(of: plan.id, to: "# Plan\n\nMine\n")
-        library.setPinned([plan.id], true)
+        library.setFavorite([plan.id], true)
         library.move([plan.id], to: nil)
         await library.reread()
         let after = try #require(library.note(plan.id))
         #expect(after.body == "# Plan\n\nMine\n")
-        #expect(after.isPinned)
+        #expect(after.isFavorite)
         #expect(after.path == "Plan.md")
-        #expect(root.read("Plan.md") == "---\npinned: true\n---\n# Plan\n\nMine\n")
+        #expect(root.read("Plan.md") == "---\ntags: [favorite]\n---\n# Plan\n\nMine\n")
     }
 
     @Test func aRenameThatFailsLeavesOneNoteAndIsTriedAgain() async throws {

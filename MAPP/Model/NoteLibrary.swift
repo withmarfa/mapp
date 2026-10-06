@@ -4,22 +4,28 @@ import Observation
 /// Every note and folder, held in memory for the views and kept in a store. Each change a person can make is
 /// made here at once, handed to the store to make on disk, and undoable through the undo manager it is given.
 @Observable
-final class NoteLibrary {
-    var notes: [Note] { didSet { cachedConnectionIndex = nil } }
+final class NoteLibrary: ItemLibrary {
+    var notes: [Note] { didSet { contentStamp &+= 1 } }
     var folders: [Folder]
-    private(set) var files: [AppFile] = [] { didSet { cachedConnectionIndex = nil } }
-    private(set) var completedImports: [UUID: UUID] = [:]
+    private(set) var files: [AppFile] = [] { didSet { contentStamp &+= 1 } }
+    private(set) var completedImports: [UUID: ItemID] = [:]
     /// Whether the store has been read, so a window restores what it showed only once there is something to find.
     private(set) var isLoaded: Bool
     /// Notes a person has asked to erase for good, until they confirm or cancel, since that cannot be undone.
-    var notesToPurge: Set<Note.ID> = []
+    var notesToPurge: Set<ItemID> = []
     /// Something the store could not do, to tell the person: what failed and why.
     var failure: (title: String, message: String)?
     let now: () -> Date
 
-    /// Derived snapshots only; source files and note identities remain the authority.
-    @ObservationIgnored var cachedItemProjections: [UUID: NoteProjection] = [:]
-    @ObservationIgnored var cachedConnectionIndex: NoteConnectionIndex?
+    /// Derived snapshots only; source files and note identities remain the authority. Each is kept until a
+    /// revision it was made from changes, which compares numbers rather than text.
+    @ObservationIgnored var cachedItemProjections: [ItemID: (revision: Int64, projection: NoteProjection)] = [:]
+    @ObservationIgnored var cachedItems: [ItemID: CachedItem] = [:]
+    @ObservationIgnored var itemCollection: ItemCollection?
+    @ObservationIgnored var itemCounts: ItemCounts?
+    @ObservationIgnored var connections: Connections?
+    /// Counts every change to the notes or files, so a cache knows it is current without looking at them.
+    @ObservationIgnored var contentStamp = 0
 
     @ObservationIgnored let store: NoteStore?
     @ObservationIgnored private let defaults: UserDefaults?
@@ -27,19 +33,15 @@ final class NoteLibrary {
     @ObservationIgnored private var queued = 0
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var needsRefresh = false
-    /// Notes whose last change could not be made, which a reading of the folder leaves as they are here, so what
+    /// Paths whose last change could not be made, which a reading of the folder leaves as they are here, so what
     /// was typed stays until it can be saved.
     @ObservationIgnored private var unsaved: Set<String> = []
     /// When each note was first found missing from the folder. Some apps save by taking a file away and writing
     /// it again, so a note goes only once it has stayed away a moment.
-    @ObservationIgnored private var missingSince: [Note.ID: Date] = [:]
+    @ObservationIgnored private var missingSince: [ItemID: Date] = [:]
     @ObservationIgnored var missingGrace: TimeInterval = 2
     /// Notes changed on a page since it was last left, whose names may need to follow their first lines.
-    @ObservationIgnored private var edited: Set<Note.ID> = []
-    /// A new note still being typed on its first line is written once the typing pauses this long, so a
-    /// one-line note is on disk before the app could be stopped.
-    @ObservationIgnored var draftDelay: Duration = .seconds(2)
-    @ObservationIgnored private var draftSaves: [Note.ID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var edited: Set<ItemID> = []
 
     private static var unreadable: (title: String, message: String) {
         (String(localized: "Can’t Read the Notes Folder"), String(localized: "It may have been moved or deleted. Choose it again in Settings."))
@@ -47,6 +49,13 @@ final class NoteLibrary {
 
     /// How long a note stays in Recently Deleted.
     static let trashDays = 30
+    var trashDays: Int? { Self.trashDays }
+    /// A folder holds no archive, and its items are files that move between folders.
+    var capabilities: SourceCapabilities { [.move, .purge, .renameFiles, .folders, .importFiles] }
+    /// A folder sends nothing, so nothing waits and nothing goes wrong on the way.
+    var syncReport: SyncReport { SyncReport(queueRead: true) }
+
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     private static let folderOrderKey = "folderOrder"
 
     /// A library of the notes given, loaded already; with a store, each change is also made there.
@@ -63,11 +72,9 @@ final class NoteLibrary {
         self.defaults = defaults
         self.now = now
         isLoaded = true
-        store?.imported = { [weak self] requestID, path in
-            guard let self else { return }
-            let namespace = (path as NSString).pathExtension.lowercased() == "md" ? "note:" : "file:"
-            self.completedImports[requestID] = UUID(stableFrom: namespace + path)
-            self.refresh()
+        store?.imported = { [weak self] requestID, id in
+            self?.completedImports[requestID] = id
+            self?.refresh()
         }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
         store?.failed = { [weak self] path, message in
@@ -86,12 +93,7 @@ final class NoteLibrary {
         isLoaded = false
     }
 
-    func fileURL(for id: UUID) -> URL? {
-        guard let file = files.first(where: { $0.id == id }) else { return nil }
-        return store?.fileURL(for: file.path)
-    }
-
-    func importFiles(_ sources: [URL], folderID: Folder.ID? = nil, requestID: UUID = UUID()) {
+    func importFiles(_ sources: [URL], folderID: ItemID? = nil, requestID: UUID = UUID()) {
         guard store != nil else { return }
         let prefix = folders.first(where: { $0.id == folderID }).map { $0.name + "/" } ?? ""
         for source in sources {
@@ -103,11 +105,26 @@ final class NoteLibrary {
         completedImports[requestID] = nil
     }
 
+    /// A file takes the store's identifier unless a note here already has it, which only a note kept by its
+    /// path can, and then keeps the one it had here or gets one of its own.
     private func reconcileFiles(_ stored: [StoredFile]) {
-        files = stored.map { disk in
-            let previous = files.first { $0.path == disk.path || (disk.fileID != nil && $0.stored.fileID == disk.fileID) }
-            return AppFile(id: previous?.id ?? UUID(stableFrom: "file:" + disk.path), stored: disk, folderID: folderID(forPath: disk.path))
+        var taken = Set(notes.map(\.id))
+        let previous = Dictionary(files.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
+        let held = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let reconciled = stored.map { disk in
+            var id = disk.id
+            if taken.contains(id) { id = previous[disk.path].flatMap { taken.contains($0) ? nil : $0 } ?? .mint() }
+            taken.insert(id)
+            let folderID = folderID(forPath: disk.path)
+            // A file read again unchanged keeps its revision, so nothing made from it is made again.
+            if let file = held[id], file.folderID == folderID, file.stored.path == disk.path,
+               file.stored.modified == disk.modified, file.stored.created == disk.created,
+               file.stored.byteCount == disk.byteCount {
+                return file
+            }
+            return AppFile(id: id, stored: disk, folderID: folderID)
         }
+        if reconciled.map(\.revision) != files.map(\.revision) { files = reconciled }
     }
 
     // MARK: Loading
@@ -122,36 +139,29 @@ final class NoteLibrary {
         perform(.purgeTrash(before: expiry))
 
         let saved = defaults?.stringArray(forKey: Self.folderOrderKey) ?? []
-        let names = stored.folders.sorted { a, b in
-            switch (saved.firstIndex(of: a), saved.firstIndex(of: b)) {
+        let ordered = stored.folders.sorted { a, b in
+            switch (saved.firstIndex(of: a.name), saved.firstIndex(of: b.name)) {
             case let (x?, y?): x < y
             case (_?, nil): true
             case (nil, _?): false
-            case (nil, nil): a.localizedStandardCompare(b) == .orderedAscending
+            case (nil, nil): a.name.localizedStandardCompare(b.name) == .orderedAscending
             }
         }
-        folders = names.map { Folder(id: UUID(stableFrom: "folder:" + $0), name: $0) }
+        folders = ordered.map { Folder(id: $0.id, name: $0.name) }
         var loaded: [Note] = []
-        var ids: Set<UUID> = []
-        func id(for path: String) -> UUID {
-            let id = UUID(stableFrom: "note:" + path)
-            return ids.insert(id).inserted ? id : UUID()
-        }
         for stored in stored.notes {
-            var note = Note(
-                id: id(for: stored.path),
+            loaded.append(Note(
+                id: stored.id,
                 path: stored.path,
                 text: stored.text,
                 created: stored.created,
                 modified: stored.modified,
                 folderID: folderID(forPath: stored.path)
-            )
-            note.fileID = stored.fileID
-            loaded.append(note)
+            ))
         }
         for trashed in stored.trash where trashed.trashed >= expiry {
             loaded.append(Note(
-                id: id(for: "trash:" + trashed.id.uuidString),
+                id: trashed.note.id,
                 path: trashed.note.path,
                 text: trashed.note.text,
                 created: trashed.note.created,
@@ -161,9 +171,8 @@ final class NoteLibrary {
                 binID: trashed.id
             ))
         }
+        notes = loaded
         reconcileFiles(stored.files)
-        // Notes begun while the folder was being read are kept.
-        notes = loaded + notes.filter(\.isDraft)
         isLoaded = true
         if needsRefresh { refresh() }
     }
@@ -224,26 +233,33 @@ final class NoteLibrary {
         }
     }
 
-    /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added or
-    /// taken away. A file renamed or moved is known by its identity and stays the same note. None of this is
-    /// undoable here, since it was not done here.
+    /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added,
+    /// renamed or taken away. The store knows a file renamed or moved, even while the app was closed, and it stays
+    /// the same note. A note here whose file the store knows under another identifier, as when a change the store
+    /// could not record wrote the file, stays itself by its path, and a note or file that would then share an
+    /// identifier gets one of its own. None of this is undoable here, since it was not done here.
     private func reconcile(_ stored: StoredLibrary) {
-        let names = Set(stored.folders)
-        var order = folders.filter { names.contains($0.name) }
-        for name in stored.folders where !order.contains(where: { $0.name == name }) {
-            let stable = UUID(stableFrom: "folder:" + name)
-            order.append(Folder(id: order.contains { $0.id == stable } ? UUID() : stable, name: name))
+        var unmatched = Dictionary(stored.folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var order: [Folder] = []
+        for folder in folders {
+            if let disk = unmatched.removeValue(forKey: folder.id) {
+                order.append(Folder(id: folder.id, name: disk.name))
+            } else if let disk = unmatched.values.first(where: { $0.name == folder.name }) {
+                unmatched[disk.id] = nil
+                order.append(folder)
+            }
+        }
+        for disk in stored.folders where unmatched[disk.id] != nil {
+            order.append(Folder(id: order.contains { $0.id == disk.id } ? .mint() : disk.id, name: disk.name))
         }
         if order != folders { folders = order }
-        reconcileFiles(stored.files)
 
         var updated = notes
-        var onDisk = Dictionary(stored.notes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
-        let onDiskText = onDisk.mapValues(\.text)
-        var seen: Set<Note.ID> = []
+        var onDisk = Dictionary(stored.notes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let onDiskText = Dictionary(stored.notes.map { ($0.path, $0.text) }, uniquingKeysWith: { first, _ in first })
+        var seen: Set<ItemID> = []
         func take(_ disk: StoredNote, at index: Int) {
             seen.insert(updated[index].id)
-            updated[index].fileID = disk.fileID
             let moved = updated[index].path != disk.path
             if moved {
                 updated[index].path = disk.path
@@ -258,38 +274,34 @@ final class NoteLibrary {
             if moved || rewritten { updated[index].reviewNaming() }
         }
         for index in updated.indices where !updated[index].isDeleted {
-            guard let path = updated[index].path, let disk = onDisk.removeValue(forKey: path) else { continue }
+            guard let disk = onDisk.removeValue(forKey: updated[index].id) else { continue }
+            take(disk, at: index)
+        }
+        var atPath = Dictionary(onDisk.values.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
+        for index in updated.indices where !updated[index].isDeleted && !seen.contains(updated[index].id) {
+            guard let id = atPath.removeValue(forKey: updated[index].path),
+                  let disk = onDisk.removeValue(forKey: id) else { continue }
             take(disk, at: index)
         }
         let ids = Set(updated.map(\.id))
         for disk in onDisk.values.sorted(by: { $0.path < $1.path }) {
-            let renamed = disk.fileID.flatMap { fileID in
-                updated.indices.first {
-                    !seen.contains(updated[$0].id) && !updated[$0].isDeleted && !updated[$0].isDraft && updated[$0].fileID == fileID
-                }
-            }
-            if let renamed {
-                take(disk, at: renamed)
-            } else {
-                let stable = UUID(stableFrom: "note:" + disk.path)
-                var note = Note(
-                    id: ids.contains(stable) ? UUID() : stable,
-                    path: disk.path,
-                    text: disk.text,
-                    created: disk.created,
-                    modified: disk.modified,
-                    folderID: folderID(forPath: disk.path)
-                )
-                note.fileID = disk.fileID
-                updated.append(note)
-                seen.insert(note.id)
-            }
+            // A note whose trashing failed is still here, deleted, under the identifier its file has.
+            let note = Note(
+                id: ids.contains(disk.id) ? .mint() : disk.id,
+                path: disk.path,
+                text: disk.text,
+                created: disk.created,
+                modified: disk.modified,
+                folderID: folderID(forPath: disk.path)
+            )
+            updated.append(note)
+            seen.insert(note.id)
         }
         // A written note whose file has gone was deleted by another app, and goes with it once it has stayed
         // away a moment. One whose last change failed stays, since what was typed is only here.
         let now = now()
         updated.removeAll { note in
-            guard !note.isDeleted, !note.isDraft, !seen.contains(note.id), !unsaved.contains(note.path ?? "") else { return false }
+            guard !note.isDeleted, !seen.contains(note.id), !unsaved.contains(note.path) else { return false }
             let since = missingSince[note.id] ?? now
             missingSince[note.id] = since
             return now.timeIntervalSince(since) >= missingGrace
@@ -301,181 +313,110 @@ final class NoteLibrary {
             return onDiskText[path] != note.file.text
         }
         if updated != notes { notes = updated }
+        reconcileFiles(stored.files)
     }
 
     // MARK: Reading
 
-    func note(_ id: Note.ID) -> Note? {
-        notes.first { $0.id == id }
+    func note(_ id: ItemID) -> Note? {
+        // The collection's positions follow the notes, so a note is usually found without a search.
+        if let position = itemCollection?.positions[id], position < notes.count, notes[position].id == id {
+            return notes[position]
+        }
+        return notes.first { $0.id == id }
     }
 
-    func folder(_ id: Folder.ID) -> Folder? {
+    /// Whether a window kept for this item has nothing left to show: the folder has been read and holds no such
+    /// item, deleted for good, say, or gone while the app was closed. Before the reading nothing is known yet.
+    func isGone(_ id: ItemID?) -> Bool {
+        isLoaded && id.flatMap { item($0) } == nil
+    }
+
+    func folder(_ id: ItemID) -> Folder? {
         folders.first { $0.id == id }
     }
 
-    func notes(in item: SidebarItem) -> [Note] {
-        switch item {
-        case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
-        case .allNotes: return notes.filter { !$0.isDeleted }
-        case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
-        case .pinnedItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isPinned }
-        case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
-        case .recentlyDeleted: return notes.filter(\.isDeleted)
-        case .marfaTypes, .files: return []
-        case .itemType(let typeID): return notes.filter { !$0.isDeleted && self.item($0.id)?.type?.id == typeID }
-        case .project(let projectID):
-            let descendants = projectDescendants(projectID)
-            return notes.filter { !$0.isDeleted && (descendants.contains($0.id) || $0.id == projectID) }
-        }
-    }
-
-    private func projectDescendants(_ id: UUID) -> Set<UUID> {
-        let edges = connectionIndex.edges.filter { $0.name == "parent-of" }
-        var result: Set<UUID> = []
-        var pending = [id]
-        while let current = pending.popLast() {
-            for edge in edges where edge.sourceID == current && !result.contains(edge.targetID) && edge.targetID != id {
-                result.insert(edge.targetID)
-                pending.append(edge.targetID)
-            }
-        }
-        return result
-    }
-
-    /// Search covers every note that has not been deleted, whichever sidebar item is selected.
-    func notes(matching query: String) -> [Note] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        return notes.filter {
-            !$0.isDeleted && ($0.body.range(of: query, options: options) != nil || $0.title.range(of: query, options: options) != nil)
-        }
-    }
-
-    /// Where each note is, to open it in a window of its own that finds it again at the next launch. A new
-    /// note is written first, so it has somewhere to be; one with nothing in it has nowhere yet, and stays.
-    func paths(forWindows ids: some Collection<Note.ID>) -> [String] {
-        ids.compactMap { id in
-            if let file = files.first(where: { $0.id == id }) { return file.path }
-            guard let note = note(id), !(note.isDraft && NoteText.isBlank(note.body)) else { return nil }
+    /// The items to open in windows of their own. A note is left first, so a name that follows its first line
+    /// is current before the window shows it.
+    func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID] {
+        ids.filter { id in
+            if files.contains(where: { $0.id == id }) { return true }
             leave(id)
-            return self.note(id)?.path
+            return note(id) != nil
         }
-    }
-
-    /// The note at a path, living before deleted, for a window that remembers where its note was.
-    func note(at path: String) -> Note? {
-        notes.first { $0.path == path && !$0.isDeleted } ?? notes.first { $0.path == path }
-    }
-
-    func count(in item: SidebarItem) -> Int {
-        let fileCount: Int
-        switch item {
-        case .allNotes, .files: fileCount = files.count
-        case .inbox: fileCount = files.filter { $0.folderID == nil }.count
-        case .folder(let id): fileCount = files.filter { $0.folderID == id }.count
-        default: fileCount = 0
-        }
-        return notes(in: item).count + fileCount
     }
 
     func name(of item: SidebarItem) -> String {
         switch item {
         case .inbox: String(localized: "Inbox")
         case .allNotes: String(localized: "All Notes")
-        case .pinned: String(localized: "Pinned")
-        case .pinnedItem(let id): self.item(id)?.title ?? ""
+        case .favorites: String(localized: "Favorites")
+        case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
         case .files: String(localized: "Files")
         case .itemType(let typeID): typeID == "aic.project" ? String(localized: "Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
         case .project(let id): self.item(id)?.title ?? ""
-
         }
     }
 
     // MARK: Notes
 
-    /// A new, empty note placed where it will show in `item`: in that folder, pinned when made from Pinned, and in
-    /// the Inbox otherwise. It has no file until its first line is written.
-    @discardableResult
-    func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
-        var file = NoteFile(text: "")
-        if item == .pinned { file.setFlag("pinned", true) }
-        var note = Note(text: file.text, created: now())
-        if case .folder(let id) = item { note.folderID = folder(id)?.id }
-        notes.append(note)
-        let id = note.id
-        registerUndo(undoManager, name: String(localized: "New Note")) { [weak undoManager] library in
-            library.discard(id, undoManager: undoManager)
-        }
-        return note
-    }
-
-    /// A note being written. A new note gets its file, named after its first line, once that line is finished
-    /// or the typing pauses. Typing is undone by the page that holds it, so this registers nothing.
-    func updateBody(of id: Note.ID, to body: String) {
-        guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body,
-              !notes[index].isDeleted
+    /// A note being written. Typing is undone by the page that holds it, so this registers nothing.
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
+        guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body, !notes[index].isDeleted
         else { return }
-        if let path = notes[index].path { unsaved.remove(path) }
+        guard readAt.rawValue >= notes[index].bodyRevision else { return keepApart(body, from: index) }
+        let path = notes[index].path
+        unsaved.remove(path)
         notes[index].file.body = body
         notes[index].modified = now()
         edited.insert(id)
-        if notes[index].isDraft {
-            draftSaves[id]?.cancel()
-            if NoteText.hasCompleteFirstLine(body) {
-                writeDraft(at: index)
-            } else if !NoteText.isBlank(body) {
-                draftSaves[id] = Task { [weak self, draftDelay] in
-                    try? await Task.sleep(for: draftDelay)
-                    guard !Task.isCancelled, let self,
-                          let index = notes.firstIndex(where: { $0.id == id }), notes[index].isDraft, !notes[index].isDeleted
-                    else { return }
-                    writeDraft(at: index)
-                }
-            }
-        } else if let path = notes[index].path {
-            perform(.write(path: path, text: notes[index].file.text))
-        }
+        perform(.write(path: path, text: notes[index].file.text))
     }
 
-    /// The note is no longer on the page. A new note is written with what it has, or let go if it has nothing,
-    /// as Notes lets an empty new note go. A note named after its first line takes the line's new name.
-    func leave(_ id: Note.ID) {
-        draftSaves.removeValue(forKey: id)?.cancel()
+    /// Text typed on what a note held before its text changed elsewhere, as in another app or window, reported
+    /// once the page had taken in the change. Written over the note, it would replace text the person never saw,
+    /// so it is kept beside the note as a copy, the folder's own way to keep both, and the person is told.
+    private func keepApart(_ body: String, from index: Int) {
+        let original = notes[index]
+        let name = String(localized: "\(original.fileTitle) (Conflicted Copy)")
+        let copy = Note(
+            path: uniquePath(name, in: original.directory, except: nil), text: body, created: now(),
+            folderID: original.folderID)
+        notes.append(copy)
+        perform(.create(path: copy.path, text: copy.file.text, id: copy.id))
+        failure = (
+            String(localized: "Saved as a Copy"),
+            String(localized: "“\(original.title)” changed while you were typing, so what you typed is in “\(copy.title)”.")
+        )
+    }
+
+    /// The note is no longer on the page. A note named after its first line takes the line's new name.
+    func leave(_ id: ItemID) {
         guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted else { return }
-        if notes[index].isDraft {
-            if NoteText.isBlank(notes[index].body) {
-                notes.remove(at: index)
-            } else {
-                writeDraft(at: index)
-            }
-        } else if edited.contains(id) {
-            followFirstLine(at: index)
-        }
+        if edited.contains(id) { followFirstLine(at: index) }
         edited.remove(id)
     }
 
-    /// Every note being written is left, so new notes with something in them get their files and names follow
-    /// their first lines, and the store finishes, as the app quits.
+    /// Every note being written is left, so names follow first lines, and the store finishes, as the app quits.
     func finish() {
-        for note in notes where note.isDraft || edited.contains(note.id) { leave(note.id) }
+        for note in notes where edited.contains(note.id) { leave(note.id) }
         store?.drain()
     }
 
-    func delete(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
+    func delete(_ ids: Set<ItemID>, undoManager: UndoManager? = nil) {
         place(ids, undoManager: undoManager, name: deleteName(ids.count)) { $0.isDeleted = true }
     }
 
-    func recover(_ ids: Set<Note.ID>, undoManager: UndoManager? = nil) {
+    func recover(_ ids: Set<ItemID>, undoManager: UndoManager? = nil) {
         place(ids, undoManager: undoManager, name: String(localized: "Recover")) { $0.isDeleted = false }
     }
 
     /// Erases notes in Recently Deleted for good. Nothing brings them back, so this is not undoable and the
     /// views confirm it first.
-    func deletePermanently(_ ids: Set<Note.ID>) {
+    func deletePermanently(_ ids: Set<ItemID>) {
         for note in notes where ids.contains(note.id) && note.isDeleted {
             if let binID = note.binID { perform(.purge(id: binID)) }
         }
@@ -485,7 +426,7 @@ final class NoteLibrary {
 
     /// Moving a note into a folder, or back to the Inbox with `nil`, also recovers it if it was deleted. A folder
     /// that no longer exists takes nothing.
-    func move(_ ids: Set<Note.ID>, to folderID: Folder.ID?, undoManager: UndoManager? = nil) {
+    func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager? = nil) {
         guard folderID.map({ folder($0) != nil }) ?? true else { return }
         place(ids, undoManager: undoManager, name: String(localized: "Move")) {
             $0.folderID = folderID
@@ -493,31 +434,97 @@ final class NoteLibrary {
         }
     }
 
-    /// Deleted notes keep their pin as it was, since Recently Deleted shows no pins.
-    func setPinned(_ ids: Set<Note.ID>, _ pinned: Bool, undoManager: UndoManager? = nil) {
-        let name = pinned ? String(localized: "Pin") : String(localized: "Unpin")
-        let changed = notes.filter { ids.contains($0.id) && !$0.isDeleted && $0.isPinned != pinned }.map(\.id)
-        guard !changed.isEmpty else { return }
-        for index in notes.indices where changed.contains(notes[index].id) {
-            notes[index].file.setFlag("pinned", pinned)
-            if let path = notes[index].path { perform(.write(path: path, text: notes[index].file.text)) }
+    /// Deleted notes keep their tags as they were, since Recently Deleted shows no favorites. A note whose tags
+    /// cannot be changed safely is left as written, and the person is told.
+    func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager? = nil) {
+        var changes: [ItemID: FileChange] = [:]
+        var refused: [(title: String, error: NoteFile.TagEditError)] = []
+        for index in notes.indices where ids.contains(notes[index].id) && !notes[index].isDeleted && notes[index].isFavorite != isFavorite {
+            var file = notes[index].file
+            do {
+                try file.setFavorite(isFavorite)
+            } catch {
+                refused.append((notes[index].title, error))
+                continue
+            }
+            guard file != notes[index].file else { continue }
+            changes[notes[index].id] = FileChange(before: notes[index].file, after: file)
+            notes[index].file = file
+            perform(.write(path: notes[index].path, text: file.text))
         }
+        if let first = refused.first {
+            let title = isFavorite ? String(localized: "Can’t Add to Favorites") : String(localized: "Can’t Remove from Favorites")
+            let message = switch (refused.count, first.error) {
+            case (1, .unreadable):
+                String(localized: "The tags of “\(first.title)” can’t be read, so its file was left unchanged.")
+            case (1, .unsafe):
+                String(localized: "The tags of “\(first.title)” are written in a form that can’t be changed safely, so its file was left unchanged.")
+            default:
+                String(localized: "Some notes have tags that can’t be read or changed safely, so their files were left unchanged.")
+            }
+            failure = (title, message)
+        }
+        guard !changes.isEmpty else { return }
+        let name = isFavorite ? String(localized: "Add to Favorites") : String(localized: "Remove from Favorites")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.setPinned(Set(changed), !pinned, undoManager: undoManager)
+            library.revertFavorites(changes, wereSetTo: isFavorite, name: name, undoManager: undoManager)
+        }
+    }
+
+    nonisolated struct FileChange: Sendable {
+        let before: NoteFile
+        let after: NoteFile
+    }
+
+    /// Puts back the bytes each file had before a favorite change. A file whose body changed since keeps the new
+    /// body under its old front matter; one whose front matter changed since has only its favorite changed back.
+    private func revertFavorites(_ changes: [ItemID: FileChange], wereSetTo isFavorite: Bool, name: String, undoManager: UndoManager?) {
+        var reverted: [ItemID: FileChange] = [:]
+        var refused: [String] = []
+        for index in notes.indices {
+            guard let change = changes[notes[index].id], !notes[index].isDeleted else { continue }
+            let current = notes[index].file
+            var restored = current
+            if current == change.after {
+                restored = change.before
+            } else if current.frontMatter == change.after.frontMatter {
+                restored.restoreFrontMatter(from: change.before)
+            } else if current.isFavorite == isFavorite {
+                do {
+                    try restored.setFavorite(!isFavorite)
+                } catch {
+                    refused.append(notes[index].title)
+                    continue
+                }
+            }
+            guard restored != current else { continue }
+            reverted[notes[index].id] = FileChange(before: current, after: restored)
+            notes[index].file = restored
+            perform(.write(path: notes[index].path, text: restored.text))
+        }
+        if let first = refused.first {
+            let title = isFavorite ? String(localized: "Can’t Remove from Favorites") : String(localized: "Can’t Add to Favorites")
+            let message = refused.count == 1
+                ? String(localized: "The tags of “\(first)” are written in a form that can’t be changed safely, so its file was left unchanged.")
+                : String(localized: "Some notes have tags that can’t be read or changed safely, so their files were left unchanged.")
+            failure = (title, message)
+        }
+        guard !reverted.isEmpty else { return }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.revertFavorites(reverted, wereSetTo: !isFavorite, name: name, undoManager: undoManager)
         }
     }
 
     /// Whether another note in the same folder already has the file name, ignoring case, as the Finder does.
-    func isNoteNameTaken(_ name: String, for id: Note.ID) -> Bool {
+    func isNoteNameTaken(_ name: String, for id: ItemID) -> Bool {
         guard let note = note(id) else { return false }
-        let directory = note.path.map { _ in note.directory } ?? directory(for: note.folderID)
-        let path = directory.isEmpty ? "\(name).md" : "\(directory)/\(name).md"
+        let path = note.directory.isEmpty ? "\(name).md" : "\(note.directory)/\(name).md"
         return isPathTaken(path, except: id)
     }
 
     /// Renames the note's file. Marfa keeps a note's title in its front matter when it has one, so that is
-    /// changed too. A new note is written under the name. An empty name, or one another note has, is refused.
-    func renameNote(_ id: Note.ID, to name: String, undoManager: UndoManager? = nil) {
+    /// changed too. An empty name, or one another note has, is refused.
+    func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager? = nil) {
         let name = NoteText.fileSafe(name)
         guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted, !name.isEmpty,
               !isNoteNameTaken(name, for: id)
@@ -532,7 +539,7 @@ final class NoteLibrary {
     private func followFirstLine(at index: Int) {
         guard let named = notes[index].namedLine else { return }
         let line = NoteText.firstLine(of: notes[index].body) ?? ""
-        let hasLinesName = notes[index].fileTitle.map { NoteText.isName($0, of: line, exactly: true) } ?? true
+        let hasLinesName = NoteText.isName(notes[index].fileTitle, of: line, exactly: true)
         guard line != named || !hasLinesName else { return }
         let title = notes[index].file.title != nil || NoteText.needsTitle(line) ? line : nil
         rename(at: index, to: NoteText.name(for: line), title: title, undoManager: nil)
@@ -540,15 +547,14 @@ final class NoteLibrary {
 
     private func rename(at index: Int, to name: String, title: String?, undoManager: UndoManager?, updateLinks: Bool = true) {
         let id = notes[index].id
-        let oldName = notes[index].fileTitle ?? NoteText.fileName(for: notes[index].body)
+        let oldName = notes[index].fileTitle
         let oldTitle = notes[index].file.property("title")
-        let directory = notes[index].path.map { _ in notes[index].directory } ?? directory(for: notes[index].folderID)
-        let path = uniquePath(name, in: directory, except: id)
+        let path = uniquePath(name, in: notes[index].directory, except: id)
         defer {
             // A note goes by its first line again once it is given the line's name, whatever gave it; exactly the
             // line's, since a name given by hand that only resembles an earlier version's is the person's choice.
             let line = NoteText.firstLine(of: notes[index].body) ?? ""
-            notes[index].namedLine = notes[index].fileTitle.flatMap { NoteText.isName($0, of: line, exactly: true) ? line : nil }
+            notes[index].namedLine = NoteText.isName(notes[index].fileTitle, of: line, exactly: true) ? line : nil
         }
         var titleFile = notes[index].file
         if title != oldTitle { titleFile.setProperty("title", title) }
@@ -558,9 +564,9 @@ final class NoteLibrary {
             return
         }
         let predictedTitle = title ?? name
-        var originals: [UUID: NoteFile] = [:]
-        var replacements: [UUID: NoteFile] = [:]
-        var spans: [UUID: [RenameReferenceSpan]] = [:]
+        var originals: [ItemID: NoteFile] = [:]
+        var replacements: [ItemID: NoteFile] = [:]
+        var spans: [ItemID: [RenameReferenceSpan]] = [:]
         if updateLinks {
             let references = connectionIndex.references.filter { $0.resolution == .resolved(id) }
             let usePath = notes.contains { !$0.isDeleted && $0.id != id && $0.title.caseInsensitiveCompare(predictedTitle) == .orderedSame }
@@ -586,7 +592,7 @@ final class NoteLibrary {
                 if let fields = projection.fields {
                     for field in WorkbenchSchema.definition(projection.declaredType ?? "core.note")?.relationshipFields ?? [] {
                         guard let value = fields[field] else { continue }
-                        func rewrite(_ value: NoteFieldValue) -> NoteFieldValue {
+                        func rewrite(_ value: PropertyValue) -> PropertyValue {
                             if case .array(let values) = value { return .array(values.map(rewrite)) }
                             if case .string(let text) = value, let replacement = rewrites[text] { return .string(replacement) }
                             return value
@@ -608,14 +614,10 @@ final class NoteLibrary {
         }
         guard path != notes[index].path || title != oldTitle else { return }
         if title != oldTitle { notes[index].file.setProperty("title", title) }
-        if let from = notes[index].path {
-            if path != from { perform(.move(from: from, to: path)) }
-            notes[index].path = path
-            if title != oldTitle { perform(.write(path: path, text: notes[index].file.text)) }
-        } else {
-            notes[index].path = path
-            perform(.create(path: path, text: notes[index].file.text))
-        }
+        let from = notes[index].path
+        if path != from { perform(.move(from: from, to: path)) }
+        notes[index].path = path
+        if title != oldTitle { perform(.write(path: path, text: notes[index].file.text)) }
         applyItemFiles(replacements, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
             guard let index = library.notes.firstIndex(where: { $0.id == id }), !library.notes[index].isDeleted else { return }
@@ -624,10 +626,10 @@ final class NoteLibrary {
         }
     }
 
-    private func restoreRenameReferences(originals: [UUID: NoteFile], replacements: [UUID: NoteFile], spans: [UUID: [RenameReferenceSpan]], undoManager: UndoManager?) {
-        var nextSpans: [UUID: [RenameReferenceSpan]] = [:]
-        var restored: [UUID: NoteFile] = [:]
-        var before: [UUID: NoteFile] = [:]
+    private func restoreRenameReferences(originals: [ItemID: NoteFile], replacements: [ItemID: NoteFile], spans: [ItemID: [RenameReferenceSpan]], undoManager: UndoManager?) {
+        var nextSpans: [ItemID: [RenameReferenceSpan]] = [:]
+        var restored: [ItemID: NoteFile] = [:]
+        var before: [ItemID: NoteFile] = [:]
         for (sourceID, original) in originals {
             guard var current = note(sourceID)?.file, let replacement = replacements[sourceID] else { continue }
             before[sourceID] = current
@@ -715,16 +717,11 @@ final class NoteLibrary {
 
     // MARK: Attachments
 
-    /// The directory a note's file is in, or will be in once it is written.
-    func directory(of note: Note) -> String {
-        note.path == nil ? directory(for: note.folderID) : note.directory
-    }
-
     /// Writes files a note points at, such as images pasted into it, into the attachments folder, and gives the
     /// links to them from where the note is, as standard markdown writes a relative link.
-    func attach(_ files: [(name: String, data: Data)], to id: Note.ID) -> [(link: String, name: String)] {
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
         guard let store, let note = note(id), !note.isDeleted else { return [] }
-        let depth = directory(of: note).split(separator: "/").count
+        let depth = note.directory.split(separator: "/").count
         return files.map { file in
             let path = store.freeAttachmentPath(named: Self.attachmentName(file.name))
             perform(.attach(path: path, data: file.data))
@@ -732,7 +729,7 @@ final class NoteLibrary {
                 $0.addingPercentEncoding(withAllowedCharacters: NoteText.linkPathAllowed) ?? String($0)
             }
             let link = (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
-            return (link, ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+            return Embed(link: link, name: ((path as NSString).lastPathComponent as NSString).deletingPathExtension)
         }
     }
 
@@ -760,7 +757,7 @@ final class NoteLibrary {
 
     /// Whether the name cannot be a folder's: another folder has it, ignoring case as the Finder does, or it is
     /// the attachments folder's.
-    func isFolderNameTaken(_ name: String, except id: Folder.ID? = nil) -> Bool {
+    func isFolderNameTaken(_ name: String, except id: ItemID? = nil) -> Bool {
         let name = NoteText.fileSafe(name)
         if name.localizedCaseInsensitiveCompare(FolderStore.attachments) == .orderedSame { return true }
         return folders.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
@@ -768,7 +765,7 @@ final class NoteLibrary {
 
     /// Renames the folder's directory. An empty name, or one another folder already has, is refused and
     /// leaves the name as it was.
-    func rename(_ id: Folder.ID, to name: String, undoManager: UndoManager? = nil) {
+    func rename(_ id: ItemID, to name: String, undoManager: UndoManager? = nil) {
         let name = NoteText.fileSafe(name)
         guard let index = folders.firstIndex(where: { $0.id == id }), !name.isEmpty,
               !isFolderNameTaken(name, except: id)
@@ -780,7 +777,7 @@ final class NoteLibrary {
 
     /// Deleting a folder moves its notes to Recently Deleted, as Notes does, and takes the directory away.
     /// Undo brings both back in one step.
-    func deleteFolder(_ id: Folder.ID, undoManager: UndoManager? = nil) {
+    func deleteFolder(_ id: ItemID, undoManager: UndoManager? = nil) {
         guard folder(id) != nil else { return }
         let name = String(localized: "Delete Folder")
         undoManager?.beginUndoGrouping()
@@ -792,7 +789,7 @@ final class NoteLibrary {
     }
 
     /// Moves the folders, in the order given, to sit before `target`, or at the end when it is `nil`.
-    func moveFolders(_ ids: [Folder.ID], before target: Folder.ID?, undoManager: UndoManager? = nil) {
+    func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager? = nil) {
         let moving = ids.compactMap { folder($0) }
         var order = folders.filter { !ids.contains($0.id) }
         let index = target.flatMap { target in order.firstIndex { $0.id == target } } ?? order.endIndex
@@ -807,12 +804,12 @@ final class NoteLibrary {
 
     /// Where a note is: its folder, and whether it is in Recently Deleted.
     struct Placement: Equatable {
-        var folderID: Folder.ID?
+        var folderID: ItemID?
         var isDeleted: Bool
     }
 
-    private func place(_ ids: Set<Note.ID>, undoManager: UndoManager?, name: String, _ change: (inout Placement) -> Void) {
-        var placements: [Note.ID: Placement] = [:]
+    private func place(_ ids: Set<ItemID>, undoManager: UndoManager?, name: String, _ change: (inout Placement) -> Void) {
+        var placements: [ItemID: Placement] = [:]
         for note in notes where ids.contains(note.id) {
             let current = Placement(folderID: note.folderID, isDeleted: note.isDeleted)
             var placement = current
@@ -822,17 +819,14 @@ final class NoteLibrary {
         apply(placements, undoManager: undoManager, name: name)
     }
 
-    private func apply(_ placements: [Note.ID: Placement], undoManager: UndoManager?, name: String) {
+    private func apply(_ placements: [ItemID: Placement], undoManager: UndoManager?, name: String) {
         guard !placements.isEmpty else { return }
-        var previous: [Note.ID: Placement] = [:]
+        var previous: [ItemID: Placement] = [:]
         for (id, placement) in placements {
             guard let index = notes.firstIndex(where: { $0.id == id }) else { continue }
             previous[id] = Placement(folderID: notes[index].folderID, isDeleted: notes[index].isDeleted)
             relocate(at: index, to: placement)
         }
-        notes.removeAll { $0.isDraft && $0.isDeleted }
-        // A new note deleted with nothing in it is gone, with nothing to bring back.
-        previous = previous.filter { id, _ in notes.contains { $0.id == id } }
         guard !previous.isEmpty else { return }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.apply(previous, undoManager: undoManager, name: name)
@@ -842,23 +836,18 @@ final class NoteLibrary {
     /// Makes one note's placement so, on disk as in memory.
     private func relocate(at index: Int, to placement: Placement) {
         let note = notes[index]
-        let fileName = note.fileTitle ?? NoteText.fileName(for: note.body)
+        let fileName = note.fileTitle
         switch (note.isDeleted, placement.isDeleted) {
         case (false, true):
-            // A new note with something in it is written first, so undoing the deletion brings it back.
-            if note.isDraft, !NoteText.isBlank(note.body) {
-                writeDraft(at: index)
-            }
             notes[index].deleted = now()
-            guard let path = notes[index].path else { return }
             let binID = UUID()
             notes[index].binID = binID
-            perform(.trash(path: path, id: binID, date: notes[index].deleted!))
+            perform(.trash(path: notes[index].path, id: binID, date: notes[index].deleted!))
         case (true, false):
             // A note comes back where it was, or into the folder it is moved to, under the name it had. A folder
             // that has gone since cannot take it, so it comes back to the Inbox.
             let folderID = placement.folderID.flatMap { folder($0)?.id }
-            let returning = folderID == note.folderID && note.path.map { self.folderID(forPath: $0) == folderID } == true
+            let returning = folderID == note.folderID && self.folderID(forPath: note.path) == folderID
             let directory = returning ? note.directory : directory(for: folderID)
             let path = uniquePath(fileName, in: directory, except: note.id)
             notes[index].deleted = nil
@@ -870,31 +859,12 @@ final class NoteLibrary {
             }
         case (false, false):
             notes[index].folderID = placement.folderID
-            guard let from = note.path else { return }
             let path = uniquePath(fileName, in: directory(for: placement.folderID), except: note.id)
-            perform(.move(from: from, to: path))
+            perform(.move(from: note.path, to: path))
             notes[index].path = path
             rebaseLinks(at: index, from: note.directory)
         case (true, true):
             notes[index].folderID = placement.folderID
-        }
-    }
-
-    /// Takes away a new note, as undoing New Note does. One already written goes to Recently Deleted instead,
-    /// so nothing typed is lost.
-    private func discard(_ id: Note.ID, undoManager: UndoManager?) {
-        guard let index = notes.firstIndex(where: { $0.id == id }), !notes[index].isDeleted else { return }
-        let note = notes[index]
-        if note.isDraft {
-            notes.remove(at: index)
-            registerUndo(undoManager, name: String(localized: "New Note")) { [weak undoManager] library in
-                library.notes.append(note)
-                library.registerUndo(undoManager, name: String(localized: "New Note")) { library in
-                    library.discard(id, undoManager: undoManager)
-                }
-            }
-        } else {
-            delete([id], undoManager: undoManager)
         }
     }
 
@@ -910,7 +880,7 @@ final class NoteLibrary {
                     renamePaths(from: before.name, to: folder.name)
                 }
             } else {
-                perform(.createFolder(path: folder.name))
+                perform(.createFolder(path: folder.name, id: folder.id))
             }
         }
         for folder in previous where !new.contains(folder.id) {
@@ -938,45 +908,31 @@ final class NoteLibrary {
 
     /// A note moved to another depth gets its links into the attachments folder written from where it now is.
     private func rebaseLinks(at index: Int, from old: String) {
-        guard let path = notes[index].path else { return }
         let body = NoteText.rebasingAttachmentLinks(in: notes[index].body, from: old, to: notes[index].directory)
         guard body != notes[index].body else { return }
         notes[index].file.body = body
-        perform(.write(path: path, text: notes[index].file.text))
-    }
-
-    /// A new note's file, named after its first line; a line with characters a name cannot hold is kept whole
-    /// as the note's `title`.
-    private func writeDraft(at index: Int) {
-        draftSaves.removeValue(forKey: notes[index].id)?.cancel()
-        let note = notes[index]
-        let line = NoteText.firstLine(of: note.body) ?? ""
-        if NoteText.needsTitle(line) { notes[index].file.setProperty("title", line) }
-        let path = uniquePath(NoteText.name(for: line), in: directory(for: note.folderID), except: note.id)
-        notes[index].path = path
-        notes[index].namedLine = line
-        perform(.create(path: path, text: notes[index].file.text))
+        perform(.write(path: notes[index].path, text: notes[index].file.text))
     }
 
     /// The directory a folder's notes are in, relative to the notes folder; the Inbox is the notes folder itself.
-    private func directory(for folderID: Folder.ID?) -> String {
+    private func directory(for folderID: ItemID?) -> String {
         folderID.flatMap { folder($0)?.name } ?? ""
     }
 
     /// The folder a path is in: the directory at the top of the notes folder that holds it, however deep. A
     /// trashed note whose folder has gone since is in none.
-    private func folderID(forPath path: String) -> Folder.ID? {
+    private func folderID(forPath path: String) -> ItemID? {
         let components = path.split(separator: "/")
         guard components.count > 1, let top = components.first else { return nil }
         return folders.first { $0.name == top }?.id
     }
 
-    private func isPathTaken(_ path: String, except id: Note.ID?) -> Bool {
-        notes.contains { $0.id != id && !$0.isDeleted && $0.path?.localizedCaseInsensitiveCompare(path) == .orderedSame }
+    private func isPathTaken(_ path: String, except id: ItemID?) -> Bool {
+        notes.contains { $0.id != id && !$0.isDeleted && $0.path.localizedCaseInsensitiveCompare(path) == .orderedSame }
     }
 
     /// `name.md` in the directory, or the first free name numbered after it, as the Finder numbers a copy.
-    func uniquePath(_ name: String, in directory: String, except id: Note.ID?) -> String {
+    func uniquePath(_ name: String, in directory: String, except id: ItemID?) -> String {
         let prefix = directory.isEmpty ? "" : directory + "/"
         var candidate = "\(prefix)\(name).md"
         var number = 2
@@ -989,7 +945,8 @@ final class NoteLibrary {
 
     private func renamePaths(from old: String, to new: String) {
         for index in notes.indices {
-            guard let path = notes[index].path, path.hasPrefix(old + "/") else { continue }
+            let path = notes[index].path
+            guard path.hasPrefix(old + "/") else { continue }
             notes[index].path = new + path.dropFirst(old.count)
         }
     }
@@ -1008,8 +965,8 @@ final class NoteLibrary {
         if !notes[index].isDeleted { rebaseLinks(at: index, from: directory) }
         // A note following its first line whose file kept a name the line no longer gives is renamed again when
         // it is next left, so a rename that failed is tried once more rather than forgotten.
-        if let line = notes[index].namedLine, let name = notes[index].fileTitle, !NoteText.isName(name, of: line) {
-            notes[index].namedLine = name
+        if let line = notes[index].namedLine, !NoteText.isName(notes[index].fileTitle, of: line) {
+            notes[index].namedLine = notes[index].fileTitle
             edited.insert(notes[index].id)
         }
     }

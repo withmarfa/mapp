@@ -6,14 +6,14 @@ import Observation
 @Observable
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
-    var selection: Set<Note.ID> = []
+    var selection: Set<ItemID> = []
     var searchText = ""
     /// The note whose file name is being asked for.
-    var renamingNote: Note.ID?
+    var renamingNote: ItemID?
     /// The folder whose name is being edited in the sidebar.
-    var renamingFolder: Folder.ID?
+    var renamingFolder: ItemID?
     /// The folder whose deletion awaits confirmation.
-    var folderToDelete: Folder.ID?
+    var folderToDelete: ItemID?
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -21,8 +21,8 @@ final class Browser {
     var palette: Palette?
     /// Whether the list's search is out as a field, rather than a button beside Sort.
     var isSearchExpanded = false
-    /// What Marfa Types' page is searched for.
-    var typesQuery = ""
+    /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
+    let types = TypesBrowser()
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
     var isCreatingItem = false
@@ -35,14 +35,14 @@ final class Browser {
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
-        /// The search of Marfa Types, which searches its page rather than the notes.
+        /// The search of Marfa Types, which searches the types rather than the notes.
         case typesSearch
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
 
     /// The folder the sidebar has selected, which the folder commands act on.
-    var selectedFolder: Folder.ID? {
+    var selectedFolder: ItemID? {
         if case .folder(let id) = item { id } else { nil }
     }
 
@@ -51,35 +51,23 @@ final class Browser {
     /// Whether the window shows Marfa's types in place of the list and the note.
     var showsTypes: Bool { item == .marfaTypes }
 
-    /// The notes the list shows: the search results while searching, the sidebar item's notes otherwise.
-    func notes(in library: NoteLibrary) -> [Note] {
-        isSearching ? library.notes(matching: searchText) : library.notes(in: item)
+    /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
+    func items(in library: any ItemLibrary) -> [Item] {
+        isSearching ? library.items(matching: searchText) : library.items(in: item)
     }
 
-    /// The selected notes that still exist.
-    func files(in library: NoteLibrary) -> [AppFile] {
-        let files: [AppFile]
-        switch item {
-        case .allNotes, .files: files = library.files
-        case .inbox: files = library.files.filter { $0.folderID == nil }
-        case .folder(let id): files = library.files.filter { $0.folderID == id }
-        default: files = []
-        }
-        guard isSearching else { return files }
-        return library.files.filter { $0.title.localizedStandardContains(searchText) }
+    /// The selected items that still exist.
+    func selectedItems(in library: any ItemLibrary) -> [Item] {
+        isCreatingItem ? [] : selection.compactMap { library.item($0) }
     }
 
-    func selectedNotes(in library: NoteLibrary) -> [Note] {
-        isCreatingItem ? [] : selection.compactMap { library.note($0) }
-    }
-
-    /// The list's sections. Pinned notes lead wherever pins mean something: not in Pinned itself, where every
-    /// note is pinned, nor in Recently Deleted or search results.
-    func sections(in library: NoteLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+    /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
+    /// note is one, nor in Recently Deleted or search results.
+    func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
-            of: notes(in: library),
+            of: items(in: library),
             sort: order.sort,
-            pinnedFirst: !isSearching && !showsOnlyPinned && item != .recentlyDeleted,
+            favoritesFirst: !isSearching && !showsOnlyFavorites && item != .recentlyDeleted,
             groupsByDate: order.groupsByDate,
             now: now
         )
@@ -87,27 +75,27 @@ final class Browser {
 
     /// Whether the list mixes notes from several places, so each row says where its note lives.
     var showsFolders: Bool {
-        isSearching || item == .allNotes || showsOnlyPinned || item == .recentlyDeleted
+        isSearching || item == .allNotes || showsOnlyFavorites || item == .recentlyDeleted
     }
 
-    private var showsOnlyPinned: Bool {
-        if case .pinnedItem = item { return true }
-        return item == .pinned
+    private var showsOnlyFavorites: Bool {
+        if case .favoriteItem = item { return true }
+        return item == .favorites
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
-    func show(_ item: SidebarItem, in library: NoteLibrary, order: NoteOrder) {
+    func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         isCreatingItem = false
         searchText = ""
-        typesQuery = ""
+        types.searchText = ""
         isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)
     }
 
-    func selectFirstNote(in library: NoteLibrary, order: NoteOrder) {
-        let first = sections(in: library, order: order, now: library.now()).first?.notes.first
-        selection = (first?.id ?? files(in: library).first?.id).map { [$0] } ?? []
+    func selectFirstNote(in library: any ItemLibrary, order: NoteOrder) {
+        let first = sections(in: library, order: order, now: library.now()).first?.items.first
+        selection = first.map { [$0.id] } ?? []
     }
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
@@ -118,56 +106,66 @@ final class Browser {
     }
 
     /// Blank titles receive a unique name without requiring a naming dialog before typing.
-    func createDraft(in library: NoteLibrary, undoManager: UndoManager?) -> Note? {
+    func createDraft(in library: any ItemLibrary, undoManager: UndoManager?) -> ItemID? {
         guard let draft = itemDraft else { return nil }
         var title = NoteName.trimmed(draft.title)
         if title.isEmpty {
             let untitled = String(localized: "Untitled")
             title = untitled
             var suffix = 2
-            while library.notes.contains(where: { !$0.isDeleted && $0.title.caseInsensitiveCompare(title) == .orderedSame }) {
+            while library.isItemTitleTaken(title) {
                 title = "\(untitled) \(suffix)"
                 suffix += 1
             }
         }
-        guard let note = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
+        guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
         isCreatingItem = false
         itemDraft = nil
         searchText = ""
         isSearchExpanded = false
-        if !library.notes(in: item).contains(where: { $0.id == note.id }) {
+        if !library.items(in: item).contains(where: { $0.id == id }) {
             sidebarItem = .itemType(draft.typeID)
         }
-        selection = [note.id]
+        selection = [id]
         focusRequest = .page
-        return note
+        return id
     }
 
-    func newFolder(in library: NoteLibrary, order: NoteOrder, undoManager: UndoManager?) {
+    func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
+        guard library.capabilities.contains(.folders) else { return }
         let folder = library.newFolder(undoManager: undoManager)
         show(.folder(folder.id), in: library, order: order)
         renamingFolder = folder.id
     }
 
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
-    /// person confirms, since that cannot be undone.
-    static func delete(_ ids: Set<Note.ID>, in library: NoteLibrary, undoManager: UndoManager?) {
-        let alreadyDeleted = Set(ids.compactMap { library.note($0) }.filter(\.isDeleted).map(\.id))
-        if !alreadyDeleted.isEmpty { library.notesToPurge = alreadyDeleted }
+    /// person confirms, since that cannot be undone, where the library can erase them.
+    static func delete(_ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?) {
+        let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
+        if !alreadyDeleted.isEmpty, library.capabilities.contains(.purge) { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 
+    /// Dropped items move into a folder or the Inbox, where the library moves items, or go to Recently Deleted.
+    static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
+        switch place {
+        case .inbox, .folder: library.capabilities.contains(.move)
+        case .recentlyDeleted: true
+        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .marfaTypes: false
+        }
+    }
+
     /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
-    func folderRemoved(in library: NoteLibrary, order: NoteOrder) {
+    func folderRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
-        if case .project(let id) = sidebarItem, library.note(id)?.isDeleted != false {
+        if case .project(let id) = sidebarItem, library.item(id)?.state != .active {
             show(.allNotes, in: library, order: order)
         }
-        if case .pinnedItem(let id) = sidebarItem,
-           library.note(id).map({ !$0.isDeleted && $0.isPinned }) != true {
-            show(.pinned, in: library, order: order)
+        if case .favoriteItem(let id) = sidebarItem,
+           library.item(id).map({ $0.state == .active && $0.isFavorite }) != true {
+            show(.favorites, in: library, order: order)
         }
         if let renamingFolder, library.folder(renamingFolder) == nil {
             self.renamingFolder = nil
@@ -182,7 +180,7 @@ final class Browser {
     /// When selected notes leave the list (deleted, moved elsewhere, filtered out by a search), the selection
     /// keeps whichever are still there. If none are, it moves to the note that followed them, or failing that
     /// the one before, as Notes and Mail do.
-    static func selection(_ selection: Set<Note.ID>, keptFrom old: [Note.ID], in new: [Note.ID]) -> Set<Note.ID> {
+    static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
         let visible = Set(new)
         let kept = selection.intersection(visible)
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }
@@ -192,59 +190,40 @@ final class Browser {
 
     // MARK: Restoring a window
 
-    /// What a window brings back when the app opens again, by where things are in the notes folder, since that
-    /// is what lasts from one launch to the next.
+    /// What a window brings back when the app opens again, by the identifiers of what it showed, which last from
+    /// one launch to the next. A snapshot in any other form reads as none.
     struct Snapshot: Codable, Equatable {
-        var sidebarItem: Item?
-        var selection: [String]
+        var place: SidebarItem
+        var selection: [ItemID]
+    }
 
-        enum Item: Codable, Equatable {
-            case inbox, allNotes, pinned, recentlyDeleted, marfaTypes, files
-            case itemType(String), project(String)
-            case pinnedItem(String)
-            case folder(String)
+    func snapshot() -> Snapshot {
+        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue })
+    }
+
+    /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
+    /// leaves the window at its default.
+    func restore(from data: Data?, in library: any ItemLibrary, order: NoteOrder) {
+        if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
+            restore(snapshot, in: library, order: order)
+        } else {
+            selectFirstNote(in: library, order: order)
         }
     }
 
-    func snapshot(in library: NoteLibrary) -> Snapshot {
-        let item: Snapshot.Item? = sidebarItem.map { item in
-            switch item {
-            case .inbox: .inbox
-            case .allNotes: .allNotes
-            case .pinned: .pinned
-            case .pinnedItem(let id): .pinnedItem(library.note(id)?.path ?? "")
-            case .recentlyDeleted: .recentlyDeleted
-            case .marfaTypes: .marfaTypes
-            case .files: .files
-            case .itemType(let type): .itemType(type)
-            case .project(let id): .project(library.note(id)?.path ?? "")
-            case .folder(let id): .folder(library.folder(id)?.name ?? "")
-            }
+    /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
+    /// items no longer in the list are dropped, leaving the top row selected if none remain.
+    func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
+        sidebarItem = switch snapshot.place {
+        case .favoriteItem(let id):
+            library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
+        case .project(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
+        case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
+        case .itemType(let type): WorkbenchSchema.definition(type).map { _ in snapshot.place } ?? .allNotes
+        case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
         }
-        let paths = selection.compactMap { library.item($0)?.projection.filePath }.sorted()
-        return Snapshot(sidebarItem: item, selection: paths)
-    }
-
-    /// Restores what still exists: a folder deleted since gives way to All Notes, and notes no longer in the
-    /// list are dropped, leaving the top row selected if none remain.
-    func restore(_ snapshot: Snapshot, in library: NoteLibrary, order: NoteOrder) {
-        switch snapshot.sidebarItem {
-        case .inbox: sidebarItem = .inbox
-        case .pinned: sidebarItem = .pinned
-        case .pinnedItem(let path):
-            sidebarItem = library.note(at: path).flatMap { $0.isPinned && !$0.isDeleted ? .pinnedItem($0.id) : nil } ?? .pinned
-        case .recentlyDeleted: sidebarItem = .recentlyDeleted
-        case .marfaTypes: sidebarItem = .marfaTypes
-        case .files: sidebarItem = .files
-        case .itemType(let type): sidebarItem = WorkbenchSchema.definition(type) == nil ? .allNotes : .itemType(type)
-        case .project(let path): sidebarItem = library.note(at: path).map { .project($0.id) } ?? .allNotes
-        case .folder(let name):
-            sidebarItem = library.folders.first { $0.name == name }.map { .folder($0.id) } ?? .allNotes
-        case .allNotes, nil: sidebarItem = .allNotes
-        }
-        let paths = Set(snapshot.selection)
-        selection = Set(notes(in: library).filter { $0.path.map(paths.contains) == true }.map(\.id))
-        selection.formUnion(files(in: library).filter { paths.contains($0.path) }.map(\.id))
+        let ids = Set(snapshot.selection)
+        selection = Set(items(in: library).map(\.id).filter(ids.contains))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }
@@ -254,7 +233,7 @@ final class NewItemDraft {
     var typeID: String
     var title = ""
     var body = ""
-    var parentID: UUID?
+    var parentID: ItemID?
     let place: SidebarItem
 
     init(place: SidebarItem) {

@@ -11,36 +11,21 @@ nonisolated enum NoteName {
     }
 }
 
-/// JSON-compatible values read from YAML, without assigning Marfa property semantics to header fields.
-nonisolated indirect enum NoteFieldValue: Equatable, Sendable {
-    case null
-    case bool(Bool)
-    case number(Decimal)
-    case string(String)
-    case array([NoteFieldValue])
-    case object([String: NoteFieldValue])
-
-    var string: String? {
-        guard case .string(let value) = self else { return nil }
-        return value
-    }
-}
-
 nonisolated struct NoteFrontMatterError: Error, Equatable, Sendable {
     let message: String
 }
 
 nonisolated enum NoteFrontMatter: Equatable, Sendable {
     case absent
-    case parsed([String: NoteFieldValue])
+    case parsed([String: PropertyValue])
     case invalid(NoteFrontMatterError)
 }
 
 /// A read-only view of a file. The original envelope remains the authority for saving and editing.
 nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
-    let id: UUID
+    let id: ItemID
     let file: NoteFile
-    /// The source file path, relative to the notes folder; drafts have none.
+    /// The source file path, relative to the notes folder; nil for a projection made without a file.
     let filePath: String?
     let frontMatter: NoteFrontMatter
     let title: String
@@ -48,7 +33,7 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
 
     var body: String { file.body }
 
-    var fields: [String: NoteFieldValue]? {
+    var fields: [String: PropertyValue]? {
         guard case .parsed(let fields) = frontMatter else { return nil }
         return fields
     }
@@ -57,12 +42,12 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
         self.init(id: note.id, file: note.file, fallbackTitle: note.title, filePath: note.path)
     }
 
-    init(id: UUID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
+    init(id: ItemID, file: NoteFile, fallbackTitle: String, filePath: String? = nil) {
         self.id = id
         self.file = file
         self.filePath = filePath
         frontMatter = Self.parse(file.frontMatter)
-        let fields: [String: NoteFieldValue]
+        let fields: [String: PropertyValue]
         if case .parsed(let parsed) = frontMatter { fields = parsed } else { fields = [:] }
         let headerTitle = fields["title"]?.string
         title = headerTitle.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 } ?? fallbackTitle
@@ -71,13 +56,9 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
 
     private static func parse(_ envelope: String) -> NoteFrontMatter {
         guard !envelope.isEmpty else { return .absent }
-        var lines = envelope.components(separatedBy: "\n")
-        if lines.last == "" { lines.removeLast() }
-        lines.removeFirst()
-        lines.removeLast()
         do {
             // Composition retains scalar spelling, unlike loading timestamps into Foundation dates.
-            guard let node = try Yams.compose(yaml: lines.joined(separator: "\n")) else {
+            guard let node = try NoteFile.composed(envelope) else {
                 return .parsed([:])
             }
             if case .scalar(let scalar) = node, node.tag.rawValue == Tag.Name.null.rawValue, scalar.string.isEmpty {
@@ -94,13 +75,13 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
         }
     }
 
-    private static func value(_ node: Node) throws -> NoteFieldValue {
+    private static func value(_ node: Node) throws -> PropertyValue {
         switch node {
         case .mapping(let mapping):
             guard node.tag.rawValue == Tag.Name.map.rawValue else {
                 throw NoteFrontMatterError(message: "Unsupported YAML mapping tag: \(node.tag.rawValue)")
             }
-            var fields: [String: NoteFieldValue] = [:]
+            var fields: [String: PropertyValue] = [:]
             for (keyNode, valueNode) in mapping {
                 guard case .scalar(let key) = keyNode, keyNode.tag.rawValue == Tag.Name.str.rawValue else {
                     throw NoteFrontMatterError(message: "Front matter mappings require string keys.")

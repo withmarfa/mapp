@@ -4,8 +4,8 @@ import Testing
 
 struct NoteTextTests {
     /// A new note's title and preview, as the list shows them while its name follows its first line.
-    func title(_ body: String) -> String { Note(text: body, created: .now).title }
-    func preview(_ body: String) -> String { Note(text: body, created: .now).preview }
+    func title(_ body: String) -> String { Note(body: body, created: .now).title }
+    func preview(_ body: String) -> String { Note(body: body, created: .now).preview }
 
     @Test func titleIsTheFirstHeadingWithoutItsMarker() {
         #expect(title("# Kitchen quotes\n\nThree quotes.") == "Kitchen quotes")
@@ -27,7 +27,7 @@ struct NoteTextTests {
     }
 
     @Test func noteKeepsItsTitleAndPreviewInStepWithItsBody() {
-        var note = Note(text: "# First", created: .now)
+        var note = Note(body: "# First", created: .now)
         #expect(note.title == "First")
         note.file.body = "# Second\nMore"
         #expect(note.title == "Second")
@@ -142,14 +142,6 @@ struct NoteTextTests {
         #expect(NoteText.needsTitle("Plan: week"))
         #expect(NoteText.needsTitle(".profile"))
         #expect(!NoteText.needsTitle("R&D budget"))
-    }
-
-    @Test func aNoteOfMarkersAloneIsBlank() {
-        #expect(NoteText.isBlank(""))
-        #expect(NoteText.isBlank("- [ ] \n"))
-        #expect(NoteText.isBlank("#\n\n> \n1. "))
-        #expect(!NoteText.isBlank("- [ ] Milk"))
-        #expect(!NoteText.isBlank("![](Attachments/a.png)"))
     }
 
     @Test func aTitleReadsAsWrittenWhateverTheEditorEscaped() {

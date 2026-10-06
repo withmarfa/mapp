@@ -2,30 +2,31 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NoteDetail: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     let browser: Browser
     let editor: EditorController
     let details: DetailsPresentation
 
     var body: some View {
-        let notes = browser.selection.compactMap { library.note($0) }
         if browser.selection.count > 1 {
             ContentUnavailableView("^[\(browser.selection.count) item](inflect: true) selected", systemImage: "note.text")
                 .onAppear { editor.close() }
-        } else if let id = browser.selection.first, let item = library.item(id), let file = item.file {
-            if let url = library.fileURL(for: file.id) {
-                FileItemContent(url: url)
-                    .onAppear { editor.close() }
+        } else if let id = browser.selection.first, let item = library.item(id) {
+            if item.isFile {
+                if let url = library.fileURL(for: id) {
+                    FileItemContent(url: url)
+                        .onAppear { editor.close() }
+                } else {
+                    ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+                        .onAppear { editor.close() }
+                }
             } else {
-                ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
-                    .onAppear { editor.close() }
+                NotePage(item: item, editor: editor, headerDrafts: details)
+                    .onAppear(perform: grantFocusRequest)
+                    .onChange(of: browser.focusRequest, grantFocusRequest)
             }
-        } else if let note = notes.first {
-            NotePage(note: note, editor: editor, headerDrafts: details)
-                .onAppear(perform: grantFocusRequest)
-                .onChange(of: browser.focusRequest, grantFocusRequest)
         } else {
-            UnselectedItemContent(hasItems: !browser.notes(in: library).isEmpty || !browser.files(in: library).isEmpty)
+            UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
                 // The page no longer shows the note it had, so that note is left.
                 .onAppear { editor.close() }
         }
@@ -69,8 +70,8 @@ private struct UnselectedItemContent: View {
 /// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
 /// text into a page that is already running.
 struct NotePage: View {
-    @Environment(NoteLibrary.self) private var library
-    let note: Note
+    @CurrentLibrary private var library
+    let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
     let headerDrafts: DetailsPresentation
@@ -80,17 +81,22 @@ struct NotePage: View {
             ZStack(alignment: .top) {
                 NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
                     .ignoresSafeArea(.container, edges: .top)
-                if note.isDeleted {
+                if item.state == .trashed {
                     ScrollingPageHeader(editor: editor) {
-                        DeletedNoteBanner(id: note.id)
+                        DeletedNoteBanner(id: item.id)
                     }
-                } else if let item = library.item(note.id) {
+                } else {
                     ScrollingPageHeader(editor: editor) {
-                        ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
-                            .id(note.id)
-                            .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
+                        VStack(spacing: 0) {
+                            if case .conflicted(let copy?, _) = item.sync {
+                                SavedAsCopyBanner(copy: copy)
+                            }
+                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                                .id(item.id)
+                                .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
+                                .padding(.top, 16)
+                                .padding(.bottom, 8)
+                        }
                     }
                 }
             }
@@ -102,9 +108,11 @@ struct NotePage: View {
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { editor.setStyle(style) }
-        .onChange(of: note.id, initial: true) { editor.load(note) }
-        .onChange(of: note.body) { editor.noteChanged(note) }
-        .onChange(of: note.isDeleted) { editor.noteChanged(note) }
+        .onChange(of: item.id, initial: true) { editor.load(item) }
+        // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
+        // Marfa server that keeps its own text over the person's changes the text without a new version.
+        .onChange(of: item.version) { editor.noteChanged(item) }
+        .onChange(of: library.body(of: item.id)) { editor.noteChanged(item) }
     }
 }
 
@@ -131,11 +139,31 @@ private struct ScrollingPageHeader<Content: View>: View {
     }
 }
 
+/// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
+/// beside the text the server kept.
+private struct SavedAsCopyBanner: View {
+    @Environment(\.openWindow) private var openWindow
+    let copy: ItemID
+
+    var body: some View {
+        HStack {
+            Text("This item changed elsewhere, so your changes were saved as a copy.")
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Open Copy") { openWindow(value: copy) }
+        }
+        .font(.callout)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+}
+
 /// Deleted notes cannot be edited; this says so and offers the way back, as Notes does.
 private struct DeletedNoteBanner: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    let id: Note.ID
+    let id: ItemID
 
     var body: some View {
         HStack {

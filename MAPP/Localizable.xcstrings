@@ -91,6 +91,9 @@
     "Manage Connections…" : {
 
     },
+    "Open" : {
+
+    },
     "Open Item" : {
 
     },
@@ -160,6 +163,9 @@
     "Add Row Below" : {
 
     },
+    "Add to Favorites" : {
+
+    },
     "Align Center" : {
 
     },
@@ -196,7 +202,19 @@
     "Cancel" : {
 
     },
+    "Can’t Add to Favorites" : {
+
+    },
+    "Can’t Attach Images" : {
+
+    },
+    "Can’t Delete Immediately" : {
+
+    },
     "Can’t Read the Notes Folder" : {
+
+    },
+    "Can’t Remove from Favorites" : {
 
     },
     "Change…" : {
@@ -275,6 +293,9 @@
 
     },
     "Export as PDF…" : {
+
+    },
+    "Favorites" : {
 
     },
     "Find" : {
@@ -410,6 +431,9 @@
     "Notes Folder" : {
 
     },
+    "Notes can’t be deleted immediately right now. They’re still in Recently Deleted." : {
+
+    },
     "Numbered List" : {
 
     },
@@ -417,15 +441,6 @@
 
     },
     "Page Width" : {
-
-    },
-    "Pin" : {
-
-    },
-    "Pin Note" : {
-
-    },
-    "Pinned" : {
 
     },
     "Places" : {
@@ -450,6 +465,9 @@
 
     },
     "Redo" : {
+
+    },
+    "Remove from Favorites" : {
 
     },
     "Rename" : {
@@ -485,9 +503,6 @@
     "Search Notes…" : {
 
     },
-    "Search Types" : {
-
-    },
     "Settings…" : {
 
     },
@@ -498,6 +513,9 @@
 
     },
     "Show in Finder" : {
+
+    },
+    "Some notes have tags that can’t be read or changed safely, so their files were left unchanged." : {
 
     },
     "Sort" : {
@@ -524,6 +542,15 @@
     "Text Size" : {
 
     },
+    "The tags of “%@” are written in a form that can’t be changed safely, so its file was left unchanged." : {
+
+    },
+    "The tags of “%@” can’t be read, so its file was left unchanged." : {
+
+    },
+    "The images weren’t added to the note. %@" : {
+
+    },
     "The note’s file takes the new name." : {
 
     },
@@ -534,12 +561,6 @@
 
     },
     "Undo" : {
-
-    },
-    "Unpin" : {
-
-    },
-    "Unpin Note" : {
 
     },
     "Use Selection for Find" : {
@@ -650,9 +671,6 @@
     "Item": {
       "extractionState": "manual"
     },
-    "Item Types": {
-      "extractionState": "manual"
-    },
     "Item not found": {
       "extractionState": "manual"
     },
@@ -716,6 +734,9 @@
       "extractionState": "manual"
     },
     "Parent": {
+      "extractionState": "manual"
+    },
+    "PDF": {
       "extractionState": "manual"
     },
     "Pending": {
@@ -795,6 +816,261 @@
       "extractionState": "manual"
     },
     "Discard Changes": {
+      "extractionState": "manual"
+    },
+    "All Items": {
+      "extractionState": "manual"
+    },
+    "There’s no key for this Marfa server.": {
+      "extractionState": "manual"
+    },
+    "This change can’t be made in a Marfa library yet.": {
+      "extractionState": "manual"
+    },
+    "This item has no file.": {
+      "extractionState": "manual"
+    },
+    "This item isn’t in the library.": {
+      "extractionState": "manual"
+    },
+    "This kind of item has no text to edit.": {
+      "extractionState": "manual"
+    },
+    "This library is already open in MAPP or another app.": {
+      "extractionState": "manual"
+    },
+    "The item was made, but it couldn’t be put under its parent: %@": {
+      "extractionState": "manual"
+    },
+    "This library is being brought up to date. Try again in a moment.": {
+      "extractionState": "manual"
+    },
+    "The Marfa server refused this library’s key. Check the key in Settings.": {
+      "extractionState": "manual"
+    },
+    "Tags: %@": {
+      "extractionState": "manual"
+    },
+    "Roles": {
+      "extractionState": "manual"
+    },
+    "Fields": {
+      "extractionState": "manual"
+    },
+    "Choice": {
+      "extractionState": "manual"
+    },
+    "Date": {
+      "extractionState": "manual"
+    },
+    "Deleting either item is refused while the connection exists": {
+      "extractionState": "manual"
+    },
+    "Each can be pointed to by many items.": {
+      "extractionState": "manual"
+    },
+    "Each can be pointed to by one item at most.": {
+      "extractionState": "manual"
+    },
+    "Each can point to many items.": {
+      "extractionState": "manual"
+    },
+    "Each can point to one item at most.": {
+      "extractionState": "manual"
+    },
+    "From": {
+      "extractionState": "manual"
+    },
+    "Number": {
+      "extractionState": "manual"
+    },
+    "Other": {
+      "extractionState": "manual"
+    },
+    "Deleting the item it points from also deletes the item it points to": {
+      "extractionState": "manual"
+    },
+    "Deleting either item keeps the other": {
+      "extractionState": "manual"
+    },
+    "The item it points from": {
+      "extractionState": "manual"
+    },
+    "The item it points to": {
+      "extractionState": "manual"
+    },
+    "To": {
+      "extractionState": "manual"
+    },
+    "^[%lld subtype](inflect: true)": {
+      "extractionState": "manual"
+    },
+    "A type that is compatible with another claims to have at least the other’s fields.": {
+      "extractionState": "manual"
+    },
+    "An edge points from one item to another.": {
+      "extractionState": "manual"
+    },
+    "Any type": {
+      "extractionState": "manual"
+    },
+    "Choose a type to see its fields and connections.": {
+      "extractionState": "manual"
+    },
+    "Compatibility": {
+      "extractionState": "manual"
+    },
+    "Edge types that do not limit their types connect every type, so they are not listed here.": {
+      "extractionState": "manual"
+    },
+    "Inherited from": {
+      "extractionState": "manual"
+    },
+    "Required": {
+      "extractionState": "manual"
+    },
+    "Reverse name: %@": {
+      "extractionState": "manual"
+    },
+    "This library has no types to show.": {
+      "extractionState": "manual"
+    },
+    "This type has no fields.": {
+      "extractionState": "manual"
+    },
+    "No Types": {
+      "extractionState": "manual"
+    },
+    "No Type Selected": {
+      "extractionState": "manual"
+    },
+    "Parent types": {
+      "extractionState": "manual"
+    },
+    "Compatible with": {
+      "extractionState": "manual"
+    },
+    "Compatible from": {
+      "extractionState": "manual"
+    },
+    "Reverse name": {
+      "extractionState": "manual"
+    },
+    "Written at": {
+      "extractionState": "manual"
+    },
+    "When an item is deleted": {
+      "extractionState": "manual"
+    },
+    "Edge types": {
+      "extractionState": "manual"
+    },
+    "Item types": {
+      "extractionState": "manual"
+    },
+    "Not a field of this type": {
+      "extractionState": "manual"
+    },
+    "Types with the role %@": {
+      "extractionState": "manual"
+    },
+    "Shown because a type below it matches the search.": {
+      "extractionState": "manual"
+    },
+    "From or to": {
+      "extractionState": "manual"
+    },
+    "Yes or no": {
+      "extractionState": "manual"
+    },
+    "Invalid Property": {
+      "extractionState": "manual"
+    },
+    "The value does not match this property's type.": {
+      "extractionState": "manual"
+    },
+    "Edit Property": {
+      "extractionState": "manual"
+    },
+    "Can’t Link This Item": {
+      "extractionState": "manual"
+    },
+    "The item's title and path cannot be represented as an unambiguous file link.": {
+      "extractionState": "manual"
+    },
+    "Can’t Create Item": {
+      "extractionState": "manual"
+    },
+    "Choose a unique title without characters that cannot be used in a file name.": {
+      "extractionState": "manual"
+    },
+    "Edit Relationship": {
+      "extractionState": "manual"
+    },
+    "Unresolved Relationship": {
+      "extractionState": "manual"
+    },
+    "Resolve the existing target before replacing this relationship.": {
+      "extractionState": "manual"
+    },
+    "Can’t Edit This Property": {
+      "extractionState": "manual"
+    },
+    "This metadata uses a form that cannot be safely changed. Your file has been left unchanged.": {
+      "extractionState": "manual"
+    },
+    "An item can’t be linked to itself.": {
+      "extractionState": "manual"
+    },
+    "This kind of item can’t be linked here.": {
+      "extractionState": "manual"
+    },
+    "This would link the item back to itself through the items between them.": {
+      "extractionState": "manual"
+    },
+    "Can’t Change This Relationship": {
+      "extractionState": "manual"
+    },
+    "Only one item can be chosen here.": {
+      "extractionState": "manual"
+    },
+    "The item chosen is already linked this way, and can be only once.": {
+      "extractionState": "manual"
+    },
+    "Choose a kind of item and give it a title.": {
+      "extractionState": "manual"
+    },
+    "This item’s title is the first line of its text.": {
+      "extractionState": "manual"
+    },
+    "Can’t Recover": {
+      "extractionState": "manual"
+    },
+    "It’s in the Marfa server’s bin, which this Mac can’t bring items back from yet.": {
+      "extractionState": "manual"
+    },
+    "Couldn’t Make This Change": {
+      "extractionState": "manual"
+    },
+    "Can’t Read This Library": {
+      "extractionState": "manual"
+    },
+    "The Marfa server refused this change.": {
+      "extractionState": "manual"
+    },
+    "Files": {
+      "extractionState": "manual"
+    },
+    "Can’t Search": {
+      "extractionState": "manual"
+    },
+    "Changing this link isn’t available yet in a Marfa library.": {
+      "extractionState": "manual"
+    },
+    "This item changed elsewhere, so your changes were saved as a copy.": {
+      "extractionState": "manual"
+    },
+    "Open Copy": {
       "extractionState": "manual"
     }
   },

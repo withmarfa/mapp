@@ -23,13 +23,17 @@ final class EditorController: NSObject {
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
     var isChoosingImages = false
 
-    /// An edit to a note, with the markdown the note now holds.
-    @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
+    /// An edit to a note, with the markdown the note now holds and the version of the text it was typed on.
+    @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
-    @ObservationIgnored var onLeave: (Note.ID) -> Void = { _ in }
-    /// The library the notes come from, for the files a note points at.
-    @ObservationIgnored weak var library: NoteLibrary?
-    @ObservationIgnored private let files = NoteFiles()
+    @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
+    /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
+    /// so no note is ever shown before its text can be read.
+    @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
+    @ObservationIgnored private let embeds = EmbeddedFiles()
+    /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
+    /// was told it may be.
+    @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -38,13 +42,22 @@ final class EditorController: NSObject {
     @ObservationIgnored let container: EditorContainer
     @ObservationIgnored private var pageFinder: PageFinder!
 
-    /// The note on the page, and the markdown the page holds for it as far as the app knows.
-    private(set) var noteID: Note.ID?
+    /// The note on the page, and the markdown the page holds for it as far as the app knows, read from the
+    /// library at `read`.
+    private(set) var noteID: ItemID?
     @ObservationIgnored private var markdown = ""
+    @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
-    /// note still reaches that note rather than the one now showing.
+    /// note still reaches that note rather than the one now showing, and an edit typed before the page took in
+    /// newer text says it was typed on the older text.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var notesByGeneration: [Int: Note.ID] = [:]
+    @ObservationIgnored private var shown: [Int: Shown] = [:]
+
+    private struct Shown {
+        let id: ItemID
+        /// The version of the text the page holds for this generation.
+        var read: ItemVersion
+    }
     @ObservationIgnored private var wantsFocus = false
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
@@ -53,9 +66,11 @@ final class EditorController: NSObject {
     /// Every editor open, so their edits can be handed over before the app quits or changes folder.
     @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
 
-    override init() {
+    init(library: any ItemLibrary) {
+        self.library = library
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
+        configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)
         webView = EditorWebView(frame: .zero, configuration: configuration)
         container = EditorContainer(webView: webView)
         super.init()
@@ -67,8 +82,8 @@ final class EditorController: NSObject {
         container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
-        files.root = { [weak self] in (self?.library?.store as? FolderStore)?.root }
-        configuration.userContentController.addScriptMessageHandler(files, contentWorld: .page, name: "files")
+        embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
+        configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -107,11 +122,11 @@ final class EditorController: NSObject {
 
     /// Shows a note, with the caret at its end. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
-    func load(_ note: Note) {
-        if noteID != nil, noteID != note.id { flush() }
+    func load(_ item: Item) {
+        if noteID != nil, noteID != item.id { flush() }
         scrollOffset = 0
         isHeaderScrolledAway = false
-        show(note, as: "load")
+        show(item, as: "load")
     }
 
     func setHeaderHeight(_ height: CGFloat) {
@@ -123,23 +138,34 @@ final class EditorController: NSObject {
 
     /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
     /// text where the caret is.
-    func noteChanged(_ note: Note) {
-        guard note.id == noteID else { return load(note) }
-        guard note.body != markdown || note.isDeleted == isEditable else { return }
-        show(note, as: "reload")
+    func noteChanged(_ item: Item) {
+        guard item.id == noteID else { return load(item) }
+        guard let body = library?.body(of: item.id) else { return }
+        guard body.text != markdown || item.isWritable != isEditable else {
+            // The page already holds this text, so what is typed next is typed on this version of it.
+            read = body.version
+            shown[generation]?.read = body.version
+            return
+        }
+        show(item, as: "reload")
     }
 
-    private func show(_ note: Note, as function: String) {
-        noteID = note.id
-        markdown = note.body
-        isEditable = !note.isDeleted
+    /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
+    /// note. The note shown before is left, so nothing on the page acts for one out of sight.
+    private func show(_ item: Item, as function: String) {
+        guard let body = library?.body(of: item.id) else { return close() }
+        noteID = item.id
+        markdown = body.text
+        read = body.version
+        isEditable = item.isWritable
         guard isReady else { return }
-        call("setImageBase", json(library?.directory(of: note) ?? note.directory))
+        embeds.version += 1
+        call("setItem", json(item.id.rawValue))
         generation += 1
         // A late report belongs to one of the last few loads, however quickly outside changes came in.
-        notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
-        notesByGeneration[generation] = note.id
-        call(function, json(note.body), String(generation), String(isEditable))
+        shown = shown.filter { $0.key >= generation - 8 }
+        shown[generation] = Shown(id: item.id, read: body.version)
+        call(function, json(body.text), String(generation), String(isEditable))
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -159,11 +185,10 @@ final class EditorController: NSObject {
             if leaving { onLeave(noteID) }
             return done()
         }
+        // Another note can be loaded before the page answers, so the edit belongs to the generation shown now.
+        let generation = generation
         webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
-            if let markdown = result as? String {
-                if noteID == self.noteID { self.markdown = markdown }
-                onChange(noteID, markdown)
-            }
+            if let markdown = result as? String { report(markdown, of: generation) }
             if leaving { onLeave(noteID) }
             done()
         }
@@ -282,7 +307,16 @@ final class EditorController: NSObject {
         Task {
             let files = await PastedImages.read(sources)
             guard self.noteID == noteID, isEditable, let library else { return }
-            let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
+            let embeds: [Embed]
+            do {
+                embeds = try await library.attach(files, to: noteID)
+            } catch {
+                library.failure = (String(localized: "Can’t Attach Images"), String(localized: "The images weren’t added to the note. \(error.localizedDescription)"))
+                return
+            }
+            // The images are kept either way; they go into the note only if it is still the one on the page.
+            guard self.noteID == noteID, isEditable else { return }
+            let images = embeds.map { ["src": $0.link, "alt": $0.name] }
             guard !images.isEmpty else { return }
             if let point {
                 call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(height)))
@@ -297,7 +331,7 @@ final class EditorController: NSObject {
 
     /// The note's title, which names a print job and an exported file.
     private var title: String {
-        noteID.flatMap { library?.note($0)?.title } ?? String(localized: "Note")
+        noteID.flatMap { library?.item($0)?.title } ?? String(localized: "Note")
     }
 
     /// Prints the note as the page shows it, laid out for paper, through the system's print panel.
@@ -350,6 +384,27 @@ final class EditorController: NSObject {
         // WebKit's print view lays the note out for paper only once it has a size to start from.
         operation.view?.frame = webView.bounds
         return operation
+    }
+
+    // MARK: Embedded files
+
+    /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder: always for
+    /// one that might run when opened (`EmbeddedFiles.opens`), whatever the page asked.
+    func openEmbed(_ reference: EmbedReference, in item: ItemID, revealing: Bool = false) {
+        Task {
+            guard let url = await library?.openEmbeddedFile(reference, in: item)?.url else { return }
+            if revealing || !EmbeddedFiles.opens(url) {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } else {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    /// The embed the context menu opening now is over, heard from the page just before; each menu takes it once.
+    func takeMenuEmbed() -> (item: ItemID, reference: EmbedReference, opens: Bool)? {
+        defer { menuEmbed = nil }
+        return menuEmbed
     }
 
     func undo() { call("undo") }
@@ -418,6 +473,25 @@ final class EditorController: NSObject {
 
     // MARK: Hearing from the page
 
+    /// Hands an edit to the library with the version of the text it was typed on. Where the library still holds
+    /// what the page last reported, the page's text is the library's at its version now, as after the library
+    /// takes in the answer to the person's own save. An edit typed before the page took in newer text keeps the
+    /// older version, so the library never lays it over text the person did not see.
+    private func report(_ markdown: String, of generation: Int) {
+        guard var page = shown[generation] else { return }
+        let isCurrent = page.id == noteID && generation == self.generation
+        if isCurrent, let body = library?.body(of: page.id), body.text == self.markdown {
+            page.read = body.version
+            read = body.version
+            shown[generation] = page
+        }
+        if isCurrent { self.markdown = markdown }
+        onChange(page.id, markdown, page.read)
+        // An edit the library took from before a reload, as when the note was only deleted or recovered, is
+        // shown again; one it kept apart from newer text leaves the page as it is.
+        if !isCurrent, page.id == noteID, let item = library?.item(page.id) { noteChanged(item) }
+    }
+
     fileprivate func receive(_ message: EditorMessage) {
         switch message {
         case .ready:
@@ -428,19 +502,15 @@ final class EditorController: NSObject {
             applyStyle()
             call("setHeaderHeight", String(Double(headerHeight)))
             if let noteID {
-                if let note = library?.note(noteID) { call("setImageBase", json(library?.directory(of: note) ?? note.directory)) }
+                embeds.version += 1
+                call("setItem", json(noteID.rawValue))
                 generation += 1
-                notesByGeneration[generation] = noteID
+                shown[generation] = Shown(id: noteID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
             if wantsFocus { focus() }
         case .changed(let markdown, let generation):
-            guard let id = notesByGeneration[generation] else { return }
-            if id == noteID, generation == self.generation { self.markdown = markdown }
-            onChange(id, markdown)
-            // An edit made before the note on the page was reloaded from outside lands after the reload. The
-            // person's text wins, so the page takes it back, as the library now holds it.
-            if id == noteID, generation != self.generation, let note = library?.note(id) { noteChanged(note) }
+            report(markdown, of: generation)
         case .state(let state):
             if state != caret { caret = state }
         case .scrolled(let offset, let generation):
@@ -458,6 +528,10 @@ final class EditorController: NSObject {
             onEscape()
         case .pasteImages:
             insertImages(PastedImages.sources(on: .general))
+        case .openEmbed(let item, let reference):
+            openEmbed(reference, in: item)
+        case .embedMenu(let embed):
+            menuEmbed = embed
         case .find(let state):
             pageFinder.update(state)
         case .error(let message):
@@ -484,13 +558,15 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
 }
 
 extension EditorController: WKNavigationDelegate {
-    /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads.
+    /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads but the
+    /// frame a PDF the note embeds shows in.
     func webView(
         _ webView: WKWebView,
         decidePolicyFor action: WKNavigationAction,
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
     ) {
-        decisionHandler(action.request.url == pageURL ? .allow : .cancel)
+        let isEmbed = action.targetFrame?.isMainFrame == false && action.request.url?.scheme == EmbeddedFiles.scheme
+        decisionHandler(action.request.url == pageURL || isEmbed ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {

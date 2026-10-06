@@ -1,20 +1,21 @@
 import CryptoKit
 import Foundation
 
-/// A folder of notes: a directory at the top of the notes folder, named as the directory is.
+/// A folder of notes: a directory at the top of the notes folder, named as the directory is. Its identifier
+/// shares the items' space, since the ledger keeps folders beside notes and files and a place names a folder by
+/// an item identifier.
 nonisolated struct Folder: Identifiable, Hashable {
-    let id: UUID
+    let id: ItemID
     var name: String
 
-    init(id: UUID = UUID(), name: String) {
+    init(id: ItemID = .mint(), name: String) {
         self.id = id
         self.name = name
     }
 }
 
 extension UUID {
-    /// The same identifier for the same text on every launch, so a window restored at launch finds the note or
-    /// folder it showed by where that note or folder is.
+    /// The same identifier for the same text on every launch.
     nonisolated init(stableFrom text: String) {
         var bytes = Array(SHA256.hash(data: Data(text.utf8)).prefix(16))
         bytes[6] = (bytes[6] & 0x0F) | 0x50

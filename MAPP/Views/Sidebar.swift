@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct Sidebar: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let order: NoteOrder
@@ -9,7 +9,7 @@ struct Sidebar: View {
     @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
-    @SceneStorage("sidebarPinnedExpanded") private var pinnedExpanded = true
+    @SceneStorage("sidebarFavoritesExpanded") private var favoritesExpanded = true
     @SceneStorage("sidebarProjectsExpanded") private var projectsExpanded = true
     @SceneStorage("sidebarItemsExpanded") private var itemsExpanded = false
     @SceneStorage("sidebarFoldersExpanded") private var foldersExpanded = true
@@ -32,16 +32,16 @@ struct Sidebar: View {
                 row(.allNotes, systemImage: "note.text")
             }
 
-            if !pinned.isEmpty {
-                Section(isExpanded: $pinnedExpanded) {
-                    ForEach(pinned) { item in
-                        Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
-                            .tag(SidebarItem.pinnedItem(item.id))
-                            .accessibilityIdentifier("SidebarPinnedItem-\(item.id.uuidString)")
+            if !favorites.isEmpty {
+                Section(isExpanded: $favoritesExpanded) {
+                    ForEach(favorites) { item in
+                        Label(item.title, systemImage: item.type == WorkbenchSchema.projectType ? "square.stack" : "doc.text")
+                            .tag(SidebarItem.favoriteItem(item.id))
+                            .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
                     }
                 } header: {
-                    Text("Pinned")
-                        .accessibilityIdentifier("SidebarPinnedSection")
+                    Text("Favorites")
+                        .accessibilityIdentifier("SidebarFavoritesSection")
                 }
             }
 
@@ -71,18 +71,18 @@ struct Sidebar: View {
                     ForEach(library.folders) { folder in
                         folderRow(folder)
                     }
-                    .onMove { source, destination in
+                    .onMove(perform: editsFolders ? { source, destination in
                         let ids = source.map { library.folders[$0].id }
                         let target = destination < library.folders.count ? library.folders[destination].id : nil
                         library.moveFolders(ids, before: target, undoManager: undoManager)
-                    }
+                    } : nil)
                 } label: {
                     Label("Folders", systemImage: "folder")
                         .contextMenu {
                             Button("New Folder") {
                                 browser.newFolder(in: library, order: order, undoManager: undoManager)
                             }
-                            .disabled(!library.isLoaded)
+                            .disabled(!library.isLoaded || !editsFolders)
                         }
                 }
                 .accessibilityIdentifier("SidebarFolders")
@@ -94,7 +94,7 @@ struct Sidebar: View {
         .listStyle(.sidebar)
         .accessibilityIdentifier("Sidebar")
         .onDeleteCommand {
-            browser.folderToDelete = browser.selectedFolder
+            if editsFolders { browser.folderToDelete = browser.selectedFolder }
         }
         .onChange(of: browser.folderToDelete) {
             if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
@@ -102,7 +102,7 @@ struct Sidebar: View {
         .onChange(of: browser.renamingFolder) {
             if browser.renamingFolder != nil { foldersExpanded = true }
         }
-        .onChange(of: pinned.map(\.id)) {
+        .onChange(of: favorites.map(\.id)) {
             browser.folderRemoved(in: library, order: order)
         }
         .scrollEdgeEffectHidden(for: .bottom)
@@ -156,14 +156,13 @@ struct Sidebar: View {
         }
     }
 
-    private var projects: [AppItem] {
-        library.items.filter { $0.type?.id == "aic.project" }
+    private var projects: [Item] {
+        library.items(in: .itemType(WorkbenchSchema.projectType.rawValue))
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private var pinned: [AppItem] {
-        library.notes(in: .pinned)
-            .compactMap { library.item($0.id) }
+    private var favorites: [Item] {
+        library.items(in: .favorites)
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -184,7 +183,7 @@ struct Sidebar: View {
         }
             .badge(library.count(in: item))
             .tag(item)
-            .dropDestination(for: NoteReference.self, isEnabled: canDrop(on: item)) { notes, _ in
+            .dropDestination(for: NoteReference.self, isEnabled: Browser.canDrop(on: item, in: library)) { notes, _ in
                 drop(notes, on: item)
             }
     }
@@ -201,31 +200,29 @@ struct Sidebar: View {
             }
         }
         .tag(SidebarItem.folder(folder.id))
-        .dropDestination(for: NoteReference.self) { notes, _ in
+        .dropDestination(for: NoteReference.self, isEnabled: Browser.canDrop(on: .folder(folder.id), in: library)) { notes, _ in
             drop(notes, on: .folder(folder.id))
         }
         .contextMenu {
             Button("Rename Folder") { browser.renamingFolder = folder.id }
+                .disabled(!editsFolders)
             Button("Delete Folder", role: .destructive) {
                 browser.folderToDelete = folder.id
             }
+            .disabled(!editsFolders)
         }
     }
 
-    private func canDrop(on item: SidebarItem) -> Bool {
-        switch item {
-        case .inbox, .folder, .recentlyDeleted: true
-        default: false
-        }
-    }
+    private var editsFolders: Bool { library.capabilities.contains(.folders) }
 
     private func drop(_ notes: [NoteReference], on item: SidebarItem) {
+        guard Browser.canDrop(on: item, in: library) else { return }
         let ids = Set(notes.map(\.id))
         switch item {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .pinned, .marfaTypes, .itemType, .project, .pinnedItem, .files: break
+        case .allNotes, .favorites, .marfaTypes, .itemType, .project, .favoriteItem, .files: break
         }
     }
 
@@ -284,15 +281,15 @@ private struct FolderNameField: View {
 #Preview("Grouped Sidebar") {
     let source = ItemPreviewFixtures.library
     let library = NoteLibrary(notes: source.notes, folders: [Folder(name: "Projects"), Folder(name: "Notes")], now: { ItemPreviewFixtures.date })
-    let _ = library.setPinned([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
+    let _ = library.setFavorite([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
     Sidebar(browser: Browser(), order: NoteOrder())
-        .environment(library)
+        .environment(\.library, library)
         .frame(width: 260, height: 740)
 }
 
-#Preview("Sidebar Without Pins") {
+#Preview("Sidebar Without Favorites") {
     Sidebar(browser: Browser(), order: NoteOrder())
-        .environment(ItemPreviewFixtures.library)
+        .environment(\.library, ItemPreviewFixtures.library)
         .frame(width: 260, height: 740)
 }
 #endif

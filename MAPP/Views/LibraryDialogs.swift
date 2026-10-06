@@ -10,9 +10,9 @@ extension View {
 }
 
 private struct LibraryDialogs: ViewModifier {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.appearsActive) private var appearsActive
-    @State private var purging: Set<Note.ID> = []
+    @State private var purging: Set<ItemID> = []
     @State private var failure: Failure?
 
     private struct Failure {
@@ -29,7 +29,7 @@ private struct LibraryDialogs: ViewModifier {
                 "^[Delete \(purging.count) note](inflect: true) immediately?",
                 isPresented: Binding { !purging.isEmpty } set: { if !$0 { purging = [] } }
             ) {
-                Button("Delete", role: .destructive) { library.deletePermanently(purging) }
+                Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
             } message: {
                 Text("You can’t undo this action.")
             }
@@ -46,7 +46,8 @@ private struct LibraryDialogs: ViewModifier {
     private func take() {
         guard appearsActive else { return }
         if !library.notesToPurge.isEmpty {
-            purging = library.notesToPurge
+            // A library that cannot erase is never asked to.
+            if library.capabilities.contains(.purge) { purging = library.notesToPurge }
             library.notesToPurge = []
         }
         if let asked = library.failure {

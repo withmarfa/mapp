@@ -20,12 +20,12 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarKeepsTopPlacesAndPinsAboveTheNativeGroups() {
-        for title in ["Inbox", "All Notes", "Pinned", "Kitchen quotes", "Reading list", "Library", "Projects", "Items", "Folders"] {
+    func testSidebarKeepsTopPlacesAndFavoritesAboveTheNativeGroups() {
+        for title in ["Inbox", "All Notes", "Favorites", "Kitchen quotes", "Reading list", "Library", "Projects", "Items", "Folders"] {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
-        XCTAssertFalse(sidebarText("All Pinned").exists)
-        XCTAssertLessThan(sidebarText("All Notes").frame.maxY, sidebarText("Pinned").frame.minY)
+        XCTAssertFalse(sidebarText("All Favorites").exists)
+        XCTAssertLessThan(sidebarText("All Notes").frame.maxY, sidebarText("Favorites").frame.minY)
         XCTAssertLessThan(sidebarText("Reading list").frame.maxY, sidebarText("Library").frame.minY)
         XCTAssertLessThan(sidebarText("Library").frame.maxY, sidebarText("Projects").frame.minY)
         let places = window.outlines["SidebarPlaces"]
@@ -34,28 +34,28 @@ final class SidebarNavigationTests: XCTestCase {
         attachScreenshot("SidebarGroupedNavigation")
     }
 
-    func testEachPinnedShortcutSelectsItsActualItem() {
+    func testEachFavoriteShortcutSelectsItsActualItem() {
         let title = window.textFields["ItemPageTitle"]
-        for pin in ["Kitchen quotes", "Reading list"] {
-            sidebarText(pin).click()
-            let selected = expectation(for: NSPredicate(format: "value == %@", pin), evaluatedWith: title)
+        for favorite in ["Kitchen quotes", "Reading list"] {
+            sidebarText(favorite).click()
+            let selected = expectation(for: NSPredicate(format: "value == %@", favorite), evaluatedWith: title)
             wait(for: [selected], timeout: 3)
-            let other = pin == "Kitchen quotes" ? "Reading list" : "Kitchen quotes"
+            let other = favorite == "Kitchen quotes" ? "Reading list" : "Kitchen quotes"
             XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", other)).firstMatch.exists)
         }
     }
 
-    func testPinnedSectionCollapsesAndRemembersItsStateWhenSettingsCloses() {
-        disclosure(for: "Pinned").click()
+    func testFavoritesSectionCollapsesAndRemembersItsStateWhenSettingsCloses() {
+        disclosure(for: "Favorites").click()
         XCTAssertTrue(sidebarText("Kitchen quotes").waitForNonExistence(timeout: 3))
         XCTAssertFalse(sidebarText("Reading list").exists)
         XCTAssertTrue(sidebarText("Library").exists)
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(window.buttons["SettingsBack"].waitForExistence(timeout: 3))
         window.buttons["SettingsBack"].click()
-        XCTAssertTrue(sidebarText("Pinned").waitForExistence(timeout: 3))
+        XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
         XCTAssertFalse(sidebarText("Reading list").exists)
-        disclosure(for: "Pinned").click()
+        disclosure(for: "Favorites").click()
         XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
     }
 
@@ -66,7 +66,7 @@ final class SidebarNavigationTests: XCTestCase {
         types.hover()
         attachScreenshot("FooterMarfaTypesHover")
         types.click()
-        XCTAssertTrue(window.groups["MarfaTypes"].webViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.descendants(matching: .any)["MarfaTypesList"].waitForExistence(timeout: 5))
         types.hover()
         attachScreenshot("FooterMarfaTypesSelected")
 
@@ -76,20 +76,20 @@ final class SidebarNavigationTests: XCTestCase {
         attachScreenshot("FooterRecentlyDeletedSelected")
     }
 
-    func testPinnedSectionDisappearsAfterTheLastItemIsUnpinned() {
-        for pin in ["Kitchen quotes", "Reading list"] {
-            let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", pin)).firstMatch
+    func testFavoritesSectionDisappearsAfterTheLastItemIsRemoved() {
+        for favorite in ["Kitchen quotes", "Reading list"] {
+            let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
             XCTAssertTrue(note.waitForExistence(timeout: 3))
             note.rightClick()
-            window.menuItems["Unpin"].click()
-            XCTAssertTrue(sidebarText(pin).waitForNonExistence(timeout: 3))
+            window.menuItems["Remove from Favorites"].click()
+            XCTAssertTrue(sidebarText(favorite).waitForNonExistence(timeout: 3))
         }
-        XCTAssertTrue(sidebarText("Pinned").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sidebarText("Favorites").waitForNonExistence(timeout: 3))
         XCTAssertTrue(sidebarText("Library").exists)
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         note.rightClick()
-        window.menuItems["Pin"].click()
-        XCTAssertTrue(sidebarText("Pinned").waitForExistence(timeout: 3))
+        window.menuItems["Add to Favorites"].click()
+        XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
         XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
     }
 
@@ -166,7 +166,7 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func disclosure(for title: String) -> XCUIElement {
-        if title == "Pinned" {
+        if title == "Favorites" {
             sidebarText(title).hover()
         }
         let row: XCUIElement
@@ -183,7 +183,7 @@ final class SidebarNavigationTests: XCTestCase {
 
     private func groupIdentifier(for title: String) -> String? {
         switch title {
-        case "Pinned": "SidebarPinnedSection"
+        case "Favorites": "SidebarFavoritesSection"
         case "Library": "SidebarLibrarySection"
         case "Projects": "SidebarProjects"
         case "Items": "SidebarItems"

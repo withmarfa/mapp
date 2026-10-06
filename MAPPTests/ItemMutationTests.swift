@@ -30,7 +30,7 @@ struct ItemMutationTests {
     @Test func creationAndRelationshipChangesUseOwningFiles() {
         let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\nAn area.", created: .now)
         let library = NoteLibrary(notes: [project])
-        let created = library.createItem(typeID: "aic.ticket.feature", title: "New Feature", parentID: project.id)
+        let created = library.createItem(typeID: "aic.ticket.feature", title: "New Feature", parentID: project.id).flatMap { library.note($0) }
         #expect(created?.path == "Tickets/New Feature.md")
         #expect(created?.file.property("child-of") == "[[Area]]")
         #expect(library.createItem(typeID: "core.note", title: "new feature") == nil)
@@ -72,10 +72,13 @@ struct ItemMutationTests {
         #expect(library.connectionIndex.edges.contains { $0.name == "about" && $0.targetID == target.id })
     }
 
-    @Test func unsupportedQuotedKeyIsRefusedWithoutChangingFile() {
+    @Test func aQuotedKeyIsEditedInItsOwnSpelling() {
         let note = Note(path: "Quoted.md", text: "---\ntype: aic.ticket.task\n\"status\": pending\n---\nBody", created: .now)
         let library = NoteLibrary(notes: [note])
-        #expect(!library.setItemProperty(note.id, key: "status", value: .string("completed")))
+        let undo = UndoManager()
+        #expect(library.setItemProperty(note.id, key: "status", value: .string("completed"), undoManager: undo))
+        #expect(library.note(note.id)?.file.text == "---\ntype: aic.ticket.task\n\"status\": completed\n---\nBody")
+        undo.undo()
         #expect(library.note(note.id)?.file.text == note.file.text)
     }
 
@@ -153,9 +156,9 @@ struct ItemMutationTests {
         let task = ticket()
         let library = NoteLibrary(notes: [project, task])
         _ = library.connectionIndex
-        #expect(library.item(task.id)?.fields["status"] == .string("pending"))
+        #expect(library.item(task.id)?.value(of: "status") == .string("pending"))
         #expect(library.setItemProperty(task.id, key: "status", value: .string("completed")))
-        #expect(library.item(task.id)?.fields["status"] == .string("completed"))
+        #expect(library.item(task.id)?.value(of: "status") == .string("completed"))
         #expect(library.setItemRelationship(task.id, field: "child-of", targetIDs: [project.id]))
         #expect(library.connectionIndex.edges.contains { $0.name == "parent-of" && $0.sourceID == project.id && $0.targetID == task.id })
         library.updateBody(of: task.id, to: "See [[Area]].")

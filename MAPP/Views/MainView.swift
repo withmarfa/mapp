@@ -2,13 +2,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MainView: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
-    @State private var editor = EditorController()
+    @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
-    @State private var types = MarfaTypesPage()
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
@@ -19,7 +18,9 @@ struct MainView: View {
     private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    /// The library is given here as well as in the environment, since the editor is made with it.
+    init(library: any ItemLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+        _editor = State(initialValue: EditorController(library: library))
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings
@@ -29,8 +30,8 @@ struct MainView: View {
     var body: some View { renamingWindow }
 
     private var splitView: some View {
-        // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
-        // the window never changes its columns (see MarfaTypesPage).
+        // Every place keeps the same three columns, Marfa Types among them: AppKit crashed laying out the toolbar
+        // as the columns changed with the sidebar hidden or resized.
         NavigationSplitView {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
@@ -39,7 +40,7 @@ struct MainView: View {
         } content: {
             Group {
                 if browser.showsTypes {
-                    MarfaTypesView(part: types.list)
+                    TypesListView(browser: browser.types, pane: $pane)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
                         .navigationTitle(settings.isPresented ? "" : library.name(of: .marfaTypes))
                         .toolbar(removing: !settings.isPresented && browser.isSearchExpanded ? .title : nil)
@@ -47,11 +48,12 @@ struct MainView: View {
                             if !settings.isPresented {
                                 ColumnSearch(
                                     isExpanded: $browser.isSearchExpanded,
-                                    text: $browser.typesQuery,
-                                    prompt: String(localized: "Search Types"),
+                                    text: Bindable(browser.types).searchText,
+                                    prompt: String(localized: "Search"),
                                     columnWidth: typesListWidth,
                                     focusRequests: browser.searchFocusRequests,
-                                    onSubmit: types.openFirstMatch
+                                    onSubmit: browser.types.selectFirstMatch,
+                                    onDown: { browser.focusRequest = .list }
                                 ) {}
                             }
                         }
@@ -66,7 +68,7 @@ struct MainView: View {
                     NewItemPage(browser: browser, draft: draft)
                         .onAppear { editor.close() }
                 } else if browser.showsTypes {
-                    MarfaTypesView(part: types.content)
+                    TypeDetailView(browser: browser.types)
                         // The note that was on the page is out of sight, so it is left.
                         .onAppear { editor.close() }
                 } else {
@@ -75,7 +77,7 @@ struct MainView: View {
             }
             .toolbar(id: "main") {
                 if !settings.isPresented {
-                    NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
+                    NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
                 }
             }
         }
@@ -90,7 +92,7 @@ struct MainView: View {
         }
         .focusedSceneValue(\.detailsPresentation, settings.isPresented ? nil : details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
-        .onChange(of: browser.typesQuery) { types.search(browser.typesQuery) }
+        .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 ZStack(alignment: .top) {
@@ -99,7 +101,7 @@ struct MainView: View {
                         .contentShape(.rect)
                         .onTapGesture {
                             browser.palette = nil
-                            browser.focusRequest = browser.showsTypes ? .sidebar : .list
+                            browser.focusRequest = .list
                         }
                     CommandPalette(browser: browser, editor: editor, settings: settings, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
@@ -110,7 +112,6 @@ struct MainView: View {
         }
         .focusedSceneValue(\.browser, settings.isPresented ? nil : browser)
         .focusedSceneValue(\.editor, settings.isPresented ? nil : editor)
-        .focusedSceneValue(\.marfaTypes, !settings.isPresented && browser.showsTypes ? types : nil)
         .focusedSceneValue(\.focusedNotes, settings.isPresented ? nil : FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
@@ -126,24 +127,22 @@ struct MainView: View {
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
-        .onChange(of: library.items.map(\.id)) { browser.folderRemoved(in: library, order: order) }
+        .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.folderRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
-        .onChange(of: browser.snapshot(in: library)) { _, snapshot in
+        .onChange(of: browser.snapshot()) { _, snapshot in
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
         .onDisappear { editor.flush() }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
-            editor.library = library
-            editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
-            types.onFind = { [browser] in browser.focusRequest = .typesSearch }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there.
         .onChange(of: library.isLoaded, initial: true) {
-            if library.isLoaded && restoresWindow { restore() }
+            if library.isLoaded && restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
         }
     }
 
@@ -158,7 +157,7 @@ struct MainView: View {
                 library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
             }
         }
-        .onChange(of: library.items.map(\.id), revealImportedItem)
+        .onChange(of: library.items(in: .allNotes).map(\.id), revealImportedItem)
         .onChange(of: completedImportID, revealImportedItem)
         .libraryDialogs()
     }
@@ -173,7 +172,7 @@ struct MainView: View {
             Text("The note’s file takes the new name.")
         }
         .onChange(of: browser.renamingNote) {
-            noteName = browser.renamingNote.flatMap { library.note($0) }.map { $0.fileTitle ?? $0.title } ?? ""
+            noteName = browser.renamingNote.flatMap { library.fileName(of: $0) } ?? ""
         }
         .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
         } message: {
@@ -181,7 +180,7 @@ struct MainView: View {
         }
     }
 
-    private var completedImportID: UUID? {
+    private var completedImportID: ItemID? {
         importRequestID.flatMap { library.completedImports[$0] }
     }
 
@@ -195,8 +194,8 @@ struct MainView: View {
         importRequestID = nil
     }
 
-    /// The list's search comes out as a field, which takes the keyboard; asked for over Marfa Types, it searches
-    /// All Notes, since that page has a search of its own.
+    /// The list's search comes out as a field, which takes the keyboard. Search List over Marfa Types searches
+    /// All Notes, since Find there searches the types.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
@@ -206,7 +205,10 @@ struct MainView: View {
         case .typesSearch:
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
-        case .sidebar, .list: pane = browser.focusRequest
+        case .sidebar, .list:
+            // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
+            let request = browser.focusRequest
+            Task { pane = request }
         case .page, nil: return
         }
         browser.focusRequest = nil
@@ -220,14 +222,6 @@ struct MainView: View {
             takenNoteName = name
         } else {
             library.renameNote(id, to: name, undoManager: undoManager)
-        }
-    }
-
-    private func restore() {
-        if let storedBrowser, let snapshot = try? JSONDecoder().decode(Browser.Snapshot.self, from: storedBrowser) {
-            browser.restore(snapshot, in: library, order: order)
-        } else {
-            browser.selectFirstNote(in: library, order: order)
         }
     }
 }

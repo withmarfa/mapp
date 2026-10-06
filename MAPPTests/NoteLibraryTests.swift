@@ -9,15 +9,15 @@ struct NoteLibraryTests {
 
     let store = RecordingStore()
 
-    func makeLibrary() -> (NoteLibrary, inbox: Note, filed: Note, pinned: Note, deleted: Note) {
+    func makeLibrary() -> (NoteLibrary, inbox: Note, filed: Note, favorite: Note, deleted: Note) {
         let inbox = Note(body: "# Inbox note", created: start)
         let filed = Note(body: "# Filed note", path: "Work/Filed note.md", created: start, folderID: work.id)
-        let pinned = Note(body: "# Pinned note", path: "Home/Pinned note.md", created: start, folderID: home.id, isPinned: true)
+        let favorite = Note(body: "# Favorite note", path: "Home/Favorite note.md", created: start, folderID: home.id, isFavorite: true)
         let deleted = Note(body: "# Deleted note", path: "Work/Deleted note.md", created: start, folderID: work.id, deleted: start)
         let library = NoteLibrary(
-            notes: [inbox, filed, pinned, deleted], folders: [work, home], store: store, now: { start + 60 }
+            notes: [inbox, filed, favorite, deleted], folders: [work, home], store: store, now: { start + 60 }
         )
-        return (library, inbox, filed, pinned, deleted)
+        return (library, inbox, filed, favorite, deleted)
     }
 
     func undoManager() -> UndoManager {
@@ -35,23 +35,23 @@ struct NoteLibraryTests {
     // MARK: Reading
 
     @Test func eachSidebarItemShowsItsNotes() {
-        let (library, inbox, filed, pinned, deleted) = makeLibrary()
-        #expect(library.notes(in: .inbox) == [inbox])
-        #expect(library.notes(in: .allNotes) == [inbox, filed, pinned])
-        #expect(library.notes(in: .pinned) == [pinned])
-        #expect(library.notes(in: .folder(work.id)) == [filed])
-        #expect(library.notes(in: .recentlyDeleted) == [deleted])
-        #expect(library.notes(in: .marfaTypes).isEmpty)
+        let (library, inbox, filed, favorite, deleted) = makeLibrary()
+        #expect(library.items(in: .inbox).map(\.id) == [inbox.id])
+        #expect(library.items(in: .allNotes).map(\.id) == [inbox.id, filed.id, favorite.id])
+        #expect(library.items(in: .favorites).map(\.id) == [favorite.id])
+        #expect(library.items(in: .folder(work.id)).map(\.id) == [filed.id])
+        #expect(library.items(in: .recentlyDeleted).map(\.id) == [deleted.id])
+        #expect(library.items(in: .marfaTypes).isEmpty)
         #expect(library.count(in: .allNotes) == 3)
     }
 
     @Test func searchCoversEveryLiveNoteIgnoringCaseAndAccents() {
         let (library, _, filed, _, _) = makeLibrary()
         library.updateBody(of: filed.id, to: "# Filed note\n\nA proper ragù")
-        #expect(library.notes(matching: "RAGU").map(\.id) == [filed.id])
-        #expect(library.notes(matching: "note").count == 3)
-        #expect(library.notes(matching: "Deleted").isEmpty)
-        #expect(library.notes(matching: "   ").isEmpty)
+        #expect(library.items(matching: "RAGU").map(\.id) == [filed.id])
+        #expect(library.items(matching: "note").count == 3)
+        #expect(library.items(matching: "Deleted").isEmpty)
+        #expect(library.items(matching: "   ").isEmpty)
     }
 
     @Test func sidebarItemsAreNamed() {
@@ -64,32 +64,39 @@ struct NoteLibraryTests {
 
     // MARK: Notes
 
-    @Test(arguments: [SidebarItem.inbox, .allNotes, .recentlyDeleted])
-    func newNotesOutsideAFolderLandInTheInbox(item: SidebarItem) {
+    @Test func aNewItemIsWrittenAtOnceUnderItsTitleInTheFolderItWasMadeIn() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let note = library.newNote(in: item)
-        #expect(library.notes(in: .inbox).contains(note))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(home.id)).flatMap { library.note($0) })
+        #expect(note.folderID == home.id)
+        #expect(note.path == "Home/Groceries.md")
         #expect(note.created == start + 60)
+        #expect(library.items(in: .folder(home.id)).contains { $0.id == note.id })
+        #expect(library.note(note.id)?.title == "Groceries")
+        #expect(store.changes.last == .create(path: "Home/Groceries.md", text: library.note(note.id)!.file.text, id: note.id))
     }
 
-    @Test func newNotesShowWhereTheyWereMade() {
+    @Test func aNewItemMadeOutsideAFolderGoesToItsTypesFolder() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let inFolder = library.newNote(in: .folder(home.id))
-        let fromPinned = library.newNote(in: .pinned)
-        #expect(library.notes(in: .folder(home.id)).contains(inFolder))
-        #expect(library.notes(in: .pinned).contains(fromPinned))
+        let note = try #require(library.createItem(typeID: "core.note", title: "Loose", in: .allNotes).flatMap { library.note($0) })
+        #expect(note.path == "Notes/Loose.md")
+        #expect(library.folder(note.folderID!)?.name == "Notes")
+        #expect(store.changes.contains(.createFolder(path: "Notes", id: try #require(note.folderID))))
+        let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(.mint())).flatMap { library.note($0) })
+        #expect(gone.path == "Notes/Also loose.md", "a folder that is gone takes nothing")
+        #expect(gone.folderID == note.folderID)
     }
 
-    @Test func newNoteUndoesAndRedoes() {
+    @Test func aNewItemUndoesToRecentlyDeletedAndRedoes() throws {
         let (library, _, _, _, _) = makeLibrary()
         let manager = undoManager()
         var note: Note?
-        undoably(manager) { note = library.newNote(in: .inbox, undoManager: manager) }
-        #expect(manager.undoActionName == "New Note")
+        undoably(manager) { note = library.createItem(typeID: "core.note", title: "Fresh", undoManager: manager).flatMap { library.note($0) } }
+        let id = try #require(note?.id)
+        #expect(manager.undoActionName == "New Item")
         manager.undo()
-        #expect(library.note(note!.id) == nil)
+        #expect(library.note(id)?.isDeleted == true)
         manager.redo()
-        #expect(library.note(note!.id) == note)
+        #expect(library.note(id)?.isDeleted == false)
     }
 
     @Test func editingABodyUpdatesTheModifiedDateOnlyWhenItChanges() {
@@ -108,11 +115,11 @@ struct NoteLibraryTests {
         let manager = undoManager()
         undoably(manager) { library.delete([inbox.id, filed.id], undoManager: manager) }
         #expect(manager.undoActionName == "Delete Notes")
-        #expect(library.notes(in: .recentlyDeleted).count == 3)
-        #expect(library.notes(in: .allNotes).count == 1)
+        #expect(library.items(in: .recentlyDeleted).count == 3)
+        #expect(library.items(in: .allNotes).count == 1)
         manager.undo()
-        #expect(library.note(inbox.id) == inbox)
-        #expect(library.note(filed.id) == filed)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
+        #expect(library.note(filed.id)?.holdsTheSame(as: filed) == true)
         manager.redo()
         #expect(library.note(inbox.id)?.isDeleted == true)
     }
@@ -121,7 +128,7 @@ struct NoteLibraryTests {
         let (library, _, _, _, deleted) = makeLibrary()
         let manager = undoManager()
         undoably(manager) { library.recover([deleted.id], undoManager: manager) }
-        #expect(library.notes(in: .folder(work.id)).map(\.id).contains(deleted.id))
+        #expect(library.items(in: .folder(work.id)).map(\.id).contains(deleted.id))
         #expect(store.changes == [.restore(id: deleted.binID!, path: "Work/Deleted note.md")])
         #expect(manager.undoActionName == "Recover")
         manager.undo()
@@ -160,32 +167,32 @@ struct NoteLibraryTests {
         let (library, inbox, _, _, deleted) = makeLibrary()
         let manager = undoManager()
         undoably(manager) { library.move([inbox.id, deleted.id], to: home.id, undoManager: manager) }
-        #expect(library.notes(in: .folder(home.id)).count == 3)
-        #expect(library.notes(in: .inbox).isEmpty)
+        #expect(library.items(in: .folder(home.id)).count == 3)
+        #expect(library.items(in: .inbox).isEmpty)
         #expect(library.note(deleted.id)?.path == "Home/Deleted note.md")
         #expect(manager.undoActionName == "Move")
         manager.undo()
-        #expect(library.note(inbox.id) == inbox)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
         #expect(library.note(deleted.id)?.isDeleted == true)
     }
 
     @Test func movingToNoFolderReturnsToTheInbox() {
         let (library, _, filed, _, _) = makeLibrary()
         library.move([filed.id], to: nil)
-        #expect(library.notes(in: .inbox).map(\.id).contains(filed.id))
+        #expect(library.items(in: .inbox).map(\.id).contains(filed.id))
     }
 
-    @Test func pinningAndUnpinningUndo() {
-        let (library, inbox, _, pinned, _) = makeLibrary()
+    @Test func addingAndRemovingFavoritesUndo() {
+        let (library, inbox, _, favorite, _) = makeLibrary()
         let manager = undoManager()
-        undoably(manager) { library.setPinned([inbox.id], true, undoManager: manager) }
-        #expect(manager.undoActionName == "Pin")
-        undoably(manager) { library.setPinned([pinned.id], false, undoManager: manager) }
-        #expect(manager.undoActionName == "Unpin")
-        #expect(library.notes(in: .pinned).map(\.id) == [inbox.id])
+        undoably(manager) { library.setFavorite([inbox.id], true, undoManager: manager) }
+        #expect(manager.undoActionName == "Add to Favorites")
+        undoably(manager) { library.setFavorite([favorite.id], false, undoManager: manager) }
+        #expect(manager.undoActionName == "Remove from Favorites")
+        #expect(library.items(in: .favorites).map(\.id) == [inbox.id])
         manager.undo()
         manager.undo()
-        #expect(library.notes(in: .pinned) == [pinned])
+        #expect(library.items(in: .favorites).map(\.id) == [favorite.id])
     }
 
     // MARK: Folders
@@ -228,8 +235,8 @@ struct NoteLibraryTests {
         #expect(manager.undoActionName == "Delete Folder")
         manager.undo()
         #expect(library.folders == [work, home])
-        #expect(library.note(filed.id) == filed)
-        #expect(library.note(deleted.id) == deleted)
+        #expect(library.note(filed.id)?.holdsTheSame(as: filed) == true)
+        #expect(library.note(deleted.id)?.holdsTheSame(as: deleted) == true)
         manager.redo()
         #expect(library.folder(work.id) == nil)
         #expect(library.note(filed.id)?.isDeleted == true)
@@ -254,26 +261,25 @@ struct NoteLibraryTests {
 
     @Test func aFolderThatIsGoneTakesNoNotes() {
         let (library, inbox, _, _, _) = makeLibrary()
-        let gone = UUID()
+        let gone = ItemID.mint()
         library.move([inbox.id], to: gone)
         #expect(library.note(inbox.id)?.folderID == nil)
-        #expect(library.newNote(in: .folder(gone)).folderID == nil)
     }
 
-    @Test func pinningLeavesDeletedNotesAlone() {
+    @Test func favoritingLeavesDeletedNotesAlone() {
         let (library, _, _, _, deleted) = makeLibrary()
         let manager = undoManager()
-        undoably(manager) { library.setPinned([deleted.id], true, undoManager: manager) }
-        #expect(library.note(deleted.id)?.isPinned == false)
+        undoably(manager) { library.setFavorite([deleted.id], true, undoManager: manager) }
+        #expect(library.note(deleted.id)?.isFavorite == false)
         #expect(manager.undoActionName == "")
     }
 
     @Test func actionsThatChangeNothingRegisterNoUndo() {
-        let (library, inbox, filed, pinned, _) = makeLibrary()
+        let (library, inbox, filed, favorite, _) = makeLibrary()
         let manager = undoManager()
         let before = library.notes
-        undoably(manager) { library.delete([UUID()], undoManager: manager) }
-        undoably(manager) { library.setPinned([pinned.id], true, undoManager: manager) }
+        undoably(manager) { library.delete([.mint()], undoManager: manager) }
+        undoably(manager) { library.setFavorite([favorite.id], true, undoManager: manager) }
         undoably(manager) { library.recover([inbox.id], undoManager: manager) }
         undoably(manager) { library.move([filed.id], to: work.id, undoManager: manager) }
         #expect(library.notes == before)
@@ -314,37 +320,129 @@ struct NoteLibraryTests {
         #expect(crowded.note(inbox.id)?.path == "Home/Inbox note 2.md")
     }
 
-    @Test func pinningWritesThePropertyIntoTheFile() {
+    @Test func favoritingWritesTheTagIntoTheFile() {
         let (library, inbox, _, _, _) = makeLibrary()
-        library.setPinned([inbox.id], true)
-        #expect(store.changes == [.write(path: "Inbox note.md", text: "---\npinned: true\n---\n# Inbox note")])
-        library.setPinned([inbox.id], false)
+        library.setFavorite([inbox.id], true)
+        #expect(store.changes == [.write(path: "Inbox note.md", text: "---\ntags: [favorite]\n---\n# Inbox note")])
+        library.setFavorite([inbox.id], false)
         #expect(store.changes.last == .write(path: "Inbox note.md", text: "# Inbox note"))
     }
 
-    @Test func aNewNoteGetsItsFileOnceItsFirstLineIsFinished() {
-        let (library, _, _, _, _) = makeLibrary()
-        let note = library.newNote(in: .folder(work.id))
-        library.updateBody(of: note.id, to: "Groceries\n")
-        #expect(store.changes.isEmpty, "a single line may still be being typed")
-        library.updateBody(of: note.id, to: "Groceries\n\nMilk\n")
-        #expect(store.changes == [.create(path: "Work/Groceries.md", text: "Groceries\n\nMilk\n")])
-        #expect(library.note(note.id)?.title == "Groceries")
-        library.updateBody(of: note.id, to: "Groceries\n\nMilk, eggs\n")
-        #expect(store.changes.last == .write(path: "Work/Groceries.md", text: "Groceries\n\nMilk, eggs\n"))
+    @Test func aTagsStringGainsTheTag() {
+        let note = Note(path: "Odd.md", text: "---\ntags: one\n---\n# Odd", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        library.setFavorite([note.id], true)
+        #expect(store.changes == [.write(path: "Odd.md", text: "---\ntags: one, favorite\n---\n# Odd")])
+        #expect(library.note(note.id)?.isFavorite == true)
     }
 
-    @Test func leavingANewNoteWritesWhatItHasOrLetsAnEmptyOneGo() {
+    @Test func tagsThatCannotBeChangedSafelyAreLeftAndThePersonIsTold() {
+        let unreadable = Note(path: "Numbers.md", text: "---\ntags: [1]\n---\n# Numbers", created: start)
+        let folded = Note(path: "Folded.md", text: "---\ntags: >\n  one\n---\n# Folded", created: start)
+        let library = NoteLibrary(notes: [unreadable, folded], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([unreadable.id], true, undoManager: manager) }
+        #expect(store.changes.isEmpty)
+        #expect(manager.undoActionName == "")
+        #expect(library.failure?.title == "Can’t Add to Favorites")
+        #expect(library.failure?.message.contains("Numbers") == true)
+        library.failure = nil
+        library.setFavorite([folded.id], true)
+        #expect(library.failure?.message.contains("Folded") == true)
+        library.failure = nil
+        library.setFavorite([unreadable.id, folded.id], true)
+        #expect(library.failure?.message.hasPrefix("Some notes") == true)
+        #expect(store.changes.isEmpty)
+        #expect(library.notes.map(\.file.text) == [unreadable.file.text, folded.file.text])
+    }
+
+    @Test func anUndoThatCannotChangeTheTagsSafelyTellsThePerson() {
+        let note = Note(path: "Odd.md", text: "---\ntags: [a]\n---\n# Odd", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
+        let folded = Note(path: "Odd.md", text: "---\ntags: >\n  a, favorite\ntitle: x\n---\n# Odd", created: start)
+        library.notes[0].file = folded.file
+        store.changes.removeAll()
+        manager.undo()
+        #expect(store.changes.isEmpty)
+        #expect(library.failure?.title == "Can’t Remove from Favorites")
+        #expect(library.failure?.message.contains("Odd") == true)
+    }
+
+    /// Undo puts back the very bytes the file had, which turning the favorite back would not.
+    @Test(arguments: [
+        ("---\ntags:\n  - favorite\ntitle: x\n---\n# Note", false),
+        ("---\ntags: [favorite, a]\n---\n# Note", false),
+        ("---\ntags:\n  - favorite\n  # mine\ntitle: x\n---\n# Note", false),
+        ("---\ntags: [a,]\n---\n# Note", true),
+        ("---\n---\n# Note", true),
+        ("\u{FEFF}---\r\ntags: a\r\n---\r\n# Note\r\n", true),
+    ])
+    func undoRestoresTheExactFile(text: String, adding: Bool) {
+        let note = Note(path: "Note.md", text: text, created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], adding, undoManager: manager) }
+        let changed = library.note(note.id)?.file.text
+        #expect(changed != text)
+        #expect(library.note(note.id)?.isFavorite == adding)
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == text)
+        #expect(store.changes.last == .write(path: "Note.md", text: text))
+        manager.redo()
+        #expect(library.note(note.id)?.file.text == changed)
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == text)
+    }
+
+    @Test func undoAfterTheBodyChangedKeepsTheBody() {
+        let note = Note(path: "Note.md", text: "---\n---\nOld body\n", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
+        library.updateBody(of: note.id, to: "New body\n")
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == "---\n---\nNew body\n")
+    }
+
+    @Test func undoAfterAnotherFieldChangedTurnsOnlyTheFavoriteBack() {
+        let note = Note(path: "Note.md", text: "---\ntags: [a]\n---\n# Note", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
+        var file = library.notes[0].file
+        file.setProperty("status", "open")
+        library.applyItemFiles([note.id: file], undoManager: nil, name: "Edit")
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == "---\ntags: [a]\nstatus: open\n---\n# Note")
+    }
+
+    @Test func laterEditsToANewItemAreWrittenToItsFile() throws {
         let (library, _, _, _, _) = makeLibrary()
-        let empty = library.newNote(in: .inbox)
-        library.leave(empty.id)
-        #expect(library.note(empty.id) == nil)
-        let short = library.newNote(in: .pinned)
-        library.updateBody(of: short.id, to: "Call the plumber\n")
-        library.leave(short.id)
-        #expect(store.changes == [
-            .create(path: "Call the plumber.md", text: "---\npinned: true\n---\nCall the plumber\n"),
-        ])
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)).flatMap { library.note($0) })
+        library.updateBody(of: note.id, to: "Milk, eggs\n")
+        #expect(store.changes.last == .write(path: "Work/Groceries.md", text: library.note(note.id)!.file.text))
+        #expect(library.note(note.id)?.body == "Milk, eggs\n")
+    }
+
+    @Test func aNewItemKeepsItsTitleAndFileNameWhateverItsFirstLineBecomes() throws {
+        let (library, _, _, _, _) = makeLibrary()
+        let note = try #require(library.createItem(typeID: "core.note", title: "Groceries", body: "Milk\n", in: .folder(work.id)).flatMap { library.note($0) })
+        library.updateBody(of: note.id, to: "Something else entirely\n")
+        let changes = store.changes.count
+        library.leave(note.id)
+        #expect(library.note(note.id)?.path == "Work/Groceries.md")
+        #expect(library.note(note.id)?.title == "Groceries")
+        #expect(store.changes.count == changes, "leaving a note whose name is its own writes nothing")
+    }
+
+    @Test func aNoteLeftWithoutEditsIsNotTouched() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        library.leave(inbox.id)
+        library.finish()
+        #expect(store.changes.isEmpty)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
     }
 
     @Test func aNoteNamedAfterItsFirstLineTakesTheNewLineOnceLeft() {
@@ -407,9 +505,10 @@ struct NoteLibraryTests {
     }
 
     @Test func aFirstLineANameCannotHoldIsKeptWholeAsTheTitle() {
-        let (library, _, _, _, _) = makeLibrary()
-        let note = library.newNote(in: .inbox)
+        let (library, inbox, _, _, _) = makeLibrary()
+        let note = inbox
         library.updateBody(of: note.id, to: "R\\&D: plan\n\nBudget\n")
+        library.leave(note.id)
         #expect(library.note(note.id)?.path == "R&D- plan.md")
         #expect(library.note(note.id)?.file.title == "R&D: plan")
         #expect(library.note(note.id)?.title == "R&D: plan")
@@ -438,9 +537,9 @@ struct NoteLibraryTests {
         #expect(rewrittenFirst.title == "Roadmap")
     }
 
-    @Test func aNewNoteWithNoWordsYetStillFollowsItsLineOnceItHasOne() {
-        let (library, _, _, _, _) = makeLibrary()
-        let note = library.newNote(in: .inbox)
+    @Test func aNoteWithNoWordsYetStillFollowsItsLineOnceItHasOne() {
+        let (library, inbox, _, _, _) = makeLibrary()
+        let note = inbox
         library.updateBody(of: note.id, to: "```\n")
         library.leave(note.id)
         #expect(library.note(note.id)?.path == "New Note.md")
@@ -449,41 +548,11 @@ struct NoteLibraryTests {
         #expect(library.note(note.id)?.path == "Snippets.md")
     }
 
-    @Test func aOneLineNoteIsWrittenOnceTheTypingPauses() async throws {
-        let (library, _, _, _, _) = makeLibrary()
-        library.draftDelay = .milliseconds(20)
-        let note = library.newNote(in: .inbox)
-        library.updateBody(of: note.id, to: "Call the plumber\n")
-        #expect(store.changes.isEmpty)
-        for _ in 0..<50 where store.changes.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(store.changes == [.create(path: "Call the plumber.md", text: "Call the plumber\n")])
-        library.updateBody(of: note.id, to: "Call the plumber today\n")
-        library.leave(note.id)
-        #expect(library.note(note.id)?.path == "Call the plumber today.md", "an early name corrects itself")
-    }
-
-    @Test func aNewNoteOfMarkersAloneIsLetGoAndTakesNoUndo() {
-        let (library, _, _, _, _) = makeLibrary()
-        let manager = undoManager()
-        var note: Note?
-        undoably(manager) { note = library.newNote(in: .inbox, undoManager: manager) }
-        library.updateBody(of: note!.id, to: "- [ ] \n")
-        #expect(library.paths(forWindows: [note!.id]).isEmpty)
-        #expect(library.note(note!.id) != nil, "opening it in a window lets nothing go")
-        undoably(manager) { library.delete([note!.id], undoManager: manager) }
-        #expect(library.note(note!.id) == nil)
-        #expect(manager.undoActionName.isEmpty, "deleting nothing registers nothing to undo")
-        #expect(store.changes.isEmpty)
-    }
-
-    @Test func undoingANewNoteAlreadyWrittenMovesItToRecentlyDeleted() {
-        let (library, _, _, _, _) = makeLibrary()
-        let manager = undoManager()
-        var note: Note?
-        undoably(manager) { note = library.newNote(in: .inbox, undoManager: manager) }
-        library.updateBody(of: note!.id, to: "Kept\n\nText\n")
-        manager.undo()
-        #expect(library.note(note!.id)?.isDeleted == true)
+    @Test func openingWindowsLeavesEachNoteSoItsNameHasFollowedItsLine() {
+        let (library, inbox, filed, _, _) = makeLibrary()
+        library.updateBody(of: inbox.id, to: "Renamed\n")
+        #expect(library.idsForWindows([inbox.id, filed.id, .mint()]) == [inbox.id, filed.id], "an item that is not there opens nothing")
+        #expect(library.note(inbox.id)?.path == "Renamed.md")
     }
 
     @Test func renamingANoteMovesItsFileAndUndoes() {
@@ -526,7 +595,7 @@ struct NoteLibraryTests {
         library.rename(work.id, to: "Office")
         library.deleteFolder(folder.id)
         #expect(store.changes == [
-            .createFolder(path: "New Folder"),
+            .createFolder(path: "New Folder", id: folder.id),
             .moveFolder(from: "Work", to: "Office"),
             .removeFolder(path: "New Folder"),
         ])
@@ -562,7 +631,7 @@ struct NoteLibraryTests {
         library.recover([filed.id])
         #expect(library.note(filed.id)?.folderID == nil)
         #expect(library.note(filed.id)?.path == "Filed note.md")
-        #expect(library.notes(in: .inbox).map(\.id).contains(filed.id))
+        #expect(library.items(in: .inbox).map(\.id).contains(filed.id))
     }
 
     @Test func aNewFolderNeverSharesAnotherFoldersIdentity() {
@@ -580,12 +649,12 @@ struct NoteLibraryTests {
         #expect(NoteText.fileSafe(String(repeating: "é", count: 300)).utf8.count <= 200)
     }
 
-    @Test func attachedFilesAreLinkedFromWhereTheNoteIs() {
+    @Test func attachedFilesAreLinkedFromWhereTheNoteIs() async throws {
         let (library, inbox, filed, _, deleted) = makeLibrary()
         let image = Data("png".utf8)
-        #expect(library.attach([("Photo 1.png", image)], to: inbox.id).map(\.link) == ["Attachments/Photo%201.png"])
-        #expect(library.attach([("a(b).png", image)], to: filed.id).map(\.link) == ["../Attachments/a%28b%29.png"])
-        #expect(library.attach([("x.png", image)], to: deleted.id).isEmpty, "a deleted note takes nothing")
+        #expect(try await library.attach([("Photo 1.png", image)], to: inbox.id).map(\.link) == ["Attachments/Photo%201.png"])
+        #expect(try await library.attach([("a(b).png", image)], to: filed.id).map(\.link) == ["../Attachments/a%28b%29.png"])
+        #expect(try await library.attach([("x.png", image)], to: deleted.id).isEmpty, "a deleted note takes nothing")
         #expect(store.changes == [
             .attach(path: "Attachments/Photo 1.png", data: image),
             .attach(path: "Attachments/a(b).png", data: image),
@@ -615,7 +684,7 @@ struct NoteLibraryTests {
         let library = NoteLibrary(loadingFrom: FolderStore(root: root.url, bin: bin.url), defaults: nil)
         await library.load()
         #expect(library.folders.count == 4)
-        for item in [SidebarItem.inbox, .allNotes, .pinned, .recentlyDeleted] + library.folders.map({ .folder($0.id) }) {
+        for item in [SidebarItem.inbox, .allNotes, .favorites, .recentlyDeleted] + library.folders.map({ .folder($0.id) }) {
             #expect(library.count(in: item) > 0, "\(item) is empty")
         }
         #expect(library.notes.contains { $0.body.contains("| --- |") })

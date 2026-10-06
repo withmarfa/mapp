@@ -11,9 +11,9 @@ nonisolated struct NoteConnectionRule: Equatable, Sendable {
 }
 
 nonisolated enum NoteReferenceResolution: Equatable, Sendable {
-    case resolved(UUID)
+    case resolved(ItemID)
     case missing
-    case ambiguous([UUID])
+    case ambiguous([ItemID])
 }
 
 nonisolated struct NoteIndexedReference: Equatable, Sendable {
@@ -22,7 +22,7 @@ nonisolated struct NoteIndexedReference: Equatable, Sendable {
         case header(String)
     }
 
-    let sourceID: UUID
+    let sourceID: ItemID
     let origin: Origin
     let targetTitle: String
     let resolution: NoteReferenceResolution
@@ -32,26 +32,28 @@ nonisolated struct NoteIndexedReference: Equatable, Sendable {
 nonisolated struct NoteConnectionEdge: Hashable, Sendable {
     let name: String
     let reverseName: String?
-    let sourceID: UUID
-    let targetID: UUID
+    let sourceID: ItemID
+    let targetID: ItemID
 }
 
 nonisolated struct NoteConnectionIssue: Equatable, Sendable {
-    let sourceID: UUID
+    let sourceID: ItemID
     let field: String
-    let value: NoteFieldValue
+    let value: PropertyValue
 }
 
 /// A snapshot rebuilt from files. Body references are lexical mentions, never semantic header edges.
 nonisolated struct NoteConnectionIndex: Sendable {
     let references: [NoteIndexedReference]
+    /// The references each record makes, in the order it makes them.
+    let referencesBySource: [ItemID: [NoteIndexedReference]]
     let edges: Set<NoteConnectionEdge>
     /// Configured fields containing malformed target references.
     let issues: [NoteConnectionIssue]
 
     init(records: [NoteProjection], rulesByType: [String: [NoteConnectionRule]]) {
-        var names: [String: [UUID]] = [:]
-        var declaredIDs: [UUID: [UUID]] = [:]
+        var names: [String: [ItemID]] = [:]
+        var declaredIDs: [UUID: [ItemID]] = [:]
         for record in records {
             for name in Self.names(of: record) {
                 let key = Self.nameKey(name)
@@ -60,13 +62,13 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 }
             }
             // A file's declaration is a local lookup hint, not a verified Marfa identity.
-            if let text = record.fields?["marfa_id"]?.string, let id = Self.itemID(text),
+            if let text = record.fields?["marfa_id"]?.string, let id = Self.declaredID(text),
                !declaredIDs[id, default: []].contains(record.id) {
                 declaredIDs[id, default: []].append(record.id)
             }
         }
-        func matches(_ name: String) -> [UUID] {
-            if let id = Self.itemID(name) { return declaredIDs[id, default: []] }
+        func matches(_ name: String) -> [ItemID] {
+            if let id = Self.declaredID(name) { return declaredIDs[id, default: []] }
             return names[Self.nameKey(NoteName.trimmed(name)), default: []]
         }
         func resolve(_ title: String) -> NoteReferenceResolution {
@@ -94,7 +96,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
             let type = record.declaredType ?? "core.note"
             for rule in rulesByType[type, default: []] {
                 guard let field = fields[rule.field] else { continue }
-                let values: [NoteFieldValue]
+                let values: [PropertyValue]
                 if case .array(let array) = field { values = array } else { values = [field] }
                 for value in values {
                     guard let string = value.string, let title = Self.typedTarget(string) else {
@@ -112,6 +114,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
             }
         }
         self.references = references
+        referencesBySource = Dictionary(grouping: references, by: \.sourceID)
         self.edges = edges
         self.issues = issues
     }
@@ -130,7 +133,7 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 filename, (filename as NSString).deletingPathExtension]
     }
 
-    private static func itemID(_ text: String) -> UUID? {
+    private static func declaredID(_ text: String) -> UUID? {
         guard text.count == 36 else { return nil }
         return UUID(uuidString: text)
     }
@@ -151,6 +154,32 @@ nonisolated struct NoteConnectionIndex: Sendable {
               !title.unicodeScalars.contains(where: { $0 == "[" || $0 == "]" || $0 == "\n" || $0 == "\r" }) else { return nil }
         guard !baseName(title).isEmpty else { return nil }
         return title
+    }
+
+    /// The lines of a body that could hold a reference. A reference never crosses a line, so while these stay
+    /// the same, so do the body's references, and finding them takes one pass over the bytes rather than a match.
+    static func referenceLines(in body: String) -> [Substring] {
+        var lines: [Substring] = []
+        let bytes = body.utf8
+        var lineStart = bytes.startIndex
+        var holdsOpening = false
+        var previous: UInt8 = 0
+        var index = bytes.startIndex
+        while index != bytes.endIndex {
+            let byte = bytes[index]
+            if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") {
+                if holdsOpening { lines.append(body[lineStart..<index]) }
+                holdsOpening = false
+                lineStart = bytes.index(after: index)
+                previous = 0
+            } else {
+                if byte == UInt8(ascii: "[") && previous == UInt8(ascii: "[") { holdsOpening = true }
+                previous = byte
+            }
+            index = bytes.index(after: index)
+        }
+        if holdsOpening { lines.append(body[lineStart..<bytes.endIndex]) }
+        return lines
     }
 
     private static func bodyTargets(_ body: String) -> [String] {
