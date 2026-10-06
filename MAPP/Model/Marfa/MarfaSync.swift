@@ -25,6 +25,9 @@ actor MarfaSync {
     private var wantsBin = false
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
     private var refreshed = false
+    /// Set when a drain threw as an answer expired the copy. The answers wait in the queue until the copy is
+    /// hydrated again, since the engine reads again the items they changed, which an expired copy refuses.
+    private var answersWaiting = false
     private var working: Task<Void, Never>?
     private var retry: Task<Void, Never>?
     private var failures = 0
@@ -240,6 +243,8 @@ actor MarfaSync {
         } else {
             try await hydrate()
         }
+        // Kept until the queue has been read, so a read that fails is tried again by the next refresh.
+        if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
     }
 
     /// A drain on a copy never hydrated sends one write and then throws, losing that write's verdict, so it waits
@@ -270,8 +275,32 @@ actor MarfaSync {
                 break
             }
         } catch {
+            // An answered write that expires the copy, a source move or a retype, is recorded before the drain
+            // throws, and the throw loses the report, so the answers are read from the queue instead, once the
+            // refresh this asks for has hydrated the copy again.
+            if case MarfaError.copyExpired = error { answersWaiting = true }
             await failed(error, retrying: .drain)
         }
+    }
+
+    /// Each write the queue holds an answer for, as a drain would have reported it.
+    nonisolated static func report(answeredIn queue: [Marfa.QueuedWrite]) -> DrainReport {
+        let verdicts = queue.filter { $0.verdict != nil }.map {
+            DrainVerdict(
+                id: $0.id, kind: $0.kind, itemId: $0.itemId, edgeId: $0.edgeId, verdict: $0.verdict, refusals: $0.refusals)
+        }
+        return DrainReport(answered: UInt64(verdicts.count), verdicts: verdicts)
+    }
+
+    /// Whether the queue could be read, which says nothing of whether it held answers.
+    private func takeAnswersFromQueue() async -> Bool {
+        guard let queue = try? await copy.queue.all() else { return false }
+        let report = Self.report(answeredIn: queue)
+        guard !report.verdicts.isEmpty else { return true }
+        await withCheckedContinuation { taken in
+            if !tell(.drained(report, taken)) { taken.resume() }
+        }
+        return true
     }
 
     /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be

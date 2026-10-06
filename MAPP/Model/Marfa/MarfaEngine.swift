@@ -37,9 +37,14 @@ actor MarfaEngine {
         var message = MarfaEngine.filesOnly
     }
 
+    /// A write the package refused before queueing it, in the person's words.
+    private nonisolated struct Refused: Error {
+        var problem: SyncProblem
+    }
+
     /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
     /// version that edit was typed on, moved on by each answer to this device's writes of the item.
-    private nonisolated struct OwnText {
+    nonisolated struct OwnText: Equatable {
         var text: String
         var on: Int64
     }
@@ -92,8 +97,16 @@ actor MarfaEngine {
     /// Refused writes as last read, kept once the queue forgets those that carried no content, so each stays
     /// before the person until they discard it or a later write of its kind lands.
     private var refusals: [String: Marfa.QueuedWrite] = [:]
-    /// The item each conflicted copy was made from, as its verdict named it.
+    /// The item each conflicted copy was made from, as its verdict named it, which is known before the copy's link has reached the copy.
     private var originals: [String: String] = [:]
+    /// The item each conflicted copy was made from, and the copies each original has that are not in the bin, as
+    /// the package reads the copy's `derived-from` link: a copy and its original know each other from the copy
+    /// alone, offline and after a relaunch.
+    private var linkedOriginals: [String: String] = [:]
+    private var linkedCopies: [String: [String]] = [:]
+    /// The items an edge move touched, read again once its answer is taken: the two ends it left and the one it went
+    /// to, since a refusal puts the edge back and the answer names only its source.
+    private var movedEnds: [String: Set<String>] = [:]
     /// The app's write for each queued write it made, until every one of them is answered.
     private var submitted: [String: WriteID] = [:]
     private var outstanding: [WriteID: Set<String>] = [:]
@@ -251,6 +264,7 @@ actor MarfaEngine {
         for row in departed { await left(row) }
         bodyLinks = [:]
         for row in rows.values where Self.mayName(row, catalogue: catalogue) { await readLinks(of: row) }
+        await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
         await readQueue()
         publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
     }
@@ -330,8 +344,39 @@ actor MarfaEngine {
         } catch {
             failures.append(Self.failure(error))
         }
+        await readConflictLinks(affected)
         await readQueue()
         publish(affected.map { ItemID($0) })
+    }
+
+    /// Asks the package which item each of these rows, if a conflicted copy, was made from, and which copies each
+    /// of those originals has. A copy kept or binned, or one that left the copy, no longer links its original.
+    private func readConflictLinks(_ ids: Set<String>) async {
+        var originalsToRead: Set<String> = []
+        for id in ids {
+            guard let row = rows[id], row.state == .active, row.tags.contains(MarfaProblems.conflictedCopyTag) else {
+                if let previous = linkedOriginals.removeValue(forKey: id) { originalsToRead.insert(previous) }
+                continue
+            }
+            do {
+                let original = try await Self.asking(hub) { try await copy.items.original(ofConflictedCopy: id) }
+                if let previous = linkedOriginals[id], previous != original { originalsToRead.insert(previous) }
+                linkedOriginals[id] = original
+                if let original { originalsToRead.insert(original) }
+            } catch {
+                // What was read before stands.
+                continue
+            }
+        }
+        for original in originalsToRead {
+            do {
+                let copies = try await Self.asking(hub) { try await copy.items.conflictedCopies(of: original) }.map(\.id)
+                linkedCopies[original] = copies.isEmpty ? nil : copies
+            } catch {
+                continue
+            }
+        }
+        if !originalsToRead.isEmpty { restate() }
     }
 
     /// The server's bin, as the copy last said it: what it holds is the copy's to say, so only the rest is kept,
@@ -382,7 +427,11 @@ actor MarfaEngine {
     }
 
     private func restate() {
-        let states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
+        var states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
+        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch.
+        for (original, copies) in linkedCopies where states[ItemID(original)] == nil {
+            if let first = copies.first { states[ItemID(original)] = .conflicted(sibling: ItemID(first), fields: []) }
+        }
         changedSync.formUnion(Set(states.keys).union(syncStates.keys).filter { states[$0] != syncStates[$0] })
         syncStates = states
     }
@@ -454,9 +503,7 @@ actor MarfaEngine {
 
     private func conflictedCopies() -> [MarfaProblems.ConflictedCopy] {
         rows.values.filter { $0.state == .active && $0.tags.contains(MarfaProblems.conflictedCopyTag) }.map { row in
-            let derived = (edgesByItem[row.id] ?? []).compactMap { edges[$0] }
-                .first { $0.edgeType == MarfaProblems.derivedFromEdge && $0.sourceId == row.id }?.targetId
-            return MarfaProblems.ConflictedCopy(row: row, original: (originals[row.id] ?? derived).map { ItemID($0) })
+            MarfaProblems.ConflictedCopy(row: row, original: (linkedOriginals[row.id] ?? originals[row.id]).map { ItemID($0) })
         }
     }
 
@@ -580,19 +627,28 @@ actor MarfaEngine {
                     touched.insert(parent.rawValue)
                 }
             } else {
-                // An edge's ends are read before it goes, since its delete names only the edge.
+                // An edge's ends are read before it goes, since its delete names only the edge, and a move names
+                // only the end it goes to.
                 var ends: Set<String> = []
-                if case .unlink(let edgeID) = write, let edge = edges[edgeID.rawValue] {
-                    ends = [edge.sourceId, edge.targetId]
+                switch write {
+                case .unlink(let edgeID):
+                    if let edge = edges[edgeID.rawValue] { ends = [edge.sourceId, edge.targetId] }
+                case .moveEdge(let edgeID, _, let to):
+                    ends = [to.rawValue]
+                    if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.sourceId, edge.targetId]) }
+                default: break
                 }
                 let queued = try await Self.asking(hub) { try await queue(write) }
                 record(id, queued)
+                if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
             }
             await reread(touched)
             await sync.drain()
         } catch let error as Unsupported {
             hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message))))
+        } catch let error as Refused {
+            hub.publish(.answered(id, .refused(error.problem)))
         } catch let error as MarfaError {
             // Refused before it was queued, such as a property the type does not allow: nothing is waiting.
             hub.publish(.answered(id, .refused(Self.problem(for: error))))
@@ -614,7 +670,25 @@ actor MarfaEngine {
         }
     }
 
+    /// What the package refuses a move for before it queues anything, in the person's words: a self-loop, or a
+    /// type whose end that stays can hold more than one edge. Anything else is the package's own.
+    nonisolated static func moveProblem(_ error: MarfaError) -> SyncProblem? {
+        guard case .validation(let code, _) = error else { return nil }
+        switch code {
+        case "edge_cycle":
+            return SyncProblem(code: code, message: String(localized: "An item can’t be linked to itself."))
+        case "validation_error":
+            return SyncProblem(
+                code: code,
+                message: String(localized: "This link can’t be replaced by moving one end, because the item that stays can hold more than one."))
+        default:
+            return nil
+        }
+    }
+
+    /// A write that needed nothing queued, such as a move to the end the edge already holds, is taken at once.
     private func record(_ id: WriteID, _ queued: [Marfa.QueuedWrite]) {
+        guard !queued.isEmpty else { return hub.publish(.answered(id, .accepted)) }
         outstanding[id] = Set(queued.map(\.id))
         for written in queued { submitted[written.id] = id }
     }
@@ -677,6 +751,23 @@ actor MarfaEngine {
             ]
         case .unlink(let edgeID):
             return [try await copy.edges.delete(edgeID.rawValue)]
+        case .moveEdge(let edgeID, let end, let to):
+            guard let edge = edges[edgeID.rawValue] else {
+                throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."))
+            }
+            let move: EdgeEdit.Move = end == .source ? .source(to.rawValue) : .target(to.rawValue)
+            do {
+                // The copy's own version of the edge, since the move is refused on any other; an edge it shows
+                // moved by a move still waiting is read from its new ends.
+                let held = try await heldEdge(edge)
+                // The edge is already there, as when an undo follows a refused move. The package would queue an
+                // update that changes nothing, which the server refuses.
+                if (end == .source ? held.sourceId : held.targetId) == to.rawValue { return [] }
+                return [try await copy.edges.update(edge.id, EdgeEdit(baseVersion: held.version, move: move))]
+            } catch let error as MarfaError {
+                if let problem = Self.moveProblem(error) { throw Refused(problem: problem) }
+                throw error
+            }
         case .purge:
             preconditionFailure("a purge is made at the server by perform(_:as:)")
         case .move, .place:
@@ -883,27 +974,49 @@ actor MarfaEngine {
     /// sent as read on an older version, lands on whatever the server held, which the copy now shows with every
     /// answer taken so far. Any other answer leaves the item where it was.
     private func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
-        guard var own = ownText[id] else { return }
+        guard let own = ownText[id] else { return }
+        var taken = counted
+        ownText[id] = try await Self.counting(queue, for: id, own: own, counted: &taken, sentAsRead: sentAsRead) {
+            try await self.heldVersion(id)
+        }
+        counted.formUnion(taken)
+    }
+
+    /// `own` moved past the answers in `queue` not yet in `counted`. Each is put in `counted` only once its effect
+    /// is known, so an answer whose version cannot be read, as while the copy is hydrated again, is counted later.
+    nonisolated static func counting(
+        _ queue: [Marfa.QueuedWrite], for id: ItemID, own: OwnText, counted: inout Set<String>, sentAsRead: Set<String>,
+        held: () async throws -> Int64
+    ) async rethrows -> OwnText {
         let answered = queue.filter {
             $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict != nil
                 && !counted.contains($0.id)
         }
-        guard !answered.isEmpty else { return }
-        counted.formUnion(answered.map(\.id))
+        guard !answered.isEmpty else { return own }
         let landedElsewhere = answered.contains { write in
             if case .merged = write.verdict { return true }
             return write.verdict == .accepted && sentAsRead.contains(write.id)
         }
-        if landedElsewhere {
-            own.on = try await heldVersion(id)
-        } else {
-            own.on += Int64(answered.count { $0.verdict == .accepted })
-        }
-        ownText[id] = own
+        var own = own
+        own.on = landedElsewhere ? try await held() : own.on + Int64(answered.count { $0.verdict == .accepted })
+        counted.formUnion(answered.map(\.id))
+        return own
     }
 
     private func answeredWrites(of id: ItemID) async throws -> [String] {
         try await copy.queue.all().filter { $0.itemId == id.rawValue && $0.verdict != nil }.map(\.id)
+    }
+
+    private func heldEdge(_ edge: Marfa.Edge) async throws -> Marfa.Edge {
+        if let held = try await copy.edges.from(edge.sourceId).first(where: { $0.id == edge.id }) { return held }
+        if let held = try await copy.edges.to(edge.targetId).first(where: { $0.id == edge.id }) { return held }
+        if let held = try await copy.edges.ofType(edge.edgeType).first(where: { $0.id == edge.id }) { return held }
+        throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."))
+    }
+
+    private func hasLeft(_ raw: String) async -> Bool {
+        guard rows[raw] == nil else { return false }
+        return (try? await copy.items.get(raw)) == nil
     }
 
     private func heldVersion(_ id: ItemID) async throws -> Int64 {
@@ -932,6 +1045,7 @@ actor MarfaEngine {
         for answer in report.verdicts {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict, let outcome = MarfaMapping.outcome(verdict) else { continue }
+            ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
@@ -950,15 +1064,33 @@ actor MarfaEngine {
             answered(answer.id, outcome)
         }
         await reread(ids.union(await settledLinks()))
+        // An answer the person's text cannot yet be moved past stays in the queue, to be counted by the next save
+        // or the next answer, since forgetting it would leave the text on a version it has passed.
+        var uncounted = false
         if let queued = try? await copy.queue.all() {
-            for raw in Set(report.verdicts.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
-                try? await count(answers: queued, for: ItemID(raw))
+            for raw in Set(queued.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
+                do {
+                    try await count(answers: queued, for: ItemID(raw))
+                } catch {
+                    // An item the copy has let go, as when its delete was answered in this drain, has no version to
+                    // count against and never will, so its text is forgotten rather than holding every answer back.
+                    if await hasLeft(raw) {
+                        ownText[ItemID(raw)] = nil
+                        counted.formUnion(queued.filter { $0.itemId == raw }.map(\.id))
+                    } else {
+                        uncounted = true
+                    }
+                }
             }
+        } else {
+            uncounted = true
         }
-        do {
-            _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
-        } catch {
-            failures.append(Self.failure(error))
+        if !uncounted {
+            do {
+                _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
+            } catch {
+                failures.append(Self.failure(error))
+            }
         }
         if !leaving.isEmpty { await reread(leaving) }
         await readQueue()

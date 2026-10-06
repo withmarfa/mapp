@@ -233,6 +233,251 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    private static let note = TypeID("core.note")
+
+    /// Makes a parent and a child under it, queued in a copy no server answers, and waits until the child shows it.
+    private func parentAndChild(
+        _ source: MarfaSource, _ log: ChangeLog, _ names: String...
+    ) async throws -> [ItemID] {
+        let ids = names.map { _ in ItemID.mint() }
+        for (id, name) in zip(ids, names).dropLast() {
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST \(name)", body: "Queued")), as: WriteID())
+        }
+        let (child, name) = (try #require(ids.last), try #require(names.last))
+        source.submit(
+            .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST \(name)", body: "Queued", parent: ids[0])), as: WriteID())
+        _ = try #require(await log.wait { state in
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(ids[0]) } == true
+        })
+        return ids
+    }
+
+    /// A new parent is one queued update of the edge, shown at once and never a delete and a create, so the child
+    /// holds a parent the whole time.
+    @Test(.timeLimit(.minutes(1)))
+    func aMovedEdgeIsOneQueuedWriteShownAtItsNewEnd() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent one", "parent two", "moved child")
+        let (first, second, child) = (ids[0], ids[1], ids[2])
+        let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+
+        let write = WriteID()
+        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: write)
+        let moved = try #require(await log.wait { state in
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(second) } == true
+        })
+        let held = try #require(moved.snapshot?.items.first { $0.id == child }?.edgesOut)
+        #expect(!held.contains { $0.target == .item(first) })
+        #expect(held.count == 1)
+        let kinds = try await source.copy.queue.all().map(\.kind)
+        #expect(kinds.filter { $0 == .updateEdge }.count == 1)
+        #expect(!kinds.contains(.deleteEdge))
+        #expect(moved.answer(to: write) == nil)
+        await source.close()
+    }
+
+    /// What the package refuses before it queues anything is told in plain words, and nothing is queued.
+    @Test(.timeLimit(.minutes(1)))
+    func aMoveThePackageRefusesIsToldPlainlyAndQueuesNothing() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent", "other", "child")
+        let (parent, other, child) = (ids[0], ids[1], ids[2])
+        source.submit(.link(EdgeDraft(type: "references", source: parent, target: other), undoing: nil), as: WriteID())
+        let references = try #require(await Self.edge(of: "references", from: parent, in: source))
+        let parentOf = try #require(await Self.edge(of: MarfaMapping.parentEdge, from: parent, in: source))
+
+        // A type whose end that stays can hold many has no end to replace.
+        let notReplaceable = WriteID()
+        source.submit(.moveEdge(EdgeID(references.id), end: .target, to: child), as: notReplaceable)
+        // A move that would leave the edge running from an item to itself.
+        let selfLoop = WriteID()
+        source.submit(.moveEdge(EdgeID(parentOf.id), end: .source, to: child), as: selfLoop)
+        let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
+        let validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "")))
+        let cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "")))
+        #expect(answered.answer(to: notReplaceable) == .refused(validation))
+        #expect(answered.answer(to: selfLoop) == .refused(cycle))
+        #expect(try await source.copy.queue.all().filter { $0.kind == .updateEdge }.isEmpty)
+        // Both links are where they were.
+        let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
+        #expect(held.contains { $0.target == .item(parent) })
+        await source.close()
+    }
+
+    /// A move to the end the edge already holds, as an undo after a refused move makes, is taken at once and
+    /// queues nothing, since the server refuses an update that changes nothing.
+    @Test(.timeLimit(.minutes(1)))
+    func aMoveToTheEndTheEdgeHoldsIsTakenAndQueuesNothing() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent", "child")
+        let (parent, child) = (ids[0], ids[1])
+        let edge = try #require(await Self.edge(of: MarfaMapping.parentEdge, from: parent, in: source))
+        let before = try await source.copy.queue.all()
+
+        let write = WriteID()
+        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: write)
+        let answered = try #require(await log.wait { $0.answer(to: write) != nil })
+        #expect(answered.answer(to: write) == .accepted)
+        #expect(try await source.copy.queue.all().map(\.id) == before.map(\.id))
+        let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
+        #expect(held.contains { $0.target == .item(parent) })
+        await source.close()
+    }
+
+    /// An answer moves the person's text on only once its effect is known. One that landed elsewhere needs the
+    /// version the copy holds, which an expired copy cannot read, so it stays to be counted again.
+    @Test func anAnswerIsCountedOnlyOnceTheVersionItNeedsIsRead() async throws {
+        struct Unreadable: Error {}
+        func write(_ id: String, _ verdict: Marfa.Verdict) -> Marfa.QueuedWrite {
+            Marfa.QueuedWrite(
+                id: id, kind: .updateItem, itemId: "item", idempotencyKey: id, verdict: verdict,
+                queuedAt: "2026-10-06T00:00:00Z")
+        }
+        let queue = [write("merged", .merged(fields: ["body"])), write("taken", .accepted)]
+        let own = MarfaEngine.OwnText(text: "Mine", on: 3)
+        var counted: Set<String> = []
+        await #expect(throws: Unreadable.self) {
+            _ = try await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
+                throw Unreadable()
+            }
+        }
+        #expect(counted.isEmpty)
+
+        let moved = await MarfaEngine.counting(queue, for: ItemID("item"), own: own, counted: &counted, sentAsRead: []) {
+            9
+        }
+        #expect(moved.on == 9)
+        #expect(counted == ["merged", "taken"])
+        // Counted once, the same answers move it no further.
+        let again = await MarfaEngine.counting(queue, for: ItemID("item"), own: moved, counted: &counted, sentAsRead: []) {
+            12
+        }
+        #expect(again == moved)
+        // Accepted on the version it was sent on, an answer moves the text one version on without reading.
+        var fresh: Set<String> = []
+        let accepted = try await MarfaEngine.counting(
+            [write("taken", .accepted)], for: ItemID("item"), own: own, counted: &fresh, sentAsRead: []
+        ) { throw Unreadable() }
+        #expect(accepted.on == 4)
+    }
+
+    private static func edge(of type: String, from id: ItemID, in source: MarfaSource) async -> Marfa.Edge? {
+        _ = await LiveMarfa.until { ((try? await source.copy.edges.from(id.rawValue)) ?? []).contains { $0.edgeType == type } }
+        return try? await source.copy.edges.from(id.rawValue).first { $0.edgeType == type }
+    }
+
+    /// A source move the server accepts expires the copy as the drain answers it, and the drain throws without its
+    /// report. The answers are read from the queue instead, once the copy is hydrated again, so the person's write is
+    /// answered and nothing queued is lost.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyExpiredByAMoveKeepsEveryQueuedWriteAndTheView() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent one", "parent two", "kept child")
+        let (first, second, child) = (ids[0], ids[1], ids[2])
+        let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+        let write = WriteID()
+        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: write)
+        _ = try #require(await log.wait { state in
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(second) } == true
+        })
+        let queued = try await source.copy.queue.all()
+        let move = try #require(queued.first { $0.kind == .updateEdge })
+
+        // The server's answer, as the queue records it before the drain throws.
+        let answered = Marfa.QueuedWrite(
+            id: move.id, kind: .updateEdge, itemId: move.itemId, edgeId: edge.id, idempotencyKey: move.idempotencyKey,
+            verdict: .accepted, queuedAt: move.queuedAt)
+        let report = MarfaSync.report(answeredIn: queued.filter { $0.id != move.id } + [answered])
+        #expect(report.verdicts.map(\.id) == [move.id])
+        #expect(report.answered == 1)
+        await withCheckedContinuation { taken in source.events.yield(.drained(report, taken)) }
+        _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
+
+        // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
+        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
+        source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
+        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        let after = try await source.copy.queue.all()
+        #expect(Set(after.map(\.id)) == Set(queued.map(\.id)))
+        let shown = try #require(log.current.snapshot?.items.first { $0.id == child })
+        #expect(shown.edgesOut.contains { $0.target == .item(second) })
+        #expect(shown.sync != .settled)
+        await source.close()
+    }
+
+    @Test func aDrainThatThrewAfterAnAnswerIsReportedFromTheQueue() {
+        func write(_ id: String, verdict: Marfa.Verdict?) -> Marfa.QueuedWrite {
+            Marfa.QueuedWrite(
+                id: id, kind: .updateEdge, itemId: "item", edgeId: "edge", idempotencyKey: id, verdict: verdict,
+                queuedAt: "2026-10-06T00:00:00Z")
+        }
+        let report = MarfaSync.report(answeredIn: [write("sent", verdict: .accepted), write("waiting", verdict: nil)])
+        #expect(report.verdicts.map(\.id) == ["sent"])
+        #expect(report.verdicts.first?.kind == .updateEdge)
+        #expect(report.verdicts.first?.edgeId == "edge")
+        #expect(report.answered == 1)
+        #expect(MarfaSync.report(answeredIn: []).verdicts.isEmpty)
+    }
+
+    /// The package names the item a conflicted copy was made from, from the copy alone, so the two know each other
+    /// without a server and without the verdict that made the copy.
+    @Test(.timeLimit(.minutes(1)))
+    func aConflictedCopyIsShownBesideItsOriginal() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let original = ItemID.mint(), copy = ItemID.mint(), bystander = ItemID.mint()
+        for (id, title) in [(original, "original"), (bystander, "bystander")] {
+            source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST \(title)", body: "Queued")), as: WriteID())
+        }
+        source.submit(
+            .create(id: copy, ItemDraft(
+                type: Self.note, title: "MAPPTEST original (conflicted copy)", body: "Mine", tags: [MarfaProblems.conflictedCopyTag])),
+            as: WriteID())
+        // Tagged, but not yet linked: no original is known.
+        _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == copy } != nil })
+        #expect(log.current.snapshot?.items.first { $0.id == original }?.sync != .conflicted(sibling: copy, fields: []))
+        source.submit(.link(EdgeDraft(type: "derived-from", source: copy, target: original), undoing: nil), as: WriteID())
+        let linked = try #require(await log.wait { state in
+            if case .conflicted(let sibling, _)? = state.snapshot?.items.first(where: { $0.id == original })?.sync {
+                sibling == copy
+            } else {
+                false
+            }
+        })
+        // Another item the copy was not made from is untouched.
+        #expect(linked.snapshot?.items.first { $0.id == bystander }?.sync != nil)
+        if case .conflicted? = linked.snapshot?.items.first(where: { $0.id == bystander })?.sync {
+            Issue.record("an item the copy was not made from shows a conflict")
+        }
+        #expect(await LiveMarfa.until {
+            source.syncReport.problems.contains { entry in
+                if case .conflicted(let sibling, let from) = entry.kind { sibling == copy && from == original } else { false }
+            }
+        })
+        #expect(try await source.copy.items.original(ofConflictedCopy: copy.rawValue) == original.rawValue)
+        #expect(try await source.copy.items.conflictedCopies(of: original.rawValue).map(\.id) == [copy.rawValue])
+        await source.close()
+    }
+
     @Test func aWriteToACopyBeingBroughtUpToDateIsRefusedPlainly() {
         for error in [
             MarfaError.hydrationIncomplete(message: "hydration did not complete; hydrate again before reading"),
@@ -587,6 +832,24 @@ extension LiveMarfaTests {
                 return
             }
             await source.close()
+
+            // The answer is forgotten by now; the copy and its original still know each other, from the copy alone.
+            let relaunched = try await MarfaSource.open(connection, keys: keys, location: location)
+            let relaunchedLog = ChangeLog(relaunched)
+            let painted = try #require(await relaunchedLog.wait { $0.snapshot != nil })
+            guard case .conflicted(let copy?, _)? = painted.snapshot?.items.first(where: { $0.id == a })?.sync else {
+                Issue.record("the original does not show its copy after the answer was forgotten")
+                await relaunched.close()
+                return
+            }
+            #expect(copy.rawValue == sibling)
+            #expect(try await relaunched.copy.items.original(ofConflictedCopy: copy.rawValue) == a.rawValue)
+            #expect(await LiveMarfa.until {
+                relaunched.syncReport.problems.contains { entry in
+                    if case .conflicted(let shown, let from) = entry.kind { shown == copy && from == a } else { false }
+                }
+            })
+            await relaunched.close()
         }
 
         /// A second drain forgetting answers the engine has not taken yet could lose them, so the next drain waits.
@@ -616,6 +879,81 @@ extension LiveMarfaTests {
                 #expect(await LiveMarfa.until { await source.engine.sync.drains == before + 2 })
                 source.submit(.transition(id, .trashed), as: WriteID())
                 await source.flush()
+            }
+        }
+
+        /// A new parent is one move the server takes in one write. It changes the copy's read view, so the drain
+        /// throws as it answers, and the copy hydrates again: the move is answered, the child is under its new parent,
+        /// and a write queued behind the move is sent and answered too.
+        @Test(.timeLimit(.minutes(2)))
+        func aMovedParentIsAnsweredAndTheCopyHydratesAgainKeepingTheQueue() async throws {
+            try await withSource { source, log, made in
+                let token = UUID().uuidString.prefix(8)
+                let first = made.mint(), second = made.mint(), child = made.mint()
+                let creates = [first, second].map { _ in WriteID() }
+                for (id, write) in zip([first, second], creates) {
+                    source.submit(.create(id: id, ItemDraft(type: Self.note, title: "MAPPTEST parent \(id.rawValue) \(token)", body: "One")), as: write)
+                }
+                source.submit(
+                    .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST moved \(token)", body: "One", parent: first)),
+                    as: WriteID())
+                _ = try #require(await log.wait { state in
+                    state.snapshot?.items.first { $0.id == child }?.sync == .settled
+                        && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(first) } == true
+                })
+                await source.flush()
+                let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+
+                let move = WriteID(), tagged = WriteID()
+                source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: move)
+                source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
+                let done = try #require(await log.wait(for: .seconds(60)) { state in
+                    state.answer(to: move) != nil && state.answer(to: tagged) != nil
+                        && state.snapshot?.items.first { $0.id == child }?.sync == .settled
+                })
+                #expect(done.answer(to: move) == .accepted)
+                #expect(done.answer(to: tagged) == .accepted)
+                // The answers are told once the copy is hydrated again, so reading the moved ends fails nowhere.
+                #expect(!done.changes.contains { if case .unavailable = $0 { true } else { false } })
+                let moved = try #require(done.snapshot?.items.first { $0.id == child })
+                #expect(moved.edgesOut.contains { $0.target == .item(second) })
+                #expect(!moved.edgesOut.contains { $0.target == .item(first) })
+                #expect(moved.isFavorite)
+                #expect(try await source.copy.edges.from(second.rawValue).contains { $0.targetId == child.rawValue })
+                #expect(try await source.copy.queue.all().isEmpty)
+                #expect(await waitForConnection(source) { $0 == .online })
+            }
+        }
+
+        /// A cycle through other edges is the server's to judge: it refuses the move, and the edge is where it was.
+        @Test(.timeLimit(.minutes(2)))
+        func aMoveThatClosesACycleIsRefusedAndTheEdgeStays() async throws {
+            try await withSource { source, log, made in
+                let token = UUID().uuidString.prefix(8)
+                let a = made.mint(), b = made.mint(), c = made.mint()
+                source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MAPPTEST cycle a \(token)", body: "One")), as: WriteID())
+                source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MAPPTEST cycle b \(token)", body: "One", parent: a)), as: WriteID())
+                source.submit(.create(id: c, ItemDraft(type: Self.note, title: "MAPPTEST cycle c \(token)", body: "One", parent: b)), as: WriteID())
+                _ = try #require(await log.wait { state in
+                    [b, c].allSatisfy { id in
+                        state.snapshot?.items.first { $0.id == id }.map { $0.sync == .settled && !$0.edgesOut.isEmpty } == true
+                    }
+                })
+                await source.flush()
+                let edge = try #require(try await source.copy.edges.from(a.rawValue).first { $0.targetId == b.rawValue })
+                // `c` is below `b`, so it cannot become `b`'s parent.
+                let move = WriteID()
+                source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: c), as: move)
+                let refused = try #require(await log.wait(for: .seconds(60)) { $0.answer(to: move) != nil })
+                guard case .refused(let problem)? = refused.answer(to: move) else {
+                    Issue.record("the move was answered \(String(describing: refused.answer(to: move)))")
+                    return
+                }
+                #expect(problem.code == "edge_cycle")
+                _ = try #require(await log.wait { state in
+                    state.snapshot?.items.first { $0.id == b }?.edgesOut.contains { $0.target == .item(a) } == true
+                })
+                #expect(try await source.copy.edges.from(a.rawValue).contains { $0.targetId == b.rawValue })
             }
         }
 

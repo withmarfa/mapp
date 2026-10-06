@@ -69,13 +69,14 @@ import Testing
         #expect(source.writes.last == .editBody(F.n1, "Theirs!", base: ItemVersion(5), merge: .asRead))
     }
 
-    /// Replacing an end that holds one link would be two writes, and when the second is refused the first has
-    /// already removed the old link. Until the package can move an edge's end in one write, it is refused whole.
-    @Test func aReplacementIsRefusedRatherThanHalfMade() async throws {
+    /// Replacing an end that holds one link would be two writes if it were a delete and a create, and when the
+    /// create is refused the delete has already removed the old link. It is one move of the edge's end instead, so a
+    /// refusal leaves the edge where it was.
+    @Test func aReplacementIsOneMoveRatherThanTwoWrites() async throws {
         let (library, source) = try await loaded()
-        #expect(!library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.p2], undoManager: nil))
-        #expect(source.writes.isEmpty, "replacement sent as \(source.writes)")
-        #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
+        #expect(library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.p2], undoManager: nil))
+        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)], "replacement sent as \(source.writes)")
+        #expect(library.failure == nil)
     }
 
     /// Choosing one item in place of another on a field that holds many adds the new link first and removes the old
