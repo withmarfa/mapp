@@ -42,6 +42,29 @@ struct OutsideChangeTests {
         #expect(library.folder(try #require(moved.folderID))?.name == "Home")
     }
 
+    @Test func aFileRenamedOutsideKeepsItsIdentifierWhenAnotherTakesItsName() async throws {
+        let shopping = try #require(note(at: "Shopping.md"))
+        try FileManager.default.moveItem(at: root.url.appending(path: "Shopping.md"), to: root.url.appending(path: "Groceries.md"))
+        try root.write("A new list\n", to: "Shopping.md")
+        await library.reread()
+        #expect(library.note(shopping.id)?.path == "Groceries.md")
+        #expect(library.note(shopping.id)?.body == "Shopping\n")
+        let newcomer = try #require(note(at: "Shopping.md"))
+        #expect(newcomer.id != shopping.id)
+        #expect(newcomer.body == "A new list\n")
+    }
+
+    @Test func aFolderRenamedOutsideKeepsItsIdentifierAndItsNotes() async throws {
+        let plan = try #require(note(at: "Work/Plan.md"))
+        let work = try #require(library.folders.first { $0.name == "Work" })
+        try FileManager.default.moveItem(at: root.url.appending(path: "Work"), to: root.url.appending(path: "Office"))
+        await library.reread()
+        #expect(library.folders.map(\.id) == [work.id])
+        #expect(library.folder(work.id)?.name == "Office")
+        #expect(library.note(plan.id)?.path == "Office/Plan.md")
+        #expect(library.note(plan.id)?.folderID == work.id)
+    }
+
     @Test func filesAddedAndDeletedOutsideComeAndGo() async throws {
         let shopping = try #require(note(at: "Shopping.md"))
         try root.write("Written by an agent\n", to: "Agent.md")
