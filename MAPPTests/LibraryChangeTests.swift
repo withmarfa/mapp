@@ -120,7 +120,33 @@ struct DraftHandoverTests {
         #expect(browser.isCreatingItem)
         #expect(browser.itemDraft?.title == "Trip")
         #expect(browser.itemDraft?.body == "Book the hotel")
+        #expect(browser.itemDraft?.parentID == parent, "nothing is changed until the person can be told")
+
+        browser.fitDraft(to: new)
         #expect(browser.itemDraft?.parentID == nil, "a parent the new library does not have is dropped, not kept dangling")
+        #expect(new.failure?.title == "New Item Changed")
+        #expect(new.failure?.message.contains("parent") == true)
+    }
+
+    /// The library a window moves to has not loaded when the window adopts it, as after a copy opens again, so a
+    /// parent the same copy still holds is kept.
+    @Test func aDraftIsFittedOnlyOnceTheNewLibraryHasLoaded() throws {
+        let parentItem = FakeItemLibrary.note("Holiday", modified: start)
+        let old = FakeItemLibrary(items: [parentItem], now: start)
+        let new = FakeItemLibrary(now: start)
+        new.isLoaded = false
+        let browser = browser(typing: "Trip", in: old, parent: parentItem.id)
+        browser.adopt(old)
+
+        browser.adopt(new)
+        #expect(browser.fitDraft(to: new) == nil)
+        #expect(browser.itemDraft?.parentID == parentItem.id, "a library still loading lacks nothing yet")
+
+        new.items = [parentItem]
+        new.isLoaded = true
+        #expect(browser.fitDraft(to: new) == nil, "nothing changed, so nothing is told")
+        #expect(browser.itemDraft?.parentID == parentItem.id)
+        #expect(new.failure == nil)
     }
 
     @Test func theFirstLibraryAWindowIsShownLeavesItAsItWas() {
@@ -132,6 +158,51 @@ struct DraftHandoverTests {
         browser.adopt(library)
         #expect(browser.selection == [library.items[0].id])
         #expect(browser.sidebarItem == .favorites)
+    }
+
+    /// The app lets go of the library it left as it makes the next, so the window holds the one it showed until
+    /// it is shown another, and can still ask it about the create.
+    @Test func aDraftTheLibraryLeftHoldsIsNotCarriedEvenOnceTheAppHasLetThatLibraryGo() throws {
+        let browser = Browser()
+        do {
+            let old = FakeItemLibrary(now: start)
+            old.holdsCreations = true
+            browser.adopt(old)
+            browser.startItemDraft()
+            browser.itemDraft?.title = "Trip"
+            _ = try #require(browser.createDraft(in: old, undoManager: nil))
+            old.deliverCreated()
+        }
+
+        browser.adopt(FakeItemLibrary(now: start))
+        #expect(browser.itemDraft == nil, "carrying it would make the item twice")
+        #expect(!browser.isCreatingItem)
+    }
+
+    /// A create still awaited when the copy opens again is in the queue the new library reads, so the window
+    /// waits for that library and hands over to the item, rather than give back a draft a second Return would
+    /// make again.
+    @Test func aCreateAwaitedWhileTheCopyOpensAgainHandsOverToTheItemTheNewLibraryShows() throws {
+        let old = FakeItemLibrary(now: start)
+        old.holdsCreations = true
+        let browser = browser(typing: "Trip", in: old)
+        browser.adopt(old)
+        let id = try #require(browser.createDraft(in: old, undoManager: nil))
+        let new = FakeItemLibrary(now: start)
+        new.isLoaded = false
+
+        browser.adopt(new)
+        #expect(browser.isAwaitingCreation, "the draft stays sent while the new library loads")
+        #expect(browser.createDraft(in: new, undoManager: nil) == id, "a second Return makes nothing more")
+        #expect(!browser.isCreationSettled(in: new))
+
+        new.items = old.created
+        new.isLoaded = true
+        #expect(browser.isCreationSettled(in: new))
+        browser.finishCreation(in: new)
+        #expect(browser.selection == [id])
+        #expect(browser.itemDraft == nil)
+        #expect(!browser.isCreatingItem)
     }
 
     @Test func aDraftTheLibraryLeftHoldsIsNotCarriedBecauseItsTextIsInThatLibrary() throws {
@@ -205,7 +276,12 @@ struct DraftHandoverTests {
         browser.itemDraft?.typeID = "aic.task"
         browser.adopt(old)
         browser.adopt(new)
+        #expect(browser.itemDraft?.typeID == "aic.task", "nothing is changed until the person can be told")
+
+        browser.fitDraft(to: new)
         #expect(browser.itemDraft?.typeID == "core.note")
+        #expect(new.failure?.title == "New Item Changed")
+        #expect(new.failure?.message == "The library now open doesn’t have the kind of item you chose, so your new item is a note. Check it before you create it.")
     }
 
     // MARK: Files

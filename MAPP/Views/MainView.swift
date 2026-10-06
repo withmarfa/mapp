@@ -149,7 +149,7 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
-            browser.itemDraft?.adopt(library)
+            browser.fitDraft(to: library)
             if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
         }
         // A new item reaches a server's library when its source says so, which the draft page waits for.
