@@ -198,7 +198,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
 
     /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
     /// a time.
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemSearchHit] {
+    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
         var filters = SearchFilters(tags: query.tags.sorted(), beneath: query.beneath?.rawValue)
         if query.types.count == 1, query.includesSubtypes { filters.type = query.types.first?.rawValue }
         if query.states.count == 1, let state = query.states.first {
@@ -218,7 +218,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         return hits.compactMap { hit in
             let id = ItemID(hit.item.id)
             guard let item = items[id], query.matches(item, catalogue: catalogue, descendants: beneath) else { return nil }
-            return ItemSearchHit(id: id, snippet: MarfaSnippet.plainText(hit.snippet))
+            return id
         }
     }
 

@@ -55,13 +55,6 @@ nonisolated struct Embed: Hashable, Sendable {
     let name: String
 }
 
-/// One item a search found, with the words around what was found as plain text.
-nonisolated struct ItemSearchHit: Hashable, Sendable {
-    let id: ItemID
-    /// Empty where the source gives none.
-    var snippet = ""
-}
-
 nonisolated protocol EmbedResolver: Sendable {
     /// The base the page resolves the item's relative references against.
     func base(for item: ItemID) -> String
@@ -82,7 +75,7 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
     func fileURL(of item: ItemID) async throws -> URL
     /// Best match first.
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemSearchHit]
+    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
     /// A files source renames the file to follow its first line here, so a rename is one change, not one per word.
     func endEditing(_ item: ItemID)
     func flush() async

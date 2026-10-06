@@ -174,9 +174,9 @@ extension MarfaLibrary {
 
     // MARK: Writing
 
-    /// Makes the field link `id` to exactly `targetIDs`. An item that writes the edge and may hold only one gives
-    /// up the one it has, as choosing a new parent replaces the old one; an item at the other end that may be
-    /// pointed at only once, such as what one item supersedes, is refused while another points at it.
+    /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed
+    /// freely. Replacing the one link an end may hold, such as a new parent, is a move of the edge's other end,
+    /// which is refused until it can be made as one write.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
@@ -188,8 +188,9 @@ extension MarfaLibrary {
             return false
         }
         let current = others(of: id, end)
-        var removing = current.filter { !targetIDs.contains($0) }.map { draft(id, $0, end) }
+        let removing = current.filter { !targetIDs.contains($0) }.map { draft(id, $0, end) }
         var adding: [EdgeDraft] = []
+        var replacing = false
         for other in targetIDs where !current.contains(other) {
             let link = draft(id, other, end)
             let farType: TypeID? = self.item(other).flatMap { $0.state == .trashed ? nil : $0.type }
@@ -201,22 +202,28 @@ extension MarfaLibrary {
             }
             let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
             let farHolds = end.isInverse ? end.info.cardinality : end.info.reverseCardinality
-            let taken = others(of: other, farEnd).filter { $0 != id }
-            if farHolds == .one, !taken.isEmpty {
+            if farHolds == .one, !others(of: other, farEnd).filter({ $0 != id }).isEmpty {
                 guard end.isInverse else {
                     failure = (cantChange, String(localized: "The item chosen is already linked this way, and can be only once."))
                     return false
                 }
-                removing += taken.map { draft(other, $0, farEnd) }
+                replacing = true
             }
             adding.append(link)
+        }
+        if holds == .one, !removing.isEmpty, !adding.isEmpty { replacing = true }
+        // The contract moves the other end of the edge an end holds (edges.md 10 and 14), in one write the package
+        // cannot make yet. An unlink then a link could leave the old link gone and the new one refused, so this is
+        // where a move goes once it can be made.
+        guard !replacing else {
+            failure = (cantChange, String(localized: "Changing this link isn’t available yet in a Marfa library."))
+            return false
         }
         guard !removing.isEmpty || !adding.isEmpty else { return true }
         relink(adding: adding, removing: removing, name: String(localized: "Edit Relationship"), undoManager: undoManager)
         return true
     }
 
-    /// Removals go first, so an end that holds one edge is free before the new one arrives.
     private func relink(adding: [EdgeDraft], removing: [EdgeDraft], name: String, undoManager: UndoManager?) {
         let title = String(localized: "Can’t Change This Relationship")
         for draft in removing {

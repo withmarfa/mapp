@@ -42,11 +42,14 @@ import Observation
     @ObservationIgnored private var searches: [String: Search] = [:]
     @ObservationIgnored private var searchOrder: [String] = []
     /// What the last search to finish found, shown while the next one runs so the list does not empty per key.
-    @ObservationIgnored private var lastFound: [ItemSearchHit] = []
+    @ObservationIgnored private var lastFound: [ItemID] = []
     /// Text writes the source has not answered, by item. While any wait, the text the person gave is what the
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
+    /// Items the person has saved text to since the library last gave out text it read from the copy. Only the
+    /// first save after that read is merged against what was read; the rest are laid over the person's own.
+    @ObservationIgnored private var savedSinceRead: Set<ItemID> = []
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
@@ -68,7 +71,7 @@ import Observation
 
     private nonisolated struct Search {
         var revision: Int
-        var hits: [ItemSearchHit]
+        var hits: [ItemID]
         var running: Bool
     }
 
@@ -215,10 +218,14 @@ import Observation
         membershipRevision += 1
     }
 
-    /// Text read while the person's own text is still on its way is older than what the library holds.
+    /// Text read while the person's own text is still on its way is older than what the library holds. Text
+    /// taken in is a new read: the page follows `body(of:)` and shows it, so the next save starts from it, and
+    /// where the server kept its own text over the person's, the page shows the server's.
     private func hold(_ bodies: [ItemBody]) {
         for body in bodies where unsettledText[body.id] == nil {
-            if let record = records[body.id], record.body != body { record.body = body }
+            guard let record = records[body.id], record.body != body else { continue }
+            record.body = body
+            savedSinceRead.remove(body.id)
         }
     }
 
@@ -262,8 +269,14 @@ import Observation
         return id
     }
 
-    /// The text the person gave is held at once, at the version it was edited from, until the source answers.
-    func holdText(_ text: String, of id: ItemID, base: ItemVersion, write: WriteID) {
+    /// The person's text, edited from the version of the text last read. The first save after a read is merged
+    /// against that version where the copy has moved on; every later one is laid over the person's own, so their
+    /// saves never come back conflicted against each other. The text is held at once until the source answers.
+    func saveText(_ text: String, of id: ItemID, failing title: String) {
+        let base = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
+        let merge: BodyMerge = savedSinceRead.contains(id) ? .following : .asRead
+        let write = submit(.editBody(id, text, base: base, merge: merge), failing: title)
+        savedSinceRead.insert(id)
         unsettledText[id, default: []].insert(write)
         textWrites[write] = id
         records[id]?.body = ItemBody(id: id, text: text, version: base)
@@ -384,30 +397,34 @@ import Observation
         let revision = contentRevision
         let held = searches[query]
         if held.map({ $0.revision != revision && !$0.running }) ?? true { startSearch(query, at: revision) }
-        return (held?.hits ?? lastFound).compactMap { hit in
-            records[hit.id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
+        return (held?.hits ?? lastFound).compactMap { id in
+            records[id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
         }
     }
 
-    func search(_ query: String) async throws -> [SearchMatch] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        return try await source.search(query, in: Self.searchScope).compactMap { hit in
-            guard let item = item(hit.id), item.state != .trashed else { return nil }
-            return SearchMatch(item: item, snippet: hit.snippet.isEmpty ? item.preview : hit.snippet)
-        }
-    }
-
+    /// A search that fails keeps the results already shown and says why, rather than showing that nothing was
+    /// found; it is not asked again until the items change.
     private func startSearch(_ query: String, at revision: Int) {
         searches[query, default: Search(revision: revision, hits: [], running: true)].running = true
         searchOrder.removeAll { $0 == query }
         searchOrder.append(query)
         while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
         Task { [weak self, source] in
-            let hits = (try? await source.search(query, in: Self.searchScope)) ?? []
+            let found: Result<[ItemID], any Error>
+            do {
+                found = .success(try await source.search(query, in: Self.searchScope))
+            } catch {
+                found = .failure(error)
+            }
             guard let self else { return }
-            searches[query] = Search(revision: revision, hits: hits, running: false)
-            lastFound = hits
+            switch found {
+            case .success(let hits):
+                searches[query] = Search(revision: revision, hits: hits, running: false)
+                lastFound = hits
+            case .failure(let error):
+                searches[query] = Search(revision: revision, hits: searches[query]?.hits ?? lastFound, running: false)
+                failure = (String(localized: "Can’t Search"), error.localizedDescription)
+            }
             searchRevision += 1
         }
     }

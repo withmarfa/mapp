@@ -36,16 +36,9 @@ extension MarfaLibrary {
 
     // MARK: Text
 
-    /// Edited from the version of the text the page was given; the source sends it as an update when the copy is
-    /// still at that version, and otherwise asks the server to merge it against what was read.
     func updateBody(of id: ItemID, to body: String) {
-        guard let item = item(id), item.isWritable else { return }
-        let held = self.body(of: id)
-        guard held?.text != body else { return }
-        let base = held?.version ?? item.version
-        let write = submit(
-            .editBody(id, body, base: base, merge: .asRead), failing: String(localized: "Couldn’t Save “\(item.title)”"))
-        holdText(body, of: id, base: base, write: write)
+        guard let item = item(id), item.isWritable, self.body(of: id)?.text != body else { return }
+        saveText(body, of: id, failing: String(localized: "Couldn’t Save “\(item.title)”"))
     }
 
     func leave(_ id: ItemID) {

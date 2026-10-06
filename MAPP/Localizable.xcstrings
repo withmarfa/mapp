@@ -1060,6 +1060,18 @@
     },
     "Files": {
       "extractionState": "manual"
+    },
+    "Can’t Search": {
+      "extractionState": "manual"
+    },
+    "Changing this link isn’t available yet in a Marfa library.": {
+      "extractionState": "manual"
+    },
+    "This item changed elsewhere, so your changes were saved as a copy.": {
+      "extractionState": "manual"
+    },
+    "Open Copy": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
