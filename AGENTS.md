@@ -29,7 +29,7 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 ## Versions
 
 - A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Agents create the tag when a release is called.
-- Every version is `0.0.x` until the first public release, because WithMarfa keeps every version inside its code at 0 until then. Each release is the previous tag plus `0.0.1`; the next TestFlight build is `0.0.5`, after `0.0.4`.
+- Every version is `0.0.x` until the first public release, because WithMarfa keeps every version inside its code at 0 until then. Each release is the latest tag plus `0.0.1`, so `v0.0.5` follows `v0.0.4`.
 - Agents never write a version into a file: `MARKETING_VERSION` stays `0.0.0` in the repository, since `ci_scripts/ci_post_clone.sh` sets it from the tag in the cloud copy only.
 
 ## Layout
