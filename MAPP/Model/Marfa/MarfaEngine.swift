@@ -676,8 +676,7 @@ actor MarfaEngine {
         guard case .validation(let code, _) = error else { return nil }
         switch code {
         case "edge_cycle":
-            return SyncProblem(
-                code: code, message: String(localized: "This would link the item back to itself through the items between them."))
+            return SyncProblem(code: code, message: String(localized: "An item can’t be linked to itself."))
         case "validation_error":
             return SyncProblem(
                 code: code,

@@ -236,7 +236,7 @@ extension MarfaLibrary {
         var change = RelationshipChange(removing: removing.map { draft(id, $0, end) })
         let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
         let farHolds = end.info.cardinality(atTarget: !end.atTarget)
-        // The edge's far end, where it sits at the target, is the one a move would replace.
+        // Replacing this item's own link moves the far end; taking another item's link moves this item's end.
         let farIsTarget = !end.atTarget
         let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
         for other in adding {
