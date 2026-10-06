@@ -44,7 +44,7 @@ actor MarfaEngine {
     private var syncStates: [ItemID: SyncState] = [:]
     private var changedSync: Set<ItemID> = []
     /// Refusals and conflicts a drain answered, which the queue forgets unless the write carried content, kept until
-    /// a later write of the same kind, or an edit, is taken.
+    /// a later write of the same kind, or an edit, is accepted or merged.
     private var remembered: [ItemID: (state: SyncState, kind: WriteKind)] = [:]
     /// The app's write for each queued write it made, until every one of them is answered.
     private var submitted: [String: WriteID] = [:]
