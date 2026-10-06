@@ -23,6 +23,32 @@ enum ItemFileResolution: Equatable {
     }
 }
 
+/// Which item's file is shown. Each load names its item, and only the latest load is shown, so a slow answer
+/// for one item, as from a Try Again before the window moved on, never shows or shares under another.
+@Observable final class ItemFileLoader {
+    private(set) var shown: (id: ItemID, resolution: ItemFileResolution)?
+    @ObservationIgnored private var latest = 0
+
+    func resolution(of id: ItemID) -> ItemFileResolution? {
+        shown.flatMap { $0.id == id ? $0.resolution : nil }
+    }
+
+    /// The item's file as this load found it, or nil where a later load has taken its place.
+    func load(_ id: ItemID, in library: any ItemLibrary) async -> ItemFileResolution? {
+        latest += 1
+        let load = latest
+        if let atHand = ItemFileResolution.atHand(id, in: library) {
+            shown = (id, atHand)
+            return atHand
+        }
+        shown = nil
+        let fetched = await ItemFileResolution.fetch(id, in: library)
+        guard load == latest, !Task.isCancelled else { return nil }
+        shown = (id, fetched)
+        return fetched
+    }
+}
+
 /// A file item's file, shown as soon as it is at hand and fetched where it is not. A library without files has
 /// nothing to show, and says so.
 struct ItemFileView: View {
@@ -31,11 +57,11 @@ struct ItemFileView: View {
     /// Told where the file is once it is, and nil when it is not, so a window can offer to share it.
     var onResolved: (URL?) -> Void = { _ in }
 
-    @State private var resolution: ItemFileResolution?
+    @State private var loader = ItemFileLoader()
 
     var body: some View {
         Group {
-            switch resolution {
+            switch loader.resolution(of: id) {
             case nil:
                 ProgressView("Getting File…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -57,15 +83,7 @@ struct ItemFileView: View {
     }
 
     private func load() async {
-        if let atHand = ItemFileResolution.atHand(id, in: library) {
-            resolution = atHand
-        } else {
-            resolution = nil
-            onResolved(nil)
-            let fetched = await ItemFileResolution.fetch(id, in: library)
-            guard !Task.isCancelled else { return }
-            resolution = fetched
-        }
-        if case .ready(let url) = resolution { onResolved(url) }
+        onResolved(nil)
+        if case .ready(let url) = await loader.load(id, in: library) { onResolved(url) }
     }
 }

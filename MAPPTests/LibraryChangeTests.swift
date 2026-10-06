@@ -242,6 +242,24 @@ struct DraftHandoverTests {
         #expect(await ItemFileResolution.fetch(.mint(), in: library) == .failed)
     }
 
+    /// A fetch still running for one item, as from Try Again, never shows its file under the next item.
+    @Test func aLateFileForAnEarlierItemIsNeverShownUnderTheNext() async {
+        let library = FakeItemLibrary(now: start)
+        let a = ItemID.mint(), b = ItemID.mint()
+        let urlA = URL(filePath: "/tmp/a.pdf"), urlB = URL(filePath: "/tmp/b.pdf")
+        library.fetchable = [a: urlA, b: urlB]
+        library.fetchDelay[a] = .milliseconds(300)
+        let loader = ItemFileLoader()
+
+        let late = Task { await loader.load(a, in: library) }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await loader.load(b, in: library) == .ready(urlB))
+        #expect(await late.value == nil, "the earlier load gave way to the later one")
+        #expect(loader.resolution(of: b) == .ready(urlB))
+        #expect(loader.resolution(of: a) == nil)
+        #expect(loader.shown?.id == b)
+    }
+
     @Test func sharingUsesTheFileAtHandOrTheOneFetchedToShow() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
