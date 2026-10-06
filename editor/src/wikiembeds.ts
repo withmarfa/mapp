@@ -130,7 +130,7 @@ function tokenizeWiki(embed: boolean) {
         inner += ']'
         return inside(code)
       }
-      if (!inner.trim() || (embed && !readNamed(`![[${inner}]]`).name)) return nok(code)
+      if (!inner.trim()) return nok(code)
       effects.consume(code)
       effects.exit('wiki')
       return ok
@@ -241,7 +241,7 @@ export const wikiEmbedSchema = $nodeSchema('embed', () => ({
 }))
 
 /** A link stays text the person edits and finds, marked so it is written back as typed rather than escaped.
- *  Emphasis or a link around it is kept around it; code, which shows the brackets as text, ends it. */
+ *  Emphasis or a link around it is kept around it; code, which shows the brackets as text, is refused over it. */
 export const wikiLinkSchema = $markSchema('wikiLink', () => ({
   inclusive: false,
   excludes: 'inlineCode',

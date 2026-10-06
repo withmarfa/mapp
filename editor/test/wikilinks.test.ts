@@ -55,6 +55,8 @@ for (const link of [
   '[[https://example.com/x]]',
   '[[A note#Part|shown]]',
   '![[A note]]',
+  '![[#Heading]]',
+  '![[#^abc123]]',
   '[[a]][[b]]',
 ]) {
   test(`${link} is written back as typed beside an edit`, async () => {
