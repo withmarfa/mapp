@@ -2,10 +2,10 @@ import SwiftUI
 
 struct ItemRelationshipSection: View {
     let relationship: ItemRelationship
-    let onOpen: (UUID) -> Void
+    let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
 
-    var onRemove: ((UUID) -> Bool)? = nil
+    var onRemove: ((ItemID) -> Bool)? = nil
     @State private var rejected = false
 
     var body: some View {
@@ -61,7 +61,7 @@ struct ItemRelationshipSection: View {
 
 struct ItemTargetRow: View {
     let target: ItemRelationshipTarget
-    let onOpen: (UUID) -> Void
+    let onOpen: (ItemID) -> Void
 
     var body: some View {
         if let id = target.itemID {
@@ -73,7 +73,7 @@ struct ItemTargetRow: View {
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("RelationshipTarget.\(id.uuidString)")
+            .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
         } else {
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.title)
@@ -97,13 +97,13 @@ struct ItemTargetRow: View {
 struct ItemRelationshipPicker: View {
     let relationship: ItemRelationship
     let candidates: [AppItem]
-    let onSave: ([UUID]) -> Bool
+    let onSave: ([ItemID]) -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
-    @State private var selection: Set<UUID>
+    @State private var selection: Set<ItemID>
     @State private var rejected = false
 
-    init(relationship: ItemRelationship, candidates: [AppItem], onSave: @escaping ([UUID]) -> Bool) {
+    init(relationship: ItemRelationship, candidates: [AppItem], onSave: @escaping ([ItemID]) -> Bool) {
         self.relationship = relationship
         self.candidates = candidates
         self.onSave = onSave
@@ -141,7 +141,7 @@ struct ItemRelationshipPicker: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("RelationshipCandidate.\(candidate.id.uuidString)")
+                .accessibilityIdentifier("RelationshipCandidate.\(candidate.id.rawValue)")
                 .accessibilityValue(selection.contains(candidate.id) ? "Selected" : "Not Selected")
             }
             .overlay {
@@ -160,7 +160,7 @@ struct ItemRelationshipPicker: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") {
-                    if onSave(selection.sorted { $0.uuidString < $1.uuidString }) { dismiss() } else { rejected = true }
+                    if onSave(selection.sorted { $0.rawValue < $1.rawValue }) { dismiss() } else { rejected = true }
                 }
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("RelationshipSave")
@@ -179,7 +179,7 @@ struct ItemRelationshipPicker: View {
 }
 
 #Preview("Wrapping Connections") {
-    let id = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+    let id = ItemID("10000000-0000-0000-0000-000000000001")
     VStack(alignment: .leading, spacing: 18) {
         ItemRelationshipSection(
             relationship: .init(field: "child-of", label: "Parent", targets: [

@@ -20,12 +20,12 @@ struct MAPPApp: App {
             SettingsCommands(request: settingsRequest)
         }
 
-        WindowGroup("Note", for: String.self) { $path in
+        WindowGroup("Item", for: ItemID.self) { $id in
             if let library = folder.library {
-                NoteWindow(path: $path)
+                NoteWindow(id: $id)
                     .environment(library)
             } else {
-                // A note's window has nothing to show without a notes folder, as when one is restored before
+                // An item's window has nothing to show without a notes folder, as when one is restored before
                 // any is chosen.
                 ClosingView()
             }

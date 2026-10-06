@@ -6,14 +6,14 @@ struct ItemInspectorHost: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     let browser: Browser?
-    let itemID: UUID?
+    let itemID: ItemID?
     let details: DetailsPresentation
     @State private var editing: ItemRelationship?
 
     init(browser: Browser, details: DetailsPresentation) { self.browser = browser; itemID = nil; self.details = details }
-    init(itemID: UUID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
+    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
 
-    private var selectedID: UUID? { itemID ?? (browser?.selection.count == 1 ? browser?.selection.first : nil) }
+    private var selectedID: ItemID? { itemID ?? (browser?.selection.count == 1 ? browser?.selection.first : nil) }
 
     var body: some View {
         Group {
@@ -47,9 +47,9 @@ struct ItemInspectorHost: View {
         .accessibilityIdentifier("ItemInspector")
     }
 
-    private func open(_ id: UUID) {
+    private func open(_ id: ItemID) {
         guard let browser else {
-            if let path = library.item(id)?.projection.filePath { openWindow(value: path) }
+            if library.item(id) != nil { openWindow(value: id) }
             return
         }
         browser.searchText = ""
@@ -65,9 +65,9 @@ struct ItemInspector: View {
     let relationships: [ItemRelationship]
     let mentions: [ItemRelationshipTarget]
     let onProperty: (String, NoteFieldValue?) -> Bool
-    let onOpen: (UUID) -> Void
+    let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
-    var onRemove: ((ItemRelationship, UUID) -> Bool)? = nil
+    var onRemove: ((ItemRelationship, ItemID) -> Bool)? = nil
     var drafts: DetailsPresentation? = nil
 
     var body: some View {

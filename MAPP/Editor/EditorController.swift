@@ -24,9 +24,9 @@ final class EditorController: NSObject {
     var isChoosingImages = false
 
     /// An edit to a note, with the markdown the note now holds.
-    @ObservationIgnored var onChange: (Note.ID, String) -> Void = { _, _ in }
+    @ObservationIgnored var onChange: (ItemID, String) -> Void = { _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
-    @ObservationIgnored var onLeave: (Note.ID) -> Void = { _ in }
+    @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
     /// The library the notes come from, for the files a note points at.
     @ObservationIgnored weak var library: NoteLibrary?
     @ObservationIgnored private let files = NoteFiles()
@@ -39,12 +39,12 @@ final class EditorController: NSObject {
     @ObservationIgnored private var pageFinder: PageFinder!
 
     /// The note on the page, and the markdown the page holds for it as far as the app knows.
-    private(set) var noteID: Note.ID?
+    private(set) var noteID: ItemID?
     @ObservationIgnored private var markdown = ""
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// note still reaches that note rather than the one now showing.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var notesByGeneration: [Int: Note.ID] = [:]
+    @ObservationIgnored private var notesByGeneration: [Int: ItemID] = [:]
     @ObservationIgnored private var wantsFocus = false
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?

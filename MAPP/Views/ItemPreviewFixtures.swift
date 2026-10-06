@@ -3,9 +3,9 @@ import SwiftUI
 
 /// Fixed values and an in-memory library keep canvas edits away from the person's files.
 enum ItemPreviewFixtures {
-    static let projectID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
-    static let ticketID = UUID(uuidString: "10000000-0000-0000-0000-000000000002")!
-    static let noteID = UUID(uuidString: "10000000-0000-0000-0000-000000000003")!
+    static let projectID = ItemID("10000000-0000-0000-0000-000000000001")
+    static let ticketID = ItemID("10000000-0000-0000-0000-000000000002")
+    static let noteID = ItemID("10000000-0000-0000-0000-000000000003")
     static let date = Date(timeIntervalSince1970: 1_791_000_000)
 
     static var library: NoteLibrary {

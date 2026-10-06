@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One note in a window of its own, opened by double-clicking it in the list. The window remembers where its
-/// note is, so it finds the note again at the next launch, and follows the note when it is renamed or moved.
+/// One item in a window of its own, opened by double-clicking it in the list. The window remembers its item's
+/// identifier, which outlasts a rename or a move, so it finds the item again at the next launch.
 struct NoteWindow: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
@@ -9,8 +9,7 @@ struct NoteWindow: View {
     @State private var editor = EditorController()
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
-    @Binding var path: String?
-    @State private var id: Note.ID?
+    @Binding var id: ItemID?
 
     private var note: Note? { id.flatMap { library.note($0) } }
     private var item: AppItem? { id.flatMap { library.item($0) } }
@@ -52,17 +51,9 @@ struct NoteWindow: View {
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
         }
-        // The note is found once the folder has been read. A window whose note has gone, deleted for good or not
-        // there when the window is restored, closes.
-        .onChange(of: library.isLoaded, initial: true) {
-            guard library.isLoaded, id == nil else { return }
-            id = path.flatMap { library.note(at: $0) }?.id ?? library.items.first { $0.projection.filePath == path }?.id
-            if id == nil { dismiss() }
+        .onChange(of: library.isGone(id), initial: true) {
+            if library.isGone(id) { dismiss() }
         }
-        .onChange(of: item?.projection.filePath) {
-            if let moved = item?.projection.filePath { path = moved }
-        }
-        .onChange(of: item == nil) { if library.isLoaded, item == nil { dismiss() } }
         // Another notes folder is another library, which does not hold this window's note.
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
         .onDisappear { editor.flush() }

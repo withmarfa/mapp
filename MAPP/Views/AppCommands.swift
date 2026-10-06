@@ -36,10 +36,10 @@ struct AppCommands: Commands {
 
         // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
-            let ids: Set<Note.ID> = browser?.isCreatingItem == true ? [] : (notes?.ids ?? [])
+            let ids: Set<ItemID> = browser?.isCreatingItem == true ? [] : (notes?.ids ?? [])
             let shown = ids.compactMap { library?.note($0) }
             Button("Open in New Window", systemImage: "macwindow") {
-                for path in library?.paths(forWindows: ids) ?? [] { openWindow(value: path) }
+                for id in library?.idsForWindows(ids) ?? [] { openWindow(value: id) }
             }
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)

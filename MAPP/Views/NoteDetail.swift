@@ -135,7 +135,7 @@ private struct ScrollingPageHeader<Content: View>: View {
 private struct DeletedNoteBanner: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
-    let id: Note.ID
+    let id: ItemID
 
     var body: some View {
         HStack {

@@ -37,7 +37,7 @@ struct Sidebar: View {
                     ForEach(favorites) { item in
                         Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
                             .tag(SidebarItem.favoriteItem(item.id))
-                            .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.uuidString)")
+                            .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
                     }
                 } header: {
                     Text("Favorites")

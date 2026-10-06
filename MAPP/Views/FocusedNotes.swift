@@ -3,7 +3,7 @@ import Observation
 
 /// The notes the frontmost window is showing, and that window's undo manager, so the menu bar acts on them.
 struct FocusedNotes {
-    let ids: Set<Note.ID>
+    let ids: Set<ItemID>
     let undoManager: UndoManager?
 }
 
@@ -22,9 +22,9 @@ extension FocusedValues {
 @Observable
 final class DetailsPresentation {
     var isPresented = false
-    @ObservationIgnored private var drafts: [UUID: [String: ItemPropertyDraft]] = [:]
+    @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
-    func draft(for itemID: UUID, key: String) -> ItemPropertyDraft {
+    func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
         if let draft = drafts[itemID]?[key] { return draft }
         let draft = ItemPropertyDraft()
         drafts[itemID, default: [:]][key] = draft

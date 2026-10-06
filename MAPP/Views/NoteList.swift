@@ -110,14 +110,14 @@ struct NoteList: View {
         .onChange(of: ids) { old, new in
             browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
         }
-        .contextMenu(forSelectionType: Note.ID.self) { ids in
+        .contextMenu(forSelectionType: ItemID.self) { ids in
             if ids.count == 1, let id = ids.first, library.note(id)?.isDeleted == false {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = id }
                 Divider()
             }
             NoteActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            for path in library.paths(forWindows: ids) { openWindow(value: path) }
+            for id in library.idsForWindows(ids) { openWindow(value: id) }
         }
         .overlay {
             if ids.isEmpty {
@@ -195,9 +195,9 @@ private enum ListLine: Identifiable {
 
     /// A note's line is known by the note, so the list's selection is its notes; a heading takes an identifier
     /// of its own, never selected.
-    var id: Note.ID {
+    var id: ItemID {
         switch self {
-        case .heading(let group, _): UUID(stableFrom: "heading:\(group)")
+        case .heading(let group, _): ItemID(UUID(stableFrom: "heading:\(group)").uuidString)
         case .note(let note, _): note.id
         }
     }

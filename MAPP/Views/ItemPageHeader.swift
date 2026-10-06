@@ -90,9 +90,8 @@ struct ItemPageHeader: View {
         }
         if let parent {
             Menu {
-                if let target = parent.targets.first, let id = target.itemID,
-                   let path = library.item(id)?.projection.filePath {
-                    Button("Open Parent") { openWindow(value: path) }
+                if let target = parent.targets.first, let id = target.itemID, library.item(id) != nil {
+                    Button("Open Parent") { openWindow(value: id) }
                 }
                 Button(parent.targets.isEmpty ? "Choose Parent…" : "Change Parent…") { editingParent = true }
                     .disabled(!parent.isEditable)
