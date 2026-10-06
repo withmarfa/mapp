@@ -20,7 +20,7 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarKeepsTopPlacesAndPinsAboveTheNativeGroups() {
+    func testSidebarKeepsTopPlacesAndFavoritesAboveTheNativeGroups() {
         for title in ["Inbox", "All Notes", "Favorites", "Kitchen quotes", "Reading list", "Library", "Projects", "Items", "Folders"] {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
