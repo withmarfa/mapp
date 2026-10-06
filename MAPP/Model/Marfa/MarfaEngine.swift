@@ -1014,6 +1014,11 @@ actor MarfaEngine {
         throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."))
     }
 
+    private func hasLeft(_ raw: String) async -> Bool {
+        guard rows[raw] == nil else { return false }
+        return (try? await copy.items.get(raw)) == nil
+    }
+
     private func heldVersion(_ id: ItemID) async throws -> Int64 {
         if let row = try await copy.items.get(id.rawValue) { return row.version }
         guard let row = rows[id.rawValue] else {
@@ -1064,7 +1069,18 @@ actor MarfaEngine {
         var uncounted = false
         if let queued = try? await copy.queue.all() {
             for raw in Set(queued.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
-                do { try await count(answers: queued, for: ItemID(raw)) } catch { uncounted = true }
+                do {
+                    try await count(answers: queued, for: ItemID(raw))
+                } catch {
+                    // An item the copy has let go, as when its delete was answered in this drain, has no version to
+                    // count against and never will, so its text is forgotten rather than holding every answer back.
+                    if await hasLeft(raw) {
+                        ownText[ItemID(raw)] = nil
+                        counted.formUnion(queued.filter { $0.itemId == raw }.map(\.id))
+                    } else {
+                        uncounted = true
+                    }
+                }
             }
         } else {
             uncounted = true

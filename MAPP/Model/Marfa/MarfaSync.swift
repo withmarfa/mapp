@@ -243,10 +243,8 @@ actor MarfaSync {
         } else {
             try await hydrate()
         }
-        if answersWaiting {
-            answersWaiting = false
-            await takeAnswersFromQueue()
-        }
+        // Kept until the queue has been read, so a read that fails is tried again by the next refresh.
+        if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
     }
 
     /// A drain on a copy never hydrated sends one write and then throws, losing that write's verdict, so it waits
@@ -294,13 +292,15 @@ actor MarfaSync {
         return DrainReport(answered: UInt64(verdicts.count), verdicts: verdicts)
     }
 
-    private func takeAnswersFromQueue() async {
-        guard let queue = try? await copy.queue.all() else { return }
+    /// Whether the queue could be read, which says nothing of whether it held answers.
+    private func takeAnswersFromQueue() async -> Bool {
+        guard let queue = try? await copy.queue.all() else { return false }
         let report = Self.report(answeredIn: queue)
-        guard !report.verdicts.isEmpty else { return }
+        guard !report.verdicts.isEmpty else { return true }
         await withCheckedContinuation { taken in
             if !tell(.drained(report, taken)) { taken.resume() }
         }
+        return true
     }
 
     /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
