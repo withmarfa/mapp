@@ -67,6 +67,11 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     var cascadeOnDelete: CascadeOnDelete = .orphan
     var properties: [ItemTypeInfo.Field] = []
 
+    /// How many edges of this type one item holds as its source, or as its target.
+    func cardinality(atTarget: Bool) -> Cardinality {
+        (writtenAt == .target) == atTarget ? cardinality : reverseCardinality
+    }
+
     func allowsAnySource() -> Bool { sourceTypes.isEmpty && sourceRoles.isEmpty }
     func allowsAnyTarget() -> Bool { targetTypes.isEmpty && targetRoles.isEmpty }
 }

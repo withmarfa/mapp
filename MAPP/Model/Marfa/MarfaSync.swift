@@ -270,7 +270,28 @@ actor MarfaSync {
                 break
             }
         } catch {
+            // An answered write that expires the copy, a source move or a retype, is recorded before the drain
+            // throws, and the throw loses the report, so the answers are read from the queue instead.
+            if case MarfaError.copyExpired = error { await takeAnswersFromQueue() }
             await failed(error, retrying: .drain)
+        }
+    }
+
+    /// Each write the queue holds an answer for, as a drain would have reported it.
+    nonisolated static func report(answeredIn queue: [Marfa.QueuedWrite]) -> DrainReport {
+        let verdicts = queue.filter { $0.verdict != nil }.map {
+            DrainVerdict(
+                id: $0.id, kind: $0.kind, itemId: $0.itemId, edgeId: $0.edgeId, verdict: $0.verdict, refusals: $0.refusals)
+        }
+        return DrainReport(answered: UInt64(verdicts.count), verdicts: verdicts)
+    }
+
+    private func takeAnswersFromQueue() async {
+        guard let queue = try? await copy.queue.all() else { return }
+        let report = Self.report(answeredIn: queue)
+        guard !report.verdicts.isEmpty else { return }
+        await withCheckedContinuation { taken in
+            if !tell(.drained(report, taken)) { taken.resume() }
         }
     }
 

@@ -53,5 +53,8 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case tag(ItemID, String, on: Bool)
     case link(EdgeDraft, undoing: WriteID?)
     case unlink(EdgeID)
+    /// Replaces one end of an edge in one write, so the end that stays never holds no edge or two. Only an edge
+    /// whose staying end holds one edge of its type can move.
+    case moveEdge(EdgeID, end: EdgeTypeInfo.End, to: ItemID)
     case place(PlaceWrite)
 }

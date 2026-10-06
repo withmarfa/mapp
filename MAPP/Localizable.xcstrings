@@ -1079,7 +1079,16 @@
     "Can’t Search": {
       "extractionState": "manual"
     },
-    "Changing this link isn’t available yet in a Marfa library.": {
+    "Both items already hold a link of this kind, so one can’t take the other’s.": {
+      "extractionState": "manual"
+    },
+    "Choose one item here, or remove the link first.": {
+      "extractionState": "manual"
+    },
+    "This link can’t be replaced by moving one end, because the item that stays can hold more than one.": {
+      "extractionState": "manual"
+    },
+    "This link isn’t in the library.": {
       "extractionState": "manual"
     },
     "This item changed elsewhere, so your changes were saved as a copy.": {

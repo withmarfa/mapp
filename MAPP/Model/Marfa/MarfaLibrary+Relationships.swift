@@ -34,9 +34,7 @@ extension MarfaLibrary {
     }
 
     private func others(of id: ItemID, _ end: FieldEnd) -> [ItemID] {
-        index.links(touching: id)
-            .filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
-            .map { end.atTarget ? $0.source : $0.target }
+        held(by: id, end).map { end.atTarget ? $0.source : $0.target }
     }
 
     /// What one end of an edge type allows: the types named, with their subtypes, and the types that play a
@@ -184,9 +182,40 @@ extension MarfaLibrary {
 
     // MARK: Writing
 
+    /// What one change to a field does to the edges, each as one write.
+    nonisolated struct RelationshipChange {
+        /// One end of an edge replaced by another item, which the edge keeps its id and properties through.
+        struct Move {
+            let edge: EdgeID
+            let end: EdgeTypeInfo.End
+            let to: ItemID
+            let from: ItemID
+        }
+
+        var adding: [EdgeDraft] = []
+        var removing: [EdgeDraft] = []
+        var moving: [Move] = []
+
+        var isEmpty: Bool { adding.isEmpty && removing.isEmpty && moving.isEmpty }
+
+        /// The change that puts everything back.
+        var reversed: RelationshipChange {
+            RelationshipChange(
+                adding: removing, removing: adding,
+                moving: moving.map { Move(edge: $0.edge, end: $0.end, to: $0.from, from: $0.to) })
+        }
+    }
+
+    /// The edges of the field's type that `id` holds at the end `end` names.
+    private func held(by id: ItemID, _ end: FieldEnd) -> [MarfaItemIndex.Link] {
+        index.links(touching: id).filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
+    }
+
     /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed
-    /// freely. Replacing the one link an end may hold, such as a new parent, is a move of the edge's other end,
-    /// which is refused until it can be made as one write.
+    /// freely. An end that holds one link of its type has it replaced by moving the edge's other end (edges.md 10
+    /// and 14), so a new parent is one write and the child never holds none or two: a replacement is a move, and so
+    /// is taking an item that holds its one link elsewhere. A change the contract would refuse is told here and
+    /// sent nowhere.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
@@ -196,16 +225,21 @@ extension MarfaLibrary {
             failure = (cantChange, String(localized: "A link is changed in the text that holds it."))
             return false
         }
-        let holds = end.isInverse ? end.info.reverseCardinality : end.info.cardinality
+        let holds = end.info.cardinality(atTarget: end.atTarget)
         if holds == .one, targetIDs.count > 1 {
             failure = (cantChange, String(localized: "Only one item can be chosen here."))
             return false
         }
         let current = others(of: id, end)
-        let removing = current.filter { !targetIDs.contains($0) }.map { draft(id, $0, end) }
-        var adding: [EdgeDraft] = []
-        var replacing = false
-        for other in targetIDs where !current.contains(other) {
+        let adding = targetIDs.filter { !current.contains($0) }
+        let removing = current.filter { !targetIDs.contains($0) }
+        var change = RelationshipChange(removing: removing.map { draft(id, $0, end) })
+        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        let farHolds = end.info.cardinality(atTarget: !end.atTarget)
+        // The edge's far end, where it sits at the target, is the one a move would replace.
+        let farIsTarget = !end.atTarget
+        let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
+        for other in adding {
             let link = draft(id, other, end)
             let farType: TypeID? = self.item(other).flatMap { $0.state == .trashed ? nil : $0.type }
             let sourceType: TypeID? = end.atTarget ? farType : item.type
@@ -214,43 +248,47 @@ extension MarfaLibrary {
                 failure = (cantChange, problem)
                 return false
             }
-            let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
-            let farHolds = end.isInverse ? end.info.cardinality : end.info.reverseCardinality
-            if farHolds == .one, !others(of: other, farEnd).filter({ $0 != id }).isEmpty {
-                guard end.isInverse else {
-                    failure = (cantChange, String(localized: "The item chosen is already linked this way, and can be only once."))
+            let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
+            if let theirs = taken.first {
+                // The item chosen holds its one link elsewhere, and takes this one in its place.
+                guard !replacingOwn else {
+                    failure = (cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
                     return false
                 }
-                replacing = true
+                let old = farIsTarget ? theirs.source : theirs.target
+                change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
+            } else if replacingOwn {
+                guard removing.count == 1, let old = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == removing[0] })
+                else {
+                    failure = (cantChange, String(localized: "Choose one item here, or remove the link first."))
+                    return false
+                }
+                // The end that stays holds one link, and its other end changes.
+                change.moving.append(.init(edge: old.id, end: farIsTarget ? .target : .source, to: other, from: removing[0]))
+                change.removing = []
+            } else {
+                change.adding.append(link)
             }
-            adding.append(link)
         }
-        if holds == .one, !removing.isEmpty, !adding.isEmpty { replacing = true }
-        // The contract moves the other end of the edge an end holds (edges.md 10 and 14) in one write. The core
-        // holds that write, but the package has no call for it, and an unlink then a link could leave the old link
-        // gone and the new one refused, so this is where a move goes once the package has the call.
-        guard !replacing else {
-            failure = (cantChange, String(localized: "Changing this link isn’t available yet in a Marfa library."))
-            return false
-        }
-        guard !removing.isEmpty || !adding.isEmpty else { return true }
-        relink(adding: adding, removing: removing, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+        guard !change.isEmpty else { return true }
+        relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
         return true
     }
 
-    /// Where links are both added and removed, as when one item is chosen in place of another, the new links go
-    /// first and the old ones are removed only once the source has taken every new one, so a refusal leaves the
-    /// field as it was rather than with the old link gone and the new one missing.
-    private func relink(adding: [EdgeDraft], removing: [EdgeDraft], name: String, undoManager: UndoManager?) {
+    /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
+    /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
+    /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
+    private func relink(_ change: RelationshipChange, name: String, undoManager: UndoManager?) {
         let title = String(localized: "Can’t Change This Relationship")
-        let links = adding.map { submit(.link($0, undoing: nil), failing: title) }
+        var links = change.adding.map { submit(.link($0, undoing: nil), failing: title) }
+        links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
         if links.isEmpty {
-            unlink(removing)
-        } else if !removing.isEmpty {
-            awaitLinks(Set(links), thenUnlink: removing)
+            unlink(change.removing)
+        } else if !change.removing.isEmpty {
+            awaitLinks(Set(links), thenUnlink: change.removing)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.relink(adding: removing, removing: adding, name: name, undoManager: undoManager)
+            library.relink(change.reversed, name: name, undoManager: undoManager)
         }
     }
 
