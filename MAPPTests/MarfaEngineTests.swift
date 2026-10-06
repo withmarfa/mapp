@@ -51,6 +51,9 @@ struct MarfaEngineTests {
         #expect(MarfaEngine.link(to: "photo.png") == "photo.png")
         #expect(MarfaEngine.link(to: "Photo 2.png") == "Photo%202.png")
         #expect(MarfaEngine.link(to: "100% sure.png").contains("%25"))
+        #expect(MarfaEngine.link(to: "image (1).png") == "image%20%281%29.png")
+        #expect(MarfaEngine.embeddable("Plan #2 [draft] | v^1.png") == "Plan -2 -draft- - v-1.png")
+        #expect(MarfaEngine.embeddable("photo.png") == "photo.png")
     }
 
     @Test func aWriteOnlyFilesMakeIsRefusedInPlainWords() {

@@ -753,11 +753,9 @@ actor MarfaEngine {
             }
             await reread(Set([id.rawValue] + [attached.item.itemId].compactMap(\.self)))
             await sync.drain()
-            guard let embed = attached.embed, let name = Self.embeddedName(embed) else {
-                throw SourceFailure(
-                    kind: .failed,
-                    message: String(localized: "The file was attached, but its name can’t be written into the text."))
-            }
+            // Where the package says no embed names the file alone, the file is attached all the same, so the text
+            // still links it by its title rather than the person being told it failed and attaching it twice.
+            let name = attached.embed.flatMap(Self.embeddedName) ?? title
             return .success(Embed(link: Self.link(to: name), name: name))
         } catch let error as SourceFailure {
             return .failure(error)
@@ -775,13 +773,19 @@ actor MarfaEngine {
         let name = file.lastPathComponent
         let stem = file.deletingPathExtension().lastPathComponent
         let ext = file.pathExtension
-        var title = name
+        var title = Self.embeddable(name)
         var number = 1
         while taken.contains(title.lowercased()) {
             number += 1
-            title = ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)"
+            title = Self.embeddable(ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)")
         }
         return title
+    }
+
+    /// An embed names its file between `![[` and `]]`, where `[`, `]`, `|`, `#` and `^` mean something else, so a
+    /// title that holds them could not be embedded. The file keeps its name on disk; only its title in Marfa changes.
+    nonisolated static func embeddable(_ name: String) -> String {
+        String(name.map { "[]|#^".contains($0) ? "-" : $0 })
     }
 
     /// The name inside `![[name]]`, which the package writes for an embed.
@@ -793,7 +797,10 @@ actor MarfaEngine {
     /// The name as a markdown destination: the page writes `![name](link)`, and the core reads the percent
     /// escapes of a path back to the name.
     nonisolated static func link(to name: String) -> String {
-        name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        var allowed = CharacterSet.urlPathAllowed
+        // The destination of `![alt](path)` ends at the first closing parenthesis, so a name's own must be escaped.
+        allowed.remove(charactersIn: "()")
+        return name.addingPercentEncoding(withAllowedCharacters: allowed) ?? name
     }
 
     /// An edit is sent on the version of the text it was typed on: as an ordinary update where the copy holds that

@@ -120,7 +120,7 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return known + properties.filter { !fields.contains($0.key) }
     }
 
-    /// Marfa's properties come unordered, so the rest follow by key.
+    /// Properties given unordered, as a note's front matter is read, put the rest in order by key.
     func ordered(_ properties: [String: PropertyValue], for type: TypeID) -> [Property] {
         ordered(properties.map { Property(key: $0, value: $1) }.sorted { $0.key < $1.key }, for: type)
     }
