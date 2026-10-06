@@ -237,7 +237,7 @@ extension LiveMarfaTests {
                 store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try #require(LiveMarfa.key)))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(id.rawValue))
-            _ = try await other.items.update(id.rawValue, Edit(properties: ["body": .string(text)], baseVersion: row.version))
+            _ = try await other.items.update(id.rawValue, Edit(.merge(["body": .string(text)]), baseVersion: row.version))
             let report = try await other.queue.drain()
             await other.close()
             try #require(report.verdicts.allSatisfy { $0.verdict == .accepted }, "the other device's write: \(report.verdicts)")

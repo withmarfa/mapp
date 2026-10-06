@@ -22,14 +22,14 @@ struct MarfaProblemsTests {
 
     private static func write(
         _ id: String, _ verdict: Verdict? = nil, kind: WriteKind = .updateItem, on item: String? = "item",
-        body: [String: JSONValue] = [:], dependsOn: [String] = [], at time: String = "2026-10-06T10:00:00Z"
+        body: JSONObject = [:], dependsOn: [String] = [], at time: String = "2026-10-06T10:00:00Z"
     ) -> QueuedWrite {
         QueuedWrite(
             id: id, kind: kind, itemId: item, idempotencyKey: id, dependsOn: dependsOn, verdict: verdict, body: body,
             queuedAt: time)
     }
 
-    private static let task: [String: JSONValue] = [
+    private static let task: JSONObject = [
         "type": "core.task", "id": "item", "tier": "library",
         "properties": ["title": "Plan the launch", "body": "Line one\nLine two", "status": "done", "due_at": .null]
     ]
@@ -109,7 +109,7 @@ struct MarfaProblemsTests {
     }
 
     @Test func aPropertyEditShowsTheValuesItWrote() throws {
-        let body: [String: JSONValue] = ["properties": ["status": "open", "due_at": "2026-10-07"], "version": 3]
+        let body: JSONObject = ["properties": ["status": "open", "due_at": "2026-10-07"], "version": 3]
         let report = Self.report(
             [Self.write("w", .refused(Refusal(reason: "x", code: "x")), body: body)], types: ["item": TypeID("core.task")])
         let entry = try #require(report.problems.first)

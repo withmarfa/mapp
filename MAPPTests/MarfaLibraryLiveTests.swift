@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MAPP
 
@@ -52,6 +53,11 @@ extension LiveMarfaTests {
                     }
                 }
                 #expect(library.items(in: .allNotes).allSatisfy { !$0.title.isEmpty })
+                // One copy holds both tiers: the Inbox is the feed, and All Items has the feed's items among the rest.
+                let inbox = library.items(in: .inbox)
+                #expect(!inbox.isEmpty)
+                #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .allNotes).map(\.id))))
+                #expect(library.items(in: .allNotes).contains { $0.tier == .library })
                 // A type's place holds its subtypes.
                 let tickets = library.items(in: .itemType("aic.ticket"))
                 #expect(tickets.contains { $0.type != TypeID("aic.ticket") })
@@ -125,7 +131,8 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually(.seconds(20)) { library.item(child)?.title == title })
 
-                // A new parent replaces the one link a child holds, which waits for the package to move an edge.
+                // A new parent replaces the one link a child holds, which waits for the package to have a call that
+                // moves an edge.
                 #expect(!library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo))
                 #expect(library.failure?.message == String(localized: "Changing this link isn’t available yet in a Marfa library."))
                 library.failure = nil
@@ -158,20 +165,150 @@ extension LiveMarfaTests {
                 await source.flush()
                 #expect(library.failure == nil, "\(String(describing: library.failure))")
 
-                // The bin: a delete the server has taken leaves the copy, so undoing it is either a restore, while the
-                // copy still holds the item, or the person is told plainly that it could not be made.
+                // The bin: a delete the server has taken leaves the copy, and the item is still in Recently Deleted,
+                // from where undoing the delete restores it.
                 step { library.delete([other], undoManager: undo) }
-                #expect(await eventually(.seconds(20)) { library.item(other).map { $0.state == .trashed } ?? true })
+                #expect(await eventually(.seconds(20)) { library.item(other)?.state == .trashed })
                 await source.flush()
+                #expect(library.items(in: .recentlyDeleted).contains { $0.id == other })
                 undo.undo()
-                #expect(await eventually(.seconds(20)) { library.item(other)?.state == .active || library.failure != nil })
-                if let failure = library.failure {
-                    #expect(failure.title == String(localized: "Can’t Recover"))
-                    Attachment.record("Undoing a delete told the person: \(failure.title): \(failure.message)", named: "Bin.txt")
-                    library.failure = nil
-                } else {
-                    Attachment.record("Undoing a delete restored the item.", named: "Bin.txt")
-                }
+                #expect(await eventually(.seconds(30)) { library.item(other)?.state == .active })
+                #expect(!library.items(in: .recentlyDeleted).contains { $0.id == other })
+                #expect(library.failure == nil, "\(String(describing: library.failure))")
+            }
+        }
+
+        /// The bin is the server's, read online: an item deleted and sent is listed, including by a copy that never
+        /// held it, is restored from there, and is destroyed for good by Delete Permanently.
+        @Test(.timeLimit(.minutes(3)))
+        func theBinListsRestoresAndPurgesItems() async throws {
+            try await withLibrary { library, source, made in
+                let token = "zq" + UUID().uuidString.prefix(8).lowercased()
+                let kept = try #require(library.createItem(
+                    typeID: "core.note", title: "MAPPTEST bin kept \(token)", body: "Kept.", parentID: nil, in: .allNotes,
+                    undoManager: nil))
+                let purged = try #require(library.createItem(
+                    typeID: "core.note", title: "MAPPTEST bin purged \(token)", body: "Purged.", parentID: nil, in: .allNotes,
+                    undoManager: nil))
+                made.add(kept)
+                made.add(purged)
+                try #require(await eventually(.seconds(20)) { library.item(kept) != nil && library.item(purged) != nil })
+                await source.flush()
+                library.delete([kept, purged], undoManager: nil)
+                await source.flush()
+                try #require(await eventually(.seconds(30)) {
+                    Set(library.items(in: .recentlyDeleted).map(\.id)).isSuperset(of: [kept, purged])
+                })
+
+                // Restoring after the delete was sent: the item comes back to its places.
+                library.recover([kept], undoManager: nil)
+                try #require(await eventually(.seconds(30)) { library.item(kept)?.state == .active })
+                #expect(!library.items(in: .recentlyDeleted).contains { $0.id == kept })
+                #expect(library.items(in: .allNotes).contains { $0.id == kept })
+
+                // Delete Permanently needs the server and takes the item out of the bin and the copy.
+                try #require(library.capabilities.contains(.purge))
+                library.deletePermanentlyOnConfirm([purged])
+                try #require(await eventually(.seconds(30)) { library.item(purged) == nil })
+                #expect(library.failure == nil, "\(String(describing: library.failure))")
+                let bin = try await source.copy.items.bin()
+                #expect(!bin.items.contains { $0.id == purged.rawValue })
+                #expect(!bin.items.contains { $0.id == kept.rawValue })
+            }
+        }
+
+        /// A copy that never held the item reads it from the server's bin, with its text, and restores it from there.
+        @Test(.timeLimit(.minutes(3)))
+        func aFreshCopyListsTheServersBinAndRestoresFromIt() async throws {
+            try await withLibrary { library, source, made in
+                let note = try #require(library.createItem(
+                    typeID: "core.note", title: "MAPPTEST fresh bin \(UUID().uuidString.prefix(8))", body: "In the bin.",
+                    parentID: nil, in: .allNotes, undoManager: nil))
+                made.add(note)
+                try #require(await eventually(.seconds(20)) { library.item(note) != nil })
+                await source.flush()
+                library.delete([note], undoManager: nil)
+                await source.flush()
+                try #require(await eventually(.seconds(30)) { library.item(note)?.state == .trashed })
+
+                let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-fresh-\(UUID().uuidString)", directoryHint: .isDirectory)
+                defer { try? FileManager.default.removeItem(at: root) }
+                let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+                let second = try await MarfaSource.open(
+                    connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                    location: try MarfaStoreLocation(root: root))
+                let fresh = MarfaLibrary(source: second)
+                second.refresh()
+                try #require(await eventually(.seconds(60)) {
+                    fresh.isLoaded && fresh.connection == .online && fresh.count(in: .allNotes) > 100
+                })
+                try #require(await eventually(.seconds(30)) { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
+                #expect(await eventually(.seconds(20)) { fresh.body(of: note)?.text == "In the bin." })
+
+                fresh.recover([note], undoManager: nil)
+                #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
+                try #require(await eventually(.seconds(30)) { fresh.item(note)?.state == .active })
+                #expect(fresh.failure == nil, "\(String(describing: fresh.failure))")
+                await second.flush()
+                await second.close()
+            }
+        }
+
+        /// A link in the text is an edge the package writes as the text is saved, seen from both ends; an embedded
+        /// file is attached by the package and shows its size once the server has stamped it.
+        @Test(.timeLimit(.minutes(3)))
+        func linksAndEmbedsInTheTextAreEdgesBothWays() async throws {
+            try await withLibrary { library, source, made in
+                let token = "zq" + UUID().uuidString.prefix(8).lowercased()
+                let targetTitle = "MAPPTEST link target \(token)"
+                let target = try #require(library.createItem(
+                    typeID: "core.note", title: targetTitle, body: "Linked.", parentID: nil, in: .allNotes, undoManager: nil))
+                let host = try #require(library.createItem(
+                    typeID: "core.note", title: "MAPPTEST link host \(token)", body: "Nothing yet.", parentID: nil,
+                    in: .allNotes, undoManager: nil))
+                made.add(target)
+                made.add(host)
+                try #require(await eventually(.seconds(20)) { library.item(target) != nil && library.item(host) != nil })
+                await source.flush()
+
+                // A link to the target, and to a name nothing answers to.
+                library.updateBody(of: host, to: "See [[\(targetTitle)]] and [[MAPPTEST nowhere \(token)]].")
+                await source.flush()
+                try #require(await eventually(.seconds(30)) {
+                    library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.map(\.itemID) == [host]
+                })
+                let mentions = library.bodyMentions(for: host)
+                #expect(mentions.contains { $0.itemID == target && $0.resolution == .resolved(target) })
+                #expect(mentions.contains { $0.title == "MAPPTEST nowhere \(token)" && $0.resolution == .missing })
+
+                // Taking the link out of the text takes the edge out.
+                library.updateBody(of: host, to: "Nothing again.")
+                await source.flush()
+                try #require(await eventually(.seconds(30)) {
+                    library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.isEmpty ?? true
+                })
+                #expect(library.bodyMentions(for: host).isEmpty)
+
+                // A file attached through the package, and embedded where the page writes it.
+                let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
+                let embeds = try await library.attach([(name: "MAPPTEST attachment \(token).png", data: png)], to: host)
+                let embed = try #require(embeds.first)
+                #expect(embed.name == "MAPPTEST attachment \(token).png")
+                library.updateBody(of: host, to: "A picture: ![\(embed.name)](\(embed.link))")
+                await source.flush()
+                try #require(await eventually(.seconds(30)) {
+                    library.relationships(for: host).first { $0.field == "inverse:attached-to" }?.targets.count == 1
+                })
+                let file = try #require(library.relationships(for: host).first { $0.field == "inverse:attached-to" }?.targets.first?.itemID)
+                made.add(file)
+                // The path-style embed the page writes reads back as the file the package attached.
+                let links = try await source.copy.items.links(in: host.rawValue)
+                #expect(links.embeds.map(\.target) == [.item(id: file.rawValue)])
+                try #require(await eventually(.seconds(30)) {
+                    if case .file(_, let size)? = library.item(file)?.content { size == Int64(png.count) } else { false }
+                })
+                #expect(library.items(in: .files).contains { $0.id == file })
+                #expect(library.failure == nil, "\(String(describing: library.failure))")
             }
         }
     }

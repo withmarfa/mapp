@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 @testable import MAPP
 
 struct MarfaMappingTests {
-    private static func field(_ name: String, _ type: String = "string", by owner: String, definition: [String: JSONValue] = [:])
+    private static func field(_ name: String, _ type: String = "string", by owner: String, definition: JSONObject = [:])
         -> TypeField
     {
         TypeField(name: name, type: type, declaredBy: owner, definition: definition)
@@ -45,7 +45,7 @@ struct MarfaMappingTests {
         ])
 
     private static func row(
-        _ id: String, type: String = "aic.ticket", properties: [String: JSONValue] = ["title": "Title", "body": "Body"],
+        _ id: String, type: String = "aic.ticket", properties: JSONObject = ["title": "Title", "body": "Body"],
         state: Marfa.ItemState = .active, tier: Marfa.Tier? = .library, version: Int64 = 3, tags: [String] = []
     ) -> Marfa.Item {
         Marfa.Item(
@@ -196,13 +196,22 @@ struct MarfaMappingTests {
         #expect(folder.titleRule == .property("title"))
     }
 
-    @Test func propertiesFollowTheCatalogueThenTheRestByKeyLeavingOutTheBodyAndClearedValues() {
+    @Test func propertiesKeepTheOrderTheServerGivesThemLeavingOutTheBody() {
         let ticket = Self.item(Self.row("t", properties: [
-            "zeta": "z", "title": "Fix it", "body": "Long text", "assignee": "agent", "alpha": 2, "gone": nil
+            "zeta": "z", "title": "Fix it", "body": "Long text", "assignee": "agent", "alpha": 2
         ]))
-        #expect(ticket.properties.map(\.key) == ["assignee", "title", "alpha", "zeta"])
+        #expect(ticket.properties.map(\.key) == ["zeta", "title", "assignee", "alpha"])
         #expect(ticket.value(of: "alpha") == .number(2))
         #expect(ticket.preview == "Long text")
+        let reversed = Self.item(Self.row("t", properties: ["alpha": 2, "assignee": "agent", "title": "Fix it", "zeta": "z"]))
+        #expect(reversed.properties.map(\.key) == ["alpha", "assignee", "title", "zeta"])
+    }
+
+    @Test func nestedObjectsKeepTheirKeysWhenWrittenBack() throws {
+        let object: PropertyValue = .object(["b": .number(1), "a": .string("x")])
+        let json = MarfaMapping.json(object)
+        #expect(json.object?.keys == ["a", "b"])
+        #expect(MarfaMapping.value(json) == object)
     }
 
     @Test func theRowsStateTierTagsVersionAndDatesCarryOver() {
@@ -224,10 +233,49 @@ struct MarfaMappingTests {
 
     @Test func aFileItemIsReadAsItsKindOfFile() {
         let image = Self.item(Self.row("i", type: "core.file.image", properties: ["title": "Cat", "mime_type": "image/png"]))
+        // The server stamps `size_bytes` once it holds the bytes, so a file not yet sent has no size.
         #expect(image.content == .file(.png, byteCount: 0))
         let unknown = Self.item(Self.row("f", type: "core.file", properties: ["title": "Blob"]))
         #expect(unknown.content == .file(.data, byteCount: 0))
         #expect(Self.item(Self.row("n")).content == .markdown)
+    }
+
+    @Test func aFileItemShowsTheSizeTheServerStamped() {
+        let sent = Self.item(Self.row(
+            "i", type: "core.file.image", properties: ["title": "Cat", "mime_type": "image/png", "size_bytes": 48_213]))
+        #expect(sent.content == .file(.png, byteCount: 48_213))
+        let large = Self.item(Self.row("l", type: "core.file", properties: ["title": "Big", "size_bytes": 5_000_000_000]))
+        #expect(large.content == .file(.data, byteCount: 5_000_000_000))
+        let odd = Self.item(Self.row("o", type: "core.file", properties: ["title": "Odd", "size_bytes": "many"]))
+        #expect(odd.content == .file(.data, byteCount: 0))
+    }
+
+    @Test func linksAndEmbedsThatNameNoItemAreShownAsEdgesOfTheText() {
+        let links = BodyLinks(
+            links: [
+                BodyName(text: "[[Plan]]", name: "Plan", target: .item(id: "plan")),
+                BodyName(text: "[[Later]]", name: "Later", target: .pending),
+                BodyName(text: "[[Nowhere]]", name: "Nowhere", target: .missing),
+                BodyName(text: "[[Twin]]", name: "Twin", target: .ambiguous),
+                BodyName(text: "[[Banned]]", name: "Banned", target: .refused(reason: "forbidden"))
+            ],
+            embeds: [
+                BodyName(text: "![[cat.png]]", name: "cat.png", target: .item(id: "file")),
+                BodyName(text: "![[dog.png]]", name: "dog.png", target: .missing)
+            ])
+        let item = MarfaMapping.item(
+            Self.row("n"), edges: [Self.edge("e", "references", from: "n", to: "plan")], catalogue: Self.catalogue,
+            bodyLinks: links, isHeld: { $0 == "plan" })
+        // Those that name an item are the copy's own edges; the rest are the package's word that none is there.
+        #expect(item.edgesOut.map(\.target) == [
+            .item(ItemID("plan")), .pending(spelling: "Later"), .unresolved(spelling: "Nowhere", ambiguous: false),
+            .unresolved(spelling: "Twin", ambiguous: true), .refused(spelling: "Banned", reason: "forbidden"),
+            .unresolved(spelling: "dog.png", ambiguous: false)
+        ])
+        #expect(item.edgesOut.map(\.type) == ["references", "references", "references", "references", "references", "attached-to"])
+        #expect(item.edgesOut.allSatisfy { $0.origin == .body })
+        #expect(Set(item.edgesOut.map(\.id)).count == item.edgesOut.count)
+        #expect(MarfaMapping.unresolvedLinks(of: "n", in: nil).isEmpty)
     }
 
     @Test func aChildHoldsItsParentUnderTheReverseName() {
