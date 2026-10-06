@@ -355,7 +355,7 @@ struct NoteLibraryTests {
         let library = NoteLibrary(notes: [note], store: store, now: { start })
         let manager = undoManager()
         undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
-        let folded = Note(path: "Odd.md", text: "---\ntags: >\n  favorite\ntitle: x\n---\n# Odd", created: start)
+        let folded = Note(path: "Odd.md", text: "---\ntags: >\n  a, favorite\ntitle: x\n---\n# Odd", created: start)
         library.notes[0].file = folded.file
         store.changes.removeAll()
         manager.undo()
