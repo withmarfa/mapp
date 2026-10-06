@@ -8,7 +8,7 @@ struct NoteList: View {
     @Bindable var browser: Browser
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
-    var settingsPresented = false
+    var settingsTitle: String?
     @State private var daysSeen = 0
     @State private var width: CGFloat = 340
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
@@ -82,7 +82,7 @@ struct NoteList: View {
             return .handled
         }
         .toolbar {
-            if !settingsPresented {
+            if settingsTitle == nil {
                 ColumnSearch(
                     isExpanded: $browser.isSearchExpanded,
                     text: $browser.searchText,
@@ -130,12 +130,12 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(title)
-        .navigationSubtitle(browser.isSearching
+        .navigationTitle(settingsTitle ?? title)
+        .navigationSubtitle(settingsTitle != nil ? Text("") : browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) item](inflect: true)"))
         // The search field takes the title's place while it is out.
-        .toolbar(removing: settingsPresented || browser.isSearchExpanded ? .title : nil)
+        .toolbar(removing: settingsTitle == nil && browser.isSearchExpanded ? .title : nil)
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.

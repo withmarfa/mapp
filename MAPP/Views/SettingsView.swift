@@ -9,15 +9,6 @@ struct SettingsView: View {
     @State private var isEmptying = false
     @FocusState private var isSearchFocused: Bool
 
-    private var panes: [SettingsPane] {
-        SettingsPane.allCases.filter { $0.matches(presentation.query) }
-    }
-
-    private var selectedPane: SettingsPane? {
-        guard let pane = presentation.pane, panes.contains(pane) else { return panes.first }
-        return pane
-    }
-
     private var deleted: Set<Note.ID> {
         folder.library.map { Set($0.notes(in: .recentlyDeleted).map(\.id)) } ?? []
     }
@@ -30,6 +21,7 @@ struct SettingsView: View {
             detail
                 .navigationSplitViewColumnWidth(min: 360, ideal: 640)
         }
+        .navigationTitle(presentation.title)
         .searchable(text: $presentation.query, placement: .sidebar, prompt: "Search Settings")
         .searchFocused($isSearchFocused)
         .toolbar {
@@ -46,7 +38,7 @@ struct SettingsView: View {
             isSearchFocused = true
         }
         .onChange(of: presentation.query) {
-            if let selectedPane { presentation.pane = selectedPane }
+            if let pane = presentation.displayedPane { presentation.pane = pane }
         }
         .fileImporter(isPresented: $isChoosing, allowedContentTypes: [.folder]) { result in
             // Open notes hand over their last edits to the folder they came from before it is changed.
@@ -64,19 +56,18 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         List(selection: $presentation.pane) {
-            ForEach(panes) { pane in
+            ForEach(presentation.matchingPanes) { pane in
                 Label(pane.title, systemImage: pane.symbol)
                     .tag(pane)
                     .accessibilityIdentifier("SettingsPane-\(pane.rawValue)")
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsSidebar")
     }
 
     @ViewBuilder private var detail: some View {
-        if let pane = selectedPane {
+        if let pane = presentation.displayedPane {
             Form {
                 switch pane {
                 case .appearance:
@@ -100,11 +91,9 @@ struct SettingsView: View {
             }
             .labelStyle(.titleOnly)
             .formStyle(.grouped)
-            .navigationTitle(pane.title)
             .accessibilityIdentifier("SettingsDetail")
         } else {
             ContentUnavailableView.search(text: presentation.query)
-                .navigationTitle("Settings")
         }
     }
 
