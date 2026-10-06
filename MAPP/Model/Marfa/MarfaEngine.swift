@@ -146,7 +146,7 @@ actor MarfaEngine {
     }
 
     /// The package refuses every call while the copy changes its key, as `invalid`, and asks for it again; that
-    /// is a wait, never a refusal or a failure to show. `invalid` at any other time is the call's own fault.
+    /// is a wait, never a refusal or a failure to show. Any other `invalid` is passed on.
     nonisolated static func asking<T>(_ hub: MarfaHub, _ work: () async throws -> T) async throws -> T {
         while true {
             let mark = hub.keyChanges
