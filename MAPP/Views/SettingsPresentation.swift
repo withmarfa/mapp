@@ -8,6 +8,17 @@ final class SettingsPresentation {
     var pane: SettingsPane? = .appearance
     var query = ""
 
+    var matchingPanes: [SettingsPane] {
+        SettingsPane.allCases.filter { $0.matches(query) }
+    }
+
+    var displayedPane: SettingsPane? {
+        guard let pane, matchingPanes.contains(pane) else { return matchingPanes.first }
+        return pane
+    }
+
+    var title: String { displayedPane?.title ?? String(localized: "Settings") }
+
     func show() { isPresented = true }
     func close() { isPresented = false }
 }

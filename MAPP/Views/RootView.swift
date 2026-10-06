@@ -21,7 +21,6 @@ struct RootView: View {
         // Settings reads the library too, so it is given to both.
         .environment(\.library, folder.library)
         .focusedSceneValue(\.settingsPresentation, settings)
-        .toolbarVisibility(settings.isPresented ? .hidden : .automatic)
         .onAppear {
             if settingsRequest.isPending {
                 settingsRequest.isPending = false
