@@ -2,6 +2,17 @@ import Foundation
 
 /// Why a write was refused or stopped, read into the parts the app shows.
 nonisolated struct SyncProblem: Hashable, Sendable {
+    /// A permission the key lacks, which the person restores on the server rather than in the app.
+    struct Grant: Hashable, Sendable {
+        enum Kind: Hashable, Sendable { case type, edgeType, `extension` }
+        enum Level: Hashable, Sendable { case read, write }
+
+        var kind: Kind
+        /// The type, edge type or extension namespace.
+        var name: String
+        var level: Level
+    }
+
     /// The server's code verbatim, the contract's name for a blocked reason, or a source's own code for a write
     /// it could not make.
     var code: String
@@ -10,6 +21,7 @@ nonisolated struct SyncProblem: Hashable, Sendable {
     var fields: [String: String] = [:]
     /// The item is in the bin and can be restored.
     var isTrashed = false
+    var grant: Grant?
 }
 
 /// The contract's closed set, less `awaiting_dependency`, which is never a verdict's reason.
@@ -44,7 +56,7 @@ nonisolated enum WriteOutcome: Hashable, Sendable {
         case .blocked(let reason, let problem):
             .blocked(SyncProblem(
                 code: reason.rawValue, message: problem?.message, fields: problem?.fields ?? [:],
-                isTrashed: problem?.isTrashed ?? false))
+                isTrashed: problem?.isTrashed ?? false, grant: problem?.grant))
         // A dead write waits for a release as a blocked one does, so the person is offered the same retry.
         case .dead: .blocked(SyncProblem(code: "dead"))
         }

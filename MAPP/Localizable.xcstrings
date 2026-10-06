@@ -835,6 +835,9 @@
     },
     "The Marfa server refused this library’s key. Check the key in Settings.": {
       "extractionState": "manual"
+    },
+    "Tags: %@": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

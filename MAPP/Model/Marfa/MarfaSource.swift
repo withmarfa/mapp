@@ -2,6 +2,19 @@ import Foundation
 import Marfa
 import Synchronization
 
+/// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
+/// covers those and no write that arrives after.
+nonisolated struct UnsentWrites: Hashable, Sendable {
+    var ids: Set<String>
+    var count: Int { ids.count }
+}
+
+nonisolated enum CloseOutcome: Hashable, Sendable {
+    case closed
+    /// Kept open for writes not agreed to; nil where the queue could not be read.
+    case waiting(UnsentWrites?)
+}
+
 /// What the source knows of its server, for the app to show beside the library.
 nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// Showing what the copy holds, not yet heard from the server.
@@ -9,13 +22,16 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     case online
     /// The server cannot be reached; writes wait in the queue and go when it can.
     case offline(reason: String?)
+    /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
+    /// another.
+    case keyRefused
     /// Following the server stopped, and stays stopped until the next refresh. The copy still reads and queues.
     case stopped(code: String, message: String)
 }
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
 /// library shows what it holds before, and without, the network.
-nonisolated final class MarfaSource: ItemSource {
+nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
     let capabilities: SourceCapabilities = [.archive]
     let embeds: any EmbedResolver = MarfaEmbeds()
@@ -83,6 +99,62 @@ nonisolated final class MarfaSource: ItemSource {
         events.yield(.write(write, id))
     }
 
+    /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
+    /// with it whatever the answer, so a caller that keeps another key gives that one back.
+    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
+        do {
+            return try await engine.sync.tryKey(key)
+        } catch let error as MarfaError {
+            // A copy that could not open its store again is closed for good, and is opened again.
+            if case .closed = error { throw SourceFailure(kind: .missing, message: error.message) }
+            throw SourceFailure(kind: .failed, message: error.message)
+        }
+    }
+
+    // MARK: Sync problems
+
+    var syncReport: SyncReport { hub.report.value }
+
+    func syncReports() -> AsyncStream<SyncReport> {
+        hub.report.values()
+    }
+
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
+        guard let entry = hub.report.value.problems.first(where: { $0.id == problem }), entry.actions.contains(action)
+        else { return false }
+        switch (problem, action) {
+        case (.write(let id), .discard):
+            return try await ask { .discard(id, $0) }
+        case (.write(let id), .tryAgain):
+            return try await ask { .release(id, $0) }
+        case (.write(let id), .withdraw):
+            // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
+            // copy announces the withdrawal, which the engine reads again.
+            do {
+                return try await MarfaEngine.asking(hub) { try await copy.queue.withdraw(id) }
+            } catch let error as MarfaError {
+                throw SourceFailure(kind: .failed, message: error.message)
+            }
+        case (.conflictedCopy(let copy), .discard):
+            submit(.transition(copy, .trashed), as: WriteID())
+            return true
+        case (.conflictedCopy(let copy), .keep):
+            submit(.tag(copy, MarfaProblems.conflictedCopyTag, on: false), as: WriteID())
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func ask(
+        _ event: (CheckedContinuation<Result<Bool, SourceFailure>, Never>) -> MarfaEngine.Event
+    ) async throws -> Bool {
+        let result = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(event(continuation)) { continuation.resume(returning: .success(false)) }
+        }
+        return try result.get()
+    }
+
     func body(of item: ItemID) async throws -> ItemBody {
         let row = try await self.row(item)
         let text = MarfaMapping.body(of: row, catalogue: hub.catalogue) ?? ""
@@ -95,7 +167,7 @@ nonisolated final class MarfaSource: ItemSource {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
         do {
-            return try await copy.blobs.get(hash)
+            return try await MarfaEngine.asking(hub) { try await copy.blobs.get(hash) }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -113,7 +185,7 @@ nonisolated final class MarfaSource: ItemSource {
         }
         let hits: [SearchHit]
         do {
-            hits = try await copy.search(text, filters: filters, limit: 500)
+            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500) }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -137,6 +209,27 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    /// The writes not sent once every write submitted before this call is in the queue; nil where the queue
+    /// cannot be read.
+    func unsentWrites() async -> UnsentWrites? {
+        await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.unsent(continuation)) { continuation.resume(returning: nil) }
+        }
+    }
+
+    /// Closes, as `close()` does, only if every write not sent, once every write submitted before this call is
+    /// in the queue, is one of `agreed`, deciding and closing in one step; nil agrees to whatever the copy
+    /// holds. Otherwise it stays open and answers what is not sent.
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+        let outcome = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.closeAgreeing(agreed, continuation)) {
+                continuation.resume(returning: .closed)
+            }
+        }
+        if outcome == .closed { events.finish() }
+        return outcome
+    }
+
     /// Nothing submitted after this is taken, and a flush still waiting returns.
     func close() async {
         await withCheckedContinuation { continuation in
@@ -149,10 +242,11 @@ nonisolated final class MarfaSource: ItemSource {
     /// A row in the bin is not answered by `get`, only by a list of the bin.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
-            if let row = try await copy.items.get(id.rawValue) { return row }
-            if let row = try await copy.items.list(ListFilters(state: .trashed)).first(where: { $0.id == id.rawValue }) {
-                return row
+            let row = try await MarfaEngine.asking(hub) { () async throws -> Marfa.Item? in
+                if let row = try await copy.items.get(id.rawValue) { return row }
+                return try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue }
             }
+            if let row { return row }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -174,14 +268,30 @@ nonisolated final class MarfaHub: Sendable {
     private struct State {
         var snapshot: SourceSnapshot?
         var readers: [UUID: AsyncStream<SourceChange>.Continuation] = [:]
-        var connection = MarfaConnectionState.connecting
-        var watchers: [UUID: AsyncStream<MarfaConnectionState>.Continuation] = [:]
         var finished = false
     }
 
     private let state = Mutex(State())
+    private let keyChange = Mutex((changing: false, count: 0))
+    private let connectionState = Latest(MarfaConnectionState.connecting)
+    let report = Latest(SyncReport())
 
-    var connection: MarfaConnectionState { state.withLock { $0.connection } }
+    var connection: MarfaConnectionState { connectionState.value }
+
+    /// Counts each start and end of a change of key, so a call refused during one is told from one refused for
+    /// its own sake.
+    var keyChanges: Int { keyChange.withLock { $0.count } }
+
+    func keyChanged(since mark: Int) -> Bool {
+        keyChange.withLock { $0.changing || $0.count != mark }
+    }
+
+    func changingKey(_ changing: Bool) {
+        keyChange.withLock {
+            $0.changing = changing
+            $0.count += 1
+        }
+    }
     var catalogue: Catalogue { state.withLock { $0.snapshot?.catalogue ?? Catalogue() } }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {
@@ -211,17 +321,7 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     func connectionStates() -> AsyncStream<MarfaConnectionState> {
-        let (stream, continuation) = AsyncStream<MarfaConnectionState>.makeStream()
-        let token = UUID()
-        continuation.onTermination = { [weak self] _ in self?.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
-        let finished = state.withLock { state in
-            guard !state.finished else { return true }
-            continuation.yield(state.connection)
-            state.watchers[token] = continuation
-            return false
-        }
-        if finished { continuation.finish() }
-        return stream
+        connectionState.values()
     }
 
     /// Only the engine publishes, one change at a time, so telling readers outside the lock keeps their order.
@@ -239,25 +339,18 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     func set(_ connection: MarfaConnectionState) {
-        let watchers = state.withLock { state -> [AsyncStream<MarfaConnectionState>.Continuation] in
-            guard state.connection != connection else { return [] }
-            state.connection = connection
-            return Array(state.watchers.values)
-        }
-        for watcher in watchers { watcher.yield(connection) }
+        connectionState.set(connection)
     }
 
     func finish() {
-        let (readers, watchers) = state.withLock { state in
+        let readers = state.withLock { state in
             state.finished = true
-            defer {
-                state.readers = [:]
-                state.watchers = [:]
-            }
-            return (Array(state.readers.values), Array(state.watchers.values))
+            defer { state.readers = [:] }
+            return Array(state.readers.values)
         }
         for reader in readers { reader.finish() }
-        for watcher in watchers { watcher.finish() }
+        connectionState.finish()
+        report.finish()
     }
 }
 
