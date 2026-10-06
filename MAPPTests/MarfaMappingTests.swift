@@ -35,7 +35,7 @@ struct MarfaMappingTests {
             ItemType(id: "core.message", label: "Message", fields: [field("text", by: "core.message")], bodyField: "text"),
             ItemType(id: "core.file", label: "File", titleField: "title"),
             ItemType(id: "core.file.image", label: "Image", parent: "core.file", titleField: "title"),
-            ItemType(id: "system.folder", label: "Folder")
+            ItemType(id: "system.folder", label: "Folder", fields: [field("title", by: "system.folder")])
         ],
         edgeTypes: [
             EdgeType(id: "parent-of", label: "Parent of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target),
@@ -88,6 +88,91 @@ struct MarfaMappingTests {
         #expect(Self.catalogue.edgeTypes["supersedes"]?.cardinality == .one)
         #expect(Self.catalogue.edgeTypes["in-folder"]?.targetTypes == [TypeID("system.folder")])
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
+    }
+
+    @Test func typesCarryTheRestOfTheirDefinition() throws {
+        let catalogue = MarfaMapping.catalogue(
+            itemTypes: [
+                ItemType(
+                    id: "core.contact", label: "Contact", description: "A person.", version: 4,
+                    fields: [TypeField(name: "name", type: "string", required: true, description: "Full name", declaredBy: "core.contact")],
+                    roles: ["person"], compatibleWith: ["core.entity"])
+            ],
+            edgeTypes: [
+                EdgeType(
+                    id: "knows", label: "Knows", description: "Two people know each other.", cardinality: "one-to-many",
+                    reverseName: "known-by", writtenAt: .target, cascadeOnDelete: "block",
+                    properties: [TypeField(name: "since", type: "date", declaredBy: "knows")]),
+                EdgeType(id: "owns", cardinality: "many-to-one", cascadeOnDelete: "cascade"),
+                EdgeType(id: "next", cardinality: "one-to-one", cascadeOnDelete: "unknown")
+            ])
+        let contact = try #require(catalogue.itemTypes[TypeID("core.contact")])
+        #expect(contact.description == "A person." && contact.version == 4)
+        #expect(contact.roles == ["person"] && contact.compatibleWith == [TypeID("core.entity")])
+        #expect(contact.fields.first?.required == true && contact.fields.first?.description == "Full name")
+        let knows = try #require(catalogue.edgeTypes["knows"])
+        #expect(knows.description == "Two people know each other.")
+        // One source per target, many targets per source, written at the target: the target holds one.
+        #expect(knows.cardinality == .one && knows.reverseCardinality == .many)
+        #expect(knows.cascadeOnDelete == .block)
+        #expect(knows.properties.map(\.key) == ["since"] && knows.properties.first?.kind == .date)
+        let owns = try #require(catalogue.edgeTypes["owns"])
+        #expect(owns.cardinality == .one && owns.reverseCardinality == .many && owns.cascadeOnDelete == .cascade)
+        #expect(catalogue.edgeTypes["next"]?.cascadeOnDelete == .orphan)
+    }
+
+    @Test func titleAndBodyFallBackToTitleAndBodyWhereTheTypeDeclaresThem() {
+        func type(_ id: String, _ fields: [String], title: String? = nil, body: String? = nil) -> ItemTypeInfo {
+            MarfaMapping.itemType(ItemType(
+                id: id, fields: fields.map { Self.field($0, by: id) }, titleField: title, bodyField: body))
+        }
+        // A type naming neither hint, as a folder does, is read under `title` and `body`.
+        let folder = type("system.folder", ["title", "body", "path"])
+        #expect(MarfaMapping.titleField(of: folder) == "title" && MarfaMapping.bodyField(of: folder) == "body")
+        // A type naming only its body, as a message does, keeps its title under `title` where it has one.
+        let message = type("core.message", ["text"], body: "text")
+        #expect(MarfaMapping.titleField(of: message) == nil && MarfaMapping.bodyField(of: message) == "text")
+        let titled = type("core.note", ["title", "text"], body: "text")
+        #expect(MarfaMapping.titleField(of: titled) == "title")
+        // A title hint alone leaves the body to `body` only where declared.
+        let entity = type("core.entity", ["name"], title: "name")
+        #expect(MarfaMapping.titleField(of: entity) == "name" && MarfaMapping.bodyField(of: entity) == nil)
+        let aic = type("aic.project", ["title", "body"], title: "title", body: "body")
+        #expect(MarfaMapping.titleField(of: aic) == "title" && MarfaMapping.bodyField(of: aic) == "body")
+        // A type with neither hint nor fields has neither.
+        let bare = type("system.connection", [])
+        #expect(MarfaMapping.titleField(of: bare) == nil && MarfaMapping.bodyField(of: bare) == nil)
+        // A type the catalogue lacks is titled by `title` and has no body.
+        #expect(MarfaMapping.titleField(of: nil) == "title" && MarfaMapping.bodyField(of: nil) == nil)
+    }
+
+    @Test func anItemOfATypeWithoutHintsReadsItsTitleAndBodyUnderTitleAndBody() {
+        let catalogue = MarfaMapping.catalogue(
+            itemTypes: [ItemType(id: "system.folder", fields: [Self.field("title", by: "system.folder"), Self.field("body", by: "system.folder")])],
+            edgeTypes: [])
+        let row = Self.row("f1", type: "system.folder", properties: ["title": "Inbox", "body": "Everything unsorted."])
+        let item = MarfaMapping.item(row, edges: [], catalogue: catalogue, isHeld: { _ in false })
+        #expect(item.title == "Inbox")
+        #expect(item.titleRule == .property("title"))
+        #expect(item.preview == "Everything unsorted.")
+        #expect(!item.properties.contains { $0.key == "body" })
+    }
+
+    @Test func aRoleConstraintIsARoleAndNotAType() throws {
+        let catalogue = MarfaMapping.catalogue(
+            itemTypes: [],
+            edgeTypes: [
+                EdgeType(id: "in-collection", cardinality: "many-to-many", targetTypeConstraints: ["role:container"]),
+                EdgeType(id: "mixed", cardinality: "many-to-many", sourceTypeConstraints: ["core.note", "role:container"]),
+                EdgeType(id: "open", cardinality: "many-to-many", sourceTypeConstraints: ["*"], targetTypeConstraints: ["*", "role:x"])
+            ])
+        let inCollection = try #require(catalogue.edgeTypes["in-collection"])
+        #expect(inCollection.targetTypes.isEmpty && inCollection.targetRoles == ["container"])
+        #expect(inCollection.allowsAnySource() && !inCollection.allowsAnyTarget())
+        let mixed = try #require(catalogue.edgeTypes["mixed"])
+        #expect(mixed.sourceTypes == [TypeID("core.note")] && mixed.sourceRoles == ["container"])
+        let open = try #require(catalogue.edgeTypes["open"])
+        #expect(open.allowsAnySource() && open.allowsAnyTarget())
     }
 
     @Test func theSliceNamesEveryNamespaceButTheServersOwn() {

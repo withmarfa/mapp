@@ -196,7 +196,7 @@ nonisolated enum MarfaProblems {
         if let titleField = MarfaMapping.titleField(of: info) {
             content.title = properties.removeValue(forKey: titleField).flatMap { text(MarfaMapping.value($0)) }
         }
-        if let bodyField = info?.bodyField ?? (info == nil ? "body" : nil) {
+        if let bodyField = MarfaMapping.bodyField(of: info) ?? (info == nil ? "body" : nil) {
             content.body = properties.removeValue(forKey: bodyField).flatMap { text(MarfaMapping.value($0)) }
         }
         let fields = info?.fields ?? []

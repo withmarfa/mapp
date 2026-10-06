@@ -14,6 +14,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         let kind: Kind
         /// The type that declares the field, which is an ancestor for an inherited one.
         let declaredBy: TypeID
+        var required = false
+        var description: String?
         var id: String { key }
     }
 
@@ -21,16 +23,30 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let label: String
     /// Inherited fields included, in the order they are shown.
     let fields: [Field]
-    /// The property holding the title, where the title is not the body's first line.
+    /// The display hints the type declares or inherits, taken whole; where they name none, Marfa reads `title` and
+    /// `body`.
     let titleField: String?
     let bodyField: String?
     let parent: TypeID?
+    var description: String?
+    /// A files library's types have none.
+    var version: Int64?
+    /// With the roles it inherits, as Marfa resolves them.
+    var roles: [String] = []
+    /// The types this one claims to be a structural superset of.
+    var compatibleWith: [TypeID] = []
+
+    func declares(_ key: String) -> Bool { fields.contains { $0.key == key } }
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     enum End: Hashable, Sendable { case source, target }
 
     enum Cardinality: Hashable, Sendable { case one, many }
+
+    /// What deleting an item does through an edge: `cascade` deletes the target when the source is deleted, `block`
+    /// refuses a delete of either end, and `orphan` keeps the other end.
+    enum CascadeOnDelete: Hashable, Sendable { case cascade, orphan, block }
 
     let id: String
     let label: String
@@ -39,9 +55,20 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     /// How many of this edge the end it is written at may hold, which decides whether its field takes a list.
     let cardinality: Cardinality
     let writtenAt: End
-    /// The types each end may be; an empty set allows any.
+    /// The types each end may be, with their subtypes, and the roles a type may play to be one. An end naming
+    /// neither allows any type.
     let sourceTypes: Set<TypeID>
     let targetTypes: Set<TypeID>
+    var sourceRoles: Set<String> = []
+    var targetRoles: Set<String> = []
+    var description: String?
+    /// How many of this edge the end it is not written at may hold.
+    var reverseCardinality: Cardinality = .many
+    var cascadeOnDelete: CascadeOnDelete = .orphan
+    var properties: [ItemTypeInfo.Field] = []
+
+    func allowsAnySource() -> Bool { sourceTypes.isEmpty && sourceRoles.isEmpty }
+    func allowsAnyTarget() -> Bool { targetTypes.isEmpty && targetRoles.isEmpty }
 }
 
 nonisolated struct Catalogue: Hashable, Sendable {

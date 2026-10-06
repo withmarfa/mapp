@@ -22,12 +22,16 @@ nonisolated enum MarfaMapping {
     static func itemType(_ type: Marfa.ItemType) -> ItemTypeInfo {
         ItemTypeInfo(
             id: TypeID(type.id), label: type.label ?? type.id,
-            fields: type.fields.map { field in
-                ItemTypeInfo.Field(
-                    key: field.name, label: label(forField: field.name), kind: kind(of: field),
-                    declaredBy: TypeID(field.declaredBy))
-            },
-            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) })
+            fields: type.fields.map(field),
+            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) },
+            description: type.description, version: type.version, roles: type.roles,
+            compatibleWith: type.compatibleWith.map { TypeID($0) })
+    }
+
+    private static func field(_ field: Marfa.TypeField) -> ItemTypeInfo.Field {
+        ItemTypeInfo.Field(
+            key: field.name, label: label(forField: field.name), kind: kind(of: field),
+            declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description)
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {
@@ -35,14 +39,33 @@ nonisolated enum MarfaMapping {
         // side of it allows.
         let ends = type.cardinality.split(separator: "-to-").map(String.init)
         let held = type.writtenAt == .target ? ends.first : ends.last
+        let other = type.writtenAt == .target ? ends.last : ends.first
         return EdgeTypeInfo(
             id: type.id, label: type.label ?? type.id, reverseName: type.reverseName,
             cardinality: held == "one" ? .one : .many, writtenAt: type.writtenAt == .target ? .target : .source,
-            sourceTypes: constraints(type.sourceTypeConstraints), targetTypes: constraints(type.targetTypeConstraints))
+            sourceTypes: constraints(type.sourceTypeConstraints).types,
+            targetTypes: constraints(type.targetTypeConstraints).types,
+            sourceRoles: constraints(type.sourceTypeConstraints).roles,
+            targetRoles: constraints(type.targetTypeConstraints).roles,
+            description: type.description, reverseCardinality: other == "one" ? .one : .many,
+            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map(field))
     }
 
-    private static func constraints(_ names: [String]) -> Set<TypeID> {
-        names.contains("*") ? [] : Set(names.map { TypeID($0) })
+    private static func cascade(_ name: String) -> EdgeTypeInfo.CascadeOnDelete {
+        switch name {
+        case "cascade": .cascade
+        case "block": .block
+        default: .orphan
+        }
+    }
+
+    /// A constraint names a type, which matches its subtypes, or `role:<name>`, which matches the types that play
+    /// the role. `*` allows any.
+    private static func constraints(_ names: [String]) -> (types: Set<TypeID>, roles: Set<String>) {
+        guard !names.contains("*") else { return ([], []) }
+        let prefix = "role:"
+        let roles = names.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+        return (Set(names.filter { !$0.hasPrefix(prefix) }.map { TypeID($0) }), Set(roles))
     }
 
     private static func kind(of field: Marfa.TypeField) -> ItemTypeInfo.Field.Kind {
@@ -93,7 +116,7 @@ nonisolated enum MarfaMapping {
             titleRule = .firstLine
         }
         var properties = row.properties
-        if let bodyField = info?.bodyField { properties[bodyField] = nil }
+        if let bodyField = bodyField(of: info) { properties[bodyField] = nil }
         // A merge edit cannot take a property away, so one cleared is sent as null and reads as absent.
         properties = properties.filter { $0.value != .null }
         let created = date(row.createdAt)
@@ -108,13 +131,23 @@ nonisolated enum MarfaMapping {
             edgesOut: edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld), sync: sync)
     }
 
-    /// A type that names neither a title nor a body field keeps its title where Marfa's own reader looks.
+    /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads
+    /// it. Where the type does not declare `title` either, the title is the first line of the body rather than a
+    /// property the type lacks. A type the catalogue lacks is read as Marfa reads one with no hints.
     static func titleField(of type: ItemTypeInfo?) -> String? {
-        type?.titleField ?? (type?.bodyField == nil ? "title" : nil)
+        guard let type else { return "title" }
+        return type.titleField ?? (type.declares("title") ? "title" : nil)
+    }
+
+    /// Where an item's text is read and written: the field the type's hints name, else `body` where the type
+    /// declares it. Marfa reads `body` even where it is not declared; the app refuses text for such a type rather
+    /// than write a property the type lacks.
+    static func bodyField(of type: ItemTypeInfo?) -> String? {
+        type.flatMap { $0.bodyField ?? ($0.declares("body") ? "body" : nil) }
     }
 
     static func body(of row: Marfa.Item, catalogue: Catalogue) -> String? {
-        catalogue.itemTypes[TypeID(row.type)]?.bodyField.flatMap { row.properties[$0]?.string }
+        bodyField(of: catalogue.itemTypes[TypeID(row.type)]).flatMap { row.properties[$0]?.string }
     }
 
     /// Each edge sits with the item at the end its type is written at, named as that end writes it: a `parent-of`
