@@ -455,28 +455,62 @@ final class WindowTests: XCTestCase {
 
     // MARK: Marfa Types
 
+    /// The list of types, where the note list would be.
+    private var typesList: XCUIElement { window.descendants(matching: .any)["MarfaTypesList"] }
     /// The chosen type, where a note would be.
-    private var typesPage: XCUIElement { window.groups["MarfaTypes"].webViews.firstMatch }
-    /// The page's list of types, where the note list would be.
-    private var typesList: XCUIElement { window.groups["MarfaTypesList"].webViews.firstMatch }
+    private var typeDetail: XCUIElement { window.descendants(matching: .any)["MarfaTypes"] }
+
+    private func typeRow(_ id: String) -> XCUIElement {
+        window.descendants(matching: .any)["MarfaTypeRow.\(id)"]
+    }
+
+    /// Waits for the chosen type's page to show the type with this id under its name.
+    private func waitForType(_ id: String) -> Bool {
+        let shown = NSPredicate(format: "identifier == 'MarfaTypeID' AND (label == %@ OR value == %@)", id, id)
+        return typeDetail.descendants(matching: .any).matching(shown).firstMatch.waitForExistence(timeout: 3)
+    }
+
+    /// The list's column before and after Marfa Types is picked, which must not move: the window keeps its columns.
+    private func assertTheColumnsStay(_ column: CGRect, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(typesList.frame.minX, column.minX, accuracy: 2, "the types take the list's column", file: file, line: line)
+        XCTAssertEqual(typesList.frame.width, column.width, accuracy: 2, "at the list's width", file: file, line: line)
+    }
 
     func testMarfaTypesTakesTheListAndThePageUntilAnotherPlaceIsPicked() {
+        XCTAssertTrue(list.waitForExistence(timeout: 2))
+        let column = list.frame
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        XCTAssertTrue(list.waitForNonExistence(timeout: 2), "the page takes the list's column")
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
+        XCTAssertTrue(list.waitForNonExistence(timeout: 2), "the types take the list's column")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 2), "and the note's")
-        let person = typesList.links["Person"].firstMatch
-        XCTAssertTrue(person.waitForExistence(timeout: 5), "the page shows its own navigation")
-        person.click()
-        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2), "the page's links move it on")
+        assertTheColumnsStay(column)
+        typeRow("aic.ticket.task").click()
+        XCTAssertTrue(waitForType("aic.ticket.task"))
+        typeDetail.links["Parent"].firstMatch.click()
+        XCTAssertTrue(waitForType("parent-of"), "a link on the page chooses the type it names")
+        let chosen = typesList.outlineRows.containing(.any, identifier: "MarfaTypeRow.parent-of").firstMatch
+        XCTAssertTrue(chosen.isSelected, "and the list follows")
         sidebarItem("Inbox").click()
         XCTAssertTrue(list.waitForExistence(timeout: 2))
-        XCTAssertTrue(typesPage.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(typesList.waitForNonExistence(timeout: 2))
+    }
+
+    func testTheArrowKeysMoveThroughTheTypes() {
+        // The palette hands the keyboard to the list, as it does for the note list.
+        app.typeKey("k", modifierFlags: .command)
+        app.typeText("marfa types\r")
+        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(waitForType("aic.decision"), "the list has the keyboard and starts at its first type")
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(waitForType("aic.epic"))
+        app.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertTrue(waitForType("aic.decision"))
     }
 
     func testSearchListFromMarfaTypesGoesToAllNotesAndSearches() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
         app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(list.waitForExistence(timeout: 2))
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
@@ -494,56 +528,90 @@ final class WindowTests: XCTestCase {
         }
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(list.waitForExistence(timeout: 2))
+        let column = list.frame
         open("marfa types")
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
+        assertTheColumnsStay(column)
         open("inbox")
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         open("marfa types")
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
         XCTAssertFalse(sidebar.exists, "the sidebar stays as it was left")
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 2))
+        XCTAssertTrue(typesList.exists, "the sidebar comes back beside the types")
+    }
+
+    func testPickingMarfaTypesAfterResizingTheSidebarWorks() {
+        // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar resized.
+        let divider = window.splitters.firstMatch
+        XCTAssertTrue(divider.waitForExistence(timeout: 2))
+        let before = sidebar.frame.width
+        let edge = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
+        XCTAssertGreaterThan(sidebar.frame.width, before + 30, "the sidebar is wider")
+        let column = list.frame
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
+        assertTheColumnsStay(column)
+        sidebarItem("Inbox").click()
+        XCTAssertTrue(list.waitForExistence(timeout: 5))
+        let width = sidebar.frame.width
+        let moved = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        moved.press(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
+        XCTAssertLessThan(sidebar.frame.width, width - 30, "the sidebar is narrower")
+        sidebarItem("Marfa Types").click()
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
+        XCTAssertTrue(sidebar.exists)
     }
 
     func testAMarfaTypesSearchEndsWhenAnotherPlaceIsPicked() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
         app.typeKey("f", modifierFlags: .command)
-        app.typeText("calendar")
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
+        app.typeText("decision")
+        XCTAssertTrue(typeRow("core.note").waitForNonExistence(timeout: 2))
         sidebarItem("Inbox").click()
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 3), "the whole list is back")
+        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 3), "the whole list is back")
+        XCTAssertFalse(listSearch.exists)
     }
 
-    func testTheToolbarSearchesMarfaTypes() {
+    func testTheListColumnsSearchSearchesMarfaTypes() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertFalse(typesPage.searchFields.firstMatch.exists || typesList.searchFields.firstMatch.exists, "the toolbar's search stands in for the page's")
+        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
         app.typeKey("f", modifierFlags: .command)
-        app.typeText("core.task")
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForNonExistence(timeout: 2), "the page's list narrows")
-        XCTAssertTrue(typesList.links["Task"].firstMatch.exists)
+        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
+        XCTAssertEqual(listSearch.placeholderValue, "Search", "the field reads as the notes' search does")
+        app.typeText("ticket.task")
+        XCTAssertTrue(typeRow("core.note").waitForNonExistence(timeout: 2), "the list narrows")
+        XCTAssertTrue(typeRow("aic.ticket.task").exists)
         app.typeKey(.return, modifierFlags: [])
-        let fields = typesPage.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Fields'")).firstMatch
-        XCTAssertTrue(fields.waitForExistence(timeout: 2), "Return opens the match")
+        XCTAssertTrue(waitForType("aic.ticket.task"), "Return chooses the first match")
     }
 
     func testBackAndForwardMoveThroughTheTypesShown() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.links["Person"].firstMatch.waitForExistence(timeout: 5))
-        typesList.links["Person"].firstMatch.click()
-        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
-        typesList.links["Place"].firstMatch.click()
-        XCTAssertTrue(typesPage.staticTexts["core.entity.place"].firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
+        typeRow("core.note").click()
+        XCTAssertTrue(waitForType("core.note"))
+        typeRow("aic.ticket.task").click()
+        XCTAssertTrue(waitForType("aic.ticket.task"))
         app.typeKey("[", modifierFlags: .command)
-        XCTAssertTrue(typesPage.staticTexts["core.entity.person"].firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(waitForType("core.note"))
         app.typeKey("]", modifierFlags: .command)
-        XCTAssertTrue(typesPage.staticTexts["core.entity.place"].firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(waitForType("aic.ticket.task"))
+        app.menuBars.menuBarItems["View"].click()
+        XCTAssertTrue(app.menuBars.menuItems["Back"].isEnabled)
+        XCTAssertFalse(app.menuBars.menuItems["Forward"].isEnabled, "nothing lies ahead")
+        app.typeKey(.escape, modifierFlags: [])
     }
 
     func testANewNoteFromMarfaTypesGoesToTheInbox() {
         sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         XCTAssertTrue(window.textFields["ItemPageTitle"].exists, "the new item opens its own page")

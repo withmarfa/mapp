@@ -14,8 +14,6 @@ extension FocusedValues {
     @Entry var focusedNotes: FocusedNotes?
     /// The editor of the window in front, for the Format menu.
     @Entry var editor: EditorController?
-    /// Marfa Types, while the window in front shows it, for Back and Forward.
-    @Entry var marfaTypes: MarfaTypesPage?
 }
 
 /// Presentation belongs to a window, so menu and toolbar actions share it without changing other windows.

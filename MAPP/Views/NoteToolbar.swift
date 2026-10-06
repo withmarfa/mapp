@@ -53,12 +53,12 @@ struct NoteToolbar: CustomizableToolbarContent {
         .hidden(showsTypes)
     }
 
-    /// Marfa Types shows a page, not a note, so the tools for notes step aside.
     private var selectedFileURL: URL? {
         guard browser?.isCreatingItem != true, browser?.selection.count == 1, let id = browser?.selection.first else { return nil }
         return library.fileURL(for: id)
     }
 
+    /// Marfa Types shows a type, not a note, so the tools for notes step aside.
     private var showsTypes: Bool { browser?.showsTypes == true }
 
     /// The one note shown, when it can be written in; the formatting tools act on nothing else.

@@ -41,6 +41,13 @@ final class TypesBrowser {
         position = history.count - 1
     }
 
+    /// Chooses the first type the list shows that matches the search, as Return in a search field opens its first
+    /// result. A type shown only for a match below it is passed over.
+    func selectFirstMatch() {
+        let first = itemRows.first(where: \.matchesSearch)?.id ?? edgeTypes.first?.selection
+        if let first { select(first) }
+    }
+
     var canGoBack: Bool { selection == nil ? position >= 0 : position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
 

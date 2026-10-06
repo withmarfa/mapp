@@ -7,10 +7,13 @@ struct TypeDetailView: View {
 
     var body: some View {
         Group {
+            // A page of its own for each type, so it opens at the top and its selectable id is not read stale.
             if let detail = browser.selectedItemType {
                 ItemTypePage(detail: detail, browser: browser)
+                    .id(browser.selection)
             } else if let detail = browser.selectedEdgeType {
                 EdgeTypePage(detail: detail, browser: browser)
+                    .id(browser.selection)
             } else {
                 ContentUnavailableView(
                     "No Type Selected", systemImage: "square.stack.3d.up",
@@ -272,13 +275,16 @@ private struct TypeHeader: View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
                 Text(label).font(.title.bold())
+                    .accessibilityAddTraits(.isHeader)
                 Text(id).font(.body.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    .accessibilityIdentifier("MarfaTypeID")
                 if let description {
                     Text(description).padding(.top, 4)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
+            // Contained rather than combined: combining drops the selectable id, and with it the type's name.
+            .accessibilityElement(children: .contain)
         }
     }
 }
