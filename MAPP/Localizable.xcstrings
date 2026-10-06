@@ -824,10 +824,25 @@
     "There’s no key for this Marfa server.": {
       "extractionState": "manual"
     },
-    "This change can’t be made in a Marfa library yet.": {
+    "This change can’t be made in a Marfa library.": {
       "extractionState": "manual"
     },
     "This item has no file.": {
+      "extractionState": "manual"
+    },
+    "This library is closed.": {
+      "extractionState": "manual"
+    },
+    "The file was attached, but its name can’t be written into the text.": {
+      "extractionState": "manual"
+    },
+    "Not looked up yet": {
+      "extractionState": "manual"
+    },
+    "The server refused this link": {
+      "extractionState": "manual"
+    },
+    "A link is changed in the text that holds it.": {
       "extractionState": "manual"
     },
     "This item isn’t in the library.": {
@@ -1046,7 +1061,7 @@
     "Can’t Recover": {
       "extractionState": "manual"
     },
-    "It’s in the Marfa server’s bin, which this Mac can’t bring items back from yet.": {
+    "The Marfa server can’t be reached. The items are still in Recently Deleted.": {
       "extractionState": "manual"
     },
     "Couldn’t Make This Change": {

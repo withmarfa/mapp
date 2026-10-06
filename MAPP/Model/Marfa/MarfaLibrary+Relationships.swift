@@ -192,6 +192,10 @@ extension MarfaLibrary {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
         else { return false }
         let cantChange = String(localized: "Can’t Change This Relationship")
+        guard end.info.id != MarfaMapping.bodyLinkEdge else {
+            failure = (cantChange, String(localized: "A link is changed in the text that holds it."))
+            return false
+        }
         let holds = end.isInverse ? end.info.reverseCardinality : end.info.cardinality
         if holds == .one, targetIDs.count > 1 {
             failure = (cantChange, String(localized: "Only one item can be chosen here."))
@@ -222,9 +226,9 @@ extension MarfaLibrary {
             adding.append(link)
         }
         if holds == .one, !removing.isEmpty, !adding.isEmpty { replacing = true }
-        // The contract moves the other end of the edge an end holds (edges.md 10 and 14), in one write the package
-        // cannot make yet. An unlink then a link could leave the old link gone and the new one refused, so this is
-        // where a move goes once it can be made.
+        // The contract moves the other end of the edge an end holds (edges.md 10 and 14) in one write. The core
+        // holds that write, but the package has no call for it, and an unlink then a link could leave the old link
+        // gone and the new one refused, so this is where a move goes once the package has the call.
         guard !replacing else {
             failure = (cantChange, String(localized: "Changing this link isn’t available yet in a Marfa library."))
             return false

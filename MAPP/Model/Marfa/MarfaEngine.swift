@@ -920,7 +920,10 @@ actor MarfaEngine {
     private func answer(_ report: DrainReport) async {
         await answering?()
         var ids: Set<String> = []
+        // The copy lets an item go once its delete is answered, which may be only as the answers are forgotten.
+        var leaving: Set<String> = []
         for answer in report.verdicts {
+            if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict, let outcome = MarfaMapping.outcome(verdict) else { continue }
             if let itemID = answer.itemId {
                 ids.insert(itemID)
@@ -950,6 +953,7 @@ actor MarfaEngine {
         } catch {
             failures.append(Self.failure(error))
         }
+        if !leaving.isEmpty { await reread(leaving) }
         await readQueue()
         publish([])
     }
