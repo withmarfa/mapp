@@ -90,6 +90,23 @@ struct MarfaMappingTests {
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
     }
 
+    /// A move replaces an end only where the end that stays holds one edge of the type (edges.md 10): the target for
+    /// `parent-of` (each child has one parent), the source for a type where each source holds one.
+    @Test func eachEndSaysHowManyEdgesOfATypeItHolds() throws {
+        let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
+        #expect(parent.cardinality(atTarget: true) == .one)
+        #expect(parent.cardinality(atTarget: false) == .many)
+        let supersedes = try #require(Self.catalogue.edgeTypes["supersedes"])
+        #expect(supersedes.cardinality(atTarget: true) == .one)
+        #expect(supersedes.cardinality(atTarget: false) == .one)
+        let references = try #require(Self.catalogue.edgeTypes["references"])
+        #expect(references.cardinality(atTarget: true) == .many)
+        #expect(references.cardinality(atTarget: false) == .many)
+        let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", cardinality: "many-to-one"))
+        #expect(thread.cardinality(atTarget: false) == .one)
+        #expect(thread.cardinality(atTarget: true) == .many)
+    }
+
     @Test func typesCarryTheRestOfTheirDefinition() throws {
         let catalogue = MarfaMapping.catalogue(
             itemTypes: [
@@ -248,6 +265,9 @@ struct MarfaMappingTests {
         #expect(large.content == .file(.data, byteCount: 5_000_000_000))
         let odd = Self.item(Self.row("o", type: "core.file", properties: ["title": "Odd", "size_bytes": "many"]))
         #expect(odd.content == .file(.data, byteCount: 0))
+        // The size is an integer; a fraction is no length.
+        let fraction = Self.item(Self.row("p", type: "core.file", properties: ["title": "Part", "size_bytes": 1.5]))
+        #expect(fraction.content == .file(.data, byteCount: 0))
     }
 
     @Test func linksAndEmbedsThatNameNoItemAreShownAsEdgesOfTheText() {

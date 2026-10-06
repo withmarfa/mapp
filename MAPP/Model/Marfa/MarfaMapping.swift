@@ -263,8 +263,9 @@ nonisolated enum MarfaMapping {
         let type = TypeID(row.type)
         guard type == fileType || catalogue.isSubtype(type, ofAnyOf: [fileType]) else { return .markdown }
         let mimeType = row.properties[mimeTypeField]?.string
-        // The server stamps the length once it holds the bytes, so an item still waiting to send them has none.
-        let size = row.properties[sizeField].flatMap { $0.integer ?? $0.number.map { Int64($0) } }
+        // `size_bytes` is an integer: the package stamps it when the file is queued and the server when it holds the
+        // bytes. Anything else, or none, is no size.
+        let size = row.properties[sizeField]?.integer
         return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: size ?? 0)
     }
 
