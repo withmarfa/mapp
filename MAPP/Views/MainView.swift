@@ -132,7 +132,7 @@ struct MainView: View {
         .onDisappear { editor.flush() }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
-            editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
+            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
             types.onFind = { [browser] in browser.focusRequest = .typesSearch }

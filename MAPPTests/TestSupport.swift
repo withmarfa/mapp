@@ -79,3 +79,10 @@ final class TemporaryFolder {
         FileManager.default.fileExists(atPath: url.appending(path: path).path)
     }
 }
+
+extension ItemLibrary {
+    /// Text typed on the text the library holds now, as the page reports it while nothing has changed elsewhere.
+    func updateBody(of id: ItemID, to body: String) {
+        updateBody(of: id, to: body, readAt: self.body(of: id)?.version ?? ItemVersion(0))
+    }
+}

@@ -23,8 +23,8 @@ final class EditorController: NSObject {
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
     var isChoosingImages = false
 
-    /// An edit to a note, with the markdown the note now holds.
-    @ObservationIgnored var onChange: (ItemID, String) -> Void = { _, _ in }
+    /// An edit to a note, with the markdown the note now holds and the version of the text it was typed on.
+    @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
     @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
@@ -42,13 +42,22 @@ final class EditorController: NSObject {
     @ObservationIgnored let container: EditorContainer
     @ObservationIgnored private var pageFinder: PageFinder!
 
-    /// The note on the page, and the markdown the page holds for it as far as the app knows.
+    /// The note on the page, and the markdown the page holds for it as far as the app knows, read from the
+    /// library at `read`.
     private(set) var noteID: ItemID?
     @ObservationIgnored private var markdown = ""
+    @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
-    /// note still reaches that note rather than the one now showing.
+    /// note still reaches that note rather than the one now showing, and an edit typed before the page took in
+    /// newer text says it was typed on the older text.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var notesByGeneration: [Int: ItemID] = [:]
+    @ObservationIgnored private var shown: [Int: Shown] = [:]
+
+    private struct Shown {
+        let id: ItemID
+        /// The version of the text the page holds for this generation.
+        var read: ItemVersion
+    }
     @ObservationIgnored private var wantsFocus = false
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
@@ -131,25 +140,32 @@ final class EditorController: NSObject {
     /// text where the caret is.
     func noteChanged(_ item: Item) {
         guard item.id == noteID else { return load(item) }
-        guard let body = library?.body(of: item.id), body.text != markdown || item.isWritable != isEditable else { return }
+        guard let body = library?.body(of: item.id) else { return }
+        guard body.text != markdown || item.isWritable != isEditable else {
+            // The page already holds this text, so what is typed next is typed on this version of it.
+            read = body.version
+            shown[generation]?.read = body.version
+            return
+        }
         show(item, as: "reload")
     }
 
     /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
     /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
-        guard let body = library?.body(of: item.id)?.text else { return close() }
+        guard let body = library?.body(of: item.id) else { return close() }
         noteID = item.id
-        markdown = body
+        markdown = body.text
+        read = body.version
         isEditable = item.isWritable
         guard isReady else { return }
         embeds.version += 1
         call("setItem", json(item.id.rawValue))
         generation += 1
         // A late report belongs to one of the last few loads, however quickly outside changes came in.
-        notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
-        notesByGeneration[generation] = item.id
-        call(function, json(body), String(generation), String(isEditable))
+        shown = shown.filter { $0.key >= generation - 8 }
+        shown[generation] = Shown(id: item.id, read: body.version)
+        call(function, json(body.text), String(generation), String(isEditable))
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -169,11 +185,10 @@ final class EditorController: NSObject {
             if leaving { onLeave(noteID) }
             return done()
         }
+        // Another note can be loaded before the page answers, so the edit belongs to the generation shown now.
+        let generation = generation
         webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
-            if let markdown = result as? String {
-                if noteID == self.noteID { self.markdown = markdown }
-                onChange(noteID, markdown)
-            }
+            if let markdown = result as? String { report(markdown, of: generation) }
             if leaving { onLeave(noteID) }
             done()
         }
@@ -458,6 +473,25 @@ final class EditorController: NSObject {
 
     // MARK: Hearing from the page
 
+    /// Hands an edit to the library with the version of the text it was typed on. Where the library still holds
+    /// what the page last reported, the page's text is the library's at its version now, as after the library
+    /// takes in the answer to the person's own save. An edit typed before the page took in newer text keeps the
+    /// older version, so the library never lays it over text the person did not see.
+    private func report(_ markdown: String, of generation: Int) {
+        guard var page = shown[generation] else { return }
+        let isCurrent = page.id == noteID && generation == self.generation
+        if isCurrent, let body = library?.body(of: page.id), body.text == self.markdown {
+            page.read = body.version
+            read = body.version
+            shown[generation] = page
+        }
+        if isCurrent { self.markdown = markdown }
+        onChange(page.id, markdown, page.read)
+        // An edit the library took from before a reload, as when the note was only deleted or recovered, is
+        // shown again; one it kept apart from newer text leaves the page as it is.
+        if !isCurrent, page.id == noteID, let item = library?.item(page.id) { noteChanged(item) }
+    }
+
     fileprivate func receive(_ message: EditorMessage) {
         switch message {
         case .ready:
@@ -471,17 +505,12 @@ final class EditorController: NSObject {
                 embeds.version += 1
                 call("setItem", json(noteID.rawValue))
                 generation += 1
-                notesByGeneration[generation] = noteID
+                shown[generation] = Shown(id: noteID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
             if wantsFocus { focus() }
         case .changed(let markdown, let generation):
-            guard let id = notesByGeneration[generation] else { return }
-            if id == noteID, generation == self.generation { self.markdown = markdown }
-            onChange(id, markdown)
-            // An edit made before the note on the page was reloaded from outside lands after the reload. The
-            // person's text wins, so the page takes it back, as the library now holds it.
-            if id == noteID, generation != self.generation, let item = library?.item(id) { noteChanged(item) }
+            report(markdown, of: generation)
         case .state(let state):
             if state != caret { caret = state }
         case .scrolled(let offset, let generation):

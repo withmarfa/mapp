@@ -1,11 +1,15 @@
 import Foundation
 import Observation
 
-/// What the host needs of a Marfa library beside reading and writing it, so its lifecycle is tested without a
-/// server.
-nonisolated protocol MarfaHostedSource: ItemSource, SyncReporting {
+/// A source read from a server: its items, what it has yet to send, and how the server stands.
+nonisolated protocol ConnectedItemSource: ItemSource, SyncReporting {
     var connectionState: MarfaConnectionState { get }
     func connectionStates() -> AsyncStream<MarfaConnectionState>
+}
+
+/// What the host needs of a Marfa library beside reading and writing it, so its lifecycle is tested without a
+/// server.
+nonisolated protocol MarfaHostedSource: ConnectedItemSource {
     /// Hydrates or catches up, then sends what waits; never waited on.
     func refresh()
     /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
@@ -433,7 +437,7 @@ extension MarfaSource: MarfaHostedSource {}
         error.localizedDescription
     }
 
-    private static func state(_ state: MarfaConnectionState) -> State {
+    static func state(_ state: MarfaConnectionState) -> State {
         switch state {
         case .connecting: .connecting
         case .online: .online

@@ -83,6 +83,27 @@ struct OutsideChangeTests {
         #expect(note(at: "Work/Plan.md") == nil)
     }
 
+    /// Text the page typed on what a note held before another app rewrote it, reported once the rewrite was taken
+    /// in, is kept beside the note as a copy, so neither the other app's text nor the person's is lost.
+    @Test func textTypedBeforeAnOutsideRewriteIsKeptAsACopy() async throws {
+        let plan = try #require(note(at: "Work/Plan.md"))
+        let read = try #require(library.body(of: plan.id)?.version)
+        try root.write("# Plan\n\nRewritten elsewhere\n", to: "Work/Plan.md")
+        await library.reread()
+        #expect(note(at: "Work/Plan.md")?.body == "# Plan\n\nRewritten elsewhere\n")
+        library.updateBody(of: plan.id, to: "# Plan\n\nFirst draft, typed\n", readAt: read)
+        await library.reread()
+        #expect(root.read("Work/Plan.md") == "# Plan\n\nRewritten elsewhere\n")
+        #expect(root.read("Work/Plan (Conflicted Copy).md") == "# Plan\n\nFirst draft, typed\n")
+        #expect(library.note(plan.id)?.body == "# Plan\n\nRewritten elsewhere\n")
+        #expect(library.failure?.title == String(localized: "Saved as a Copy"))
+        // Typing on the rewritten text is saved over it as usual.
+        let now = try #require(library.body(of: plan.id)?.version)
+        library.updateBody(of: plan.id, to: "# Plan\n\nRewritten elsewhere, typed\n", readAt: now)
+        await library.reread()
+        #expect(root.read("Work/Plan.md") == "# Plan\n\nRewritten elsewhere, typed\n")
+    }
+
     @Test func theLibrarysOwnChangesAreNotTakenForAnothersOnceMade() async throws {
         let plan = try #require(note(at: "Work/Plan.md"))
         library.updateBody(of: plan.id, to: "# Plan\n\nMine\n")

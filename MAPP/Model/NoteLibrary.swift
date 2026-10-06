@@ -364,15 +364,33 @@ final class NoteLibrary: ItemLibrary {
     // MARK: Notes
 
     /// A note being written. Typing is undone by the page that holds it, so this registers nothing.
-    func updateBody(of id: ItemID, to body: String) {
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].body != body, !notes[index].isDeleted
         else { return }
+        guard readAt.rawValue >= notes[index].bodyRevision else { return keepApart(body, from: index) }
         let path = notes[index].path
         unsaved.remove(path)
         notes[index].file.body = body
         notes[index].modified = now()
         edited.insert(id)
         perform(.write(path: path, text: notes[index].file.text))
+    }
+
+    /// Text typed on what a note held before its text changed elsewhere, as in another app or window, reported
+    /// once the page had taken in the change. Written over the note, it would replace text the person never saw,
+    /// so it is kept beside the note as a copy, the folder's own way to keep both, and the person is told.
+    private func keepApart(_ body: String, from index: Int) {
+        let original = notes[index]
+        let name = String(localized: "\(original.fileTitle) (Conflicted Copy)")
+        let copy = Note(
+            path: uniquePath(name, in: original.directory, except: nil), text: body, created: now(),
+            folderID: original.folderID)
+        notes.append(copy)
+        perform(.create(path: copy.path, text: copy.file.text, id: copy.id))
+        failure = (
+            String(localized: "Saved as a Copy"),
+            String(localized: "“\(original.title)” changed while you were typing, so what you typed is in “\(copy.title)”.")
+        )
     }
 
     /// The note is no longer on the page. A note named after its first line takes the line's new name.

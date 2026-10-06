@@ -114,7 +114,7 @@ final class FakeItemLibrary: ItemLibrary {
         return item.id
     }
 
-    func updateBody(of id: ItemID, to body: String) {
+    func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         bodies[id] = body
         items[index].version = ItemVersion(items[index].version.rawValue + 1)

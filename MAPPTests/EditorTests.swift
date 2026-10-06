@@ -18,7 +18,7 @@ struct EditorTests {
         init(library: NoteLibrary = NoteLibrary()) async throws {
             self.library = library
             editor = EditorController(library: library)
-            editor.onChange = { [unowned self] _, markdown in changes.append(markdown) }
+            editor.onChange = { [unowned self] _, markdown, _ in changes.append(markdown) }
             try await wait { self.editor.isReady }
         }
 
@@ -37,6 +37,17 @@ struct EditorTests {
 
         func run(_ script: String) async throws {
             _ = try await editor.webView.evaluateJavaScript("\(script); 0")
+        }
+
+        /// The page's text, once it reads `expected` or after a couple of seconds.
+        func shownText(until expected: String) async throws -> String {
+            var shown = ""
+            for _ in 0..<40 {
+                shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
+                if shown == expected { break }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            return shown
         }
 
         /// Waits for something the page does in its own time, such as reporting an edit after a pause.
@@ -168,7 +179,7 @@ struct EditorTests {
         let note = Note(body: "Plan\n", created: .now)
         let library = NoteLibrary(notes: [note], store: store)
         let page = try await Harness(library: library)
-        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
+        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         page.editor.onLeave = { library.leave($0) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
@@ -180,25 +191,69 @@ struct EditorTests {
         #expect(library.note(note.id)?.title == "R&D plan")
     }
 
-    @Test func anEditOverlappingAnOutsideChangeWinsOnThePageAsInTheFile() async throws {
+    /// An edit still waiting to be reported when another change to the note is taken in was typed on the text
+    /// before that change. Laid over the note it would replace text the person never saw, so it is kept beside the
+    /// note as a copy, and the note and the page keep the other change.
+    @Test func anEditOverlappingAnOutsideChangeIsKeptAsACopy() async throws {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
         let page = try await Harness(library: library)
-        page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
+        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        // The person's edit is still waiting to be reported when another app's change is taken in.
         page.editor.format(.checklist)
+        // Another window's text, typed on the text it held.
         library.updateBody(of: note.id, to: "Outside\n")
         page.editor.noteChanged(try #require(library.item(note.id)))
-        try await page.wait { library.note(note.id)?.body == "- [ ] Milk\n" }
+        try await page.wait { library.notes.count == 2 }
+        #expect(library.note(note.id)?.body == "Outside\n")
+        let copy = try #require(library.notes.first { $0.id != note.id })
+        #expect(copy.body == "- [ ] Milk\n")
+        #expect(copy.path == "Milk (Conflicted Copy).md")
+        #expect(library.failure?.title == String(localized: "Saved as a Copy"))
+        #expect(try await page.shownText(until: "Outside") == "Outside")
+    }
+
+    /// The same in a Marfa library: the edit is sent as typed on the version before the other device's text, so the
+    /// server keeps both, and the page shows the other device's text rather than taking the edit back over it.
+    @Test func anEditOverlappingAnotherDevicesTextIsSentAsTypedOnTheOlderVersion() async throws {
+        typealias F = LibraryFixture
+        let source = FakeItemSource()
+        for (id, text) in F.texts { source.setBody(text, of: id) }
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let editor = EditorController(library: library)
+        editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        try #require(await eventually { editor.isReady })
+        let item = try #require(library.item(F.n1))
+        editor.load(item)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        editor.format(.checklist)
+        var theirs = item
+        theirs.version = ItemVersion(2)
+        source.setBody("Theirs", of: F.n1, version: 2)
+        source.send(.upserted([theirs]))
+        try #require(await eventually { library.body(of: F.n1)?.text == "Theirs" })
+        editor.noteChanged(try #require(library.item(F.n1)))
+        let typed = await eventually {
+            source.writes.contains { if case .editBody = $0 { true } else { false } }
+        }
+        try #require(typed)
+        guard case .editBody(F.n1, let text, let base, let merge) = source.writes.last else {
+            Issue.record("sent \(source.writes)")
+            return
+        }
+        #expect(text.contains("[ ] Note body"))
+        #expect(base == ItemVersion(1))
+        #expect(merge == .asRead)
+        #expect(library.body(of: F.n1)?.text == "Theirs")
         var shown = ""
-        for _ in 0..<40 {
-            shown = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
-            if shown == "Milk" { break }
+        for _ in 0..<20 {
+            shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(shown == "Milk")
+        #expect(shown == "Theirs")
     }
 
     @Test func anImageInTheNotesFolderShowsAndOneLinkedFromOutsideDoesNot() async throws {

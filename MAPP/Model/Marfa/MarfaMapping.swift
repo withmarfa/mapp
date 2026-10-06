@@ -337,7 +337,7 @@ nonisolated enum MarfaMapping {
                 query: ItemQuery(tier: .feed)),
             Place(
                 id: .all, title: String(localized: "All Items"), symbol: "note.text", section: .library,
-                query: ItemQuery(tier: .library)),
+                query: ItemQuery()),
             Place(
                 id: .favorites, title: String(localized: "Favorites"), symbol: "star", section: .library,
                 query: ItemQuery(tags: [ItemTag.favorite]), drop: .tag(ItemTag.favorite)),

@@ -70,6 +70,7 @@ private struct UnselectedItemContent: View {
 /// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
 /// text into a page that is already running.
 struct NotePage: View {
+    @CurrentLibrary private var library
     let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
@@ -86,11 +87,16 @@ struct NotePage: View {
                     }
                 } else {
                     ScrollingPageHeader(editor: editor) {
-                        ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
-                            .id(item.id)
-                            .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
+                        VStack(spacing: 0) {
+                            if case .conflicted(let copy?, _) = item.sync {
+                                SavedAsCopyBanner(copy: copy)
+                            }
+                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                                .id(item.id)
+                                .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
+                                .padding(.top, 16)
+                                .padding(.bottom, 8)
+                        }
                     }
                 }
             }
@@ -103,8 +109,10 @@ struct NotePage: View {
         }
         .onChange(of: style, initial: true) { editor.setStyle(style) }
         .onChange(of: item.id, initial: true) { editor.load(item) }
-        // Every change to the note takes a new version; the editor takes in only one to its text or its state.
+        // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
+        // Marfa server that keeps its own text over the person's changes the text without a new version.
         .onChange(of: item.version) { editor.noteChanged(item) }
+        .onChange(of: library.body(of: item.id)) { editor.noteChanged(item) }
     }
 }
 
@@ -128,6 +136,26 @@ private struct ScrollingPageHeader<Content: View>: View {
             .padding(.top, editor.findBarHeight)
             .accessibilityHidden(editor.isHeaderScrolledAway)
             .allowsHitTesting(!editor.isHeaderScrolledAway)
+    }
+}
+
+/// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
+/// beside the text the server kept.
+private struct SavedAsCopyBanner: View {
+    @Environment(\.openWindow) private var openWindow
+    let copy: ItemID
+
+    var body: some View {
+        HStack {
+            Text("This item changed elsewhere, so your changes were saved as a copy.")
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Open Copy") { openWindow(value: copy) }
+        }
+        .font(.callout)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 }
 

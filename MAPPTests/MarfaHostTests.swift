@@ -64,6 +64,7 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
     func submit(_ write: ItemWrite, as id: WriteID) {}
     func body(of item: ItemID) async throws -> ItemBody { throw SourceFailure(kind: .missing, message: "") }
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
+    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] { [] }
     func endEditing(_ item: ItemID) {}
     func flush() async {}
@@ -772,122 +773,124 @@ struct MarfaHostOfflineTests {
     }
 }
 
-/// Runs against the test instance only when it is configured, as `MarfaSourceLiveTests` does, each on a copy of
-/// its own that it removes.
-@MainActor @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
-struct MarfaHostLiveTests {
-    private func host(_ bench: HostBench) -> MarfaHost {
-        bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
-    }
-
-    @Test(.timeLimit(.minutes(2)))
-    func aRefusedCreateIsAProblemThePersonCanCopyAndDiscard() async throws {
-        let bench = try HostBench()
-        let host = host(bench)
-        let made = LiveMarfa.Made()
-        do {
-            try await refuseAndDiscard(host, made)
-        } catch {
-            await LiveMarfa.purge(made.ids)
-            throw error
+extension LiveMarfaTests {
+    /// Runs against the test instance only when it is configured, as `MarfaSourceLiveTests` does, each on a copy of
+    /// its own that it removes.
+    @MainActor @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    struct MarfaHostLiveTests {
+        private func host(_ bench: HostBench) -> MarfaHost {
+            bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
         }
-        await LiveMarfa.purge(made.ids)
-        try await host.disconnect(.discardCopy(nil))
-    }
 
-    private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
-        try await host.connect(address: try #require(LiveMarfa.address), key: try #require(LiveMarfa.key))
-        #expect(await eventually(.seconds(30)) { host.state == .online && host.report.queueRead })
+        @Test(.timeLimit(.minutes(2)))
+        func aRefusedCreateIsAProblemThePersonCanCopyAndDiscard() async throws {
+            let bench = try HostBench()
+            let host = host(bench)
+            let made = LiveMarfa.Made()
+            do {
+                try await refuseAndDiscard(host, made)
+            } catch {
+                await LiveMarfa.purge(made.ids)
+                throw error
+            }
+            await LiveMarfa.purge(made.ids)
+            try await host.disconnect(.discardCopy(nil))
+        }
 
-        let title = "MAPPTEST refused \(UUID().uuidString.prefix(8))"
-        let id = made.mint()
-        // The server makes no items of its own reserved types, so this is refused and nothing is made.
-        try #require(host.source).submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: title)), as: WriteID())
-        #expect(await eventually(.seconds(30)) { !host.report.problems.isEmpty })
-        let entry = try #require(host.report.problems.first { $0.itemID == id })
-        #expect(entry.kind == .refused)
-        #expect(entry.change == .create)
-        #expect(entry.reason?.code == "type_not_permitted")
-        #expect(entry.reason?.message?.isEmpty == false)
-        #expect(entry.copyText == title)
-        #expect(entry.actions == [.discard])
-        #expect(host.waitingChanges == 1)
+        private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
+            try await host.connect(address: try #require(LiveMarfa.address), key: try #require(LiveMarfa.key))
+            #expect(await eventually(.seconds(30)) { host.state == .online && host.report.queueRead })
 
-        let source = try #require(host.source)
-        #expect(try await source.resolve(entry.id, by: .tryAgain) == false)
-        #expect(try await source.resolve(entry.id, by: .discard))
-        #expect(await eventually { host.report.problems.isEmpty })
-        let marfa = try #require(source as? MarfaSource)
-        #expect(try await marfa.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
-        #expect(host.waitingChanges == 0)
-    }
-
-    /// A mistyped key never replaces the key that works.
-    @Test(.timeLimit(.minutes(2)))
-    func aWrongKeyGivenForAWorkingCopyKeepsTheOldKey() async throws {
-        let bench = try HostBench()
-        let host = host(bench)
-        let address = try #require(LiveMarfa.address)
-        let key = try #require(LiveMarfa.key)
-        try await host.connect(address: address, key: key)
-        #expect(await eventually(.seconds(30)) { host.state == .online })
-        do {
-            try await host.replaceKey("mapptest-not-a-key-\(UUID().uuidString)")
-            Issue.record("took a key the server refuses")
-        } catch {}
-        #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
-        #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
-        try await host.disconnect(.discardCopy(nil))
-    }
-
-    /// What the person typed after a create the server refused is shown, and copied, with it.
-    @Test(.timeLimit(.minutes(2)))
-    func anEditBehindARefusedCreateIsPartOfItsProblem() async throws {
-        let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let made = LiveMarfa.Made()
-        let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
-        let source = try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-            location: try MarfaStoreLocation(root: root))
-        do {
-            let log = ChangeLog(source)
-            _ = try #require(await log.wait { $0.snapshot != nil })
-            // Queued before the copy is first hydrated, so neither goes until both are queued.
+            let title = "MAPPTEST refused \(UUID().uuidString.prefix(8))"
             let id = made.mint()
-            source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST first words")), as: WriteID())
-            let created = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
-            let version = try #require(created.snapshot?.items.first { $0.id == id }?.version)
-            source.submit(
-                .editProperties(id, ["title": .string("MAPPTEST first words, then everything typed after")], base: version, undoing: nil),
-                as: WriteID())
-            #expect(await eventually { source.syncReport.waiting == 2 })
-            source.refresh()
-            #expect(await eventually(.seconds(30)) { source.syncReport.problems.contains { $0.itemID == id } })
-            let entry = try #require(source.syncReport.problems.first { $0.itemID == id })
-            #expect(entry.copyText == "MAPPTEST first words, then everything typed after")
-            #expect(entry.dependents.count == 1)
+            // The server makes no items of its own reserved types, so this is refused and nothing is made.
+            try #require(host.source).submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: title)), as: WriteID())
+            #expect(await eventually(.seconds(30)) { !host.report.problems.isEmpty })
+            let entry = try #require(host.report.problems.first { $0.itemID == id })
+            #expect(entry.kind == .refused)
+            #expect(entry.change == .create)
+            #expect(entry.reason?.code == "type_not_permitted")
+            #expect(entry.reason?.message?.isEmpty == false)
+            #expect(entry.copyText == title)
+            #expect(entry.actions == [.discard])
+            #expect(host.waitingChanges == 1)
+
+            let source = try #require(host.source)
+            #expect(try await source.resolve(entry.id, by: .tryAgain) == false)
             #expect(try await source.resolve(entry.id, by: .discard))
-            #expect(await eventually { source.syncReport.problems.isEmpty })
-            #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
-        } catch {
+            #expect(await eventually { host.report.problems.isEmpty })
+            let marfa = try #require(source as? MarfaSource)
+            #expect(try await marfa.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
+            #expect(host.waitingChanges == 0)
+        }
+
+        /// A mistyped key never replaces the key that works.
+        @Test(.timeLimit(.minutes(2)))
+        func aWrongKeyGivenForAWorkingCopyKeepsTheOldKey() async throws {
+            let bench = try HostBench()
+            let host = host(bench)
+            let address = try #require(LiveMarfa.address)
+            let key = try #require(LiveMarfa.key)
+            try await host.connect(address: address, key: key)
+            #expect(await eventually(.seconds(30)) { host.state == .online })
+            do {
+                try await host.replaceKey("mapptest-not-a-key-\(UUID().uuidString)")
+                Issue.record("took a key the server refuses")
+            } catch {}
+            #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
+            #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
+            try await host.disconnect(.discardCopy(nil))
+        }
+
+        /// What the person typed after a create the server refused is shown, and copied, with it.
+        @Test(.timeLimit(.minutes(2)))
+        func anEditBehindARefusedCreateIsPartOfItsProblem() async throws {
+            let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let made = LiveMarfa.Made()
+            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let source = try await MarfaSource.open(
+                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                location: try MarfaStoreLocation(root: root))
+            do {
+                let log = ChangeLog(source)
+                _ = try #require(await log.wait { $0.snapshot != nil })
+                // Queued before the copy is first hydrated, so neither goes until both are queued.
+                let id = made.mint()
+                source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST first words")), as: WriteID())
+                let created = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
+                let version = try #require(created.snapshot?.items.first { $0.id == id }?.version)
+                source.submit(
+                    .editProperties(id, ["title": .string("MAPPTEST first words, then everything typed after")], base: version, undoing: nil),
+                    as: WriteID())
+                #expect(await eventually { source.syncReport.waiting == 2 })
+                source.refresh()
+                #expect(await eventually(.seconds(30)) { source.syncReport.problems.contains { $0.itemID == id } })
+                let entry = try #require(source.syncReport.problems.first { $0.itemID == id })
+                #expect(entry.copyText == "MAPPTEST first words, then everything typed after")
+                #expect(entry.dependents.count == 1)
+                #expect(try await source.resolve(entry.id, by: .discard))
+                #expect(await eventually { source.syncReport.problems.isEmpty })
+                #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
+            } catch {
+                await source.close()
+                await LiveMarfa.purge(made.ids)
+                throw error
+            }
             await source.close()
             await LiveMarfa.purge(made.ids)
-            throw error
         }
-        await source.close()
-        await LiveMarfa.purge(made.ids)
-    }
 
-    /// A throwaway key on a throwaway copy, so the real key is never revoked.
-    @Test(.timeLimit(.minutes(2)))
-    func aWrongKeyIsRefusedUntilTheRightOneIsGiven() async throws {
-        let bench = try HostBench()
-        let host = host(bench)
-        try await host.connect(address: try #require(LiveMarfa.address), key: "mapptest-not-a-key-\(UUID().uuidString)")
-        #expect(await eventually(.seconds(30)) { host.state == .keyRefused }, "\(host.state)")
-        try await host.replaceKey(try #require(LiveMarfa.key))
-        #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
-        try await host.disconnect(.discardCopy(nil))
+        /// A throwaway key on a throwaway copy, so the real key is never revoked.
+        @Test(.timeLimit(.minutes(2)))
+        func aWrongKeyIsRefusedUntilTheRightOneIsGiven() async throws {
+            let bench = try HostBench()
+            let host = host(bench)
+            try await host.connect(address: try #require(LiveMarfa.address), key: "mapptest-not-a-key-\(UUID().uuidString)")
+            #expect(await eventually(.seconds(30)) { host.state == .keyRefused }, "\(host.state)")
+            try await host.replaceKey(try #require(LiveMarfa.key))
+            #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
+            try await host.disconnect(.discardCopy(nil))
+        }
     }
 }
