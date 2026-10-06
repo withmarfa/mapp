@@ -29,7 +29,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
-    @ObservationIgnored private(set) weak var library: NoteLibrary?
+    @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
     @ObservationIgnored private let files = NoteFiles()
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
@@ -54,7 +54,7 @@ final class EditorController: NSObject {
     /// Every editor open, so their edits can be handed over before the app quits or changes folder.
     @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
 
-    init(library: NoteLibrary) {
+    init(library: any ItemLibrary) {
         self.library = library
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
@@ -69,7 +69,7 @@ final class EditorController: NSObject {
         container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
-        files.root = { [weak self] in (self?.library?.store as? FolderStore)?.root }
+        files.root = { [weak self] in self?.library?.folderURL }
         configuration.userContentController.addScriptMessageHandler(files, contentWorld: .page, name: "files")
         #if DEBUG
         webView.isInspectable = true

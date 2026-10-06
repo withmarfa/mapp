@@ -10,7 +10,7 @@ extension View {
 }
 
 private struct LibraryDialogs: ViewModifier {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.appearsActive) private var appearsActive
     @State private var purging: Set<ItemID> = []
     @State private var failure: Failure?

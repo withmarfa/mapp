@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NoteDetail: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     let browser: Browser
     let editor: EditorController
     let details: DetailsPresentation
@@ -133,7 +133,7 @@ private struct ScrollingPageHeader<Content: View>: View {
 
 /// Deleted notes cannot be edited; this says so and offers the way back, as Notes does.
 private struct DeletedNoteBanner: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let id: ItemID
 

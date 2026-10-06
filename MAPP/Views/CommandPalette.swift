@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 /// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
 /// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
     @StoredOrder private var order
@@ -228,11 +228,13 @@ struct CommandPalette: View {
             add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
-            if !selected.allSatisfy({ $0.container == nil }) {
-                add(String(localized: "Move to Inbox"), "tray") { library.move(ids, to: nil, undoManager: undoManager) }
-            }
-            for folder in library.folders where !selected.allSatisfy({ $0.container == ContainerID(folder.id) }) {
-                add(String(localized: "Move to \(folder.name)"), "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
+            if library.capabilities.contains(.move) {
+                if !selected.allSatisfy({ $0.container == nil }) {
+                    add(String(localized: "Move to Inbox"), "tray") { library.move(ids, to: nil, undoManager: undoManager) }
+                }
+                for folder in library.folders where !selected.allSatisfy({ $0.container == ContainerID(folder.id) }) {
+                    add(String(localized: "Move to \(folder.name)"), "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
+                }
             }
             add(String(localized: "Delete Note"), "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager)

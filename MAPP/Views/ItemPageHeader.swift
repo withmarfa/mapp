@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details.
 struct ItemPageHeader: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     let item: Item
@@ -117,7 +117,7 @@ struct ItemPageHeader: View {
 #Preview("Editable Page Header") {
     let library = ItemPreviewFixtures.library
     ItemPageHeader(item: library.item(ItemPreviewFixtures.ticketID)!, drafts: DetailsPresentation(), onStartWriting: {})
-        .environment(library)
+        .environment(\.library, library)
         .padding(24)
         .frame(width: 620)
 }
@@ -126,7 +126,7 @@ struct ItemPageHeader: View {
     let library = ItemPreviewFixtures.library
     let _ = library.setItemProperty(ItemPreviewFixtures.ticketID, key: "title", value: .string("Review the field observations and decide which findings belong in the final report"))
     ItemPageHeader(item: library.item(ItemPreviewFixtures.ticketID)!, drafts: DetailsPresentation(), onStartWriting: {})
-        .environment(library)
+        .environment(\.library, library)
         .padding(24)
         .frame(width: 380)
 }

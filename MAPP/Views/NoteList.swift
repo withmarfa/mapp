@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct NoteList: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser

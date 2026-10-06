@@ -95,7 +95,7 @@ struct ItemTargetRow: View {
 
 /// Changes are committed together; dismissing the chooser leaves existing connections intact.
 struct ItemRelationshipPicker: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     let relationship: ItemRelationship
     let candidates: [Item]
     let onSave: ([ItemID]) -> Bool

@@ -4,7 +4,7 @@ import SwiftUI
 /// and forward through the types Marfa Types has shown.
 struct AppCommands: Commands {
     /// Nil until a folder of notes is chosen.
-    let library: NoteLibrary?
+    let library: (any ItemLibrary)?
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
@@ -55,7 +55,7 @@ struct AppCommands: Commands {
             .disabled(browser == nil || ids.count != 1 || shown.count != 1 || shown.first?.isWritable != true)
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
-                    .environment(library)
+                    .environment(\.library, library)
             }
             Divider()
             Button("Rename Folder", systemImage: "pencil") {

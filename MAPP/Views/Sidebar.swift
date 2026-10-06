@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct Sidebar: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let order: NoteOrder
@@ -285,13 +285,13 @@ private struct FolderNameField: View {
     let library = NoteLibrary(notes: source.notes, folders: [Folder(name: "Projects"), Folder(name: "Notes")], now: { ItemPreviewFixtures.date })
     let _ = library.setFavorite([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
     Sidebar(browser: Browser(), order: NoteOrder())
-        .environment(library)
+        .environment(\.library, library)
         .frame(width: 260, height: 740)
 }
 
 #Preview("Sidebar Without Favorites") {
     Sidebar(browser: Browser(), order: NoteOrder())
-        .environment(ItemPreviewFixtures.library)
+        .environment(\.library, ItemPreviewFixtures.library)
         .frame(width: 260, height: 740)
 }
 #endif

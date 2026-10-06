@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MainView: View {
-    @Environment(NoteLibrary.self) private var library
+    @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
     @State private var editor: EditorController
@@ -20,7 +20,7 @@ struct MainView: View {
     private let restoresWindow: Bool
 
     /// The library is given here as well as in the environment, since the editor is made with it.
-    init(library: NoteLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    init(library: any ItemLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
         _editor = State(initialValue: EditorController(library: library))
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
