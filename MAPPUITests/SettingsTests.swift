@@ -47,7 +47,7 @@ final class SettingsTests: XCTestCase {
     }
 
     func testSettingsUsesNativeSidebarAndToolbarAcrossCategories() {
-        let workspaceTitle = window.toolbars.staticTexts["All Notes"]
+        let workspaceTitle = window.children(matching: .staticText).matching(NSPredicate(format: "value == %@", "All Notes")).firstMatch
         XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
