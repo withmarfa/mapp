@@ -134,7 +134,23 @@ struct DraftHandoverTests {
         #expect(browser.sidebarItem == .favorites)
     }
 
-    @Test func aDraftAlreadySentIsNotCarriedBecauseItsTextIsInTheLibrarysOwnQueue() throws {
+    @Test func aDraftTheLibraryLeftHoldsIsNotCarriedBecauseItsTextIsInThatLibrary() throws {
+        let old = FakeItemLibrary(now: start)
+        old.holdsCreations = true
+        let browser = browser(typing: "Trip", in: old)
+        browser.adopt(old)
+        _ = try #require(browser.createDraft(in: old, undoManager: nil))
+        old.deliverCreated()
+
+        browser.adopt(FakeItemLibrary(now: start))
+        #expect(!browser.isAwaitingCreation)
+        #expect(browser.itemDraft == nil, "carrying it would make the item twice")
+        #expect(!browser.isCreatingItem)
+    }
+
+    /// A create not yet answered when the window leaves its library may never be queued, so its draft is kept
+    /// rather than dropped with text no queue holds.
+    @Test func aDraftNotYetAnsweredIsCarriedToTheNextLibrary() throws {
         let old = FakeItemLibrary(now: start)
         old.holdsCreations = true
         let browser = browser(typing: "Trip", in: old)
@@ -143,8 +159,42 @@ struct DraftHandoverTests {
 
         browser.adopt(FakeItemLibrary(now: start))
         #expect(!browser.isAwaitingCreation)
-        #expect(browser.itemDraft == nil, "carrying it would make the item twice")
-        #expect(!browser.isCreatingItem)
+        #expect(browser.isCreatingItem)
+        #expect(browser.itemDraft?.title == "Trip")
+        #expect(browser.itemDraft?.body == "Book the hotel")
+    }
+
+    @Test func aCreateRefusedBeforeItWasQueuedGivesTheDraftBack() throws {
+        let library = FakeItemLibrary(now: start)
+        library.holdsCreations = true
+        let browser = browser(typing: "Trip", in: library)
+        let id = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(!browser.isCreationSettled(in: library))
+        library.refusedCreations.insert(id)
+
+        #expect(browser.isCreationSettled(in: library))
+        browser.finishCreation(in: library)
+        #expect(!browser.isAwaitingCreation)
+        #expect(browser.isCreatingItem)
+        #expect(browser.itemDraft?.title == "Trip")
+        #expect(browser.createDraft(in: library, undoManager: nil) != id, "New Item works again")
+    }
+
+    /// The window's undo acts on the library it was registered with, so it goes when the window shows another.
+    @Test func aWindowCarriedToAnotherLibraryForgetsItsUndo() {
+        let undoManager = UndoManager()
+        undoManager.groupsByEvent = false
+        let browser = Browser()
+        let old = FakeItemLibrary(now: start)
+        browser.adopt(old, undoManager: undoManager)
+        undoManager.beginUndoGrouping()
+        undoManager.registerUndo(withTarget: old) { _ in }
+        undoManager.endUndoGrouping()
+        browser.adopt(old, undoManager: undoManager)
+        #expect(undoManager.canUndo, "the same library keeps its undo")
+
+        browser.adopt(FakeItemLibrary(now: start), undoManager: undoManager)
+        #expect(!undoManager.canUndo)
     }
 
     @Test func aDraftOfAKindTheNewLibraryLacksBecomesANote() {

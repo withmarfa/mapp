@@ -35,6 +35,8 @@ final class Browser {
     private(set) var fetchedFile: (id: ItemID, url: URL)?
     /// The library this window was last shown, so a different one starts the window afresh.
     @ObservationIgnored private var libraryID: ObjectIdentifier?
+    /// That library while anything holds it, so a create still awaited can be asked about as the window leaves it.
+    @ObservationIgnored private weak var shownLibrary: (any ItemLibrary)?
 
     struct Creation: Hashable {
         let id: ItemID
@@ -140,12 +142,25 @@ final class Browser {
         return id
     }
 
+    /// Whether the item made from the draft is now held by the library, or was refused, and so is to be handed
+    /// over to, or given back.
+    func isCreationSettled(in library: any ItemLibrary) -> Bool {
+        guard let creation else { return false }
+        return library.item(creation.id) != nil || isRefused(creation, in: library)
+    }
+
+    /// Refused once queued, so its text is also in the problem the refusal shows, or refused before it was
+    /// queued, so the draft holds the only copy.
+    private func isRefused(_ creation: Creation, in library: any ItemLibrary) -> Bool {
+        library.wasRefused(creating: creation.id) || library.syncReport.problems.contains { $0.itemID == creation.id }
+    }
+
     /// Hands the window over to the item made from the draft once the library holds it. The draft is kept until
-    /// then, and kept for good if the server refuses the item, whose text the refusal also holds.
+    /// then, and given back to edit and send again if the item is refused; the library tells the person why.
     func finishCreation(in library: any ItemLibrary) {
         guard let creation else { return }
         guard library.item(creation.id) != nil else {
-            if library.syncReport.problems.contains(where: { $0.itemID == creation.id }) { self.creation = nil }
+            if isRefused(creation, in: library) { self.creation = nil }
             return
         }
         self.creation = nil
@@ -164,14 +179,18 @@ final class Browser {
     var isAwaitingCreation: Bool { creation != nil }
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
-    /// it selected, searched or was renaming named items the new library may not have. A draft is kept, since it
-    /// is the person's text, unless it was already sent, when it is in the library's own queue.
-    func adopt(_ library: any ItemLibrary) {
+    /// it selected, searched or was renaming named items the new library may not have, and the window's undo
+    /// would act on the library left. A draft is kept, since it is the person's text, unless the library left
+    /// already holds the item made from it; one refused, or not yet answered, is kept, since no queue may hold it.
+    func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
         guard libraryID != id else { return }
         let isFirst = libraryID == nil
+        let left = shownLibrary
         libraryID = id
+        shownLibrary = library
         guard !isFirst else { return }
+        undoManager?.removeAllActions()
         selection = []
         sidebarItem = .allNotes
         searchText = ""
@@ -182,10 +201,12 @@ final class Browser {
         palette = nil
         fetchedFile = nil
         types.searchText = ""
-        if creation != nil {
-            creation = nil
-            itemDraft = nil
-            isCreatingItem = false
+        if let creation {
+            self.creation = nil
+            if left?.item(creation.id) != nil {
+                itemDraft = nil
+                isCreatingItem = false
+            }
         }
         itemDraft?.adopt(library)
     }

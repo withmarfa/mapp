@@ -66,7 +66,12 @@ struct NoteWindow: View {
         }
         // Another notes folder is another library, which does not hold this window's note.
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
-        .onDisappear { editor.flush() }
+        // The page goes when its library does, as when the window waits while the server's copy opens again, and
+        // the window's undo would act on the library left.
+        .onDisappear {
+            editor.flush()
+            undoManager?.removeAllActions()
+        }
         .libraryDialogs()
     }
 }

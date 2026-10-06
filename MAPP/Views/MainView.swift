@@ -147,7 +147,7 @@ struct MainView: View {
         // A window restores what it showed once the folder has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it, keeping only a draft the person was writing.
         .onChange(of: library.isLoaded, initial: true) {
-            browser.adopt(library)
+            browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
             browser.itemDraft?.adopt(library)
             if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
@@ -192,11 +192,7 @@ struct MainView: View {
         }
     }
 
-    /// Whether the item made from the draft is now held by the library, or was refused, and so is to be handed over to.
-    private var creationIsSettled: Bool {
-        guard let creation = browser.creation else { return false }
-        return library.item(creation.id) != nil || library.syncReport.problems.contains { $0.itemID == creation.id }
-    }
+    private var creationIsSettled: Bool { browser.isCreationSettled(in: library) }
 
     private var completedImportID: ItemID? {
         importRequestID.flatMap { library.completedImports[$0] }
