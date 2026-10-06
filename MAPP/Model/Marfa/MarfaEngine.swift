@@ -500,7 +500,7 @@ actor MarfaEngine {
         case .create:
             preconditionFailure("a create is queued by perform(_:as:)")
         case .editBody(let id, let text, let base, let merge):
-            guard let bodyField = catalogue.itemTypes[try itemType(of: id)]?.bodyField else {
+            guard let bodyField = MarfaMapping.bodyField(of: catalogue.itemTypes[try itemType(of: id)]) else {
                 throw NotYet(message: Self.noText)
             }
             return [try await edit(id, [bodyField: .string(text)], base: base, merge: merge)]
@@ -536,7 +536,7 @@ actor MarfaEngine {
             body = body.isEmpty ? draft.title : draft.title + "\n\n" + body
         }
         if !body.isEmpty {
-            guard let bodyField = info?.bodyField else { throw NotYet(message: Self.noText) }
+            guard let bodyField = MarfaMapping.bodyField(of: info) else { throw NotYet(message: Self.noText) }
             properties[bodyField] = .string(body)
         }
         return try await copy.items.create(

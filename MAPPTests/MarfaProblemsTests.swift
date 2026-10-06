@@ -16,7 +16,7 @@ struct MarfaProblemsTests {
                 ],
                 titleField: "title", bodyField: "body"),
             ItemType(id: "core.entity", label: "Entity", titleField: "name"),
-            ItemType(id: "system.folder", label: "Folder")
+            ItemType(id: "system.folder", label: "Folder", fields: [TypeField(name: "title", type: "string", declaredBy: "system.folder")])
         ],
         edgeTypes: [])
 
@@ -128,7 +128,7 @@ struct MarfaProblemsTests {
         #expect(entity.title == "Ada")
         #expect(entity.body == nil)
         #expect(entity.properties == [SyncContent.Line(label: "Role", value: "Engineer")])
-        // A type with neither field keeps its title where Marfa's own reader looks.
+        // A type with neither hint is read under the `title` it declares.
         let folder = MarfaProblems.content(
             of: ["properties": ["title": "Archive"]], type: TypeID("system.folder"), catalogue: Self.catalogue)
         #expect(folder.title == "Archive")
