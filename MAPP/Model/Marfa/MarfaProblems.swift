@@ -220,7 +220,8 @@ nonisolated enum MarfaProblems {
         }
         let fields = info?.fields ?? []
         let ordered = catalogue.ordered(
-            properties.map { Property(key: $0.key, value: MarfaMapping.value($0.value)) }, for: type ?? TypeID(""))
+            Dictionary(uniqueKeysWithValues: properties.map { ($0.key, MarfaMapping.value($0.value)) }),
+            for: type ?? TypeID(""))
         content.properties = ordered.compactMap { property in
             guard let value = text(property.value) else { return nil }
             let label = fields.first { $0.key == property.key }?.label ?? MarfaMapping.label(forField: property.key)
