@@ -524,6 +524,9 @@ actor MarfaEngine {
                 throw NotYet(message: Self.noText)
             }
             let properties: [String: JSONValue] = [bodyField: .string(text)]
+            // Read before the edit is sent: an answer that lands during the send is not in the version it was sent
+            // on, so it is counted later, as it comes.
+            let answeredBefore = merge == .following && ownText[id] != nil ? [] : try await answeredWrites(of: id)
             let queued: Marfa.QueuedWrite
             switch merge {
             case .ifUnchanged:
@@ -534,10 +537,8 @@ actor MarfaEngine {
                 queued = try await send(id, properties) { try await self.followingVersion(id, otherwise: base) }
             }
             ownText[id] = OwnText(text: text, on: queued.baseVersion ?? base.rawValue)
-            // Answers already in the copy are in the version this edit was sent on.
-            for write in try await copy.queue.all() where write.itemId == id.rawValue && write.verdict != nil {
-                counted.insert(write.id)
-            }
+            // A following edit counted the answers it saw as it chose its version (`followingVersion`).
+            counted.formUnion(answeredBefore)
             return [queued]
         case .editProperties(let id, let changes, let base, _):
             let properties = changes.mapValues { $0.map(MarfaMapping.json) ?? .null }
@@ -676,6 +677,10 @@ actor MarfaEngine {
             own.on += Int64(answered.count { $0.verdict == .accepted })
         }
         ownText[id] = own
+    }
+
+    private func answeredWrites(of id: ItemID) async throws -> [String] {
+        try await copy.queue.all().filter { $0.itemId == id.rawValue && $0.verdict != nil }.map(\.id)
     }
 
     private func heldVersion(_ id: ItemID) async throws -> Int64 {
