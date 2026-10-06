@@ -805,6 +805,24 @@
     },
     "Discard Changes": {
       "extractionState": "manual"
+    },
+    "All Items": {
+      "extractionState": "manual"
+    },
+    "There’s no key for this Marfa server.": {
+      "extractionState": "manual"
+    },
+    "This change can’t be made in a Marfa library yet.": {
+      "extractionState": "manual"
+    },
+    "This item has no file.": {
+      "extractionState": "manual"
+    },
+    "This item isn’t in the library.": {
+      "extractionState": "manual"
+    },
+    "This kind of item has no text to edit.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
