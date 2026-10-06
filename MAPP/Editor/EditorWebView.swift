@@ -117,6 +117,26 @@ final class EditorWebView: WKWebView {
 
     // MARK: Context menu
 
+    private final class MenuEmbed: NSObject {
+        let item: ItemID
+        let reference: EmbedReference
+
+        init(item: ItemID, reference: EmbedReference) {
+            self.item = item
+            self.reference = reference
+        }
+    }
+
+    @objc private func openEmbed(_ sender: NSMenuItem) {
+        guard let embed = sender.representedObject as? MenuEmbed else { return }
+        controller?.openEmbed(embed.reference, in: embed.item)
+    }
+
+    @objc private func revealEmbed(_ sender: NSMenuItem) {
+        guard let embed = sender.representedObject as? MenuEmbed else { return }
+        controller?.openEmbed(embed.reference, in: embed.item, revealing: true)
+    }
+
     /// WebKit's own items that mean nothing in a note: page navigation, and opening or saving what links and
     /// images point at, which the page never does (a link opens with Command-click). WebKit names them only in
     /// a private header, so were it to rename one, that item would simply stay.
@@ -143,6 +163,17 @@ final class EditorWebView: WKWebView {
 
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
+        if let embed = controller?.takeMenuEmbed() {
+            let open = NSMenuItem(title: String(localized: "Open"), action: #selector(openEmbed(_:)), keyEquivalent: "")
+            let reveal = NSMenuItem(title: String(localized: "Show in Finder"), action: #selector(revealEmbed(_:)), keyEquivalent: "")
+            for item in [open, reveal] {
+                item.target = self
+                item.representedObject = MenuEmbed(item: embed.item, reference: embed.reference)
+            }
+            let items = embed.opens ? [open, reveal] : [reveal]
+            for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
+            menu.insertItem(.separator(), at: items.count)
+        }
         for item in menu.items {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")
             let isRichText = item.submenu?.items.contains { $0.action.map(Self.richTextActions.contains) ?? false } ?? false

@@ -11,7 +11,7 @@ interface Run {
 }
 
 /** The note as plain text, as the system find bar searches it: each block's text, blocks separated by a line
- *  break, a line break for a hard break, and an object replacement character for an image. */
+ *  break, a line break for a hard break, and an object replacement character for an image or other embedded file. */
 export interface TextModel {
   text: string
   runs: Run[]
@@ -30,7 +30,11 @@ export function textModel(doc: ProseNode): TextModel {
       text += '\n'
       pendingBreak = false
     }
-    const piece = node.isText ? node.text! : node.type.name === 'image' ? '￼' : '\n'
+    const piece = node.isText
+      ? node.text!
+      : node.type.name === 'image' || node.type.name === 'embed'
+        ? '￼'
+        : '\n'
     runs.push({ offset: text.length, pos, length: piece.length })
     text += piece
     return false

@@ -1,6 +1,6 @@
 import { postToHost } from './bridge'
 import { NoteEditor, type FormatCommand, type Keymap } from './editor'
-import { setImageBase } from './images'
+import { embedAt, setItem } from './embeds'
 import { setLabels, type Labels } from './labels'
 import './style.css'
 
@@ -15,7 +15,7 @@ declare global {
       focus(): void
       undo(): void
       redo(): void
-      setImageBase(directory: string): void
+      setItem(id: string): void
       setFinding(finding: boolean): void
       findSelect(from: number, to: number): void
       findScroll(from: number): void
@@ -85,6 +85,17 @@ window.addEventListener(
   { capture: true },
 )
 
+// The app adds Open and Show in Finder to the context menu over an embedded file, and needs to hear which one
+// before WebKit asks it for the menu.
+window.addEventListener(
+  'contextmenu',
+  (event) => {
+    const shown = embedAt(event.target)
+    postToHost({ type: 'embedMenu', embed: shown?.embed ?? null, opens: shown?.opens ?? false })
+  },
+  { capture: true },
+)
+
 // Links open on ⌘-click, so the pointer says so only while ⌘ is down.
 for (const name of ['keydown', 'keyup'] as const) {
   window.addEventListener(name, (event) =>
@@ -135,7 +146,7 @@ window.editor = {
   focus: () => editor.focus(),
   undo: () => editor.undo(),
   redo: () => editor.redo(),
-  setImageBase: (directory) => setImageBase(directory),
+  setItem: (id) => setItem(id),
   setFinding: (finding) => editor.setFinding(finding),
   findSelect: (from, to) => editor.findSelect(from, to),
   findScroll: (from) => editor.findScroll(from),

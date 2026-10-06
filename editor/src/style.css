@@ -337,6 +337,84 @@ body {
   font-style: italic;
 }
 
+/* Sound and video keep WebKit's own controls; a video keeps its aspect within the page and the window. */
+.ProseMirror .embed-audio,
+.ProseMirror .embed-video,
+.ProseMirror .embed-pdf {
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  vertical-align: bottom;
+}
+
+.ProseMirror .embed-audio audio {
+  width: 22rem;
+  max-width: 100%;
+}
+
+.ProseMirror .embed-video video {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+  border-radius: 4px;
+  background: #000;
+}
+
+.ProseMirror .embed-pdf {
+  width: 100%;
+}
+
+.ProseMirror .embed-pdf iframe {
+  display: block;
+  width: 100%;
+  height: min(70vh, 48rem);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* Any other file is a card that opens it, sized to sit in a line of text. */
+.ProseMirror .embed-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.267rem 0.667rem 0.267rem 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--code-bg);
+  line-height: 1.3;
+  vertical-align: middle;
+  cursor: default;
+  user-select: none;
+}
+
+.ProseMirror .embed-icon {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+}
+
+.ProseMirror .embed-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ProseMirror .embed-detail {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.867em;
+}
+
+.ProseMirror.ProseMirror-focused .ProseMirror-selectednode .embed-card,
+.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-audio audio,
+.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-video video,
+.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-pdf iframe {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .ProseMirror ul,
 .ProseMirror ol {
   margin: 0 0 0.667rem;
