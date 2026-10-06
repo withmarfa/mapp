@@ -143,6 +143,82 @@ struct TypesBrowserTests {
         #expect(browser.selection == image)
     }
 
+    @Test func aCatalogueThatIsTransientlyEmptyKeepsTheChoiceAndTheHistory() {
+        let browser = browser()
+        browser.select(image)
+        browser.select(pdf)
+        browser.catalogue = Catalogue()
+        #expect(browser.selection == pdf && browser.canGoBack)
+        browser.catalogue = TypesFixtures.catalogue
+        #expect(browser.selectedItemType?.type.label == "PDF")
+        browser.goBack()
+        #expect(browser.selection == image)
+    }
+
+    @Test func aReturningCatalogueThatLacksTheTypeThenClearsIt() {
+        let browser = browser()
+        browser.select(image)
+        browser.catalogue = Catalogue()
+        var smaller = TypesFixtures.catalogue
+        smaller.itemTypes[TypeID("core.file.image")] = nil
+        browser.catalogue = smaller
+        #expect(browser.selection == nil)
+    }
+
+    // MARK: Revealing
+
+    private let raw = TypeSelection.item(TypeID("core.file.image.raw"))
+
+    @Test func choosingATypeOpensEveryTypeAboveIt() {
+        let browser = browser()
+        #expect(browser.expanded.isEmpty)
+        browser.select(raw)
+        #expect(browser.expanded == [TypeID("core.file"), TypeID("core.file.image")])
+        #expect(!browser.isExpanded(TypeID("core.entity")))
+    }
+
+    @Test func choosingATypeUnderAMissingParentOpensWhatExists() {
+        let browser = browser()
+        browser.select(.item(TypeID("aic.ticket.bug")))
+        #expect(browser.expanded.isEmpty)
+    }
+
+    @Test func backAndForwardOpenWhatTheyReturnTo() {
+        let browser = browser()
+        browser.select(raw)
+        browser.select(person)
+        browser.setExpanded(TypeID("core.file"), false)
+        browser.setExpanded(TypeID("core.file.image"), false)
+        browser.goBack()
+        #expect(browser.selection == raw)
+        #expect(browser.isExpanded(TypeID("core.file")) && browser.isExpanded(TypeID("core.file.image")))
+    }
+
+    @Test func aGroupOpensAndClosesAtTheListsRequestWithoutChangingTheChoice() {
+        let browser = browser()
+        browser.select(image)
+        browser.setExpanded(TypeID("core.entity"), true)
+        #expect(browser.isExpanded(TypeID("core.entity")))
+        browser.setExpanded(TypeID("core.entity"), false)
+        #expect(!browser.isExpanded(TypeID("core.entity")))
+        #expect(browser.selection == image && !browser.canGoBack)
+    }
+
+    @Test func choosingAnEdgeTypeOpensNothing() {
+        let browser = browser()
+        browser.select(parentOf)
+        #expect(browser.expanded.isEmpty)
+    }
+
+    @Test func aLoopOfParentsDoesNotHangTheReveal() {
+        let catalogue = Catalogue(itemTypes: [
+            TypesFixtures.type("a.one", parent: "a.two"), TypesFixtures.type("a.two", parent: "a.one")
+        ])
+        let browser = TypesBrowser(catalogue: catalogue)
+        browser.select(.item(TypeID("a.one")))
+        #expect(browser.expanded == [TypeID("a.two")])
+    }
+
     // MARK: Search
 
     private func labels(_ browser: TypesBrowser) -> [String] { browser.itemRows.map(\.type.label) }
@@ -151,7 +227,7 @@ struct TypesBrowserTests {
         let browser = browser()
         #expect(!browser.isSearching)
         #expect(browser.itemRows.count == TypesFixtures.catalogue.itemTypes.count)
-        #expect(browser.edgeTypes.count == 3)
+        #expect(browser.edgeTypes.count == 4)
         browser.searchText = "   "
         #expect(!browser.isSearching)
         #expect(browser.itemRows.count == TypesFixtures.catalogue.itemTypes.count)

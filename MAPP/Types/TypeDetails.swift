@@ -61,8 +61,11 @@ nonisolated struct ItemTypeDetail: Sendable {
         compatibleFrom = TypeTree.ordered(catalogue.itemTypes.values.filter { $0.compatibleWith.contains(type.id) })
             .map { TypeReference($0.id, in: catalogue) }
         edgeTypes = TypeTree.ordered(Array(catalogue.edgeTypes.values)).compactMap { edge in
-            let asSource = edge.sourceTypes.contains(type.id) || catalogue.isSubtype(type.id, ofAnyOf: edge.sourceTypes)
-            let asTarget = edge.targetTypes.contains(type.id) || catalogue.isSubtype(type.id, ofAnyOf: edge.targetTypes)
+            func may(_ types: Set<TypeID>, _ roles: Set<String>) -> Bool {
+                types.contains(type.id) || catalogue.isSubtype(type.id, ofAnyOf: types) || !roles.isDisjoint(with: type.roles)
+            }
+            let asSource = may(edge.sourceTypes, edge.sourceRoles)
+            let asTarget = may(edge.targetTypes, edge.targetRoles)
             switch (asSource, asTarget) {
             case (true, true): return EdgeLink(edge: edge, role: .either)
             case (true, false): return EdgeLink(edge: edge, role: .source)
@@ -72,16 +75,24 @@ nonisolated struct ItemTypeDetail: Sendable {
         }
     }
 
-    /// The field that holds the title, or nil where the title is the body's first line.
-    var titleField: String? { MarfaMapping.titleField(of: type) }
+    /// The property Marfa reads the title under: the hint's field, or `title` where the hints name none.
+    var titleProperty: String { type.titleField ?? "title" }
+
+    /// Whether the type has the property its title is read under. If not, a title is read as none.
+    var declaresTitle: Bool { type.declares(titleProperty) }
+
+    /// The property Marfa reads the text under: the hint's field, or `body` where the type declares it.
+    var bodyProperty: String? { MarfaMapping.bodyField(of: type) }
 }
 
 /// Everything the page for an edge type shows.
 nonisolated struct EdgeTypeDetail: Sendable {
     let edge: EdgeTypeInfo
-    /// Empty where any type may stand at the end.
+    /// Empty, with no roles, where any type may stand at the end.
     let sourceTypes: [TypeReference]
     let targetTypes: [TypeReference]
+    let sourceRoles: [String]
+    let targetRoles: [String]
 
     init(_ edge: EdgeTypeInfo, in catalogue: Catalogue) {
         self.edge = edge
@@ -92,6 +103,8 @@ nonisolated struct EdgeTypeDetail: Sendable {
         }
         sourceTypes = references(edge.sourceTypes)
         targetTypes = references(edge.targetTypes)
+        sourceRoles = edge.sourceRoles.sorted()
+        targetRoles = edge.targetRoles.sorted()
     }
 }
 
@@ -134,12 +147,17 @@ extension EdgeTypeInfo {
     }
 }
 
+/// A role as the person reads it: the roles are Marfa's own words, such as `container`.
+nonisolated func roleWording(_ role: String) -> String {
+    String(localized: "Types with the role \(role)")
+}
+
 extension ItemTypeInfo.Field.Kind {
     var wording: String {
         switch self {
         case .text: String(localized: "Text")
         case .number: String(localized: "Number")
-        case .boolean: String(localized: "Yes or No")
+        case .boolean: String(localized: "Yes or no")
         case .date: String(localized: "Date")
         case .choice: String(localized: "Choice")
         case .other: String(localized: "Other")
@@ -152,7 +170,7 @@ extension ItemTypeDetail.EdgeLink.Role {
         switch self {
         case .source: String(localized: "From")
         case .target: String(localized: "To")
-        case .either: String(localized: "From or To")
+        case .either: String(localized: "From or to")
         }
     }
 }

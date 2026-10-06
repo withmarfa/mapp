@@ -33,7 +33,7 @@ private struct ItemTypePage: View {
 
             Section {
                 if !detail.parents.isEmpty {
-                    LabeledContent("Parent Types") {
+                    LabeledContent("Parent types") {
                         HStack(spacing: 4) {
                             ForEach(Array(detail.parents.enumerated()), id: \.element.id) { index, parent in
                                 if index > 0 { Image(systemName: "chevron.right").imageScale(.small).foregroundStyle(.tertiary) }
@@ -49,14 +49,15 @@ private struct ItemTypePage: View {
                     LabeledContent("Roles") { Text(detail.type.roles.formatted(.list(type: .and, width: .narrow))) }
                 }
                 LabeledContent("Title") {
-                    if let field = detail.titleField {
-                        Text(field).monospaced()
-                    } else {
-                        Text("First line of the body")
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(detail.titleProperty).monospaced()
+                        if !detail.declaresTitle {
+                            Text("Not a field of this type").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 LabeledContent("Body") {
-                    if let field = detail.type.bodyField {
+                    if let field = detail.bodyProperty {
                         Text(field).monospaced()
                     } else {
                         Text("None").foregroundStyle(.secondary)
@@ -76,10 +77,10 @@ private struct ItemTypePage: View {
             if !detail.compatibleWith.isEmpty || !detail.compatibleFrom.isEmpty {
                 Section {
                     if !detail.compatibleWith.isEmpty {
-                        LabeledContent("Compatible With") { TypeLinks(references: detail.compatibleWith, browser: browser) }
+                        LabeledContent("Compatible with") { TypeLinks(references: detail.compatibleWith, browser: browser) }
                     }
                     if !detail.compatibleFrom.isEmpty {
-                        LabeledContent("Compatible From") { TypeLinks(references: detail.compatibleFrom, browser: browser) }
+                        LabeledContent("Compatible from") { TypeLinks(references: detail.compatibleFrom, browser: browser) }
                     }
                 } header: {
                     Text("Compatibility")
@@ -93,7 +94,7 @@ private struct ItemTypePage: View {
                     EdgeLinkRow(link: link, browser: browser)
                 }
             } header: {
-                Text("Edge Types")
+                Text("Edge types")
             } footer: {
                 Text("Edge types that do not limit their types connect every type, so they are not listed here.")
             }
@@ -140,7 +141,8 @@ private struct FieldRowView: View {
                 }
             }
         }
-        .accessibilityElement(children: .combine)
+        // Contained rather than combined, so the link to the declaring type stays reachable on its own.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("MarfaTypeField.\(row.field.key)")
     }
 }
@@ -175,20 +177,24 @@ private struct EdgeTypePage: View {
             TypeHeader(label: detail.edge.label, id: detail.edge.id, description: detail.edge.description)
 
             Section {
-                LabeledContent("Reverse Name") {
+                LabeledContent("Reverse name") {
                     if let reverse = detail.edge.reverseName {
                         Text(reverse).monospaced()
                     } else {
                         Text("None").foregroundStyle(.secondary)
                     }
                 }
-                LabeledContent("Written At") { Text(detail.edge.writtenAtWording) }
-                LabeledContent("When an Item Is Deleted") { Text(detail.edge.cascadeWording) }
+                LabeledContent("Written at") { Text(detail.edge.writtenAtWording) }
+                LabeledContent("When an item is deleted") { Text(detail.edge.cascadeWording) }
             }
 
             Section {
-                EndRow(title: "From", types: detail.sourceTypes, wording: detail.edge.sourceEndWording, browser: browser)
-                EndRow(title: "To", types: detail.targetTypes, wording: detail.edge.targetEndWording, browser: browser)
+                EndRow(
+                    title: "From", types: detail.sourceTypes, roles: detail.sourceRoles,
+                    wording: detail.edge.sourceEndWording, browser: browser)
+                EndRow(
+                    title: "To", types: detail.targetTypes, roles: detail.targetRoles,
+                    wording: detail.edge.targetEndWording, browser: browser)
             } header: {
                 Text("Ends")
             } footer: {
@@ -210,16 +216,20 @@ private struct EdgeTypePage: View {
 private struct EndRow: View {
     let title: LocalizedStringKey
     let types: [TypeReference]
+    let roles: [String]
     let wording: String
     let browser: TypesBrowser
 
     var body: some View {
         LabeledContent(title) {
             VStack(alignment: .trailing, spacing: 2) {
-                if types.isEmpty {
+                if types.isEmpty && roles.isEmpty {
                     Text("Any type")
                 } else {
                     TypeLinks(references: types, browser: browser)
+                    ForEach(roles, id: \.self) { role in
+                        Text(roleWording(role))
+                    }
                 }
                 Text(wording).font(.caption).foregroundStyle(.secondary)
             }
@@ -291,10 +301,58 @@ private struct TypeLinks: View {
     let browser: TypesBrowser
 
     var body: some View {
-        HStack(spacing: 8) {
+        WrappingLayout(spacing: 8) {
             ForEach(references) { reference in
                 TypeLink(reference: reference, browser: browser)
             }
         }
+    }
+}
+
+/// Lays its views out in lines that break where the width runs out, as text does, so a long list of types stays
+/// readable at large text sizes. Each line ends at the trailing edge, where the values of a form sit.
+private struct WrappingLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let lines = lines(in: proposal.width ?? .infinity, subviews)
+        let width = lines.map(\.width).max() ?? 0
+        let height = lines.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, lines.count - 1))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for line in lines(in: bounds.width, subviews) {
+            var x = bounds.maxX - line.width
+            for index in line.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += line.height + spacing
+        }
+    }
+
+    private struct Line {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func lines(in available: CGFloat, _ subviews: Subviews) -> [Line] {
+        var lines: [Line] = [Line()]
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let gap = lines[lines.count - 1].indices.isEmpty ? 0 : spacing
+            if !lines[lines.count - 1].indices.isEmpty, lines[lines.count - 1].width + gap + size.width > available {
+                lines.append(Line())
+            }
+            let last = lines.count - 1
+            lines[last].width += (lines[last].indices.isEmpty ? 0 : spacing) + size.width
+            lines[last].height = max(lines[last].height, size.height)
+            lines[last].indices.append(index)
+        }
+        return lines
     }
 }

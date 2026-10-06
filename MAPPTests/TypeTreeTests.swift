@@ -6,9 +6,9 @@ struct TypeTreeTests {
     @Test func parentsComeBeforeTheirChildrenInLabelOrder() {
         let rows = TypeTree.flattened(TypeTree.nodes(in: TypesFixtures.catalogue))
         #expect(rows.map(\.type.label) == [
-            "Bug", "Contact", "Entity", "Person", "File", "Image", "Raw Image", "PDF"
+            "Album", "Live Album", "Bug", "Contact", "Entity", "Person", "File", "Image", "Raw Image", "PDF"
         ])
-        #expect(rows.map(\.depth) == [0, 0, 0, 1, 0, 1, 2, 1])
+        #expect(rows.map(\.depth) == [0, 1, 0, 0, 0, 1, 0, 1, 2, 1])
         for (index, row) in rows.enumerated() {
             guard let parent = rows.firstIndex(where: { $0.type.id == row.type.parent }) else { continue }
             #expect(parent < index)

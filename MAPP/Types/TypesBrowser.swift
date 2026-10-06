@@ -14,6 +14,8 @@ final class TypesBrowser {
     /// Each type chosen, in order, with `position` at the one shown. Choosing anew drops what lay ahead.
     private var history: [TypeSelection] = []
     private var position = -1
+    /// The item types whose subtypes the list shows. Choosing a type opens everything above it, so it is in view.
+    private(set) var expanded: Set<TypeID> = []
 
     init(catalogue: Catalogue = Catalogue()) {
         self.catalogue = catalogue
@@ -31,6 +33,7 @@ final class TypesBrowser {
         }
         guard contains(new) else { return }
         selection = new
+        reveal(new)
         // A choice cleared and made again is the same stop, not a new one.
         if position >= 0, history[position] == new { return }
         history.removeSubrange((position + 1)...)
@@ -45,12 +48,30 @@ final class TypesBrowser {
         guard canGoBack else { return }
         if selection != nil { position -= 1 }
         selection = history[position]
+        reveal(history[position])
     }
 
     func goForward() {
         guard canGoForward else { return }
         position += 1
         selection = history[position]
+        reveal(history[position])
+    }
+
+    func isExpanded(_ id: TypeID) -> Bool { expanded.contains(id) }
+
+    func setExpanded(_ id: TypeID, _ isExpanded: Bool) {
+        if isExpanded { expanded.insert(id) } else { expanded.remove(id) }
+    }
+
+    private func reveal(_ selection: TypeSelection) {
+        guard case .item(let id) = selection else { return }
+        var next = catalogue.itemTypes[id]?.parent
+        var seen: Set<TypeID> = [id]
+        while let parent = next, seen.insert(parent).inserted, let type = catalogue.itemTypes[parent] {
+            expanded.insert(parent)
+            next = type.parent
+        }
     }
 
     private func contains(_ selection: TypeSelection) -> Bool {
@@ -60,8 +81,10 @@ final class TypesBrowser {
         }
     }
 
-    /// A catalogue that has changed may have lost types the history names.
+    /// A catalogue that has changed may have lost types the history names. One with no types at all is a library
+    /// between connections, not one that lost them, so the choice and the history wait for the types to return.
     private func reconcile() {
+        guard !catalogue.itemTypes.isEmpty || !catalogue.edgeTypes.isEmpty else { return }
         var kept: [TypeSelection] = []
         var newPosition = -1
         for (index, entry) in history.enumerated() {

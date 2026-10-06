@@ -659,9 +659,6 @@
     "Item": {
       "extractionState": "manual"
     },
-    "Item Types": {
-      "extractionState": "manual"
-    },
     "Item not found": {
       "extractionState": "manual"
     },
@@ -842,28 +839,7 @@
     "Tags: %@": {
       "extractionState": "manual"
     },
-    "Compatible From": {
-      "extractionState": "manual"
-    },
-    "Compatible With": {
-      "extractionState": "manual"
-    },
-    "Parent Types": {
-      "extractionState": "manual"
-    },
-    "Reverse Name": {
-      "extractionState": "manual"
-    },
     "Roles": {
-      "extractionState": "manual"
-    },
-    "When an Item Is Deleted": {
-      "extractionState": "manual"
-    },
-    "Written At": {
-      "extractionState": "manual"
-    },
-    "Edge Types": {
       "extractionState": "manual"
     },
     "Fields": {
@@ -890,9 +866,6 @@
     "Each can point to one item at most.": {
       "extractionState": "manual"
     },
-    "From or To": {
-      "extractionState": "manual"
-    },
     "From": {
       "extractionState": "manual"
     },
@@ -917,9 +890,6 @@
     "To": {
       "extractionState": "manual"
     },
-    "Yes or No": {
-      "extractionState": "manual"
-    },
     "^[%lld subtype](inflect: true)": {
       "extractionState": "manual"
     },
@@ -941,9 +911,6 @@
     "Edge types that do not limit their types connect every type, so they are not listed here.": {
       "extractionState": "manual"
     },
-    "First line of the body": {
-      "extractionState": "manual"
-    },
     "Inherited from": {
       "extractionState": "manual"
     },
@@ -963,6 +930,45 @@
       "extractionState": "manual"
     },
     "No Type Selected": {
+      "extractionState": "manual"
+    },
+    "Parent types": {
+      "extractionState": "manual"
+    },
+    "Compatible with": {
+      "extractionState": "manual"
+    },
+    "Compatible from": {
+      "extractionState": "manual"
+    },
+    "Reverse name": {
+      "extractionState": "manual"
+    },
+    "Written at": {
+      "extractionState": "manual"
+    },
+    "When an item is deleted": {
+      "extractionState": "manual"
+    },
+    "Edge types": {
+      "extractionState": "manual"
+    },
+    "Item types": {
+      "extractionState": "manual"
+    },
+    "Not a field of this type": {
+      "extractionState": "manual"
+    },
+    "Types with the role %@": {
+      "extractionState": "manual"
+    },
+    "Shown because a type below it matches the search.": {
+      "extractionState": "manual"
+    },
+    "From or to": {
+      "extractionState": "manual"
+    },
+    "Yes or no": {
       "extractionState": "manual"
     }
   },

@@ -58,12 +58,24 @@ struct TypeDetailsTests {
         #expect(contact.compatibleWith.isEmpty)
     }
 
-    @Test func theTitleIsTheFieldTheTypeNamesOrTheBodysFirstLine() {
-        #expect(ItemTypeDetail(TypesFixtures.type("a.x", titleField: "name"), in: Catalogue()).titleField == "name")
-        let bodyOnly = TypesFixtures.type("a.y", titleField: nil, bodyField: "text")
-        #expect(ItemTypeDetail(bodyOnly, in: Catalogue()).titleField == nil)
-        let neither = TypesFixtures.type("a.z", titleField: nil)
-        #expect(ItemTypeDetail(neither, in: Catalogue()).titleField == "title")
+    @Test func titleAndBodyAreUnderTheHintsFieldsOrUnderTitleAndBody() {
+        let named = ItemTypeDetail(
+            TypesFixtures.type("a.x", fields: [TypesFixtures.field("name", by: "a.x")], titleField: "name"), in: Catalogue())
+        #expect(named.titleProperty == "name" && named.declaresTitle)
+        #expect(named.bodyProperty == nil)
+        // A type naming neither hint is read under `title` and `body`, where it declares them.
+        let folder = ItemTypeDetail(
+            TypesFixtures.type("a.folder", fields: [
+                TypesFixtures.field("title", by: "a.folder"), TypesFixtures.field("body", by: "a.folder")
+            ], titleField: nil), in: Catalogue())
+        #expect(folder.titleProperty == "title" && folder.declaresTitle && folder.bodyProperty == "body")
+        let bare = ItemTypeDetail(TypesFixtures.type("a.bare", titleField: nil), in: Catalogue())
+        #expect(bare.titleProperty == "title" && !bare.declaresTitle && bare.bodyProperty == nil)
+        // A type naming only its body field is still titled by `title`.
+        let message = ItemTypeDetail(
+            TypesFixtures.type("a.message", fields: [TypesFixtures.field("text", by: "a.message")], titleField: nil, bodyField: "text"),
+            in: Catalogue())
+        #expect(message.titleProperty == "title" && message.bodyProperty == "text")
     }
 
     @Test func edgeTypesThatNameATypeOrOneAboveItConnectIt() throws {
@@ -87,6 +99,24 @@ struct TypeDetailsTests {
             edgeTypes: [TypesFixtures.edge("links", from: ["a.x"], to: ["a.x"])])
         let detail = ItemTypeDetail(catalogue.itemTypes[TypeID("a.x")]!, in: catalogue)
         #expect(detail.edgeTypes.map(\.role) == [.either])
+    }
+
+    @Test func aRoleConstraintListsTheTypesThatPlayTheRole() throws {
+        let album = try detail("core.media.album")
+        #expect(album.edgeTypes.map(\.edge.id) == ["in-collection"])
+        #expect(album.edgeTypes.first?.role == .target)
+        // The role is the type's own: a subtype does not declare it.
+        #expect(try detail("core.media.album.live").edgeTypes.isEmpty)
+        #expect(try detail("core.contact").edgeTypes.isEmpty)
+    }
+
+    @Test func anEndConstrainedByRoleIsNotAnyType() throws {
+        let inCollection = try edge("in-collection")
+        #expect(!inCollection.allowsAnyTarget() && inCollection.allowsAnySource())
+        let detail = EdgeTypeDetail(inCollection, in: TypesFixtures.catalogue)
+        #expect(detail.targetTypes.isEmpty && detail.targetRoles == ["container"])
+        #expect(detail.sourceRoles.isEmpty)
+        #expect(roleWording("container") == "Types with the role container")
     }
 
     // MARK: Edge types
@@ -139,6 +169,6 @@ struct TypeDetailsTests {
 
     @Test func fieldKindsReadAsPlainWords() {
         let kinds: [ItemTypeInfo.Field.Kind] = [.text, .number, .boolean, .date, .choice(["a"]), .other]
-        #expect(kinds.map(\.wording) == ["Text", "Number", "Yes or No", "Date", "Choice", "Other"])
+        #expect(kinds.map(\.wording) == ["Text", "Number", "Yes or no", "Date", "Choice", "Other"])
     }
 }
