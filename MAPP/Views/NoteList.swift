@@ -82,20 +82,22 @@ struct NoteList: View {
             return .handled
         }
         .toolbar {
-            ColumnSearch(
-                isExpanded: $browser.isSearchExpanded,
-                text: $browser.searchText,
-                prompt: String(localized: "Search"),
-                columnWidth: width,
-                focusRequests: browser.searchFocusRequests,
-                onDown: { browser.focusRequest = .list }
-            ) {
-                Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                    OrderOptions()
-                        .pickerStyle(.inline)
+            if !settingsPresented {
+                ColumnSearch(
+                    isExpanded: $browser.isSearchExpanded,
+                    text: $browser.searchText,
+                    prompt: String(localized: "Search"),
+                    columnWidth: width,
+                    focusRequests: browser.searchFocusRequests,
+                    onDown: { browser.focusRequest = .list }
+                ) {
+                    Menu("Sort", systemImage: "arrow.up.arrow.down") {
+                        OrderOptions()
+                            .pickerStyle(.inline)
+                    }
+                    .menuIndicator(.hidden)
+                    .help("Sort")
                 }
-                .menuIndicator(.hidden)
-                .help("Sort")
             }
         }
         .task {
@@ -128,12 +130,12 @@ struct NoteList: View {
                 }
             }
         }
-        .navigationTitle(settingsPresented ? String(localized: "Settings") : title)
-        .navigationSubtitle(settingsPresented ? Text("") : browser.isSearching
+        .navigationTitle(title)
+        .navigationSubtitle(browser.isSearching
             ? Text("^[\(ids.count) result](inflect: true)")
             : Text("^[\(ids.count) item](inflect: true)"))
         // The search field takes the title's place while it is out.
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+        .toolbar(removing: settingsPresented || browser.isSearchExpanded ? .title : nil)
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.

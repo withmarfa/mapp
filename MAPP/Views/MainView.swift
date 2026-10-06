@@ -41,17 +41,19 @@ struct MainView: View {
                 if browser.showsTypes {
                     MarfaTypesView(part: types.list)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(settings.isPresented ? String(localized: "Settings") : library.name(of: .marfaTypes))
-                        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+                        .navigationTitle(library.name(of: .marfaTypes))
+                        .toolbar(removing: settings.isPresented || browser.isSearchExpanded ? .title : nil)
                         .toolbar {
-                            ColumnSearch(
-                                isExpanded: $browser.isSearchExpanded,
-                                text: $browser.typesQuery,
-                                prompt: String(localized: "Search Types"),
-                                columnWidth: typesListWidth,
-                                focusRequests: browser.searchFocusRequests,
-                                onSubmit: types.openFirstMatch
-                            ) {}
+                            if !settings.isPresented {
+                                ColumnSearch(
+                                    isExpanded: $browser.isSearchExpanded,
+                                    text: $browser.typesQuery,
+                                    prompt: String(localized: "Search Types"),
+                                    columnWidth: typesListWidth,
+                                    focusRequests: browser.searchFocusRequests,
+                                    onSubmit: types.openFirstMatch
+                                ) {}
+                            }
                         }
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane, settingsPresented: settings.isPresented)
@@ -72,9 +74,12 @@ struct MainView: View {
                 }
             }
             .toolbar(id: "main") {
-                NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
+                if !settings.isPresented {
+                    NoteToolbar(browser: browser, notes: browser.selectedNotes(in: library), editor: editor, details: details)
+                }
             }
         }
+        .toolbar(removing: settings.isPresented ? .sidebarToggle : nil)
     }
 
     private var presentedWindow: some View {

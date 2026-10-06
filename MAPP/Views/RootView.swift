@@ -19,7 +19,6 @@ struct RootView: View {
             }
         }
         .focusedSceneValue(\.settingsPresentation, settings)
-        .toolbarVisibility(settings.isPresented ? .hidden : .automatic)
         .onAppear {
             if settingsRequest.isPending {
                 settingsRequest.isPending = false
