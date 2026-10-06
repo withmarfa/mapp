@@ -46,7 +46,8 @@ private struct LibraryDialogs: ViewModifier {
     private func take() {
         guard appearsActive else { return }
         if !library.notesToPurge.isEmpty {
-            purging = library.notesToPurge
+            // A library that cannot erase is never asked to.
+            if library.capabilities.contains(.purge) { purging = library.notesToPurge }
             library.notesToPurge = []
         }
         if let asked = library.failure {

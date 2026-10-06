@@ -131,7 +131,7 @@ private struct MoreMenu: View {
             Divider()
             if let browser {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = notes.first?.id }
-                    .disabled(notes.count != 1 || notes.first?.isWritable != true)
+                    .disabled(notes.count != 1 || !library.canRenameFile(of: notes.first))
                 Divider()
             }
             if !notes.isEmpty {

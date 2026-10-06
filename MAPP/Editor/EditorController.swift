@@ -287,7 +287,16 @@ final class EditorController: NSObject {
         Task {
             let files = await PastedImages.read(sources)
             guard self.noteID == noteID, isEditable, let library else { return }
-            let images = library.attach(files, to: noteID).map { ["src": $0.link, "alt": $0.name] }
+            let embeds: [Embed]
+            do {
+                embeds = try await library.attach(files, to: noteID)
+            } catch {
+                library.failure = (String(localized: "Can’t Attach Images"), error.localizedDescription)
+                return
+            }
+            // The images are kept either way; they go into the note only if it is still the one on the page.
+            guard self.noteID == noteID, isEditable else { return }
+            let images = embeds.map { ["src": $0.link, "alt": $0.name] }
             guard !images.isEmpty else { return }
             if let point {
                 call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(height)))

@@ -196,12 +196,16 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
-            add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
+            if library.capabilities.contains(.importFiles) {
+                add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
+            }
             if !browser.isCreatingItem, browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "info.circle", "⌥⌘I") { details.isPresented.toggle() }
             }
-            add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
-                browser.newFolder(in: library, order: order, undoManager: undoManager)
+            if library.capabilities.contains(.folders) {
+                add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
+                    browser.newFolder(in: library, order: order, undoManager: undoManager)
+                }
             }
         }
         let search = String(localized: "Search Notes")
@@ -218,7 +222,9 @@ struct CommandPalette: View {
                 add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
             }
             }
-            add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
+            if library.canRenameFile(of: one) {
+                add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
+            }
         }
 
         if !selected.isEmpty, selected.allSatisfy({ $0.state == .trashed }) {
