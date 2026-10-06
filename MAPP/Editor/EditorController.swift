@@ -30,7 +30,9 @@ final class EditorController: NSObject {
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
-    @ObservationIgnored private let files = NoteFiles()
+    @ObservationIgnored private let embeds = EmbeddedFiles()
+    /// The embedded file the context menu is opening over, which it offers to open.
+    @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
 
@@ -58,6 +60,7 @@ final class EditorController: NSObject {
         self.library = library
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
+        configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)
         webView = EditorWebView(frame: .zero, configuration: configuration)
         container = EditorContainer(webView: webView)
         super.init()
@@ -69,8 +72,8 @@ final class EditorController: NSObject {
         container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
-        files.root = { [weak self] in self?.library?.folderURL }
-        configuration.userContentController.addScriptMessageHandler(files, contentWorld: .page, name: "files")
+        embeds.resolve = { [weak self] reference, item in await self?.library?.embeddedFile(reference, in: item) }
+        configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -139,7 +142,8 @@ final class EditorController: NSObject {
         markdown = body
         isEditable = item.isWritable
         guard isReady else { return }
-        call("setImageBase", json(library?.imageBase(of: item.id) ?? ""))
+        embeds.version += 1
+        call("setItem", json(item.id.rawValue))
         generation += 1
         // A late report belongs to one of the last few loads, however quickly outside changes came in.
         notesByGeneration = notesByGeneration.filter { $0.key >= generation - 8 }
@@ -366,6 +370,26 @@ final class EditorController: NSObject {
         return operation
     }
 
+    // MARK: Embedded files
+
+    /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder.
+    func openEmbed(_ reference: EmbedReference, in item: ItemID, revealing: Bool = false) {
+        Task {
+            guard let url = await library?.embeddedFile(reference, in: item) else { return }
+            if revealing {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } else {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    /// The embed the context menu opening now is over, heard from the page just before; each menu takes it once.
+    func takeMenuEmbed() -> (item: ItemID, reference: EmbedReference)? {
+        defer { menuEmbed = nil }
+        return menuEmbed
+    }
+
     func undo() { call("undo") }
     func redo() { call("redo") }
 
@@ -442,7 +466,8 @@ final class EditorController: NSObject {
             applyStyle()
             call("setHeaderHeight", String(Double(headerHeight)))
             if let noteID {
-                if let base = library?.imageBase(of: noteID) { call("setImageBase", json(base)) }
+                embeds.version += 1
+                call("setItem", json(noteID.rawValue))
                 generation += 1
                 notesByGeneration[generation] = noteID
                 call("load", json(markdown), String(generation), String(isEditable))
@@ -472,6 +497,10 @@ final class EditorController: NSObject {
             onEscape()
         case .pasteImages:
             insertImages(PastedImages.sources(on: .general))
+        case .openEmbed(let item, let reference):
+            openEmbed(reference, in: item)
+        case .embedMenu(let embed):
+            menuEmbed = embed
         case .find(let state):
             pageFinder.update(state)
         case .error(let message):
@@ -498,13 +527,15 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
 }
 
 extension EditorController: WKNavigationDelegate {
-    /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads.
+    /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads but the
+    /// frame a PDF the note embeds shows in.
     func webView(
         _ webView: WKWebView,
         decidePolicyFor action: WKNavigationAction,
         decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
     ) {
-        decisionHandler(action.request.url == pageURL ? .allow : .cancel)
+        let isEmbed = action.targetFrame?.isMainFrame == false && action.request.url?.scheme == EmbeddedFiles.scheme
+        decisionHandler(action.request.url == pageURL || isEmbed ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
