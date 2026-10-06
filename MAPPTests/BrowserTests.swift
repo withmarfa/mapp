@@ -14,8 +14,17 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
+    /// The same three notes in a library held in memory, for what the browser asks of any library.
+    func makeFakeLibrary() -> (FakeItemLibrary, older: Item, newer: Item, favorite: Item) {
+        let older = FakeItemLibrary.note("Older", modified: start - 120)
+        let newer = FakeItemLibrary.note("Newer", modified: start - 60)
+        let favorite = FakeItemLibrary.note("Favorite", modified: start - 3600, in: work, isFavorite: true)
+        let library = FakeItemLibrary(items: [older, newer, favorite], folders: [work], now: start)
+        return (library, older, newer, favorite)
+    }
+
     @Test func draftDoesNotExposePreviouslySelectedNoteToCommands() {
-        let (library, _, newer, _) = makeLibrary()
+        let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.selection = [newer.id]
         #expect(browser.selectedItems(in: library).count == 1)
@@ -27,7 +36,7 @@ struct BrowserTests {
 
     @Test func creationOutsideOriginalProjectRevealsTheNewItem() throws {
         let library = NoteLibrary(notes: [])
-        let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes))
+        let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes).flatMap { library.note($0) })
         let browser = Browser()
         browser.sidebarItem = .project(project.id)
         browser.startItemDraft()
@@ -65,7 +74,7 @@ struct BrowserTests {
     // MARK: Showing and making
 
     @Test func showingAnItemClearsTheSearchAndSelectsItsTopRow() {
-        let (library, _, newer, favorite) = makeLibrary()
+        let (library, _, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
         browser.searchText = "Older"
         browser.show(.allNotes, in: library, order: NoteOrder())
@@ -188,7 +197,7 @@ struct BrowserTests {
     // MARK: Restoring
 
     @Test func aRestoredWindowShowsWhatItShowedBefore() {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let saved = Browser()
         saved.show(.inbox, in: library, order: NoteOrder())
         saved.selection = [older.id]
@@ -208,7 +217,7 @@ struct BrowserTests {
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
-        let (library, _, _, favorite) = makeLibrary()
+        let (library, _, _, favorite) = makeFakeLibrary()
         let snapshot = Browser.Snapshot(place: .folder(.mint()), selection: [.mint()])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: NoteOrder())
