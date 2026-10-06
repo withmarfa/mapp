@@ -1,9 +1,9 @@
 import Foundation
 import Observation
 
-/// What the two views of Marfa's types share: the catalogue, the type chosen, the search, and the types shown so
-/// far, which Back and Forward move through as a browser's do. The list and the page for the chosen type are views
-/// of it, so it holds no view state and is tested on its own.
+/// What the two views of Marfa's types share: the catalogue, the type chosen, the search, the groups the list holds
+/// open, and the types shown so far, which Back and Forward move through as a browser's do. The list and the page
+/// for the chosen type are views of it, so it is tested on its own.
 @Observable @MainActor
 final class TypesBrowser {
     var catalogue: Catalogue {

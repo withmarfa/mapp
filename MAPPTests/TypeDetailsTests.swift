@@ -105,7 +105,8 @@ struct TypeDetailsTests {
         let album = try detail("core.media.album")
         #expect(album.edgeTypes.map(\.edge.id) == ["in-collection"])
         #expect(album.edgeTypes.first?.role == .target)
-        // The role is the type's own: a subtype does not declare it.
+        // Marfa gives each type its roles with the inherited ones included, so a type whose list lacks the role,
+        // as this fixture's subtype's does, does not play it.
         #expect(try detail("core.media.album.live").edgeTypes.isEmpty)
         #expect(try detail("core.contact").edgeTypes.isEmpty)
     }

@@ -31,6 +31,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     var description: String?
     /// A files library's types have none.
     var version: Int64?
+    /// With the roles it inherits, as Marfa resolves them.
     var roles: [String] = []
     /// The types this one claims to be a structural superset of.
     var compatibleWith: [TypeID] = []

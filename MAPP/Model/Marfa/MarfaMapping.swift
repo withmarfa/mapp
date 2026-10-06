@@ -131,15 +131,17 @@ nonisolated enum MarfaMapping {
             edgesOut: edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld), sync: sync)
     }
 
-    /// Where Marfa reads an item's title: the field the type's hints name, else `title`. A type that has no such
-    /// field has no title of its own, so its title is the first line of its body. A type the catalogue lacks is
-    /// read as Marfa reads one with no hints.
+    /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads
+    /// it. Where the type does not declare `title` either, the title is the first line of the body rather than a
+    /// property the type lacks. A type the catalogue lacks is read as Marfa reads one with no hints.
     static func titleField(of type: ItemTypeInfo?) -> String? {
         guard let type else { return "title" }
         return type.titleField ?? (type.declares("title") ? "title" : nil)
     }
 
-    /// Where Marfa keeps an item's text: the field the type's hints name, else `body` where the type has it.
+    /// Where an item's text is read and written: the field the type's hints name, else `body` where the type
+    /// declares it. Marfa reads `body` even where it is not declared; the app refuses text for such a type rather
+    /// than write a property the type lacks.
     static func bodyField(of type: ItemTypeInfo?) -> String? {
         type.flatMap { $0.bodyField ?? ($0.declares("body") ? "body" : nil) }
     }

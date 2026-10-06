@@ -78,10 +78,10 @@ nonisolated struct ItemTypeDetail: Sendable {
     /// The property Marfa reads the title under: the hint's field, or `title` where the hints name none.
     var titleProperty: String { type.titleField ?? "title" }
 
-    /// Whether the type has the property its title is read under. If not, a title is read as none.
+    /// Whether the type declares that property. If not, an item has a title only where one was written there anyway.
     var declaresTitle: Bool { type.declares(titleProperty) }
 
-    /// The property Marfa reads the text under: the hint's field, or `body` where the type declares it.
+    /// The property the app reads and writes an item's text under, as `MarfaMapping.bodyField(of:)` decides.
     var bodyProperty: String? { MarfaMapping.bodyField(of: type) }
 }
 
