@@ -24,7 +24,7 @@ struct FolderStoreTests {
         try root.write("Picture", to: "Attachments/readme.md")
         try FileManager.default.createDirectory(at: root.url.appending(path: "Empty"), withIntermediateDirectories: true)
         let library = try store.load()
-        #expect(Set(library.folders) == ["Work", "Empty"])
+        #expect(Set(library.folders.map(\.name)) == ["Work", "Empty"])
         #expect(Set(library.notes.map(\.path)) == ["One.md", "Work/Two.md", "Work/Project/Deep.md"])
         #expect(library.notes.first { $0.path == "One.md" }?.text == "One")
     }
@@ -53,7 +53,7 @@ struct FolderStoreTests {
         try root.write("Someone else's", to: "Note.md")
         var moved: (String, String)?
         store.relocated = { from, to in moved = (from, to) }
-        store.perform(.create(path: "Note.md", text: "Mine"))
+        store.perform(.create(path: "Note.md", text: "Mine", id: UUID()))
         store.drain()
         #expect(root.read("Note.md") == "Someone else's")
         #expect(root.read("Note 2.md") == "Mine")
@@ -65,7 +65,7 @@ struct FolderStoreTests {
 
     @Test func changesQueuedForATakenPathReachTheFileMadeInstead() throws {
         try root.write("Someone else's", to: "Ideas.md")
-        store.perform(.create(path: "Ideas.md", text: "Mine"))
+        store.perform(.create(path: "Ideas.md", text: "Mine", id: UUID()))
         store.perform(.write(path: "Ideas.md", text: "Mine, edited"))
         store.perform(.trash(path: "Ideas.md", id: UUID(), date: .now))
         store.drain()
@@ -76,7 +76,7 @@ struct FolderStoreTests {
 
     @Test func onceTheLibraryKnowsOfARelocationTheOldPathIsItsOwnAgain() throws {
         try root.write("Someone else's", to: "Ideas.md")
-        store.perform(.create(path: "Ideas.md", text: "Mine"))
+        store.perform(.create(path: "Ideas.md", text: "Mine", id: UUID()))
         store.drain()
         store.acknowledgeRelocation(of: "Ideas.md")
         store.perform(.write(path: "Ideas 2.md", text: "Mine, edited"))
@@ -154,7 +154,7 @@ struct FolderStoreTests {
         store.perform(.purge(id: recent))
         store.drain()
         #expect(try store.load().trash.isEmpty)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: bin.url.path) == ["Trash.json"])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: bin.url.path)) == ["Trash.json", "Identities.json"])
     }
 
     @Test func aFolderIsRemovedOnlyWhenNothingIsLeftInIt() throws {
@@ -185,7 +185,7 @@ struct FolderStoreTests {
 
     @Test func movesAndFolderRenamesMoveTheFiles() throws {
         try root.write("Text", to: "Note.md")
-        store.perform(.createFolder(path: "Work"))
+        store.perform(.createFolder(path: "Work", id: UUID()))
         store.perform(.move(from: "Note.md", to: "Work/Note.md"))
         store.perform(.moveFolder(from: "Work", to: "Office"))
         store.drain()
@@ -213,7 +213,7 @@ struct FolderStoreTests {
         var failure: String?
         store.failed = { path, _ in failure = path }
         try FileManager.default.removeItem(at: root.url)
-        store.perform(.create(path: "Work/Note.md", text: "Text"))
+        store.perform(.create(path: "Work/Note.md", text: "Text", id: UUID()))
         store.drain()
         #expect(!FileManager.default.fileExists(atPath: root.url.path))
         for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }

@@ -59,11 +59,9 @@ final class NoteLibrary {
         self.defaults = defaults
         self.now = now
         isLoaded = true
-        store?.imported = { [weak self] requestID, path in
-            guard let self else { return }
-            let namespace = (path as NSString).pathExtension.lowercased() == "md" ? "note:" : "file:"
-            self.completedImports[requestID] = UUID(stableFrom: namespace + path)
-            self.refresh()
+        store?.imported = { [weak self] requestID, id in
+            self?.completedImports[requestID] = id
+            self?.refresh()
         }
         store?.relocated = { [weak self] from, to in self?.relocate(from, to) }
         store?.failed = { [weak self] path, message in
@@ -100,10 +98,7 @@ final class NoteLibrary {
     }
 
     private func reconcileFiles(_ stored: [StoredFile]) {
-        files = stored.map { disk in
-            let previous = files.first { $0.path == disk.path || (disk.fileID != nil && $0.stored.fileID == disk.fileID) }
-            return AppFile(id: previous?.id ?? UUID(stableFrom: "file:" + disk.path), stored: disk, folderID: folderID(forPath: disk.path))
-        }
+        files = stored.map { AppFile(id: $0.id, stored: $0, folderID: folderID(forPath: $0.path)) }
     }
 
     // MARK: Loading
@@ -118,36 +113,29 @@ final class NoteLibrary {
         perform(.purgeTrash(before: expiry))
 
         let saved = defaults?.stringArray(forKey: Self.folderOrderKey) ?? []
-        let names = stored.folders.sorted { a, b in
-            switch (saved.firstIndex(of: a), saved.firstIndex(of: b)) {
+        let ordered = stored.folders.sorted { a, b in
+            switch (saved.firstIndex(of: a.name), saved.firstIndex(of: b.name)) {
             case let (x?, y?): x < y
             case (_?, nil): true
             case (nil, _?): false
-            case (nil, nil): a.localizedStandardCompare(b) == .orderedAscending
+            case (nil, nil): a.name.localizedStandardCompare(b.name) == .orderedAscending
             }
         }
-        folders = names.map { Folder(id: UUID(stableFrom: "folder:" + $0), name: $0) }
+        folders = ordered.map { Folder(id: $0.id, name: $0.name) }
         var loaded: [Note] = []
-        var ids: Set<UUID> = []
-        func id(for path: String) -> UUID {
-            let id = UUID(stableFrom: "note:" + path)
-            return ids.insert(id).inserted ? id : UUID()
-        }
         for stored in stored.notes {
-            var note = Note(
-                id: id(for: stored.path),
+            loaded.append(Note(
+                id: stored.id,
                 path: stored.path,
                 text: stored.text,
                 created: stored.created,
                 modified: stored.modified,
                 folderID: folderID(forPath: stored.path)
-            )
-            note.fileID = stored.fileID
-            loaded.append(note)
+            ))
         }
         for trashed in stored.trash where trashed.trashed >= expiry {
             loaded.append(Note(
-                id: id(for: "trash:" + trashed.id.uuidString),
+                id: trashed.note.id,
                 path: trashed.note.path,
                 text: trashed.note.text,
                 created: trashed.note.created,
@@ -219,26 +207,34 @@ final class NoteLibrary {
         }
     }
 
-    /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added or
-    /// taken away. A file renamed or moved is known by its identity and stays the same note. None of this is
-    /// undoable here, since it was not done here.
+    /// Takes in what another app did: a file changed, renamed, moved, added or deleted, and folders added,
+    /// renamed or taken away. The store knows a file renamed or moved, even while the app was closed, and it stays
+    /// the same note. The library and the store agree on every identifier unless a change failed to reach the
+    /// store, so what is at the same path stays itself then. None of this is undoable here, since it was not
+    /// done here.
     private func reconcile(_ stored: StoredLibrary) {
-        let names = Set(stored.folders)
-        var order = folders.filter { names.contains($0.name) }
-        for name in stored.folders where !order.contains(where: { $0.name == name }) {
-            let stable = UUID(stableFrom: "folder:" + name)
-            order.append(Folder(id: order.contains { $0.id == stable } ? UUID() : stable, name: name))
+        var unmatched = Dictionary(stored.folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var order: [Folder] = []
+        for folder in folders {
+            if let disk = unmatched.removeValue(forKey: folder.id) {
+                order.append(Folder(id: folder.id, name: disk.name))
+            } else if let disk = unmatched.values.first(where: { $0.name == folder.name }) {
+                unmatched[disk.id] = nil
+                order.append(folder)
+            }
+        }
+        for disk in stored.folders where unmatched[disk.id] != nil {
+            order.append(Folder(id: order.contains { $0.id == disk.id } ? UUID() : disk.id, name: disk.name))
         }
         if order != folders { folders = order }
         reconcileFiles(stored.files)
 
         var updated = notes
-        var onDisk = Dictionary(stored.notes.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
-        let onDiskText = onDisk.mapValues(\.text)
+        var onDisk = Dictionary(stored.notes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let onDiskText = Dictionary(stored.notes.map { ($0.path, $0.text) }, uniquingKeysWith: { first, _ in first })
         var seen: Set<Note.ID> = []
         func take(_ disk: StoredNote, at index: Int) {
             seen.insert(updated[index].id)
-            updated[index].fileID = disk.fileID
             let moved = updated[index].path != disk.path
             if moved {
                 updated[index].path = disk.path
@@ -253,32 +249,28 @@ final class NoteLibrary {
             if moved || rewritten { updated[index].reviewNaming() }
         }
         for index in updated.indices where !updated[index].isDeleted {
-            guard let path = updated[index].path, let disk = onDisk.removeValue(forKey: path) else { continue }
+            guard let disk = onDisk.removeValue(forKey: updated[index].id) else { continue }
+            take(disk, at: index)
+        }
+        var atPath = Dictionary(onDisk.values.map { ($0.path, $0.id) }, uniquingKeysWith: { first, _ in first })
+        for index in updated.indices where !updated[index].isDeleted && !seen.contains(updated[index].id) {
+            guard let path = updated[index].path, let id = atPath.removeValue(forKey: path),
+                  let disk = onDisk.removeValue(forKey: id) else { continue }
             take(disk, at: index)
         }
         let ids = Set(updated.map(\.id))
         for disk in onDisk.values.sorted(by: { $0.path < $1.path }) {
-            let renamed = disk.fileID.flatMap { fileID in
-                updated.indices.first {
-                    !seen.contains(updated[$0].id) && !updated[$0].isDeleted && updated[$0].fileID == fileID
-                }
-            }
-            if let renamed {
-                take(disk, at: renamed)
-            } else {
-                let stable = UUID(stableFrom: "note:" + disk.path)
-                var note = Note(
-                    id: ids.contains(stable) ? UUID() : stable,
-                    path: disk.path,
-                    text: disk.text,
-                    created: disk.created,
-                    modified: disk.modified,
-                    folderID: folderID(forPath: disk.path)
-                )
-                note.fileID = disk.fileID
-                updated.append(note)
-                seen.insert(note.id)
-            }
+            // A note whose trashing failed is still here, deleted, under the identifier its file has.
+            let note = Note(
+                id: ids.contains(disk.id) ? UUID() : disk.id,
+                path: disk.path,
+                text: disk.text,
+                created: disk.created,
+                modified: disk.modified,
+                folderID: folderID(forPath: disk.path)
+            )
+            updated.append(note)
+            seen.insert(note.id)
         }
         // A written note whose file has gone was deleted by another app, and goes with it once it has stayed
         // away a moment. One whose last change failed stays, since what was typed is only here.
@@ -632,7 +624,7 @@ final class NoteLibrary {
             if title != oldTitle { perform(.write(path: path, text: notes[index].file.text)) }
         } else {
             notes[index].path = path
-            perform(.create(path: path, text: notes[index].file.text))
+            perform(.create(path: path, text: notes[index].file.text, id: id))
         }
         applyItemFiles(replacements, undoManager: nil, name: String(localized: "Rename Links"))
         registerUndo(undoManager, name: String(localized: "Rename Note")) { [weak undoManager] library in
@@ -898,7 +890,7 @@ final class NoteLibrary {
                     renamePaths(from: before.name, to: folder.name)
                 }
             } else {
-                perform(.createFolder(path: folder.name))
+                perform(.createFolder(path: folder.name, id: folder.id))
             }
         }
         for folder in previous where !new.contains(folder.id) {

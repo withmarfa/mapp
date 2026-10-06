@@ -13,8 +13,7 @@ nonisolated struct Folder: Identifiable, Hashable {
 }
 
 extension UUID {
-    /// The same identifier for the same text on every launch, so a window restored at launch finds the note or
-    /// folder it showed by where that note or folder is.
+    /// The same identifier for the same text on every launch.
     nonisolated init(stableFrom text: String) {
         var bytes = Array(SHA256.hash(data: Data(text.utf8)).prefix(16))
         bytes[6] = (bytes[6] & 0x0F) | 0x50

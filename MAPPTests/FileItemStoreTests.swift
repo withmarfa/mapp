@@ -20,7 +20,7 @@ struct FileItemStoreTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         await library.reread()
-        let expected = UUID(stableFrom: "note:Imported.MD")
+        let expected = try #require(library.notes.first { $0.path == "Imported.MD" }?.id)
         #expect(library.completedImports[requestID] == expected)
         #expect(library.note(expected)?.file.text == text)
         #expect(library.item(expected) != nil)
@@ -63,21 +63,22 @@ struct FileItemStoreTests {
         #expect(try Data(contentsOf: input) == Data("Private".utf8))
     }
 
-    @Test func successfulImportReportsActualPathAndDirectoryImportFails() async throws {
+    @Test func successfulImportReportsTheNewItemAndDirectoryImportFails() async throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()
         let source = try TemporaryFolder()
         try source.write("PDF", to: "Report.pdf")
         try root.write("Existing", to: "Report.pdf")
         let store = FolderStore(root: root.url, bin: bin.url)
-        var imported: String?
+        var imported: UUID?
         var failure: String?
-        store.imported = { _, path in imported = path }
+        store.imported = { _, id in imported = id }
         store.failed = { _, message in failure = message }
         store.perform(.importFile(path: "Report.pdf", source: source.url.appending(path: "Report.pdf")))
         store.drain()
         for _ in 0..<100 where imported == nil { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(imported == "Report 2.pdf")
+        let id = try #require(imported)
+        #expect(try store.load().files.first { $0.path == "Report 2.pdf" }?.id == id)
         store.perform(.importFile(path: "Directory", source: source.url))
         store.drain()
         for _ in 0..<100 where failure == nil { try await Task.sleep(for: .milliseconds(10)) }

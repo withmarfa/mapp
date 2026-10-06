@@ -72,7 +72,7 @@ struct NoteLibraryTests {
         #expect(note.created == start + 60)
         #expect(library.notes(in: .folder(home.id)).contains(note))
         #expect(library.note(note.id)?.title == "Groceries")
-        #expect(store.changes.last == .create(path: "Home/Groceries.md", text: library.note(note.id)!.file.text))
+        #expect(store.changes.last == .create(path: "Home/Groceries.md", text: library.note(note.id)!.file.text, id: note.id))
     }
 
     @Test func aNewItemMadeOutsideAFolderGoesToItsTypesFolder() throws {
@@ -80,7 +80,7 @@ struct NoteLibraryTests {
         let note = try #require(library.createItem(typeID: "core.note", title: "Loose", in: .allNotes))
         #expect(note.path == "Notes/Loose.md")
         #expect(library.folder(note.folderID!)?.name == "Notes")
-        #expect(store.changes.contains(.createFolder(path: "Notes")))
+        #expect(store.changes.contains(.createFolder(path: "Notes", id: try #require(note.folderID))))
         let gone = try #require(library.createItem(typeID: "core.note", title: "Also loose", in: .folder(UUID())))
         #expect(gone.path == "Notes/Also loose.md", "a folder that is gone takes nothing")
         #expect(gone.folderID == note.folderID)
@@ -595,7 +595,7 @@ struct NoteLibraryTests {
         library.rename(work.id, to: "Office")
         library.deleteFolder(folder.id)
         #expect(store.changes == [
-            .createFolder(path: "New Folder"),
+            .createFolder(path: "New Folder", id: folder.id),
             .moveFolder(from: "Work", to: "Office"),
             .removeFolder(path: "New Folder"),
         ])
