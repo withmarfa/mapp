@@ -1049,7 +1049,7 @@
     "Only one item can be chosen here.": {
       "extractionState": "manual"
     },
-    "The item chosen is already linked this way, and can be only once.": {
+    "“%@” already holds this link to “%@”. Remove it there first.": {
       "extractionState": "manual"
     },
     "Choose a kind of item and give it a title.": {

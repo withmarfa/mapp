@@ -605,13 +605,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.message == String(localized: "Only one item can be chosen here."))
         #expect(source.writes.isEmpty)
 
-        // The first bug is already superseded by the second, so the task takes that link over: the second bug's
-        // edge moves its source, and the first bug still has exactly one.
+        // The first bug is already superseded by the second. That link is the second bug's own, so the task does
+        // not take it: the person is told which item holds it, and nothing is sent.
         library.failure = nil
-        #expect(library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
-        #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .source, to: F.e1)])
-        // Chosen from the other end, the second bug gives up what it superseded for the task: the edge's target moves.
-        source.clearWrites()
+        #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
+        #expect(library.failure?.message
+            == String(localized: "“\("Bug two")” already holds this link to “\("Bug one")”. Remove it there first."))
+        #expect(source.writes.isEmpty)
+        #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.targets.map(\.itemID) == [bug2.id])
+        // Chosen from the other end, the second bug's own link changes from the first bug to the task: the edge's
+        // target moves.
+        library.failure = nil
         #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
         #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)])
         #expect(library.failure == nil)
@@ -626,10 +630,16 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         }
         let (library, source) = try await loaded(F.items + [bug("a"), bug("b"), bug("c", supersedes: ItemID("a"), edge: "s1"),
             bug("d", supersedes: ItemID("b"), edge: "s2")])
-        // `c` supersedes `a` and would supersede `b` instead, which `d` already does: two edges would change.
-        #expect(!library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil))
+        // `a`, superseded by `c`, would be superseded by `d` instead, which supersedes `b`: two edges would change.
+        #expect(!library.setItemRelationship(ItemID("a"), field: "inverse:supersedes", targetIDs: [ItemID("d")], undoManager: nil))
         #expect(library.failure?.message
             == String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
+        #expect(source.writes.isEmpty)
+        // From `c`'s own side, `b` is held by `d` as its own link, which is never taken from it.
+        library.failure = nil
+        #expect(!library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil))
+        #expect(library.failure?.message
+            == String(localized: "“\("Bug d")” already holds this link to “\("Bug b")”. Remove it there first."))
         #expect(source.writes.isEmpty)
         // Replacing its own link for an item that holds none is one move of the end that goes.
         library.failure = nil

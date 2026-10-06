@@ -214,8 +214,8 @@ extension MarfaLibrary {
     /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed
     /// freely. An end that holds one link of its type has it replaced by moving the edge's other end (edges.md 10
     /// and 14), so a new parent is one write and the child never holds none or two: a replacement is a move, and so
-    /// is taking an item that holds its one link elsewhere. A change the contract would refuse is told here and
-    /// sent nowhere.
+    /// is taking an item whose own link points elsewhere, as a child chosen under a project. A link a third item
+    /// holds as its own is never taken from it. A change the contract would refuse is told here and sent nowhere.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
@@ -250,12 +250,22 @@ extension MarfaLibrary {
             }
             let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
             if let theirs = taken.first {
-                // The item chosen holds its one link elsewhere, and takes this one in its place.
+                let old = farIsTarget ? theirs.source : theirs.target
+                // The item chosen holds its one link elsewhere. Where that link is its own, as a child's parent is,
+                // the move changes it to this one. Where it is the third item's own, the move would take it from an
+                // item the person is not looking at, so they are told which item holds it.
+                guard end.isInverse else {
+                    let chosen = self.item(other)?.title ?? ""
+                    let holder = self.item(old)?.title ?? ""
+                    failure = (
+                        cantChange, String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first.")
+                    )
+                    return false
+                }
                 guard !replacingOwn else {
                     failure = (cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
                     return false
                 }
-                let old = farIsTarget ? theirs.source : theirs.target
                 change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
             } else if replacingOwn {
                 guard removing.count == 1, let old = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == removing[0] })
