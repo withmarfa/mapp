@@ -587,7 +587,7 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.7;
+				minimumVersion = 0.0.8;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
