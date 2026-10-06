@@ -35,7 +35,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(list.exists, "there is no item-list column in settings")
         XCTAssertFalse(window.buttons["Share"].exists, "note commands are hidden in settings")
         attachScreenshot("SettingsAppearance")
-        XCTAssertTrue(window.staticTexts["Settings"].exists)
+        XCTAssertTrue(window.staticTexts["Appearance"].exists)
         XCTAssertTrue(window.popUpButtons["NoteSort"].exists, "the real list preferences are available")
         XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort By")
 
@@ -46,10 +46,60 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(list.frame.width, listFrame.width, accuracy: 2, "the note-list width is preserved")
     }
 
+    func testSettingsUsesNativeSidebarAndToolbarAcrossCategories() {
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        let back = window.toolbars.buttons["SettingsBack"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "Back belongs to the system toolbar")
+        let sidebar = window.outlines["SettingsSidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
+        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
+        for pane in ["editor", "library", "about", "appearance"] {
+            let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
+            XCTAssertTrue(category.exists)
+            category.click()
+            XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0).exists)
+            attachScreenshot("NativeSettings-\(pane)")
+        }
+        back.click()
+        XCTAssertTrue(list.waitForExistence(timeout: 3))
+        XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
+    }
+
+    func testSettingsReturnsToTheTypesBrowser() {
+        window.outlines["SidebarPlaces"].staticTexts["Marfa Types"].click()
+        let types = window.groups["MarfaTypes"].webViews.firstMatch
+        XCTAssertTrue(types.waitForExistence(timeout: 5))
+        for _ in 0..<2 {
+            app.typeKey(",", modifierFlags: .command)
+            XCTAssertTrue(settings.waitForExistence(timeout: 3))
+            window.buttons["SettingsBack"].click()
+            XCTAssertTrue(types.waitForExistence(timeout: 5))
+            XCTAssertFalse(list.exists)
+        }
+    }
+
+    func testSettingsFromAnUnselectedItemKeepsNativeChrome() {
+        let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        row.click()
+        XCTAssertTrue(window.textFields["ItemPageTitle"].waitForExistence(timeout: 3))
+        XCUIElement.perform(withKeyModifiers: .command) { row.click() }
+        let prompt = window.staticTexts["SelectItemPrompt"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 3))
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertTrue(window.toolbars.buttons["SettingsBack"].exists)
+        XCTAssertTrue(window.outlines["SettingsSidebar"].exists)
+        attachScreenshot("NativeSettings-no-item-selected")
+        window.buttons["SettingsBack"].click()
+        XCTAssertTrue(prompt.waitForExistence(timeout: 3))
+    }
+
     func testSettingsSearchFindsControlsAndHandlesNoMatches() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        let search = window.searchFields["SettingsSearch"]
+        let search = window.searchFields.element(boundBy: 0)
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         search.click()
         search.typeText("spelling")
