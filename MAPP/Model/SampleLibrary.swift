@@ -31,7 +31,7 @@ nonisolated enum SampleLibrary {
             deleted: Bool = false
         ) throws {
             var file = NoteFile(text: body + "\n")
-            if favorite { file.setFavorite(true) }
+            if favorite { try file.setFavorite(true) }
             let name = NoteText.fileName(for: body)
             let path = folder.map { "\($0)/\(name).md" } ?? "\(name).md"
             let url = root.appending(path: path)

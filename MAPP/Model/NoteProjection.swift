@@ -71,13 +71,9 @@ nonisolated struct NoteProjection: Identifiable, Equatable, Sendable {
 
     private static func parse(_ envelope: String) -> NoteFrontMatter {
         guard !envelope.isEmpty else { return .absent }
-        var lines = envelope.components(separatedBy: "\n")
-        if lines.last == "" { lines.removeLast() }
-        lines.removeFirst()
-        lines.removeLast()
         do {
             // Composition retains scalar spelling, unlike loading timestamps into Foundation dates.
-            guard let node = try Yams.compose(yaml: lines.joined(separator: "\n")) else {
+            guard let node = try NoteFile.composed(envelope) else {
                 return .parsed([:])
             }
             if case .scalar(let scalar) = node, node.tag.rawValue == Tag.Name.null.rawValue, scalar.string.isEmpty {

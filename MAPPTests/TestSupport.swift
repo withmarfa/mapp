@@ -14,7 +14,7 @@ extension Note {
         deleted: Date? = nil
     ) {
         var file = NoteFile(text: body)
-        if isFavorite { file.setFavorite(true) }
+        if isFavorite { try! file.setFavorite(true) }
         self.init(
             path: path ?? "\(NoteText.fileName(for: body)).md",
             text: file.text,
