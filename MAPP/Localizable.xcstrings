@@ -841,6 +841,129 @@
     },
     "Tags: %@": {
       "extractionState": "manual"
+    },
+    "Compatible From": {
+      "extractionState": "manual"
+    },
+    "Compatible With": {
+      "extractionState": "manual"
+    },
+    "Parent Types": {
+      "extractionState": "manual"
+    },
+    "Reverse Name": {
+      "extractionState": "manual"
+    },
+    "Roles": {
+      "extractionState": "manual"
+    },
+    "When an Item Is Deleted": {
+      "extractionState": "manual"
+    },
+    "Written At": {
+      "extractionState": "manual"
+    },
+    "Edge Types": {
+      "extractionState": "manual"
+    },
+    "Fields": {
+      "extractionState": "manual"
+    },
+    "Choice": {
+      "extractionState": "manual"
+    },
+    "Date": {
+      "extractionState": "manual"
+    },
+    "Deleting is refused while the connection exists": {
+      "extractionState": "manual"
+    },
+    "Each can be pointed to by many items.": {
+      "extractionState": "manual"
+    },
+    "Each can be pointed to by one item at most.": {
+      "extractionState": "manual"
+    },
+    "Each can point to many items.": {
+      "extractionState": "manual"
+    },
+    "Each can point to one item at most.": {
+      "extractionState": "manual"
+    },
+    "From or To": {
+      "extractionState": "manual"
+    },
+    "From": {
+      "extractionState": "manual"
+    },
+    "Number": {
+      "extractionState": "manual"
+    },
+    "Other": {
+      "extractionState": "manual"
+    },
+    "The item at the other end is deleted too": {
+      "extractionState": "manual"
+    },
+    "The item at the other end is kept": {
+      "extractionState": "manual"
+    },
+    "The item it points from": {
+      "extractionState": "manual"
+    },
+    "The item it points to": {
+      "extractionState": "manual"
+    },
+    "To": {
+      "extractionState": "manual"
+    },
+    "Yes or No": {
+      "extractionState": "manual"
+    },
+    "^[%lld subtype](inflect: true)": {
+      "extractionState": "manual"
+    },
+    "A compatible type has every field of the other, so it can be used wherever the other is accepted.": {
+      "extractionState": "manual"
+    },
+    "An edge points from one item to another.": {
+      "extractionState": "manual"
+    },
+    "Any type": {
+      "extractionState": "manual"
+    },
+    "Choose a type to see its fields and connections.": {
+      "extractionState": "manual"
+    },
+    "Compatibility": {
+      "extractionState": "manual"
+    },
+    "Edge types that do not limit their types connect every type, so they are not listed here.": {
+      "extractionState": "manual"
+    },
+    "First line of the body": {
+      "extractionState": "manual"
+    },
+    "Inherited from": {
+      "extractionState": "manual"
+    },
+    "Required": {
+      "extractionState": "manual"
+    },
+    "Reverse name: %@": {
+      "extractionState": "manual"
+    },
+    "This library has no types to show.": {
+      "extractionState": "manual"
+    },
+    "This type has no fields.": {
+      "extractionState": "manual"
+    },
+    "No Types": {
+      "extractionState": "manual"
+    },
+    "No Type Selected": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"
