@@ -322,14 +322,80 @@ struct NoteLibraryTests {
         #expect(store.changes.last == .write(path: "Inbox note.md", text: "# Inbox note"))
     }
 
-    @Test func aTagsValueThatIsNotAListIsNotWrittenOrCountedAsChanged() {
+    @Test func aTagsStringGainsTheTag() {
         let note = Note(path: "Odd.md", text: "---\ntags: one\n---\n# Odd", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        library.setFavorite([note.id], true)
+        #expect(store.changes == [.write(path: "Odd.md", text: "---\ntags: one, favorite\n---\n# Odd")])
+        #expect(library.note(note.id)?.isFavorite == true)
+    }
+
+    @Test func tagsThatCannotBeChangedSafelyAreLeftAndThePersonIsTold() {
+        let unreadable = Note(path: "Numbers.md", text: "---\ntags: [1]\n---\n# Numbers", created: start)
+        let folded = Note(path: "Folded.md", text: "---\ntags: >\n  one\n---\n# Folded", created: start)
+        let library = NoteLibrary(notes: [unreadable, folded], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([unreadable.id], true, undoManager: manager) }
+        #expect(store.changes.isEmpty)
+        #expect(manager.undoActionName == "")
+        #expect(library.failure?.title == "Can’t Add to Favorites")
+        #expect(library.failure?.message.contains("Numbers") == true)
+        library.failure = nil
+        library.setFavorite([folded.id], true)
+        #expect(library.failure?.message.contains("Folded") == true)
+        library.failure = nil
+        library.setFavorite([unreadable.id, folded.id], true)
+        #expect(library.failure?.message.hasPrefix("Some notes") == true)
+        #expect(store.changes.isEmpty)
+        #expect(library.notes.map(\.file.text) == [unreadable.file.text, folded.file.text])
+    }
+
+    /// Undo puts back the very bytes the file had, which turning the favorite back would not.
+    @Test(arguments: [
+        ("---\ntags:\n  - favorite\ntitle: x\n---\n# Note", false),
+        ("---\ntags: [favorite, a]\n---\n# Note", false),
+        ("---\ntags:\n  - favorite\n  # mine\ntitle: x\n---\n# Note", false),
+        ("---\ntags: [a,]\n---\n# Note", true),
+        ("---\n---\n# Note", true),
+        ("\u{FEFF}---\r\ntags: a\r\n---\r\n# Note\r\n", true),
+    ])
+    func undoRestoresTheExactFile(text: String, adding: Bool) {
+        let note = Note(path: "Note.md", text: text, created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], adding, undoManager: manager) }
+        let changed = library.note(note.id)?.file.text
+        #expect(changed != text)
+        #expect(library.note(note.id)?.isFavorite == adding)
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == text)
+        #expect(store.changes.last == .write(path: "Note.md", text: text))
+        manager.redo()
+        #expect(library.note(note.id)?.file.text == changed)
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == text)
+    }
+
+    @Test func undoAfterTheBodyChangedKeepsTheBody() {
+        let note = Note(path: "Note.md", text: "---\n---\nOld body\n", created: start)
         let library = NoteLibrary(notes: [note], store: store, now: { start })
         let manager = undoManager()
         undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
-        #expect(store.changes.isEmpty)
-        #expect(manager.undoActionName == "")
-        #expect(library.note(note.id)?.isFavorite == false)
+        library.updateBody(of: note.id, to: "New body\n")
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == "---\n---\nNew body\n")
+    }
+
+    @Test func undoAfterAnotherFieldChangedTurnsOnlyTheFavoriteBack() {
+        let note = Note(path: "Note.md", text: "---\ntags: [a]\n---\n# Note", created: start)
+        let library = NoteLibrary(notes: [note], store: store, now: { start })
+        let manager = undoManager()
+        undoably(manager) { library.setFavorite([note.id], true, undoManager: manager) }
+        var file = library.notes[0].file
+        file.setProperty("status", "open")
+        library.applyItemFiles([note.id: file], undoManager: nil, name: "Edit")
+        manager.undo()
+        #expect(library.note(note.id)?.file.text == "---\ntags: [a]\nstatus: open\n---\n# Note")
     }
 
     @Test func aNewNoteGetsItsFileOnceItsFirstLineIsFinished() {
