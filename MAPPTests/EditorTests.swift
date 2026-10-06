@@ -10,21 +10,21 @@ import WebKit
 struct EditorTests {
     /// An editor whose page has loaded, reporting each change it makes.
     final class Harness {
-        let editor = EditorController()
-        var changes: [String] = []
         /// The editor holds its library weakly, so the harness keeps the one it loads from.
-        var library: NoteLibrary?
+        let library: NoteLibrary
+        let editor: EditorController
+        var changes: [String] = []
 
-        init() async throws {
+        init(library: NoteLibrary = NoteLibrary()) async throws {
+            self.library = library
+            editor = EditorController(library: library)
             editor.onChange = { [unowned self] _, markdown in changes.append(markdown) }
             try await wait { self.editor.isReady }
         }
 
         func load(_ body: String, deleted: Bool = false) async throws {
             let note = Note(body: body, created: .now, deleted: deleted ? .now : nil)
-            let library = NoteLibrary(notes: [note])
-            self.library = library
-            editor.library = library
+            library.notes.append(note)
             editor.load(try #require(library.item(note.id)))
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
@@ -150,12 +150,24 @@ struct EditorTests {
         #expect(page.changes == ["# Draft\n"])
     }
 
+    @Test func aNoteWhoseTextCannotBeReadIsNotOpenedForWriting() async throws {
+        let page = try await Harness()
+        try await page.load("Kept\n")
+        let note = Note(body: "Plan\n", created: .now)
+        let item = try #require(NoteLibrary(notes: [note]).item(note.id))
+        // The editor's library has no text for this item, so the page must not open an empty note to type into.
+        page.editor.load(item)
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.noteID != item.id)
+        page.editor.noteChanged(item)
+        #expect(page.editor.noteID != item.id)
+    }
+
     @Test func aFirstLineTypedWithASpaceAtItsEndNamesTheFileWithoutIt() async throws {
         let store = RecordingStore()
         let note = Note(body: "Plan\n", created: .now)
         let library = NoteLibrary(notes: [note], store: store)
-        let page = try await Harness()
-        page.editor.library = library
+        let page = try await Harness(library: library)
         page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
         page.editor.onLeave = { library.leave($0) }
         page.editor.load(try #require(library.item(note.id)))
@@ -171,8 +183,7 @@ struct EditorTests {
     @Test func anEditOverlappingAnOutsideChangeWinsOnThePageAsInTheFile() async throws {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
-        let page = try await Harness()
-        page.editor.library = library
+        let page = try await Harness(library: library)
         page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
@@ -206,8 +217,7 @@ struct EditorTests {
         )
         let note = Note(body: "![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n", created: .now)
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness()
-        page.editor.library = library
+        let page = try await Harness(library: library)
         page.editor.load(try #require(library.item(note.id)))
         var widths: [Int] = []
         for _ in 0..<40 {

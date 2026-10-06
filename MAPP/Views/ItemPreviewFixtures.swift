@@ -66,14 +66,15 @@ enum ItemPreviewFixtures {
 #Preview("New Item") {
     let browser = Browser()
     let _ = browser.startItemDraft()
-    MainView(browser: browser, restoresWindow: false)
-        .environment(ItemPreviewFixtures.library)
+    let library = ItemPreviewFixtures.library
+    MainView(library: library, browser: browser, restoresWindow: false)
+        .environment(library)
         .frame(width: 1180, height: 760)
 }
 
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
-    MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)
+    MainView(library: library, browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)
         .environment(library)
         .frame(width: 1280, height: 800)
 }

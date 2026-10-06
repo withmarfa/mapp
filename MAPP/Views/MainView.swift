@@ -5,7 +5,7 @@ struct MainView: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
-    @State private var editor = EditorController()
+    @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @State private var types = MarfaTypesPage()
@@ -19,7 +19,9 @@ struct MainView: View {
     private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    /// The library is given here as well as in the environment, since the editor is made with it.
+    init(library: NoteLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+        _editor = State(initialValue: EditorController(library: library))
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings
@@ -130,7 +132,6 @@ struct MainView: View {
         .onDisappear { editor.flush() }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
-            editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }

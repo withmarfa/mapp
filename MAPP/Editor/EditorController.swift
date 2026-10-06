@@ -27,8 +27,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var onChange: (ItemID, String) -> Void = { _, _ in }
     /// A note the page has moved on from, once any edit to it has been handed over.
     @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
-    /// The library the notes come from, for the files a note points at.
-    @ObservationIgnored weak var library: NoteLibrary?
+    /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
+    /// so no note is ever shown before its text can be read.
+    @ObservationIgnored private(set) weak var library: NoteLibrary?
     @ObservationIgnored private let files = NoteFiles()
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
@@ -53,7 +54,8 @@ final class EditorController: NSObject {
     /// Every editor open, so their edits can be handed over before the app quits or changes folder.
     @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
 
-    override init() {
+    init(library: NoteLibrary) {
+        self.library = library
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         webView = EditorWebView(frame: .zero, configuration: configuration)
@@ -125,12 +127,14 @@ final class EditorController: NSObject {
     /// text where the caret is.
     func noteChanged(_ item: Item) {
         guard item.id == noteID else { return load(item) }
-        guard library?.body(of: item.id)?.text ?? "" != markdown || item.isWritable != isEditable else { return }
+        guard let body = library?.body(of: item.id), body.text != markdown || item.isWritable != isEditable else { return }
         show(item, as: "reload")
     }
 
+    /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
+    /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
-        let body = library?.body(of: item.id)?.text ?? ""
+        guard let body = library?.body(of: item.id)?.text else { return close() }
         noteID = item.id
         markdown = body
         isEditable = item.isWritable

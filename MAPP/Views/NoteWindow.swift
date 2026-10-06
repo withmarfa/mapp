@@ -6,10 +6,16 @@ struct NoteWindow: View {
     @Environment(NoteLibrary.self) private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @State private var editor = EditorController()
+    @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @Binding var id: ItemID?
+
+    /// The library is given here as well as in the environment, since the editor is made with it.
+    init(library: NoteLibrary, id: Binding<ItemID?>) {
+        _editor = State(initialValue: EditorController(library: library))
+        _id = id
+    }
 
     private var item: Item? { id.flatMap { library.item($0) } }
 
@@ -46,7 +52,6 @@ struct NoteWindow: View {
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {
             details.isPresented = storedDetailsPresented
-            editor.library = library
             editor.onChange = { [library] id, markdown in library.updateBody(of: id, to: markdown) }
             editor.onLeave = { [library] id in library.leave(id) }
         }

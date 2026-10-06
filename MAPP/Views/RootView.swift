@@ -30,7 +30,7 @@ struct RootView: View {
 
     @ViewBuilder private var workspace: some View {
         if let library = folder.library {
-            MainView(settings: settings)
+            MainView(library: library, settings: settings)
                 .environment(library)
                 // A different folder is a different library, and the window starts afresh with it.
                 .id(ObjectIdentifier(library))
