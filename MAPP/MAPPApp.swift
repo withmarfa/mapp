@@ -4,16 +4,19 @@ import SwiftUI
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()
-    private var folder: NotesFolder { delegate.folder }
+    private var libraries: Libraries { delegate.libraries }
 
     var body: some Scene {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
-                .environment(folder)
+                .unkeptChanges(libraries)
+                .environment(libraries)
+                .environment(libraries.folder)
+                .environment(libraries.host)
         }
         .defaultSize(width: 1100, height: 720)
         .commands {
-            AppCommands(library: folder.library)
+            AppCommands(library: libraries.current)
             FindCommands()
             FormatCommands()
             ToolbarCommands()
@@ -21,21 +24,28 @@ struct MAPPApp: App {
         }
 
         WindowGroup("Item", for: ItemID.self) { $id in
-            if let library = folder.library {
-                NoteWindow(library: library, id: $id)
-                    .environment(\.library, library)
-            } else {
-                // An item's window has nothing to show without a notes folder, as when one is restored before
-                // any is chosen.
-                ClosingView()
+            Group {
+                if let library = libraries.current {
+                    NoteWindow(library: library, id: $id)
+                        .environment(\.library, library)
+                } else if libraries.mode == .opening {
+                    // A window restored while the server's copy opens waits for it rather than closing.
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // An item's window has nothing to show without a library, as when one is restored before a
+                    // notes folder is chosen, or after the server's copy could not be opened.
+                    ClosingView()
+                }
             }
+            .unkeptChanges(libraries)
         }
         .defaultSize(width: 640, height: 720)
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let folder = NotesFolder()
+    let libraries = Libraries.standard()
 
     override init() {
         #if DEBUG
@@ -50,11 +60,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
     }
 
-    /// Nothing typed is lost to quitting: each page hands over its last edit, new notes with something in them
-    /// get their files, and the store finishes writing, before the app goes.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // The saved server's copy opens and paints before the network is asked anything.
+        Task { await libraries.launch() }
+    }
+
+    /// Nothing typed is lost to quitting: each page hands over its last edit and each library keeps its writes on
+    /// this Mac, the folder's on disk and a server's in its copy's queue, before the app goes. The server is not
+    /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        EditorController.flushAll { [folder] in
-            folder.library?.finish()
+        Task { [libraries] in
+            _ = await libraries.flushEditors(within: .seconds(5))
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

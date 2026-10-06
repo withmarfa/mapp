@@ -406,6 +406,9 @@ final class NoteLibrary: ItemLibrary {
         store?.drain()
     }
 
+    /// The store writes a create before `createItem` answers, so none is refused later.
+    func wasRefused(creating id: ItemID) -> Bool { false }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager? = nil) {
         place(ids, undoManager: undoManager, name: deleteName(ids.count)) { $0.isDeleted = true }
     }

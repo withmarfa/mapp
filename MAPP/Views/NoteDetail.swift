@@ -13,13 +13,8 @@ struct NoteDetail: View {
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if item.isFile {
-                if let url = library.fileURL(for: id) {
-                    FileItemContent(url: url)
-                        .onAppear { editor.close() }
-                } else {
-                    ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
-                        .onAppear { editor.close() }
-                }
+                ItemFileView(id: id) { browser.fileFetched(id, at: $0) }
+                    .onAppear { editor.close() }
             } else {
                 NotePage(item: item, editor: editor, headerDrafts: details)
                     .onAppear(perform: grantFocusRequest)

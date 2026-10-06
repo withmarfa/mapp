@@ -20,6 +20,13 @@ final class SettingsPresentation {
     var title: String { displayedPane?.title ?? String(localized: "Settings") }
 
     func show() { isPresented = true }
+
+    /// Opens Settings at a pane, whatever was searched for before.
+    func show(_ pane: SettingsPane) {
+        query = ""
+        self.pane = pane
+        isPresented = true
+    }
     func close() { isPresented = false }
 }
 
@@ -34,7 +41,7 @@ extension FocusedValues {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case appearance, editor, library, about
+    case appearance, editor, library, marfa, about
 
     var id: Self { self }
 
@@ -43,6 +50,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: String(localized: "Appearance")
         case .editor: String(localized: "Editor")
         case .library: String(localized: "Library")
+        case .marfa: String(localized: "Marfa")
         case .about: String(localized: "About")
         }
     }
@@ -52,6 +60,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: "paintpalette"
         case .editor: "square.and.pencil"
         case .library: "folder"
+        case .marfa: "server.rack"
         case .about: "info.circle"
         }
     }
@@ -61,6 +70,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: String(localized: "Sort By Group by Date List Preview Notes List")
         case .editor: String(localized: "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing")
         case .library: String(localized: "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete")
+        case .marfa: String(localized: "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting")
         case .about: String(localized: "MAPP Version Build")
         }
     }

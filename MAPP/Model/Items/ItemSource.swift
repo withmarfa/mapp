@@ -67,8 +67,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     var capabilities: SourceCapabilities { get }
     var embeds: any EmbedResolver { get }
     func changes() -> AsyncStream<SourceChange>
-    /// Never blocks; writes are made in the order submitted.
-    func submit(_ write: ItemWrite, as id: WriteID)
+    /// Never blocks; writes are made in the order submitted. False where the source is closed and takes nothing.
+    @discardableResult
+    func submit(_ write: ItemWrite, as id: WriteID) -> Bool
     func body(of item: ItemID) async throws -> ItemBody
     /// The text of each item named that has any, read together, since a library reads every body as it loads.
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
@@ -77,6 +78,7 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
     /// A files source renames the file to follow its first line here, so a rename is one change, not one per word.
     func endEditing(_ item: ItemID)
-    func flush() async
+    /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
+    func queueSubmitted() async
     func close() async
 }

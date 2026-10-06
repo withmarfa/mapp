@@ -26,7 +26,7 @@ extension MarfaLibrary {
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
         // The Inbox is the feed tier, so an item made there stays where it was made.
         let draft = ItemDraft(type: type, title: title, body: text, tier: place == .inbox ? .feed : nil, parent: parentID)
-        submit(.create(id: id, draft), failing: cantCreate)
+        submitCreate(id, draft, failing: cantCreate)
         let name = String(localized: "New Item")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.setStates([id: (from: .active, to: .trashed)], name: name, undoManager: undoManager)
@@ -45,8 +45,14 @@ extension MarfaLibrary {
         source.endEditing(id)
     }
 
-    func finish() {
-        Task { [source] in await source.flush() }
+    /// Waits only until the source holds every write in its queue on this Mac, never for the server, so quitting
+    /// or leaving the library offline keeps every write without waiting on the network.
+    func finish() async {
+        await source.queueSubmitted()
+    }
+
+    func wasRefused(creating id: ItemID) -> Bool {
+        refusedCreations.contains(id)
     }
 
     // MARK: Properties

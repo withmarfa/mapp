@@ -13,6 +13,9 @@ actor MarfaEngine {
         case drained(DrainReport, CheckedContinuation<Void, Never>)
         case failed(SourceFailure)
         case flush(CheckedContinuation<Void, Never>)
+        /// Resumed once every event before it is taken, so each write submitted before it is in the queue or
+        /// refused; it never waits on the network, so quitting offline does not wait for a server.
+        case queued(CheckedContinuation<Void, Never>)
         case close(CheckedContinuation<Void, Never>)
         /// Takes a refused write, and those refused only for it, out of the queue.
         case discard(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
@@ -59,6 +62,14 @@ actor MarfaEngine {
 
     nonisolated static var closedLibrary: String {
         String(localized: "This library is closed.")
+    }
+
+    /// The code of the refusal a write gets when it reaches the engine after the copy closed.
+    nonisolated static let closedCode = "closed"
+
+    /// A write that reached the source after it closed, which no queue holds.
+    nonisolated static var notKept: String {
+        String(localized: "This library was closed before the change could be kept.")
     }
 
     nonisolated static var noText: String {
@@ -138,7 +149,11 @@ actor MarfaEngine {
     func run(_ events: AsyncStream<Event>) async {
         for await event in events {
             if closed {
+                if case .write(_, let id) = event {
+                    hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
+                }
                 if case .flush(let done) = event { done.resume() }
+                if case .queued(let done) = event { done.resume() }
                 if case .close(let done) = event { done.resume() }
                 if case .drained(_, let taken) = event { taken.resume() }
                 if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
@@ -168,6 +183,7 @@ actor MarfaEngine {
                     await sync.flush()
                     done.resume()
                 }
+            case .queued(let done): done.resume()
             case .discard(let id, let done): done.resume(returning: await discard(id))
             case .release(let id, let done): done.resume(returning: await release(id))
             case .unsent(let done):
@@ -186,12 +202,18 @@ actor MarfaEngine {
                 done.resume()
             }
         }
+        // Finished only once the events that came after the close are answered, so a write made too late is told
+        // to its library rather than dropped unseen.
+        hub.finish()
     }
 
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
     private func unsentWrites() async -> UnsentWrites? {
         guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
-        return UnsentWrites(ids: MarfaProblems.unsent(queue))
+        let named = Set(queue.compactMap(\.itemId))
+        let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
+        return UnsentWrites(
+            ids: MarfaProblems.unsent(queue), texts: MarfaProblems.unsentTexts(queue, catalogue: catalogue, types: types))
     }
 
     private func shutDown() async {
@@ -199,7 +221,6 @@ actor MarfaEngine {
         following?.cancel()
         await sync.stop()
         await copy.close()
-        hub.finish()
     }
 
     /// The package refuses every call while the copy changes its key, as `invalid`, and asks for it again; that

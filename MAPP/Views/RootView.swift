@@ -1,10 +1,13 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A main window: the notes once a folder is chosen, and until then a page asking for one.
+/// A main window: the notes of the library the app reads once there is one, and until then a page saying why not.
 struct RootView: View {
-    @Environment(NotesFolder.self) private var folder
+    @Environment(Libraries.self) private var libraries
     @State private var settings = SettingsPresentation()
+    /// The window's browser lives here, above the library, so what the person was writing outlives a change of
+    /// library, which starts the rest of the window afresh.
+    @State private var browser = Browser()
     let settingsRequest: SettingsRequest
 
     var body: some View {
@@ -19,7 +22,7 @@ struct RootView: View {
             }
         }
         // Settings reads the library too, so it is given to both.
-        .environment(\.library, folder.library)
+        .environment(\.library, libraries.current)
         .focusedSceneValue(\.settingsPresentation, settings)
         .onAppear {
             if settingsRequest.isPending {
@@ -30,13 +33,47 @@ struct RootView: View {
     }
 
     @ViewBuilder private var workspace: some View {
-        if let library = folder.library {
-            MainView(library: library, settings: settings)
-                // A different folder is a different library, and the window starts afresh with it.
-                .id(ObjectIdentifier(library))
-        } else {
-            WelcomeView()
+        switch libraries.mode {
+        case .files, .marfa:
+            if let library = libraries.current {
+                MainView(library: library, browser: browser, settings: settings)
+                    // A different library is a different set of items, and the window starts afresh with it.
+                    .id(ObjectIdentifier(library))
+            } else {
+                WelcomeView()
+            }
+        case .opening:
+            ProgressView("Opening Your Library…")
+                .frame(minWidth: 480, minHeight: 360)
+        case .failed:
+            LibraryUnavailableView(settings: settings)
         }
+    }
+}
+
+/// A server is set, but its library can't be shown, because its key was refused or its copy can't be opened.
+/// The notes folder is not shown in its place, which is not what the app was set to read.
+struct LibraryUnavailableView: View {
+    @Environment(Libraries.self) private var libraries
+    let settings: SettingsPresentation
+
+    var body: some View {
+        let status = ConnectionStatus(libraries.host.state)
+        // The pane's own line points "below", which here is only this button.
+        let detail = libraries.host.state == .keyRefused
+            ? String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
+            : status.detail
+        ContentUnavailableView {
+            Label("Can’t Open Your Marfa Library", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
+        } actions: {
+            Button("Open Settings…") { settings.show(.marfa) }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("LibraryUnavailableSettings")
+        }
+        .frame(minWidth: 480, minHeight: 360)
+        .accessibilityIdentifier("LibraryUnavailable")
     }
 }
 

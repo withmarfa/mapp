@@ -95,6 +95,10 @@ extension MarfaSource: MarfaHostedSource {}
     private(set) var report = SyncReport()
     private(set) var isBusy = false
     private var watching: [Task<Void, Never>] = []
+    /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
+    /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
+    /// is in the copy when it closes. Set by the app; tests may set none.
+    @ObservationIgnored var handOverEdits: () async -> Void = {}
 
     init(
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
@@ -106,12 +110,26 @@ extension MarfaSource: MarfaHostedSource {}
         self.opener = opener
     }
 
+    /// The server the app is set to read from: the one connected to, or the one saved by an earlier launch before
+    /// its copy is opened, so a window can say it is opening a library rather than show another.
+    var configuredConnection: MarfaConnection? {
+        connection ?? defaults.string(forKey: Self.addressKey).flatMap { try? MarfaConnection(address: $0) }
+    }
+
     /// Writes in the copy that the server has not taken, problems included, as last reported, for showing; nil
     /// where no open copy can say. Leaving a copy asks the copy itself.
     var waitingChanges: Int? {
         if source != nil, report.queueRead { return report.changesNotSent }
         guard let connection else { return 0 }
         return hasCopy(connection) ? nil : 0
+    }
+
+    /// Whether the key kept for `connection` is `key`, so Settings forgets what was typed once the host holds it,
+    /// whatever became of the step that gave it.
+    func holds(_ key: String, for connection: MarfaConnection) async -> Bool {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection) }) else { return false }
+        return kept == key
     }
 
     /// Opens the saved library's copy and paints from it, then asks the server.
@@ -135,6 +153,7 @@ extension MarfaSource: MarfaHostedSource {}
         }
         try begin()
         defer { isBusy = false }
+        await handOverEdits()
         try await save(key, for: connection)
         do {
             try await open(connection)
@@ -159,12 +178,13 @@ extension MarfaSource: MarfaHostedSource {}
             throw .changesWaiting(nil)
         }
         detach()
-        let problem = await finishLeaving(connection, discarding: choice != .keepCopy)
+        // The address goes first, so a quit while the key and the copy are removed never opens this server again
+        // at the next launch, with a key already gone.
         defaults.removeObject(forKey: Self.addressKey)
         self.connection = nil
         state = .disconnected
         report = SyncReport()
-        if let problem { throw problem }
+        if let problem = await finishLeaving(connection, discarding: choice != .keepCopy) { throw problem }
     }
 
     /// Takes a new key for the address connected to, for a key refused or replaced on the server. A key that
@@ -225,7 +245,9 @@ extension MarfaSource: MarfaHostedSource {}
     /// A copy that could not take a key is closed for good; it opens again with the key that is stored, and the
     /// person is told why.
     private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
+        await handOverEdits()
         detach()
+        state = .connecting
         await source.close()
         try await open(connection)
         throw .unavailable(message: Self.message(error))
@@ -241,6 +263,7 @@ extension MarfaSource: MarfaHostedSource {}
         try begin()
         defer { isBusy = false }
         let current = source
+        if current != nil { await handOverEdits() }
         if let current, choice == nil {
             let unsent = await current.unsentWrites()
             if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
@@ -268,11 +291,11 @@ extension MarfaSource: MarfaHostedSource {}
                 throw error
             }
         }
-        detach()
-        let problem = await finishLeaving(old, discarding: choice != .keepCopy)
+        // The new copy is shown before the old one's key and copy are removed, so the windows go from one library
+        // to the other and never show the notes folder between them.
         remember(connection)
         attach(opened)
-        if let problem { throw problem }
+        if let problem = await finishLeaving(old, discarding: choice != .keepCopy) { throw problem }
     }
 
     // MARK: Lifecycle
@@ -315,6 +338,7 @@ extension MarfaSource: MarfaHostedSource {}
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
+        await handOverEdits()
         let agreed: UnsentWrites?
         switch choice {
         case .keepCopy:

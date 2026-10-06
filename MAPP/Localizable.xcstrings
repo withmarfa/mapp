@@ -1096,6 +1096,541 @@
     },
     "Open Copy": {
       "extractionState": "manual"
+    },
+    "Opening Your Library…": {
+      "extractionState": "manual"
+    },
+    "Can’t Open Your Marfa Library": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t open the copy of your library on this Mac.": {
+      "extractionState": "manual"
+    },
+    "Open Settings…": {
+      "extractionState": "manual"
+    },
+    "Marfa": {
+      "extractionState": "manual"
+    },
+    "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting": {
+      "extractionState": "manual"
+    },
+    "Disconnect from this server?": {
+      "extractionState": "manual"
+    },
+    "Disconnect": {
+      "extractionState": "manual"
+    },
+    "MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes. Your notes folder is used again.": {
+      "extractionState": "manual"
+    },
+    "MAPP is reading your Marfa library, so it doesn’t need a notes folder. Your notes folder is used again if you disconnect.": {
+      "extractionState": "manual"
+    },
+    "Not connected": {
+      "extractionState": "manual"
+    },
+    "Connecting…": {
+      "extractionState": "manual"
+    },
+    "Showing what’s on this Mac while MAPP reaches the server.": {
+      "extractionState": "manual"
+    },
+    "Connected": {
+      "extractionState": "manual"
+    },
+    "Offline": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can.": {
+      "extractionState": "manual"
+    },
+    "Key refused": {
+      "extractionState": "manual"
+    },
+    "The server doesn’t accept the key. Enter a new one below.": {
+      "extractionState": "manual"
+    },
+    "Library unavailable": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t open or follow the copy of your library on this Mac.": {
+      "extractionState": "manual"
+    },
+    "Check the Address": {
+      "extractionState": "manual"
+    },
+    "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.": {
+      "extractionState": "manual"
+    },
+    "Enter a Key": {
+      "extractionState": "manual"
+    },
+    "Paste the key for this server.": {
+      "extractionState": "manual"
+    },
+    "Can’t Open the Library": {
+      "extractionState": "manual"
+    },
+    "The copy of your library on this Mac can’t be opened.": {
+      "extractionState": "manual"
+    },
+    "Can’t Keep the Key": {
+      "extractionState": "manual"
+    },
+    "The Keychain wouldn’t take the key. Check that MAPP can use the Keychain, then try again.": {
+      "extractionState": "manual"
+    },
+    "The server doesn’t accept that key. Check it and try again. The key you had is kept.": {
+      "extractionState": "manual"
+    },
+    "Can’t Reach the Server": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t ask the server about the key. Check the address and your connection, then try again. The key you had is kept.": {
+      "extractionState": "manual"
+    },
+    "Disconnected, but Not Everything Was Removed": {
+      "extractionState": "manual"
+    },
+    "This library was closed before the change could be kept.": {
+      "extractionState": "manual"
+    },
+    "Switched Servers, but Not Everything Was Removed": {
+      "extractionState": "manual"
+    },
+    "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s key is still in your Keychain, and its copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s key is still in your Keychain. Remove it in Keychain Access.": {
+      "extractionState": "manual"
+    },
+    "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again.": {
+      "extractionState": "manual"
+    },
+    "Connect to a server first.": {
+      "extractionState": "manual"
+    },
+    "Still Working": {
+      "extractionState": "manual"
+    },
+    "Wait for the current step to finish, then try again.": {
+      "extractionState": "manual"
+    },
+    "The key is still in your Keychain, and the copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.": {
+      "extractionState": "manual"
+    },
+    "The key is still in your Keychain. Remove it in Keychain Access.": {
+      "extractionState": "manual"
+    },
+    "The copy is still on this Mac. MAPP removes it before it connects to that server again.": {
+      "extractionState": "manual"
+    },
+    "The server doesn’t accept your key. Enter a new one in Settings.": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do.": {
+      "extractionState": "manual"
+    },
+    "Needs attention": {
+      "extractionState": "manual"
+    },
+    "Your changes are kept on this Mac and sent when you’re back online.": {
+      "extractionState": "manual"
+    },
+    "%lld changes will be sent when you’re back online.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change will be sent when you’re back online."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes will be sent when you’re back online."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Catching up": {
+      "extractionState": "manual"
+    },
+    "Getting the latest changes from the server.": {
+      "extractionState": "manual"
+    },
+    "%lld changes are waiting to be sent.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change is waiting to be sent."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes are waiting to be sent."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sending %lld changes": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sending %lld change"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sending %lld changes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes need your attention.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change needs your attention."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes need your attention."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes on this Mac haven’t reached the server.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld change on this Mac hasn’t reached the server."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld changes on this Mac haven’t reached the server."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "And %lld more changes whose text can’t be shown.": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "And %lld more change whose text can’t be shown."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "And %lld more changes whose text can’t be shown."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Your changes to “%@” were saved as a copy": {
+      "extractionState": "manual"
+    },
+    "Your changes were saved as a copy": {
+      "extractionState": "manual"
+    },
+    "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy.": {
+      "extractionState": "manual"
+    },
+    "Your key doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again.": {
+      "extractionState": "manual"
+    },
+    "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.": {
+      "extractionState": "manual"
+    },
+    "The server refused it: %@": {
+      "extractionState": "manual"
+    },
+    "The server refused it.": {
+      "extractionState": "manual"
+    },
+    "To keep what you wrote, copy it before you discard this change.": {
+      "extractionState": "manual"
+    },
+    "It will be sent once the server accepts a key. Enter a new one in Settings.": {
+      "extractionState": "manual"
+    },
+    "The server stopped this change from going through. Try again to send it.": {
+      "extractionState": "manual"
+    },
+    "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.": {
+      "extractionState": "manual"
+    },
+    "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.": {
+      "extractionState": "manual"
+    },
+    "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it.": {
+      "extractionState": "manual"
+    },
+    "“%@” wasn’t created": {
+      "extractionState": "manual"
+    },
+    "A new item wasn’t created": {
+      "extractionState": "manual"
+    },
+    "Changes to “%@” weren’t sent": {
+      "extractionState": "manual"
+    },
+    "“%@” wasn’t deleted": {
+      "extractionState": "manual"
+    },
+    "A deletion wasn’t sent": {
+      "extractionState": "manual"
+    },
+    "“%@” wasn’t restored": {
+      "extractionState": "manual"
+    },
+    "A restore wasn’t sent": {
+      "extractionState": "manual"
+    },
+    "A change to “%@” wasn’t sent": {
+      "extractionState": "manual"
+    },
+    "A change wasn’t sent": {
+      "extractionState": "manual"
+    },
+    "A change to “%@” is on hold": {
+      "extractionState": "manual"
+    },
+    "A change is on hold": {
+      "extractionState": "manual"
+    },
+    "Discard Copy": {
+      "extractionState": "manual"
+    },
+    "Discard": {
+      "extractionState": "manual"
+    },
+    "Try Again": {
+      "extractionState": "manual"
+    },
+    "Undo Change": {
+      "extractionState": "manual"
+    },
+    "Keep Copy": {
+      "extractionState": "manual"
+    },
+    "Getting File…": {
+      "extractionState": "manual"
+    },
+    "Can’t Get This File": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t get the file from the server. Check your connection, then try again.": {
+      "extractionState": "manual"
+    },
+    "Address": {
+      "extractionState": "manual"
+    },
+    "https://marfa.example.com": {
+      "extractionState": "manual"
+    },
+    "Key": {
+      "extractionState": "manual"
+    },
+    "Paste your key": {
+      "extractionState": "manual"
+    },
+    "Connect": {
+      "extractionState": "manual"
+    },
+    "Marfa Server": {
+      "extractionState": "manual"
+    },
+    "Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again. Your notes folder is used again if you disconnect.": {
+      "extractionState": "manual"
+    },
+    "Waiting to Send": {
+      "extractionState": "manual"
+    },
+    "New Key": {
+      "extractionState": "manual"
+    },
+    "Paste a new key": {
+      "extractionState": "manual"
+    },
+    "The server doesn’t accept your key. Changes you make are kept on this Mac and sent once a key works.": {
+      "extractionState": "manual"
+    },
+    "MAPP keeps the key in your Keychain and doesn’t show it again.": {
+      "extractionState": "manual"
+    },
+    "Use a Different Server": {
+      "extractionState": "manual"
+    },
+    "Paste its key": {
+      "extractionState": "manual"
+    },
+    "Switch Server": {
+      "extractionState": "manual"
+    },
+    "Each server has its own copy on this Mac.": {
+      "extractionState": "manual"
+    },
+    "Changes Haven’t Been Sent": {
+      "extractionState": "manual"
+    },
+    "More changes arrived while you were deciding. Look at them before you choose.": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t tell what’s waiting in the copy on this Mac.": {
+      "extractionState": "manual"
+    },
+    "Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.": {
+      "extractionState": "manual"
+    },
+    "Copy Text": {
+      "extractionState": "manual"
+    },
+    "Open Original": {
+      "extractionState": "manual"
+    },
+    "This needs the server. Try again when you’re back online.": {
+      "extractionState": "manual"
+    },
+    "Discard this change?": {
+      "extractionState": "manual"
+    },
+    "What you wrote is lost unless you copy it first.": {
+      "extractionState": "manual"
+    },
+    "That can’t be done right now.": {
+      "extractionState": "manual"
+    },
+    "That didn’t work. Try again in a moment.": {
+      "extractionState": "manual"
+    },
+    "Discard Changes and Disconnect": {
+      "extractionState": "manual"
+    },
+    "Discard Changes and Switch": {
+      "extractionState": "manual"
+    },
+    "Keep Copy and Disconnect": {
+      "extractionState": "manual"
+    },
+    "Keep Copy and Switch": {
+      "extractionState": "manual"
+    },
+    "Use New Key": {
+      "extractionState": "manual"
+    },
+    "Replace Key": {
+      "extractionState": "manual"
+    },
+    "Some Changes Weren’t Saved": {
+      "extractionState": "manual"
+    },
+    "MAPP closed the library before it could keep your change. Make the change again.": {
+      "extractionState": "manual"
+    },
+    "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the kind of item you chose or the item you chose as its parent, so your new item is a note with no parent. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the kind of item you chose, so your new item is a note. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "The library now open doesn’t have the item you chose as its parent, so your new item has no parent. Check it before you create it.": {
+      "extractionState": "manual"
+    },
+    "New Item Changed": {
+      "extractionState": "manual"
+    },
+    "Can’t Check the Key": {
+      "extractionState": "manual"
+    },
+    "MAPP kept the new key and opened your library again, but couldn’t check the key with the server.": {
+      "extractionState": "manual"
+    },
+    "Can’t Use the New Key": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again.": {
+      "extractionState": "manual"
+    },
+    "MAPP kept the new key, but the copy of your library on this Mac can’t be opened.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

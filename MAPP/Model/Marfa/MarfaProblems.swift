@@ -67,6 +67,24 @@ nonisolated enum MarfaProblems {
         }.map(\.id))
     }
 
+    /// What the person wrote in each write not sent that carried content, oldest first, for showing before they
+    /// agree to lose it. A write that only changes a tag or a link has none to show.
+    static func unsentTexts(
+        _ queue: [QueuedWrite], catalogue: Catalogue, types: [String: TypeID] = [:]
+    ) -> [UnsentWrites.Text] {
+        let held = unsent(queue)
+        return queue.filter { held.contains($0.id) }.compactMap { write in
+            switch write.kind {
+            case .createItem, .updateItem: break
+            default: return nil
+            }
+            let type = write.body["type"]?.string.map { TypeID($0) } ?? write.itemId.flatMap { types[$0] }
+            let content = content(of: write.body, type: type, catalogue: catalogue)
+            guard !content.plainText.isEmpty else { return nil }
+            return UnsentWrites.Text(id: write.id, change: change(write.kind), content: content, date: MarfaMapping.date(write.queuedAt))
+        }.sorted { $0.date < $1.date }
+    }
+
     /// A write the queue refused without sending, because a write it waits on was refused, died or is blocked,
     /// is shown with that write: discarding a refusal takes it too, and releasing a stopped write releases it.
     static func foldedRoots(_ stopped: [QueuedWrite]) -> [String: String] {

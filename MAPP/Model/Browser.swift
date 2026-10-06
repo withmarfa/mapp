@@ -27,7 +27,24 @@ final class Browser {
     var searchFocusRequests = 0
     var isCreatingItem = false
     var itemDraft: NewItemDraft?
+    /// The item made from the draft, until the library shows it: a Marfa library answers a create only when its
+    /// source says so, so the draft stays on the page, as typed, until then.
+    private(set) var creation: Creation?
     var isImportingFiles = false
+    /// A file the library had to fetch to show, so the commands that share it have its location too.
+    private(set) var fetchedFile: (id: ItemID, url: URL)?
+    /// The library this window was last shown, so a different one starts the window afresh.
+    @ObservationIgnored private var libraryID: ObjectIdentifier?
+    /// That library, held until the window shows another, so a create still awaited can be asked about as the
+    /// window leaves it: by then the app has let it go.
+    @ObservationIgnored private var shownLibrary: (any ItemLibrary)?
+
+    struct Creation {
+        let id: ItemID
+        let typeID: String
+        /// The library the create was sent to; another one that has loaded without the item never will hold it.
+        let library: any ItemLibrary
+    }
 
     nonisolated enum Palette: Hashable {
         case commands, search
@@ -105,8 +122,12 @@ final class Browser {
         focusRequest = .page
     }
 
-    /// Blank titles receive a unique name without requiring a naming dialog before typing.
+    /// Blank titles receive a unique name without requiring a naming dialog before typing. A library that shows
+    /// the new item at once hands over to it here; one that shows it later, as a Marfa library does when its
+    /// source answers, keeps the draft until `finishCreation` finds the item.
     func createDraft(in library: any ItemLibrary, undoManager: UndoManager?) -> ItemID? {
+        // A second Return while the first is awaited makes nothing more.
+        if let creation { return creation.id }
         guard let draft = itemDraft else { return nil }
         var title = NoteName.trimmed(draft.title)
         if title.isEmpty {
@@ -119,16 +140,101 @@ final class Browser {
             }
         }
         guard let id = library.createItem(typeID: draft.typeID, title: title, body: draft.body, parentID: draft.parentID, in: draft.place, undoManager: undoManager) else { return nil }
+        creation = Creation(id: id, typeID: draft.typeID, library: library)
+        finishCreation(in: library)
+        return id
+    }
+
+    /// Whether the item made from the draft is now held by the library, or was refused, and so is to be handed
+    /// over to, or given back.
+    func isCreationSettled(in library: any ItemLibrary) -> Bool {
+        guard let creation else { return false }
+        return library.item(creation.id) != nil || isRefused(creation, in: library)
+    }
+
+    /// Refused once queued, so its text is also in the problem the refusal shows, or refused before it was
+    /// queued, so the draft holds the only copy. A create sent to another library counts as refused once this
+    /// one has loaded without it, since it will not come.
+    private func isRefused(_ creation: Creation, in library: any ItemLibrary) -> Bool {
+        if creation.library !== library { return library.isLoaded }
+        return library.wasRefused(creating: creation.id) || library.syncReport.problems.contains { $0.itemID == creation.id }
+    }
+
+    /// Hands the window over to the item made from the draft once the library holds it. The draft is kept until
+    /// then, and given back to edit and send again if the item is refused; the library tells the person why.
+    func finishCreation(in library: any ItemLibrary) {
+        guard let creation else { return }
+        guard library.item(creation.id) != nil else {
+            if isRefused(creation, in: library) {
+                self.creation = nil
+                if creation.library !== library { fitDraft(to: library) }
+            }
+            return
+        }
+        self.creation = nil
         isCreatingItem = false
         itemDraft = nil
         searchText = ""
         isSearchExpanded = false
-        if !library.items(in: item).contains(where: { $0.id == id }) {
-            sidebarItem = .itemType(draft.typeID)
+        if !library.items(in: item).contains(where: { $0.id == creation.id }) {
+            sidebarItem = .itemType(creation.typeID)
         }
-        selection = [id]
+        selection = [creation.id]
         focusRequest = .page
-        return id
+    }
+
+    /// Whether the draft has been sent and is waiting to be shown.
+    var isAwaitingCreation: Bool { creation != nil }
+
+    /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
+    /// it selected, searched or was renaming named items the new library may not have, and the window's undo
+    /// would act on the library left. A draft is kept, since it is the person's text, unless the library left
+    /// already holds the item made from it. One not yet answered stays sent, not editable, until the new library
+    /// has loaded: a copy opened again over the same queue then shows the item, and the window hands over to it
+    /// rather than let a second Return make it twice; a library that loads without it gives the draft back.
+    func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
+        let id = ObjectIdentifier(library)
+        guard libraryID != id else { return }
+        let isFirst = libraryID == nil
+        let left = shownLibrary
+        libraryID = id
+        shownLibrary = library
+        guard !isFirst else { return }
+        undoManager?.removeAllActions()
+        selection = []
+        sidebarItem = .allNotes
+        searchText = ""
+        isSearchExpanded = false
+        renamingNote = nil
+        renamingFolder = nil
+        folderToDelete = nil
+        palette = nil
+        fetchedFile = nil
+        types.searchText = ""
+        if let creation, left?.item(creation.id) != nil {
+            self.creation = nil
+            itemDraft = nil
+            isCreatingItem = false
+        }
+        finishCreation(in: library)
+    }
+
+    /// Fits the draft to the library the window shows once it has loaded, since before then it cannot say what it
+    /// lacks. What changes is told to the person, never made silently. Nil where nothing changed.
+    @discardableResult
+    func fitDraft(to library: any ItemLibrary) -> (title: String, message: String)? {
+        guard library.isLoaded, creation == nil, let changed = itemDraft?.fit(to: library) else { return nil }
+        library.failure = changed
+        return changed
+    }
+
+    func fileFetched(_ id: ItemID, at url: URL?) {
+        fetchedFile = url.map { (id, $0) }
+    }
+
+    /// Where an item's file is, for sharing: the library's own answer, or the file it fetched to show.
+    func fileURL(of id: ItemID, in library: any ItemLibrary) -> URL? {
+        library.fileURL(for: id) ?? fetchedFile.flatMap { $0.id == id ? $0.url : nil }
     }
 
     func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
@@ -240,5 +346,28 @@ final class NewItemDraft {
         self.place = place
         if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
         if case .project(let id) = place { parentID = id }
+    }
+
+    /// A draft carried to another library keeps its text and what the loaded library can still hold: a parent it
+    /// does not have is dropped, and a kind it does not know gives way to a note. Answers what changed, in words
+    /// for the person, or nil where nothing did.
+    func fit(to library: any ItemLibrary) -> (title: String, message: String)? {
+        guard library.isLoaded else { return nil }
+        let losesParent = parentID.map { library.item($0) == nil } ?? false
+        let losesType = library.catalogue.itemTypes[TypeID(typeID)] == nil
+        if losesParent { parentID = nil }
+        if losesType { typeID = "core.note" }
+        let message: String
+        switch (losesType, losesParent) {
+        case (true, true):
+            message = String(localized: "The library now open doesn’t have the kind of item you chose or the item you chose as its parent, so your new item is a note with no parent. Check it before you create it.")
+        case (true, false):
+            message = String(localized: "The library now open doesn’t have the kind of item you chose, so your new item is a note. Check it before you create it.")
+        case (false, true):
+            message = String(localized: "The library now open doesn’t have the item you chose as its parent, so your new item has no parent. Check it before you create it.")
+        case (false, false):
+            return nil
+        }
+        return (String(localized: "New Item Changed"), message)
     }
 }

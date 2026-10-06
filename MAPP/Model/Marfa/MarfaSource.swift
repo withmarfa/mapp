@@ -4,9 +4,25 @@ import Synchronization
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
-nonisolated struct UnsentWrites: Hashable, Sendable {
+nonisolated struct UnsentWrites: Sendable {
+    /// What the person wrote in one of the writes, to show before they agree to lose it.
+    nonisolated struct Text: Hashable, Sendable, Identifiable {
+        let id: String
+        var change: SyncProblemEntry.Change
+        var content: SyncContent
+        var date: Date
+    }
+
     var ids: Set<String>
+    /// The writes that carried content, oldest first. Shown, never compared: two reads of the same queue agree
+    /// on what is not sent by its ids alone.
+    var texts: [Text] = []
     var count: Int { ids.count }
+}
+
+nonisolated extension UnsentWrites: Hashable {
+    static func == (lhs: UnsentWrites, rhs: UnsentWrites) -> Bool { lhs.ids == rhs.ids }
+    func hash(into hasher: inout Hasher) { hasher.combine(ids) }
 }
 
 nonisolated enum CloseOutcome: Hashable, Sendable {
@@ -98,8 +114,10 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         Task { [engine] in await engine.sync.refresh() }
     }
 
-    func submit(_ write: ItemWrite, as id: WriteID) {
-        events.yield(.write(write, id))
+    @discardableResult
+    func submit(_ write: ItemWrite, as id: WriteID) -> Bool {
+        if case .terminated = events.yield(.write(write, id)) { return false }
+        return true
     }
 
     /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
@@ -231,10 +249,18 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     func endEditing(_ item: ItemID) {}
 
     /// Returns once every write submitted before it has been queued and the queue drained where the server can
-    /// be reached.
+    /// be reached. The app never waits on the server like this; the tests that drive a server do.
     func flush() async {
         await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.flush(continuation)) { continuation.resume() }
+        }
+    }
+
+    /// Returns once every write submitted before it is in the queue, or refused, without waiting on the network,
+    /// so a quit while offline keeps every write and does not wait for a server.
+    func queueSubmitted() async {
+        await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.queued(continuation)) { continuation.resume() }
         }
     }
 

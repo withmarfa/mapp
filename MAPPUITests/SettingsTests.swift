@@ -62,7 +62,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(back.exists)
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("about", "About"), ("appearance", "Appearance")] {
+        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("marfa", "Marfa"), ("about", "About"), ("appearance", "Appearance")] {
             let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
             XCTAssertTrue(category.exists)
             category.click()

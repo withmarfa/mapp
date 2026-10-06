@@ -55,7 +55,7 @@ struct NoteToolbar: CustomizableToolbarContent {
 
     private var selectedFileURL: URL? {
         guard browser?.isCreatingItem != true, browser?.selection.count == 1, let id = browser?.selection.first else { return nil }
-        return library.fileURL(for: id)
+        return browser?.fileURL(of: id, in: library)
     }
 
     /// Marfa Types shows a type, not a note, so the tools for notes step aside.
