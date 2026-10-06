@@ -72,10 +72,13 @@ struct ItemMutationTests {
         #expect(library.connectionIndex.edges.contains { $0.name == "about" && $0.targetID == target.id })
     }
 
-    @Test func unsupportedQuotedKeyIsRefusedWithoutChangingFile() {
+    @Test func aQuotedKeyIsEditedInItsOwnSpelling() {
         let note = Note(path: "Quoted.md", text: "---\ntype: aic.ticket.task\n\"status\": pending\n---\nBody", created: .now)
         let library = NoteLibrary(notes: [note])
-        #expect(!library.setItemProperty(note.id, key: "status", value: .string("completed")))
+        let undo = UndoManager()
+        #expect(library.setItemProperty(note.id, key: "status", value: .string("completed"), undoManager: undo))
+        #expect(library.note(note.id)?.file.text == "---\ntype: aic.ticket.task\n\"status\": completed\n---\nBody")
+        undo.undo()
         #expect(library.note(note.id)?.file.text == note.file.text)
     }
 

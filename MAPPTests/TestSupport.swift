@@ -2,7 +2,7 @@ import Foundation
 @testable import MAPP
 
 extension Note {
-    /// A note as the tests write one: its body, pinned in its front matter when asked, at a path named after its
+    /// A note as the tests write one: its body, a favorite when asked, at a path named after its
     /// first line unless one is given, and in the trash when deleted.
     init(
         body: String,
@@ -10,11 +10,11 @@ extension Note {
         created: Date,
         modified: Date? = nil,
         folderID: Folder.ID? = nil,
-        isPinned: Bool = false,
+        isFavorite: Bool = false,
         deleted: Date? = nil
     ) {
         var file = NoteFile(text: body)
-        if isPinned { file.setFlag("pinned", true) }
+        if isFavorite { try! file.setFavorite(true) }
         self.init(
             path: path ?? "\(NoteText.fileName(for: body)).md",
             text: file.text,

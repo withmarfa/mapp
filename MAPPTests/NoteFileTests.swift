@@ -40,9 +40,9 @@ struct NoteFileTests {
     }
 
     @Test func aBodyAddedAfterFrontMatterClosedAtTheEndStartsOnItsOwnLine() {
-        var file = NoteFile(text: "---\ntitle: X\npinned: true\n---")
+        var file = NoteFile(text: "---\ntitle: X\nstatus: open\n---")
         file.body = "Hello\n"
-        #expect(file.text == "---\ntitle: X\npinned: true\n---\nHello\n")
+        #expect(file.text == "---\ntitle: X\nstatus: open\n---\nHello\n")
         #expect(NoteFile(text: file.text).title == "X")
     }
 
@@ -66,7 +66,7 @@ struct NoteFileTests {
         ---
         title: "Quoted: yes"
         other: 'it''s'
-        pinned: true
+        status: open
         list:
           - a
         plain: value # comment
@@ -75,7 +75,7 @@ struct NoteFileTests {
         """)
         #expect(file.title == "Quoted: yes")
         #expect(file.property("other") == "it's")
-        #expect(file.isPinned)
+        #expect(file.property("status") == "open")
         #expect(file.property("list") == nil)
         #expect(file.property("plain") == "value")
         #expect(file.property("missing") == nil)
@@ -86,9 +86,9 @@ struct NoteFileTests {
         var file = NoteFile(text: "---\nmarfa_id: 1\ntags:\n  - a\n# kept\ntitle: Old\n---\nBody\n")
         file.setProperty("tags", "one")
         file.setProperty("title", "New: one")
-        file.setFlag("pinned", true)
-        #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\npinned: true\n---\nBody\n")
-        file.setFlag("pinned", false)
+        file.setProperty("status", "open")
+        #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\nstatus: open\n---\nBody\n")
+        file.setProperty("status", nil)
         file.setProperty("absent", nil)
         #expect(file.text == "---\nmarfa_id: 1\ntags: one\n# kept\ntitle: \"New: one\"\n---\nBody\n")
     }
@@ -98,10 +98,10 @@ struct NoteFileTests {
         var file = NoteFile(text: text)
         file.setProperty("title", "New")
         #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New"))
-        file.setFlag("pinned", true)
+        file.setProperty("status", "open")
         #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New")
-            .replacingOccurrences(of: "---\r\nBody", with: "pinned: true\r\n---\r\nBody"))
-        file.setFlag("pinned", false)
+            .replacingOccurrences(of: "---\r\nBody", with: "status: open\r\n---\r\nBody"))
+        file.setProperty("status", nil)
         #expect(file.text == text.replacingOccurrences(of: "title: Old", with: "title: New"))
     }
 
@@ -120,8 +120,8 @@ struct NoteFileTests {
     @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
     func removingTheFirstPropertyKeepsTheHeaderReadable(opening: String, following: String) {
         let remainder = "type: example.task\(following)child-of: \"[[Parent]]\"\(following)\(following)custom: [one, two]\(following)---\(opening)Body\(following)"
-        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following)\(remainder)")
-        file.setFlag("pinned", false)
+        var file = NoteFile(text: "---\(opening)status: open\(opening)\(following)\(remainder)")
+        file.setProperty("status", nil)
         #expect(file.text == "---\(opening)\(remainder)")
         let reread = NoteFile(text: file.text)
         #expect(reread.property("type") == "example.task")
@@ -131,17 +131,17 @@ struct NoteFileTests {
 
     @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
     func removingTheLastPropertyRemovesTheHeaderAndItsBlankSeparators(opening: String, following: String) {
-        var file = NoteFile(text: "---\(opening)pinned: true\(opening)\(following) \t\(following)---\(opening)Body\(following)")
-        file.setFlag("pinned", false)
+        var file = NoteFile(text: "---\(opening)status: open\(opening)\(following) \t\(following)---\(opening)Body\(following)")
+        file.setProperty("status", nil)
         #expect(file.text == "Body\(following)")
         #expect(NoteFile(text: file.text).body == "Body\n")
     }
 
     @Test func frontMatterIsMadeForTheFirstPropertyAndGoesWithTheLast() {
         var file = NoteFile(text: "Body\n")
-        file.setFlag("pinned", true)
-        #expect(file.text == "---\npinned: true\n---\nBody\n")
-        file.setFlag("pinned", false)
+        file.setProperty("status", "open")
+        #expect(file.text == "---\nstatus: open\n---\nBody\n")
+        file.setProperty("status", nil)
         #expect(file.text == "Body\n")
     }
 

@@ -5,17 +5,17 @@ import Testing
 @MainActor
 struct TypedRecordTests {
     @Test(arguments: [("\n", "\n"), ("\r\n", "\r\n"), ("\r\n", "\n")])
-    func unpinningTheFirstPropertyKeepsTypedMetadataAfterReread(opening: String, following: String) async throws {
+    func unfavoritingTheFirstPropertyKeepsTypedMetadataAfterReread(opening: String, following: String) async throws {
         let root = try TemporaryFolder()
         let bin = try TemporaryFolder()
         let store = FolderStore(root: root.url, bin: bin.url)
         let path = "Records/Task.md"
         let remainder = "type: example.task\(following)title: Task\(following)child-of: \"[[Parent]]\"\(following)\(following)custom: unchanged\(following)---\(opening)Body\(following)"
-        try root.write("---\(opening)pinned: true\(opening)\(following)\(remainder)", to: path)
+        try root.write("---\(opening)tags: [favorite]\(opening)\(following)\(remainder)", to: path)
         let library = NoteLibrary(loadingFrom: store, defaults: nil)
         await library.load()
         let note = try #require(library.notes.first)
-        library.setPinned([note.id], false)
+        library.setFavorite([note.id], false)
         store.drain()
         #expect(try Data(contentsOf: root.url.appending(path: path)) == Data("---\(opening)\(remainder)".utf8))
         await library.reread()
@@ -77,8 +77,8 @@ struct TypedRecordTests {
         #expect(library.note(note.id)?.body == editedBody)
         #expect(library.note(note.id)?.file.text == edited)
 
-        library.setPinned([note.id], true)
-        library.setPinned([note.id], false)
+        library.setFavorite([note.id], true)
+        library.setFavorite([note.id], false)
         store.drain()
         #expect(try Data(contentsOf: root.url.appending(path: path)) == Data(edited.utf8))
         library.renameNote(note.id, to: "Renamed record")

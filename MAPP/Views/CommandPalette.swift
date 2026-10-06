@@ -219,9 +219,9 @@ struct CommandPalette: View {
         if !selected.isEmpty, selected.allSatisfy(\.isDeleted) {
             add(String(localized: "Recover"), "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
         } else if !selected.isEmpty, !selected.contains(where: \.isDeleted) {
-            let allPinned = selected.allSatisfy(\.isPinned)
-            add(allPinned ? String(localized: "Unpin Note") : String(localized: "Pin Note"), allPinned ? "pin.slash" : "pin") {
-                library.setPinned(ids, !allPinned, undoManager: undoManager)
+            let allFavorites = selected.allSatisfy(\.isFavorite)
+            add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
+                library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
             if !selected.allSatisfy({ $0.folderID == nil }) {
                 add(String(localized: "Move to Inbox"), "tray") { library.move(ids, to: nil, undoManager: undoManager) }
@@ -251,7 +251,7 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.pinned, "pin")]
+        var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.favorites, "star")]
         items += library.items.filter { $0.type?.id == "aic.project" }.map { (.project($0.id), "square.stack") }
         items += WorkbenchSchema.types.map { (.itemType($0.id), "doc.text") }
         items += [(.files, "doc")]

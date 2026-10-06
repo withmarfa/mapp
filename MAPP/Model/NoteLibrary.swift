@@ -317,8 +317,8 @@ final class NoteLibrary {
         switch item {
         case .inbox: return notes.filter { !$0.isDeleted && $0.folderID == nil }
         case .allNotes: return notes.filter { !$0.isDeleted }
-        case .pinned: return notes.filter { !$0.isDeleted && $0.isPinned }
-        case .pinnedItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isPinned }
+        case .favorites: return notes.filter { !$0.isDeleted && $0.isFavorite }
+        case .favoriteItem(let id): return notes.filter { $0.id == id && !$0.isDeleted && $0.isFavorite }
         case .folder(let id): return notes.filter { !$0.isDeleted && $0.folderID == id }
         case .recentlyDeleted: return notes.filter(\.isDeleted)
         case .marfaTypes, .files: return []
@@ -383,8 +383,8 @@ final class NoteLibrary {
         switch item {
         case .inbox: String(localized: "Inbox")
         case .allNotes: String(localized: "All Notes")
-        case .pinned: String(localized: "Pinned")
-        case .pinnedItem(let id): self.item(id)?.title ?? ""
+        case .favorites: String(localized: "Favorites")
+        case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .marfaTypes: String(localized: "Marfa Types")
@@ -397,12 +397,12 @@ final class NoteLibrary {
 
     // MARK: Notes
 
-    /// A new, empty note placed where it will show in `item`: in that folder, pinned when made from Pinned, and in
+    /// A new, empty note placed where it will show in `item`: in that folder, a favorite when made from Favorites, and in
     /// the Inbox otherwise. It has no file until its first line is written.
     @discardableResult
     func newNote(in item: SidebarItem, undoManager: UndoManager? = nil) -> Note {
         var file = NoteFile(text: "")
-        if item == .pinned { file.setFlag("pinned", true) }
+        if item == .favorites { try? file.setFavorite(true) }
         var note = Note(text: file.text, created: now())
         if case .folder(let id) = item { note.folderID = folder(id)?.id }
         notes.append(note)
@@ -493,17 +493,84 @@ final class NoteLibrary {
         }
     }
 
-    /// Deleted notes keep their pin as it was, since Recently Deleted shows no pins.
-    func setPinned(_ ids: Set<Note.ID>, _ pinned: Bool, undoManager: UndoManager? = nil) {
-        let name = pinned ? String(localized: "Pin") : String(localized: "Unpin")
-        let changed = notes.filter { ids.contains($0.id) && !$0.isDeleted && $0.isPinned != pinned }.map(\.id)
-        guard !changed.isEmpty else { return }
-        for index in notes.indices where changed.contains(notes[index].id) {
-            notes[index].file.setFlag("pinned", pinned)
-            if let path = notes[index].path { perform(.write(path: path, text: notes[index].file.text)) }
+    /// Deleted notes keep their tags as they were, since Recently Deleted shows no favorites. A note whose tags
+    /// cannot be changed safely is left as written, and the person is told.
+    func setFavorite(_ ids: Set<Note.ID>, _ isFavorite: Bool, undoManager: UndoManager? = nil) {
+        var changes: [Note.ID: FileChange] = [:]
+        var refused: [(title: String, error: NoteFile.TagEditError)] = []
+        for index in notes.indices where ids.contains(notes[index].id) && !notes[index].isDeleted && notes[index].isFavorite != isFavorite {
+            var file = notes[index].file
+            do {
+                try file.setFavorite(isFavorite)
+            } catch {
+                refused.append((notes[index].title, error))
+                continue
+            }
+            guard file != notes[index].file else { continue }
+            changes[notes[index].id] = FileChange(before: notes[index].file, after: file)
+            notes[index].file = file
+            if let path = notes[index].path { perform(.write(path: path, text: file.text)) }
         }
+        if let first = refused.first {
+            let title = isFavorite ? String(localized: "Can’t Add to Favorites") : String(localized: "Can’t Remove from Favorites")
+            let message = switch (refused.count, first.error) {
+            case (1, .unreadable):
+                String(localized: "The tags of “\(first.title)” can’t be read, so its file was left unchanged.")
+            case (1, .unsafe):
+                String(localized: "The tags of “\(first.title)” are written in a form that can’t be changed safely, so its file was left unchanged.")
+            default:
+                String(localized: "Some notes have tags that can’t be read or changed safely, so their files were left unchanged.")
+            }
+            failure = (title, message)
+        }
+        guard !changes.isEmpty else { return }
+        let name = isFavorite ? String(localized: "Add to Favorites") : String(localized: "Remove from Favorites")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.setPinned(Set(changed), !pinned, undoManager: undoManager)
+            library.revertFavorites(changes, wereSetTo: isFavorite, name: name, undoManager: undoManager)
+        }
+    }
+
+    nonisolated struct FileChange: Sendable {
+        let before: NoteFile
+        let after: NoteFile
+    }
+
+    /// Puts back the bytes each file had before a favorite change. A file whose body changed since keeps the new
+    /// body under its old front matter; one whose front matter changed since has only its favorite changed back.
+    private func revertFavorites(_ changes: [Note.ID: FileChange], wereSetTo isFavorite: Bool, name: String, undoManager: UndoManager?) {
+        var reverted: [Note.ID: FileChange] = [:]
+        var refused: [String] = []
+        for index in notes.indices {
+            guard let change = changes[notes[index].id], !notes[index].isDeleted else { continue }
+            let current = notes[index].file
+            var restored = current
+            if current == change.after {
+                restored = change.before
+            } else if current.frontMatter == change.after.frontMatter {
+                restored.restoreFrontMatter(from: change.before)
+            } else if current.isFavorite == isFavorite {
+                do {
+                    try restored.setFavorite(!isFavorite)
+                } catch {
+                    refused.append(notes[index].title)
+                    continue
+                }
+            }
+            guard restored != current else { continue }
+            reverted[notes[index].id] = FileChange(before: current, after: restored)
+            notes[index].file = restored
+            if let path = notes[index].path { perform(.write(path: path, text: restored.text)) }
+        }
+        if let first = refused.first {
+            let title = isFavorite ? String(localized: "Can’t Remove from Favorites") : String(localized: "Can’t Add to Favorites")
+            let message = refused.count == 1
+                ? String(localized: "The tags of “\(first)” are written in a form that can’t be changed safely, so its file was left unchanged.")
+                : String(localized: "Some notes have tags that can’t be read or changed safely, so their files were left unchanged.")
+            failure = (title, message)
+        }
+        guard !reverted.isEmpty else { return }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.revertFavorites(reverted, wereSetTo: !isFavorite, name: name, undoManager: undoManager)
         }
     }
 

@@ -4,7 +4,7 @@ import Foundation
 /// Nothing ships with them.
 nonisolated enum SampleLibrary {
     /// Writes the sample notes into an empty folder: each note as a file named after its first line, in its
-    /// folder, pinned in its front matter, with the dates it was written and edited. Two are then trashed.
+    /// folder, favorited in its front matter, with the dates it was written and edited. Two are then trashed.
     static func write(to root: URL, bin: URL, now: Date = .now) throws {
         let files = FileManager()
         try? files.removeItem(at: root)
@@ -27,11 +27,11 @@ nonisolated enum SampleLibrary {
             hour: Int,
             minute: Int = 0,
             editedDaysAgo: Int? = nil,
-            pinned: Bool = false,
+            favorite: Bool = false,
             deleted: Bool = false
         ) throws {
             var file = NoteFile(text: body + "\n")
-            if pinned { file.setFlag("pinned", true) }
+            if favorite { try file.setFavorite(true) }
             let name = NoteText.fileName(for: body)
             let path = folder.map { "\($0)/\(name).md" } ?? "\(name).md"
             let url = root.appending(path: path)
@@ -43,11 +43,11 @@ nonisolated enum SampleLibrary {
             if deleted { trashed.append(path) }
         }
 
-        try note(kitchenQuotes, "Home", daysAgo: 0, hour: 9, minute: 12, pinned: true)
+        try note(kitchenQuotes, "Home", daysAgo: 0, hour: 9, minute: 12, favorite: true)
         try note(gardenIdeas, daysAgo: 0, hour: 7, minute: 55)
         try note(weeklyReview, "Work", daysAgo: 0, hour: 8, minute: 30)
         try note(accountant, daysAgo: 1, hour: 16, minute: 40)
-        try note(readingList, "Reading", daysAgo: 1, hour: 21, minute: 5, pinned: true)
+        try note(readingList, "Reading", daysAgo: 1, hour: 21, minute: 5, favorite: true)
         try note(podcastIdea, daysAgo: 1, hour: 12, minute: 20)
         try note(lisbon, "Personal", daysAgo: 3, hour: 19, minute: 20)
         try note(designReview, "Work", daysAgo: 4, hour: 11)

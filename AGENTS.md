@@ -28,7 +28,9 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 ## Versions
 
-- A version exists only as a git tag, and tags are the maintainer's. Agents never create a tag or write a version into a file; `MARKETING_VERSION` stays `0.0.0`.
+- A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Agents create the tag when a release is called.
+- Every version is `0.0.x` until the first public release, because WithMarfa keeps every version inside its code at 0 until then. Each release is the latest tag plus `0.0.1`, so `v0.0.5` follows `v0.0.4`.
+- Agents never write a version into a file: `MARKETING_VERSION` stays `0.0.0` in the repository, since `ci_scripts/ci_post_clone.sh` sets it from the tag in the cloud copy only.
 
 ## Layout
 
@@ -44,7 +46,7 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 ## Storage and Marfa
 
 - Notes are `.md` files in the folder the person picks; each directory at the top of it is a folder, and the files at the top are the Inbox. Anything whose name starts with a dot, such as Marfa's `.marfa`, and the `Attachments` folder are not notes. The folder is remembered as a security-scoped bookmark.
-- The folder is shaped so Marfa's folder device can sync it. Front matter is found by Marfa's rule (`NoteFile.frontMatterLength`); a note's title is its `title` property, otherwise its file name; `pinned: true` is a property; every other property, `marfa_id` among them, is kept as written. Front matter is edited line by line and never re-emitted.
+- The folder is shaped so Marfa's folder device can sync it. Front matter is found by Marfa's rule (`NoteFile.frontMatterLength`); a note's title is its `title` property, otherwise its file name; a favorite is Marfa's ordinary `favorite` tag in the `tags` field, read by Marfa's own rule (a list, tags separated by commas, or nothing; `NoteFile.tags`) and changed in the form already there (`NoteFile.setFavorite`), which reads its result again and refuses tags Marfa cannot read or an edit that would change anything but that one tag, and the person is told; every other property, `marfa_id` among them, is kept as written. Front matter is edited line by line and never re-emitted.
 - `NoteStore` is where notes are kept, in Marfa's words (trash, restore, purge). `FolderStore` keeps them as files and keeps the trash in the app's own storage, since a file moved within the folder reads to Marfa as a rename. A Marfa store is meant to take over the trash, restore and purge; conflicts between writers are Marfa's to settle, not the app's.
 - `NoteLibrary` decides every path and hands the store one change at a time, which the store makes in order off the main thread, coordinated and whole. New Item keeps an in-window draft until the person enters the content area or submits the title. Creation then writes the chosen title, type and parent through the same store; later body edits are saved by the editor.
 - A note's file is named after its first line as it reads (`NoteText.name(for:)`, the one place a name is made safe), and follows the line while the note goes by it: once the person leaves a note whose first line changed, the file is renamed, so Marfa sees one rename rather than one per word. A name given with Rename Note that is not the line's stops the following. A first line with characters a file name cannot hold is also kept whole as the note's `title`.
@@ -52,7 +54,8 @@ MAPP: a native macOS markdown notes app with a sidebar, a list and a page, in th
 
 ## Releases
 
-- Builds reach TestFlight through Xcode Cloud: a workflow started by the maintainer's tag archives the app and gives it to internal testers. There is no other distribution, so no Sparkle and no notarisation.
+- Builds reach TestFlight through Xcode Cloud: a workflow started by a tag beginning with `v` archives the app and gives it to internal testers. There is no other distribution, so no Sparkle and no notarization.
+- To release, an agent tags the merged commit on `main` with the next version (see Versions) and pushes the tag. Agents cannot see Xcode Cloud, so the release is checked in App Store Connect: the build for the tag's version appears under TestFlight.
 - `ci_scripts/ci_post_clone.sh` runs in the cloud checkout: it writes `Config/Local.xcconfig` from the workflow's secret `MAPP_DEVELOPMENT_TEAM`, and sets `MARKETING_VERSION` from the tag (`1.2.3` or `v1.2.3`) in that copy only. Xcode Cloud numbers the builds. The repository still never holds a team or a version.
 
 ## Commands

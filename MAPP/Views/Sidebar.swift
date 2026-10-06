@@ -9,7 +9,7 @@ struct Sidebar: View {
     @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
-    @SceneStorage("sidebarPinnedExpanded") private var pinnedExpanded = true
+    @SceneStorage("sidebarFavoritesExpanded") private var favoritesExpanded = true
     @SceneStorage("sidebarProjectsExpanded") private var projectsExpanded = true
     @SceneStorage("sidebarItemsExpanded") private var itemsExpanded = false
     @SceneStorage("sidebarFoldersExpanded") private var foldersExpanded = true
@@ -32,16 +32,16 @@ struct Sidebar: View {
                 row(.allNotes, systemImage: "note.text")
             }
 
-            if !pinned.isEmpty {
-                Section(isExpanded: $pinnedExpanded) {
-                    ForEach(pinned) { item in
+            if !favorites.isEmpty {
+                Section(isExpanded: $favoritesExpanded) {
+                    ForEach(favorites) { item in
                         Label(item.title, systemImage: item.type?.id == "aic.project" ? "square.stack" : "doc.text")
-                            .tag(SidebarItem.pinnedItem(item.id))
-                            .accessibilityIdentifier("SidebarPinnedItem-\(item.id.uuidString)")
+                            .tag(SidebarItem.favoriteItem(item.id))
+                            .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.uuidString)")
                     }
                 } header: {
-                    Text("Pinned")
-                        .accessibilityIdentifier("SidebarPinnedSection")
+                    Text("Favorites")
+                        .accessibilityIdentifier("SidebarFavoritesSection")
                 }
             }
 
@@ -102,7 +102,7 @@ struct Sidebar: View {
         .onChange(of: browser.renamingFolder) {
             if browser.renamingFolder != nil { foldersExpanded = true }
         }
-        .onChange(of: pinned.map(\.id)) {
+        .onChange(of: favorites.map(\.id)) {
             browser.folderRemoved(in: library, order: order)
         }
         .scrollEdgeEffectHidden(for: .bottom)
@@ -161,8 +161,8 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private var pinned: [AppItem] {
-        library.notes(in: .pinned)
+    private var favorites: [AppItem] {
+        library.notes(in: .favorites)
             .compactMap { library.item($0.id) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -225,7 +225,7 @@ struct Sidebar: View {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
         case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .pinned, .marfaTypes, .itemType, .project, .pinnedItem, .files: break
+        case .allNotes, .favorites, .marfaTypes, .itemType, .project, .favoriteItem, .files: break
         }
     }
 
@@ -284,13 +284,13 @@ private struct FolderNameField: View {
 #Preview("Grouped Sidebar") {
     let source = ItemPreviewFixtures.library
     let library = NoteLibrary(notes: source.notes, folders: [Folder(name: "Projects"), Folder(name: "Notes")], now: { ItemPreviewFixtures.date })
-    let _ = library.setPinned([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
+    let _ = library.setFavorite([ItemPreviewFixtures.projectID, ItemPreviewFixtures.ticketID], true)
     Sidebar(browser: Browser(), order: NoteOrder())
         .environment(library)
         .frame(width: 260, height: 740)
 }
 
-#Preview("Sidebar Without Pins") {
+#Preview("Sidebar Without Favorites") {
     Sidebar(browser: Browser(), order: NoteOrder())
         .environment(ItemPreviewFixtures.library)
         .frame(width: 260, height: 740)

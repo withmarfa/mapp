@@ -1,10 +1,10 @@
 import XCTest
 
-/// The places pinned at the sidebar's foot are a list sized to its rows, whose height follows the sidebar size
+/// The places fixed at the sidebar's foot are a list sized to its rows, whose height follows the sidebar size
 /// chosen in System Settings, so each size is checked.
 @MainActor
 final class SidebarSizeTests: XCTestCase {
-    func testThePinnedPlacesFitAtEverySidebarSize() {
+    func testThePlacesAtTheFootFitAtEverySidebarSize() {
         for size in ["1", "2", "3"] {
             let app = XCUIApplication()
             // Before the sample folder's flag, which takes no value.
