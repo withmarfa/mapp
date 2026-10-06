@@ -25,6 +25,9 @@ actor MarfaSync {
     private var wantsBin = false
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
     private var refreshed = false
+    /// Set when a drain threw as an answer expired the copy. The answers wait in the queue until the copy is
+    /// hydrated again, since the engine reads again the items they changed, which an expired copy refuses.
+    private var answersWaiting = false
     private var working: Task<Void, Never>?
     private var retry: Task<Void, Never>?
     private var failures = 0
@@ -240,6 +243,10 @@ actor MarfaSync {
         } else {
             try await hydrate()
         }
+        if answersWaiting {
+            answersWaiting = false
+            await takeAnswersFromQueue()
+        }
     }
 
     /// A drain on a copy never hydrated sends one write and then throws, losing that write's verdict, so it waits
@@ -271,8 +278,9 @@ actor MarfaSync {
             }
         } catch {
             // An answered write that expires the copy, a source move or a retype, is recorded before the drain
-            // throws, and the throw loses the report, so the answers are read from the queue instead.
-            if case MarfaError.copyExpired = error { await takeAnswersFromQueue() }
+            // throws, and the throw loses the report, so the answers are read from the queue instead, once the
+            // refresh this asks for has hydrated the copy again.
+            if case MarfaError.copyExpired = error { answersWaiting = true }
             await failed(error, retrying: .drain)
         }
     }

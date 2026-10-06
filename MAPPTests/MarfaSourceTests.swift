@@ -342,8 +342,8 @@ struct MarfaSourceOfflineTests {
     }
 
     /// A source move the server accepts expires the copy as the drain answers it, and the drain throws without its
-    /// report. The answers are read from the queue instead, so the person's write is answered and nothing queued is
-    /// lost when the copy hydrates again.
+    /// report. The answers are read from the queue instead, once the copy is hydrated again, so the person's write is
+    /// answered and nothing queued is lost.
     @Test(.timeLimit(.minutes(1)))
     func aCopyExpiredByAMoveKeepsEveryQueuedWriteAndTheView() async throws {
         let root = scratch()
@@ -876,6 +876,8 @@ extension LiveMarfaTests {
                 })
                 #expect(done.answer(to: move) == .accepted)
                 #expect(done.answer(to: tagged) == .accepted)
+                // The answers are told once the copy is hydrated again, so reading the moved ends fails nowhere.
+                #expect(!done.changes.contains { if case .unavailable = $0 { true } else { false } })
                 let moved = try #require(done.snapshot?.items.first { $0.id == child })
                 #expect(moved.edgesOut.contains { $0.target == .item(second) })
                 #expect(!moved.edgesOut.contains { $0.target == .item(first) })
