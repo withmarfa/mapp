@@ -161,6 +161,29 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
+    /// A few rows are read one by one; more are read in one list of the copy rather than a read each.
+    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] {
+        guard !items.isEmpty else { return [] }
+        let rows: [Marfa.Item]
+        do {
+            rows = try await MarfaEngine.asking(hub) { () async throws -> [Marfa.Item] in
+                if items.count <= 12 {
+                    var rows: [Marfa.Item] = []
+                    for id in items { if let row = try await copy.items.get(id.rawValue) { rows.append(row) } }
+                    return rows
+                }
+                return try await copy.items.list(ListFilters(allStates: true)).filter { items.contains(ItemID($0.id)) }
+            }
+        } catch let error as MarfaError {
+            throw SourceFailure(kind: .failed, message: error.message)
+        }
+        let catalogue = hub.catalogue
+        return rows.compactMap { row in
+            MarfaMapping.body(of: row, catalogue: catalogue)
+                .map { ItemBody(id: ItemID(row.id), text: $0, version: ItemVersion(row.version)) }
+        }
+    }
+
     func fileURL(of item: ItemID) async throws -> URL {
         let row = try await self.row(item)
         guard let hash = row.properties[MarfaMapping.blobField]?.string else {
@@ -173,9 +196,9 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
     }
 
-    /// Ids best match first, narrowed to `query` by what the copy holds, since the package filters one type at a
-    /// time and one state at a time.
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
+    /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
+    /// a time.
+    func search(_ text: String, in query: ItemQuery) async throws -> [ItemSearchHit] {
         var filters = SearchFilters(tags: query.tags.sorted(), beneath: query.beneath?.rawValue)
         if query.types.count == 1, query.includesSubtypes { filters.type = query.types.first?.rawValue }
         if query.states.count == 1, let state = query.states.first {
@@ -195,7 +218,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         return hits.compactMap { hit in
             let id = ItemID(hit.item.id)
             guard let item = items[id], query.matches(item, catalogue: catalogue, descendants: beneath) else { return nil }
-            return id
+            return ItemSearchHit(id: id, snippet: MarfaSnippet.plainText(hit.snippet))
         }
     }
 

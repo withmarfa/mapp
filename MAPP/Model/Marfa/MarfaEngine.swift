@@ -461,9 +461,14 @@ actor MarfaEngine {
                     touched.insert(parent.rawValue)
                 }
             } else {
+                // An edge's ends are read before it goes, since its delete names only the edge.
+                var ends: Set<String> = []
+                if case .unlink(let edgeID) = write, let edge = edges[edgeID.rawValue] {
+                    ends = [edge.sourceId, edge.targetId]
+                }
                 let queued = try await Self.asking(hub) { try await queue(write) }
                 record(id, queued)
-                touched = Set(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
+                touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
             }
             await reread(touched)
             await sync.drain()
@@ -519,7 +524,14 @@ actor MarfaEngine {
             case .active, .archived:
                 return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
-        case .retype, .retier, .move, .purge, .link, .unlink, .attach, .place:
+        case .link(let draft, _):
+            return [
+                try await copy.edges.create(
+                    from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+            ]
+        case .unlink(let edgeID):
+            return [try await copy.edges.delete(edgeID.rawValue)]
+        case .retype, .retier, .move, .purge, .attach, .place:
             throw NotYet()
         }
     }

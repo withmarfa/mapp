@@ -338,7 +338,7 @@ struct MarfaSourceLiveTests {
         #expect(projectItem.properties.allSatisfy { $0.key != "body" })
 
         let word = try #require(projectItem.title.split(separator: " ").first { $0.count > 3 }.map(String.init))
-        let found = try await source.search(word, in: ItemQuery(types: [MarfaMapping.projectType]))
+        let found = try await source.search(word, in: ItemQuery(types: [MarfaMapping.projectType])).map(\.id)
         #expect(found.contains(project))
         #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == MarfaMapping.projectType })
         let count = snapshot.items.count

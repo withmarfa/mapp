@@ -64,7 +64,8 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
     func submit(_ write: ItemWrite, as id: WriteID) {}
     func body(of item: ItemID) async throws -> ItemBody { throw SourceFailure(kind: .missing, message: "") }
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] { [] }
+    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
+    func search(_ text: String, in query: ItemQuery) async throws -> [ItemSearchHit] { [] }
     func endEditing(_ item: ItemID) {}
     func flush() async {}
     func close() async { record("close") }
