@@ -31,7 +31,6 @@ struct MainView: View {
     private var splitView: some View {
         // Every place keeps the same three columns; Marfa Types fills the list's and the note's with its page, so
         // the window never changes its columns (see MarfaTypesPage).
-        // Hidden navigation columns still publish the window title, so they follow Settings while it is open.
         NavigationSplitView {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
@@ -42,7 +41,7 @@ struct MainView: View {
                 if browser.showsTypes {
                     MarfaTypesView(part: types.list)
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(settings.isPresented ? settings.title : library.name(of: .marfaTypes))
+                        .navigationTitle(library.name(of: .marfaTypes))
                         .toolbar(removing: !settings.isPresented && browser.isSearchExpanded ? .title : nil)
                         .toolbar {
                             if !settings.isPresented {
@@ -57,7 +56,7 @@ struct MainView: View {
                             }
                         }
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane, settingsTitle: settings.isPresented ? settings.title : nil)
+                    NoteList(browser: browser, order: order, pane: $pane, settingsPresented: settings.isPresented)
                 }
             }
             .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)

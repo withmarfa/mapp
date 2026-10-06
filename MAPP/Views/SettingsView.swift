@@ -21,10 +21,15 @@ struct SettingsView: View {
             detail
                 .navigationSplitViewColumnWidth(min: 360, ideal: 640)
         }
-        .navigationTitle(presentation.title)
         .searchable(text: $presentation.query, placement: .sidebar, prompt: "Search Settings")
         .searchFocused($isSearchFocused)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(presentation.title)
+                    .font(.headline)
+                    .accessibilityIdentifier("SettingsTitle")
+            }
+            .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .navigation) {
                 Button("Back to MAPP", systemImage: "chevron.left") { presentation.close() }
                     .help("Back to MAPP")
@@ -63,6 +68,7 @@ struct SettingsView: View {
             }
         }
         .listStyle(.sidebar)
+        .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsSidebar")
     }
 
@@ -91,9 +97,11 @@ struct SettingsView: View {
             }
             .labelStyle(.titleOnly)
             .formStyle(.grouped)
+            .navigationTitle(pane.title)
             .accessibilityIdentifier("SettingsDetail")
         } else {
             ContentUnavailableView.search(text: presentation.query)
+                .navigationTitle("Settings")
         }
     }
 
