@@ -14,6 +14,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         let kind: Kind
         /// The type that declares the field, which is an ancestor for an inherited one.
         let declaredBy: TypeID
+        var required = false
+        var description: String?
         var id: String { key }
     }
 
@@ -25,12 +27,21 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let titleField: String?
     let bodyField: String?
     let parent: TypeID?
+    var description: String?
+    /// A files library's types have none.
+    var version: Int64?
+    var roles: [String] = []
+    /// The types this one is a structural superset of, so it can stand where they are accepted.
+    var compatibleWith: [TypeID] = []
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     enum End: Hashable, Sendable { case source, target }
 
     enum Cardinality: Hashable, Sendable { case one, many }
+
+    /// What deleting an item does to the item at the other end of one of its edges.
+    enum CascadeOnDelete: Hashable, Sendable { case cascade, orphan, block }
 
     let id: String
     let label: String
@@ -42,6 +53,11 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     /// The types each end may be; an empty set allows any.
     let sourceTypes: Set<TypeID>
     let targetTypes: Set<TypeID>
+    var description: String?
+    /// How many of this edge the end it is not written at may hold.
+    var reverseCardinality: Cardinality = .many
+    var cascadeOnDelete: CascadeOnDelete = .orphan
+    var properties: [ItemTypeInfo.Field] = []
 }
 
 nonisolated struct Catalogue: Hashable, Sendable {

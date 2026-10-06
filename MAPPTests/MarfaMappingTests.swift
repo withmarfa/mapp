@@ -90,6 +90,37 @@ struct MarfaMappingTests {
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
     }
 
+    @Test func typesCarryTheRestOfTheirDefinition() throws {
+        let catalogue = MarfaMapping.catalogue(
+            itemTypes: [
+                ItemType(
+                    id: "core.contact", label: "Contact", description: "A person.", version: 4,
+                    fields: [TypeField(name: "name", type: "string", required: true, description: "Full name", declaredBy: "core.contact")],
+                    roles: ["person"], compatibleWith: ["core.entity"])
+            ],
+            edgeTypes: [
+                EdgeType(
+                    id: "knows", label: "Knows", description: "Two people know each other.", cardinality: "one-to-many",
+                    reverseName: "known-by", writtenAt: .target, cascadeOnDelete: "block",
+                    properties: [TypeField(name: "since", type: "date", declaredBy: "knows")]),
+                EdgeType(id: "owns", cardinality: "many-to-one", cascadeOnDelete: "cascade"),
+                EdgeType(id: "next", cardinality: "one-to-one", cascadeOnDelete: "unknown")
+            ])
+        let contact = try #require(catalogue.itemTypes[TypeID("core.contact")])
+        #expect(contact.description == "A person." && contact.version == 4)
+        #expect(contact.roles == ["person"] && contact.compatibleWith == [TypeID("core.entity")])
+        #expect(contact.fields.first?.required == true && contact.fields.first?.description == "Full name")
+        let knows = try #require(catalogue.edgeTypes["knows"])
+        #expect(knows.description == "Two people know each other.")
+        // One source per target, many targets per source, written at the target: the target holds one.
+        #expect(knows.cardinality == .one && knows.reverseCardinality == .many)
+        #expect(knows.cascadeOnDelete == .block)
+        #expect(knows.properties.map(\.key) == ["since"] && knows.properties.first?.kind == .date)
+        let owns = try #require(catalogue.edgeTypes["owns"])
+        #expect(owns.cardinality == .one && owns.reverseCardinality == .many && owns.cascadeOnDelete == .cascade)
+        #expect(catalogue.edgeTypes["next"]?.cascadeOnDelete == .orphan)
+    }
+
     @Test func theSliceNamesEveryNamespaceButTheServersOwn() {
         #expect(MarfaMapping.namespaces(of: Self.catalogue) == ["aic.*", "core.*"])
         #expect(MarfaMapping.namespaces(of: Catalogue()).isEmpty)

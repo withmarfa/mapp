@@ -22,12 +22,16 @@ nonisolated enum MarfaMapping {
     static func itemType(_ type: Marfa.ItemType) -> ItemTypeInfo {
         ItemTypeInfo(
             id: TypeID(type.id), label: type.label ?? type.id,
-            fields: type.fields.map { field in
-                ItemTypeInfo.Field(
-                    key: field.name, label: label(forField: field.name), kind: kind(of: field),
-                    declaredBy: TypeID(field.declaredBy))
-            },
-            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) })
+            fields: type.fields.map(field),
+            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) },
+            description: type.description, version: type.version, roles: type.roles,
+            compatibleWith: type.compatibleWith.map { TypeID($0) })
+    }
+
+    private static func field(_ field: Marfa.TypeField) -> ItemTypeInfo.Field {
+        ItemTypeInfo.Field(
+            key: field.name, label: label(forField: field.name), kind: kind(of: field),
+            declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description)
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {
@@ -35,10 +39,21 @@ nonisolated enum MarfaMapping {
         // side of it allows.
         let ends = type.cardinality.split(separator: "-to-").map(String.init)
         let held = type.writtenAt == .target ? ends.first : ends.last
+        let other = type.writtenAt == .target ? ends.last : ends.first
         return EdgeTypeInfo(
             id: type.id, label: type.label ?? type.id, reverseName: type.reverseName,
             cardinality: held == "one" ? .one : .many, writtenAt: type.writtenAt == .target ? .target : .source,
-            sourceTypes: constraints(type.sourceTypeConstraints), targetTypes: constraints(type.targetTypeConstraints))
+            sourceTypes: constraints(type.sourceTypeConstraints), targetTypes: constraints(type.targetTypeConstraints),
+            description: type.description, reverseCardinality: other == "one" ? .one : .many,
+            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map(field))
+    }
+
+    private static func cascade(_ name: String) -> EdgeTypeInfo.CascadeOnDelete {
+        switch name {
+        case "cascade": .cascade
+        case "block": .block
+        default: .orphan
+        }
     }
 
     private static func constraints(_ names: [String]) -> Set<TypeID> {
