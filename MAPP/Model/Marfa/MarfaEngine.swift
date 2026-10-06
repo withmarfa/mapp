@@ -24,11 +24,17 @@ actor MarfaEngine {
         /// Closes, as `close` does, only if every write not sent, read from the queue in the same step, is one
         /// of those agreed to; nil agrees to whatever the copy holds.
         case closeAgreeing(UnsentWrites?, CheckedContinuation<CloseOutcome, Never>)
+        /// The server's bin as `MarfaSync` read it, which the copy never holds; `complete` where every page was read.
+        case binned([Marfa.Item], complete: Bool)
+        /// The verdict on a write made at the server at once rather than queued, such as a purge.
+        case answer(WriteID, WriteOutcome)
+        /// Attaches a file, which the package queues as an upload, a file item and an edge.
+        case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
     }
 
-    /// A write the package does not offer yet, or this source does not make yet.
-    private nonisolated struct NotYet: Error {
-        var message = MarfaEngine.notYet
+    /// A write only a files library makes, such as a move, or one the type cannot take.
+    private nonisolated struct Unsupported: Error {
+        var message = MarfaEngine.filesOnly
     }
 
     /// The person's latest edit of an item's text, and the version of the item their own writes account for: the
@@ -38,12 +44,16 @@ actor MarfaEngine {
         var on: Int64
     }
 
-    nonisolated static var notYet: String {
-        String(localized: "This change can’t be made in a Marfa library yet.")
+    nonisolated static var filesOnly: String {
+        String(localized: "This change can’t be made in a Marfa library.")
     }
 
     nonisolated static var notCurrent: String {
         String(localized: "This library is being brought up to date. Try again in a moment.")
+    }
+
+    nonisolated static var closedLibrary: String {
+        String(localized: "This library is closed.")
     }
 
     nonisolated static var noText: String {
@@ -56,6 +66,13 @@ actor MarfaEngine {
     private let tell: @Sendable (Event) -> Bool
     private var catalogue = Catalogue()
     private var rows: [String: Marfa.Item] = [:]
+    /// Rows the server holds in its bin that the copy does not: Recently Deleted's items once their delete is
+    /// answered, which the copy lets go of. Read from the server, kept as it last said and as the copy last held.
+    private var binned: [String: Marfa.Item] = [:]
+    /// Binned rows whose restore is queued: shown nowhere until the server answers, then in the copy or back in the bin.
+    private var restoring: [String: Marfa.Item] = [:]
+    /// What each item's text names, read by the package from the copy, for the items whose text can name anything.
+    private var bodyLinks: [String: BodyLinks] = [:]
     private var edges: [String: Marfa.Edge] = [:]
     /// The edges touching each row, so mapping an item reads its own edges rather than every edge.
     private var edgesByItem: [String: Set<String>] = [:]
@@ -115,12 +132,18 @@ actor MarfaEngine {
                 if case .release(_, let done) = event { done.resume(returning: .success(false)) }
                 if case .unsent(let done) = event { done.resume(returning: nil) }
                 if case .closeAgreeing(_, let done) = event { done.resume(returning: .closed) }
+                if case .attach(_, _, let done) = event {
+                    done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
+                }
                 continue
             }
             switch event {
             case .paint: await paint()
             case .write(let write, let id): await perform(write, as: id)
             case .change(let change): await handle(change)
+            case .binned(let found, let complete): take(bin: found, complete: complete)
+            case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
+            case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
             case .drained(let report, let taken):
                 await answer(report)
                 taken.resume()
@@ -218,13 +241,61 @@ actor MarfaEngine {
             return
         }
         let gone = Set(self.rows.keys).subtracting(rows.keys)
+        let departed = self.rows.filter { gone.contains($0.key) }.values
         self.catalogue = catalogue
         self.rows = rows
         self.edges = [:]
         edgesByItem = [:]
         for edge in edges { insert(edge) }
+        binned = binned.filter { rows[$0.key] == nil }
+        for row in departed { await left(row) }
+        bodyLinks = [:]
+        for row in rows.values where Self.mayName(row, catalogue: catalogue) { await readLinks(of: row) }
         await readQueue()
-        publish(Set(rows.keys).union(gone).map { ItemID($0) }, catalogueChanged: true)
+        publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
+    }
+
+    /// A row that left the copy: one in the bin went there with its delete answered, so Recently Deleted keeps it,
+    /// as the copy last held it, until the server's bin is read; any other was deleted elsewhere or fell out of the
+    /// slice, which may have put it in the bin, so the bin is read again.
+    private func left(_ row: Marfa.Item) async {
+        bodyLinks[row.id] = nil
+        guard restoring[row.id] == nil else { return }
+        if row.state == .trashed { binned[row.id] = row }
+        await sync.binChanged()
+    }
+
+    /// Whether an item's text can hold a link or an embed: a `[[link]]` or an `![](embed)`. The package reads each
+    /// body from the copy one at a time, so the items that cannot are not asked.
+    static func mayName(_ row: Marfa.Item, catalogue: Catalogue) -> Bool {
+        guard let body = MarfaMapping.body(of: row, catalogue: catalogue) else { return false }
+        return body.contains("[[") || body.contains("![")
+    }
+
+    /// Asks the package what the item's text names, from the copy alone.
+    private func readLinks(of row: Marfa.Item) async {
+        guard Self.mayName(row, catalogue: catalogue) else {
+            bodyLinks[row.id] = nil
+            return
+        }
+        do {
+            bodyLinks[row.id] = try await Self.asking(hub) { try await copy.items.links(in: row.id) }
+        } catch {
+            // An item the copy cannot name links for shows the edges it holds, and no more.
+            bodyLinks[row.id] = nil
+        }
+    }
+
+    /// The items whose links named nothing, or nothing yet, which a drain, a catch-up or a new item may have
+    /// settled: those whose links now read differently.
+    private func settledLinks() async -> Set<String> {
+        var changed: Set<String> = []
+        for (id, links) in bodyLinks where (links.links + links.embeds).contains(where: { !$0.target.isItem }) {
+            guard let row = rows[id] else { continue }
+            await readLinks(of: row)
+            if bodyLinks[id] != links { changed.insert(id) }
+        }
+        return changed
     }
 
     /// Reads again the rows named, with every edge they hold or are held by.
@@ -239,7 +310,15 @@ actor MarfaEngine {
                     }
                     return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
                 }
+                let previous = rows[id]
                 rows[id] = row
+                if let row {
+                    binned[id] = nil
+                    await readLinks(of: row)
+                } else {
+                    bodyLinks[id] = nil
+                    if let previous { await left(previous) }
+                }
                 for edgeID in edgesByItem[id] ?? [] {
                     if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
                 }
@@ -253,6 +332,28 @@ actor MarfaEngine {
         }
         await readQueue()
         publish(affected.map { ItemID($0) })
+    }
+
+    /// The server's bin, as the copy last said it: what it holds is the copy's to say, so only the rest is kept,
+    /// and a restore waiting for its answer keeps its row hidden.
+    private func take(bin found: [Marfa.Item], complete: Bool) {
+        var next: [String: Marfa.Item] = complete ? [:] : binned
+        for row in found where rows[row.id] == nil && restoring[row.id] == nil && row.state == .trashed {
+            next[row.id] = row
+        }
+        let changed = Set(binned.keys).union(next.keys).filter { binned[$0] != next[$0] }
+        guard !changed.isEmpty else { return }
+        binned = next
+        publish(changed.map { ItemID($0) })
+    }
+
+    /// An item the server destroyed leaves the copy and the bin.
+    private func purged(_ id: String?) async {
+        guard let id else { return await reload() }
+        rows[id] = nil
+        binned[id] = nil
+        restoring[id] = nil
+        await reread([id])
     }
 
     /// A queue that cannot be read leaves each item's sync as it was, rather than settling it.
@@ -302,6 +403,7 @@ actor MarfaEngine {
     /// Maps `ids` again and tells readers what differs: the first time, everything as `.loaded`. Failures gathered
     /// on the way follow as `.unavailable`.
     private func publish(_ ids: some Sequence<ItemID>, catalogueChanged: Bool = false) {
+        hub.setBinned(binned)
         let copies = conflictedCopies()
         settleConflicts(copies)
         let ids = Set(ids).union(changedSync)
@@ -311,14 +413,14 @@ actor MarfaEngine {
         var removed: [ItemID] = []
         var bodyChanged: [(ItemID, ItemVersion)] = []
         for id in ids {
-            guard let row = rows[id.rawValue] else {
+            guard let row = rows[id.rawValue] ?? binned[id.rawValue] else {
                 if items.removeValue(forKey: id) != nil { removed.append(id) }
                 bodies[id] = nil
                 continue
             }
             let held = (edgesByItem[row.id] ?? []).compactMap { edges[$0] }.sorted { $0.createdAt < $1.createdAt }
             let item = MarfaMapping.item(
-                row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled,
+                row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled, bodyLinks: bodyLinks[row.id],
                 isHeld: { self.rows[$0] != nil })
             let body = MarfaMapping.body(of: row, catalogue: catalogue)?.hashValue ?? 0
             if let previous = bodies[id], previous != body { bodyChanged.append((id, item.version)) }
@@ -436,14 +538,12 @@ actor MarfaEngine {
         switch change.origin {
         // This engine makes every local write and hears every drain's answers from `MarfaSync`.
         case .local, .answered, .refreshed(.drained): break
-        case .server(let event, _):
-            switch event {
-            case "server.reachable": await sync.reachable()
-            case "server.unreachable": await sync.unreachable(change.reason)
-            default:
-                await sync.heard()
-                await reread(change)
-            }
+        case .serverReachable: await sync.reachable()
+        case .serverUnreachable(let error): await sync.unreachable(error.message)
+        case .server:
+            await sync.heard()
+            await reread(change)
+        case .refreshed(.purged): await purged(change.itemId)
         case .saved, .refreshed: await reload()
         case .stopped(let error): await sync.stopped(error)
         }
@@ -465,6 +565,10 @@ actor MarfaEngine {
     // MARK: Writing
 
     private func perform(_ write: ItemWrite, as id: WriteID) async {
+        if case .purge(let item, let version) = write {
+            purge(item, at: version, as: id)
+            return
+        }
         do {
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
@@ -487,7 +591,7 @@ actor MarfaEngine {
             }
             await reread(touched)
             await sync.drain()
-        } catch let error as NotYet {
+        } catch let error as Unsupported {
             hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message))))
         } catch let error as MarfaError {
             // Refused before it was queued, such as a property the type does not allow: nothing is waiting.
@@ -521,16 +625,16 @@ actor MarfaEngine {
             preconditionFailure("a create is queued by perform(_:as:)")
         case .editBody(let id, let text, let base, let merge):
             guard let bodyField = MarfaMapping.bodyField(of: catalogue.itemTypes[try itemType(of: id)]) else {
-                throw NotYet(message: Self.noText)
+                throw Unsupported(message: Self.noText)
             }
-            let properties: [String: JSONValue] = [bodyField: .string(text)]
+            let properties = Edit.Properties.merge(JSONObject([(bodyField, .string(text))]))
             // Read before the edit is sent: an answer that lands during the send is not in the version it was sent
             // on, so it is counted later, as it comes.
             let answeredBefore = merge == .following && ownText[id] != nil ? [] : try await answeredWrites(of: id)
             let queued: Marfa.QueuedWrite
             switch merge {
             case .ifUnchanged:
-                queued = try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
+                queued = try await copy.items.update(id.rawValue, Edit(properties, baseVersion: base.rawValue))
             case .asRead:
                 queued = try await send(id, properties) { base.rawValue }
             case .following:
@@ -541,8 +645,11 @@ actor MarfaEngine {
             counted.formUnion(answeredBefore)
             return [queued]
         case .editProperties(let id, let changes, let base, _):
-            let properties = changes.mapValues { $0.map(MarfaMapping.json) ?? .null }
-            return [try await send(id, properties) { base.rawValue }]
+            return [try await send(id, try properties(editing: id, by: changes)) { base.rawValue }]
+        case .retype(let id, let type, let base):
+            return [try await send(id, .merge(JSONObject()), type: type.rawValue) { base.rawValue }]
+        case .retier(let id, let tier, let base):
+            return [try await send(id, .merge(JSONObject()), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
         case .tag(let id, let tag, let on):
             return [
                 on ? try await copy.tags.add(tag, to: id.rawValue) : try await copy.tags.remove(tag, from: id.rawValue)
@@ -550,8 +657,16 @@ actor MarfaEngine {
         case .transition(let id, let state):
             switch state {
             case .trashed: return [try await copy.items.delete(id.rawValue)]
-            case .active where rows[id.rawValue]?.state == .trashed:
-                return [try await copy.items.restore(id.rawValue)]
+            case .active where rows[id.rawValue]?.state == .trashed || rows[id.rawValue] == nil:
+                // A row the copy lets go of after its delete is answered is restored by its id, and shown nowhere
+                // until the server answers.
+                let row = binned[id.rawValue]
+                let queued = try await copy.items.restore(id.rawValue)
+                if let row {
+                    binned[id.rawValue] = nil
+                    restoring[id.rawValue] = row
+                }
+                return [queued]
             case .active, .archived:
                 return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
@@ -562,8 +677,10 @@ actor MarfaEngine {
             ]
         case .unlink(let edgeID):
             return [try await copy.edges.delete(edgeID.rawValue)]
-        case .retype, .retier, .move, .purge, .attach, .place:
-            throw NotYet()
+        case .purge:
+            preconditionFailure("a purge is made at the server by perform(_:as:)")
+        case .move, .place:
+            throw Unsupported()
         }
     }
 
@@ -571,7 +688,7 @@ actor MarfaEngine {
     /// no body field is refused rather than dropped.
     private func create(_ id: ItemID, _ draft: ItemDraft) async throws -> Marfa.QueuedWrite {
         let info = catalogue.itemTypes[draft.type]
-        var properties = draft.properties.mapValues(MarfaMapping.json)
+        var properties = JSONObject(draft.properties.sorted { $0.key < $1.key }.map { ($0.key, MarfaMapping.json($0.value)) })
         var body = draft.body
         if let titleField = MarfaMapping.titleField(of: info) {
             properties[titleField] = .string(draft.title)
@@ -579,7 +696,7 @@ actor MarfaEngine {
             body = body.isEmpty ? draft.title : draft.title + "\n\n" + body
         }
         if !body.isEmpty {
-            guard let bodyField = MarfaMapping.bodyField(of: info) else { throw NotYet(message: Self.noText) }
+            guard let bodyField = MarfaMapping.bodyField(of: info) else { throw Unsupported(message: Self.noText) }
             properties[bodyField] = .string(body)
         }
         return try await copy.items.create(
@@ -602,13 +719,91 @@ actor MarfaEngine {
         }
     }
 
+    /// Destroys an item in the bin at the server, which the package does only at once and only for an item whose
+    /// writes have all been sent, so the writes submitted before it go first. It runs beside the engine, which
+    /// takes no call to the server, and its verdict arrives as an event. The copy and the bin follow from the
+    /// copy's own word that the item was purged.
+    private func purge(_ id: ItemID, at version: ItemVersion, as write: WriteID) {
+        Task { [copy, hub, sync, tell] in
+            await sync.flush()
+            let outcome: WriteOutcome
+            do {
+                try await Self.asking(hub) { try await copy.items.purge(id.rawValue, version: version.rawValue) }
+                outcome = .accepted
+            } catch let error as MarfaError {
+                outcome = .refused(Self.problem(for: error))
+            } catch {
+                outcome = .refused(SyncProblem(code: "failed", message: error.localizedDescription))
+            }
+            _ = tell(.answer(write, outcome))
+        }
+    }
+
+    /// The package queues the upload, the file's item and its edge to this one, and says what to write in the text
+    /// to embed it. The title is the file's name unless another attachment of the item has it, since an embed must
+    /// name one file alone; the text itself is the page's to place, and the editor saves it as it does any typing.
+    private func attach(_ file: URL, to id: ItemID) async -> Result<Embed, SourceFailure> {
+        do {
+            guard let row = rows[id.rawValue], row.state == .active || row.state == .archived else {
+                throw SourceFailure(kind: .missing, message: String(localized: "This item isn’t in the library."))
+            }
+            let title = attachmentTitle(for: file, on: row)
+            let attached = try await Self.asking(hub) {
+                try await copy.items.attach(to: id.rawValue, file: file, Attachment(title: title))
+            }
+            await reread(Set([id.rawValue] + [attached.item.itemId].compactMap(\.self)))
+            await sync.drain()
+            guard let embed = attached.embed, let name = Self.embeddedName(embed) else {
+                throw SourceFailure(
+                    kind: .failed,
+                    message: String(localized: "The file was attached, but its name can’t be written into the text."))
+            }
+            return .success(Embed(link: Self.link(to: name), name: name))
+        } catch let error as SourceFailure {
+            return .failure(error)
+        } catch {
+            return .failure(Self.failure(error))
+        }
+    }
+
+    /// The file's name, or that name with a number when another attachment of the item already has it.
+    private func attachmentTitle(for file: URL, on host: Marfa.Item) -> String {
+        let taken = Set(
+            (edgesByItem[host.id] ?? []).compactMap { edges[$0] }
+                .filter { $0.edgeType == MarfaMapping.attachmentEdge && $0.targetId == host.id }
+                .compactMap { rows[$0.sourceId]?.title?.lowercased() })
+        let name = file.lastPathComponent
+        let stem = file.deletingPathExtension().lastPathComponent
+        let ext = file.pathExtension
+        var title = name
+        var number = 1
+        while taken.contains(title.lowercased()) {
+            number += 1
+            title = ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)"
+        }
+        return title
+    }
+
+    /// The name inside `![[name]]`, which the package writes for an embed.
+    nonisolated static func embeddedName(_ embed: String) -> String? {
+        guard embed.hasPrefix("![["), embed.hasSuffix("]]"), embed.count > 5 else { return nil }
+        return String(embed.dropFirst(3).dropLast(2))
+    }
+
+    /// The name as a markdown destination: the page writes `![name](link)`, and the core reads the percent
+    /// escapes of a path back to the name.
+    nonisolated static func link(to name: String) -> String {
+        name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+    }
+
     /// An edit is sent on the version of the text it was typed on: as an ordinary update where the copy holds that
     /// version, and otherwise said to be read there, so the server merges it against what was read rather than
     /// laying it over a change the person never saw (queue-and-verdicts 43). An edit queued behind the person's own
     /// on the version the copy holds moves onto that edit's answer (42). The copy moves as answers and catch-ups
     /// land, so the version is decided against one reading of the copy, and again if the copy moved meanwhile.
     private func send(
-        _ id: ItemID, _ properties: [String: JSONValue], typedOn: () async throws -> Int64
+        _ id: ItemID, _ properties: Edit.Properties, type: String? = nil, tier: Marfa.Tier? = nil,
+        typedOn: () async throws -> Int64
     ) async throws -> Marfa.QueuedWrite {
         var attempt = 0
         while true {
@@ -616,7 +811,7 @@ actor MarfaEngine {
             let held = try await heldVersion(id)
             let version = try await typedOn()
             let steady = try await heldVersion(id) == held && version <= held
-            let edit = Edit(properties: properties, baseVersion: version)
+            let edit = Edit(properties, baseVersion: version, type: type, tier: tier)
             do {
                 if steady, version < held {
                     let queued = try await copy.items.updateAsRead(id.rawValue, edit)
@@ -628,6 +823,27 @@ actor MarfaEngine {
                 continue
             }
         }
+    }
+
+    /// A property is given a value or taken away. A merge keeps a property it names no value for, and a null clears
+    /// nothing, so taking one away replaces the item's properties with those it holds less that one.
+    private func properties(editing id: ItemID, by changes: [String: PropertyValue?]) throws -> Edit.Properties {
+        func clears(_ value: PropertyValue?) -> Bool {
+            guard let value else { return true }
+            return value == .null
+        }
+        let given = changes.sorted { $0.key < $1.key }.compactMap { key, value -> (String, JSONValue)? in
+            guard let value, !clears(value) else { return nil }
+            return (key, MarfaMapping.json(value))
+        }
+        let cleared = changes.filter { clears($0.value) }.keys
+        guard !cleared.isEmpty else { return .merge(JSONObject(given)) }
+        guard var whole = rows[id.rawValue]?.properties else {
+            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
+        }
+        for key in cleared { whole.removeValue(forKey: key) }
+        for (key, value) in given { whole[key] = value }
+        return .replace(whole)
     }
 
     /// The version an edit that follows the person's last edit of the text was typed on: the version their own
@@ -709,6 +925,13 @@ actor MarfaEngine {
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
+                if answer.kind == .restoreItem, let row = restoring.removeValue(forKey: itemID) {
+                    // Taken, the item arrives in the copy; otherwise it is still in the bin.
+                    switch outcome {
+                    case .accepted, .merged: break
+                    default: binned[itemID] = row
+                    }
+                }
             }
             if case .conflicted(let sibling, _) = outcome {
                 ids.insert(sibling.rawValue)
@@ -716,7 +939,7 @@ actor MarfaEngine {
             }
             answered(answer.id, outcome)
         }
-        await reread(ids)
+        await reread(ids.union(await settledLinks()))
         if let queued = try? await copy.queue.all() {
             for raw in Set(report.verdicts.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
                 try? await count(answers: queued, for: ItemID(raw))

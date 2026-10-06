@@ -88,6 +88,10 @@ nonisolated enum EdgeTarget: Hashable, Sendable {
     case item(ItemID)
     /// A reference no item answers to, or more than one does, kept as spelled so it can be shown and fixed.
     case unresolved(spelling: String, ambiguous: Bool)
+    /// Not looked up on the server yet, which a later sync does.
+    case pending(spelling: String)
+    /// The server refused the lookup or the write of the edge.
+    case refused(spelling: String, reason: String)
 }
 
 nonisolated enum EdgeOrigin: Hashable, Sendable {

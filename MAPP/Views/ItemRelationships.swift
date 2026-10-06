@@ -88,6 +88,8 @@ struct ItemTargetRow: View {
         switch target.resolution {
         case .ambiguous: String(localized: "More than one item matches")
         case .missing: String(localized: "Item not found")
+        case .pending: String(localized: "Not looked up yet")
+        case .refused: String(localized: "The server refused this link")
         case .resolved: String(localized: "Item unavailable")
         }
     }

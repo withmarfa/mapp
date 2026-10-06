@@ -115,7 +115,8 @@ import Observation
     }
 
     /// Purge needs the server, so it is offered only while the server can be reached. Moving, renaming files,
-    /// folders and importing are a files library's.
+    /// folders and importing are a files library's: the package attaches a file to an item, and has no call that
+    /// makes a file item of its own.
     var capabilities: SourceCapabilities {
         var offered = source.capabilities.intersection([.archive, .retype, .retier, .purge])
         if connection != .online { offered.remove(.purge) }

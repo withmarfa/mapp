@@ -1,5 +1,4 @@
 import Foundation
-import UniformTypeIdentifiers
 
 nonisolated struct ItemDraft: Hashable, Sendable {
     var type: TypeID
@@ -18,11 +17,6 @@ nonisolated struct EdgeDraft: Hashable, Sendable {
     var type: String
     var source: ItemID
     var target: ItemID
-}
-
-nonisolated enum AttachmentSource: Hashable, Sendable {
-    case file(URL)
-    case data(Data, name: String, type: UTType)
 }
 
 nonisolated enum BodyMerge: Hashable, Sendable {
@@ -54,10 +48,10 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case retier(ItemID, Tier, base: ItemVersion)
     case move(ItemID, to: ContainerID?)
     case transition(ItemID, ItemState)
-    case purge(ItemID)
+    /// Sent at the version the person was shown, so an item changed elsewhere since is refused rather than erased.
+    case purge(ItemID, version: ItemVersion)
     case tag(ItemID, String, on: Bool)
     case link(EdgeDraft, undoing: WriteID?)
     case unlink(EdgeID)
-    case attach(ItemID, AttachmentSource)
     case place(PlaceWrite)
 }

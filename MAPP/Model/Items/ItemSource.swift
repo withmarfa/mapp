@@ -56,9 +56,8 @@ nonisolated struct Embed: Hashable, Sendable {
 }
 
 nonisolated protocol EmbedResolver: Sendable {
-    /// The base the page resolves the item's relative references against.
-    func base(for item: ItemID) -> String
-    func resolve(_ reference: String, from item: ItemID) async -> URL?
+    /// Attaches each file to the item and says what the page writes in its text to show it. A failure means no
+    /// text is to be written, though files already attached may remain.
     func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
 }
 

@@ -6,11 +6,14 @@ import UniformTypeIdentifiers
 nonisolated enum MarfaMapping {
     static let fileType = TypeID("core.file")
     static let projectType = TypeID("aic.project")
-    /// The core.file fields naming the bytes and their kind.
+    /// The core.file fields naming the bytes, their kind and their length, which the server sets.
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
+    static let sizeField = "size_bytes"
     /// Marfa's folder device writes a body link as this edge, so it reads as the body's, not a property's.
     static let bodyLinkEdge = "references"
+    /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.
+    static let attachmentEdge = "attached-to"
     static let parentEdge = "parent-of"
 
     // MARK: Catalogue
@@ -99,9 +102,11 @@ nonisolated enum MarfaMapping {
 
     // MARK: Items
 
+    /// `bodyLinks` are what the item's text names, read by the package: the links and embeds that name no item,
+    /// or none yet, are shown as such beside the edges the copy holds for those that do.
     static func item(
         _ row: Marfa.Item, edges: [Marfa.Edge], catalogue: Catalogue, sync: SyncState = .settled,
-        isHeld: (String) -> Bool
+        bodyLinks: BodyLinks? = nil, isHeld: (String) -> Bool
     ) -> Item {
         let type = TypeID(row.type)
         let info = catalogue.itemTypes[type]
@@ -115,20 +120,20 @@ nonisolated enum MarfaMapping {
             title = firstLine(of: body)
             titleRule = .firstLine
         }
-        var properties = row.properties
-        if let bodyField = bodyField(of: info) { properties[bodyField] = nil }
-        // A merge edit cannot take a property away, so one cleared is sent as null and reads as absent.
-        properties = properties.filter { $0.value != .null }
+        let bodyField = bodyField(of: info)
+        // The server answers the properties in the order it keeps them, which is the order shown.
+        let properties = row.properties.filter { $0.key != bodyField }.map { Property(key: $0.key, value: value($0.value)) }
         let created = date(row.createdAt)
         let modified = date(row.updatedAt)
         let state = self.state(row.state)
+        var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
+        edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
         return Item(
-            id: ItemID(row.id), type: type, title: title, titleRule: titleRule,
-            properties: catalogue.ordered(properties.mapValues(value), for: type),
+            id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
-            created: created, modified: modified, trashed: state == .trashed ? modified : nil,
-            edgesOut: edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld), sync: sync)
+            created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
+            sync: sync)
     }
 
     /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads
@@ -167,6 +172,30 @@ nonisolated enum MarfaMapping {
                 id: EdgeID(edge.id), type: name, source: ItemID(id), target: .item(ItemID(other)),
                 origin: edge.edgeType == bodyLinkEdge ? .body : .property(name))
         }
+    }
+
+    /// The links and embeds of a body that name no item the copy can show: none yet, none at all, more than one, or
+    /// one the server refused. Those that name an item are the copy's own edges, which `edgesOut` reads. Each
+    /// is given an identifier of its own, from the item and its place in the body, so a list of them is stable.
+    static func unresolvedLinks(of id: String, in bodyLinks: BodyLinks?) -> [Edge] {
+        guard let bodyLinks else { return [] }
+        var found: [Edge] = []
+        for (kind, names) in [(bodyLinkEdge, bodyLinks.links), (attachmentEdge, bodyLinks.embeds)] {
+            for (position, name) in names.enumerated() {
+                let target: EdgeTarget
+                switch name.target {
+                case .item: continue
+                case .pending: target = .pending(spelling: name.name)
+                case .missing: target = .unresolved(spelling: name.name, ambiguous: false)
+                case .ambiguous: target = .unresolved(spelling: name.name, ambiguous: true)
+                case .refused(let reason): target = .refused(spelling: name.name, reason: reason)
+                }
+                found.append(Edge(
+                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, source: ItemID(id), target: target,
+                    origin: .body))
+            }
+        }
+        return found
     }
 
     static func state(_ state: Marfa.ItemState) -> ItemState {
@@ -210,7 +239,7 @@ nonisolated enum MarfaMapping {
         case .number(let number): .number(Decimal(string: "\(number)") ?? Decimal(number))
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(self.value))
-        case .object(let object): .object(object.mapValues(self.value))
+        case .object(let object): .object(Dictionary(object.map { ($0.key, self.value($0.value)) }, uniquingKeysWith: { first, _ in first }))
         }
     }
 
@@ -226,7 +255,7 @@ nonisolated enum MarfaMapping {
             }
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(json))
-        case .object(let object): .object(object.mapValues(json))
+        case .object(let object): .object(JSONObject(object.sorted { $0.key < $1.key }.map { ($0.key, json($0.value)) }))
         }
     }
 
@@ -234,8 +263,9 @@ nonisolated enum MarfaMapping {
         let type = TypeID(row.type)
         guard type == fileType || catalogue.isSubtype(type, ofAnyOf: [fileType]) else { return .markdown }
         let mimeType = row.properties[mimeTypeField]?.string
-        // Marfa's file items do not carry their size; the blob holds it once fetched.
-        return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: 0)
+        // The server stamps the length once it holds the bytes, so an item still waiting to send them has none.
+        let size = row.properties[sizeField].flatMap { $0.integer ?? $0.number.map { Int64($0) } }
+        return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: size ?? 0)
     }
 
     private static func firstLine(of body: String) -> String {
@@ -374,5 +404,12 @@ nonisolated enum MarfaMapping {
             Place(id: .marfaTypes, title: String(localized: "Marfa Types"), symbol: "cube", section: .footer, query: nil)
         ]
         return places
+    }
+}
+
+extension BodyTarget {
+    /// Whether the link or embed names an item, which the copy then holds an edge for.
+    nonisolated var isItem: Bool {
+        if case .item = self { true } else { false }
     }
 }

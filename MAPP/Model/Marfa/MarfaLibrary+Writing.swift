@@ -123,29 +123,20 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
-    /// The copy restores only what it still holds: an item whose delete the server has taken leaves the copy for
-    /// the server's bin.
+    /// An item whose delete the server has taken is in the server's bin, which the source lists with the items the
+    /// copy still holds, so it is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
         for id in ids { if item(id)?.state == .trashed { changes[id] = (.trashed, .active) } }
         setStates(changes, name: String(localized: "Recover"), undoManager: undoManager)
     }
 
-    /// A delete the server has taken leaves the copy, and the copy cannot bring an item back from the server's
-    /// bin yet, so an undo that would is refused here, in the person's words.
     func setStates(_ changes: [ItemID: (from: ItemState, to: ItemState)], name: String, undoManager: UndoManager?) {
-        var changes = changes
-        let binned = changes.filter { $0.value.from == .trashed && item($0.key) == nil }.map(\.key)
-        let cantRecover = String(localized: "Can’t Recover")
-        let inTheBin = String(localized: "It’s in the Marfa server’s bin, which this Mac can’t bring items back from yet.")
-        if !binned.isEmpty {
-            for id in binned { changes[id] = nil }
-            failure = (cantRecover, inTheBin)
-        }
+        let changes = changes.filter { item($0.key) != nil }
         guard !changes.isEmpty else { return }
         for (id, change) in changes {
             if change.from == .trashed {
-                submit(.transition(id, change.to), failing: cantRecover, notHeld: inTheBin)
+                submit(.transition(id, change.to), failing: String(localized: "Can’t Recover"))
             } else {
                 submit(.transition(id, change.to), failing: String(localized: "Couldn’t Make This Change"))
             }
@@ -156,42 +147,47 @@ extension MarfaLibrary {
         }
     }
 
-    /// Only where `capabilities` has `purge`, which the source does not offer yet; the person is told rather than
-    /// left to wonder.
+    /// Destroys items in the bin at the server, which only a server that can be reached does, so it is only where
+    /// `capabilities` has `purge`. It is sent at the version the person was shown.
     func deletePermanently(_ ids: Set<ItemID>) {
         notesToPurge.subtract(ids)
-        let trashed = ids.filter { item($0)?.state == .trashed }
         guard capabilities.contains(.purge) else {
-            failure = (String(localized: "Can’t Delete Immediately"), MarfaEngine.notYet)
+            failure = (
+                String(localized: "Can’t Delete Immediately"),
+                String(localized: "The Marfa server can’t be reached. The items are still in Recently Deleted."))
             return
         }
-        for id in trashed { submit(.purge(id), failing: String(localized: "Can’t Delete Immediately")) }
+        for id in ids {
+            guard let item = item(id), item.state == .trashed else { continue }
+            submit(.purge(id, version: item.version), failing: String(localized: "Can’t Delete Immediately"))
+        }
     }
 
     // MARK: What only files have
 
-    func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager?) { notYet() }
-    func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?) { notYet() }
-    func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) { notYet() }
+    func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager?) { filesOnly() }
+    func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?) { filesOnly() }
+    func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) { filesOnly() }
     func consumeImportCompletion(_ requestID: UUID) {}
 
     /// The views offer folders only where `capabilities` has them, so this answers a folder the library never
     /// holds.
     @discardableResult
     func newFolder(undoManager: UndoManager?) -> Folder {
-        notYet()
+        filesOnly()
         return Folder(name: "")
     }
 
-    func rename(_ id: ItemID, to name: String, undoManager: UndoManager?) { notYet() }
-    func deleteFolder(_ id: ItemID, undoManager: UndoManager?) { notYet() }
-    func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager?) { notYet() }
+    func rename(_ id: ItemID, to name: String, undoManager: UndoManager?) { filesOnly() }
+    func deleteFolder(_ id: ItemID, undoManager: UndoManager?) { filesOnly() }
+    func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager?) { filesOnly() }
 
-    private func notYet() {
-        failure = (String(localized: "Couldn’t Make This Change"), MarfaEngine.notYet)
+    private func filesOnly() {
+        failure = (String(localized: "Couldn’t Make This Change"), MarfaEngine.filesOnly)
     }
 
-    /// The files go to the source's embeds as files of their own, which it removes once they are taken.
+    /// The files go to the source as files of their own, which this removes once it has taken them. Each is
+    /// attached to the item by the package, which says what the page writes in the text to embed it.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
         let directory = URL.temporaryDirectory.appending(path: "MAPP-attach-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

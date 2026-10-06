@@ -14,6 +14,10 @@ nonisolated enum NoteReferenceResolution: Equatable, Sendable {
     case resolved(ItemID)
     case missing
     case ambiguous([ItemID])
+    /// Not looked up on the server yet; only a Marfa library has these.
+    case pending
+    /// The server refused the lookup or the write of the edge; only a Marfa library has these.
+    case refused(String)
 }
 
 nonisolated struct NoteIndexedReference: Equatable, Sendable {

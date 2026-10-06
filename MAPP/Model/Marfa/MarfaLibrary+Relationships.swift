@@ -2,7 +2,9 @@ import Foundation
 
 /// Relationships are Marfa's edges. An item's own fields are the edges it holds, named as its end writes them,
 /// such as `child-of` for the parent a child holds; its inverse fields, `inverse:` and the edge type, are the
-/// edges other items hold that point at it, such as a parent's children.
+/// edges other items hold that point at it, such as a parent's children. What an item's text links or embeds is
+/// written as edges by the package, as the text is saved: a link is a `references` edge, which the item it names
+/// shows as linked from, and an embedded file is an `attached-to` edge from the file to the item.
 extension MarfaLibrary {
     static let inversePrefix = "inverse:"
     /// The contract refuses an edge that would close a cycle for these types only, and a self-loop for any type.
@@ -96,6 +98,8 @@ extension MarfaLibrary {
             return switch end.info.id {
             case MarfaMapping.parentEdge: "Children"
             case "about": "Items About This"
+            case MarfaMapping.bodyLinkEdge: "Linked From"
+            case MarfaMapping.attachmentEdge: "Attachments"
             default: "Incoming " + end.info.label
             }
         }
@@ -121,15 +125,17 @@ extension MarfaLibrary {
                 field: name, label: label(of: name, end), targets: others(of: id, end).map(target),
                 isEditable: item.isEditable, allowsMultiple: end.info.cardinality == .many)
         }
-        let pointing = index.links(touching: id).filter { $0.holder != id && $0.type != MarfaMapping.bodyLinkEdge }
+        let pointing = index.links(touching: id).filter { $0.holder != id }
         for type in Set(pointing.map(\.type)) {
             guard let end = fieldEnd(Self.inversePrefix + type) else { continue }
             let holders = pointing.filter { $0.type == type }.map { $0.holder }
             let targets = holders.filter { self.item($0) != nil }.map(target)
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            // The text that links an item is the linking item's to change, not a relationship of this one.
             results.append(ItemRelationship(
                 field: Self.inversePrefix + type, label: label(of: type, end), targets: targets,
-                isEditable: item.isEditable, allowsMultiple: end.info.reverseCardinality == .many))
+                isEditable: item.isEditable && type != MarfaMapping.bodyLinkEdge,
+                allowsMultiple: end.info.reverseCardinality == .many))
         }
         return results.sorted { lhs, rhs in
             lhs.field.hasPrefix(Self.inversePrefix) != rhs.field.hasPrefix(Self.inversePrefix)
@@ -158,6 +164,10 @@ extension MarfaLibrary {
             case .item(let other): target(other)
             case .unresolved(let spelling, let ambiguous):
                 ItemRelationshipTarget(title: spelling, itemID: nil, resolution: ambiguous ? .ambiguous([]) : .missing)
+            case .pending(let spelling):
+                ItemRelationshipTarget(title: spelling, itemID: nil, resolution: .pending)
+            case .refused(let spelling, let reason):
+                ItemRelationshipTarget(title: spelling, itemID: nil, resolution: .refused(reason))
             }
         }
     }
