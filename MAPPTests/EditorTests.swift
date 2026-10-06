@@ -146,17 +146,18 @@ struct EditorTests {
 
     @Test func aFirstLineTypedWithASpaceAtItsEndNamesTheFileWithoutIt() async throws {
         let store = RecordingStore()
-        let library = NoteLibrary(store: store)
-        let note = library.newNote(in: .inbox)
+        let note = Note(body: "Plan\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: store)
         let page = try await Harness()
         page.editor.library = library
         page.editor.onChange = { id, markdown in library.updateBody(of: id, to: markdown) }
+        page.editor.onLeave = { library.leave($0) }
         page.editor.load(try #require(library.note(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'R&D plan ')")
-        // Leaving the note writes it, named after its first line.
+        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, 'R&D plan ')")
+        // Leaving the note renames its file after its first line.
         page.editor.flush()
-        try await page.wait { library.note(note.id)?.path != nil }
+        try await page.wait { library.note(note.id)?.path != "Plan.md" }
         #expect(library.note(note.id)?.path == "R&D plan.md")
         #expect(library.note(note.id)?.title == "R&D plan")
     }

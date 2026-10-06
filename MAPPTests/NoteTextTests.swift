@@ -144,14 +144,6 @@ struct NoteTextTests {
         #expect(!NoteText.needsTitle("R&D budget"))
     }
 
-    @Test func aNoteOfMarkersAloneIsBlank() {
-        #expect(NoteText.isBlank(""))
-        #expect(NoteText.isBlank("- [ ] \n"))
-        #expect(NoteText.isBlank("#\n\n> \n1. "))
-        #expect(!NoteText.isBlank("- [ ] Milk"))
-        #expect(!NoteText.isBlank("![](Attachments/a.png)"))
-    }
-
     @Test func aTitleReadsAsWrittenWhateverTheEditorEscaped() {
         #expect(title("R\\&D: plan\n\nNext") == "R&D: plan")
         #expect(preview("R\\&D: plan\n\nsnake\\_case") == "snake_case")

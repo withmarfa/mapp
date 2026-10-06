@@ -2,8 +2,8 @@ import Foundation
 
 nonisolated struct Note: Identifiable, Hashable {
     let id: UUID
-    /// Where the note's file is, relative to the notes folder, with `/` between components. A new note has no
-    /// file until its first line is written, and a deleted note keeps the path it had.
+    /// Where the note's file is, relative to the notes folder, with `/` between components. A deleted note keeps
+    /// the path it had.
     var path: String? {
         didSet { refreshText() }
     }
@@ -23,7 +23,7 @@ nonisolated struct Note: Identifiable, Hashable {
     /// The file's identity when last read, to know it again if another app renames it.
     var fileID: UInt64?
     /// The first line the note's name was taken from, while the note still goes by it; nil for a note named
-    /// otherwise, which keeps its name whatever its first line says. A new note follows its first line too.
+    /// otherwise, which keeps its name whatever its first line says.
     var namedLine: String? {
         didSet { refreshText() }
     }
@@ -72,8 +72,6 @@ nonisolated struct Note: Identifiable, Hashable {
     var body: String { file.body }
     var isFavorite: Bool { file.isFavorite }
     var isDeleted: Bool { deleted != nil }
-    /// A note not yet written to a file.
-    var isDraft: Bool { path == nil }
 
     /// The directory the note's file is in, relative to the notes folder; empty at the top.
     var directory: String {
@@ -86,8 +84,9 @@ nonisolated struct Note: Identifiable, Hashable {
         path.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }
     }
 
-    /// Whether the note's name comes from its first line, so it changes as the line does.
-    var followsFirstLine: Bool { isDraft || namedLine != nil }
+    /// Whether the note's name comes from its first line, so it changes as the line does. A note with no file
+    /// has no other name.
+    var followsFirstLine: Bool { path == nil || namedLine != nil }
 
     /// As Marfa reads a note: its `title` property, otherwise its file name. A note named after its first line
     /// shows the line as it now reads, which its name takes once the note is left.
