@@ -14,7 +14,7 @@ struct SidebarNavigationTests {
         browser.show(.favoriteItem(second.id), in: library, order: NoteOrder())
         #expect(browser.item == .favoriteItem(second.id))
         #expect(browser.selection == [second.id])
-        #expect(browser.notes(in: library).map(\.id) == [second.id])
+        #expect(browser.items(in: library).map(\.id) == [second.id])
         #expect(browser.searchText.isEmpty)
         #expect(library.name(of: browser.item) == "Second favorite")
         #expect(browser.sections(in: library, order: NoteOrder(), now: date).first?.group != .favorites)
@@ -30,7 +30,7 @@ struct SidebarNavigationTests {
         browser.folderRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
         #expect(browser.selection == [second.id])
-        #expect(library.notes(in: .favoriteItem(first.id)).isEmpty)
+        #expect(library.items(in: .favoriteItem(first.id)).isEmpty)
     }
 
     @Test func aDeletedFavoriteShortcutLeavesAnEmptyFavoritesCollection() {
@@ -42,7 +42,7 @@ struct SidebarNavigationTests {
         browser.folderRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
         #expect(browser.selection.isEmpty)
-        #expect(library.notes(in: .favoriteItem(favorite.id)).isEmpty)
+        #expect(library.items(in: .favoriteItem(favorite.id)).isEmpty)
     }
 
     @Test func aFavoriteShortcutRestoresByItsIdentifierWhereverItsFileIsNow() throws {
@@ -81,9 +81,9 @@ struct SidebarNavigationTests {
         let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id))
         library.setFavorite([project.id], true)
         #expect(SidebarItem.project(project.id) != .favoriteItem(project.id))
-        #expect(Set(library.notes(in: .project(project.id)).map(\.id)) == [project.id, child.id])
-        #expect(library.notes(in: .favoriteItem(project.id)).map(\.id) == [project.id])
-        #expect(library.notes(in: .itemType("aic.project")).map(\.id) == [project.id])
+        #expect(Set(library.items(in: .project(project.id)).map(\.id)) == [project.id, child.id])
+        #expect(library.items(in: .favoriteItem(project.id)).map(\.id) == [project.id])
+        #expect(library.items(in: .itemType("aic.project")).map(\.id) == [project.id])
         #expect(library.name(of: .itemType("aic.project")) == "Projects")
     }
 

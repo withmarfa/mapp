@@ -36,22 +36,22 @@ struct NoteLibraryTests {
 
     @Test func eachSidebarItemShowsItsNotes() {
         let (library, inbox, filed, favorite, deleted) = makeLibrary()
-        #expect(library.notes(in: .inbox) == [inbox])
-        #expect(library.notes(in: .allNotes) == [inbox, filed, favorite])
-        #expect(library.notes(in: .favorites) == [favorite])
-        #expect(library.notes(in: .folder(work.id)) == [filed])
-        #expect(library.notes(in: .recentlyDeleted) == [deleted])
-        #expect(library.notes(in: .marfaTypes).isEmpty)
+        #expect(library.items(in: .inbox).map(\.id) == [inbox.id])
+        #expect(library.items(in: .allNotes).map(\.id) == [inbox.id, filed.id, favorite.id])
+        #expect(library.items(in: .favorites).map(\.id) == [favorite.id])
+        #expect(library.items(in: .folder(work.id)).map(\.id) == [filed.id])
+        #expect(library.items(in: .recentlyDeleted).map(\.id) == [deleted.id])
+        #expect(library.items(in: .marfaTypes).isEmpty)
         #expect(library.count(in: .allNotes) == 3)
     }
 
     @Test func searchCoversEveryLiveNoteIgnoringCaseAndAccents() {
         let (library, _, filed, _, _) = makeLibrary()
         library.updateBody(of: filed.id, to: "# Filed note\n\nA proper ragù")
-        #expect(library.notes(matching: "RAGU").map(\.id) == [filed.id])
-        #expect(library.notes(matching: "note").count == 3)
-        #expect(library.notes(matching: "Deleted").isEmpty)
-        #expect(library.notes(matching: "   ").isEmpty)
+        #expect(library.items(matching: "RAGU").map(\.id) == [filed.id])
+        #expect(library.items(matching: "note").count == 3)
+        #expect(library.items(matching: "Deleted").isEmpty)
+        #expect(library.items(matching: "   ").isEmpty)
     }
 
     @Test func sidebarItemsAreNamed() {
@@ -70,7 +70,7 @@ struct NoteLibraryTests {
         #expect(note.folderID == home.id)
         #expect(note.path == "Home/Groceries.md")
         #expect(note.created == start + 60)
-        #expect(library.notes(in: .folder(home.id)).contains(note))
+        #expect(library.items(in: .folder(home.id)).contains { $0.id == note.id })
         #expect(library.note(note.id)?.title == "Groceries")
         #expect(store.changes.last == .create(path: "Home/Groceries.md", text: library.note(note.id)!.file.text, id: note.id))
     }
@@ -115,11 +115,11 @@ struct NoteLibraryTests {
         let manager = undoManager()
         undoably(manager) { library.delete([inbox.id, filed.id], undoManager: manager) }
         #expect(manager.undoActionName == "Delete Notes")
-        #expect(library.notes(in: .recentlyDeleted).count == 3)
-        #expect(library.notes(in: .allNotes).count == 1)
+        #expect(library.items(in: .recentlyDeleted).count == 3)
+        #expect(library.items(in: .allNotes).count == 1)
         manager.undo()
-        #expect(library.note(inbox.id) == inbox)
-        #expect(library.note(filed.id) == filed)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
+        #expect(library.note(filed.id)?.holdsTheSame(as: filed) == true)
         manager.redo()
         #expect(library.note(inbox.id)?.isDeleted == true)
     }
@@ -128,7 +128,7 @@ struct NoteLibraryTests {
         let (library, _, _, _, deleted) = makeLibrary()
         let manager = undoManager()
         undoably(manager) { library.recover([deleted.id], undoManager: manager) }
-        #expect(library.notes(in: .folder(work.id)).map(\.id).contains(deleted.id))
+        #expect(library.items(in: .folder(work.id)).map(\.id).contains(deleted.id))
         #expect(store.changes == [.restore(id: deleted.binID!, path: "Work/Deleted note.md")])
         #expect(manager.undoActionName == "Recover")
         manager.undo()
@@ -167,19 +167,19 @@ struct NoteLibraryTests {
         let (library, inbox, _, _, deleted) = makeLibrary()
         let manager = undoManager()
         undoably(manager) { library.move([inbox.id, deleted.id], to: home.id, undoManager: manager) }
-        #expect(library.notes(in: .folder(home.id)).count == 3)
-        #expect(library.notes(in: .inbox).isEmpty)
+        #expect(library.items(in: .folder(home.id)).count == 3)
+        #expect(library.items(in: .inbox).isEmpty)
         #expect(library.note(deleted.id)?.path == "Home/Deleted note.md")
         #expect(manager.undoActionName == "Move")
         manager.undo()
-        #expect(library.note(inbox.id) == inbox)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
         #expect(library.note(deleted.id)?.isDeleted == true)
     }
 
     @Test func movingToNoFolderReturnsToTheInbox() {
         let (library, _, filed, _, _) = makeLibrary()
         library.move([filed.id], to: nil)
-        #expect(library.notes(in: .inbox).map(\.id).contains(filed.id))
+        #expect(library.items(in: .inbox).map(\.id).contains(filed.id))
     }
 
     @Test func addingAndRemovingFavoritesUndo() {
@@ -189,10 +189,10 @@ struct NoteLibraryTests {
         #expect(manager.undoActionName == "Add to Favorites")
         undoably(manager) { library.setFavorite([favorite.id], false, undoManager: manager) }
         #expect(manager.undoActionName == "Remove from Favorites")
-        #expect(library.notes(in: .favorites).map(\.id) == [inbox.id])
+        #expect(library.items(in: .favorites).map(\.id) == [inbox.id])
         manager.undo()
         manager.undo()
-        #expect(library.notes(in: .favorites) == [favorite])
+        #expect(library.items(in: .favorites).map(\.id) == [favorite.id])
     }
 
     // MARK: Folders
@@ -235,8 +235,8 @@ struct NoteLibraryTests {
         #expect(manager.undoActionName == "Delete Folder")
         manager.undo()
         #expect(library.folders == [work, home])
-        #expect(library.note(filed.id) == filed)
-        #expect(library.note(deleted.id) == deleted)
+        #expect(library.note(filed.id)?.holdsTheSame(as: filed) == true)
+        #expect(library.note(deleted.id)?.holdsTheSame(as: deleted) == true)
         manager.redo()
         #expect(library.folder(work.id) == nil)
         #expect(library.note(filed.id)?.isDeleted == true)
@@ -442,7 +442,7 @@ struct NoteLibraryTests {
         library.leave(inbox.id)
         library.finish()
         #expect(store.changes.isEmpty)
-        #expect(library.note(inbox.id) == inbox)
+        #expect(library.note(inbox.id)?.holdsTheSame(as: inbox) == true)
     }
 
     @Test func aNoteNamedAfterItsFirstLineTakesTheNewLineOnceLeft() {
@@ -631,7 +631,7 @@ struct NoteLibraryTests {
         library.recover([filed.id])
         #expect(library.note(filed.id)?.folderID == nil)
         #expect(library.note(filed.id)?.path == "Filed note.md")
-        #expect(library.notes(in: .inbox).map(\.id).contains(filed.id))
+        #expect(library.items(in: .inbox).map(\.id).contains(filed.id))
     }
 
     @Test func aNewFolderNeverSharesAnotherFoldersIdentity() {

@@ -72,7 +72,7 @@ struct OutsideChangeTests {
         await library.reread()
         #expect(library.note(shopping.id) == nil)
         #expect(note(at: "Agent.md")?.body == "Written by an agent\n")
-        #expect(library.notes(in: .recentlyDeleted).isEmpty, "a file deleted outside is gone, not trashed")
+        #expect(library.items(in: .recentlyDeleted).isEmpty, "a file deleted outside is gone, not trashed")
     }
 
     @Test func foldersMadeAndRemovedOutsideAppearAndGo() async throws {

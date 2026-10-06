@@ -27,13 +27,25 @@ extension Note {
     }
 }
 
+extension Note {
+    /// Whether the note holds what the other did, whichever revisions they are at: a change undone takes a new
+    /// revision, so equality alone says only that nothing changed.
+    func holdsTheSame(as other: Note) -> Bool {
+        id == other.id && path == other.path && file == other.file && created == other.created
+            && modified == other.modified && folderID == other.folderID && deleted == other.deleted
+            && binID == other.binID && namedLine == other.namedLine
+    }
+}
+
 /// A store that keeps a list of the changes it is asked to make, and makes none.
 final class RecordingStore: NoteStore, @unchecked Sendable {
     var changes: [StoreChange] = []
+    /// What `load()` reads.
+    var stored = StoredLibrary()
     var relocated: @MainActor @Sendable (String, String) -> Void = { _, _ in }
     var failed: @MainActor @Sendable (String, String) -> Void = { _, _ in }
 
-    func load() throws -> StoredLibrary { StoredLibrary() }
+    func load() throws -> StoredLibrary { stored }
     func perform(_ change: StoreChange) { changes.append(change) }
     func drain() {}
     func acknowledgeRelocation(of path: String) {}
