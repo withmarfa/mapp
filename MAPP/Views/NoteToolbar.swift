@@ -1,71 +1,104 @@
 import SwiftUI
 
-/// Creation, formatting and item actions share the trailing toolbar group.
-/// The compact title and New Item stay fixed; the other items can be moved or removed through Customize Toolbar.
-/// Every action is also a menu command, since a toolbar can be hidden.
+/// The list workspace keeps its existing customizable toolbar and item identities.
 struct NoteToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
-    /// The main window's browser; nil in a note's own window, which makes no notes.
     let browser: Browser?
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
 
-    /// The notes among the items, which the note tools act on; a file has tools of its own.
-    private var notes: [Item] { items.filter { !$0.isFile } }
+    private var tools: ItemToolbarActions {
+        ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+    }
 
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: "scrolledTitle") {
-            Text(notes.first?.title ?? "")
-                .interfaceFont(.headline)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            Text(tools.notes.first?.title ?? "")
+                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
                 .frame(maxWidth: 220, alignment: .leading)
                 .accessibilityIdentifier("ScrolledItemTitle")
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!editor.isHeaderScrolledAway || notes.count != 1 || browser?.isCreatingItem == true || showsTypes)
+        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsGallery == true || tools.showsTypes)
         ToolbarSpacer(.flexible)
+        ToolbarItem(id: "newNote") { NewNoteButton(browser: browser) }
+            .customizationBehavior(.disabled)
+            .hidden(browser == nil)
+        ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
+            .hidden(tools.showsTypes || browser?.showsGallery == true)
+        ToolbarItem(id: "details") { tools.detailsButton }
+            .hidden(tools.showsTypes)
+        ToolbarItem(id: "more") { tools.moreMenu }
+            .hidden(tools.showsTypes)
+    }
+}
 
-        ToolbarItem(id: "newNote") {
+/// Gallery shares the item actions without a second customizable toolbar configuration.
+struct GalleryToolbar: ToolbarContent {
+    @CurrentLibrary private var library
+    let browser: Browser
+    let items: [Item]
+    let editor: EditorController
+    let details: DetailsPresentation
+
+    var body: some ToolbarContent {
+        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+        if !browser.showsGallery, !browser.isCreatingItem, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+            ToolbarItem(placement: .navigation) {
+                Text(tools.notes.first?.title ?? "")
+                    .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: 220, alignment: .leading)
+                    .accessibilityIdentifier("ScrolledItemTitle")
+            }
+            .sharedBackgroundVisibility(.hidden)
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
             NewNoteButton(browser: browser)
+            if !browser.showsGallery { FormatMenu(editor: editor, note: tools.editableNote) }
+            tools.detailsButton
+            tools.moreMenu
         }
-        .customizationBehavior(.disabled)
-        .hidden(browser == nil)
-        ToolbarItem(id: "format") {
-            FormatMenu(editor: editor, note: editableNote)
-        }
-        .hidden(showsTypes)
-        ToolbarItem(id: "details") {
-            Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
-                .help(details.isPresented ? "Hide Details" : "Show Details")
-                .disabled((browser?.selection.count ?? notes.count) != 1 || browser?.isCreatingItem == true)
-                .accessibilityIdentifier("DetailsToggle")
-        }
-        .hidden(showsTypes)
-        ToolbarItem(id: "more") {
-            MoreMenu(
-                notes: browser?.isCreatingItem != true && (browser?.selection.count ?? notes.count) == notes.count ? notes : [],
-                fileURL: selectedFileURL, browser: browser, editor: editor, editableNote: editableNote
-            )
-        }
-        .hidden(showsTypes)
+    }
+}
+
+private struct ItemToolbarActions {
+    let library: any ItemLibrary
+    let browser: Browser?
+    let items: [Item]
+    let editor: EditorController
+    let details: DetailsPresentation
+
+    var notes: [Item] { items.filter { !$0.isFile } }
+    var showsTypes: Bool { browser?.showsTypes == true }
+
+    var visibleNote: Item? {
+        guard browser?.isCreatingItem != true, browser?.showsGallery != true,
+              (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
+              let note = notes.first, editor.hasNote, editor.noteID == note.id else { return nil }
+        return note
     }
 
+    /// Formatting acts only on the writable note currently visible in the editor.
+    var editableNote: Item? { visibleNote.flatMap { $0.isWritable ? $0 : nil } }
+
     private var selectedFileURL: URL? {
-        guard browser?.isCreatingItem != true, browser?.selection.count == 1, let id = browser?.selection.first else { return nil }
+        guard browser?.isCreatingItem != true, browser?.selection.count == 1,
+              let id = browser?.selection.first else { return nil }
         return browser?.fileURL(of: id, in: library)
     }
 
-    /// Marfa Types shows a type, not a note, so the tools for notes step aside.
-    private var showsTypes: Bool { browser?.showsTypes == true }
+    var detailsButton: some View {
+        Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
+            .help(details.isPresented ? "Hide Details" : "Show Details")
+            .disabled((browser?.selection.count ?? notes.count) != 1 || browser?.isCreatingItem == true)
+            .accessibilityIdentifier("DetailsToggle")
+    }
 
-    /// The one note shown, when it can be written in; the formatting tools act on nothing else.
-    private var editableNote: Item? {
-        guard browser?.isCreatingItem != true, (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
-              let note = notes.first, note.isWritable, editor.hasNote, editor.noteID == note.id else { return nil }
-        return note
+    var moreMenu: some View {
+        MoreMenu(notes: browser?.isCreatingItem != true && (browser?.selection.count ?? notes.count) == notes.count ? notes : [],
+                 fileURL: selectedFileURL, browser: browser, editor: editor, editableNote: editableNote)
     }
 }
 
@@ -124,6 +157,10 @@ private struct MoreMenu: View {
 
     var body: some View {
         Menu("More", systemImage: "ellipsis") {
+            if let browser {
+                ItemViewOptions(browser: browser)
+                Divider()
+            }
             let note = notes.count == 1 ? notes.first : nil
             NoteShareLink(title: note?.title ?? "", text: note.flatMap { library.body(of: $0.id)?.text }, fileURL: fileURL)
             Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }

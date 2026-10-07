@@ -78,6 +78,12 @@ struct NewItemPage: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .defaultFocus($titleFocused, true)
+        .onChange(of: browser.focusRequest, initial: true) {
+            if browser.isCreatingItem, browser.focusRequest == .page {
+                titleFocused = true
+                browser.focusRequest = nil
+            }
+        }
         .onChange(of: draft.typeID) {
             if !parents.contains(where: { $0.id == draft.parentID }) { draft.parentID = nil }
             rejected = false

@@ -11,7 +11,7 @@ struct MainView: View {
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var isSidebarVisible = true
     @State private var sidebarWidth: CGFloat = 220
     @State private var listWidth: CGFloat = 340
     @State private var measuredWidths = ColumnWidths()
@@ -38,8 +38,18 @@ struct MainView: View {
             if settings.isPresented {
                 SettingsView(presentation: settings)
             } else {
-                renamingWindow
+                // Release the split view's toolbar provider before changing its native column count.
+                // Browser, editor, drafts, and column preferences remain above this presentation identity.
+                renamingWindow.id(browser.usesGallery)
             }
+        }
+        .onChange(of: browser.usesGallery) {
+            sidebarWidth = measuredWidths.sidebar
+            listWidth = measuredWidths.list
+            editor.flush()
+        }
+        .onChange(of: browser.showsGallery) {
+            if browser.showsGallery { editor.flush() }
         }
         .onChange(of: settings.isPresented) {
             if settings.isPresented {
@@ -53,27 +63,20 @@ struct MainView: View {
         }
     }
 
+    // Both native split shapes read the same sidebar preference before their first layout.
+    private var listColumnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding { isSidebarVisible ? .all : .doubleColumn } set: { isSidebarVisible = $0 == .all }
+    }
+
+    private var galleryColumnVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding { isSidebarVisible ? .all : .detailOnly } set: { isSidebarVisible = $0 == .all }
+    }
+
     private var splitView: some View {
-        // Every place keeps the same three columns, Marfa Types among them: AppKit crashed laying out the toolbar
-        // as the columns changed with the sidebar hidden or resized.
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            Sidebar(browser: browser, order: order)
-                // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
-                .focused($pane, equals: .sidebar)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    SyncStatusBar { settings.show(.marfa) }
-                }
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                    if $0 >= 180 { measuredWidths.sidebar = $0 }
-                }
-                .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
-                .toolbar {
-                    ToolbarItem {
-                        Button("Settings…", systemImage: "gearshape") { settings.show() }
-                            .help("Settings")
-                            .accessibilityIdentifier("SettingsToolbar")
-                    }
-                }
+        // The list workspace keeps three columns even when Marfa Types replaces its content.
+        // Gallery replaces this entire split view rather than changing the columns inside it.
+        NavigationSplitView(columnVisibility: listColumnVisibility) {
+            sidebarColumn
         } content: {
             Group {
                 if browser.showsTypes {
@@ -97,31 +100,84 @@ struct MainView: View {
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0 >= 280 { measuredWidths.list = $0 }
+                if $0.isFinite, $0 >= 280 { measuredWidths.list = $0 }
             }
             .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
         } detail: {
-            Group {
-                if browser.isCreatingItem, let draft = browser.itemDraft {
-                    NewItemPage(browser: browser, draft: draft)
-                        .disabled(browser.isAwaitingCreation)
-                        .onAppear { editor.close() }
-                } else if browser.showsTypes {
-                    TypeDetailView(browser: browser.types)
-                        // The note that was on the page is out of sight, so it is left.
-                        .onAppear { editor.close() }
-                } else {
-                    NoteDetail(browser: browser, editor: editor, details: details)
+            itemPage
+                .toolbar(id: "main") {
+                    NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                }
+        }
+    }
+
+    private var sidebarColumn: some View {
+        Sidebar(browser: browser, order: order)
+            // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
+            .focused($pane, equals: .sidebar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                SyncStatusBar { settings.show(.marfa) }
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                if $0.isFinite, $0 >= 180 { measuredWidths.sidebar = $0 }
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
+            .toolbar {
+                ToolbarItem {
+                    Button("Settings…", systemImage: "gearshape") { settings.show() }
+                        .help("Settings")
+                        .accessibilityIdentifier("SettingsToolbar")
                 }
             }
-            .toolbar(id: "main") {
-                NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+    }
+
+    private var itemPage: some View {
+        Group {
+            if browser.isCreatingItem, let draft = browser.itemDraft {
+                NewItemPage(browser: browser, draft: draft)
+                    .disabled(browser.isAwaitingCreation)
+                    .onAppear { editor.close() }
+            } else if browser.showsTypes {
+                TypeDetailView(browser: browser.types)
+                    // The note that was on the page is out of sight, so it is left.
+                    .onAppear { editor.close() }
+            } else {
+                NoteDetail(browser: browser, editor: editor, details: details)
+            }
+        }
+    }
+
+    private var workspace: some View {
+        Group {
+            if browser.usesGallery {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    Group {
+                        if browser.showsGallery {
+                            ItemGallery(browser: browser, order: order, pane: $pane)
+                        } else {
+                            itemPage
+                                .toolbar {
+                                    ToolbarItem(placement: .navigation) {
+                                        Button("Back to Gallery", systemImage: "chevron.backward") { browser.returnToGallery() }
+                                            .accessibilityIdentifier("BackToGallery")
+                                    }
+                                }
+                        }
+                    }
+                    .toolbar {
+                        GalleryToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                    }
+                }
+            } else {
+                splitView
             }
         }
     }
 
     private var presentedWindow: some View {
-        splitView
+        workspace
         .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
@@ -147,12 +203,17 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, editor)
+        .focusedSceneValue(\.editor, browser.showsGallery ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
         activeWindow
+        // The gallery disappears while an item is open; selection must still follow deletes and moves.
+        .onChange(of: galleryItemIDs) { old, new in
+            guard browser.usesGallery, !browser.isCreatingItem else { return }
+            browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
+        }
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)
         }
@@ -183,6 +244,11 @@ struct MainView: View {
         .onChange(of: creationIsSettled) {
             if creationIsSettled { browser.finishCreation(in: library) }
         }
+    }
+
+    private var galleryItemIDs: [ItemID] {
+        guard browser.usesGallery else { return [] }
+        return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 
     private var importingWindow: some View {
@@ -230,6 +296,7 @@ struct MainView: View {
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]
+        browser.openGallerySelection()
         library.consumeImportCompletion(requestID)
         importRequestID = nil
     }
@@ -240,6 +307,10 @@ struct MainView: View {
         switch browser.focusRequest {
         case .search:
             if browser.showsTypes { browser.show(.allNotes, in: library, order: order) }
+            if browser.usesGallery {
+                browser.isCreatingItem = false
+                browser.isGalleryItemPresented = false
+            }
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .typesSearch:
@@ -249,7 +320,10 @@ struct MainView: View {
             // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
             let request = browser.focusRequest
             Task { pane = request }
-        case .page, nil: return
+        case .page:
+            if browser.showsGallery { browser.isGalleryItemPresented = true }
+            return
+        case nil: return
         }
         browser.focusRequest = nil
     }

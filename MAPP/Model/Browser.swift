@@ -7,6 +7,16 @@ import Observation
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
     var selection: Set<ItemID> = []
+    var viewMode: ItemViewMode = .list {
+        didSet {
+            isGalleryItemPresented = false
+            if viewMode == .gallery {
+                isCreatingItem = false
+                focusRequest = .list
+            }
+        }
+    }
+    var isGalleryItemPresented = false
     var searchText = ""
     /// The note whose file name is being asked for.
     var renamingNote: ItemID?
@@ -68,6 +78,21 @@ final class Browser {
     /// Whether the window shows Marfa's types in place of the list and the note.
     var showsTypes: Bool { item == .marfaTypes }
 
+    var usesGallery: Bool { viewMode == .gallery && !showsTypes }
+    var showsGallery: Bool { usesGallery && !isGalleryItemPresented && !isCreatingItem }
+
+    func openGallerySelection() {
+        guard usesGallery, selection.count == 1 else { return }
+        isGalleryItemPresented = true
+        focusRequest = .page
+    }
+
+    func returnToGallery() {
+        isCreatingItem = false
+        isGalleryItemPresented = false
+        focusRequest = .list
+    }
+
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
         isSearching ? library.items(matching: searchText) : library.items(in: item)
@@ -103,6 +128,7 @@ final class Browser {
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         isCreatingItem = false
+        isGalleryItemPresented = false
         searchText = ""
         types.searchText = ""
         isSearchExpanded = false
@@ -174,6 +200,7 @@ final class Browser {
         self.creation = nil
         isCreatingItem = false
         itemDraft = nil
+        isGalleryItemPresented = usesGallery
         searchText = ""
         isSearchExpanded = false
         if !library.items(in: item).contains(where: { $0.id == creation.id }) {
@@ -202,6 +229,7 @@ final class Browser {
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         selection = []
+        isGalleryItemPresented = false
         sidebarItem = .allNotes
         searchText = ""
         isSearchExpanded = false
@@ -301,10 +329,11 @@ final class Browser {
     struct Snapshot: Codable, Equatable {
         var place: SidebarItem
         var selection: [ItemID]
+        var viewMode: ItemViewMode = .list
     }
 
     func snapshot() -> Snapshot {
-        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue })
+        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
     }
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
@@ -320,6 +349,7 @@ final class Browser {
     /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
     /// items no longer in the list are dropped, leaving the top row selected if none remain.
     func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
+        viewMode = snapshot.viewMode
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
