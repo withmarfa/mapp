@@ -70,10 +70,10 @@ struct AppCommands: Commands {
         // ⌘P is Search Notes, so Print takes ⇧⌘P, which Page Setup would have had; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
-                .disabled(browser?.isCreatingItem == true || editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-                .disabled(browser?.isCreatingItem == true || editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
@@ -84,6 +84,8 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            if let browser { ItemViewOptions(browser: browser) }
+            Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "info.circle") {
                 details?.isPresented.toggle()
             }
@@ -95,9 +97,12 @@ struct AppCommands: Commands {
             PageWidthOptions()
             Divider()
             // ⌘[ and ⌘], as in Safari and the Finder.
-            Button("Back", systemImage: "chevron.backward") { marfaTypes?.goBack() }
+            Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
+                if browser?.usesGallery == true { browser?.returnToGallery() }
+                else { marfaTypes?.goBack() }
+            }
                 .keyboardShortcut("[")
-                .disabled(marfaTypes?.canGoBack != true)
+                .disabled(browser?.usesGallery == true ? browser?.showsGallery != false : marfaTypes?.canGoBack != true)
             Button("Forward", systemImage: "chevron.forward") { marfaTypes?.goForward() }
                 .keyboardShortcut("]")
                 .disabled(marfaTypes?.canGoForward != true)

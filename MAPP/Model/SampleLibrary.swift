@@ -44,7 +44,17 @@ nonisolated enum SampleLibrary {
         }
 
         try note(kitchenQuotes, "Home", daysAgo: 0, hour: 9, minute: 12, favorite: true)
-        try note(gardenIdeas, daysAgo: 0, hour: 7, minute: 55)
+        var gardenBody = gardenIdeas
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-MAPPGallerySampleImages"),
+           let photo = Bundle.main.url(forResource: "item-preview-photo", withExtension: "png") {
+            let destination = root.appending(path: "Attachments/Gallery.png")
+            try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(contentsOf: photo).write(to: destination)
+            gardenBody += "\n\n![Garden](Attachments/Gallery.png)\n"
+        }
+        #endif
+        try note(gardenBody, daysAgo: 0, hour: 7, minute: 55)
         try note(weeklyReview, "Work", daysAgo: 0, hour: 8, minute: 30)
         try note(accountant, daysAgo: 1, hour: 16, minute: 40)
         try note(readingList, "Reading", daysAgo: 1, hour: 21, minute: 5, favorite: true)

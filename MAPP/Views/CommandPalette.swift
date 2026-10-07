@@ -189,12 +189,20 @@ struct CommandPalette: View {
         let selected = browser.selectedItems(in: library).filter { !$0.isFile }
         let ids = Set(selected.map(\.id))
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
+        let hasVisibleEditor = !browser.showsGallery && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
         }
 
         if library.isLoaded {
+            if !browser.showsTypes {
+                add(String(localized: "List View"), "list.bullet") { browser.viewMode = .list }
+                add(String(localized: "Gallery View"), "square.grid.2x2") { browser.viewMode = .gallery }
+                if browser.usesGallery && !browser.showsGallery {
+                    add(String(localized: "Back to Gallery"), "chevron.backward", "⌘[") { browser.returnToGallery() }
+                }
+            }
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
             if library.capabilities.contains(.importFiles) {
                 add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
@@ -214,13 +222,13 @@ struct CommandPalette: View {
         })
 
         if let one, one.isWritable {
-            if editor.hasNote, editor.noteID == one.id {
-            for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
-                           .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
-            where format != .table || !editor.caret.inTable {
-                let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
-                add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
-            }
+            if hasVisibleEditor {
+                for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
+                               .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
+                where format != .table || !editor.caret.inTable {
+                    let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
+                    add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
+                }
             }
             if library.canRenameFile(of: one) {
                 add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
@@ -252,7 +260,7 @@ struct CommandPalette: View {
         } else {
             add(String(localized: "Full Width"), "arrow.left.and.right") { fullWidth = true }
         }
-        if one != nil, editor.hasNote {
+        if hasVisibleEditor {
             add(String(localized: "Print…"), "printer", "⇧⌘P") { editor.printNote() }
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
@@ -303,7 +311,8 @@ struct CommandPalette: View {
             browser.show(.allNotes, in: library, order: order)
         }
         browser.selection = [item.id]
-        browser.focusRequest = item.isFile ? .list : .page
+        if browser.usesGallery { browser.openGallerySelection() }
+        else { browser.focusRequest = item.isFile ? .list : .page }
     }
 
     /// Modifier keys as the menus write them.
