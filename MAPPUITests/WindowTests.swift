@@ -306,6 +306,8 @@ final class WindowTests: XCTestCase {
         app.typeKey(.delete, modifierFlags: [])
         let confirm = app.sheets.buttons["Delete Folder"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.sheets.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Books")).element(boundBy: 0).exists)
+        XCTAssertTrue(app.sheets.staticTexts["Its notes will be moved to Recently Deleted."].exists)
         confirm.click()
         XCTAssertTrue(sidebarItem("Books").waitForNonExistence(timeout: 2))
     }

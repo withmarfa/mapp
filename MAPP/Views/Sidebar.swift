@@ -5,8 +5,6 @@ struct Sidebar: View {
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let order: NoteOrder
-    /// Kept after the dialog closes, so its title does not empty while it animates away.
-    @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
     @Environment(\.interfaceTextSize) private var textSize
@@ -99,9 +97,6 @@ struct Sidebar: View {
         .onDeleteCommand {
             if editsFolders { browser.folderToDelete = browser.selectedFolder }
         }
-        .onChange(of: browser.folderToDelete) {
-            if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
-        }
         .onChange(of: browser.renamingFolder) {
             if browser.renamingFolder != nil { foldersExpanded = true }
         }
@@ -115,7 +110,7 @@ struct Sidebar: View {
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
-            isPresented: Binding { browser.folderToDelete != nil } set: { if !$0 { browser.folderToDelete = nil } },
+            isPresented: Binding { folderToDelete != nil } set: { if !$0 { browser.folderToDelete = nil } },
             presenting: folderToDelete
         ) { folder in
             Button("Delete Folder", role: .destructive) {
@@ -231,6 +226,10 @@ struct Sidebar: View {
     }
 
     private var editsFolders: Bool { library.capabilities.contains(.folders) }
+
+    private var folderToDelete: Folder? {
+        browser.folderToDelete.flatMap { library.folder($0) }
+    }
 
     private func drop(_ notes: [NoteReference], on item: SidebarItem) {
         guard Browser.canDrop(on: item, in: library) else { return }
