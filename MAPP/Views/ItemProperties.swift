@@ -16,17 +16,17 @@ struct ItemPropertyRow: View {
             control
                 .disabled(!isEditable)
             if let invalidValue {
-                Text(invalidValue).font(.caption).foregroundStyle(.orange)
+                Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
             }
             if input.rejected {
                 Text("The value could not be saved. Your input has been kept.")
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.red)
                 Button("Discard Changes") {
                     input.isDirty = false
                     seed()
                 }
-                .font(.caption)
+                .interfaceFont(.caption)
             }
         }
         .onAppear { if !input.isDirty { seed() } }
@@ -95,7 +95,7 @@ struct ItemPropertyRow: View {
     private var textField: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(LocalizedStringKey(definition.label))
-                .font(.subheadline).foregroundStyle(.secondary)
+                .interfaceFont(.subheadline).foregroundStyle(.secondary)
             TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
                 input.text = $0
                 input.isDirty = true

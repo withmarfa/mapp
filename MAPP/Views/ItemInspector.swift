@@ -84,10 +84,10 @@ struct ItemInspector: View {
                         if let type { Text(LocalizedStringKey(type.label)) }
                         else { Text(item.type.rawValue) }
                     }
-                    .font(.callout)
+                    .interfaceFont(.callout)
                     if let message = item.problem?.message {
                         Label(message, systemImage: "exclamationmark.triangle")
-                            .font(.callout).foregroundStyle(.red)
+                            .interfaceFont(.callout).foregroundStyle(.red)
                     }
                 }
                 if let fields = type?.fields, !fields.isEmpty {
@@ -110,13 +110,13 @@ struct ItemInspector: View {
                 }
                 if !mentions.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Links in Content").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Links in Content").interfaceFont(.subheadline).foregroundStyle(.secondary)
                         ForEach(mentions) { target in
                             ItemTargetRow(target: target, onOpen: onOpen)
                                 .padding(.vertical, 5)
                         }
                         Text("These links come from the document text.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .interfaceFont(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if !otherProperties.isEmpty {
@@ -135,7 +135,7 @@ struct ItemInspector: View {
                     DisclosureGroup("File") {
                         VStack(alignment: .leading, spacing: 8) {
                             if let path {
-                                Text(path).font(.caption).textSelection(.enabled)
+                                Text(path).interfaceFont(.caption).textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             if case .file(let contentType, let byteCount) = item.content {
@@ -148,11 +148,11 @@ struct ItemInspector: View {
                                 LabeledContent("Modified", value: item.modified.formatted(date: .abbreviated, time: .shortened))
                                 if path != nil {
                                     Text("File properties cannot be edited in this file-backed library.")
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .interfaceFont(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
-                        .font(.callout)
+                        .interfaceFont(.callout)
                         .padding(.top, 8)
                     }
                 }

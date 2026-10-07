@@ -11,7 +11,7 @@ struct ItemRelationshipSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(LocalizedStringKey(relationship.label))
-                .font(.subheadline).foregroundStyle(.secondary)
+                .interfaceFont(.subheadline).foregroundStyle(.secondary)
             ForEach(relationship.targets) { target in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     ItemTargetRow(target: target, onOpen: onOpen)
@@ -52,7 +52,7 @@ struct ItemRelationshipSection: View {
             }
             if rejected {
                 Text("The connection could not be removed.")
-                    .font(.caption).foregroundStyle(.red)
+                    .interfaceFont(.caption).foregroundStyle(.red)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,7 +79,7 @@ struct ItemTargetRow: View {
                 Text(target.title)
                     .fixedSize(horizontal: false, vertical: true)
                 Label(resolutionLabel, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .interfaceFont(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -115,7 +115,7 @@ struct ItemRelationshipPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(LocalizedStringKey(relationship.label)).font(.title2.bold())
+            Text(LocalizedStringKey(relationship.label)).interfaceFont(.title2.bold())
             TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("RelationshipSearch")
@@ -137,7 +137,7 @@ struct ItemRelationshipPicker: View {
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .interfaceFont(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                     }
@@ -152,11 +152,11 @@ struct ItemRelationshipPicker: View {
             }
             if relationship.targets.contains(where: { $0.itemID == nil }) {
                 Text("Unresolved connections will be preserved.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .interfaceFont(.caption).foregroundStyle(.secondary)
             }
             if rejected {
                 Text("The connections could not be saved. Your selection has been kept.")
-                    .font(.callout).foregroundStyle(.red)
+                    .interfaceFont(.callout).foregroundStyle(.red)
             }
             HStack {
                 Button("Clear Selection") { selection = [] }

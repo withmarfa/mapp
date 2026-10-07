@@ -5,10 +5,9 @@ struct Sidebar: View {
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let order: NoteOrder
-    /// Kept after the dialog closes, so its title does not empty while it animates away.
-    @State private var folderToDelete: Folder?
     @State private var takenName: String?
     @Environment(\.sidebarRowSize) private var rowSize
+    @Environment(\.interfaceTextSize) private var textSize
     @SceneStorage("sidebarFavoritesExpanded") private var favoritesExpanded = true
     @SceneStorage("sidebarProjectsExpanded") private var projectsExpanded = true
     @SceneStorage("sidebarItemsExpanded") private var itemsExpanded = false
@@ -35,12 +34,13 @@ struct Sidebar: View {
             if !favorites.isEmpty {
                 Section(isExpanded: $favoritesExpanded) {
                     ForEach(favorites) { item in
-                        Label(item.title, systemImage: item.type == WorkbenchSchema.projectType ? "square.stack" : "doc.text")
+                        sidebarLabel(item.title, systemImage: item.type == WorkbenchSchema.projectType ? "square.stack" : "doc.text")
                             .tag(SidebarItem.favoriteItem(item.id))
                             .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
                     }
                 } header: {
                     Text("Favorites")
+                        .interfaceFont(.caption.weight(.semibold))
                         .accessibilityIdentifier("SidebarFavoritesSection")
                 }
             }
@@ -51,7 +51,7 @@ struct Sidebar: View {
                         row(.project(project.id), systemImage: "square.stack")
                     }
                 } label: {
-                    Label("Projects", systemImage: "square.stack")
+                    sidebarLabel(String(localized: "Projects"), systemImage: "square.stack")
                         .badge(library.count(in: .itemType("aic.project")))
                 }
                 .tag(SidebarItem.itemType("aic.project"))
@@ -63,7 +63,7 @@ struct Sidebar: View {
                     }
                     row(.files, systemImage: "doc")
                 } label: {
-                    Label("Items", systemImage: "doc.text")
+                    sidebarLabel(String(localized: "Items"), systemImage: "doc.text")
                 }
                 .accessibilityIdentifier("SidebarItems")
 
@@ -77,7 +77,7 @@ struct Sidebar: View {
                         library.moveFolders(ids, before: target, undoManager: undoManager)
                     } : nil)
                 } label: {
-                    Label("Folders", systemImage: "folder")
+                    sidebarLabel(String(localized: "Folders"), systemImage: "folder")
                         .contextMenu {
                             Button("New Folder") {
                                 browser.newFolder(in: library, order: order, undoManager: undoManager)
@@ -88,6 +88,7 @@ struct Sidebar: View {
                 .accessibilityIdentifier("SidebarFolders")
             } header: {
                 Text("Library")
+                    .interfaceFont(.caption.weight(.semibold))
                     .accessibilityIdentifier("SidebarLibrarySection")
             }
         }
@@ -95,9 +96,6 @@ struct Sidebar: View {
         .accessibilityIdentifier("Sidebar")
         .onDeleteCommand {
             if editsFolders { browser.folderToDelete = browser.selectedFolder }
-        }
-        .onChange(of: browser.folderToDelete) {
-            if let id = browser.folderToDelete { folderToDelete = library.folder(id) }
         }
         .onChange(of: browser.renamingFolder) {
             if browser.renamingFolder != nil { foldersExpanded = true }
@@ -112,7 +110,7 @@ struct Sidebar: View {
         }
         .confirmationDialog(
             "Delete the folder “\(folderToDelete?.name ?? "")”?",
-            isPresented: Binding { browser.folderToDelete != nil } set: { if !$0 { browser.folderToDelete = nil } },
+            isPresented: Binding { folderToDelete != nil } set: { if !$0 { browser.folderToDelete = nil } },
             presenting: folderToDelete
         ) { folder in
             Button("Delete Folder", role: .destructive) {
@@ -149,11 +147,13 @@ struct Sidebar: View {
     /// A sidebar row's height at the size chosen in System Settings, which the list of the places at its foot is
     /// given, since a list takes the height it is offered rather than its rows'.
     private var rowHeight: CGFloat {
+        let height: CGFloat
         switch rowSize {
-        case .small: 26
-        case .large: 40
-        default: 32
+        case .small: height = 26
+        case .large: height = 40
+        default: height = 32
         }
+        return max(height, height * InterfaceStyle.scale(for: textSize))
     }
 
     private var projects: [Item] {
@@ -173,12 +173,15 @@ struct Sidebar: View {
     private func row(_ item: SidebarItem, systemImage: String, secondaryIcon: Bool = false) -> some View {
         Label {
             Text(library.name(of: item))
+                .interfaceFont(.body)
         } icon: {
             if secondaryIcon {
                 Image(systemName: systemImage)
+                    .interfaceFont(.body)
                     .foregroundStyle(.secondary)
             } else {
                 Image(systemName: systemImage)
+                    .interfaceFont(.body)
             }
         }
             .badge(library.count(in: item))
@@ -195,10 +198,11 @@ struct Sidebar: View {
                     rename(folder, to: name)
                 }
             } else {
-                Label(folder.name, systemImage: "folder")
+                sidebarLabel(folder.name, systemImage: "folder")
                     .badge(library.count(in: .folder(folder.id)))
             }
         }
+        .interfaceFont(.body)
         .tag(SidebarItem.folder(folder.id))
         .dropDestination(for: NoteReference.self, isEnabled: Browser.canDrop(on: .folder(folder.id), in: library)) { notes, _ in
             drop(notes, on: .folder(folder.id))
@@ -213,7 +217,19 @@ struct Sidebar: View {
         }
     }
 
+    private func sidebarLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title).interfaceFont(.body)
+        } icon: {
+            Image(systemName: systemImage).interfaceFont(.body)
+        }
+    }
+
     private var editsFolders: Bool { library.capabilities.contains(.folders) }
+
+    private var folderToDelete: Folder? {
+        browser.folderToDelete.flatMap { library.folder($0) }
+    }
 
     private func drop(_ notes: [NoteReference], on item: SidebarItem) {
         guard Browser.canDrop(on: item, in: library) else { return }
@@ -256,6 +272,7 @@ private struct FolderNameField: View {
     var body: some View {
         Label {
             TextField("Folder Name", text: $name)
+                .interfaceFont(.body)
                 .focused($isFocused)
                 .onSubmit { commit(name) }
                 .onExitCommand { commit(folder.name) }

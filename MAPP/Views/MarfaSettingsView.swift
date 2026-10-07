@@ -124,7 +124,7 @@ struct MarfaSettingsView: View {
             Section {
                 VStack(alignment: .leading, spacing: 4) {
                     Label(notice.title, systemImage: "exclamationmark.triangle")
-                        .font(.headline)
+                        .interfaceFont(.headline)
                         .foregroundStyle(Color.orange)
                     Text(notice.message)
                         .foregroundStyle(.secondary)
@@ -148,7 +148,7 @@ struct DepartureSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Changes Haven’t Been Sent")
-                .font(.title2.bold())
+                .interfaceFont(.title2.bold())
             if departure.isAskedAgain {
                 Text("More changes arrived while you were deciding. Look at them before you choose.")
                     .foregroundStyle(.orange)

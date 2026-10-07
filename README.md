@@ -13,9 +13,9 @@ The sidebar keeps Inbox and All Notes above a collapsible Favorites section with
 
 The native title and property chips scroll with the note's body. When the header scrolls away, a compact title appears at the leading edge of the toolbar. The trailing group contains New Item (plus), Format (Aa), Details and More. Format includes lists and table insertion; More contains Share and Add Attachment. Selecting a note opens it at the top; editing marks appear when you enter the editor. An empty list leaves the content pane blank; a populated list with no selection shows “Select an item”. Search List (⌥⌘F) expands across the list column, with a trailing close button that also works when the search is empty.
 
-Settings (⌘,) fills the main window using a native two-column navigation split view, sidebar search, and grouped preference controls. Back to MAPP returns to the selected item and preserves an unsubmitted draft and the note-list width. The command palette opens the same Settings page. Search Settings finds categories by their names and preference labels, including spelling, text size, page width, and the notes folder.
+The note list defaults to 340 points and can be resized. Settings (⌘, or the gear in the sidebar toolbar) fills the main window using a native two-column navigation split view, sidebar search, and grouped preference controls. Back to MAPP in the sidebar toolbar returns to the selected item and preserves an unsubmitted draft and the note-list width. The command palette opens the same Settings page. Appearance > Base Text Size scales interface text, including the sidebar, list, and inspector. Editor > Text Size controls note text separately. Search Settings finds categories by their names and preference labels, including font size, spelling, page width, and the notes folder.
 
-File-backed items use the workbench definitions as interim input. Files without a Markdown envelope expose their file information, but do not claim editable properties that the folder cannot persist. Marfa integration is a separate phase.
+File-backed items use the workbench definitions as interim input. Files without a Markdown envelope expose their file information, but do not claim editable properties that the folder cannot persist.
 
 ## Reviewing components in Xcode
 

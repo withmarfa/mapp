@@ -5,7 +5,7 @@ import XCTest
 final class ItemLayoutTests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUp() {
+    override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
@@ -13,7 +13,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() { app.terminate() }
+    override func tearDown() async throws { app.terminate() }
 
     func testHeaderAndBodyOccupySeparateRegions() {
         app.outlines["Sidebar"].staticTexts["All Notes"].click()
@@ -82,6 +82,13 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertTrue(header.waitForExistence(timeout: 3))
         capture("Header at start of long document")
         let before = header.frame.minY
+        let otherColumnControls = [
+            app.toolbars.buttons["Search"],
+            app.toolbars.menuButtons["Sort"],
+            app.toolbars.buttons["Hide Sidebar"],
+        ]
+        let controlFrames = otherColumnControls.map(\.frame)
+        let controlColors = otherColumnControls.map { averageColor(of: $0.screenshot()) }
         header.scroll(byDeltaX: 0, deltaY: -40)
         Thread.sleep(forTimeInterval: 0.3)
         XCTAssertLessThan(header.frame.minY, before - 20, "The native header follows WebKit's scroll.")
@@ -89,7 +96,25 @@ final class ItemLayoutTests: XCTestCase {
         let compactTitle = app.staticTexts["ScrolledItemTitle"]
         XCTAssertTrue(compactTitle.waitForExistence(timeout: 3))
         XCTAssertFalse(header.isHittable)
+        for _ in 0..<3 {
+            page.scroll(byDeltaX: 0, deltaY: 800)
+            page.scroll(byDeltaX: 0, deltaY: -1200)
+        }
+        for (index, control) in otherColumnControls.enumerated() {
+            XCTAssertEqual(control.frame.minX, controlFrames[index].minX, accuracy: 2)
+            let color = averageColor(of: control.screenshot())
+            for channel in 0..<3 {
+                XCTAssertEqual(color[channel], controlColors[index][channel], accuracy: 0.08,
+                               "scrolling a note must not recolor controls in the other columns")
+            }
+        }
         capture("Compact title in toolbar after scrolling")
+        app.typeKey(",", modifierFlags: .command)
+        let back = app.buttons["SettingsBack"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3))
+        back.click()
+        XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the note's scroll position")
+        XCTAssertFalse(header.isHittable)
         app.typeKey("f", modifierFlags: .command)
         capture("Find bar on scrolled document")
     }
@@ -101,5 +126,26 @@ final class ItemLayoutTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func averageColor(of screenshot: XCUIScreenshot) -> [Double] {
+        guard let data = screenshot.image.tiffRepresentation,
+              let image = NSBitmapImageRep(data: data) else {
+            XCTFail("the toolbar screenshot could not be read")
+            return [0, 0, 0]
+        }
+        var color = [0.0, 0.0, 0.0]
+        var count = 0.0
+        for y in stride(from: 0, to: image.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: image.pixelsWide, by: 2) {
+                guard let pixel = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                color[0] += pixel.redComponent
+                color[1] += pixel.greenComponent
+                color[2] += pixel.blueComponent
+                count += 1
+            }
+        }
+        XCTAssertGreaterThan(count, 0)
+        return color.map { $0 / max(1, count) }
     }
 }

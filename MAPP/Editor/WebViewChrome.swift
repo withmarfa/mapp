@@ -50,14 +50,22 @@ class WebViewContainer: NSView {
         self.webView = webView
         runsUnderToolbar = webView.fadesUnderToolbar()
         super.init(frame: .zero)
+        clipsToBounds = true
         addSubview(webView)
+    }
+
+    // WebKit's printing thread queries these constant view properties.
+    nonisolated override var isOpaque: Bool { true }
+    nonisolated override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        // The transparent page needs backing in its own column, including the region below the toolbar.
+        NSColor.windowBackgroundColor.setFill()
+        bounds.fill()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
-
-    // WebKit lays a page out for printing on a thread of its own, which asks the views above the page this.
-    nonisolated override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()

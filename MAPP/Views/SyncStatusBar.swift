@@ -34,7 +34,7 @@ struct SyncStatusBar: View {
                 Text(note.title)
                 Spacer(minLength: 0)
             }
-            .font(.callout)
+            .interfaceFont(.callout)
             .foregroundStyle(note.isWarning ? Color.orange : Color.secondary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -70,7 +70,7 @@ private struct SyncDetails: View {
                 ForEach(status.notes.filter { $0.kind != .needsAttention }) { note in
                     VStack(alignment: .leading, spacing: 2) {
                         Label(note.title, systemImage: note.symbol)
-                            .font(.headline)
+                            .interfaceFont(.headline)
                             .foregroundStyle(note.isWarning ? Color.orange : Color.primary)
                         Text(note.detail)
                             .foregroundStyle(.secondary)
@@ -110,7 +110,7 @@ private struct SyncProblemRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(wording.headline)
-                .font(.headline)
+                .interfaceFont(.headline)
                 .fixedSize(horizontal: false, vertical: true)
             Text(wording.explanation)
                 .foregroundStyle(.secondary)

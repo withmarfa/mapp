@@ -89,7 +89,7 @@ private struct TypeRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(node.type.label)
                 Text(node.type.id.rawValue)
-                    .font(.caption.monospaced())
+                    .interfaceFont(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
             // A type shown only for the matches below it reads as context.
@@ -97,7 +97,7 @@ private struct TypeRow: View {
             Spacer(minLength: 0)
             if node.subtypeCount > 0 {
                 Text("^[\(node.subtypeCount) subtype](inflect: true)")
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -114,7 +114,7 @@ private struct EdgeTypeRow: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(edge.label)
             Text(edge.id)
-                .font(.caption.monospaced())
+                .interfaceFont(.caption.monospaced())
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)

@@ -306,6 +306,8 @@ final class WindowTests: XCTestCase {
         app.typeKey(.delete, modifierFlags: [])
         let confirm = app.sheets.buttons["Delete Folder"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.sheets.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Books")).element(boundBy: 0).exists)
+        XCTAssertTrue(app.sheets.staticTexts["Its notes will be moved to Recently Deleted."].exists)
         confirm.click()
         XCTAssertTrue(sidebarItem("Books").waitForNonExistence(timeout: 2))
     }
@@ -543,13 +545,16 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typesList.exists, "the sidebar comes back beside the types")
     }
 
-    func testPickingMarfaTypesAfterResizingTheSidebarWorks() {
+    func testPickingMarfaTypesAfterResizingTheSidebarWorks() throws {
         // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar resized.
-        let divider = window.splitters.firstMatch
-        XCTAssertTrue(divider.waitForExistence(timeout: 2))
+        XCTAssertTrue(window.splitters.firstMatch.waitForExistence(timeout: 2))
+        let divider = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min {
+            abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX)
+        })
+        XCTAssertLessThan(abs(divider.frame.midX - sidebar.frame.maxX), 8)
         let before = sidebar.frame.width
         let edge = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
+        edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
         XCTAssertGreaterThan(sidebar.frame.width, before + 30, "the sidebar is wider")
         let column = list.frame
         sidebarItem("Marfa Types").click()
@@ -559,7 +564,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         let width = sidebar.frame.width
         let moved = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        moved.press(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
+        moved.click(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
         XCTAssertLessThan(sidebar.frame.width, width - 30, "the sidebar is narrower")
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typesList.waitForExistence(timeout: 5))

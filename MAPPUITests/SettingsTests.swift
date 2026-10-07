@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -20,13 +21,21 @@ final class SettingsTests: XCTestCase {
         app.terminate()
     }
 
-    func testSettingsUsesTheCurrentWindowAndReturnsToTheSelectedNote() {
+    func testSettingsUsesTheCurrentWindowAndReturnsToTheSelectedNote() throws {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
         let title = window.textFields["ItemPageTitle"]
         let selected = expectation(for: NSPredicate(format: "value == %@", "Trip to Lisbon"), evaluatedWith: title)
         wait(for: [selected], timeout: 3)
+        let initialWidth = list.frame.width
+        let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min {
+            abs($0.frame.midX - list.frame.maxX) < abs($1.frame.midX - list.frame.maxX)
+        })
+        XCTAssertLessThan(abs(splitter.frame.midX - list.frame.maxX), 8)
+        let divider = splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        divider.click(forDuration: 0.2, thenDragTo: divider.withOffset(CGVector(dx: 60, dy: 0)))
+        XCTAssertGreaterThan(list.frame.width, initialWidth + 40, "the list is resized before opening Settings")
         let listFrame = list.frame
 
         app.typeKey(",", modifierFlags: .command)
@@ -56,6 +65,10 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 3), "Back belongs to the system toolbar")
         let sidebar = window.outlines["SettingsSidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
+        XCTAssertLessThan(back.frame.maxX, sidebar.frame.maxX, "Back stays in the sidebar toolbar")
+        let sidebarToggle = window.toolbars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Sidebar")).firstMatch
+        XCTAssertTrue(sidebarToggle.exists)
+        XCTAssertLessThan(sidebarToggle.frame.maxX, sidebar.frame.maxX, "the sidebar toggle stays with its column")
         XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3), "the native sidebar toggle targets Settings")
@@ -88,6 +101,29 @@ final class SettingsTests: XCTestCase {
             XCTAssertTrue(types.waitForExistence(timeout: 5))
             XCTAssertFalse(list.exists)
         }
+    }
+
+    func testSettingsPreservesTheEditorsTextAndUndoHistory() {
+        let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
+        row.click()
+        let body = window.webViews.firstMatch.textViews.firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
+        body.click()
+        app.typeKey(.downArrow, modifierFlags: .command)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("\n\nRetained editor check", forType: .string)
+        app.typeKey("v", modifierFlags: .command)
+        let inserted = expectation(for: NSPredicate(format: "value CONTAINS %@", "Retained editor check"), evaluatedWith: body)
+        wait(for: [inserted], timeout: 3)
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        window.buttons["SettingsBack"].click()
+        XCTAssertTrue(body.waitForExistence(timeout: 3))
+        XCTAssertTrue((body.value as? String)?.contains("Retained editor check") == true)
+        body.click()
+        app.typeKey("z", modifierFlags: .command)
+        let undone = expectation(for: NSPredicate(format: "NOT (value CONTAINS %@)", "Retained editor check"), evaluatedWith: body)
+        wait(for: [undone], timeout: 3)
     }
 
     func testSettingsFromAnUnselectedItemKeepsNativeChrome() {
@@ -187,6 +223,74 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         XCTAssertEqual(app.windows.count, 1)
         XCTAssertFalse(field.exists)
+    }
+
+    func testBaseTextSizeChangesTheInterfaceAndPreservesNoteTextSize() {
+        let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        let originalHeight = row.frame.height
+        let sidebarText = window.outlines["Sidebar"].staticTexts["All Notes"]
+        let originalSidebarHeight = sidebarText.frame.height
+        let favoriteText = window.outlines["Sidebar"].staticTexts["Kitchen quotes"]
+        let folderText = window.outlines["Sidebar"].staticTexts["Home"]
+        let originalFavoriteHeight = favoriteText.frame.height
+        let originalFolderHeight = folderText.frame.height
+        XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
+        let settingsButton = window.toolbars.buttons["SettingsToolbar"]
+        XCTAssertTrue(settingsButton.exists)
+        XCTAssertLessThan(settingsButton.frame.maxX, list.frame.minX, "Settings belongs to the sidebar")
+        settingsButton.click()
+        let size = window.popUpButtons["InterfaceTextSize"]
+        XCTAssertTrue(size.waitForExistence(timeout: 3))
+        size.click()
+        app.menuItems["18 pt"].click()
+        window.buttons["SettingsBack"].click()
+        XCTAssertTrue(list.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(row.frame.height, originalHeight + 8, "list text and row height scale together")
+        XCTAssertGreaterThan(favoriteText.frame.height, originalFavoriteHeight + 3, "favorite text scales with the interface")
+        XCTAssertGreaterThan(folderText.frame.height, originalFolderHeight + 3, "nested folder text scales with the interface")
+        XCTAssertGreaterThan(sidebarText.frame.height, originalSidebarHeight + 3, "sidebar text scales too")
+        attachScreenshot("LargerInterfaceText")
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(size.waitForExistence(timeout: 3))
+        XCTAssertEqual(size.value as? String, "18 pt", "the setting is retained on returning")
+        window.outlines["SettingsSidebar"].staticTexts["Editor"].click()
+        let noteSize = window.popUpButtons["TextSize"]
+        XCTAssertTrue(noteSize.waitForExistence(timeout: 3))
+        XCTAssertEqual(noteSize.value as? String, "13 pt", "the note's own text setting stays independent")
+        attachScreenshot("SeparateEditorTextSize")
+        app.terminate()
+        app.launchArguments += ["-MAPPKeepSampleSettings", "-MAPPKeepSampleFolder"]
+        app.launch()
+        XCTAssertTrue(list.waitForExistence(timeout: 5))
+        app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(size.waitForExistence(timeout: 3))
+        XCTAssertEqual(size.value as? String, "18 pt", "the preference survives restarting the app")
+    }
+
+    func testBaseTextSizeKeepsSidebarPlacesAndSearchUsableAtLimits() {
+        for points in [24, 11] {
+            app.typeKey(",", modifierFlags: .command)
+            let size = window.popUpButtons["InterfaceTextSize"]
+            XCTAssertTrue(size.waitForExistence(timeout: 3))
+            size.click()
+            app.menuItems["\(points) pt"].click()
+            window.buttons["SettingsBack"].click()
+            let places = window.outlines["SidebarPlaces"]
+            XCTAssertTrue(places.waitForExistence(timeout: 3))
+            XCTAssertEqual(places.outlineRows.count, 2)
+            for row in places.outlineRows.allElementsBoundByIndex {
+                XCTAssertTrue(places.frame.contains(row.frame), "a sidebar place is clipped at \(points) points")
+            }
+            app.typeKey("f", modifierFlags: [.command, .option])
+            let search = window.searchFields["ColumnSearch"]
+            XCTAssertTrue(search.waitForExistence(timeout: 3))
+            search.typeText("Lisbon")
+            XCTAssertEqual(search.value as? String, "Lisbon")
+            window.buttons["CloseColumnSearch"].click()
+            XCTAssertTrue(search.waitForNonExistence(timeout: 3))
+            attachScreenshot("InterfaceText-\(points)")
+        }
     }
 
     private func attachScreenshot(_ name: String) {

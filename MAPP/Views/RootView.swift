@@ -11,18 +11,16 @@ struct RootView: View {
     let settingsRequest: SettingsRequest
 
     var body: some View {
-        ZStack {
-            workspace
-                .opacity(settings.isPresented ? 0 : 1)
-                .allowsHitTesting(!settings.isPresented)
-                .disabled(settings.isPresented)
-                .accessibilityHidden(settings.isPresented)
-            if settings.isPresented {
+        Group {
+            if settings.isPresented && libraries.current == nil {
                 SettingsView(presentation: settings)
+            } else {
+                workspace
             }
         }
         // Settings reads the library too, so it is given to both.
         .environment(\.library, libraries.current)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .focusedSceneValue(\.settingsPresentation, settings)
         .onAppear {
             if settingsRequest.isPending {
