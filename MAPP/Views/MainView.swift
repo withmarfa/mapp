@@ -8,6 +8,7 @@ struct MainView: View {
     @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
+    @AppStorage(DetailsKey.style) private var detailsStyle = DetailsStyle.sidebar
     @StoredOrder private var order
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
@@ -176,12 +177,22 @@ struct MainView: View {
         }
     }
 
+    private var showsDetails: Bool { details.isPresented && !browser.showsTypes && !browser.isCreatingItem }
+
     private var presentedWindow: some View {
         workspace
-        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
+        .inspector(isPresented: Binding { showsDetails && detailsStyle == .sidebar } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
         }
+        .overlay {
+            if showsDetails && detailsStyle == .panel {
+                DetailsPanel(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
+                    ItemInspectorHost(browser: browser, details: details)
+                }
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: showsDetails && detailsStyle == .panel)
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }

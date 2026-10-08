@@ -9,6 +9,7 @@ struct NoteWindow: View {
     @State private var editor: EditorController
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
+    @AppStorage(DetailsKey.style) private var detailsStyle = DetailsStyle.sidebar
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
     @State private var fileURL: URL?
@@ -51,9 +52,17 @@ struct NoteWindow: View {
                     }
             }
         }
-        .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
+        .inspector(isPresented: Binding { details.isPresented && detailsStyle == .sidebar } set: { details.isPresented = $0 }) {
             if let id { ItemInspectorHost(itemID: id, details: details) }
         }
+        .overlay {
+            if let id, details.isPresented && detailsStyle == .panel {
+                DetailsPanel(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
+                    ItemInspectorHost(itemID: id, details: details)
+                }
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: details.isPresented && detailsStyle == .panel)
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {

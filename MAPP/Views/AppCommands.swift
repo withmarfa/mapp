@@ -91,6 +91,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1 || browser?.showsTypes == true)
+            DetailsStyleOptions()
             Divider()
             OrderOptions()
             Divider()
