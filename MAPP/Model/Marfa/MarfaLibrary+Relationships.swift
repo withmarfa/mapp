@@ -211,11 +211,12 @@ extension MarfaLibrary {
         index.links(touching: id).filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
     }
 
-    /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed
-    /// freely. An end that holds one link of its type has it replaced by moving the edge's other end (edges.md 10
-    /// and 14), so a new parent is one write and the child never holds none or two: a replacement is a move, and so
-    /// is taking an item whose own link points elsewhere, as a child chosen under a project. A link a third item
-    /// holds as its own is never taken from it. A change the contract would refuse is told here and sent nowhere.
+    /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed freely.
+    /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
+    /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
+    /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
+    /// project. A link a third item holds as its own is never taken from it. A change the contract would refuse is told
+    /// here and sent nowhere.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
