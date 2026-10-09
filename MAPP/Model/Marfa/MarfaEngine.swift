@@ -992,9 +992,9 @@ actor MarfaEngine {
     }
 
     /// Moves the version the person's own writes account for past the answers the copy has taken. A create or update
-    /// the server took on the version it held moves the item one version on (`versions/update-step`); one merged, or
-    /// sent as read on an older version, lands on whatever the server held, which the copy now shows with every answer
-    /// taken so far. Any other answer leaves the item where it was.
+    /// the server took on the version it held moves the item one version on (`versions/create-version-one`,
+    /// `versions/update-step`); one merged, or sent as read on an older version, lands on whatever the server held,
+    /// which the copy now shows with every answer taken so far. Any other answer leaves the item where it was.
     private func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
         guard let own = ownText[id] else { return }
         var taken = counted
