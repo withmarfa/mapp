@@ -355,12 +355,12 @@ import Observation
         if refusals[write] != nil { creating[write] = id } else { refusedCreations.insert(id) }
     }
 
-    /// The person's text, typed on the text the library gave at `readAt`. The first save typed on a version is
-    /// merged against it where the copy has moved on; every later one follows the person's own, so their saves
-    /// never come back conflicted against each other. Text typed on the text the library holds is held at once
-    /// until the source answers. Text typed on older text, reported after the page took in newer text, is sent as
-    /// made on what it was typed on (queue-and-verdicts 43), so the server keeps both rather than this text
-    /// replacing what the person never saw, and the library goes on holding the newer text.
+    /// The person's text, typed on the text the library gave at `readAt`. The first save typed on a version is merged
+    /// against it where the copy has moved on; every later one follows the person's own, so their saves never come back
+    /// conflicted against each other. Text typed on the text the library holds is held at once until the source
+    /// answers. Text typed on older text, reported after the page took in newer text, is sent as made on what it was
+    /// typed on (`queue-and-verdicts/as-read-sent-on-read`), so the server keeps both rather than this text replacing
+    /// what the person never saw, and the library goes on holding the newer text.
     func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String) {
         let held = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
         let merge: BodyMerge = savedOn[id] == readAt ? .following : .asRead

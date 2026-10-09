@@ -917,9 +917,10 @@ actor MarfaEngine {
 
     /// An edit is sent on the version of the text it was typed on: as an ordinary update where the copy holds that
     /// version, and otherwise said to be read there, so the server merges it against what was read rather than
-    /// laying it over a change the person never saw (queue-and-verdicts 43). An edit queued behind the person's own
-    /// on the version the copy holds moves onto that edit's answer (42). The copy moves as answers and catch-ups
-    /// land, so the version is decided against one reading of the copy, and again if the copy moved meanwhile.
+    /// laying it over a change the person never saw (`queue-and-verdicts/as-read-sent-on-read`). An edit queued
+    /// behind the person's own on the version the copy holds moves onto that edit's answer
+    /// (`queue-and-verdicts/edit-on-answer`). The copy moves as answers and catch-ups land, so the version is
+    /// decided against one reading of the copy, and again if the copy moved meanwhile.
     private func send(
         _ id: ItemID, _ properties: Edit.Properties, type: String? = nil, tier: Marfa.Tier? = nil,
         typedOn: () async throws -> Int64
@@ -990,10 +991,10 @@ actor MarfaEngine {
         return ownText[id]?.on ?? base.rawValue
     }
 
-    /// Moves the version the person's own writes account for past the answers the copy has taken. A create or
-    /// update the server took on the version it held moves the item one version on (versions.md 2); one merged, or
-    /// sent as read on an older version, lands on whatever the server held, which the copy now shows with every
-    /// answer taken so far. Any other answer leaves the item where it was.
+    /// Moves the version the person's own writes account for past the answers the copy has taken. A create or update
+    /// the server took on the version it held moves the item one version on (`versions/create-version-one`,
+    /// `versions/update-step`); one merged, or sent as read on an older version, lands on whatever the server held,
+    /// which the copy now shows with every answer taken so far. Any other answer leaves the item where it was.
     private func count(answers queue: [Marfa.QueuedWrite], for id: ItemID) async throws {
         guard let own = ownText[id] else { return }
         var taken = counted
