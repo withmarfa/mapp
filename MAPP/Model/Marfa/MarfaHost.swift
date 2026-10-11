@@ -98,7 +98,7 @@ extension MarfaSource: MarfaHostedSource {}
     /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
-    @ObservationIgnored var handOverEdits: () async -> Void = {}
+    @ObservationIgnored var handOverEdits: () async -> Bool = { true }
 
     init(
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
@@ -153,7 +153,7 @@ extension MarfaSource: MarfaHostedSource {}
         }
         try begin()
         defer { isBusy = false }
-        await handOverEdits()
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         try await save(key, for: connection)
         do {
             try await open(connection)
@@ -245,7 +245,7 @@ extension MarfaSource: MarfaHostedSource {}
     /// A copy that could not take a key is closed for good; it opens again with the key that is stored, and the
     /// person is told why.
     private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
-        await handOverEdits()
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         detach()
         state = .connecting
         await source.close()
@@ -263,7 +263,7 @@ extension MarfaSource: MarfaHostedSource {}
         try begin()
         defer { isBusy = false }
         let current = source
-        if current != nil { await handOverEdits() }
+        if current != nil { guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
         if let current, choice == nil {
             let unsent = await current.unsentWrites()
             if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
@@ -338,7 +338,7 @@ extension MarfaSource: MarfaHostedSource {}
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
-        await handOverEdits()
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         let agreed: UnsentWrites?
         switch choice {
         case .keepCopy:

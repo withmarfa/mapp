@@ -15,7 +15,7 @@ import Testing
     private func model(_ bench: HostBench) -> (MarfaSettingsModel, flushed: Counter) {
         let flushed = Counter()
         let host = bench.host()
-        host.handOverEdits = { flushed.count += 1 }
+        host.handOverEdits = { flushed.count += 1; return true }
         return (MarfaSettingsModel(host: host), flushed)
     }
 
@@ -106,7 +106,7 @@ import Testing
         let source = try #require(bench.servers.last)
         source.closesOn.withLock { $0 = ["key-2"] }
         var seen: [[String]] = []
-        model.host.handOverEdits = { seen.append(source.calls) }
+        model.host.handOverEdits = { seen.append(source.calls); return true }
         model.newKey = "key-2"
         await model.replaceKey()
         #expect(seen == [["refresh", "tryKey key-2"]])

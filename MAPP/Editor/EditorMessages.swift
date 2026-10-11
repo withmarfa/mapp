@@ -19,9 +19,13 @@ nonisolated struct CaretState: Equatable, Sendable {
     var block: Block = .paragraph
     /// One quote holds the whole selection; `block` is what sits inside it.
     var quoted = false
+    var sourceMode = false
     var inTable = false
     var canUndo = false
     var canRedo = false
+    var generation = -1
+    var formats: [String: Bool] = [:]
+    var tables: [String: Bool] = [:]
 }
 
 /// What the page tells the app, decoded from the JSON it posts to the `host` message handler.
@@ -57,9 +61,13 @@ nonisolated enum EditorMessage: Sendable {
                 marks: Set(marks),
                 block: block,
                 quoted: dict["quoted"] as? Bool ?? false,
+                sourceMode: dict["sourceMode"] as? Bool ?? false,
                 inTable: dict["inTable"] as? Bool ?? false,
                 canUndo: dict["canUndo"] as? Bool ?? false,
-                canRedo: dict["canRedo"] as? Bool ?? false
+                canRedo: dict["canRedo"] as? Bool ?? false,
+                generation: dict["generation"] as? Int ?? -1,
+                formats: dict["formats"] as? [String: Bool] ?? [:],
+                tables: dict["tables"] as? [String: Bool] ?? [:]
             ))
         case "openLink":
             guard let href = dict["href"] as? String else { return nil }
@@ -86,6 +94,8 @@ nonisolated enum EditorMessage: Sendable {
                   let visible = dict["visible"] as? [Int], visible.count == 2
             else { return nil }
             self = .find(FindState(
+                snapshotID: dict["snapshotId"] as? String ?? "",
+                generation: dict["generation"] as? Int ?? -1,
                 text: text,
                 selection: NSRange(location: selection[0], length: selection[1] - selection[0]),
                 visible: NSRange(location: visible[0], length: visible[1] - visible[0]),

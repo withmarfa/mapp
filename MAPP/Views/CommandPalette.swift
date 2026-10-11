@@ -223,6 +223,9 @@ struct CommandPalette: View {
 
         if let one, one.isWritable {
             if hasVisibleEditor {
+            add(editor.caret.sourceMode ? String(localized: "Show Formatted Text") : String(localized: "Show Markdown Source"), "doc.plaintext") {
+                editor.setSourceMode(!editor.caret.sourceMode)
+            }
                 for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                                .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {

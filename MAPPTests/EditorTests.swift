@@ -71,6 +71,61 @@ struct EditorTests {
 
     """
 
+    @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        var left = false
+        page.editor.onLeave = { _ in left = true }
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        let originalID = page.editor.noteID
+        let replacement = Note(body: "Replacement\n", created: .now)
+        page.library.notes.append(replacement)
+        let kept = await withCheckedContinuation { continuation in
+            page.editor.flush { continuation.resume(returning: $0) }
+            page.editor.load(page.library.item(replacement.id)!)
+        }
+        #expect(page.editor.noteID == originalID)
+        #expect(page.changes.isEmpty)
+        #expect(!kept)
+        #expect(!left)
+        #expect(page.library.failure != nil)
+        try await page.run("window.editor.flush = window.savedFlush")
+        let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
+        try await page.load("Replacement\n")
+        let rejected = try await page.editor.webView.callAsyncJavaScript("try { window.editor.flush(expected); return false } catch { return true }", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? Bool
+        #expect(rejected == true)
+        #expect(try await page.markdown() == nil)
+    }
+
+    @Test func closeProxyRestoresTheHostDelegateAndNeverReusesARejectedApproval() async throws {
+        final class HostDelegate: NSObject, NSWindowDelegate {
+            var permitsClose = true
+            func windowShouldClose(_ sender: NSWindow) -> Bool { permitsClose }
+        }
+        let page = try await Harness()
+        try await page.load("Draft\n")
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let host = HostDelegate()
+        window.delegate = host
+        let proxy = EditorCloseDelegate(editor: page.editor, window: window)
+        var left = false
+        page.editor.onLeave = { _ in left = true }
+        #expect(!proxy.windowShouldClose(window))
+        host.permitsClose = false
+        try await page.wait { left }
+        try await page.run("0")
+        host.permitsClose = true
+        try await page.run("window.editor.flush = () => { throw new Error('composition') }")
+        #expect(!proxy.windowShouldClose(window))
+        try await Task.sleep(for: .milliseconds(2200))
+        #expect(page.library.failure != nil)
+        proxy.detach()
+        #expect(window.delegate === host)
+        window.delegate = nil
+        window.close()
+    }
+
     @Test func aNoteOpenedAndLeftAloneIsNotRewritten() async throws {
         let page = try await Harness()
         try await page.load(kitchen)
@@ -284,9 +339,9 @@ struct EditorTests {
         }
         #expect(widths == [4])
         let absent = try await page.editor.webView.evaluateJavaScript(
-            "[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)"
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind='missing'] .inkkit-file-label')].map((span) => span.textContent)"
         ) as? [String]
-        #expect(absent == ["b"])
+        #expect(absent == ["b: File Not Found"])
     }
 
     // MARK: Embedded files of any kind
@@ -338,27 +393,24 @@ struct EditorTests {
         let image = try await settle(editor, "(() => { const i = document.querySelector('.image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
         #expect(image == [5, 3], "the image loads through the scheme at the width its embed gives")
 
-        let audio = try await settle(editor, "(() => { const a = document.querySelector('.embed-audio audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
+        let audio = try await settle(editor, "(() => { const a = document.querySelector('.inkkit-file audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
         #expect(abs((audio ?? 0) - 0.5) < 0.05, "the sound's length is read through ranges of the file")
 
-        let video = try await settle(editor, "(() => { const v = document.querySelector('.embed-video video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
+        let video = try await settle(editor, "(() => { const v = document.querySelector('.inkkit-file video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
         #expect(video == [64, 64])
 
-        let frame = try await settle(editor, "document.querySelector('.embed-pdf iframe')?.src ?? ''", as: String.self) { $0?.isEmpty == false }
+        let frame = try await settle(editor, "document.querySelector('.inkkit-file iframe')?.src ?? ''", as: String.self) { $0?.isEmpty == false }
         #expect(frame?.hasPrefix("mapp-embed://file/") == true)
 
-        let card = try await settle(editor, "(() => { const c = document.querySelector('.embed-card'); const i = c?.querySelector('img'); return c && i?.complete && i.naturalWidth > 0 ? [c.querySelector('.embed-name').textContent, c.querySelector('.embed-detail').textContent] : [] })()", as: [String].self) { $0?.count == 2 }
-        #expect(card?.first == "Budget.csv")
-        #expect(card?.last?.isEmpty == false, "the card says how large the file is")
-
-        let absent = try await editor.webView.evaluateJavaScript("[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)") as? [String]
-        #expect(absent == ["Missing.zip", "far"])
-        let text = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String
-        #expect(text?.contains("![[A note]]") == true, "an embedded note is text")
+        let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
+        #expect(labels?.contains("Budget.csv") == true)
+        #expect(labels?.contains("Note reference: A note. Open to edit source.") == true)
+        #expect(labels?.contains("Missing.zip: File Not Found") == true)
+        #expect(labels?.contains("far: File Not Found") == true)
 
         // WebKit draws a PDF in a frame from the app's scheme: the red page shows where the frame is.
         let rect = try #require(try await editor.webView.evaluateJavaScript(
-            "(() => { const r = document.querySelector('.embed-pdf iframe').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()"
+            "(() => { const r = document.querySelector('.inkkit-file iframe').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()"
         ) as? [Double])
         var red = false
         for _ in 0..<60 where !red {
@@ -411,8 +463,8 @@ struct EditorTests {
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
         let page = try await Harness(library: library)
         page.editor.load(try #require(library.item(note.id)))
-        _ = try await settle(page.editor, "!!document.querySelector('.embed-card')", as: Bool.self) { $0 == true }
-        try await page.run("document.querySelector('.embed-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
+        try await page.run("document.querySelector('.inkkit-file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         try await page.wait { page.editor.menuEmbed != nil }
         #expect(page.editor.menuEmbed?.item == note.id)
         #expect(page.editor.menuEmbed?.reference == .name("Budget.csv"))

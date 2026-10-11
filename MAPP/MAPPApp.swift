@@ -74,8 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in
-            _ = await libraries.flushEditors(within: .seconds(5))
-            NSApp.reply(toApplicationShouldTerminate: true)
+            let kept = await libraries.flushEditors(within: .seconds(5))
+            NSApp.reply(toApplicationShouldTerminate: kept)
         }
         return .terminateLater
     }

@@ -114,7 +114,8 @@ struct Sidebar: View {
             presenting: folderToDelete
         ) { folder in
             Button("Delete Folder", role: .destructive) {
-                EditorController.flushAll(leaving: false) { [undoManager] in
+                EditorController.flushAll(leaving: false) { [undoManager] kept in
+                    guard kept else { return }
                     library.deleteFolder(folder.id, undoManager: undoManager)
                 }
             }

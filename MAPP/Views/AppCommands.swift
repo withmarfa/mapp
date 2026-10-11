@@ -84,6 +84,11 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            Button(editor?.caret.sourceMode == true ? "Show Formatted Text" : "Show Markdown Source") {
+                if let editor { editor.setSourceMode(!editor.caret.sourceMode) }
+            }
+            .disabled(editor?.hasNote != true)
+            Divider()
             if let browser { ItemViewOptions(browser: browser) }
             Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "info.circle") {

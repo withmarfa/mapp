@@ -1,6 +1,78 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Collapse" : {
+
+    },
+    "Couldn’t Print Note" : {
+
+    },
+    "Couldn’t Save Note" : {
+
+    },
+    "Diagram unavailable:" : {
+
+    },
+    "Editor Couldn’t Complete the Action" : {
+
+    },
+    "Expand" : {
+
+    },
+    "File Not Found" : {
+
+    },
+    "File could not be loaded" : {
+
+    },
+    "Finish editing the current note before changing libraries." : {
+
+    },
+    "Footnote" : {
+
+    },
+    "Link unavailable" : {
+
+    },
+    "Loading file…" : {
+
+    },
+    "Markdown Source" : {
+
+    },
+    "Note reference: %@. Open to edit source." : {
+
+    },
+    "Open to view this PDF" : {
+
+    },
+    "Plain Text" : {
+
+    },
+    "Preview unavailable" : {
+
+    },
+    "Rendering diagram…" : {
+
+    },
+    "Show Formatted Text" : {
+
+    },
+    "Show Markdown Source" : {
+
+    },
+    "Start typing…" : {
+
+    },
+    "The PDF exceeds the export limit of 200 pages or 64 MB." : {
+
+    },
+    "The editor could not finish the current change. Keep this window open and try again." : {
+
+    },
+    "The printable note could not finish loading." : {
+
+    },
     "List View" : {
 
     },

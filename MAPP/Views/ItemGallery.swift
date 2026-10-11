@@ -196,7 +196,8 @@ struct ItemGallery: View {
 
     private func deleteSelection() {
         let ids = browser.selection
-        EditorController.flushAll(leaving: false) { [library, undoManager] in
+        EditorController.flushAll(leaving: false) { [library, undoManager] kept in
+            guard kept else { return }
             Browser.delete(ids, in: library, undoManager: undoManager)
         }
     }

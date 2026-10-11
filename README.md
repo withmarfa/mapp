@@ -9,7 +9,7 @@ Requires macOS 27 and Xcode 27. Open `MAPP.xcodeproj` and run the `MAPP` scheme,
 
 ## Item interface
 
-The sidebar keeps Inbox and All Notes above a collapsible Favorites section with shortcuts to individual items. Favorites disappears when it has no items. Under Library, native disclosure groups show Projects, item types and files under Items, and Folders. Details in the toolbar reveals the item's native inspector; View > Show Details provides the same action. New Item in the toolbar or File menu opens an Untitled page. Choose its type and optional parent, then press Return in the title or click the content area to start writing. Draft input stays in that window when you navigate away; New Item resumes it. File > Import Files creates a separate file item, while Add Attachment opens the image chooser to embed an image in a Markdown document. Property and relationship edits are saved to the selected folder. Markdown remains in the existing editor; photos, PDFs, and other files use native viewing or opening.
+The sidebar keeps Inbox and All Notes above a collapsible Favorites section with shortcuts to individual items. Favorites disappears when it has no items. Under Library, native disclosure groups show Projects, item types and files under Items, and Folders. Details in the toolbar reveals the item's native inspector; View > Show Details provides the same action. New Item in the toolbar or File menu opens an Untitled page. Choose its type and optional parent, then press Return in the title or click the content area to start writing. Draft input stays in that window when you navigate away; New Item resumes it. File > Import Files creates a separate file item, while Add Attachment opens the image chooser to embed an image in a Markdown document. Property and relationship edits are saved to the selected folder. Markdown uses InkKit through its public editor API; photos, PDFs, and other files use native viewing or opening.
 
 The native title and property chips scroll with the note's body. When the header scrolls away, a compact title appears at the leading edge of the toolbar. The trailing group contains New Item (plus), Format (Aa), Details and More. Format includes lists and table insertion; More contains Share and Add Attachment. Selecting a note opens it at the top; editing marks appear when you enter the editor. An empty list leaves the content pane blank; a populated list with no selection shows “Select an item”. Search List (⌥⌘F) expands across the list column, with a trailing close button that also works when the search is empty.
 
@@ -18,6 +18,12 @@ More > Gallery View replaces the list and page with a grid beside the sidebar, a
 The note list defaults to 340 points and can be resized. Settings (⌘, or the gear in the sidebar toolbar) fills the main window using a native two-column navigation split view, sidebar search, and grouped preference controls. Back to MAPP in the sidebar toolbar returns to the selected item and preserves an unsubmitted draft and the note-list width. The command palette opens the same Settings page. Appearance > Base Text Size scales interface text, including the sidebar, list, and inspector. Editor > Text Size controls note text separately. Search Settings finds categories by their names and preference labels, including font size, spelling, page width, and the notes folder.
 
 File-backed items use the workbench definitions as interim input. Files without a Markdown envelope expose their file information, but do not claim editable properties that the folder cannot persist.
+
+## Editing and export
+
+View and the command palette switch between formatted and source editing. Native Find and Replace work with the active editor. Local images and attachments keep their existing file-access protections; note references open source editing rather than pretending to embed another note.
+
+Print and Export as PDF render a complete snapshot of the note, including local images. Other attachments use readable descriptions. PDF export is limited to 200 pages or 64 MB; a failed export leaves an existing destination unchanged.
 
 ## Reviewing components in Xcode
 
