@@ -62,7 +62,7 @@ final class EditorController: NSObject {
     }
     @ObservationIgnored private var loadRequest = 0
     @ObservationIgnored private var closeDelegate: EditorCloseDelegate?
-    @ObservationIgnored private var wantsFocus = false
+    @ObservationIgnored private var wantsFocus: ItemID?
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
@@ -128,9 +128,10 @@ final class EditorController: NSObject {
 
     // MARK: Driving the page
 
-    /// Shows a note, with the caret at its end. A deleted note is shown read-only. The note shown before is
+    /// Shows a note for reading. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
+        if wantsFocus != item.id { wantsFocus = nil }
         loadRequest += 1
         let request = loadRequest
         let present = { [self] in
@@ -182,11 +183,13 @@ final class EditorController: NSObject {
         shown = shown.filter { $0.key >= generation - 8 }
         shown[generation] = Shown(id: item.id, read: body.version)
         call(function, json(body.text), String(generation), String(isEditable))
+        if let requested = wantsFocus { focus(requested) }
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
+        wantsFocus = nil
         isPresented = false
         loadRequest += 1
         let request = loadRequest
@@ -256,14 +259,23 @@ final class EditorController: NSObject {
 
     /// Gives the page the keyboard: now if it is ready and in a window, otherwise once it is, as when the page
     /// comes back after Marfa Types. One request, never repeated.
-    func focus() {
-        guard isReady, let window = webView.window else {
-            wantsFocus = true
+    func focus(_ itemID: ItemID? = nil) {
+        guard let requested = itemID ?? noteID else { return }
+        guard requested == noteID, isReady, let window = webView.window else {
+            wantsFocus = requested
             return
         }
-        wantsFocus = false
+        wantsFocus = nil
         window.makeFirstResponder(webView)
         call("focus")
+    }
+
+    func releaseFocus() {
+        wantsFocus = nil
+        if isReady { call("blurText", String(generation)) }
+        guard let window = webView.window, let responder = window.firstResponder as? NSView,
+              responder === webView || responder.isDescendant(of: webView) else { return }
+        window.makeFirstResponder(nil)
     }
 
     /// The page is in a window again, where a request for the keyboard made while it was out can be granted.
@@ -273,7 +285,7 @@ final class EditorController: NSObject {
                 closeDelegate?.detach()
                 closeDelegate = EditorCloseDelegate(editor: self, window: window)
             }
-            if wantsFocus { focus() }
+            if let requested = wantsFocus { focus(requested) }
         }
     }
 
@@ -584,7 +596,7 @@ final class EditorController: NSObject {
                 shown[generation] = Shown(id: noteID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
-            if wantsFocus { focus() }
+            if let requested = wantsFocus { focus(requested) }
         case .changed(let markdown, let generation):
             report(markdown, of: generation)
         case .state(let state):

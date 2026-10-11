@@ -107,9 +107,46 @@ struct EditorTests {
         ) as? Bool
         #expect(reading == false)
         let outline = try await page.editor.webView.evaluateJavaScript(
-            "getComputedStyle(document.querySelector('.ProseMirror')).outlineWidth"
+            "getComputedStyle(document.querySelector('.ProseMirror')).outlineStyle"
         ) as? String
-        #expect(outline == "0px")
+        #expect(outline == "none")
+    }
+
+    @Test func deferredFocusBelongsToTheRequestedItem() async throws {
+        let first = Note(body: "First", created: .now)
+        let second = Note(body: "Second", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(first.id)))
+        page.editor.focus(first.id)
+        page.editor.load(try #require(library.item(second.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
+                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        window.contentView = page.editor.webView
+        window.makeKeyAndOrderFront(nil)
+        page.editor.pageDidMoveToWindow()
+        let reading = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(reading == false)
+        page.editor.focus(first.id)
+        page.editor.load(try #require(library.item(first.id)))
+        let composing = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(composing == true)
+        page.editor.releaseFocus()
+        window.contentView = nil
+        window.contentView = page.editor.webView
+        page.editor.noteChanged(try #require(library.item(first.id)))
+        page.editor.pageDidMoveToWindow()
+        let reopened = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(reopened == false)
     }
 
     @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
