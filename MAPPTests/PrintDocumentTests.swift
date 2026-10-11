@@ -1,5 +1,6 @@
 import AppKit
 import PDFKit
+import WebKit
 import Testing
 @testable import MAPP
 
@@ -43,6 +44,16 @@ struct PrintDocumentTests {
             } }
         }
         #expect(bluePixels > 20, "the portable image is drawn in the PDF")
+    }
+
+    @Test func oversizedParagraphKeepsTheCrossingTextLineIntact() async throws {
+        let view = WKWebView()
+        let boundary = try await view.callAsyncJavaScript("""
+        \(PrintDocumentRenderer.pageBoundaryScript)
+        const spans = [{top:80,bottom:1114}, {top:674,bottom:696}];
+        return safePageBoundary(spans, 0, 684, 684);
+        """, arguments: [:], in: nil, contentWorld: .page) as? Double
+        #expect(boundary == 674)
     }
 
     @Test func limitsRejectWithoutCreatingOrReplacingADestination() async throws {

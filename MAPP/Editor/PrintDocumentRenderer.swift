@@ -70,6 +70,7 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
         view.frame = NSRect(x: 0, y: 0, width: width, height: height)
         let layout: [[String: Double]]?
         do { layout = try await view.callAsyncJavaScript("""
+        \(Self.pageBoundaryScript)
         const style = document.createElement('style');
         style.textContent = `html,body{margin:0!important;padding:0!important;min-height:0!important;max-width:none!important;width:auto!important}
           img{max-width:100%;max-height:${height}px;object-fit:contain} pre{white-space:pre-wrap}`;
@@ -88,13 +89,7 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
         while(start < bottom) {
           if(pages.length >= limit) throw new Error('PDF_PAGE_LIMIT');
           let end = Math.min(start + height, bottom);
-          const crossing = spans.filter(r => r.top > start && r.top < end && r.bottom > end);
-          if(crossing.length) {
-            let boundary = Math.min(...crossing.map(r => r.top));
-            const heading = spans.find(r => r.heading && r.top > start && r.bottom <= boundary && boundary-r.bottom < 40);
-            if(heading) boundary = heading.top;
-            if(boundary > start + height * 0.4) end = boundary;
-          }
+          end = safePageBoundary(spans, start, end, height);
           pages.push({start,height:end-start}); start = end;
         }
         return pages;
@@ -131,6 +126,17 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
               document.pageCount == layout.count else { throw PrintError.limit }
         try (output as Data).write(to: destination, options: .atomic)
     }
+
+    static let pageBoundaryScript = """
+    function safePageBoundary(spans, start, end, height) {
+      const crossing = spans.filter(r => r.top > start + height * 0.4 && r.top < end && r.bottom > end);
+      if(!crossing.length) return end;
+      let boundary = Math.min(...crossing.map(r => r.top));
+      const heading = spans.find(r => r.heading && r.top > start + height * 0.4 && r.bottom <= boundary && boundary-r.bottom < 40);
+      if(heading) boundary = heading.top;
+      return boundary;
+    }
+    """
 
     private func pdf(_ configuration: WKPDFConfiguration) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
