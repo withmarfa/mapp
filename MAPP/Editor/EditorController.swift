@@ -12,6 +12,8 @@ private let log = Logger(subsystem: "com.withmarfa.mapp", category: "editor")
 final class EditorController: NSObject {
     private(set) var caret = CaretState()
     private(set) var isReady = false
+    @ObservationIgnored private var hasLoadedPage = false
+    private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
     private(set) var scrollOffset: CGFloat = 0
@@ -167,6 +169,7 @@ final class EditorController: NSObject {
     /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
         guard let body = library?.body(of: item.id) else { return close() }
+        if function == "load" { isPresented = true }
         noteID = item.id
         markdown = body.text
         read = body.version
@@ -184,6 +187,7 @@ final class EditorController: NSObject {
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
+        isPresented = false
         loadRequest += 1
         let request = loadRequest
         flush { [self] kept in
@@ -198,7 +202,7 @@ final class EditorController: NSObject {
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
     func flush(leaving: Bool = true, then done: @escaping (Bool) -> Void = { _ in }) {
         guard let noteID else { return done(true) }
-        guard isReady else { return done(false) }
+        guard isReady else { return done(!hasLoadedPage) }
         let generation = generation
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
         func capture() {
@@ -213,8 +217,8 @@ final class EditorController: NSObject {
                     }
                     return
                 }
-                guard self.noteID == noteID, self.generation == generation else { return done(false) }
                 if let markdown = result as? String { report(markdown, of: generation) }
+                guard self.noteID == noteID, self.generation == generation else { return done(false) }
                 if leaving { onLeave(noteID) }
                 done(true)
             }
@@ -320,7 +324,7 @@ final class EditorController: NSObject {
     // MARK: Find
 
     /// Whether a note is on the page to find in.
-    var hasNote: Bool { isReady && noteID != nil }
+    var hasNote: Bool { isPresented && isReady && noteID != nil }
 
     /// Does what an item of Edit > Find asks, through the system find bar above the page.
     func performFind(_ action: NSTextFinder.Action) {
@@ -413,6 +417,9 @@ final class EditorController: NSObject {
             do {
                 guard noteID == id, self.generation == generation else { return }
                 let value = try await webView.callAsyncJavaScript("return await window.editor.printable(expected)", arguments: ["expected": generation], in: nil, contentWorld: .page)
+                if let result = value as? [String: Any], result["snapshotError"] != nil, let message = result["message"] as? String {
+                    throw NSError(domain: "MAPP.Print", code: 2, userInfo: [NSLocalizedDescriptionKey: message])
+                }
                 guard let result = value as? [String: Any], let html = result["html"] as? String,
                       let revision = result["revision"] as? Int else {
                     throw NSError(domain: "MAPP.Print", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "The printable note could not finish loading.")])
@@ -562,6 +569,7 @@ final class EditorController: NSObject {
         switch message {
         case .ready:
             isReady = true
+            hasLoadedPage = true
             applyAccent()
             applyKeymap()
             applyStyle()
@@ -601,6 +609,8 @@ final class EditorController: NSObject {
         case .find(let state):
             guard state.generation == generation else { return }
             pageFinder.update(state)
+        case .diagnostic(let message):
+            log.notice("preview diagnostic: \(message, privacy: .public)")
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
             library?.failure = (String(localized: "Editor Couldn’t Complete the Action"), message)

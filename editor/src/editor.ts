@@ -94,8 +94,8 @@ export class NoteEditor {
       root,
       {
         changed(text, generation) {
-          host.reported = text
-          events.changed(text, generation)
+          host.pendingChanged = { text, generation }
+          queueMicrotask(() => host.flushChanges())
           host.findChanged()
         },
         stateChanged() {},
@@ -115,7 +115,13 @@ export class NoteEditor {
         openLink: events.openLink,
         copy: events.copy,
         error(error) {
-          postToHost({ type: 'error', message: error.message })
+          postToHost({
+            type:
+              error instanceof InkKitError && error.code === 'diagram-unavailable'
+                ? 'diagnostic'
+                : 'error',
+            message: error.message,
+          })
         },
       },
       {
@@ -197,11 +203,19 @@ export class NoteEditor {
       },
     )
     host.engine.setViewport({ scrollContainer: document.documentElement })
-    window.addEventListener('scroll', () => host.findChanged(), { passive: true })
+    window.addEventListener('scroll', host.scrolled, { passive: true, capture: true })
     return host
   }
   setItem(id: string) {
     this.item = id
+  }
+  private pendingChanged?: { text: string; generation: number }
+  private flushChanges() {
+    const pending = this.pendingChanged
+    this.pendingChanged = undefined
+    if (!pending) return
+    if (pending.generation === this.generation) this.reported = pending.text
+    this.events.changed(pending.text, pending.generation)
   }
   private replacement = 0
   get loadedGeneration() {
@@ -213,6 +227,7 @@ export class NoteEditor {
     const apply = () => {
       if (request !== this.replacement) return
       try {
+        this.flushChanges()
         if (this.generation) {
           const previous = this.snapshot()
           if (previous.text !== this.reported)
@@ -246,6 +261,9 @@ export class NoteEditor {
   reload(text: string, generation: number, editable = true) {
     this.replace(text, generation, editable, true)
   }
+  readableSnapshot(expected = this.generation) {
+    return this.engine.textSnapshot(expected)
+  }
   snapshot(expected = this.generation) {
     return this.engine.snapshot(expected)
   }
@@ -255,6 +273,7 @@ export class NoteEditor {
   }
   flush(expected = this.generation): string | null {
     const text = this.snapshot(expected).text
+    if (this.pendingChanged?.generation === expected) this.pendingChanged = undefined
     if (text === this.reported) return null
     this.reported = text
     return text
@@ -302,6 +321,7 @@ export class NoteEditor {
     this.finding = finding
     if (finding) this.sendFind()
   }
+  private scrolled = () => this.findChanged()
   private findChanged() {
     if (!this.finding) return
     cancelAnimationFrame(this.findPending)
@@ -317,17 +337,20 @@ export class NoteEditor {
       const from = visible[0]?.from ?? 0,
         to = visible.at(-1)?.to ?? 0
       const boxes: number[] = []
-      for (let at = from; at < to; at++) {
+      for (let at = from; at < to;) {
+        const length = (snapshot.text.codePointAt(at) ?? 0) > 0xffff ? 2 : 1
         let rect
         try {
-          rect = this.engine.textRangeRects(this.range(at, at + 1, snapshot))[0]
+          rect = this.engine.textRangeRects(this.range(at, at + length, snapshot))[0]
         } catch {}
-        boxes.push(
-          rect?.left ?? 0,
-          (rect?.top ?? 0) + window.scrollY,
-          rect?.width ?? 0,
-          rect?.height ?? 0,
-        )
+        for (let unit = 0; unit < length; unit++)
+          boxes.push(
+            rect?.left ?? 0,
+            (rect?.top ?? 0) + window.scrollY,
+            rect?.width ?? 0,
+            rect?.height ?? 0,
+          )
+        at += length
       }
       this.events.find({
         snapshotId: snapshot.snapshotId,
@@ -351,6 +374,7 @@ export class NoteEditor {
     const snapshot = this.engine.textSnapshot(generation)
     this.engine.revealTextRange({ snapshotId: snapshotId ?? snapshot.snapshotId, from, to: from })
   }
+  private failedReplacementBatch?: string
   private replacementBatch?: { id: string; snapshotId: string }
   findReplace(
     from: number,
@@ -360,22 +384,30 @@ export class NoteEditor {
     snapshotId?: string,
     batch?: string,
   ) {
-    const snapshot = this.engine.textSnapshot(generation)
-    const continuing = batch && this.replacementBatch?.id === batch
-    if (continuing && snapshot.snapshotId !== this.replacementBatch!.snapshotId)
-      throw new InkKitError('stale-document', 'The text changed before replacement.')
-    this.engine.replaceTextRange(
-      {
-        snapshotId: continuing ? snapshot.snapshotId : (snapshotId ?? snapshot.snapshotId),
-        from,
-        to,
-      },
-      text,
-    )
-    this.replacementBatch = batch
-      ? { id: batch, snapshotId: this.engine.textSnapshot(generation).snapshotId }
-      : undefined
-    this.sendFind()
+    try {
+      if (batch && this.failedReplacementBatch === batch)
+        throw new InkKitError('stale-document', 'An earlier replacement in this batch failed.')
+      const snapshot = this.engine.textSnapshot(generation)
+      const continuing = batch && this.replacementBatch?.id === batch
+      if (continuing && snapshot.snapshotId !== this.replacementBatch!.snapshotId)
+        throw new InkKitError('stale-document', 'The text changed before replacement.')
+      this.engine.replaceTextRange(
+        {
+          snapshotId: continuing ? snapshot.snapshotId : (snapshotId ?? snapshot.snapshotId),
+          from,
+          to,
+        },
+        text,
+      )
+      this.replacementBatch = batch
+        ? { id: batch, snapshotId: this.engine.textSnapshot(generation).snapshotId }
+        : undefined
+      this.sendFind()
+    } catch (error) {
+      if (batch) this.failedReplacementBatch = batch
+      this.sendFind()
+      throw error
+    }
   }
   insertImages(images: { src: string; alt: string }[], x?: number, y?: number) {
     return this.engine.insertImages(
@@ -390,6 +422,7 @@ export class NoteEditor {
   }
   destroy() {
     this.replacement++
+    window.removeEventListener('scroll', this.scrolled, true)
     cancelAnimationFrame(this.findPending)
     return this.engine.destroy()
   }

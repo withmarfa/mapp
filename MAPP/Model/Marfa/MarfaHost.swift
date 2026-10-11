@@ -242,8 +242,8 @@ extension MarfaSource: MarfaHostedSource {}
         }
     }
 
-    /// A copy that could not take a key is closed for good; it opens again with the key that is stored, and the
-    /// person is told why.
+    /// Once pending edits are saved, a copy that could not take a key reopens with the stored key.
+    /// Recovery is deferred while an editor cannot hand over its changes.
     private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         detach()

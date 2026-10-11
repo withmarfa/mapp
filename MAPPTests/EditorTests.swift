@@ -71,6 +71,41 @@ struct EditorTests {
 
     """
 
+    @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
+        let first = Note(body: "First\n", created: .now)
+        let second = Note(body: "Second\n", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let editor = EditorController(library: library)
+        editor.load(try #require(library.item(first.id)))
+        #expect(!editor.isReady)
+        editor.load(try #require(library.item(second.id)))
+        #expect(editor.noteID == second.id)
+        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(editor.isReady)
+        let source = try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String
+        #expect(source == "Second\n")
+    }
+
+    @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
+        let note = Note(body: "Original\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: RecordingStore())
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        var captured: [String] = []
+        page.editor.onChange = { id, text, read in captured.append(text); library.updateBody(of: id, to: text, readAt: read) }
+        try await page.run("window.editor.flush = () => 'Pending\\n'")
+        let kept = await withCheckedContinuation { continuation in
+            page.editor.flush { continuation.resume(returning: $0) }
+            library.updateBody(of: note.id, to: "Outside\n")
+            page.editor.noteChanged(library.item(note.id)!)
+        }
+        #expect(!kept)
+        #expect(captured == ["Pending\n"])
+        #expect(library.note(note.id)?.body == "Outside\n")
+        #expect(library.notes.contains { $0.id != note.id && $0.body == "Pending\n" })
+    }
+
     @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
         let page = try await Harness()
         try await page.load("Original\n")
@@ -95,6 +130,59 @@ struct EditorTests {
         let rejected = try await page.editor.webView.callAsyncJavaScript("try { window.editor.flush(expected); return false } catch { return true }", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? Bool
         #expect(rejected == true)
         #expect(try await page.markdown() == nil)
+    }
+
+    @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        let id = page.editor.noteID
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        page.editor.close()
+        #expect(!page.editor.hasNote)
+        try await page.wait { page.library.failure != nil }
+        #expect(page.editor.noteID == id)
+        #expect(!page.editor.hasNote)
+        let retainedID = try #require(id)
+        let item = try #require(page.library.item(retainedID))
+        page.library.updateBody(of: item.id, to: "Outside\n")
+        page.editor.noteChanged(item)
+        #expect(!page.editor.hasNote)
+        try await page.run("window.editor.flush = window.savedFlush")
+        page.editor.load(item)
+        #expect(page.editor.hasNote)
+    }
+
+    @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
+        let page = try await Harness()
+        try await page.load("```mermaid\nnot a valid diagram [\n```\n")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(page.library.failure == nil)
+        #expect(try await page.markdown() == nil)
+    }
+
+    @Test func nativeFindReplacementBatchUsesScopedReadableTextAndEmojiGeometry() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.webView
+        defer { window.close() }
+        try await page.load("one 😀 one\n")
+        try await page.run("window.originalPost = window.webkit.messageHandlers.host.postMessage; window.webkit.messageHandlers.host.postMessage = message => { if (message.type === 'find') window.capturedFind = message; window.originalPost(message) }; window.editor.setFinding(true)")
+        let body = try await page.editor.webView.evaluateJavaScript("window.capturedFind")
+        let capturedBody = try #require(body)
+        guard case .find(let state) = try #require(EditorMessage(body: capturedBody)) else { Issue.record("Missing Find snapshot"); return }
+        let emoji = (state.text as NSString).range(of: "😀")
+        let finder = PageFinder(controller: page.editor)
+        finder.update(state)
+        let rects = try #require(finder.rects(forCharacterRange: emoji))
+        #expect(rects.contains { $0.rectValue.width > 0 && $0.rectValue.height > 0 })
+        let first = NSRange(location: 0, length: 3)
+        let last = (state.text as NSString).range(of: "one", options: .backwards)
+        #expect(finder.shouldReplaceCharacters(inRanges: [NSValue(range: first), NSValue(range: last)], with: ["two", "two"]))
+        finder.replaceCharacters(in: first, with: "two")
+        finder.replaceCharacters(in: last, with: "two")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(try await page.markdown() == "two 😀 two\n")
     }
 
     @Test func closeProxyRestoresTheHostDelegateAndNeverReusesARejectedApproval() async throws {
@@ -137,7 +225,7 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    @Test func headingMarksAppearOnlyWhileEditing() async throws {
+    @Test func aHeadingHasNativeFormatStateAndItsAuthoredSource() async throws {
         let page = try await Harness()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
@@ -152,23 +240,17 @@ struct EditorTests {
             window.close()
         }
         try await page.load("A paragraph.\n\n## Closing\n")
-        let markers = "getComputedStyle(document.querySelector('h2'), '::before').content"
-        let hidden = ["none", "normal", "\"\""]
-        let beforeFocus = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(hidden.contains(beforeFocus ?? ""))
         page.editor.focus()
-        try await page.run("0")
-        let hasFocus = try await page.editor.webView.evaluateJavaScript(
-            "document.activeElement === document.querySelector('.ProseMirror')"
-        ) as? Bool
-        #expect(hasFocus == true)
-        try await page.run("(() => { const heading = document.querySelector('h2'); const range = document.createRange(); range.selectNodeContents(heading); range.collapse(true); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range) })()")
-        try await Task.sleep(for: .milliseconds(100))
-        let focused = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(focused == "\"##\"")
-        try await page.run("document.querySelector('.ProseMirror').blur()")
-        let afterBlur = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(hidden.contains(afterBlur ?? ""))
+        try await page.run("(() => { const snapshot = window.editor.readableSnapshot(); const at = snapshot.text.indexOf('Closing'); window.editor.findSelect(at, at, snapshot.generation, snapshot.snapshotId); window.editor.focus() })()")
+        try await page.wait { page.editor.caret.block == .heading(2) }
+        #expect(Format.heading.isActive(in: page.editor.caret))
+        page.editor.setSourceMode(true)
+        try await page.wait { page.editor.caret.sourceMode }
+        let source = try await page.editor.webView.evaluateJavaScript("document.querySelector('textarea').value") as? String
+        #expect(source == "A paragraph.\n\n## Closing\n")
+        page.editor.setSourceMode(false)
+        try await page.wait { !page.editor.caret.sourceMode }
+        #expect(try await page.shownText(until: "A paragraph.Closing") == "A paragraph.Closing")
         #expect(try await page.markdown() == nil)
         #expect(page.changes.isEmpty)
     }
@@ -257,7 +339,8 @@ struct EditorTests {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
         let page = try await Harness(library: library)
-        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        var reported: [String] = []
+        page.editor.onChange = { id, markdown, read in reported.append(markdown); library.updateBody(of: id, to: markdown, readAt: read) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         try await page.wait { page.editor.canApply(.checklist) }
@@ -265,7 +348,9 @@ struct EditorTests {
         // Another window's text, typed on the text it held.
         library.updateBody(of: note.id, to: "Outside\n")
         page.editor.noteChanged(try #require(library.item(note.id)))
-        try await page.wait { library.notes.count == 2 }
+        for _ in 0..<100 where library.notes.count == 1 { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(reported == ["- [ ] Milk\n"])
+        try #require(library.notes.count == 2)
         #expect(library.note(note.id)?.body == "Outside\n")
         let copy = try #require(library.notes.first { $0.id != note.id })
         #expect(copy.body == "- [ ] Milk\n")
@@ -348,7 +433,9 @@ struct EditorTests {
         ) as? [String]
         #expect(absent == ["b: File Not Found"])
         let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
-        #expect(rejected?["snapshotError"] as? String == "image-unavailable")
+        #expect(rejected?["snapshotError"] == nil)
+        #expect(rejected?["assetCount"] as? Int == 1)
+        #expect((rejected?["html"] as? String)?.contains("mapp-embed:") == false)
         library.updateBody(of: note.id, to: "![a](Attachments/Photo%201.png)\n")
         page.editor.noteChanged(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")

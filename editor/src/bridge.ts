@@ -20,7 +20,7 @@ export interface EmbeddedFile {
 
 export type EditorMessage =
   | { type: 'ready' }
-  | { type: 'error'; message: string }
+  | { type: 'error' | 'diagnostic'; message: string }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
   | { type: 'scrolled'; offset: number; generation: number }

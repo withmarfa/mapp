@@ -98,3 +98,71 @@ test('cached native Find scopes reject same-note edits and ordered replacement b
     expect(() => editor.findReplace(4, 7, 'bad', 1, first.snapshotId, 'batch')).toThrow()
     expect(editor.snapshot().text).toBe('new two\n')
   }))
+
+test('one logical task-list command reports only final source while later turns still report separately', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const changes: string[] = []
+  const editor = await NoteEditor.mount(root, {
+    changed(text) {
+      changes.push(text)
+    },
+    stateChanged() {},
+    find() {},
+    copy() {},
+    openLink() {},
+  })
+  editor.setItem('note')
+  editor.load('Milk\n', 1)
+  try {
+    editor.format('taskList')
+    await Promise.resolve()
+    expect(changes).toEqual(['- [ ] Milk\n'])
+    editor.setEditingMode('source')
+    editor.findReplace(6, 10, 'Bread')
+    await Promise.resolve()
+    expect(changes).toEqual(['- [ ] Milk\n', '- [ ] Bread\n'])
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
+test('explicit flush returns a pending logical edit without a later duplicate report', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const changes: string[] = []
+  const editor = await NoteEditor.mount(root, {
+    changed(text) {
+      changes.push(text)
+    },
+    stateChanged() {},
+    find() {},
+    copy() {},
+    openLink() {},
+  })
+  editor.setItem('note')
+  editor.load('Milk\n', 1)
+  try {
+    editor.format('taskList')
+    expect(editor.flush(1)).toBe('- [ ] Milk\n')
+    await Promise.resolve()
+    expect(changes).toEqual([])
+    expect(editor.flush(1)).toBeNull()
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
+test('a rejected replacement poisons its batch rather than applying shifted later offsets', async () =>
+  withEditor('one one\n', (editor) => {
+    const snapshot = editor.readableSnapshot(1)
+    expect(() => editor.findReplace(-1, 3, 'longer', 1, snapshot.snapshotId, 'failed')).toThrow()
+    expect(() => editor.findReplace(4, 7, 'wrong', 1, snapshot.snapshotId, 'failed')).toThrow()
+    expect(editor.snapshot().text).toBe('one one\n')
+    editor.findReplace(0, 3, 'two', 1, snapshot.snapshotId, 'middle')
+    expect(() => editor.findReplace(4, 100, 'longer', 1, snapshot.snapshotId, 'middle')).toThrow()
+    expect(() => editor.findReplace(4, 7, 'wrong', 1, snapshot.snapshotId, 'middle')).toThrow()
+    expect(editor.snapshot().text).toBe('two one\n')
+  }))

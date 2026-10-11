@@ -36,6 +36,7 @@ declare global {
         height?: number,
       ): void
       setKeymap(keymap: Keymap): void
+      readableSnapshot(expected?: number): unknown
       snapshot(expected?: number): unknown
       printable(expected?: number): Promise<unknown>
       setFullWidth(full: boolean): void
@@ -169,6 +170,7 @@ window.editor = {
       y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
     ),
   setKeymap: (keymap) => editor.setKeymap(keymap),
+  readableSnapshot: (expected) => editor.readableSnapshot(expected),
   snapshot: (expected) => editor.snapshot(expected),
   printable: async (expected) => {
     try {

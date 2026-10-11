@@ -44,6 +44,7 @@ nonisolated enum EditorMessage: Sendable {
     /// app said it may be opened.
     case embedMenu((item: ItemID, reference: EmbedReference, opens: Bool)?)
     case find(FindState)
+    case diagnostic(String)
     case error(String)
 
     init?(body: Any) {
@@ -103,6 +104,8 @@ nonisolated enum EditorMessage: Sendable {
                 scrollY: (dict["scrollY"] as? NSNumber)?.doubleValue ?? 0,
                 viewportHeight: (dict["viewportHeight"] as? NSNumber)?.doubleValue ?? 0
             ))
+        case "diagnostic":
+            self = .diagnostic(dict["message"] as? String ?? "")
         case "error":
             self = .error(dict["message"] as? String ?? "")
         default:

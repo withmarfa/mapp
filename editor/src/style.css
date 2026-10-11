@@ -121,52 +121,6 @@ body {
   margin: 1.333rem 0 0.4rem;
 }
 
-/* A heading's marks show while editing it, hung in the margin so the text never moves and the caret
-   in an empty heading sits after them. The saved insertion point stays invisible while browsing. */
-.ProseMirror h1,
-.ProseMirror h2,
-.ProseMirror h3,
-.ProseMirror h4,
-.ProseMirror h5,
-.ProseMirror h6 {
-  position: relative;
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] .editing::before {
-  position: absolute;
-  right: 100%;
-  padding-right: 0.3em;
-  white-space: pre;
-  color: color-mix(in srgb, CanvasText 40%, transparent);
-  font-weight: 500;
-  user-select: none;
-  pointer-events: none;
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h1.editing::before {
-  content: '#';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h2.editing::before {
-  content: '##';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h3.editing::before {
-  content: '###';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h4.editing::before {
-  content: '####';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h5.editing::before {
-  content: '#####';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h6.editing::before {
-  content: '######';
-}
-
 .ProseMirror strong {
   font-weight: 700;
 }
@@ -493,10 +447,4 @@ body {
 
 [hidden] {
   display: none !important;
-}
-
-/* Native browsing leaves heading syntax hidden until this page owns the caret. */
-#editor .ProseMirror:not(.ProseMirror-focused) .editing::before,
-#editor .ProseMirror[contenteditable='false'] .editing::before {
-  content: none;
 }
