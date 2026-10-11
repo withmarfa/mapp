@@ -236,9 +236,17 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     ) {
         guard let (item, reference) = EmbedReference.request(message.body) else { return replyHandler(nil, nil) }
         let version = version
+        let exporting = (message.body as? [String: Any])?["export"] as? Bool == true
         Task {
-            guard let file = await open(reference, item) else { return replyHandler(nil, nil) }
+            guard let file = await open(reference, item), self.version == version else { return replyHandler(nil, nil) }
             let type = UTType(filenameExtension: file.url.pathExtension)
+            if exporting {
+                // Portable exports read the checked descriptor, never the path resolved before it opened.
+                guard type?.conforms(to: .image) == true, file.length <= 16 << 20,
+                      let data = await file.read(at: 0, count: Int(file.length)), data.count == Int(file.length),
+                      self.version == version else { return replyHandler(nil, nil) }
+                return replyHandler(["data": data.base64EncodedString(), "mimeType": type?.preferredMIMEType ?? "application/octet-stream"], nil)
+            }
             replyHandler([
                 "url": Self.url(for: reference, in: item, version: version).absoluteString,
                 "kind": Self.kind(of: type),
