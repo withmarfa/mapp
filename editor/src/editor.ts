@@ -346,7 +346,7 @@ export class NoteEditor {
     const snapshot = this.engine.textSnapshot(generation)
     this.engine.revealTextRange({ snapshotId: snapshotId ?? snapshot.snapshotId, from, to: from })
   }
-  private replacementBatch?: { id: string; revision: number }
+  private replacementBatch?: { id: string; snapshotId: string }
   findReplace(
     from: number,
     to: number,
@@ -357,7 +357,7 @@ export class NoteEditor {
   ) {
     const snapshot = this.engine.textSnapshot(generation)
     const continuing = batch && this.replacementBatch?.id === batch
-    if (continuing && this.snapshot(generation).revision !== this.replacementBatch!.revision)
+    if (continuing && snapshot.snapshotId !== this.replacementBatch!.snapshotId)
       throw new InkKitError('stale-document', 'The text changed before replacement.')
     this.engine.replaceTextRange(
       {
@@ -368,7 +368,7 @@ export class NoteEditor {
       text,
     )
     this.replacementBatch = batch
-      ? { id: batch, revision: this.snapshot(generation).revision }
+      ? { id: batch, snapshotId: this.engine.textSnapshot(generation).snapshotId }
       : undefined
     this.sendFind()
   }
