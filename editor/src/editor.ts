@@ -135,6 +135,11 @@ export class NoteEditor {
               return { kind: 'missing', label: reference.label ?? reference.reference }
             described.set(JSON.stringify(embed), file)
             if (file.kind === 'file') return { kind: 'file', label: file.name }
+            if (file.kind === 'pdf')
+              return {
+                kind: 'file',
+                label: `${file.name}: ${labels.filePDFPreview ?? 'Open to view this PDF'}`,
+              }
             return {
               kind: file.kind,
               url:

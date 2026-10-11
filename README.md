@@ -21,7 +21,7 @@ File-backed items use the workbench definitions as interim input. Files without 
 
 ## Editing and export
 
-View and the command palette switch between formatted and source editing. Native Find and Replace work with the active editor. Local images and attachments keep their existing file-access protections; note references open source editing rather than pretending to embed another note.
+View and the command palette switch between formatted and source editing. Native Find and Replace work with the active editor. Local images, audio, and video preview inline with the existing file-access protections. PDFs show a card with Open to view the document in its native app, because WebKit cannot display them in the protected editor frame. Note references open source editing; they do not embed the referenced note.
 
 Print and Export as PDF render a complete snapshot of the note, including local images. Other attachments use readable descriptions. PDF export is limited to 200 pages or 64 MB; a failed export leaves an existing destination unchanged.
 

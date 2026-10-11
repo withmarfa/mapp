@@ -37,6 +37,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
             guard kept, let sender else { return }
             self.approved = true
             sender.performClose(nil)
+            self.approved = false
         }
         return false
     }

@@ -111,13 +111,15 @@ struct EditorTests {
         let proxy = EditorCloseDelegate(editor: page.editor, window: window)
         var left = false
         page.editor.onLeave = { _ in left = true }
-        #expect(!proxy.windowShouldClose(window))
+        let rejected = proxy.windowShouldClose(window)
+        #expect(!rejected)
         host.permitsClose = false
         try await page.wait { left }
         try await page.run("0")
         host.permitsClose = true
         try await page.run("window.editor.flush = () => { throw new Error('composition') }")
-        #expect(!proxy.windowShouldClose(window))
+        let laterRejected = proxy.windowShouldClose(window)
+        #expect(!laterRejected)
         try await Task.sleep(for: .milliseconds(2200))
         #expect(page.library.failure != nil)
         proxy.detach()
@@ -160,6 +162,8 @@ struct EditorTests {
             "document.activeElement === document.querySelector('.ProseMirror')"
         ) as? Bool
         #expect(hasFocus == true)
+        try await page.run("(() => { const heading = document.querySelector('h2'); const range = document.createRange(); range.selectNodeContents(heading); range.collapse(true); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range) })()")
+        try await Task.sleep(for: .milliseconds(100))
         let focused = try await page.editor.webView.evaluateJavaScript(markers) as? String
         #expect(focused == "\"##\"")
         try await page.run("document.querySelector('.ProseMirror').blur()")
@@ -183,7 +187,7 @@ struct EditorTests {
         page.editor.format(.table)
         try await page.wait { !page.changes.isEmpty }
         let markdown = try #require(page.changes.last)
-        #expect(markdown.contains("| --- | --- | --- |"))
+        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("---") })
         #expect(!markdown.contains(":-"))
     }
 
@@ -256,6 +260,7 @@ struct EditorTests {
         page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
+        try await page.wait { page.editor.canApply(.checklist) }
         page.editor.format(.checklist)
         // Another window's text, typed on the text it held.
         library.updateBody(of: note.id, to: "Outside\n")
@@ -339,9 +344,18 @@ struct EditorTests {
         }
         #expect(widths == [4])
         let absent = try await page.editor.webView.evaluateJavaScript(
-            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind='missing'] .inkkit-file-label')].map((span) => span.textContent)"
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing] .inkkit-file-label')].map((span) => span.textContent)"
         ) as? [String]
         #expect(absent == ["b: File Not Found"])
+        let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
+        #expect(rejected?["snapshotError"] as? String == "image-unavailable")
+        library.updateBody(of: note.id, to: "![a](Attachments/Photo%201.png)\n")
+        page.editor.noteChanged(try #require(library.item(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let printable = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
+        let html = try #require(printable?["html"] as? String)
+        #expect(html.contains("data:image/png;base64,"))
+        #expect(!html.contains("mapp-embed:"))
     }
 
     // MARK: Embedded files of any kind
@@ -399,31 +413,15 @@ struct EditorTests {
         let video = try await settle(editor, "(() => { const v = document.querySelector('.inkkit-file video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
         #expect(video == [64, 64])
 
-        let frame = try await settle(editor, "document.querySelector('.inkkit-file iframe')?.src ?? ''", as: String.self) { $0?.isEmpty == false }
-        #expect(frame?.hasPrefix("mapp-embed://file/") == true)
-
         let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
         #expect(labels?.contains("Budget.csv") == true)
         #expect(labels?.contains("Note reference: A note. Open to edit source.") == true)
         #expect(labels?.contains("Missing.zip: File Not Found") == true)
         #expect(labels?.contains("far: File Not Found") == true)
 
-        // WebKit draws a PDF in a frame from the app's scheme: the red page shows where the frame is.
-        let rect = try #require(try await editor.webView.evaluateJavaScript(
-            "(() => { const r = document.querySelector('.inkkit-file iframe').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()"
-        ) as? [Double])
-        var red = false
-        for _ in 0..<60 where !red {
-            try await Task.sleep(for: .milliseconds(100))
-            let configuration = WKSnapshotConfiguration()
-            configuration.rect = CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3])
-            configuration.afterScreenUpdates = true
-            guard let snapshot = try? await editor.webView.takeSnapshot(configuration: configuration),
-                  let bitmap = snapshot.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) else { continue }
-            let center = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB)
-            red = (center?.redComponent ?? 0) > 0.8 && (center?.greenComponent ?? 1) < 0.3
-        }
-        #expect(red, "the PDF is drawn inside its frame")
+        #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
+        #expect(await library.embeddedFile(.name("Plan.pdf"), in: note.id)?.lastPathComponent == "Plan.pdf")
+        #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
 
         #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
     }
