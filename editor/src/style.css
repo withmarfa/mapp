@@ -1,6 +1,5 @@
 /* Copyright (c) 2026 August Cayzer. MIT licence. Adapted from Memos WithMarfa's editor. Table styles adapted from
    Milkdown Crepe's table.css, copyright (c) 2021 Mirone, MIT licence. */
-@import '@milkdown/kit/prose/tables/style/tables.css';
 
 :root {
   /* The note's text size, the system's 13-point body text until the app sets the person's; the metrics below
@@ -48,14 +47,17 @@ body {
   -webkit-text-size-adjust: none;
 }
 
+#editor {
+  --inkkit-font-size: 1rem;
+  --inkkit-line-height: 1.55;
+  --inkkit-min-height: 100vh;
+  --inkkit-reading-width: calc(var(--page-width) + 6rem);
+  --inkkit-padding-top: calc(22px + var(--item-header-height, 0px));
+  --inkkit-padding-inline: 3rem;
+  --inkkit-padding-bottom: 48px;
+}
+
 .ProseMirror {
-  /* The whole page, so a click below the text still places the caret. */
-  min-height: 100vh;
-  box-sizing: border-box;
-  /* The margins, not a narrower editor, make the measure, so a click beside the text still places the caret.
-     The least of them leaves room for a heading's marks, which hang in the leading margin. */
-  padding: calc(22px + var(--item-header-height, 0px))
-    max(3rem, calc((100% - var(--page-width)) / 2)) 48px;
   outline: none;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -68,15 +70,15 @@ body {
   background: transparent;
 }
 
-.ProseMirror::highlight(selection) {
+.ProseMirror::highlight(inkkit-selection) {
   background-color: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
-.ProseMirror-focused::highlight(selection) {
+.ProseMirror-focused::highlight(inkkit-selection) {
   background-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
-.inactive .ProseMirror::highlight(selection) {
+.inactive .ProseMirror::highlight(inkkit-selection) {
   background-color: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
@@ -117,52 +119,6 @@ body {
   font-size: 1rem;
   font-weight: 600;
   margin: 1.333rem 0 0.4rem;
-}
-
-/* A heading's marks show while editing it, hung in the margin so the text never moves and the caret
-   in an empty heading sits after them. The saved insertion point stays invisible while browsing. */
-.ProseMirror h1,
-.ProseMirror h2,
-.ProseMirror h3,
-.ProseMirror h4,
-.ProseMirror h5,
-.ProseMirror h6 {
-  position: relative;
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] .editing::before {
-  position: absolute;
-  right: 100%;
-  padding-right: 0.3em;
-  white-space: pre;
-  color: color-mix(in srgb, CanvasText 40%, transparent);
-  font-weight: 500;
-  user-select: none;
-  pointer-events: none;
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h1.editing::before {
-  content: '#';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h2.editing::before {
-  content: '##';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h3.editing::before {
-  content: '###';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h4.editing::before {
-  content: '####';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h5.editing::before {
-  content: '#####';
-}
-
-.ProseMirror.ProseMirror-focused[contenteditable='true'] h6.editing::before {
-  content: '######';
 }
 
 .ProseMirror strong {
@@ -337,84 +293,6 @@ body {
   font-style: italic;
 }
 
-/* Sound and video keep WebKit's own controls; a video keeps its aspect within the page and the window. */
-.ProseMirror .embed-audio,
-.ProseMirror .embed-video,
-.ProseMirror .embed-pdf {
-  display: inline-block;
-  max-width: 100%;
-  line-height: 0;
-  vertical-align: bottom;
-}
-
-.ProseMirror .embed-audio audio {
-  width: 22rem;
-  max-width: 100%;
-}
-
-.ProseMirror .embed-video video {
-  display: block;
-  max-width: 100%;
-  max-height: 70vh;
-  height: auto;
-  border-radius: 4px;
-  background: #000;
-}
-
-.ProseMirror .embed-pdf {
-  width: 100%;
-}
-
-.ProseMirror .embed-pdf iframe {
-  display: block;
-  width: 100%;
-  height: min(70vh, 48rem);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-}
-
-/* Any other file is a card that opens it, sized to sit in a line of text. */
-.ProseMirror .embed-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  max-width: 100%;
-  padding: 0.267rem 0.667rem 0.267rem 0.4rem;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  background: var(--code-bg);
-  line-height: 1.3;
-  vertical-align: middle;
-  cursor: default;
-  user-select: none;
-}
-
-.ProseMirror .embed-icon {
-  width: 2rem;
-  height: 2rem;
-  flex: none;
-}
-
-.ProseMirror .embed-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ProseMirror .embed-detail {
-  flex: none;
-  color: var(--muted);
-  font-size: 0.867em;
-}
-
-.ProseMirror.ProseMirror-focused .ProseMirror-selectednode .embed-card,
-.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-audio audio,
-.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-video video,
-.ProseMirror.ProseMirror-focused .ProseMirror-selectednode.embed-pdf iframe {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .ProseMirror ul,
 .ProseMirror ol {
   margin: 0 0 0.667rem;
@@ -569,218 +447,4 @@ body {
 
 [hidden] {
   display: none !important;
-}
-
-/* Tables, drawn with hairlines as Notes draws them. */
-.milkdown-table-block {
-  display: block;
-  position: relative;
-  margin: 0 0 0.8rem;
-}
-
-.milkdown-table-block .table-wrapper {
-  overflow-x: auto;
-}
-
-.milkdown-table-block table {
-  border-collapse: collapse;
-  margin: 0;
-}
-
-.milkdown-table-block th,
-.milkdown-table-block td {
-  border: 1px solid var(--rule);
-  padding: 0.3rem 0.7rem;
-  min-width: 3rem;
-  vertical-align: top;
-}
-
-.milkdown-table-block th {
-  font-weight: 600;
-  background: var(--code-bg);
-}
-
-.milkdown-table-block th > p,
-.milkdown-table-block td > p {
-  margin: 0;
-}
-
-.ProseMirror:not(.ProseMirror-focused) .selectedCell::after {
-  background: transparent;
-}
-
-.ProseMirror-focused .milkdown-table-block .selectedCell::after {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.milkdown-table-block .selectedCell ::selection {
-  background: transparent;
-}
-
-.milkdown-table-block .drag-preview {
-  position: absolute;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  opacity: 0.5;
-  background: var(--surface);
-  outline: 1px solid var(--accent);
-}
-
-.milkdown-table-block .drag-preview[data-show='false'] {
-  display: none;
-}
-
-.milkdown-table-block .handle {
-  position: absolute;
-  transition: opacity 150ms ease-in-out;
-}
-
-.milkdown-table-block .handle[data-show='false'] {
-  opacity: 0;
-}
-
-.milkdown-table-block .cell-handle {
-  z-index: 50;
-  left: -999px;
-  top: -999px;
-  display: grid;
-  place-items: center;
-  cursor: grab;
-  color: var(--muted);
-  background: var(--surface);
-  border-radius: 100px;
-  box-shadow:
-    0 0 0 0.5px var(--rule),
-    0 1px 3px color-mix(in srgb, CanvasText 15%, transparent);
-}
-
-.milkdown-table-block .cell-handle[data-role='col-drag-handle'] {
-  transform: translateY(50%);
-  width: 24px;
-  height: 14px;
-}
-
-.milkdown-table-block .cell-handle[data-role='row-drag-handle'] {
-  transform: translateX(50%);
-  width: 14px;
-  height: 24px;
-}
-
-.milkdown-table-block .button-group {
-  position: absolute;
-  left: 50%;
-  top: -40px;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--surface);
-  border-radius: 8px;
-  box-shadow:
-    0 0 0 0.5px var(--rule),
-    0 2px 8px color-mix(in srgb, CanvasText 18%, transparent);
-  cursor: default;
-}
-
-.milkdown-table-block .button-group[data-show='false'] {
-  display: none;
-}
-
-.milkdown-table-block .button-group button {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.milkdown-table-block .button-group button:hover {
-  background: var(--code-bg);
-}
-
-.milkdown-table-block .line-handle {
-  z-index: 20;
-  background: var(--accent);
-}
-
-.milkdown-table-block .line-handle[data-role='x-line-drag-handle'] {
-  height: 1px;
-}
-
-.milkdown-table-block .line-handle[data-role='y-line-drag-handle'] {
-  width: 1px;
-}
-
-.milkdown-table-block .add-button {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--muted);
-  background: var(--surface);
-  border-radius: 100px;
-  box-shadow:
-    0 0 0 0.5px var(--rule),
-    0 1px 3px color-mix(in srgb, CanvasText 15%, transparent);
-}
-
-.milkdown-table-block .line-handle[data-role='x-line-drag-handle'] .add-button {
-  transform: translate(-50%, -50%);
-  width: 14px;
-  height: 24px;
-}
-
-.milkdown-table-block .line-handle[data-role='y-line-drag-handle'] .add-button {
-  transform: translate(-50%, -50%);
-  width: 24px;
-  height: 14px;
-}
-
-.milkdown-table-block .line-handle[data-display-type='indicator'] .add-button {
-  display: none;
-}
-
-.milkdown-table-block.readonly .handle {
-  display: none;
-}
-
-/* Printed, or exported as a PDF, a note is its text on paper: the printer's margins replace the page's, the
-   colours are those of light paper whatever the app's appearance, and nothing made for the pointer shows. */
-@media print {
-  :root {
-    color-scheme: light;
-  }
-
-  .ProseMirror {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .ProseMirror .editing::before,
-  .ProseMirror pre .copy,
-  .ProseMirror .image-handle,
-  .milkdown-table-block .handle,
-  .milkdown-table-block .cell-handle,
-  .milkdown-table-block .button-group,
-  .milkdown-table-block .line-handle {
-    display: none;
-  }
-
-  .ProseMirror pre,
-  .ProseMirror img,
-  .ProseMirror tr {
-    break-inside: avoid;
-  }
-
-  .ProseMirror h1,
-  .ProseMirror h2,
-  .ProseMirror h3 {
-    break-after: avoid;
-  }
 }

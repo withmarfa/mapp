@@ -62,6 +62,6 @@ extension ItemLibrary {
     /// Moves notes to Recently Deleted once every open page has handed over what was just typed, since a deleted
     /// note takes no edit. Every way of deleting a note comes through here.
     func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?) {
-        EditorController.flushAll(leaving: false) { [self] in delete(ids, undoManager: undoManager) }
+        EditorController.flushAll(leaving: false) { [self] kept in if kept { delete(ids, undoManager: undoManager) } }
     }
 }

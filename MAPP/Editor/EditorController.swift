@@ -12,6 +12,8 @@ private let log = Logger(subsystem: "com.withmarfa.mapp", category: "editor")
 final class EditorController: NSObject {
     private(set) var caret = CaretState()
     private(set) var isReady = false
+    @ObservationIgnored private var hasLoadedPage = false
+    private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
     private(set) var scrollOffset: CGFloat = 0
@@ -58,6 +60,8 @@ final class EditorController: NSObject {
         /// The version of the text the page holds for this generation.
         var read: ItemVersion
     }
+    @ObservationIgnored private var loadRequest = 0
+    @ObservationIgnored private var closeDelegate: EditorCloseDelegate?
     @ObservationIgnored private var wantsFocus = false
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
@@ -70,6 +74,7 @@ final class EditorController: NSObject {
         self.library = library
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
+        configuration.websiteDataStore = .nonPersistent()
         configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)
         webView = EditorWebView(frame: .zero, configuration: configuration)
         container = EditorContainer(webView: webView)
@@ -114,6 +119,9 @@ final class EditorController: NSObject {
         guard let url = Bundle.main.url(forResource: "editor", withExtension: "html") else {
             preconditionFailure("editor.html missing from the bundle")
         }
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: "window.mappLabels = \(json(Self.editorLabels))", injectionTime: .atDocumentStart, forMainFrameOnly: true
+        ))
         pageURL = url
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
@@ -123,10 +131,17 @@ final class EditorController: NSObject {
     /// Shows a note, with the caret at its end. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
-        if noteID != nil, noteID != item.id { flush() }
-        scrollOffset = 0
-        isHeaderScrolledAway = false
-        show(item, as: "load")
+        loadRequest += 1
+        let request = loadRequest
+        let present = { [self] in
+            guard request == loadRequest else { return }
+            scrollOffset = 0
+            isHeaderScrolledAway = false
+            show(item, as: "load")
+        }
+        if noteID != nil, noteID != item.id {
+            flush { kept in if kept { present() } }
+        } else { present() }
     }
 
     func setHeaderHeight(_ height: CGFloat) {
@@ -154,6 +169,7 @@ final class EditorController: NSObject {
     /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
         guard let body = library?.body(of: item.id) else { return close() }
+        if function == "load" { isPresented = true }
         noteID = item.id
         markdown = body.text
         read = body.version
@@ -171,59 +187,69 @@ final class EditorController: NSObject {
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
-        flush()
-        noteID = nil
-        isHeaderScrolledAway = false
+        isPresented = false
+        loadRequest += 1
+        let request = loadRequest
+        flush { [self] kept in
+            guard kept, request == loadRequest else { return }
+            noteID = nil
+            isHeaderScrolledAway = false
+        }
     }
 
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
     /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
-    func flush(leaving: Bool = true, then done: @escaping () -> Void = {}) {
-        guard let noteID else { return done() }
-        guard isReady else {
-            if leaving { onLeave(noteID) }
-            return done()
-        }
-        // Another note can be loaded before the page answers, so the edit belongs to the generation shown now.
+    func flush(leaving: Bool = true, then done: @escaping (Bool) -> Void = { _ in }) {
+        guard let noteID else { return done(true) }
+        guard isReady else { return done(!hasLoadedPage) }
         let generation = generation
-        webView.evaluateJavaScript("window.editor.flush()") { [self] result, _ in
-            if let markdown = result as? String { report(markdown, of: generation) }
-            if leaving { onLeave(noteID) }
-            done()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        func capture() {
+            guard self.noteID == noteID, self.generation == generation else { return done(false) }
+            webView.evaluateJavaScript("window.editor.flush(\(generation))") { [self] result, error in
+                if error != nil {
+                    if ContinuousClock.now < deadline {
+                        Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
+                    } else {
+                        library?.failure = (String(localized: "Couldn’t Save Note"), String(localized: "The editor could not finish the current change. Keep this window open and try again."))
+                        done(false)
+                    }
+                    return
+                }
+                if let markdown = result as? String { report(markdown, of: generation) }
+                guard self.noteID == noteID, self.generation == generation else { return done(false) }
+                if leaving { onLeave(noteID) }
+                done(true)
+            }
         }
+        capture()
     }
 
-    /// Hands over every open editor's last edit, then carries on; with `leaving` off, the pages stay on their
-    /// notes, as before a note is deleted, since a note in Recently Deleted takes no edit. A page that does not
-    /// answer within a couple of seconds is not waited for.
-    static func flushAll(leaving: Bool = true, then done: @escaping () -> Void) {
+    /// Destructive transitions proceed only once every editor has handed over its current text.
+    static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
         for editor in editors { editor.flush(leaving: leaving, then: gate.arrive) }
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            gate.open()
-        }
+        Task { try? await Task.sleep(for: .seconds(3)); gate.open(false) }
     }
 
     private final class Gate {
         private var remaining: Int
-        private var action: (() -> Void)?
-
-        init(waitingFor count: Int, then action: @escaping () -> Void) {
+        private var succeeded = true
+        private var action: ((Bool) -> Void)?
+        init(waitingFor count: Int, then action: @escaping (Bool) -> Void) {
             remaining = count
             self.action = action
-            if count == 0 { open() }
+            if count == 0 { open(true) }
         }
-
-        func arrive() {
+        func arrive(_ success: Bool) {
+            succeeded = succeeded && success
             remaining -= 1
-            if remaining <= 0 { open() }
+            if remaining <= 0 { open(succeeded) }
         }
-
-        func open() {
-            action?()
+        func open(_ success: Bool) {
+            action?(success)
             action = nil
         }
     }
@@ -242,7 +268,13 @@ final class EditorController: NSObject {
 
     /// The page is in a window again, where a request for the keyboard made while it was out can be granted.
     func pageDidMoveToWindow() {
-        if wantsFocus, webView.window != nil { focus() }
+        if let window = webView.window {
+            if closeDelegate?.window !== window {
+                closeDelegate?.detach()
+                closeDelegate = EditorCloseDelegate(editor: self, window: window)
+            }
+            if wantsFocus { focus() }
+        }
     }
 
     /// How the page is set out: its width, its text size and whether spelling is checked.
@@ -266,18 +298,33 @@ final class EditorController: NSObject {
     }
 
     func format(_ format: Format) {
+        guard canApply(format) else { return }
         let (name, argument) = format.command
         if let argument {
-            call("format", json(name), json(argument))
+            call("format", json(name), json(argument), String(generation))
         } else {
-            call("format", json(name))
+            call("format", json(name), "null", String(generation))
         }
+    }
+
+    func canApply(_ format: Format) -> Bool {
+        guard hasNote, isEditable, caret.generation == generation else { return false }
+        let (name, argument) = format.command
+        let table: String? = switch name {
+        case "table": "insert"
+        case "addRowAbove": "addRowBefore"
+        case "addRowBelow": "addRowAfter"
+        case "addColumnBefore", "addColumnAfter", "deleteRow", "deleteColumn": name
+        case "alignColumn": argument.map { "align" + $0.prefix(1).uppercased() + $0.dropFirst() }
+        default: nil
+        }
+        return table.map { caret.tables[$0] == true } ?? (caret.formats[name] == true)
     }
 
     // MARK: Find
 
     /// Whether a note is on the page to find in.
-    var hasNote: Bool { isReady && noteID != nil }
+    var hasNote: Bool { isPresented && isReady && noteID != nil }
 
     /// Does what an item of Edit > Find asks, through the system find bar above the page.
     func performFind(_ action: NSTextFinder.Action) {
@@ -285,16 +332,16 @@ final class EditorController: NSObject {
         pageFinder.finder.performAction(action)
     }
 
-    func findSelect(_ range: NSRange) {
-        call("findSelect", String(range.location), String(NSMaxRange(range)))
+    func findSelect(_ range: NSRange, state: FindState) {
+        call("findSelect", String(range.location), String(NSMaxRange(range)), String(state.generation), json(state.snapshotID))
     }
 
-    func findScroll(_ range: NSRange) {
-        call("findScroll", String(range.location))
+    func findScroll(_ range: NSRange, state: FindState) {
+        call("findScroll", String(range.location), String(state.generation), json(state.snapshotID))
     }
 
-    func findReplace(_ range: NSRange, with text: String) {
-        call("findReplace", String(range.location), String(NSMaxRange(range)), json(text))
+    func findReplace(_ range: NSRange, with text: String, state: FindState, batch: String) {
+        call("findReplace", String(range.location), String(NSMaxRange(range)), json(text), String(state.generation), json(state.snapshotID), json(batch))
     }
 
     /// Puts images into the note: into the attachments folder, and linked where they were dropped, given in the
@@ -334,56 +381,61 @@ final class EditorController: NSObject {
         noteID.flatMap { library?.item($0)?.title } ?? String(localized: "Note")
     }
 
-    /// Prints the note as the page shows it, laid out for paper, through the system's print panel.
+    @ObservationIgnored private var printRenderer: PrintDocumentRenderer?
+
     func printNote() {
         guard hasNote, let window = webView.window else { return }
-        printOperation(Self.printInfo)
-            .runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        renderDocument(in: window, destination: nil)
     }
 
-    /// Asks where to save the note as a PDF, laid out as it prints, and saves it there.
     func exportPDF() {
         guard hasNote, let window = webView.window else { return }
+        let id = noteID
+        let generation = generation
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
         panel.nameFieldStringValue = NoteText.fileSafe(title)
         panel.beginSheetModal(for: window) { [self] response in
-            guard response == .OK, let url = panel.url else { return }
+            guard response == .OK, let url = panel.url, noteID == id, self.generation == generation else { return }
             exportPDF(to: url)
         }
     }
 
-    /// Saves the note as a PDF at the URL, without asking anything.
     func exportPDF(to url: URL) {
         guard hasNote, let window = webView.window else { return }
-        let info = Self.printInfo
-        info.jobDisposition = .save
-        info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] = url
-        let operation = printOperation(info)
-        operation.showsPrintPanel = false
-        operation.showsProgressPanel = false
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        renderDocument(in: window, destination: url)
     }
 
-    /// The person's paper and printer, taken fresh for each job.
-    private static var printInfo: NSPrintInfo {
-        NSPrintInfo.shared.copy() as? NSPrintInfo ?? NSPrintInfo()
-    }
-
-    private func printOperation(_ info: NSPrintInfo) -> NSPrintOperation {
-        info.horizontalPagination = .fit
-        info.verticalPagination = .automatic
-        info.isHorizontallyCentered = false
-        info.isVerticallyCentered = false
-        info.topMargin = 54
-        info.bottomMargin = 54
-        info.leftMargin = 54
-        info.rightMargin = 54
-        let operation = webView.printOperation(with: info)
-        operation.jobTitle = title
-        // WebKit's print view lays the note out for paper only once it has a size to start from.
-        operation.view?.frame = webView.bounds
-        return operation
+    private func renderDocument(in window: NSWindow, destination: URL?) {
+        guard printRenderer == nil, isReady, let id = noteID else { return }
+        let generation = generation
+        let title = title
+        let renderer = PrintDocumentRenderer()
+        printRenderer = renderer
+        Task { [self] in
+            defer { renderer.close(); printRenderer = nil }
+            do {
+                guard noteID == id, self.generation == generation else { return }
+                let value = try await webView.callAsyncJavaScript("return await window.editor.printable(expected)", arguments: ["expected": generation], in: nil, contentWorld: .page)
+                if let result = value as? [String: Any], result["snapshotError"] != nil, let message = result["message"] as? String {
+                    throw NSError(domain: "MAPP.Print", code: 2, userInfo: [NSLocalizedDescriptionKey: message])
+                }
+                guard let result = value as? [String: Any], let html = result["html"] as? String,
+                      let revision = result["revision"] as? Int else {
+                    throw NSError(domain: "MAPP.Print", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "The printable note could not finish loading.")])
+                }
+                guard noteID == id, self.generation == generation else { return }
+                try await renderer.load(html, textSize: CGFloat(style.textSize))
+                guard noteID == id, self.generation == generation, webView.window === window,
+                      let current = try await webView.evaluateJavaScript("window.editor.snapshot(\(generation))") as? [String: Any],
+                      current["revision"] as? Int == revision else { return }
+                if let destination { try await renderer.exportPDF(to: destination) }
+                else { _ = await renderer.printDocument(in: window, title: title) }
+            } catch {
+                guard noteID == id, self.generation == generation else { return }
+                library?.failure = (String(localized: "Couldn’t Print Note"), error.localizedDescription)
+            }
+        }
     }
 
     // MARK: Embedded files
@@ -407,11 +459,19 @@ final class EditorController: NSObject {
         return menuEmbed
     }
 
-    func undo() { call("undo") }
-    func redo() { call("redo") }
+    func setSourceMode(_ source: Bool) {
+        guard hasNote, isReady else { return }
+        call("setEditingMode", json(source ? "source" : "formatted"), String(generation))
+    }
+
+    func undo() { call("undo", String(generation)) }
+    func redo() { call("redo", String(generation)) }
 
     private func call(_ function: String, _ arguments: String...) {
-        webView.evaluateJavaScript("window.editor.\(function)(\(arguments.joined(separator: ", ")))") { _, error in
+        webView.evaluateJavaScript("window.editor.\(function)(\(arguments.joined(separator: ", ")))") { result, error in
+            if let rejected = result as? [String: Any], let message = rejected["message"] as? String, rejected["commandError"] != nil {
+                log.notice("\(function, privacy: .public) rejected: \(message, privacy: .public)")
+            }
             if let error {
                 let detail = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String ?? error.localizedDescription
                 log.error("\(function, privacy: .public): \(detail, privacy: .public)")
@@ -444,21 +504,37 @@ final class EditorController: NSObject {
     }
 
     /// The page's own words, from the String Catalog.
-    private func applyLabels() {
-        let labels = [
-            "note": String(localized: "Note"),
-            "copy": String(localized: "Copy"),
-            "addRow": String(localized: "Add Row"),
-            "addColumn": String(localized: "Add Column"),
-            "deleteRow": String(localized: "Delete Row"),
-            "deleteColumn": String(localized: "Delete Column"),
-            "alignLeft": String(localized: "Align Left"),
-            "alignCenter": String(localized: "Align Center"),
-            "alignRight": String(localized: "Align Right"),
-            "row": String(localized: "Row"),
-            "column": String(localized: "Column"),
+    private static var editorLabels: [String: String] {
+        [
+            "plainTextEditor": String(localized: "Plain Text"),
+            "placeholder": String(localized: "Start typing…"),
+            "expandCallout": String(localized: "Expand"),
+            "collapseCallout": String(localized: "Collapse"),
+            "diagramRendering": String(localized: "Rendering diagram…"),
+            "diagramUnavailable": String(localized: "Diagram unavailable:"),
+            "footnote": String(localized: "Footnote"),
+            "fileLoading": String(localized: "Loading file…"),
+            "fileError": String(localized: "File could not be loaded"),
+            "filePreviewUnavailable": String(localized: "Preview unavailable"),
+            "filePDFPreview": String(localized: "Open to view this PDF"),
+            "wikiMissing": String(localized: "Link unavailable"),
+            "formattedEditor": String(localized: "Note"),
+            "noteReference": String(localized: "Note reference: %@. Open to edit source."),
+            "sourceEditor": String(localized: "Markdown Source"),
+            "copyCode": String(localized: "Copy"),
+            "tableAddRow": String(localized: "Add Row"),
+            "tableAddColumn": String(localized: "Add Column"),
+            "tableDeleteRow": String(localized: "Delete Row"),
+            "tableDeleteColumn": String(localized: "Delete Column"),
+            "tableAlignLeft": String(localized: "Align Left"),
+            "tableAlignCenter": String(localized: "Align Center"),
+            "tableAlignRight": String(localized: "Align Right"),
+            "tableMoveRow": String(localized: "Row"),
+            "tableMoveColumn": String(localized: "Column"),
+            "fileOpen": String(localized: "Open"),
+            "fileMissing": String(localized: "File Not Found"),
+            "fileRetry": String(localized: "Try Again"),
         ]
-        call("setLabels", json(labels))
     }
 
     private func applyKeymap() {
@@ -496,8 +572,8 @@ final class EditorController: NSObject {
         switch message {
         case .ready:
             isReady = true
+            hasLoadedPage = true
             applyAccent()
-            applyLabels()
             applyKeymap()
             applyStyle()
             call("setHeaderHeight", String(Double(headerHeight)))
@@ -512,6 +588,7 @@ final class EditorController: NSObject {
         case .changed(let markdown, let generation):
             report(markdown, of: generation)
         case .state(let state):
+            guard state.generation == generation else { return }
             if state != caret { caret = state }
         case .scrolled(let offset, let generation):
             guard generation == self.generation else { return }
@@ -533,9 +610,13 @@ final class EditorController: NSObject {
         case .embedMenu(let embed):
             menuEmbed = embed
         case .find(let state):
+            guard state.generation == generation else { return }
             pageFinder.update(state)
+        case .diagnostic(let message):
+            log.notice("preview diagnostic: \(message, privacy: .public)")
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
+            library?.failure = (String(localized: "Editor Couldn’t Complete the Action"), message)
         }
     }
 }

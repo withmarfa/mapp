@@ -130,7 +130,7 @@ private struct FormatMenu: View {
             ForEach([Format.bulletList, .orderedList, .checklist], id: \.self, content: toggle)
             Button("Table", systemImage: "tablecells") { editor.apply(.table) }
                 // A table is inserted beside another table, never inside one.
-                .disabled(editor.caret.inTable)
+                .disabled(!editor.canApply(.table))
         }
         .menuIndicator(.hidden)
         .help("Format")
@@ -141,7 +141,7 @@ private struct FormatMenu: View {
     private func toggle(_ format: Format) -> some View {
         Toggle(isOn: Binding { format.isActive(in: editor.caret) } set: { _ in editor.apply(format) }) {
             Text(format.title)
-        }
+        }.disabled(!editor.canApply(format))
     }
 }
 

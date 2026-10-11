@@ -41,7 +41,7 @@ struct FormatCommands: Commands {
     @ViewBuilder
     private func item(_ format: Format, title: LocalizedStringResource? = nil) -> some View {
         let caret = editor?.caret ?? CaretState()
-        let enabled = editor?.isFocused == true && editor?.isEditable == true && (format.needsTable ? caret.inTable : format != .table || !caret.inTable)
+        let enabled = editor?.isFocused == true && editor?.canApply(format) == true
         Toggle(isOn: Binding { format.isActive(in: caret) } set: { _ in editor?.format(format) }) {
             Text(title ?? format.title)
         }

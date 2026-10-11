@@ -46,7 +46,7 @@ import Observation
         self.host = host
         marfaSettings = MarfaSettingsModel(host: host)
         isLaunching = host.configuredConnection != nil
-        host.handOverEdits = { [weak self] in await self?.flushEditors() }
+        host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -109,20 +109,21 @@ import Observation
     /// Hands every open page's last edit to the library it came from, and returns once each library keeps its
     /// writes on this Mac, never waiting on a server. Run before anything changes which library the windows read,
     /// and before quitting.
-    func flushEditors() async {
-        await Self.flush()
+    @discardableResult
+    func flushEditors() async -> Bool {
+        guard await Self.flush() else { return false }
         folder.library?.finish()
         await marfaLibrary?.finish()
+        return true
     }
 
-    /// As `flushEditors`, for quitting: waits at most `limit`, so a library that cannot finish never keeps the app
-    /// from quitting. False where it did not finish in time.
+    /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish.
     func flushEditors(within limit: Duration) async -> Bool {
         let first = FirstOf()
         return await withCheckedContinuation { continuation in
             Task {
-                await flushEditors()
-                first.resume(continuation, with: true)
+                let kept = await flushEditors()
+                first.resume(continuation, with: kept)
             }
             Task {
                 try? await Task.sleep(for: limit)
@@ -143,9 +144,9 @@ import Observation
     }
 
     /// The pages first, since an edit still in a page reaches a library only by being handed over.
-    private static func flush() async {
+    private static func flush() async -> Bool {
         await withCheckedContinuation { continuation in
-            EditorController.flushAll { continuation.resume() }
+            EditorController.flushAll { continuation.resume(returning: $0) }
         }
     }
 

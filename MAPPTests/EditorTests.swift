@@ -71,6 +71,151 @@ struct EditorTests {
 
     """
 
+    @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
+        let first = Note(body: "First\n", created: .now)
+        let second = Note(body: "Second\n", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let editor = EditorController(library: library)
+        editor.load(try #require(library.item(first.id)))
+        #expect(!editor.isReady)
+        editor.load(try #require(library.item(second.id)))
+        #expect(editor.noteID == second.id)
+        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(editor.isReady)
+        let source = try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String
+        #expect(source == "Second\n")
+    }
+
+    @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
+        let note = Note(body: "Original\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: RecordingStore())
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        var captured: [String] = []
+        page.editor.onChange = { id, text, read in captured.append(text); library.updateBody(of: id, to: text, readAt: read) }
+        try await page.run("window.editor.flush = () => 'Pending\\n'")
+        let kept = await withCheckedContinuation { continuation in
+            page.editor.flush { continuation.resume(returning: $0) }
+            library.updateBody(of: note.id, to: "Outside\n")
+            page.editor.noteChanged(library.item(note.id)!)
+        }
+        #expect(!kept)
+        #expect(captured == ["Pending\n"])
+        #expect(library.note(note.id)?.body == "Outside\n")
+        #expect(library.notes.contains { $0.id != note.id && $0.body == "Pending\n" })
+    }
+
+    @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        var left = false
+        page.editor.onLeave = { _ in left = true }
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        let originalID = page.editor.noteID
+        let replacement = Note(body: "Replacement\n", created: .now)
+        page.library.notes.append(replacement)
+        let kept = await withCheckedContinuation { continuation in
+            page.editor.flush { continuation.resume(returning: $0) }
+            page.editor.load(page.library.item(replacement.id)!)
+        }
+        #expect(page.editor.noteID == originalID)
+        #expect(page.changes.isEmpty)
+        #expect(!kept)
+        #expect(!left)
+        #expect(page.library.failure != nil)
+        try await page.run("window.editor.flush = window.savedFlush")
+        let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
+        try await page.load("Replacement\n")
+        let rejected = try await page.editor.webView.callAsyncJavaScript("try { window.editor.flush(expected); return false } catch { return true }", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? Bool
+        #expect(rejected == true)
+        #expect(try await page.markdown() == nil)
+    }
+
+    @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        let id = page.editor.noteID
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        page.editor.close()
+        #expect(!page.editor.hasNote)
+        try await page.wait { page.library.failure != nil }
+        #expect(page.editor.noteID == id)
+        #expect(!page.editor.hasNote)
+        let retainedID = try #require(id)
+        let item = try #require(page.library.item(retainedID))
+        page.library.updateBody(of: item.id, to: "Outside\n")
+        page.editor.noteChanged(item)
+        #expect(!page.editor.hasNote)
+        try await page.run("window.editor.flush = window.savedFlush")
+        page.editor.load(item)
+        #expect(page.editor.hasNote)
+    }
+
+    @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
+        let page = try await Harness()
+        try await page.load("```mermaid\nnot a valid diagram [\n```\n")
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(page.library.failure == nil)
+        #expect(try await page.markdown() == nil)
+    }
+
+    @Test func nativeFindReplacementBatchUsesScopedReadableTextAndEmojiGeometry() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.webView
+        defer { window.close() }
+        try await page.load("one 😀 one\n")
+        try await page.run("window.originalPost = window.webkit.messageHandlers.host.postMessage; window.webkit.messageHandlers.host.postMessage = message => { if (message.type === 'find') window.capturedFind = message; window.originalPost(message) }; window.editor.setFinding(true)")
+        let body = try await page.editor.webView.evaluateJavaScript("window.capturedFind")
+        let capturedBody = try #require(body)
+        guard case .find(let state) = try #require(EditorMessage(body: capturedBody)) else { Issue.record("Missing Find snapshot"); return }
+        let emoji = (state.text as NSString).range(of: "😀")
+        let finder = PageFinder(controller: page.editor)
+        finder.update(state)
+        let rects = try #require(finder.rects(forCharacterRange: emoji))
+        #expect(rects.contains { $0.rectValue.width > 0 && $0.rectValue.height > 0 })
+        let first = NSRange(location: 0, length: 3)
+        let last = (state.text as NSString).range(of: "one", options: .backwards)
+        #expect(finder.shouldReplaceCharacters(inRanges: [NSValue(range: first), NSValue(range: last)], with: ["two", "two"]))
+        finder.replaceCharacters(in: first, with: "two")
+        finder.replaceCharacters(in: last, with: "two")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(try await page.markdown() == "two 😀 two\n")
+    }
+
+    @Test func closeProxyRestoresTheHostDelegateAndNeverReusesARejectedApproval() async throws {
+        final class HostDelegate: NSObject, NSWindowDelegate {
+            var permitsClose = true
+            func windowShouldClose(_ sender: NSWindow) -> Bool { permitsClose }
+        }
+        let page = try await Harness()
+        try await page.load("Draft\n")
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let host = HostDelegate()
+        window.delegate = host
+        let proxy = EditorCloseDelegate(editor: page.editor, window: window)
+        var left = false
+        page.editor.onLeave = { _ in left = true }
+        let rejected = proxy.windowShouldClose(window)
+        #expect(!rejected)
+        host.permitsClose = false
+        try await page.wait { left }
+        try await page.run("0")
+        host.permitsClose = true
+        try await page.run("window.editor.flush = () => { throw new Error('composition') }")
+        let laterRejected = proxy.windowShouldClose(window)
+        #expect(!laterRejected)
+        try await Task.sleep(for: .milliseconds(2200))
+        #expect(page.library.failure != nil)
+        proxy.detach()
+        #expect(window.delegate === host)
+        window.delegate = nil
+        window.close()
+    }
+
     @Test func aNoteOpenedAndLeftAloneIsNotRewritten() async throws {
         let page = try await Harness()
         try await page.load(kitchen)
@@ -80,7 +225,7 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    @Test func headingMarksAppearOnlyWhileEditing() async throws {
+    @Test func aHeadingHasNativeFormatStateAndItsAuthoredSource() async throws {
         let page = try await Harness()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
@@ -95,21 +240,17 @@ struct EditorTests {
             window.close()
         }
         try await page.load("A paragraph.\n\n## Closing\n")
-        let markers = "getComputedStyle(document.querySelector('h2'), '::before').content"
-        let hidden = ["none", "normal", "\"\""]
-        let beforeFocus = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(hidden.contains(beforeFocus ?? ""))
         page.editor.focus()
-        try await page.run("0")
-        let hasFocus = try await page.editor.webView.evaluateJavaScript(
-            "document.activeElement === document.querySelector('.ProseMirror')"
-        ) as? Bool
-        #expect(hasFocus == true)
-        let focused = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(focused == "\"##\"")
-        try await page.run("document.querySelector('.ProseMirror').blur()")
-        let afterBlur = try await page.editor.webView.evaluateJavaScript(markers) as? String
-        #expect(hidden.contains(afterBlur ?? ""))
+        try await page.run("(() => { const snapshot = window.editor.readableSnapshot(); const at = snapshot.text.indexOf('Closing'); window.editor.findSelect(at, at, snapshot.generation, snapshot.snapshotId); window.editor.focus() })()")
+        try await page.wait { page.editor.caret.block == .heading(2) }
+        #expect(Format.heading.isActive(in: page.editor.caret))
+        page.editor.setSourceMode(true)
+        try await page.wait { page.editor.caret.sourceMode }
+        let source = try await page.editor.webView.evaluateJavaScript("document.querySelector('textarea').value") as? String
+        #expect(source == "A paragraph.\n\n## Closing\n")
+        page.editor.setSourceMode(false)
+        try await page.wait { !page.editor.caret.sourceMode }
+        #expect(try await page.shownText(until: "A paragraph.Closing") == "A paragraph.Closing")
         #expect(try await page.markdown() == nil)
         #expect(page.changes.isEmpty)
     }
@@ -128,7 +269,7 @@ struct EditorTests {
         page.editor.format(.table)
         try await page.wait { !page.changes.isEmpty }
         let markdown = try #require(page.changes.last)
-        #expect(markdown.contains("| --- | --- | --- |"))
+        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("---") })
         #expect(!markdown.contains(":-"))
     }
 
@@ -198,14 +339,18 @@ struct EditorTests {
         let note = Note(body: "Milk\n", created: .now)
         let library = NoteLibrary(notes: [note], store: RecordingStore())
         let page = try await Harness(library: library)
-        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        var reported: [String] = []
+        page.editor.onChange = { id, markdown, read in reported.append(markdown); library.updateBody(of: id, to: markdown, readAt: read) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
+        try await page.wait { page.editor.canApply(.checklist) }
         page.editor.format(.checklist)
         // Another window's text, typed on the text it held.
         library.updateBody(of: note.id, to: "Outside\n")
         page.editor.noteChanged(try #require(library.item(note.id)))
-        try await page.wait { library.notes.count == 2 }
+        for _ in 0..<100 where library.notes.count == 1 { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(reported == ["- [ ] Milk\n"])
+        try #require(library.notes.count == 2)
         #expect(library.note(note.id)?.body == "Outside\n")
         let copy = try #require(library.notes.first { $0.id != note.id })
         #expect(copy.body == "- [ ] Milk\n")
@@ -284,9 +429,20 @@ struct EditorTests {
         }
         #expect(widths == [4])
         let absent = try await page.editor.webView.evaluateJavaScript(
-            "[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)"
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing] .inkkit-file-label')].map((span) => span.textContent)"
         ) as? [String]
-        #expect(absent == ["b"])
+        #expect(absent == ["b: File Not Found"])
+        let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
+        #expect(rejected?["snapshotError"] == nil)
+        #expect(rejected?["assetCount"] as? Int == 1)
+        #expect((rejected?["html"] as? String)?.contains("mapp-embed:") == false)
+        library.updateBody(of: note.id, to: "![a](Attachments/Photo%201.png)\n")
+        page.editor.noteChanged(try #require(library.item(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let printable = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
+        let html = try #require(printable?["html"] as? String)
+        #expect(html.contains("data:image/png;base64,"))
+        #expect(!html.contains("mapp-embed:"))
     }
 
     // MARK: Embedded files of any kind
@@ -338,40 +494,21 @@ struct EditorTests {
         let image = try await settle(editor, "(() => { const i = document.querySelector('.image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
         #expect(image == [5, 3], "the image loads through the scheme at the width its embed gives")
 
-        let audio = try await settle(editor, "(() => { const a = document.querySelector('.embed-audio audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
+        let audio = try await settle(editor, "(() => { const a = document.querySelector('.inkkit-file audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
         #expect(abs((audio ?? 0) - 0.5) < 0.05, "the sound's length is read through ranges of the file")
 
-        let video = try await settle(editor, "(() => { const v = document.querySelector('.embed-video video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
+        let video = try await settle(editor, "(() => { const v = document.querySelector('.inkkit-file video'); return v && v.readyState >= 1 ? [v.videoWidth, v.videoHeight] : [] })()", as: [Int].self) { $0 == [64, 64] }
         #expect(video == [64, 64])
 
-        let frame = try await settle(editor, "document.querySelector('.embed-pdf iframe')?.src ?? ''", as: String.self) { $0?.isEmpty == false }
-        #expect(frame?.hasPrefix("mapp-embed://file/") == true)
+        let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
+        #expect(labels?.contains("Budget.csv") == true)
+        #expect(labels?.contains("Note reference: A note. Open to edit source.") == true)
+        #expect(labels?.contains("Missing.zip: File Not Found") == true)
+        #expect(labels?.contains("far: File Not Found") == true)
 
-        let card = try await settle(editor, "(() => { const c = document.querySelector('.embed-card'); const i = c?.querySelector('img'); return c && i?.complete && i.naturalWidth > 0 ? [c.querySelector('.embed-name').textContent, c.querySelector('.embed-detail').textContent] : [] })()", as: [String].self) { $0?.count == 2 }
-        #expect(card?.first == "Budget.csv")
-        #expect(card?.last?.isEmpty == false, "the card says how large the file is")
-
-        let absent = try await editor.webView.evaluateJavaScript("[...document.querySelectorAll('.image-absent')].map((span) => span.textContent)") as? [String]
-        #expect(absent == ["Missing.zip", "far"])
-        let text = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String
-        #expect(text?.contains("![[A note]]") == true, "an embedded note is text")
-
-        // WebKit draws a PDF in a frame from the app's scheme: the red page shows where the frame is.
-        let rect = try #require(try await editor.webView.evaluateJavaScript(
-            "(() => { const r = document.querySelector('.embed-pdf iframe').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()"
-        ) as? [Double])
-        var red = false
-        for _ in 0..<60 where !red {
-            try await Task.sleep(for: .milliseconds(100))
-            let configuration = WKSnapshotConfiguration()
-            configuration.rect = CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3])
-            configuration.afterScreenUpdates = true
-            guard let snapshot = try? await editor.webView.takeSnapshot(configuration: configuration),
-                  let bitmap = snapshot.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) else { continue }
-            let center = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB)
-            red = (center?.redComponent ?? 0) > 0.8 && (center?.greenComponent ?? 1) < 0.3
-        }
-        #expect(red, "the PDF is drawn inside its frame")
+        #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
+        #expect(await library.embeddedFile(.name("Plan.pdf"), in: note.id)?.lastPathComponent == "Plan.pdf")
+        #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
 
         #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
     }
@@ -411,8 +548,8 @@ struct EditorTests {
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
         let page = try await Harness(library: library)
         page.editor.load(try #require(library.item(note.id)))
-        _ = try await settle(page.editor, "!!document.querySelector('.embed-card')", as: Bool.self) { $0 == true }
-        try await page.run("document.querySelector('.embed-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
+        try await page.run("document.querySelector('.inkkit-file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         try await page.wait { page.editor.menuEmbed != nil }
         #expect(page.editor.menuEmbed?.item == note.id)
         #expect(page.editor.menuEmbed?.reference == .name("Budget.csv"))

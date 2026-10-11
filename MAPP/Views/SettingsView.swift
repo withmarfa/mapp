@@ -54,7 +54,7 @@ struct SettingsView: View {
         }
         .fileImporter(isPresented: $isChoosing, allowedContentTypes: [.folder]) { result in
             // Open notes hand over their last edits to the folder they came from before it is changed.
-            if case .success(let url) = result { EditorController.flushAll { folder.choose(url) } }
+            if case .success(let url) = result { EditorController.flushAll { kept in if kept { folder.choose(url) } } }
         }
         // A question about changes that wait is put again when Settings is next opened, not answered by leaving.
         .onDisappear { libraries.marfaSettings.cancelDeparture() }

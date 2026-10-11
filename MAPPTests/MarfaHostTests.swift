@@ -351,7 +351,7 @@ nonisolated final class TestKeyStore: KeyStore {
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
-        host.handOverEdits = { source.report.set(SyncReport(waiting: 1, queueRead: true)) }
+        host.handOverEdits = { source.report.set(SyncReport(waiting: 1, queueRead: true)); return true }
 
         await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         #expect(host.source === source)
@@ -362,6 +362,19 @@ nonisolated final class TestKeyStore: KeyStore {
         }
         #expect(host.connection == first)
         #expect(!source.calls.contains("close"))
+    }
+
+    @Test func aRejectedEditorFlushKeepsTheCurrentLibraryOpen() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        let source = try #require(host.source as? FakeMarfaSource)
+        host.handOverEdits = { false }
+        do { try await host.disconnect(.keepCopy); Issue.record("Leaving was approved after the editor rejected saving") }
+        catch { if case .unavailable = error {} else { Issue.record("Unexpected failure: \(error)") } }
+        #expect(host.source === source)
+        #expect(!source.calls.contains("close"))
+        #expect(!host.isBusy)
     }
 
     @Test func refusedWritesCountAsWaiting() async throws {

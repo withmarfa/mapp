@@ -1,7 +1,8 @@
 import { postToHost } from './bridge'
-import { NoteEditor, type FormatCommand, type Keymap } from './editor'
-import { embedAt, setItem } from './embeds'
-import { setLabels, type Labels } from './labels'
+import { NoteEditor, guardedCommand, type FormatCommand, type Keymap } from './editor'
+import { InkKitError } from '@aicayzer/inkkit'
+import '@aicayzer/inkkit/style.css'
+import type { EditorLabels } from '@aicayzer/inkkit'
 import './style.css'
 
 declare global {
@@ -10,16 +11,24 @@ declare global {
       load(markdown: string, generation: number, editable: boolean): void
       reload(markdown: string, generation: number, editable: boolean): void
       markdown(): string | null
-      flush(): string | null
-      format(command: FormatCommand, arg?: string | number): void
+      flush(expected?: number): string | null
+      format(command: FormatCommand, arg?: string | number, expected?: number): void
       focus(): void
-      undo(): void
-      redo(): void
+      setEditingMode(mode: 'source' | 'formatted', expected?: number): void
+      undo(expected?: number): void
+      redo(expected?: number): void
       setItem(id: string): void
       setFinding(finding: boolean): void
-      findSelect(from: number, to: number): void
-      findScroll(from: number): void
-      findReplace(from: number, to: number, text: string): void
+      findSelect(from: number, to: number, generation?: number, snapshotId?: string): void
+      findScroll(from: number, generation?: number, snapshotId?: string): void
+      findReplace(
+        from: number,
+        to: number,
+        text: string,
+        generation?: number,
+        snapshotId?: string,
+        batch?: string,
+      ): void
       insertImages(
         images: { src: string; alt: string }[],
         x?: number,
@@ -27,7 +36,9 @@ declare global {
         height?: number,
       ): void
       setKeymap(keymap: Keymap): void
-      setLabels(labels: Partial<Labels>): void
+      readableSnapshot(expected?: number): unknown
+      snapshot(expected?: number): unknown
+      printable(expected?: number): Promise<unknown>
       setFullWidth(full: boolean): void
       setTextSize(points: number): void
       setReadingWidth(ems: number): void
@@ -40,23 +51,27 @@ declare global {
 const root = document.getElementById('editor')
 if (!root) throw new Error('editor root missing')
 
-const editor = await NoteEditor.mount(root, {
-  find(state) {
-    postToHost({ type: 'find', ...state })
+const editor = await NoteEditor.mount(
+  root,
+  {
+    find(state) {
+      postToHost({ type: 'find', ...state })
+    },
+    changed(markdown, generation) {
+      postToHost({ type: 'changed', markdown, generation })
+    },
+    stateChanged(state) {
+      postToHost({ type: 'state', ...state })
+    },
+    openLink(href) {
+      postToHost({ type: 'openLink', href })
+    },
+    copy(text) {
+      postToHost({ type: 'copy', text })
+    },
   },
-  changed(markdown, generation) {
-    postToHost({ type: 'changed', markdown, generation })
-  },
-  stateChanged(state) {
-    postToHost({ type: 'state', ...state })
-  },
-  openLink(href) {
-    postToHost({ type: 'openLink', href })
-  },
-  copy(text) {
-    postToHost({ type: 'copy', text })
-  },
-})
+  (window as unknown as { mappLabels?: Partial<EditorLabels> }).mappLabels,
+)
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -85,14 +100,9 @@ window.addEventListener(
   { capture: true },
 )
 
-// The app adds Open and Show in Finder to the context menu over an embedded file, and needs to hear which one
-// before WebKit asks it for the menu.
 window.addEventListener(
   'contextmenu',
-  (event) => {
-    const shown = embedAt(event.target)
-    postToHost({ type: 'embedMenu', embed: shown?.embed ?? null, opens: shown?.opens ?? false })
-  },
+  () => postToHost({ type: 'embedMenu', embed: null, opens: false }),
   { capture: true },
 )
 
@@ -112,7 +122,7 @@ window.addEventListener('focus', () => document.documentElement.classList.remove
 let generation = 0
 let scrollPending = false
 function reportScroll(): void {
-  postToHost({ type: 'scrolled', offset: window.scrollY, generation })
+  postToHost({ type: 'scrolled', offset: window.scrollY, generation: editor.loadedGeneration })
 }
 window.addEventListener(
   'scroll',
@@ -130,27 +140,30 @@ window.addEventListener(
 window.editor = {
   load: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
-    editor.setEditable(editable)
-    editor.load(markdown, nextGeneration)
+    editor.load(markdown, nextGeneration, editable)
     reportScroll()
   },
   reload: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
-    editor.setEditable(editable)
-    editor.reload(markdown, nextGeneration)
+    editor.reload(markdown, nextGeneration, editable)
     reportScroll()
   },
   markdown: () => editor.markdown(),
-  flush: () => editor.flush(),
-  format: (command, arg) => editor.format(command, arg),
+  flush: (expected) => editor.flush(expected),
+  format: (command, arg, expected) =>
+    guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
   focus: () => editor.focus(),
-  undo: () => editor.undo(),
-  redo: () => editor.redo(),
-  setItem: (id) => setItem(id),
+  setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
+  undo: (expected) => guardedCommand(() => editor.undo(expected)),
+  redo: (expected) => guardedCommand(() => editor.redo(expected)),
+  setItem: (id) => editor.setItem(id),
   setFinding: (finding) => editor.setFinding(finding),
-  findSelect: (from, to) => editor.findSelect(from, to),
-  findScroll: (from) => editor.findScroll(from),
-  findReplace: (from, to, text) => editor.findReplace(from, to, text),
+  findSelect: (from, to, generation, snapshotId) =>
+    guardedCommand(() => editor.findSelect(from, to, generation, snapshotId)),
+  findScroll: (from, generation, snapshotId) =>
+    guardedCommand(() => editor.findScroll(from, generation, snapshotId)),
+  findReplace: (from, to, text, generation, snapshotId, batch) =>
+    guardedCommand(() => editor.findReplace(from, to, text, generation, snapshotId, batch)),
   // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
   insertImages: (images, x, y, height) =>
     editor.insertImages(
@@ -159,7 +172,16 @@ window.editor = {
       y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
     ),
   setKeymap: (keymap) => editor.setKeymap(keymap),
-  setLabels: (labels) => setLabels(labels),
+  readableSnapshot: (expected) => editor.readableSnapshot(expected),
+  snapshot: (expected) => editor.snapshot(expected),
+  printable: async (expected) => {
+    try {
+      return await editor.printable(expected)
+    } catch (error) {
+      if (error instanceof InkKitError) return { snapshotError: error.code, message: error.message }
+      throw error
+    }
+  },
   setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
   // Text measures use rem, so the reading width scales with its text.
   setTextSize: (points) => {

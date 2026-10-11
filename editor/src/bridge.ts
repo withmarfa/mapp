@@ -2,7 +2,9 @@ import type { CaretState, FindState } from './editor'
 
 /** An embed as the note names it: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
  *  does, for the app to resolve as Marfa's core does. */
-export type EmbedRequest = { item: string } & ({ path: string } | { name: string })
+export type EmbedRequest = { item: string; export?: boolean } & (
+  { path: string } | { name: string }
+)
 
 /** A file an embed names, as the app serves it: `url` and `icon` load through the app's own scheme, and
  *  `detail` is its size in the person's words. */
@@ -18,6 +20,7 @@ export interface EmbeddedFile {
 
 export type EditorMessage =
   | { type: 'ready' }
+  | { type: 'error' | 'diagnostic'; message: string }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
   | { type: 'scrolled'; offset: number; generation: number }

@@ -4,6 +4,8 @@ import WebKit
 /// What the page tells the find bar: its text as the find bar searches it, the selection and the visible
 /// stretch as offsets into that text, and each visible character's box in page coordinates.
 nonisolated struct FindState: Sendable {
+    var snapshotID = ""
+    var generation = 0
     var text = ""
     var selection = NSRange(location: 0, length: 0)
     var visible = NSRange(location: 0, length: 0)
@@ -20,6 +22,7 @@ final class PageFinder: NSObject, NSTextFinderClient {
     let finder = NSTextFinder()
     private weak var controller: EditorController?
     private var state = FindState()
+    private var replacementBatch = UUID().uuidString
 
     init(controller: EditorController) {
         self.controller = controller
@@ -46,13 +49,14 @@ final class PageFinder: NSObject, NSTextFinderClient {
     var allowsMultipleSelection: Bool { false }
 
     func shouldReplaceCharacters(inRanges ranges: [NSValue], with strings: [String]) -> Bool {
-        isEditable
+        replacementBatch = UUID().uuidString
+        return isEditable
     }
 
     /// Replaces a match on the page, and in the copy here at once, since Replace All goes on to the next match
     /// before the page has answered.
     func replaceCharacters(in range: NSRange, with string: String) {
-        controller?.findReplace(range, with: string)
+        controller?.findReplace(range, with: string, state: state, batch: replacementBatch)
         state.text = (state.text as NSString).replacingCharacters(in: range, with: string)
     }
 
@@ -63,14 +67,14 @@ final class PageFinder: NSObject, NSTextFinderClient {
         set {
             guard let range = newValue.first?.rangeValue else { return }
             state.selection = range
-            controller?.findSelect(range)
+            controller?.findSelect(range, state: state)
         }
     }
 
     var visibleCharacterRanges: [NSValue] { [NSValue(range: state.visible)] }
 
     func scrollRangeToVisible(_ range: NSRange) {
-        controller?.findScroll(range)
+        controller?.findScroll(range, state: state)
     }
 
     func contentView(at index: Int, effectiveCharacterRange outRange: NSRangePointer) -> NSView {
