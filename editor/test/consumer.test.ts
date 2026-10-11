@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test } from 'vitest'
-import { NoteEditor } from '../src/editor'
+import { NoteEditor, isPreviewDiagnostic, guardedCommand } from '../src/editor'
 
 async function withEditor(source: string, run: (editor: NoteEditor) => void | Promise<void>) {
   const root = document.createElement('div')
@@ -166,3 +166,21 @@ test('a rejected replacement poisons its batch rather than applying shifted late
     expect(() => editor.findReplace(4, 7, 'wrong', 1, snapshot.snapshotId, 'middle')).toThrow()
     expect(editor.snapshot().text).toBe('two one\n')
   }))
+
+test('preview fallbacks remain diagnostic and expected command rejections stay local', async () => {
+  expect(isPreviewDiagnostic(new Error('Preview unavailable'))).toBe(true)
+  expect(
+    isPreviewDiagnostic(new Error('Local preview label'), {
+      filePreviewUnavailable: 'Local preview label',
+    }),
+  ).toBe(true)
+  expect(isPreviewDiagnostic(new Error('Unexpected failure'))).toBe(false)
+  await withEditor('one\n', (editor) => {
+    const snapshot = editor.readableSnapshot(1)
+    editor.findReplace(0, 3, 'two', 1)
+    expect(guardedCommand(() => editor.findSelect(0, 3, 1, snapshot.snapshotId))).toMatchObject({
+      commandError: 'stale-document',
+    })
+    expect(editor.snapshot().text).toBe('two\n')
+  })
+})

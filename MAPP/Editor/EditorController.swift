@@ -468,7 +468,10 @@ final class EditorController: NSObject {
     func redo() { call("redo", String(generation)) }
 
     private func call(_ function: String, _ arguments: String...) {
-        webView.evaluateJavaScript("window.editor.\(function)(\(arguments.joined(separator: ", ")))") { _, error in
+        webView.evaluateJavaScript("window.editor.\(function)(\(arguments.joined(separator: ", ")))") { result, error in
+            if let rejected = result as? [String: Any], let message = rejected["message"] as? String, rejected["commandError"] != nil {
+                log.notice("\(function, privacy: .public) rejected: \(message, privacy: .public)")
+            }
             if let error {
                 let detail = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String ?? error.localizedDescription
                 log.error("\(function, privacy: .public): \(detail, privacy: .public)")

@@ -10,6 +10,22 @@ import {
 } from '@aicayzer/inkkit'
 import { postToHost, type EmbeddedFile, type EmbedRequest } from './bridge'
 
+export function isPreviewDiagnostic(error: Error, labels: Partial<EditorLabels> = {}): boolean {
+  return (
+    (error instanceof InkKitError && error.code === 'diagram-unavailable') ||
+    error.message === (labels.filePreviewUnavailable ?? 'Preview unavailable')
+  )
+}
+
+export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
+  try {
+    return action()
+  } catch (error) {
+    if (error instanceof InkKitError) return { commandError: error.code, message: error.message }
+    throw error
+  }
+}
+
 export type CaretState = InkCaret & {
   sourceMode: boolean
   inTable: boolean
@@ -116,10 +132,7 @@ export class NoteEditor {
         copy: events.copy,
         error(error) {
           postToHost({
-            type:
-              error instanceof InkKitError && error.code === 'diagram-unavailable'
-                ? 'diagnostic'
-                : 'error',
+            type: isPreviewDiagnostic(error, labels) ? 'diagnostic' : 'error',
             message: error.message,
           })
         },

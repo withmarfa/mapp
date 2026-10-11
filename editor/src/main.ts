@@ -1,5 +1,5 @@
 import { postToHost } from './bridge'
-import { NoteEditor, type FormatCommand, type Keymap } from './editor'
+import { NoteEditor, guardedCommand, type FormatCommand, type Keymap } from './editor'
 import { InkKitError } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import type { EditorLabels } from '@aicayzer/inkkit'
@@ -150,18 +150,20 @@ window.editor = {
   },
   markdown: () => editor.markdown(),
   flush: (expected) => editor.flush(expected),
-  format: (command, arg, expected) => editor.format(command, arg ?? undefined, expected),
+  format: (command, arg, expected) =>
+    guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
   focus: () => editor.focus(),
-  setEditingMode: (mode, expected) => editor.setEditingMode(mode, expected),
-  undo: (expected) => editor.undo(expected),
-  redo: (expected) => editor.redo(expected),
+  setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
+  undo: (expected) => guardedCommand(() => editor.undo(expected)),
+  redo: (expected) => guardedCommand(() => editor.redo(expected)),
   setItem: (id) => editor.setItem(id),
   setFinding: (finding) => editor.setFinding(finding),
   findSelect: (from, to, generation, snapshotId) =>
-    editor.findSelect(from, to, generation, snapshotId),
-  findScroll: (from, generation, snapshotId) => editor.findScroll(from, generation, snapshotId),
+    guardedCommand(() => editor.findSelect(from, to, generation, snapshotId)),
+  findScroll: (from, generation, snapshotId) =>
+    guardedCommand(() => editor.findScroll(from, generation, snapshotId)),
   findReplace: (from, to, text, generation, snapshotId, batch) =>
-    editor.findReplace(from, to, text, generation, snapshotId, batch),
+    guardedCommand(() => editor.findReplace(from, to, text, generation, snapshotId, batch)),
   // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
   insertImages: (images, x, y, height) =>
     editor.insertImages(
