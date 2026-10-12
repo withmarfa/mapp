@@ -61,9 +61,20 @@ final class EditorWebView: WKWebView {
     /// The window's undo manager, which holds the app's actions such as New Item and Delete.
     private var windowUndoManager: UndoManager? { window?.undoManager }
 
+    /// The item's title in the page is a plain text field, whose typing WebKit's own steps undo, as a field
+    /// editor's would. Steps left from typing in the note are dropped first, since undoing them would change the
+    /// note behind the page's back.
+    func beginEditingTitle() {
+        pageUndoManager.removeAllActions()
+    }
+
+    private var isEditingTitle: Bool { controller?.isEditingTitle == true }
+
     // The page's history comes first, as a text view's does; once it is spent, Undo reaches the window's.
     @objc func undo(_ sender: Any?) {
-        if controller?.caret.canUndo == true {
+        if isEditingTitle {
+            if pageUndoManager.canUndo { pageUndoManager.undo() } else { windowUndoManager?.undo() }
+        } else if controller?.caret.canUndo == true {
             controller?.undo()
         } else {
             windowUndoManager?.undo()
@@ -71,7 +82,9 @@ final class EditorWebView: WKWebView {
     }
 
     @objc func redo(_ sender: Any?) {
-        if controller?.caret.canRedo == true {
+        if isEditingTitle {
+            if pageUndoManager.canRedo { pageUndoManager.redo() } else { windowUndoManager?.redo() }
+        } else if controller?.caret.canRedo == true {
             controller?.redo()
         } else {
             windowUndoManager?.redo()
@@ -102,6 +115,14 @@ final class EditorWebView: WKWebView {
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         let caret = controller?.caret ?? CaretState()
         switch item.action {
+        case #selector(undo(_:)) where isEditingTitle:
+            let title = pageUndoManager.canUndo ? pageUndoManager.undoMenuItemTitle : windowUndoManager?.undoMenuItemTitle
+            (item as? NSMenuItem)?.title = title ?? String(localized: "Undo")
+            return pageUndoManager.canUndo || windowUndoManager?.canUndo == true
+        case #selector(redo(_:)) where isEditingTitle:
+            let title = pageUndoManager.canRedo ? pageUndoManager.redoMenuItemTitle : windowUndoManager?.redoMenuItemTitle
+            (item as? NSMenuItem)?.title = title ?? String(localized: "Redo")
+            return pageUndoManager.canRedo || windowUndoManager?.canRedo == true
         case #selector(undo(_:)):
             let title = caret.canUndo ? String(localized: "Undo") : windowUndoManager?.undoMenuItemTitle
             (item as? NSMenuItem)?.title = title ?? String(localized: "Undo")

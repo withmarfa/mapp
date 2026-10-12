@@ -130,6 +130,21 @@ extension ItemLibrary {
         deletePermanently(ids)
     }
 
+    /// Whether the person can give the item a title. A library with files names the file after any title; one
+    /// without keeps a title only as a property, so an item titled by its first line takes its title from its text.
+    func canSetTitle(of item: Item) -> Bool {
+        guard item.isEditable else { return false }
+        if case .firstLine = item.titleRule { return capabilities.contains(.renameFiles) }
+        return true
+    }
+
+    /// Why the library refused a title, in the person's words.
+    var titleRefusal: String {
+        capabilities.contains(.renameFiles)
+            ? String(localized: "The title could not be saved. Use a unique file name without slashes or line breaks.")
+            : String(localized: "The title could not be saved. Enter a title.")
+    }
+
     /// Whether Rename Note applies: it names a file, which a deleted note keeps as it is.
     func canRenameFile(of item: Item?) -> Bool {
         capabilities.contains(.renameFiles) && item?.isWritable == true

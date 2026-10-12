@@ -12,7 +12,7 @@ final class ItemToolbarTests: XCTestCase {
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
-        XCTAssertTrue(window.textFields["ItemPageTitle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 5))
         XCTAssertTrue(window.webViews.firstMatch.textViews.firstMatch.waitForExistence(timeout: 5))
     }
 

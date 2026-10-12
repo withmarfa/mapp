@@ -24,7 +24,9 @@ struct MainView: View {
 
     /// The library is given here as well as in the environment, since the editor is made with it.
     init(library: any ItemLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
-        _editor = State(initialValue: EditorController(library: library))
+        let editor = EditorController(library: library)
+        editor.titleDrafts = details
+        _editor = State(initialValue: editor)
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings
@@ -227,12 +229,20 @@ struct MainView: View {
         .onChange(of: browser.snapshot()) { _, snapshot in
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
-        .onDisappear { editor.flush() }
+        // The window has gone, by closing or changing library, once its titles were saved or the person chose to
+        // go; its drafts take no part in what other windows do.
+        .onDisappear {
+            editor.flush()
+            editor.titleDrafts = nil
+        }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
+            editor.onShowRefusedTitle = { [browser, library, order] id in
+                if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
+            }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it, keeping only a draft the person was writing.

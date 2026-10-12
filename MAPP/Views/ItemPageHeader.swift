@@ -1,133 +1,160 @@
+import AppKit
 import SwiftUI
 
-/// The page owns its title; the inspector is reserved for the rest of the item's details.
-struct ItemPageHeader: View {
+/// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
+/// title and chips above the note, so they scroll with it as one surface, and this carries out what the person
+/// does there: the title is saved as the item's property, and each chip opens a native menu. Applied to the
+/// editor's view, whose container the chips' frames arrive in.
+struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     let item: Item
+    let editor: EditorController
     let drafts: DetailsPresentation
-    let onStartWriting: () -> Void
-    @FocusState private var titleFocused: Bool
-    @State private var editingParent = false
-    @State private var propertyError = false
-    @StoredPageStyle private var style
+    /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
+    /// the safe area leaves, while the container runs up under the toolbar.
+    let containerTop: CGFloat
+    /// The parent chip's frame while its chooser is open.
+    @State private var choosingParent: CGRect?
 
-    private var titleDraft: ItemPropertyDraft { drafts.draft(for: item.id, key: "title") }
-    private var parent: ItemRelationship? { library.relationships(for: item.id).first { $0.field == "child-of" } }
-    private var status: ItemTypeInfo.Field? { library.catalogue.itemTypes[item.type]?.fields.first { $0.key == "status" } }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Untitled", text: Binding {
-                titleDraft.isDirty ? titleDraft.text : item.title
-            } set: {
-                titleDraft.text = $0
-                titleDraft.isDirty = true
-                titleDraft.rejected = false
-            }, axis: .vertical)
-            .textFieldStyle(.plain)
-            .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
-            .foregroundStyle(Color(nsColor: .textColor))
-            .lineLimit(1...6)
-            .focused($titleFocused)
-            .disabled(!item.isEditable)
-            .accessibilityLabel("Title")
-            .accessibilityIdentifier("ItemPageTitle")
-            .onSubmit { if commitTitle() { onStartWriting() } }
-            .onChange(of: titleFocused) { if !titleFocused { _ = commitTitle() } }
-            if titleDraft.rejected {
-                Text("The title could not be saved. Use a unique file name without slashes or line breaks.")
-                    .interfaceFont(.caption).foregroundStyle(.red)
-                Button("Discard Changes") { titleDraft.isDirty = false; titleDraft.rejected = false }
-                    .interfaceFont(.caption)
-            }
-            ItemChipLayout { chips }
-            if propertyError {
-                Text("The value could not be saved. Please try again.")
-                    .interfaceFont(.caption).foregroundStyle(.red)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onDisappear { _ = commitTitle() }
-        .popover(isPresented: $editingParent) {
-            if let parent {
-                ItemRelationshipPicker(relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
-                    library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private var chips: some View {
-        if let type = library.catalogue.itemTypes[item.type] {
-            ItemChipLabel(title: Text(LocalizedStringKey(type.label)))
-                .itemChipStyle()
-                .accessibilityIdentifier("ItemTypeChip")
-                .help("Item Type")
-        }
-        if let status, case .choice(let choices) = status.kind {
-            Menu {
-                ForEach(choices, id: \.self) { choice in
-                    Button {
-                        propertyError = !library.setItemProperty(item.id, key: status.key, value: .string(choice), undoManager: undoManager)
-                    } label: {
-                        if item.value(of: status.key)?.string == choice {
-                            Label(LocalizedStringKey(ItemPropertyRow.choiceLabel(choice)), systemImage: "checkmark")
-                        } else {
-                            Text(LocalizedStringKey(ItemPropertyRow.choiceLabel(choice)))
-                        }
+    func body(content: Content) -> some View {
+        content
+            .popover(isPresented: Binding { choosingParent != nil } set: { if !$0 { choosingParent = nil } },
+                     attachmentAnchor: .rect(.rect((choosingParent ?? .zero).offsetBy(dx: 0, dy: -containerTop))), arrowEdge: .bottom) {
+                if let parent = Self.parent(of: item.id, in: library) {
+                    ItemRelationshipPicker(relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
+                        library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
                     }
                 }
-            } label: {
-                ItemChipLabel(title: Text((item.value(of: status.key)?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status")),
-                              systemImage: "circle.lefthalf.filled")
             }
-            .itemChipMenuStyle()
-            .disabled(!item.isEditable)
-            .accessibilityIdentifier("ItemStatusChip")
-            .accessibilityLabel("Status")
-        }
-        if let parent {
-            Menu {
-                if let target = parent.targets.first, let id = target.itemID, library.item(id) != nil {
-                    Button("Open Parent") { openWindow(value: id) }
+            // The action may run on an earlier copy of this view, so it takes what changed from the change itself.
+            .onChange(of: item.id, initial: true) { old, id in
+                if old != id {
+                    drafts.saveTitle(of: old, in: library, undoManager: undoManager)
+                    // A refused status belongs to the visit, as the page showed it before.
+                    drafts.draft(for: old, key: "status").rejected = false
+                    choosingParent = nil
                 }
-                Button(parent.targets.isEmpty ? "Choose Parent…" : "Change Parent…") { editingParent = true }
-                    .disabled(!parent.isEditable)
-            } label: {
-                ItemChipLabel(title: Text(parent.targets.first?.title ?? String(localized: "Add Parent")),
-                              systemImage: "square.stack")
+                editor.onHeaderEvent = handler
+                let library = library, drafts = drafts
+                editor.showHeader { Self.header(of: id, in: library, drafts: drafts) }
             }
-            .itemChipMenuStyle()
-            .accessibilityIdentifier("ItemParentChip")
+            .onChange(of: interfaceTextSize) { editor.refreshHeader() }
+            .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
+    }
+
+    /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
+    static func header(of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation) -> PageHeader? {
+        guard let item = library.item(id) else { return nil }
+        let draft = drafts.draft(for: item.id, key: "title")
+        let status = Self.status(of: item, in: library)
+        let parent = Self.parent(of: item.id, in: library)
+        return PageHeader(
+            item: item.id.rawValue,
+            hidden: item.state == .trashed,
+            title: item.title,
+            draft: draft.isDirty ? draft.text : nil,
+            titleRejected: draft.rejected,
+            titleRefusal: library.titleRefusal,
+            editable: library.canSetTitle(of: item),
+            type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
+            status: status.map { _ in
+                PageHeader.Chip(label: (item.value(of: "status")?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status"),
+                                enabled: item.isEditable)
+            },
+            parent: parent.map { PageHeader.Chip(label: $0.targets.first?.title ?? String(localized: "Add Parent"), enabled: true) },
+            propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
+            interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
+        )
+    }
+
+    /// Carries out what the page asks, for the item it names, which may be one the page has just left.
+    private var handler: (PageHeaderEvent) -> Void {
+        let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow
+        let choosingParent = $choosingParent
+        // The editor keeps this, so it holds the editor weakly; otherwise neither would ever be released.
+        return { [weak editor] event in
+            guard let editor else { return }
+            switch event {
+            case .titleInput(let id, let text):
+                let draft = drafts.draft(for: id, key: "title")
+                draft.text = text
+                draft.isDirty = true
+                draft.rejected = false
+            case .titleCommit(let id, let text, let startWriting):
+                let draft = drafts.draft(for: id, key: "title")
+                if text != (draft.isDirty ? draft.text : library.item(id)?.title) {
+                    draft.text = text
+                    draft.isDirty = true
+                    draft.rejected = false
+                }
+                if drafts.saveTitle(of: id, in: library, undoManager: undoManager), startWriting {
+                    editor.focus(id)
+                }
+            case .titleDiscard(let id):
+                let draft = drafts.draft(for: id, key: "title")
+                draft.isDirty = false
+                draft.rejected = false
+            case .menu(.status, let id, let rect):
+                guard let item = library.item(id), let status = Self.status(of: item, in: library),
+                      case .choice(let choices) = status.kind else { return }
+                let menu = NSMenu()
+                for choice in choices {
+                    let entry = actionItem(Self.localized(ItemPropertyRow.choiceLabel(choice))) {
+                        drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
+                    }
+                    entry.state = item.value(of: status.key)?.string == choice ? .on : .off
+                    menu.addItem(entry)
+                }
+                editor.popUpMenu(menu, under: rect)
+            case .menu(.parent, let id, let rect):
+                guard let parent = Self.parent(of: id, in: library) else { return }
+                let menu = NSMenu()
+                menu.autoenablesItems = false
+                if let target = parent.targets.first?.itemID, library.item(target) != nil {
+                    menu.addItem(actionItem(String(localized: "Open Parent")) { openWindow(value: target) })
+                }
+                let choose = actionItem(parent.targets.isEmpty ? String(localized: "Choose Parent…") : String(localized: "Change Parent…")) {
+                    choosingParent.wrappedValue = rect
+                }
+                choose.isEnabled = parent.isEditable
+                menu.addItem(choose)
+                editor.popUpMenu(menu, under: rect)
+            }
         }
     }
 
-    @discardableResult private func commitTitle() -> Bool {
-        guard titleDraft.isDirty, item.isEditable else { return !titleDraft.rejected }
-        let title = titleDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        titleDraft.rejected = !library.setItemProperty(item.id, key: "title", value: .string(title), undoManager: undoManager)
-        if !titleDraft.rejected { titleDraft.isDirty = false }
-        return !titleDraft.rejected
+    private static func status(of item: Item, in library: any ItemLibrary) -> ItemTypeInfo.Field? {
+        guard let field = library.catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == "status" }),
+              case .choice = field.kind else { return nil }
+        return field
+    }
+
+    private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {
+        library.relationships(for: id).first { $0.field == "child-of" }
+    }
+
+    /// A catalogue's words, looked up in the String Catalog as SwiftUI's text would look them up.
+    private static func localized(_ key: String) -> String {
+        Bundle.main.localizedString(forKey: key, value: key, table: nil)
     }
 }
 
-#if DEBUG
-#Preview("Editable Page Header") {
-    let library = ItemPreviewFixtures.library
-    ItemPageHeader(item: library.item(ItemPreviewFixtures.ticketID)!, drafts: DetailsPresentation(), onStartWriting: {})
-        .environment(\.library, library)
-        .padding(24)
-        .frame(width: 620)
+/// Runs a menu item's action, for menus built for the page. The item holds it, since a target is not retained.
+private final class MenuAction: NSObject {
+    private let run: () -> Void
+
+    init(_ run: @escaping () -> Void) { self.run = run }
+
+    @objc func runAction() { run() }
 }
 
-#Preview("Long Title and Narrow Page") {
-    let library = ItemPreviewFixtures.library
-    let _ = library.setItemProperty(ItemPreviewFixtures.ticketID, key: "title", value: .string("Review the field observations and decide which findings belong in the final report"))
-    ItemPageHeader(item: library.item(ItemPreviewFixtures.ticketID)!, drafts: DetailsPresentation(), onStartWriting: {})
-        .environment(\.library, library)
-        .padding(24)
-        .frame(width: 380)
+private func actionItem(_ title: String, _ run: @escaping () -> Void) -> NSMenuItem {
+    let action = MenuAction(run)
+    let item = NSMenuItem(title: title, action: #selector(MenuAction.runAction), keyEquivalent: "")
+    item.target = action
+    item.representedObject = action
+    return item
 }
-#endif

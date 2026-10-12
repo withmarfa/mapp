@@ -24,13 +24,14 @@ struct ItemPropertyRow: View {
                     .foregroundStyle(.red)
                 Button("Discard Changes") {
                     input.isDirty = false
-                    seed()
+                    seed(value)
                 }
                 .interfaceFont(.caption)
             }
         }
-        .onAppear { if !input.isDirty { seed() } }
-        .onChange(of: value) { if !input.isDirty { seed() } }
+        .onAppear { if !input.isDirty { seed(value) } }
+        // The action may run on an earlier copy of this view, so it takes the value from the change itself.
+        .onChange(of: value) { _, value in if !input.isDirty { seed(value) } }
         .onChange(of: isFocused) { if !isFocused { commit() } }
         .onDisappear { commit() }
     }
@@ -124,7 +125,7 @@ struct ItemPropertyRow: View {
         return valid ? nil : String(localized: "Unrecognized value: \(ItemValueText.string(value)). It is preserved until you replace it.")
     }
 
-    private func seed() {
+    private func seed(_ value: PropertyValue?) {
         input.text = value.map(ItemValueText.string) ?? ""
         input.rejected = false
     }

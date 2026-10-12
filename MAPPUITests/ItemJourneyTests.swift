@@ -79,7 +79,7 @@ final class ItemJourneyTests: XCTestCase {
         let typedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: editor)
         wait(for: [typedBody], timeout: 5)
 
-        let title = app.descendants(matching: .any)["ItemPageTitle"]
+        let title = app.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeKey("a", modifierFlags: .command)
@@ -87,7 +87,7 @@ final class ItemJourneyTests: XCTestCase {
         title.typeKey(.return, modifierFlags: [])
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
-        let status = app.descendants(matching: .any)["ItemStatusChip"]
+        let status = app.itemStatusChip
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         status.click()
         app.menuItems["Completed"].click()

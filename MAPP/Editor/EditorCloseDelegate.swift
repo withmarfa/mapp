@@ -28,6 +28,8 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
             return previous?.windowShouldClose?(sender) != false
         }
         guard previous?.windowShouldClose?(sender) != false else { return false }
+        // A title typed in this window and refused would be lost with it.
+        guard editor?.saveTitles(tellingRefusal: true) != false else { return false }
         guard let editor, editor.hasNote else { return true }
         guard !awaiting else { return false }
         awaiting = true

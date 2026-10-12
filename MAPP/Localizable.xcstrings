@@ -1721,6 +1721,18 @@
     },
     "MAPP kept the new key, but the copy of your library on this Mac can’t be opened.": {
       "extractionState": "manual"
+    },
+    "Couldn’t Save Title": {
+      "extractionState": "manual"
+    },
+    "The title could not be saved. Enter a title.": {
+      "extractionState": "manual"
+    },
+    "The title “%@” for “%@” couldn’t be saved. Open the item to change the title or discard your changes.": {
+      "extractionState": "manual"
+    },
+    "The title for “%@” is empty. Open the item to enter a title or discard your changes.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

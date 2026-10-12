@@ -35,7 +35,7 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     func testEachFavoriteShortcutSelectsItsActualItem() {
-        let title = window.textFields["ItemPageTitle"]
+        let title = window.itemPageTitle
         for favorite in ["Kitchen quotes", "Reading list"] {
             sidebarText(favorite).click()
             let selected = expectation(for: NSPredicate(format: "value == %@", favorite), evaluatedWith: title)

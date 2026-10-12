@@ -9,9 +9,21 @@
   --rule: color-mix(in srgb, CanvasText 14%, transparent);
   --code-bg: color-mix(in srgb, CanvasText 7%, transparent);
   --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  /* The header's system colors: the quaternary label color behind a chip, the placeholder text color and red. */
+  --chip-fill: rgb(0 0 0 / 0.098);
+  --placeholder: rgb(0 0 0 / 0.498);
+  --error: rgb(255 56 60);
   --reading-width: 54rem;
   --page-width: var(--reading-width);
   color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chip-fill: rgb(255 255 255 / 0.098);
+    --placeholder: rgb(255 255 255 / 0.549);
+    --error: rgb(255 66 69);
+  }
 }
 
 :root.full-width {
@@ -39,14 +51,179 @@ body {
   -webkit-text-size-adjust: none;
 }
 
-#editor {
+body {
   --inkkit-font-size: 1rem;
   --inkkit-line-height: 1.55;
   --inkkit-min-height: 100vh;
   --inkkit-reading-width: calc(var(--page-width) + 6rem);
-  --inkkit-padding-top: calc(22px + var(--item-header-height, 0px));
+  --inkkit-padding-top: 22px;
   --inkkit-padding-inline: 3rem;
   --inkkit-padding-bottom: 48px;
+  /* The reading column's margins, resolved against each element's own width. */
+  --column-inset: max(
+    var(--inkkit-padding-inline),
+    calc((100% - var(--inkkit-reading-width)) / 2 + var(--inkkit-padding-inline))
+  );
+}
+
+/* One rule sets the header's margins and the text's, so the two can never drift apart. */
+#item-header,
+.inkkit-root .ProseMirror {
+  padding-inline: var(--column-inset);
+}
+
+/* The item's header, drawn as the app's native header was: the system font, a bold title at nearly twice the
+   text's size, and chips in the interface's text size. */
+#item-header {
+  --interface-text-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 16px;
+  padding-bottom: 8px;
+  font-family: -apple-system, system-ui, sans-serif;
+  line-height: normal;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#item-header[hidden] {
+  display: none;
+}
+
+.item-title {
+  align-self: stretch;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.item-title[contenteditable='false'] {
+  cursor: default;
+}
+
+.item-title.empty::before {
+  content: attr(data-placeholder);
+  color: var(--placeholder);
+  pointer-events: none;
+}
+
+.item-title-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.item-title-error[hidden],
+.item-error[hidden],
+.item-chip[hidden] {
+  display: none;
+}
+
+.item-error {
+  margin: 0;
+  font-size: calc(var(--interface-text-size) * 10 / 13);
+  color: var(--error);
+}
+
+.item-discard {
+  font:
+    calc(var(--interface-text-size) * 10 / 13) -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+.item-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.item-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--chip-fill);
+  color: var(--text);
+  font:
+    var(--interface-text-size) / normal -apple-system,
+    system-ui,
+    sans-serif;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.item-chip-label {
+  overflow: hidden;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* AppKit draws a menu chip's button inside the chip's padding, with its own spacing and its arrow after the
+   label. */
+.item-menu-chip {
+  gap: 4px;
+  padding-inline: 13px 15px;
+  cursor: default;
+}
+
+.item-menu-chip .item-icon-indicator {
+  margin-inline-start: -2px;
+}
+
+.item-menu-chip:disabled {
+  color: color-mix(in srgb, var(--text) 35%, transparent);
+}
+
+.item-menu-chip:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 0;
+}
+
+.item-chip-icon {
+  flex: none;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.item-icon-status {
+  width: var(--icon-status-width, 1em);
+  height: var(--icon-status-height, 1em);
+  -webkit-mask-image: var(--icon-status);
+  mask-image: var(--icon-status);
+}
+
+.item-icon-parent {
+  width: var(--icon-parent-width, 1em);
+  height: var(--icon-parent-height, 1em);
+  -webkit-mask-image: var(--icon-parent);
+  mask-image: var(--icon-parent);
+}
+
+.item-icon-indicator {
+  width: var(--icon-indicator-width, 0.6em);
+  height: var(--icon-indicator-height, 0.6em);
+  -webkit-mask-image: var(--icon-indicator);
+  mask-image: var(--icon-indicator);
 }
 
 /* InkKit draws text selection without filling the page margins. */

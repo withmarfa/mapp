@@ -61,38 +61,31 @@ private struct UnselectedItemContent: View {
         .frame(width: 600, height: 500)
 }
 
-/// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
-/// text into a page that is already running.
+/// One note as a formatted page, with the item's header drawn by the page above the text. The same editor shows
+/// each note in turn, so moving between notes loads text into a page that is already running.
 struct NotePage: View {
     @CurrentLibrary private var library
     let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
     let headerDrafts: DetailsPresentation
+    @State private var bannerHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .top) {
-                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
+                // The page runs under the toolbar and any banner, so it starts below them and scrolls beneath.
+                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
-                if item.state == .trashed {
-                    ScrollingPageHeader(editor: editor) {
+                    .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts, containerTop: proxy.safeAreaInsets.top))
+                VStack(spacing: 0) {
+                    if item.state == .trashed {
                         DeletedNoteBanner(id: item.id)
-                    }
-                } else {
-                    ScrollingPageHeader(editor: editor) {
-                        VStack(spacing: 0) {
-                            if case .conflicted(let copy?, _) = item.sync {
-                                SavedAsCopyBanner(copy: copy)
-                            }
-                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus(item.id) })
-                                .id(item.id)
-                                .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                                .padding(.top, 16)
-                                .padding(.bottom, 8)
-                        }
+                    } else if case .conflicted(let copy?, _) = item.sync {
+                        SavedAsCopyBanner(copy: copy)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -101,44 +94,27 @@ struct NotePage: View {
             editor.focus(item.id)
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
-        .onChange(of: style, initial: true) { editor.setStyle(style) }
-        .onChange(of: item.id, initial: true) {
+        .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
+        .onChange(of: item.id, initial: true) { _, id in
+            guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             if editor.noteID == item.id { editor.noteChanged(item) }
             else { editor.load(item) }
         }
         // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
-        // Marfa server that keeps its own text over the person's changes the text without a new version.
-        .onChange(of: item.version) { editor.noteChanged(item) }
-        .onChange(of: library.body(of: item.id)) { editor.noteChanged(item) }
+        // Marfa server that keeps its own text over the person's changes the text without a new version. The
+        // action may run on an earlier copy of this view, so the note is read as it is now.
+        .onChange(of: item.version) { noteChanged() }
+        .onChange(of: library.body(of: item.id)) { noteChanged() }
     }
-}
 
-/// WebKit owns scrolling. Its public script bridge supplies the offset for the native controls, while the
-/// page reserves their measured height. No second scroll view or copy of the item's data is involved.
-private struct ScrollingPageHeader<Content: View>: View {
-    let editor: EditorController
-    @ViewBuilder let content: () -> Content
-    @State private var height: CGFloat = 0
-
-    var body: some View {
-        ScrollingHeader(webView: editor.webView, content: content)
-            .fixedSize(horizontal: false, vertical: true)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                height = $0
-                editor.setHeaderHeight($0)
-            }
-            .offset(y: -editor.scrollOffset)
-            .frame(height: max(0, height - editor.scrollOffset), alignment: .top)
-            .clipped()
-            .padding(.top, editor.findBarHeight)
-            .accessibilityHidden(editor.isHeaderScrolledAway)
-            .allowsHitTesting(!editor.isHeaderScrolledAway)
+    private func noteChanged() {
+        if let item = library.item(item.id) { editor.noteChanged(item) }
     }
 }
 
 /// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
-/// beside the text the server kept.
+/// beside the text the server kept. It stays above the page while the note scrolls.
 private struct SavedAsCopyBanner: View {
     @Environment(\.openWindow) private var openWindow
     let copy: ItemID

@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import PDFKit
+import SwiftUI
 import Testing
 import WebKit
 @testable import MAPP
@@ -38,6 +39,15 @@ struct EditorTests {
 
         func run(_ script: String) async throws {
             _ = try await editor.webView.evaluateJavaScript("\(script); 0")
+        }
+
+        /// Waits until the page has drawn two more frames, so what it does in the next frame has been done and
+        /// anything it posted then has arrived.
+        func frames() async throws {
+            _ = try await editor.webView.callAsyncJavaScript(
+                "await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))",
+                arguments: [:], in: nil, contentWorld: .page)
+            _ = try await editor.webView.evaluateJavaScript("1")
         }
 
         /// The page's text, once it reads `expected` or after a couple of seconds.
@@ -288,35 +298,41 @@ struct EditorTests {
         try await page.wait { !rects().isEmpty }
         for source in [false, true] {
             page.editor.setSourceMode(source)
-            _ = try await page.editor.webView.evaluateJavaScript("1")
+            try await page.frames()
             for width in [CGFloat(360), 900, 500] {
                 let before = rects()
                 window.setContentSize(NSSize(width: width, height: 600))
                 #expect(page.editor.webView.frame.width == width)
                 try await page.wait { rects() != before }
+                try await page.frames()
                 #expect(rects().contains { $0.width > 0 && $0.height > 0 })
                 #expect(try await page.editor.webView.evaluateJavaScript("window.innerWidth") as? Double == Double(width))
             }
-            for command in source ? ["setTextSize(20)", "setHeaderHeight(150)"] : ["setTextSize(18)", "setHeaderHeight(130)"] {
+            // A header that wraps differently moves the text below it.
+            let header = Self.header(source ? "A short title" : String(repeating: "A title long enough to wrap ", count: 2))
+            for command in ["setTextSize(\(source ? 20 : 18))", "setHeader(\(Self.json(header)))"] {
                 let before = rects()
                 try await page.run("window.editor.\(command)")
                 try await page.wait { rects() != before }
+                try await page.frames()
             }
             if !source {
+                let before = rects()
                 window.setContentSize(NSSize(width: 1400, height: 600))
-                _ = try await page.editor.webView.evaluateJavaScript("1")
-                try await Task.sleep(for: .milliseconds(100))
+                try await page.wait { rects() != before }
+                try await page.frames()
                 for command in ["setFullWidth(true)", "setFullWidth(false)", "setReadingWidth(24)"] {
                     let before = rects()
                     try await page.run("window.editor.\(command)")
                     try await page.wait { rects() != before }
+                    try await page.frames()
                 }
             }
         }
         try await page.run("window.editor.setFinding(false)")
         let stopped = rects()
-        try await page.run("window.editor.setHeaderHeight(200)")
-        try await Task.sleep(for: .milliseconds(100))
+        try await page.run("window.editor.setHeader(\(Self.json(Self.header(String(repeating: "Another title ", count: 12)))))")
+        try await page.frames()
         #expect(rects() == stopped)
         #expect(try await page.markdown() == nil)
     }
@@ -783,6 +799,7 @@ struct EditorTests {
         defer { window.close() }
         page.editor.setStyle(PageStyle(textSize: 20, checksSpelling: false))
         try await page.load(kitchen)
+        page.editor.setHeader(Self.header("Header only words"))
         let size = try await page.editor.webView.evaluateJavaScript("getComputedStyle(document.documentElement).fontSize") as? String
         #expect(size == "20px")
         let spellcheck = try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').getAttribute('spellcheck')") as? String
@@ -806,5 +823,570 @@ struct EditorTests {
         #expect((1...2).contains(document.pageCount), "a short note prints on a page or two")
         #expect(document.string?.contains("Kitchen quotes") == true)
         #expect(document.string?.contains("Book a site visit") == true)
+        #expect(document.string?.contains("Header only words") == false, "the page's header is not part of the note")
+    }
+
+    // MARK: The item header
+
+    static func header(_ title: String, id: ItemID = ItemID("note"), hidden: Bool = false) -> PageHeader {
+        PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
+                   titleRefusal: "The title could not be saved.", editable: true,
+                   type: "Task", status: .init(label: "In Progress", enabled: true),
+                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, interfaceTextSize: 13)
+    }
+
+    static func json(_ value: some Encodable) -> String {
+        String(decoding: try! JSONEncoder().encode(value), as: UTF8.self)
+    }
+
+    /// An element's frame in the page's window, as left, top, width and height.
+    static func rect(_ selector: String, in page: Harness) async throws -> [Double] {
+        try #require(try await page.editor.webView.evaluateJavaScript(
+            "(() => { const r = document.querySelector(\(json(selector))).getBoundingClientRect(); return [r.left, r.top, r.width, r.height] })()"
+        ) as? [Double])
+    }
+
+    @Test func theItemHeaderScrollsWithTheTextInsideThePageAndKeepsItsMargins() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        try await page.load(Array(repeating: "A paragraph for the scrolling check.", count: 60).joined(separator: "\n\n") + "\n")
+        page.editor.setHeader(Self.header("Review the findings"))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let shown = try await page.editor.webView.evaluateJavaScript(
+            "[...document.querySelectorAll('#ItemPageTitle, #ItemTypeChip, #ItemStatusChip, #ItemParentChip')].map(e => e.textContent)"
+        ) as? [String]
+        #expect(shown == ["Review the findings", "Task", "In Progress", "Field Research"])
+
+        // The title and the text start at the same margin whatever the width, the reading width or Full Width.
+        for (width, full) in [(CGFloat(360), false), (900, false), (1400, false), (1400, true)] {
+            window.setContentSize(NSSize(width: width, height: 500))
+            page.editor.setStyle(PageStyle(fullWidth: full))
+            try await page.frames()
+            let title = try await Self.rect("#ItemPageTitle", in: page)
+            let text = try await Self.rect(".ProseMirror p", in: page)
+            #expect(abs(title[0] - text[0]) < 0.5, "at \(width) points the title starts at \(title[0]) and the text at \(text[0])")
+            #expect(abs(title[2] - text[2]) < 0.5)
+            #expect(text[1] >= title[1] + title[3] + 20, "the text starts below the header")
+        }
+        try await page.run("window.scrollTo(0, 0)")
+
+        // One surface: the header moves exactly as far as the text, and the app hears only the crossing.
+        try await page.run("""
+            window.headerMessages = []
+            const post = window.webkit.messageHandlers.host.postMessage.bind(window.webkit.messageHandlers.host)
+            window.webkit.messageHandlers.host.postMessage = m => { if (m.type === 'headerScrolledAway') window.headerMessages.push(m.away); post(m) }
+            """)
+        let titleBefore = try await Self.rect("#ItemPageTitle", in: page)
+        let textBefore = try await Self.rect(".ProseMirror p", in: page)
+        try await page.run("window.scrollTo(0, 37)")
+        let titleAfter = try await Self.rect("#ItemPageTitle", in: page)
+        let textAfter = try await Self.rect(".ProseMirror p", in: page)
+        #expect(titleBefore[1] - titleAfter[1] == 37)
+        #expect(textBefore[1] - textAfter[1] == 37)
+        #expect(!page.editor.isHeaderScrolledAway)
+        for offset in stride(from: 40, through: 400, by: 20) {
+            try await page.run("window.scrollTo(0, \(offset)); window.dispatchEvent(new Event('scroll'))")
+        }
+        try await page.wait { page.editor.isHeaderScrolledAway }
+        for offset in stride(from: 400, through: 0, by: -20) {
+            try await page.run("window.scrollTo(0, \(offset)); window.dispatchEvent(new Event('scroll'))")
+        }
+        try await page.wait { !page.editor.isHeaderScrolledAway }
+        #expect(try await page.editor.webView.evaluateJavaScript("window.headerMessages") as? [Bool] == [true, false])
+
+        // A deleted note's page has no header, so the toolbar holds its title from the start.
+        page.editor.setHeader(Self.header("Review the findings", hidden: true))
+        try await page.wait { page.editor.isHeaderScrolledAway }
+        let hidden = try await page.editor.webView.evaluateJavaScript("document.getElementById('item-header').hidden") as? Bool
+        #expect(hidden == true)
+        #expect(try await page.markdown() == nil)
+        // Resizing the header and the window raises nothing in the page.
+        #expect(page.library.failure == nil)
+    }
+
+    @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.makeKeyAndOrderFront(nil)
+        let saved = NSPasteboard.general.string(forType: .string)
+        defer {
+            NSPasteboard.general.clearContents()
+            if let saved { NSPasteboard.general.setString(saved, forType: .string) }
+            window.orderOut(nil); window.contentView = nil; window.close()
+        }
+        try await page.load("Text\n")
+        let id = try #require(page.editor.noteID)
+        page.editor.setHeader(Self.header("Title", id: id))
+        #expect(window.makeFirstResponder(page.editor.webView))
+        func title() async throws -> String? {
+            try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').textContent") as? String
+        }
+        // The last is copied from a page, with its markup beside the plain text.
+        let cases = ["one\ntwo", "one\r\ntwo", "one\u{2028}two", "one\u{2029}two", "one\n\n\ntwo", "one \n \ntwo", "<p>one</p><p>two</p>"]
+        // Pasted over the whole title, and at its end.
+        for (pasted, replacing) in cases.map({ ($0, true) }) + cases.map({ ($0, false) }) {
+            let expected = replacing ? "one two" : "Titleone two"
+            let caret = replacing ? "document.execCommand('selectAll')" : "getSelection().collapse(document.getElementById('ItemPageTitle'), 1)"
+            try await page.run("document.getElementById('ItemPageTitle').focus(); \(caret)")
+            try await page.wait { page.editor.isEditingTitle }
+            NSPasteboard.general.clearContents()
+            if pasted.hasPrefix("<") {
+                NSPasteboard.general.setString(pasted, forType: .html)
+                NSPasteboard.general.setString("one\ntwo", forType: .string)
+            } else {
+                NSPasteboard.general.setString(pasted, forType: .string)
+            }
+            NSApp.sendAction(#selector(NSText.paste(_:)), to: page.editor.webView, from: nil)
+            for _ in 0..<60 where try await title() == "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            let markup = try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').innerHTML") as? String
+            #expect(markup == expected, "pasting \(pasted.unicodeScalars.map { String($0.value, radix: 16) }) left \(markup ?? "")")
+            page.editor.webView.undo(nil)
+            for _ in 0..<60 where try await title() != "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            #expect(try await title() == "Title", "one Undo takes out what was pasted")
+        }
+    }
+
+    @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        page.editor.container.topInset = 52
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        try await page.load(Array(repeating: "Some text.", count: 80).joined(separator: "\n\n") + "\n")
+        let id = try #require(page.editor.noteID)
+        page.editor.setHeader(Self.header("Review the findings", id: id))
+        var menus: [(PageHeaderMenu, ItemID, CGRect)] = []
+        page.editor.onHeaderEvent = { if case .menu(let menu, let item, let rect) = $0 { menus.append((menu, item, rect)) } }
+        try await page.run("window.scrollTo(0, 30)")
+        let chip = try await Self.rect("#ItemStatusChip", in: page)
+        let viewport = try #require(try await page.editor.webView.evaluateJavaScript("window.innerHeight") as? Double)
+        try await page.run("document.getElementById('ItemStatusChip').dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, cancelable: true }))")
+        try await page.run("document.getElementById('ItemParentChip').click()")
+        try await page.wait { menus.count == 2 }
+        #expect(menus.map(\.0) == [.status, .parent])
+        #expect(menus.allSatisfy { $0.1 == id })
+        // The page's window starts below what covers the web view's top; the frame is in the container's terms.
+        let covered = page.editor.webView.bounds.height - viewport
+        let expected = page.editor.container.convert(CGRect(x: chip[0], y: chip[1] + covered, width: chip[2], height: chip[3]), from: page.editor.webView)
+        #expect(abs(menus[0].2.minX - expected.minX) < 0.5 && abs(menus[0].2.minY - expected.minY) < 0.5)
+        #expect(abs(menus[0].2.width - chip[2]) < 0.5 && abs(menus[0].2.height - chip[3]) < 0.5)
+        #expect(menus[0].2.minY > 52 - 30, "the chip lies below the covered top, less what has scrolled")
+    }
+
+    /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
+    @Observable final class Shown {
+        var id: ItemID
+        init(_ id: ItemID) { self.id = id }
+    }
+
+    struct PageHost: View {
+        let library: any ItemLibrary
+        let editor: EditorController
+        let drafts: DetailsPresentation
+        let shown: Shown
+
+        var body: some View {
+            if let item = library.item(shown.id) {
+                NotePage(item: item, editor: editor, headerDrafts: drafts)
+            }
+        }
+    }
+
+    /// The preview library's ticket on a page in a window of its own, driven through the page.
+    final class HostedPage {
+        let library: NoteLibrary
+        let ticket = ItemPreviewFixtures.ticketID
+        let page: Harness
+        let drafts = DetailsPresentation()
+        let shown: Shown
+        let window: NSWindow
+
+        init(library: NoteLibrary = ItemPreviewFixtures.library, showing id: ItemID = ItemPreviewFixtures.ticketID) async throws {
+            self.library = library
+            page = try await Harness(library: library)
+            page.editor.titleDrafts = drafts
+            shown = Shown(id)
+            window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
+                .environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            try await waitForTitle(try #require(library.item(id)).title)
+        }
+
+        func close() {
+            window.orderOut(nil)
+            window.contentView = nil
+            window.close()
+        }
+
+        /// Hands over every page's edits, as quitting or changing library does, or as deleting a note does when
+        /// `leaving` is false.
+        func flushAll(leaving: Bool = true) async -> Bool {
+            await withCheckedContinuation { continuation in EditorController.flushAll(leaving: leaving) { continuation.resume(returning: $0) } }
+        }
+
+        func value(_ script: String) async throws -> Any? {
+            try await page.editor.webView.evaluateJavaScript(script)
+        }
+
+        func shownTitle() async throws -> String? {
+            try await value("document.getElementById('ItemPageTitle')?.textContent") as? String
+        }
+
+        func titleError() async throws -> Bool? {
+            try await value("!document.querySelector('.item-title-error').hidden") as? Bool
+        }
+
+        func type(_ text: String) async throws {
+            #expect(window.makeFirstResponder(page.editor.webView))
+            try await page.run("""
+                document.getElementById('ItemPageTitle').focus()
+                document.execCommand('selectAll'); document.execCommand('insertText', false, \(EditorTests.json(text)))
+                """)
+            try await page.wait { self.drafts.draft(for: self.ticket, key: "title").text == text }
+        }
+
+        func pressReturn() async throws {
+            try await page.run("document.getElementById('ItemPageTitle').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))")
+        }
+
+        /// Waits for something the page or the window does in its own time, for up to ten seconds.
+        func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
+            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
+            try #require(try await condition(), "waiting for \(what)")
+        }
+
+        func waitForTitle(_ title: String) async throws {
+            try await waitFor("the page to show the title \(title)") { try await self.shownTitle() == title }
+        }
+    }
+
+    @Test func theTitleIsSavedFromThePageAndARefusalIsShownThere() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let library = host.library, ticket = host.ticket, page = host.page
+        let status = try await host.value("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
+        #expect(status == "In Progress")
+
+        // Return saves the title as the item's, once, and the note's text takes the keyboard.
+        var commits = 0
+        let handler = page.editor.onHeaderEvent
+        page.editor.onHeaderEvent = { event in
+            if case .titleCommit = event { commits += 1 }
+            handler(event)
+        }
+        try await host.type("Review the photographs")
+        try await page.wait { page.editor.isEditingTitle }
+        try await host.pressReturn()
+        try await page.wait { library.item(ticket)?.title == "Review the photographs" }
+        try await page.wait { !page.editor.isEditingTitle }
+        let writing = try await host.value("document.activeElement?.matches('.ProseMirror') === true") as? Bool
+        #expect(writing == true)
+        #expect(!host.drafts.draft(for: ticket, key: "title").isDirty)
+        // Anything the blur posted arrives before the answer to a script run after it.
+        _ = try await host.value("1")
+        #expect(commits == 1, "leaving the title after Return does not save it again")
+
+        // The change is undone as the app's own, from the window's undo manager, and the page shows it.
+        #expect(host.window.undoManager?.canUndo == true)
+        host.window.undoManager?.undo()
+        try await page.wait { library.item(ticket)?.title == "Review the findings" }
+        try await host.waitForTitle("Review the findings")
+
+        // A title the library refuses stays as typed, with the reason, and survives moving to another note and back.
+        try await host.type("Review/photographs")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        #expect(library.item(ticket)?.title == "Review the findings")
+        #expect(try await host.shownTitle() == "Review/photographs")
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(try await host.titleError() == false)
+        host.shown.id = ticket
+        try await host.waitForTitle("Review/photographs")
+        #expect(try await host.titleError() == true)
+
+        // Discard Changes gives the saved title back.
+        try await page.run("document.querySelector('.item-title-error button').click()")
+        try await host.waitForTitle("Review the findings")
+        #expect(try await host.titleError() == false)
+        #expect(library.item(ticket)?.title == "Review the findings")
+    }
+
+    @Test func aChangeFromOutsideReachesThePageAsItIsNow() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        for round in 1...5 {
+            let title = "Outside title \(round)"
+            #expect(host.library.setItemProperty(host.ticket, key: "title", value: .string(title), undoManager: nil))
+            try await host.waitForTitle(title)
+        }
+        // Deleted elsewhere, the note becomes read-only and its header gives way to the banner.
+        host.library.delete([host.ticket])
+        try await host.page.wait { !host.page.editor.isEditable }
+        try await host.waitFor("the header to hide") { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
+        host.library.recover([host.ticket])
+        try await host.page.wait { host.page.editor.isEditable }
+        try await host.waitFor("the header to show") { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
+    }
+
+    static func editorWebView(in view: NSView?) -> EditorWebView? {
+        guard let view else { return nil }
+        if let web = view as? EditorWebView { return web }
+        for sub in view.subviews { if let web = editorWebView(in: sub) { return web } }
+        return nil
+    }
+
+    /// What a window held, by weak references, so a test can see what outlives it.
+    struct Released {
+        weak var editor: EditorController?
+        weak var webView: EditorWebView?
+        weak var library: NoteLibrary?
+        var isEmpty: Bool { editor == nil && webView == nil && library == nil }
+    }
+
+    /// Opens the item in a window of its own, as the app's item window shows it, sets its title as `edit` says,
+    /// and closes the window the way ⌘W does.
+    static func openAndClose(_ library: NoteLibrary, item: ItemID, edit: (EditorController, EditorWebView) async throws -> Void = { _, _ in }) async throws -> Released {
+        // The app's run loop empties its autorelease pool after every event; a test's await does not, so the
+        // window's own steps are made in pools of their own.
+        let window = autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: NoteWindow(library: library, id: .constant(item)).environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+        for _ in 0..<200 where editorWebView(in: window.contentView)?.controller?.isReady != true {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let web = try #require(editorWebView(in: window.contentView))
+        let editor = try #require(web.controller)
+        for _ in 0..<200 where try await web.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        try await edit(editor, web)
+        autoreleasepool { window.performClose(nil) }
+        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(!window.isVisible, "the window closes")
+        // What SwiftUI does with a window it closes.
+        autoreleasepool {
+            window.toolbar = nil
+            window.contentView = nil
+        }
+        return Released(editor: editor, webView: web, library: library)
+    }
+
+    /// An item's page in a window of its own, with an editor and drafts of its own, through to its window closing.
+    static func openAndCloseAPage(_ library: NoteLibrary, item: ItemID) async throws -> Released {
+        let editor = EditorController(library: library)
+        let drafts = DetailsPresentation()
+        editor.titleDrafts = drafts
+        let window = autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: Shown(item))
+                .environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+        for _ in 0..<200 where try await editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        // Typing in the title goes through the window's handler, as a person's does.
+        editor.onHeaderEvent(.titleInput(item, "Review the findings"))
+        drafts.draft(for: item, key: "title").isDirty = false
+        autoreleasepool { window.performClose(nil) }
+        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(!window.isVisible, "the window closes")
+        autoreleasepool { window.contentView = nil }
+        return Released(editor: editor, webView: editor.webView, library: library)
+    }
+
+    @Test func aClosedWindowLetsGoOfItsEditorPageAndLibrary() async throws {
+        let released = try await Self.openAndCloseAPage(ItemPreviewFixtures.library, item: ItemPreviewFixtures.ticketID)
+        for _ in 0..<200 where !released.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(released.editor == nil, "a closed window's editor is released")
+        #expect(released.webView == nil, "a closed window's web view is released")
+        #expect(released.library == nil, "a library no window shows is released")
+    }
+
+    @Test func aRefusedTitleInAClosedWindowNeverHoldsUpQuittingOrRenamesTheNote() async throws {
+        let library = ItemPreviewFixtures.library
+        let ticket = ItemPreviewFixtures.ticketID
+        _ = try await Self.openAndClose(library, item: ticket) { editor, web in
+            _ = try await web.evaluateJavaScript("""
+                const title = document.getElementById('ItemPageTitle'); title.focus()
+                document.execCommand('selectAll'); document.execCommand('insertText', false, 'Review/photos')
+                title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
+                """)
+            for _ in 0..<200 where try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool != true {
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            // Deleted from another window, so closing this one is allowed: the draft cannot be saved anywhere.
+            library.delete([ticket], undoManager: nil)
+            for _ in 0..<200 where editor.isEditable { try await Task.sleep(for: .milliseconds(50)) }
+            #expect(!editor.isEditable, "the page shows the note deleted")
+        }
+        library.recover([ticket], undoManager: nil)
+        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(kept, "a draft no window holds cannot stop quitting")
+        #expect(library.failure == nil)
+        #expect(library.item(ticket)?.title == "Review the findings")
+    }
+
+    @Test func aRefusedEmptyTitleIsToldAsEmpty() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        #expect(await !host.flushAll())
+        #expect(host.library.failure?.message == "The title for “Review the findings” is empty. Open the item to enter a title or discard your changes.")
+    }
+
+    @Test func aRefusedStatusIsForgottenOnMovingToAnotherItem() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let error = "!document.querySelectorAll('#item-header > .item-error')[0]?.hidden"
+        host.drafts.draft(for: host.ticket, key: "status").rejected = true
+        try await host.waitFor("the status refusal") { try await host.value(error) as? Bool == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        host.shown.id = host.ticket
+        try await host.waitForTitle("Review the findings")
+        try await host.waitFor("the page to settle") { try await host.value(error) as? Bool != nil }
+        #expect(try await host.value(error) as? Bool == false, "a refused status belongs to the item's visit, as it did")
+    }
+
+    @Test func refusedTitlesInSeveralWindowsAreToldOnceAndShownWhereTheyAre() async throws {
+        let library = ItemPreviewFixtures.library
+        let first = try await HostedPage(library: library)
+        defer { first.close() }
+        let second = try await HostedPage(library: library, showing: ItemPreviewFixtures.noteID)
+        defer { second.close() }
+        var shown: [ItemID] = []
+        first.page.editor.onShowRefusedTitle = { shown.append($0) }
+        second.page.editor.onShowRefusedTitle = { shown.append($0) }
+        first.drafts.draft(for: first.ticket, key: "title").text = "Review/photos"
+        first.drafts.draft(for: first.ticket, key: "title").isDirty = true
+        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").text = "Field/notes"
+        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").isDirty = true
+        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(!kept)
+        #expect(shown.count == 1, "one refusal is told, and its window shows its item")
+        let told = try #require(shown.first)
+        let message = try #require(library.failure?.message)
+        let window = told == first.ticket ? first.window : second.window
+        #expect(message.contains(told == first.ticket ? "“Review/photos”" : "“Field/notes”"), "\(message)")
+        #expect(window.isKeyWindow || window.isMainWindow || NSApp.orderedWindows.first === window, "the window holding the draft comes forward")
+    }
+
+    @Test func aTitleTypedButNotLeftIsSavedBeforeQuittingAndARefusalStopsIt() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review before quitting")
+        #expect(await host.flushAll())
+        #expect(host.library.item(host.ticket)?.title == "Review before quitting")
+        #expect(host.library.failure == nil)
+
+        try await host.type("Review/before quitting")
+        #expect(await !host.flushAll(), "a title that cannot be saved stops quitting rather than being lost")
+        #expect(host.library.item(host.ticket)?.title == "Review before quitting")
+        #expect(host.library.failure?.message.contains("“Review/before quitting”") == true)
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+    }
+
+    @Test func aRefusedTitleForANoteNoLongerShownStillStopsQuittingAndNamesTheNote() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review/photos")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(await !host.flushAll())
+        let message = try #require(host.library.failure?.message)
+        #expect(message.contains("“Review/photos”") && message.contains("“Review the findings”"), "\(message)")
+        // Deleting a note keeps the window, so a refused title is tried again but stops nothing.
+        host.library.failure = nil
+        #expect(await host.flushAll(leaving: false))
+        #expect(host.library.failure == nil)
+        #expect(host.drafts.draft(for: host.ticket, key: "title").rejected)
+    }
+
+    @Test func aTitleRefusedBecauseTheNameWasTakenIsSavedOnceTheNameIsFree() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let taken = Note(path: "Tickets/Taken.md", text: "Taken\n", created: .now)
+        host.library.notes.append(taken)
+        try await host.type("Taken")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(host.library.setItemProperty(taken.id, key: "title", value: .string("Taken before"), undoManager: nil))
+        #expect(await host.flushAll())
+        #expect(host.library.item(host.ticket)?.title == "Taken")
+        #expect(!host.drafts.draft(for: host.ticket, key: "title").isDirty)
+    }
+
+    @Test func closingTheWindowWithARefusedTitleIsCancelledAndSaysWhy() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review/photos")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.window.performClose(nil)
+        try await host.waitFor("the refusal to be told") { host.library.failure != nil }
+        #expect(host.library.failure?.message.contains("“Review/photos”") == true)
+        #expect(host.window.isVisible, "the window stays open with the title that could not be saved")
+    }
+
+    @Test func aTitleTheLibraryCannotSetIsReadOnlyAndARefusalSaysWhyInItsTerms() async throws {
+        let firstLine = FakeItemLibrary.note("Shopping list", modified: .now)
+        var ticket = FakeItemLibrary.note("Review the findings", modified: .now)
+        ticket.titleRule = .property("title")
+        let library = FakeItemLibrary(items: [firstLine, ticket], bodies: [firstLine.id: "Shopping list\n", ticket.id: "Notes\n"])
+        let editor = EditorController(library: library)
+        let drafts = DetailsPresentation()
+        editor.titleDrafts = drafts
+        let shown = Shown(firstLine.id)
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: shown)
+            .environment(\.library, library))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        func value(_ script: String) async throws -> Any? { try await editor.webView.evaluateJavaScript(script) }
+        func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
+            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
+            try #require(try await condition(), "waiting for \(what)")
+        }
+        let editable = "document.getElementById('ItemPageTitle').getAttribute('contenteditable')"
+        try await waitFor("the first-line title") { try await value("document.getElementById('ItemPageTitle')?.textContent") as? String == "Shopping list" }
+        #expect(try await value(editable) as? String == "false", "a library without files cannot give a first-line title another")
+
+        shown.id = ticket.id
+        try await waitFor("the property title") { try await value("document.getElementById('ItemPageTitle').textContent") as? String == "Review the findings" }
+        #expect(try await value(editable) as? String == "plaintext-only")
+        #expect(window.makeFirstResponder(editor.webView))
+        _ = try await value("""
+            const title = document.getElementById('ItemPageTitle'); title.focus()
+            document.execCommand('selectAll'); document.execCommand('insertText', false, 'Review the photographs')
+            title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
+            """)
+        try await waitFor("the refusal") { try await value("!document.querySelector('.item-title-error').hidden") as? Bool == true }
+        let reason = try await value("document.querySelector('.item-title-error .item-error').textContent") as? String
+        #expect(reason?.contains("file name") == false, "a library without files does not talk about file names: \(reason ?? "")")
     }
 }

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 nonisolated enum Mark: String, Sendable {
@@ -33,7 +34,15 @@ nonisolated enum EditorMessage: Sendable {
     case ready
     case changed(String, generation: Int)
     case state(CaretState)
-    case scrolled(CGFloat, generation: Int)
+    /// The item's header has gone under the toolbar, or come back; said only when it changes.
+    case headerScrolledAway(Bool, generation: Int)
+    /// The item's title took or lost the keyboard.
+    case titleFocus(Bool)
+    case titleInput(ItemID, String)
+    case titleCommit(ItemID, String, startWriting: Bool)
+    case titleDiscard(ItemID)
+    /// A chip asks for its menu, with the chip's frame in the page's window and the height of that window.
+    case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
     case openLink(String)
     case copy(String)
     case escape
@@ -73,10 +82,29 @@ nonisolated enum EditorMessage: Sendable {
         case "openLink":
             guard let href = dict["href"] as? String else { return nil }
             self = .openLink(href)
-        case "scrolled":
-            guard let offset = dict["offset"] as? Double, offset.isFinite,
-                  let generation = dict["generation"] as? Int else { return nil }
-            self = .scrolled(offset, generation: generation)
+        case "headerScrolledAway":
+            guard let away = dict["away"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
+            self = .headerScrolledAway(away, generation: generation)
+        case "titleFocus":
+            guard let focused = dict["focused"] as? Bool else { return nil }
+            self = .titleFocus(focused)
+        case "titleInput":
+            guard let item = dict["item"] as? String, let text = dict["text"] as? String else { return nil }
+            self = .titleInput(ItemID(item), text)
+        case "titleCommit":
+            guard let item = dict["item"] as? String, let text = dict["text"] as? String,
+                  let startWriting = dict["startWriting"] as? Bool else { return nil }
+            self = .titleCommit(ItemID(item), text, startWriting: startWriting)
+        case "titleDiscard":
+            guard let item = dict["item"] as? String else { return nil }
+            self = .titleDiscard(ItemID(item))
+        case "headerMenu":
+            guard let item = dict["item"] as? String,
+                  let menu = (dict["menu"] as? String).flatMap(PageHeaderMenu.init(rawValue:)),
+                  let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
+            else { return nil }
+            self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
         case "copy":
             guard let text = dict["text"] as? String else { return nil }
             self = .copy(text)
