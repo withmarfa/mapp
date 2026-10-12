@@ -12,8 +12,20 @@ extension FocusedValues {
     @Entry var browser: Browser?
     @Entry var detailsPresentation: DetailsPresentation?
     @Entry var focusedNotes: FocusedNotes?
-    /// The editor of the window in front, for the Format menu.
-    @Entry var editor: EditorController?
+    /// The editor of the window in front, for the Format menu. Held weakly: SwiftUI keeps the last focused
+    /// values after their window closes, which would otherwise keep that window's editor, page and library.
+    var editor: EditorController? {
+        get { self[FocusedEditorKey.self]?.editor }
+        set { self[FocusedEditorKey.self] = newValue.map(FocusedEditor.init) }
+    }
+}
+
+private struct FocusedEditor {
+    weak var editor: EditorController?
+}
+
+private struct FocusedEditorKey: FocusedValueKey {
+    typealias Value = FocusedEditor
 }
 
 /// Presentation belongs to a window, so menu and toolbar actions share it without changing other windows.

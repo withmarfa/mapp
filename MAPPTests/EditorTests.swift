@@ -1002,30 +1002,27 @@ struct EditorTests {
 
     /// The preview library's ticket on a page in a window of its own, driven through the page.
     final class HostedPage {
-        let library = ItemPreviewFixtures.library
+        let library: NoteLibrary
         let ticket = ItemPreviewFixtures.ticketID
         let page: Harness
         let drafts = DetailsPresentation()
         let shown: Shown
         let window: NSWindow
 
-        init() async throws {
+        init(library: NoteLibrary = ItemPreviewFixtures.library, showing id: ItemID = ItemPreviewFixtures.ticketID) async throws {
+            self.library = library
             page = try await Harness(library: library)
             page.editor.titleDrafts = drafts
-            shown = Shown(ticket)
+            shown = Shown(id)
             window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
                 .environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
-            try await waitForTitle("Review the findings")
+            try await waitForTitle(try #require(library.item(id)).title)
         }
 
         func close() {
-            // A draft left refused here must not hold up a later test's flush of every editor.
-            for id in [ItemPreviewFixtures.ticketID, ItemPreviewFixtures.noteID, ItemPreviewFixtures.projectID] {
-                drafts.draft(for: id, key: "title").isDirty = false
-            }
             window.orderOut(nil)
             window.contentView = nil
             window.close()
@@ -1142,6 +1139,111 @@ struct EditorTests {
         try await host.waitFor("the header to show") { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
     }
 
+    static func editorWebView(in view: NSView?) -> EditorWebView? {
+        guard let view else { return nil }
+        if let web = view as? EditorWebView { return web }
+        for sub in view.subviews { if let web = editorWebView(in: sub) { return web } }
+        return nil
+    }
+
+    /// What a window held, by weak references, so a test can see what outlives it.
+    struct Released {
+        weak var editor: EditorController?
+        weak var webView: EditorWebView?
+        weak var library: NoteLibrary?
+        var isEmpty: Bool { editor == nil && webView == nil && library == nil }
+    }
+
+    /// Opens the item in a window of its own, as the app's item window shows it, sets its title as `edit` says,
+    /// and closes the window the way ⌘W does.
+    static func openAndClose(_ library: NoteLibrary, item: ItemID, edit: (EditorController, EditorWebView) async throws -> Void = { _, _ in }) async throws -> Released {
+        // The app's run loop empties its autorelease pool after every event; a test's await does not, so the
+        // window's own steps are made in pools of their own.
+        let window = autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: NoteWindow(library: library, id: .constant(item)).environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+        for _ in 0..<200 where editorWebView(in: window.contentView)?.controller?.isReady != true {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let web = try #require(editorWebView(in: window.contentView))
+        let editor = try #require(web.controller)
+        for _ in 0..<200 where try await web.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        try await edit(editor, web)
+        autoreleasepool { window.performClose(nil) }
+        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(!window.isVisible, "the window closes")
+        // What SwiftUI does with a window it closes.
+        autoreleasepool {
+            window.toolbar = nil
+            window.contentView = nil
+        }
+        return Released(editor: editor, webView: web, library: library)
+    }
+
+    /// An item's page in a window of its own, with an editor and drafts of its own, through to its window closing.
+    static func openAndCloseAPage(_ library: NoteLibrary, item: ItemID) async throws -> Released {
+        let editor = EditorController(library: library)
+        let drafts = DetailsPresentation()
+        editor.titleDrafts = drafts
+        let window = autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: Shown(item))
+                .environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+        for _ in 0..<200 where try await editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        // Typing in the title goes through the window's handler, as a person's does.
+        editor.onHeaderEvent(.titleInput(item, "Review the findings"))
+        drafts.draft(for: item, key: "title").isDirty = false
+        autoreleasepool { window.performClose(nil) }
+        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(!window.isVisible, "the window closes")
+        autoreleasepool { window.contentView = nil }
+        return Released(editor: editor, webView: editor.webView, library: library)
+    }
+
+    @Test func aClosedWindowLetsGoOfItsEditorPageAndLibrary() async throws {
+        let released = try await Self.openAndCloseAPage(ItemPreviewFixtures.library, item: ItemPreviewFixtures.ticketID)
+        for _ in 0..<200 where !released.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(released.editor == nil, "a closed window's editor is released")
+        #expect(released.webView == nil, "a closed window's web view is released")
+        #expect(released.library == nil, "a library no window shows is released")
+    }
+
+    @Test func aRefusedTitleInAClosedWindowNeverHoldsUpQuittingOrRenamesTheNote() async throws {
+        let library = ItemPreviewFixtures.library
+        let ticket = ItemPreviewFixtures.ticketID
+        _ = try await Self.openAndClose(library, item: ticket) { editor, web in
+            _ = try await web.evaluateJavaScript("""
+                const title = document.getElementById('ItemPageTitle'); title.focus()
+                document.execCommand('selectAll'); document.execCommand('insertText', false, 'Review/photos')
+                title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
+                """)
+            for _ in 0..<200 where try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool != true {
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            // Deleted from another window, so closing this one is allowed: the draft cannot be saved anywhere.
+            library.delete([ticket], undoManager: nil)
+            for _ in 0..<200 where editor.isEditable { try await Task.sleep(for: .milliseconds(50)) }
+            #expect(!editor.isEditable, "the page shows the note deleted")
+        }
+        library.recover([ticket], undoManager: nil)
+        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(kept, "a draft no window holds cannot stop quitting")
+        #expect(library.failure == nil)
+        #expect(library.item(ticket)?.title == "Review the findings")
+    }
+
     @Test func aTitleTypedButNotLeftIsSavedBeforeQuittingAndARefusalStopsIt() async throws {
         let host = try await HostedPage()
         defer { host.close() }
@@ -1217,7 +1319,7 @@ struct EditorTests {
         window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: shown)
             .environment(\.library, library))
         window.makeKeyAndOrderFront(nil)
-        defer { drafts.draft(for: ticket.id, key: "title").isDirty = false; window.orderOut(nil); window.contentView = nil; window.close() }
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
         func value(_ script: String) async throws -> Any? { try await editor.webView.evaluateJavaScript(script) }
         func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
             for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }

@@ -74,6 +74,7 @@ struct NoteWindow: View {
         // the window's undo would act on the library left.
         .onDisappear {
             editor.flush()
+            editor.titleDrafts = nil
             undoManager?.removeAllActions()
         }
         .libraryDialogs()

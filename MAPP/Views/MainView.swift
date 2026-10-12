@@ -229,7 +229,12 @@ struct MainView: View {
         .onChange(of: browser.snapshot()) { _, snapshot in
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
-        .onDisappear { editor.flush() }
+        // The window has gone, by closing or changing library, once its titles were saved or the person chose to
+        // go; its drafts take no part in what other windows do.
+        .onDisappear {
+            editor.flush()
+            editor.titleDrafts = nil
+        }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }

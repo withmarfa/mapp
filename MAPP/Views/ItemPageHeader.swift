@@ -70,9 +70,11 @@ struct ItemPageHeader: ViewModifier {
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left.
     private var handler: (PageHeaderEvent) -> Void {
-        let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow, editor = editor
+        let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow
         let choosingParent = $choosingParent
-        return { event in
+        // The editor keeps this, so it holds the editor weakly; otherwise neither would ever be released.
+        return { [weak editor] event in
+            guard let editor else { return }
             switch event {
             case .titleInput(let id, let text):
                 let draft = drafts.draft(for: id, key: "title")

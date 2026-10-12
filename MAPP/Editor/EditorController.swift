@@ -163,7 +163,8 @@ final class EditorController: NSObject {
     func refreshHeader() {
         headerReading += 1
         let reading = headerReading
-        let header = withObservationTracking(headerSource) {
+        // Weak here as well as in the task, or the tracking would hold the editor until the next change.
+        let header = withObservationTracking(headerSource) { [weak self] in
             // Heard before the change is made, so the header is read again once it has been.
             Task { @MainActor [weak self] in
                 guard let self, headerReading == reading else { return }
