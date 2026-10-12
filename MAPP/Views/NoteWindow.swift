@@ -78,7 +78,7 @@ struct NoteWindow: View {
         .onDisappear {
             // A window that never showed a note made no editor.
             editorSlot.made?.flush()
-            editorSlot.made?.titleDrafts = nil
+            editorSlot.made?.windowWent()
             undoManager?.removeAllActions()
         }
         .libraryDialogs()

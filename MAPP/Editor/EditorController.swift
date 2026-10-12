@@ -325,6 +325,13 @@ final class EditorController: NSObject {
         }
     }
 
+    /// The window is gone and its text already flushed, so its drafts and page take no part in later flushes, even
+    /// while SwiftUI still holds the editor for a moment.
+    func windowWent() {
+        titleDrafts = nil
+        Self.open.remove(self)
+    }
+
     /// Tries every title the window holds unsaved, since a name taken before may be free now, leaving out items that
     /// are gone or whose title cannot be set. Whether all are saved; if not, and asked to, says which is not.
     func saveTitles(tellingRefusal: Bool) -> Bool {

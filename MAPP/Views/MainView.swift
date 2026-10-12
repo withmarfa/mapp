@@ -238,7 +238,7 @@ struct MainView: View {
         // go; its drafts take no part in what other windows do.
         .onDisappear {
             editorSlot.made?.flush()
-            editorSlot.made?.titleDrafts = nil
+            editorSlot.made?.windowWent()
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
