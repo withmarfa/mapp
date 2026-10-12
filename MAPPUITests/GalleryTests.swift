@@ -79,7 +79,7 @@ final class GalleryTests: XCTestCase {
         let editor = window.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         let reading = editor.value as? String
-        app.typeText("q")
+        app.typeKey("q", modifierFlags: [])
         XCTAssertEqual(editor.value as? String, reading)
         editor.click()
         app.typeKey(.end, modifierFlags: .command)
