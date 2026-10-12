@@ -218,3 +218,23 @@ test('the Return that confirms an input method conversion leaves the title as it
   }
   expect(posted.filter((message) => message.type === 'titleCommit')).toEqual([])
 })
+
+test('text dropped on the title while it is not being edited is saved when the title is left', () => {
+  header.set(ticket)
+  document.execCommand = () => true
+  const drop = new Event('drop', { cancelable: true })
+  Object.defineProperty(drop, 'dataTransfer', { value: clipboard('dropped\nline') })
+  title().dispatchEvent(drop)
+  expect(header.isEditingTitle).toBe(true)
+  title().textContent = 'Review the findings dropped line'
+  title().dispatchEvent(new InputEvent('input'))
+  title().blur()
+  expect(posted.filter((message) => message.type === 'titleCommit')).toEqual([
+    {
+      type: 'titleCommit',
+      item: 'ticket',
+      text: 'Review the findings dropped line',
+      startWriting: false,
+    },
+  ])
+})

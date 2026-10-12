@@ -151,6 +151,8 @@ export class ItemHeader {
       const text = event.dataTransfer?.getData('text/plain') ?? ''
       if (!lineBreak.test(text)) return
       event.preventDefault()
+      // A drop the page makes itself does not move the keyboard; the title takes it so that leaving saves it.
+      this.title.focus()
       const selection = document.getSelection()
       if (caret && selection) {
         selection.removeAllRanges()
