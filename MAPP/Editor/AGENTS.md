@@ -25,7 +25,11 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 ## Header
 
-- The header is drawn in the page (see `editor/AGENTS.md`). `MAPP/Views/ItemPageHeader.swift` carries out its events: it saves the title through `setItemProperty` on Return or when the title loses focus, and keeps unsaved and refused titles per item in `DetailsPresentation` so they survive switching notes. An editor's flush also saves a title typed and not yet left; a title that cannot be saved stops quitting, closing, or changing libraries as a failed capture does.
+- The header is drawn in the page (see `editor/AGENTS.md`). `MAPP/Views/ItemPageHeader.swift` carries out its events: it saves the title through `setItemProperty` on Return or when the title loses focus. Title typing is undone by WebKit's own steps.
+- A title is editable only where the library can set it (`ItemLibrary.canSetTitle(of:)`). A library without files cannot retitle an item titled by its first line.
+- Each window's editor holds that window's title drafts (`EditorController.titleDrafts`, a `DetailsPresentation` keyed by item), so an unsaved or refused title survives switching notes. A refused title is kept until it is saved or discarded.
+- `EditorController.flushAll` tries every unsaved title again before it captures the pages. Where a window or the library goes (quitting, changing library, closing a window through `EditorCloseDelegate`), a title still refused stops it as a failed capture does, and the window holding it comes forward and names the item. Deleting items or a folder calls `flushAll(leaving: false)`, which saves titles too but never waits on a refused one.
+- When a window goes, it sets its editor's `titleDrafts` to `nil`, so its drafts take no part in other windows' flushes. Closures the editor keeps (header events, observation tracking) and the Format menu's focused editor hold it weakly. A strong capture keeps a closed window's editor, web view, and drafts alive, and `flushAll` would still visit them.
 - A chip's menu opens under the chip's frame, which the page sends in its own coordinates. `EditorController` converts it to container coordinates, allowing for the covered top and the scroll offset.
 
 ## Printing and PDF export
