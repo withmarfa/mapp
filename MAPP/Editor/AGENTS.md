@@ -5,7 +5,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 ## Web view
 
 - Use AppKit's `WKWebView` in an `NSViewRepresentable`, not SwiftUI's `WebView` and `WebPage`. An editor needs what they do not offer: printing, filtering WebKit's context menu rather than replacing it, routing Undo to the page's own history, dropped files, and focus. Revisit only when Apple makes editing, printing, and the scroll edge public in them.
-- `WebViewChrome.swift` sets two WebKit settings that are not public API, as Apple's own `WebView` does: a clear background (`drawsBackground`) and the soft edge under the toolbar (`usesAutomaticContentInsetBackgroundFill`). Each is set only while WebKit responds to its selector, and the page must still work without it: it then keeps its own background and stops below the toolbar. Add no other private WebKit API.
+- `WebViewChrome.swift` sets two WebKit settings that are not public API, as Apple's own `WebView` does: a clear background (`drawsBackground`) and the soft edge under the toolbar (`usesAutomaticContentInsetBackgroundFill`). Each is set only while WebKit responds to its selector, and the page must still work without it: it then keeps its own background and stops below the toolbar. Add another private WebKit setting only on the same terms: Apple's own `WebView` uses it, it is guarded the same way, and the page works without it.
 - The navigation delegate allows only the page itself and `mapp-embed:` requests. Keep every other navigation cancelled.
 
 ## Embedded files
@@ -25,7 +25,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 ## Header
 
-- The header is drawn in the page (see `editor/AGENTS.md`). `MAPP/Views/ItemPageHeader.swift` carries out its events: it saves the title through `setItemProperty` on Return or when the title loses focus, and keeps unsaved and refused titles per item in `DetailsPresentation` so they survive switching notes.
+- The header is drawn in the page (see `editor/AGENTS.md`). `MAPP/Views/ItemPageHeader.swift` carries out its events: it saves the title through `setItemProperty` on Return or when the title loses focus, and keeps unsaved and refused titles per item in `DetailsPresentation` so they survive switching notes. An editor's flush also saves a title typed and not yet left; a title that cannot be saved stops quitting, closing, or changing libraries as a failed capture does.
 - A chip's menu opens under the chip's frame, which the page sends in its own coordinates. `EditorController` converts it to container coordinates, allowing for the covered top and the scroll offset.
 
 ## Printing and PDF export
@@ -37,5 +37,5 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 - **Embed escapes the folder.** Flag any path that reads, serves, or opens an embedded file without `openEmbeddedFile(_:in:)`, follows a symbolic link, or reopens by path. Safe path: use the descriptor `OpenFile` returns.
 - **Runnable file opened.** Flag any route that hands a file to another app without `EmbeddedFiles.opens`.
-- **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one without a stated reason.
+- **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one that Apple's own `WebView` does not use.
 - **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another note after the page changed notes.

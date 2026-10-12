@@ -5,7 +5,7 @@ The note editor's page: TypeScript on InkKit, built by Vite into one self-contai
 ## Rules
 
 - The built page is committed so the app builds without Node. After any change in `editor/`, run `pnpm build` and commit `MAPP/Editor/Page/editor.html` with the change. A build of an unchanged checkout leaves the committed page byte-identical.
-- Import only InkKit's public facade, `@aicayzer/inkkit`, and its stylesheet. Never import InkKit's Milkdown or ProseMirror internals. If the page needs something the facade lacks, add it to InkKit.
+- Import only InkKit's public facade, `@aicayzer/inkkit`, and its stylesheet. Never import InkKit's Milkdown or ProseMirror internals. If the page needs something the facade lacks, it belongs in a new InkKit release (`aicayzer/inkkit`); say so rather than reach past the facade.
 - The page fetches nothing from the network and never navigates. Its Content-Security-Policy, in `editor/editor.html`, starts from `default-src 'none'` and allows the app's `mapp-embed:` scheme only for images, media, and frames. Do not widen it.
 - The page learns what an embed is only through the `embeds` message, and loads an embedded file only through `mapp-embed:`.
 - A PDF shows as a card with Open because WebKit does not paint local PDFs in InkKit's sandboxed frame. Keep the frame sandbox; do not loosen it to show PDFs.
