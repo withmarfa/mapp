@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@aicayzer/inkkit':
-        specifier: 0.0.15
-        version: 0.0.15(@codemirror/language@6.12.4)(@codemirror/state@6.7.5)(@codemirror/view@6.43.12)(typescript@7.0.2)
+        specifier: 0.0.16
+        version: 0.0.16(@codemirror/language@6.12.4)(@codemirror/state@6.7.5)(@codemirror/view@6.43.12)(typescript@7.0.2)
     devDependencies:
       '@types/node':
         specifier: ^26.6.2
@@ -36,8 +36,8 @@ importers:
 
 packages:
 
-  '@aicayzer/inkkit@0.0.15':
-    resolution: {integrity: sha512-4C7cNbVN2QMg1rYKnhWrY65lgPC8dD4Jr75qiTzK5Xi3IpgFXVq6EYdX9HaluApR8Y4rRvWtyVc9EZEutx+tiA==}
+  '@aicayzer/inkkit@0.0.16':
+    resolution: {integrity: sha512-Upaje2Sahk2G/++aUU7ZUWbctm2m8mp4bU3IKGQ1bd5jaAwzgBhARxMpxgPGze8mcQX73fNjGqD+xa5gmFoYBg==}
     engines: {node: '>=22.14'}
 
   '@antfu/install-pkg@2.1.0':
@@ -1666,7 +1666,7 @@ packages:
 
 snapshots:
 
-  '@aicayzer/inkkit@0.0.15(@codemirror/language@6.12.4)(@codemirror/state@6.7.5)(@codemirror/view@6.43.12)(typescript@7.0.2)':
+  '@aicayzer/inkkit@0.0.16(@codemirror/language@6.12.4)(@codemirror/state@6.7.5)(@codemirror/view@6.43.12)(typescript@7.0.2)':
     dependencies:
       '@milkdown/kit': 7.22.1(@codemirror/language@6.12.4)(@codemirror/state@6.7.5)(@codemirror/view@6.43.12)(typescript@7.0.2)
       dompurify: 3.4.16

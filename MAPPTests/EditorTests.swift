@@ -952,6 +952,46 @@ struct EditorTests {
         }
     }
 
+    /// The paste itself is InkKit's; this holds that it works through the pasteboard, the web view and the bridge.
+    @Test func htmlCopiedFromAWebPageIsPastedIntoTheNoteAsReadableText() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.makeKeyAndOrderFront(nil)
+        let saved = NSPasteboard.general.string(forType: .string)
+        defer {
+            NSPasteboard.general.clearContents()
+            if let saved { NSPasteboard.general.setString(saved, forType: .string) }
+            window.orderOut(nil); window.contentView = nil; window.close()
+        }
+        try await page.load("Start\n")
+        #expect(window.makeFirstResponder(page.editor.webView))
+        // As a browser puts it on the pasteboard: source indentation and line breaks inside the text, styling,
+        // and a script, beside a plain-text flattening. It has no link: WebKit turns the spaces beside an inline
+        // element into non-breaking ones before the page sees them, whatever the package does.
+        let html = """
+            <meta charset='utf-8'><style>p { color: red }</style>
+            <h2 style="margin: 0">Oak and iron</h2>
+            <p>The quote for the
+                alcove is
+                ready to read.</p>
+            <ul>
+              <li>Measure</li>
+              <li>Book a visit</li>
+            </ul>
+            <script>window.pastedScriptRan = true</script>
+            """
+        try await page.run("document.querySelector('.ProseMirror').focus(); getSelection().selectAllChildren(document.querySelector('.ProseMirror'))")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(html, forType: .html)
+        NSPasteboard.general.setString("Oak and iron\nThe quote", forType: .string)
+        NSApp.sendAction(#selector(NSText.paste(_:)), to: page.editor.webView, from: nil)
+        try await page.wait { !page.changes.isEmpty }
+        #expect(page.changes.last == "## Oak and iron\n\nThe quote for the alcove is ready to read.\n\n- Measure\n- Book a visit\n")
+        #expect(try await page.editor.webView.evaluateJavaScript("window.pastedScriptRan === undefined") as? Bool == true)
+    }
+
     @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
         let page = try await Harness()
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
