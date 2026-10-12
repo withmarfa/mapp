@@ -2,8 +2,7 @@
 ///
 /// SwiftUI makes a view's value again each time its parent updates and keeps only the state it stored first, so an
 /// editor made in a view's initializer would build a web view, and start a page process, for every parent update.
-/// A view keeps this slot in `@State`, which keeps the slot it stored first, and reads the editor in `body`, which SwiftUI runs only
-/// for the view on screen.
+/// A view keeps this slot in `@State` and reads the editor in `body`, which SwiftUI runs only for the view it keeps.
 final class EditorSlot {
     /// The editor, once the view has read it.
     private(set) var made: EditorController?

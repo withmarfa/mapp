@@ -237,7 +237,6 @@ struct MainView: View {
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do.
         .onDisappear {
-            // A window that only ever showed Settings never made an editor.
             editorSlot.made?.flush()
             editorSlot.made?.titleDrafts = nil
         }

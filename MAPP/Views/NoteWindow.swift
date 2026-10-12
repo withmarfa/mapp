@@ -76,7 +76,7 @@ struct NoteWindow: View {
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.
         .onDisappear {
-            // A window showing a file never made an editor.
+            // A window that never showed a note made no editor.
             editorSlot.made?.flush()
             editorSlot.made?.titleDrafts = nil
             undoManager?.removeAllActions()
