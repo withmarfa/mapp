@@ -138,6 +138,13 @@ window.addEventListener(
   { passive: true },
 )
 
+function setPageProperty(name: string, value: string): void {
+  const style = document.documentElement.style
+  if (style.getPropertyValue(name) === value) return
+  style.setProperty(name, value)
+  editor.invalidateFindGeometry()
+}
+
 window.editor = {
   load: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
@@ -189,17 +196,16 @@ window.editor = {
       throw error
     }
   },
-  setFullWidth: (full) => document.documentElement.classList.toggle('full-width', full),
+  setFullWidth: (full) => {
+    if (document.documentElement.classList.contains('full-width') === full) return
+    document.documentElement.classList.toggle('full-width', full)
+    editor.invalidateFindGeometry()
+  },
   // Text measures use rem, so the reading width scales with its text.
-  setTextSize: (points) => {
-    document.documentElement.style.fontSize = `${points}px`
-  },
+  setTextSize: (points) => setPageProperty('font-size', `${points}px`),
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
-  setReadingWidth: (ems) =>
-    document.documentElement.style.setProperty('--reading-width', `${ems}rem`),
-  setHeaderHeight: (height) => {
-    document.documentElement.style.setProperty('--item-header-height', `${Math.max(0, height)}px`)
-  },
+  setReadingWidth: (ems) => setPageProperty('--reading-width', `${ems}rem`),
+  setHeaderHeight: (height) => setPageProperty('--item-header-height', `${Math.max(0, height)}px`),
 }
 
 postToHost({ type: 'ready' })
