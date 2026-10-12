@@ -39,7 +39,13 @@
 		3303FE203066ED47005D07A2 /* Exceptions for "MAPP" folder in "MAPP" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Editor/AGENTS.md,
+				Editor/CLAUDE.md,
 				Info.plist,
+				Model/AGENTS.md,
+				Model/CLAUDE.md,
+				Model/Marfa/AGENTS.md,
+				Model/Marfa/CLAUDE.md,
 			);
 			target = 3303FCF83066ED46005D07A2 /* MAPP */;
 		};
