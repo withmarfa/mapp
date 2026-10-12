@@ -76,7 +76,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
     /// Every editor open, so their edits can be handed over before the app quits or changes folder.
-    @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
+    @ObservationIgnored static let open = NSHashTable<EditorController>.weakObjects()
 
     init(library: any ItemLibrary) {
         self.library = library
