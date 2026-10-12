@@ -212,17 +212,20 @@ nonisolated enum NoteText {
 
     private static func stripInline(_ text: String) -> String {
         var text = text
-        text.replace(htmlBreak, with: " ")
         let authored = text
+        text.replace(htmlBreak) { match in
+            isEscaped(at: match.range.lowerBound, in: authored) ? String(match.output) : " "
+        }
+        let linked = text
         text.replace(wikiReference) { match in
             let (whole, embedded, content) = match.output
-            let escapes = authored[..<match.range.lowerBound].reversed().prefix { $0 == "\\" }.count
-            guard escapes.isMultiple(of: 2) else { return String(whole) }
-            let parts = content.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard !isEscaped(at: match.range.lowerBound, in: linked) else { return String(whole) }
+            let alias = firstUnescaped("|", in: content)
+            let target = content[..<(alias ?? content.endIndex)]
             if !embedded.isEmpty {
-                return String(parts[0].split(separator: "#", maxSplits: 1).first ?? parts[0])
+                return String(target[..<(firstUnescaped("#", in: target) ?? target.endIndex)])
             }
-            return String(parts.count > 1 ? parts[1] : parts[0])
+            return alias.map { String(content[content.index(after: $0)...]) } ?? String(content)
         }
         // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
         text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
@@ -230,6 +233,24 @@ nonisolated enum NoteText {
         text.replace(strongOrStrike) { String($0.output.2) }
         text.replace(emphasis) { String($0.output.1) + String($0.output.2) }
         return text
+    }
+
+    private static func isEscaped(at index: String.Index, in text: String) -> Bool {
+        !text[..<index].reversed().prefix { $0 == "\\" }.count.isMultiple(of: 2)
+    }
+
+    private static func firstUnescaped(_ delimiter: Character, in text: Substring) -> String.Index? {
+        var escaped = false
+        for index in text.indices {
+            if escaped {
+                escaped = false
+            } else if text[index] == "\\" {
+                escaped = true
+            } else if text[index] == delimiter {
+                return index
+            }
+        }
+        return nil
     }
 
     // Regex is not Sendable; these are immutable and only ever read.
