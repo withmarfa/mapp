@@ -178,9 +178,6 @@ struct MainView: View {
         }
     }
 
-    // On the detail column rather than the split view: an inspector on the split view makes every resize of the
-    // window lay out every column again, which made live resizing several times slower. It goes before the column's
-    // toolbar; after it, opening a new window raises an exception during layout.
     private var itemInspector: ItemInspectorColumn {
         ItemInspectorColumn(browser: browser, details: details)
     }
@@ -352,6 +349,9 @@ private final class ColumnWidths {
     var list: CGFloat = 340
 }
 
+/// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
+/// resize of the window lay out every column again, which made live resizing several times slower, and one applied
+/// after the column's toolbar raises an exception during layout when a new window opens.
 private struct ItemInspectorColumn: ViewModifier {
     let browser: Browser
     let details: DetailsPresentation
