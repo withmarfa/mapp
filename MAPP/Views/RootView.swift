@@ -34,7 +34,7 @@ struct RootView: View {
         switch libraries.mode {
         case .files, .marfa:
             if let library = libraries.current {
-                MainView(library: library, browser: browser, settings: settings)
+                MainView(browser: browser, settings: settings)
                     // A different library is a different set of items, and the window starts afresh with it.
                     .id(ObjectIdentifier(library))
             } else {

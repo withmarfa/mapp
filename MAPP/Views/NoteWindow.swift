@@ -6,21 +6,26 @@ struct NoteWindow: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @State private var editor: EditorController
-    @State private var details: DetailsPresentation
+    @State private var editorSlot = EditorSlot()
+    @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
     @State private var fileURL: URL?
 
-    /// The library is given here as well as in the environment, since the editor is made with it.
-    init(library: any ItemLibrary, id: Binding<ItemID?>) {
-        let editor = EditorController(library: library)
-        let details = DetailsPresentation()
-        editor.titleDrafts = details
-        _editor = State(initialValue: editor)
-        _details = State(initialValue: details)
+    init(id: Binding<ItemID?>) {
         _id = id
+    }
+
+    /// The window's editor, holding the window's title drafts.
+    private var editor: EditorController {
+        editorSlot.editor {
+            let editor = EditorController(library: library)
+            editor.titleDrafts = details
+            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+            editor.onLeave = { [library] id in library.leave(id) }
+            return editor
+        }
     }
 
     private var item: Item? { id.flatMap { library.item($0) } }
@@ -62,8 +67,6 @@ struct NoteWindow: View {
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {
             details.isPresented = storedDetailsPresented
-            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onLeave = { [library] id in library.leave(id) }
         }
         .onChange(of: library.isGone(id), initial: true) {
             if library.isGone(id) { dismiss() }
@@ -73,8 +76,9 @@ struct NoteWindow: View {
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.
         .onDisappear {
-            editor.flush()
-            editor.titleDrafts = nil
+            // A window showing a file never made an editor.
+            editorSlot.made?.flush()
+            editorSlot.made?.titleDrafts = nil
             undoManager?.removeAllActions()
         }
         .libraryDialogs()

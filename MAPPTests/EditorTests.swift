@@ -1162,7 +1162,7 @@ struct EditorTests {
         let window = autoreleasepool {
             let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: NoteWindow(library: library, id: .constant(item)).environment(\.library, library))
+            window.contentView = NSHostingView(rootView: NoteWindow(id: .constant(item)).environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
             return window
         }
