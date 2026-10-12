@@ -891,6 +891,8 @@ struct EditorTests {
         let hidden = try await page.editor.webView.evaluateJavaScript("document.getElementById('item-header').hidden") as? Bool
         #expect(hidden == true)
         #expect(try await page.markdown() == nil)
+        // Resizing the header and the window raises nothing in the page.
+        #expect(page.library.failure == nil)
     }
 
     @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
