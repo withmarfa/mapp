@@ -5,7 +5,7 @@ struct MainView: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
-    @State private var editor: EditorController
+    @State private var editorSlot = EditorSlot()
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
@@ -22,15 +22,20 @@ struct MainView: View {
     private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    /// The library is given here as well as in the environment, since the editor is made with it.
-    init(library: any ItemLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
-        let editor = EditorController(library: library)
-        editor.titleDrafts = details
-        _editor = State(initialValue: editor)
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings
         self.restoresWindow = restoresWindow
+    }
+
+    /// The window's editor, holding the window's title drafts.
+    private var editor: EditorController {
+        editorSlot.editor {
+            let editor = EditorController(library: library)
+            editor.titleDrafts = details
+            return editor
+        }
     }
 
     var body: some View { lifecycleWindow }
@@ -232,8 +237,8 @@ struct MainView: View {
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do.
         .onDisappear {
-            editor.flush()
-            editor.titleDrafts = nil
+            editorSlot.made?.flush()
+            editorSlot.made?.windowWent()
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }

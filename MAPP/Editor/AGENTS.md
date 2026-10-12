@@ -7,6 +7,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - Use AppKit's `WKWebView` in an `NSViewRepresentable`, not SwiftUI's `WebView` and `WebPage`. An editor needs what they do not offer: printing, filtering WebKit's context menu rather than replacing it, routing Undo to the page's own history, dropped files, and focus. Revisit only when Apple makes editing, printing, and the scroll edge public in them.
 - `WebViewChrome.swift` sets two WebKit settings that are not public API, as Apple's own `WebView` does: a clear background (`drawsBackground`) and the soft edge under the toolbar (`usesAutomaticContentInsetBackgroundFill`). Each is set only while WebKit responds to its selector, and the page must still work without it: it then keeps its own background and stops below the toolbar. Add another private WebKit setting only on the same terms: Apple's own `WebView` uses it, it is guarded the same way, and the page works without it.
 - The navigation delegate allows only the page itself and `mapp-embed:` requests. Keep every other navigation cancelled.
+- A window makes its editor once: the view keeps an `EditorSlot` in `@State` and reads the editor from it in `body`. SwiftUI makes a view's value again each time its parent updates and keeps only the state it stored first, so an editor made in a view's initializer builds a web view and loads the page in a process of its own, only to be thrown away.
 
 ## Embedded files
 
@@ -29,7 +30,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - A title is editable only where the library can set it (`ItemLibrary.canSetTitle(of:)`). A library without files cannot retitle an item titled by its first line.
 - Each window's editor holds that window's title drafts (`EditorController.titleDrafts`, a `DetailsPresentation` keyed by item), so an unsaved or refused title survives switching notes. A refused title is kept until it is saved or discarded.
 - `EditorController.flushAll` tries every unsaved title again before it captures the pages. Where a window or the library goes (quitting, changing library, closing a window through `EditorCloseDelegate`), a title still refused stops it as a failed capture does, and the window holding it comes forward and names the item. Deleting items or a folder calls `flushAll(leaving: false)`, which saves titles too but never waits on a refused one.
-- When a window goes, it sets its editor's `titleDrafts` to `nil`, so its drafts take no part in other windows' flushes. Closures the editor keeps (header events, observation tracking) and the Format menu's focused editor hold it weakly. A strong capture keeps a closed window's editor, web view, and drafts alive, and `flushAll` would still visit them.
+- When a window goes, it calls its editor's `windowWent()`, which drops the window's drafts and removes the editor from `EditorController.open`, so neither takes part in later flushes while SwiftUI still holds the editor for a moment. Closures the editor keeps (header events, observation tracking) and the Format menu's focused editor hold it weakly. A strong capture keeps a closed window's editor, web view, and drafts alive, and `flushAll` would still visit them.
 - A chip's menu opens under the chip's frame, which the page sends in its own coordinates. `EditorController` converts it to container coordinates, allowing for the covered top and the scroll offset.
 
 ## Printing and PDF export
@@ -41,5 +42,6 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 - **Embed escapes the folder.** Flag any path that reads, serves, or opens an embedded file without `openEmbeddedFile(_:in:)`, follows a symbolic link, or reopens by path. Safe path: use the descriptor `OpenFile` returns.
 - **Runnable file opened.** Flag any route that hands a file to another app without `EmbeddedFiles.opens`.
+- **Editor made for every view value.** Flag an `EditorController`, a web view, or another costly object made in a view's initializer or given to `State(initialValue:)`. Safe path: `EditorSlot`, or make it in `.task` as Apple's `State` documentation shows.
 - **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one that Apple's own `WebView` does not use.
 - **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another note after the page changed notes.

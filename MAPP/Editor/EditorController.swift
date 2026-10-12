@@ -76,7 +76,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
     /// Every editor open, so their edits can be handed over before the app quits or changes folder.
-    @ObservationIgnored private static let open = NSHashTable<EditorController>.weakObjects()
+    @ObservationIgnored static let open = NSHashTable<EditorController>.weakObjects()
 
     init(library: any ItemLibrary) {
         self.library = library
@@ -323,6 +323,13 @@ final class EditorController: NSObject {
             action?(success)
             action = nil
         }
+    }
+
+    /// The window is gone and its text already flushed, so its drafts and page take no part in later flushes, even
+    /// while SwiftUI still holds the editor for a moment.
+    func windowWent() {
+        titleDrafts = nil
+        Self.open.remove(self)
     }
 
     /// Tries every title the window holds unsaved, since a name taken before may be free now, leaving out items that

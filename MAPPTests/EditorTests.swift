@@ -1202,7 +1202,7 @@ struct EditorTests {
         let window = autoreleasepool {
             let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: NoteWindow(library: library, id: .constant(item)).environment(\.library, library))
+            window.contentView = NSHostingView(rootView: NoteWindow(id: .constant(item)).environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
             return window
         }
@@ -1258,6 +1258,89 @@ struct EditorTests {
         #expect(released.editor == nil, "a closed window's editor is released")
         #expect(released.webView == nil, "a closed window's web view is released")
         #expect(released.library == nil, "a library no window shows is released")
+    }
+
+    @Observable final class Ticks {
+        var count = 0
+    }
+
+    /// Makes its content again whenever `ticks` changes, as a window's parent does each time its body runs.
+    struct Remaking<Content: View>: View {
+        let ticks: Ticks
+        @ViewBuilder let content: () -> Content
+
+        var body: some View {
+            let _ = ticks.count
+            content()
+        }
+    }
+
+    /// Hosts `content` in a window, has its parent make it again `times` times, and returns every editor made
+    /// meanwhile, held so none can go unseen, the one the window shows, and the drafts it held while shown.
+    static func editorsMade<Content: View>(remaking times: Int, _ content: @escaping () -> Content) async throws -> (made: [EditorController], shown: EditorController, drafts: DetailsPresentation?) {
+        let before = EditorController.open.allObjects
+        var made: [EditorController] = []
+        func gather() {
+            for editor in EditorController.open.allObjects where !before.contains(where: { $0 === editor }) && !made.contains(where: { $0 === editor }) {
+                made.append(editor)
+            }
+        }
+        let ticks = Ticks()
+        let window = autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1100, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: Remaking(ticks: ticks, content: content))
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+        for _ in 0..<200 where editorWebView(in: window.contentView)?.controller?.isReady != true {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        gather()
+        for _ in 0..<times {
+            ticks.count += 1
+            try await Task.sleep(for: .milliseconds(100))
+            gather()
+        }
+        let shown = try #require(editorWebView(in: window.contentView)?.controller)
+        let drafts = shown.titleDrafts
+        autoreleasepool { window.performClose(nil) }
+        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        autoreleasepool {
+            window.toolbar = nil
+            window.contentView = nil
+        }
+        return (made, shown, drafts)
+    }
+
+    /// An editor is a web view with a page process of its own, so a window makes one, however often SwiftUI makes
+    /// the window's view again.
+    @Test func aMainWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
+        let library = ItemPreviewFixtures.library
+        let browser = ItemPreviewFixtures.browser
+        let details = DetailsPresentation()
+        let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
+            MainView(browser: browser, details: details, restoresWindow: false)
+                .environment(\.library, library)
+        }
+        #expect(made.count == 1, "one editor for the window, not one for each time its view is made")
+        #expect(made.first === shown)
+        #expect(drafts === details, "the editor holds the window's drafts")
+        #expect(shown.titleDrafts == nil, "the window's drafts leave with it")
+        withExtendedLifetime(library) {}
+    }
+
+    @Test func anItemWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
+        let library = ItemPreviewFixtures.library
+        let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
+            NoteWindow(id: .constant(ItemPreviewFixtures.ticketID))
+                .environment(\.library, library)
+        }
+        #expect(made.count == 1, "one editor for the window, not one for each time its view is made")
+        #expect(made.first === shown)
+        #expect(drafts != nil, "the editor holds the window's drafts")
+        #expect(shown.titleDrafts == nil, "the window's drafts leave with it")
+        withExtendedLifetime(library) {}
     }
 
     @Test func aRefusedTitleInAClosedWindowNeverHoldsUpQuittingOrRenamesTheNote() async throws {
