@@ -26,6 +26,7 @@ struct EditorTests {
             let note = Note(body: body, created: .now, deleted: deleted ? .now : nil)
             library.notes.append(note)
             editor.load(try #require(library.item(note.id)))
+            try await wait { self.editor.noteID == note.id }
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
         }
@@ -120,6 +121,7 @@ struct EditorTests {
         page.editor.load(try #require(library.item(first.id)))
         page.editor.focus(first.id)
         page.editor.load(try #require(library.item(second.id)))
+        try await page.wait { page.editor.noteID == second.id }
         _ = try await page.editor.webView.evaluateJavaScript("1")
         let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
                                   styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -134,6 +136,7 @@ struct EditorTests {
         #expect(reading == false)
         page.editor.focus(first.id)
         page.editor.load(try #require(library.item(first.id)))
+        try await page.wait { page.editor.noteID == first.id }
         let composing = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
         ) as? Bool
