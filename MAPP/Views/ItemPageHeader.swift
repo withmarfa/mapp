@@ -16,7 +16,6 @@ struct ItemPageHeader: ViewModifier {
     /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
     /// the safe area leaves, while the container runs up under the toolbar.
     let containerTop: CGFloat
-    @State private var propertyError = false
     /// The parent chip's frame while its chooser is open.
     @State private var choosingParent: CGRect?
 
@@ -31,19 +30,22 @@ struct ItemPageHeader: ViewModifier {
                 }
             }
             // The action may run on an earlier copy of this view, so it takes what changed from the change itself.
-            .onChange(of: header, initial: true) { _, header in editor.setHeader(header) }
             .onChange(of: item.id, initial: true) { old, id in
                 if old != id {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
-                    propertyError = false
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
+                let library = library, drafts = drafts
+                editor.showHeader { Self.header(of: id, in: library, drafts: drafts) }
             }
+            .onChange(of: interfaceTextSize) { editor.refreshHeader() }
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
     }
 
-    private var header: PageHeader {
+    /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
+    static func header(of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation) -> PageHeader? {
+        guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
         let status = Self.status(of: item, in: library)
         let parent = Self.parent(of: item.id, in: library)
@@ -61,15 +63,15 @@ struct ItemPageHeader: ViewModifier {
                                 enabled: item.isEditable)
             },
             parent: parent.map { PageHeader.Chip(label: $0.targets.first?.title ?? String(localized: "Add Parent"), enabled: true) },
-            propertyRejected: propertyError,
-            interfaceTextSize: interfaceTextSize
+            propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
+            interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
         )
     }
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left.
     private var handler: (PageHeaderEvent) -> Void {
         let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow, editor = editor
-        let propertyError = $propertyError, choosingParent = $choosingParent
+        let choosingParent = $choosingParent
         return { event in
             switch event {
             case .titleInput(let id, let text):
@@ -97,7 +99,7 @@ struct ItemPageHeader: ViewModifier {
                 let menu = NSMenu()
                 for choice in choices {
                     let entry = actionItem(Self.localized(ItemPropertyRow.choiceLabel(choice))) {
-                        propertyError.wrappedValue = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
+                        drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
                     }
                     entry.state = item.value(of: status.key)?.string == choice ? .on : .off
                     menu.addItem(entry)

@@ -149,6 +149,30 @@ final class EditorController: NSObject {
         } else { present() }
     }
 
+    @ObservationIgnored private var headerSource: () -> PageHeader? = { nil }
+    /// Only the latest reading of the header follows changes, so readings never pile up.
+    @ObservationIgnored private var headerReading = 0
+
+    /// Shows in the page's header what `source` builds, and again whenever anything it read changes. It is followed
+    /// here rather than by a view, so the page keeps up even when the view showing it is not updated.
+    func showHeader(_ source: @escaping () -> PageHeader?) {
+        headerSource = source
+        refreshHeader()
+    }
+
+    func refreshHeader() {
+        headerReading += 1
+        let reading = headerReading
+        let header = withObservationTracking(headerSource) {
+            // Heard before the change is made, so the header is read again once it has been.
+            Task { @MainActor [weak self] in
+                guard let self, headerReading == reading else { return }
+                refreshHeader()
+            }
+        }
+        setHeader(header)
+    }
+
     /// What the page's item header shows, sent whenever it changes.
     func setHeader(_ header: PageHeader?) {
         guard header != self.header else { return }
