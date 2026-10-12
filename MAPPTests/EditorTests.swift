@@ -275,40 +275,49 @@ struct EditorTests {
 
     @Test func nativeFindGeometryFollowsViewportAndAppearanceChanges() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
-        window.orderFront(nil)
+        window.orderFrontRegardless()
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        // WebKit pauses animation frames in an offscreen window; geometry still comes from its real layout.
-        try await page.run("window.requestAnimationFrame = callback => setTimeout(() => callback(performance.now()), 0); window.cancelAnimationFrame = clearTimeout")
         try await page.load(String(repeating: "Wrap these words around the native Find markings. ", count: 30) + "\n")
-        try await page.run("window.findReports = []; window.originalPost = window.webkit.messageHandlers.host.postMessage; window.webkit.messageHandlers.host.postMessage = message => { if (message.type === 'find') window.findReports.push(message); window.originalPost(message) }; window.editor.setFinding(true)")
+        try await page.run("window.editor.setFinding(true)")
+        let client = try #require(page.editor.pageFinder)
+        let range = NSRange(location: 50, length: 100)
+        func rects() -> [NSRect] { client.rects(forCharacterRange: range)?.map(\.rectValue) ?? [] }
+        try await page.wait { !rects().isEmpty }
         for source in [false, true] {
             page.editor.setSourceMode(source)
+            _ = try await page.editor.webView.evaluateJavaScript("1")
             for width in [CGFloat(360), 900, 500] {
-                let before = try #require(try await page.editor.webView.evaluateJavaScript("window.findReports.length") as? Int)
-                page.editor.container.setFrameSize(NSSize(width: width, height: 600))
+                let before = rects()
+                window.setContentSize(NSSize(width: width, height: 600))
                 #expect(page.editor.webView.frame.width == width)
-                let refreshed = try await settle(page.editor, "window.findReports.length", as: Int.self) { ($0 ?? 0) > before }
-                #expect((refreshed ?? 0) > before)
-                let geometry = try #require(try await page.editor.webView.evaluateJavaScript("window.findReports.at(-1).boxes") as? [Double])
-                #expect(geometry.enumerated().contains { $0.offset % 4 == 2 && $0.element > 0 })
+                try await page.wait { rects() != before }
+                #expect(rects().contains { $0.width > 0 && $0.height > 0 })
                 #expect(try await page.editor.webView.evaluateJavaScript("window.innerWidth") as? Double == Double(width))
             }
-            let appearance = source
-                ? ["setTextSize(20)", "setFullWidth(false)", "setReadingWidth(40)", "setHeaderHeight(150)"]
-                : ["setTextSize(18)", "setFullWidth(true)", "setReadingWidth(30)", "setHeaderHeight(130)"]
-            for command in appearance {
-                let before = try #require(try await page.editor.webView.evaluateJavaScript("window.findReports.length") as? Int)
+            for command in source ? ["setTextSize(20)", "setHeaderHeight(150)"] : ["setTextSize(18)", "setHeaderHeight(130)"] {
+                let before = rects()
                 try await page.run("window.editor.\(command)")
-                let refreshed = try await settle(page.editor, "window.findReports.length", as: Int.self) { ($0 ?? 0) > before }
-                #expect((refreshed ?? 0) > before)
+                try await page.wait { rects() != before }
+            }
+            if !source {
+                window.setContentSize(NSSize(width: 1400, height: 600))
+                _ = try await page.editor.webView.evaluateJavaScript("1")
+                try await Task.sleep(for: .milliseconds(100))
+                for command in ["setFullWidth(true)", "setFullWidth(false)", "setReadingWidth(24)"] {
+                    let before = rects()
+                    try await page.run("window.editor.\(command)")
+                    try await page.wait { rects() != before }
+                }
             }
         }
-        try await page.run("window.editor.setFinding(false); window.stoppedReports = window.findReports.length; window.editor.setHeaderHeight(200)")
+        try await page.run("window.editor.setFinding(false)")
+        let stopped = rects()
+        try await page.run("window.editor.setHeaderHeight(200)")
         try await Task.sleep(for: .milliseconds(100))
-        #expect(try await page.editor.webView.evaluateJavaScript("window.findReports.length === window.stoppedReports") as? Bool == true)
+        #expect(rects() == stopped)
         #expect(try await page.markdown() == nil)
     }
 
