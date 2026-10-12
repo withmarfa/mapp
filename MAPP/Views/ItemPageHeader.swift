@@ -39,8 +39,13 @@ struct ItemPageHeader: ViewModifier {
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
+                let library = library, drafts = drafts, undoManager = undoManager
+                editor.onCommitTitle = { Self.commitTitle(of: id, library: library, drafts: drafts, undoManager: undoManager) }
             }
-            .onDisappear { Self.commitTitle(of: item.id, library: library, drafts: drafts, undoManager: undoManager) }
+            .onDisappear {
+                Self.commitTitle(of: item.id, library: library, drafts: drafts, undoManager: undoManager)
+                editor.onCommitTitle = { true }
+            }
     }
 
     private var header: PageHeader {

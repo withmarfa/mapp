@@ -1069,4 +1069,21 @@ struct EditorTests {
         try await host.page.wait { host.page.editor.isEditable }
         try await host.waitFor { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
     }
+
+    @Test func aTitleTypedButNotLeftIsSavedBeforeQuittingAndARefusalStopsIt() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review before quitting")
+        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(kept)
+        #expect(host.library.item(host.ticket)?.title == "Review before quitting")
+        #expect(host.library.failure == nil)
+
+        try await host.type("Review/before quitting")
+        let refused = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(!refused, "a title that cannot be saved stops quitting rather than being lost")
+        #expect(host.library.item(host.ticket)?.title == "Review before quitting")
+        #expect(host.library.failure != nil)
+        try await host.waitFor { try await host.titleError() == true }
+    }
 }

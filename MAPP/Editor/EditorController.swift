@@ -24,6 +24,8 @@ final class EditorController: NSObject {
     @ObservationIgnored private var headerIconSize: Int?
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
+    /// Saves a title typed in the page's header and not yet left; whether the title the page shows is saved.
+    @ObservationIgnored var onCommitTitle: () -> Bool = { true }
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
@@ -257,11 +259,19 @@ final class EditorController: NSObject {
         capture()
     }
 
-    /// Destructive transitions proceed only once every editor has handed over its current text.
+    /// Destructive transitions proceed only once every editor has handed over its current text and its title.
+    /// A title that cannot be saved stops them as a failed capture does, since it would otherwise be lost.
     static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
-        for editor in editors { editor.flush(leaving: leaving, then: gate.arrive) }
+        for editor in editors {
+            guard editor.onCommitTitle() else {
+                editor.library?.failure = (String(localized: "Couldn’t Save Note"), String(localized: "The title could not be saved. Use a unique file name without slashes or line breaks."))
+                gate.arrive(false)
+                continue
+            }
+            editor.flush(leaving: leaving, then: gate.arrive)
+        }
         Task { try? await Task.sleep(for: .seconds(3)); gate.open(false) }
     }
 
