@@ -160,7 +160,8 @@ export class ItemHeader {
       this.insertOnOneLine(event.dataTransfer)
     })
     this.title.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' || event.isComposing) return
+      // The Return that confirms an input method's conversion belongs to the input method.
+      if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return
       event.preventDefault()
       // Return saves the title, so moving on from it afterwards does not save it again.
       this.editing = undefined

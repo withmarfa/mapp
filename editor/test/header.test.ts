@@ -205,3 +205,14 @@ test('text pasted or dropped into the title comes in on one line, as one change'
   expect(plain.defaultPrevented).toBe(false)
   expect(inserted).toEqual([...broken.map(() => 'one two'), 'dropped line'])
 })
+
+test('the Return that confirms an input method conversion leaves the title as it is', () => {
+  header.set(ticket)
+  title().focus()
+  for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+    const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, ...init })
+    title().dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  }
+  expect(posted.filter((message) => message.type === 'titleCommit')).toEqual([])
+})
