@@ -127,9 +127,16 @@ struct EditorTests {
                                   styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        window.contentView = page.editor.webView
+        let content = NSView(frame: window.contentLayoutRect)
+        let search = NSTextField(frame: NSRect(x: 20, y: 540, width: 250, height: 28))
+        content.addSubview(search)
+        window.contentView = content
         window.makeKeyAndOrderFront(nil)
+        #expect(window.makeFirstResponder(search))
+        page.editor.webView.frame = NSRect(x: 0, y: 0, width: 500, height: 500)
+        content.addSubview(page.editor.webView)
         page.editor.pageDidMoveToWindow()
+        #expect(window.firstResponder === search.currentEditor())
         let reading = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
         ) as? Bool
