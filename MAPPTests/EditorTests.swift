@@ -564,10 +564,11 @@ struct EditorTests {
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(widths == [4])
-        let absent = try await page.editor.webView.evaluateJavaScript(
-            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing] .inkkit-file-label')].map((span) => span.textContent)"
-        ) as? [String]
-        #expect(absent == ["b: File Not Found"])
+        let expectedMissing = [["name": "b", "status": "File Not Found"]]
+        let absent = try await settle(page.editor,
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
+            as: [[String: String]].self) { $0 == expectedMissing }
+        #expect(absent == expectedMissing)
         let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         #expect(rejected?["snapshotError"] == nil)
         #expect(rejected?["assetCount"] as? Int == 1)
@@ -639,8 +640,14 @@ struct EditorTests {
         let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
         #expect(labels?.contains("Budget.csv") == true)
         #expect(labels?.contains("Note reference: A note. Open to edit source.") == true)
-        #expect(labels?.contains("Missing.zip: File Not Found") == true)
-        #expect(labels?.contains("far: File Not Found") == true)
+        let expectedMissing = [
+            ["name": "Missing.zip", "status": "File Not Found"],
+            ["name": "far", "status": "File Not Found"],
+        ]
+        let missing = try await settle(editor,
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
+            as: [[String: String]].self) { $0 == expectedMissing }
+        #expect(missing == expectedMissing)
 
         #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
         #expect(await library.embeddedFile(.name("Plan.pdf"), in: note.id)?.lastPathComponent == "Plan.pdf")
