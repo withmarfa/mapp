@@ -20,7 +20,7 @@ final class ItemLayoutTests: XCTestCase {
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
-        let title = app.descendants(matching: .any)["ItemPageTitle"]
+        let title = app.itemPageTitle
         let page = app.webViews.firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(page.waitForExistence(timeout: 5))
@@ -29,7 +29,7 @@ final class ItemLayoutTests: XCTestCase {
         else { app.typeKey(.escape, modifierFlags: []) }
         let normalWidth = page.frame.width
         capture("Document normal width")
-        let bodyHeading = page.staticTexts["Kitchen quotes"].firstMatch
+        let bodyHeading = page.textViews.firstMatch.staticTexts["Kitchen quotes"].firstMatch
         XCTAssertTrue(bodyHeading.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20,
                                     "Body content must start below the title and property chips.")
@@ -78,7 +78,7 @@ final class ItemLayoutTests: XCTestCase {
         NSPasteboard.general.setString("\n\n" + Array(repeating: "A paragraph for the scrolling check.", count: 45).joined(separator: "\n\n"), forType: .string)
         app.typeKey("v", modifierFlags: .command)
         app.typeKey(.upArrow, modifierFlags: .command)
-        let header = app.textFields["ItemPageTitle"]
+        let header = app.itemPageTitle
         XCTAssertTrue(header.waitForExistence(timeout: 3))
         capture("Header at start of long document")
         let before = header.frame.minY

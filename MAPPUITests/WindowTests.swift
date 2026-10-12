@@ -105,7 +105,7 @@ final class WindowTests: XCTestCase {
         beginNewItem(title: "Groceries")
         XCTAssertTrue(row(titled: "Groceries").waitForExistence(timeout: 3))
         editor.typeText("Milk and eggs")
-        let title = window.textFields["ItemPageTitle"]
+        let title = window.itemPageTitle
         title.click()
         title.typeKey("a", modifierFlags: .command)
         title.typeText("Weekly Groceries")
@@ -619,7 +619,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typesList.waitForExistence(timeout: 5))
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
-        XCTAssertTrue(window.textFields["ItemPageTitle"].exists, "the new item opens its own page")
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3), "the new item opens its own page")
         app.typeText("Shopping")
         XCTAssertTrue(waitForText("CONTAINS", "Shopping"))
     }

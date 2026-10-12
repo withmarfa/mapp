@@ -25,7 +25,7 @@ final class SettingsTests: XCTestCase {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
-        let title = window.textFields["ItemPageTitle"]
+        let title = window.itemPageTitle
         let selected = expectation(for: NSPredicate(format: "value == %@", "Trip to Lisbon"), evaluatedWith: title)
         wait(for: [selected], timeout: 3)
         let initialWidth = list.frame.width
@@ -130,7 +130,7 @@ final class SettingsTests: XCTestCase {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
-        XCTAssertTrue(window.textFields["ItemPageTitle"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
         let prompt = window.staticTexts["SelectItemPrompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))

@@ -24,12 +24,12 @@ final class ItemEmptyStateTests: XCTestCase {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
-        XCTAssertTrue(window.textFields["ItemPageTitle"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
         XCTAssertEqual(prompt.value as? String, "Select an item")
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
-        XCTAssertFalse(window.textFields["ItemPageTitle"].exists)
+        XCTAssertFalse(window.itemPageTitle.exists)
         capture("Items without selection and matching toolbar background")
     }
 
@@ -45,7 +45,7 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(window.staticTexts["No Items"].waitForExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
-        XCTAssertFalse(window.textFields["ItemPageTitle"].exists)
+        XCTAssertFalse(window.itemPageTitle.exists)
         capture("Empty collection and blank content pane")
     }
 
@@ -55,7 +55,7 @@ final class ItemEmptyStateTests: XCTestCase {
         let search = window.searchFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         search.typeText("No matching item for this empty state check")
-        XCTAssertTrue(window.textFields["ItemPageTitle"].waitForNonExistence(timeout: 3))
+        XCTAssertTrue(window.itemPageTitle.waitForNonExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         capture("Empty search and blank content pane")
