@@ -141,6 +141,8 @@ export class ItemHeader {
     this.title.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' || event.isComposing) return
       event.preventDefault()
+      // Return saves the title, so moving on from it afterwards does not save it again.
+      this.editing = undefined
       if (this.model)
         postToHost({
           type: 'titleCommit',
@@ -153,7 +155,9 @@ export class ItemHeader {
       // An emptied editable keeps a line break, which would hide the placeholder.
       if (this.text === '' && this.title.childNodes.length) this.title.replaceChildren()
       this.title.classList.toggle('empty', this.text === '')
-      if (this.model) postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
+      if (!this.model) return
+      this.editing = this.model.item
+      postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
     })
   }
 

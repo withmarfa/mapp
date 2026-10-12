@@ -75,7 +75,7 @@ test('a refused title shows why and offers to discard the draft', () => {
   expect(posted).toEqual([{ type: 'titleDiscard', item: 'ticket' }])
 })
 
-test('typing, Return and leaving the title reach the app for the item it belongs to', () => {
+test('typing and Return reach the app for the item the title belongs to', () => {
   header.set(ticket)
   title().focus()
   expect(header.isEditingTitle).toBe(true)
@@ -93,7 +93,6 @@ test('typing, Return and leaving the title reach the app for the item it belongs
     { type: 'titleInput', item: 'ticket', text: 'Review the photographs' },
     { type: 'titleCommit', item: 'ticket', text: 'Review the photographs', startWriting: true },
     { type: 'titleFocus', focused: false },
-    { type: 'titleCommit', item: 'ticket', text: 'Review the photographs', startWriting: false },
   ])
   // Once the title is left, it shows what the app holds.
   header.set({ ...ticket, title: 'Review the photographs' })
@@ -143,4 +142,28 @@ test('a chip asks for its menu with its frame, from the mouse or the keyboard', 
   posted = []
   chip('ItemStatusChip').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
   expect(posted).toEqual([])
+})
+
+test('Return saves the title once; moving on from it does not save it again, unless typed in since', () => {
+  header.set(ticket)
+  title().focus()
+  title().textContent = 'Review the photographs'
+  title().dispatchEvent(new InputEvent('input'))
+  title().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+  title().blur()
+  const commits = () => posted.filter((message) => message.type === 'titleCommit')
+  expect(commits()).toEqual([
+    { type: 'titleCommit', item: 'ticket', text: 'Review the photographs', startWriting: true },
+  ])
+  // A title the app refused is typed in again, and leaving it then saves it.
+  header.set({ ...ticket, draft: 'Review the photographs', titleRejected: true })
+  title().focus()
+  title().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+  title().textContent = 'Review the notes'
+  title().dispatchEvent(new InputEvent('input'))
+  title().blur()
+  expect(commits().slice(1)).toEqual([
+    { type: 'titleCommit', item: 'ticket', text: 'Review the photographs', startWriting: true },
+    { type: 'titleCommit', item: 'ticket', text: 'Review the notes', startWriting: false },
+  ])
 })

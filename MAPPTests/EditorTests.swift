@@ -1009,7 +1009,13 @@ struct EditorTests {
         let status = try await host.value("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
         #expect(status == "In Progress")
 
-        // Return saves the title as the item's, and the note's text takes the keyboard.
+        // Return saves the title as the item's, once, and the note's text takes the keyboard.
+        var commits = 0
+        let handler = page.editor.onHeaderEvent
+        page.editor.onHeaderEvent = { event in
+            if case .titleCommit = event { commits += 1 }
+            handler(event)
+        }
         try await host.type("Review the photographs")
         try await page.wait { page.editor.isEditingTitle }
         try await host.pressReturn()
@@ -1018,6 +1024,8 @@ struct EditorTests {
         let writing = try await host.value("document.activeElement?.matches('.ProseMirror') === true") as? Bool
         #expect(writing == true)
         #expect(!host.drafts.draft(for: ticket, key: "title").isDirty)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(commits == 1, "leaving the title after Return does not save it again")
 
         // The change is undone as the app's own, from the window's undo manager, and the page shows it.
         #expect(host.window.undoManager?.canUndo == true)
