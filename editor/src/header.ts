@@ -136,7 +136,23 @@ export class ItemHeader {
     })
     this.title.addEventListener('beforeinput', (event) => {
       if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak')
-        event.preventDefault()
+        return event.preventDefault()
+      // A title is one line, so text brought in with line breaks comes in with spaces instead.
+      if (!['insertFromPaste', 'insertFromDrop', 'insertReplacementText'].includes(event.inputType))
+        return
+      const text = event.dataTransfer?.getData('text/plain') ?? event.data ?? ''
+      if (!/[\r\n]/.test(text)) return
+      event.preventDefault()
+      const [range] = event.getTargetRanges?.() ?? []
+      const selection = document.getSelection()
+      if (range && selection) {
+        const target = document.createRange()
+        target.setStart(range.startContainer, range.startOffset)
+        target.setEnd(range.endContainer, range.endOffset)
+        selection.removeAllRanges()
+        selection.addRange(target)
+      }
+      document.execCommand('insertText', false, text.replace(/\s*[\r\n]+\s*/g, ' '))
     })
     this.title.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' || event.isComposing) return

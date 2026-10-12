@@ -167,3 +167,33 @@ test('Return saves the title once; moving on from it does not save it again, unl
     { type: 'titleCommit', item: 'ticket', text: 'Review the notes', startWriting: false },
   ])
 })
+
+test('text pasted, dropped or replaced into the title comes in on one line', () => {
+  header.set(ticket)
+  title().focus()
+  const inserted: string[] = []
+  document.execCommand = (command: string, _ui?: boolean, value?: string) => {
+    if (command === 'insertText' && value != null) inserted.push(value)
+    return true
+  }
+  for (const inputType of ['insertFromPaste', 'insertFromDrop', 'insertReplacementText']) {
+    const event = new InputEvent('beforeinput', { inputType, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { getData: (type: string) => (type === 'text/plain' ? 'Field\nnotes\r\nreview' : '') },
+    })
+    title().dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  }
+  const typed = new InputEvent('beforeinput', {
+    inputType: 'insertText',
+    data: 'x',
+    cancelable: true,
+  })
+  title().dispatchEvent(typed)
+  expect(typed.defaultPrevented).toBe(false)
+  const plain = new InputEvent('beforeinput', { inputType: 'insertFromPaste', cancelable: true })
+  Object.defineProperty(plain, 'dataTransfer', { value: { getData: () => 'One line' } })
+  title().dispatchEvent(plain)
+  expect(plain.defaultPrevented).toBe(false)
+  expect(inserted).toEqual(['Field notes review', 'Field notes review', 'Field notes review'])
+})
