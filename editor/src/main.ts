@@ -142,9 +142,14 @@ window.addEventListener('resize', checkHeaderScrolledAway)
 // The note's text fills the rest of the window below the header, so a click anywhere below it places the caret
 // and a short note does not scroll. The text's height changes in the next frame: changed while the browser
 // reports sizes, it would be reported late, which WebKit raises as an error.
+// A header that only grew wider moves nothing below it.
+let headerHeight = -1
 new ResizeObserver(() => {
+  const height = headerRoot.offsetHeight
+  if (height === headerHeight) return
+  headerHeight = height
   requestAnimationFrame(() => {
-    root.style.setProperty('--inkkit-min-height', `calc(100vh - ${headerRoot.offsetHeight}px)`)
+    root.style.setProperty('--inkkit-min-height', `calc(100vh - ${height}px)`)
     editor.invalidateFindGeometry()
     checkHeaderScrolledAway()
   })

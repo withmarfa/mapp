@@ -41,6 +41,15 @@ struct EditorTests {
             _ = try await editor.webView.evaluateJavaScript("\(script); 0")
         }
 
+        /// Waits until the page has drawn two more frames, so what it does in the next frame has been done and
+        /// anything it posted then has arrived.
+        func frames() async throws {
+            _ = try await editor.webView.callAsyncJavaScript(
+                "await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))",
+                arguments: [:], in: nil, contentWorld: .page)
+            _ = try await editor.webView.evaluateJavaScript("1")
+        }
+
         /// The page's text, once it reads `expected` or after a couple of seconds.
         func shownText(until expected: String) async throws -> String {
             var shown = ""
@@ -289,12 +298,13 @@ struct EditorTests {
         try await page.wait { !rects().isEmpty }
         for source in [false, true] {
             page.editor.setSourceMode(source)
-            _ = try await page.editor.webView.evaluateJavaScript("1")
+            try await page.frames()
             for width in [CGFloat(360), 900, 500] {
                 let before = rects()
                 window.setContentSize(NSSize(width: width, height: 600))
                 #expect(page.editor.webView.frame.width == width)
                 try await page.wait { rects() != before }
+                try await page.frames()
                 #expect(rects().contains { $0.width > 0 && $0.height > 0 })
                 #expect(try await page.editor.webView.evaluateJavaScript("window.innerWidth") as? Double == Double(width))
             }
@@ -304,22 +314,25 @@ struct EditorTests {
                 let before = rects()
                 try await page.run("window.editor.\(command)")
                 try await page.wait { rects() != before }
+                try await page.frames()
             }
             if !source {
+                let before = rects()
                 window.setContentSize(NSSize(width: 1400, height: 600))
-                _ = try await page.editor.webView.evaluateJavaScript("1")
-                try await Task.sleep(for: .milliseconds(100))
+                try await page.wait { rects() != before }
+                try await page.frames()
                 for command in ["setFullWidth(true)", "setFullWidth(false)", "setReadingWidth(24)"] {
                     let before = rects()
                     try await page.run("window.editor.\(command)")
                     try await page.wait { rects() != before }
+                    try await page.frames()
                 }
             }
         }
         try await page.run("window.editor.setFinding(false)")
         let stopped = rects()
         try await page.run("window.editor.setHeader(\(Self.json(Self.header(String(repeating: "Another title ", count: 12)))))")
-        try await Task.sleep(for: .milliseconds(100))
+        try await page.frames()
         #expect(rects() == stopped)
         #expect(try await page.markdown() == nil)
     }
@@ -852,8 +865,7 @@ struct EditorTests {
         for (width, full) in [(CGFloat(360), false), (900, false), (1400, false), (1400, true)] {
             window.setContentSize(NSSize(width: width, height: 500))
             page.editor.setStyle(PageStyle(fullWidth: full))
-            _ = try await page.editor.webView.evaluateJavaScript("1")
-            try await Task.sleep(for: .milliseconds(50))
+            try await page.frames()
             let title = try await Self.rect("#ItemPageTitle", in: page)
             let text = try await Self.rect(".ProseMirror p", in: page)
             #expect(abs(title[0] - text[0]) < 0.5, "at \(width) points the title starts at \(title[0]) and the text at \(text[0])")
