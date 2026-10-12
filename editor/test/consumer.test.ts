@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, test } from 'vitest'
-import { NoteEditor, isPreviewDiagnostic, guardedCommand } from '../src/editor'
+import { expect, test, vi } from 'vitest'
+import { NoteEditor, isPreviewDiagnostic, guardedCommand, type FindState } from '../src/editor'
 
 async function withEditor(source: string, run: (editor: NoteEditor) => void | Promise<void>) {
   const root = document.createElement('div')
@@ -183,4 +183,83 @@ test('preview fallbacks remain diagnostic and expected command rejections stay l
     })
     expect(editor.snapshot().text).toBe('two\n')
   })
+})
+
+test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layout refreshes', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const reports: FindState[] = []
+  let layoutChanged: () => void = () => {}
+  const disconnect = vi.fn()
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        layoutChanged = callback
+      }
+      observe() {}
+      disconnect = disconnect
+    },
+  )
+  const editor = await NoteEditor.mount(root, {
+    find: (state) => reports.push(state),
+    changed() {},
+    stateChanged() {},
+    openLink() {},
+    copy() {},
+  })
+  const frames = new Map<number, FrameRequestCallback>()
+  let nextFrame = 1
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    const id = nextFrame++
+    frames.set(id, callback)
+    return id
+  })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    frames.delete(id)
+  })
+  try {
+    editor.load('A😀B gap C\n', 1)
+    await Promise.resolve()
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    const snapshotId = engine.textSnapshot(1).snapshotId
+    vi.spyOn(engine, 'visibleTextRanges').mockReturnValue([
+      { snapshotId, from: 0, to: 4 },
+      { snapshotId, from: 9, to: 10 },
+    ])
+    const batch = vi.fn((ranges: { from: number }[]) =>
+      ranges.map((range) => [{ left: range.from, top: 20, width: 8, height: 16 }]),
+    )
+    Object.defineProperty(engine, 'textRangesRects', { value: batch, configurable: true })
+    const single = vi.spyOn(engine, 'textRangeRects')
+    editor.setFinding(true)
+    expect(batch).toHaveBeenCalledTimes(1)
+    expect(batch.mock.calls[0]![0].map((range) => range.from)).toEqual([0, 1, 3, 9])
+    expect(single).not.toHaveBeenCalled()
+    expect(reports[0]!.visible).toEqual([0, 10])
+    expect(reports[0]!.boxes.slice(4, 8)).toEqual(reports[0]!.boxes.slice(8, 12))
+    expect(reports[0]!.boxes.slice(16, 36)).toEqual(new Array(20).fill(0))
+    window.dispatchEvent(new Event('resize'))
+    root.dispatchEvent(new Event('load'))
+    root.dispatchEvent(new Event('loadedmetadata'))
+    layoutChanged()
+    editor.invalidateFindGeometry()
+    expect(frames.size).toBe(1)
+    const [id, refresh] = [...frames.entries()][0]!
+    frames.delete(id)
+    refresh(0)
+    expect(batch).toHaveBeenCalledTimes(2)
+    editor.invalidateFindGeometry()
+    editor.setFinding(false)
+    expect(frames.size).toBe(0)
+    window.dispatchEvent(new Event('resize'))
+    layoutChanged()
+    expect(frames.size).toBe(0)
+  } finally {
+    await editor.destroy()
+    expect(disconnect).toHaveBeenCalledOnce()
+    root.remove()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  }
 })

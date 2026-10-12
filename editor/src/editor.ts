@@ -94,6 +94,7 @@ export class NoteEditor {
   private engine!: InkKitEditor
   private finding = false
   private findPending = 0
+  private layoutObserver?: ResizeObserver
   private generation = 0
   private item = ''
   private reported = ''
@@ -112,7 +113,7 @@ export class NoteEditor {
         changed(text, generation) {
           host.pendingChanged = { text, generation }
           queueMicrotask(() => host.flushChanges())
-          host.findChanged()
+          host.invalidateFindGeometry()
         },
         stateChanged() {},
         commandStateChanged(state) {
@@ -126,7 +127,7 @@ export class NoteEditor {
             formats: state.commands.format,
             tables: state.commands.table,
           })
-          host.findChanged()
+          host.invalidateFindGeometry()
         },
         openLink: events.openLink,
         copy: events.copy,
@@ -217,6 +218,13 @@ export class NoteEditor {
     )
     host.engine.setViewport({ scrollContainer: document.documentElement })
     window.addEventListener('scroll', host.scrolled, { passive: true, capture: true })
+    window.addEventListener('resize', host.scrolled)
+    root.addEventListener('load', host.scrolled, true)
+    root.addEventListener('loadedmetadata', host.scrolled, true)
+    document.fonts?.addEventListener('loadingdone', host.scrolled)
+    host.layoutRoot = root
+    host.layoutObserver = new ResizeObserver(host.scrolled)
+    host.layoutObserver.observe(root)
     return host
   }
   setItem(id: string) {
@@ -254,7 +262,7 @@ export class NoteEditor {
         this.reported = text
         this.original = text
         if (!reload) window.scrollTo(0, 0)
-        this.findChanged()
+        this.invalidateFindGeometry()
       } catch (error) {
         if (
           error instanceof InkKitError &&
@@ -296,7 +304,7 @@ export class NoteEditor {
   }
   setEditingMode(mode: 'source' | 'formatted', expected = this.generation) {
     this.engine.setEditingMode(mode, expected)
-    this.findChanged()
+    this.invalidateFindGeometry()
   }
   undo(expected = this.generation) {
     this.engine.undo(expected)
@@ -332,38 +340,48 @@ export class NoteEditor {
   }
   setFinding(finding: boolean) {
     this.finding = finding
+    cancelAnimationFrame(this.findPending)
+    this.findPending = 0
     if (finding) this.sendFind()
   }
-  private scrolled = () => this.findChanged()
-  private findChanged() {
-    if (!this.finding) return
-    cancelAnimationFrame(this.findPending)
-    this.findPending = requestAnimationFrame(() => this.sendFind())
+  private layoutRoot?: HTMLElement
+  private scrolled = () => this.invalidateFindGeometry()
+  invalidateFindGeometry() {
+    if (!this.finding || this.findPending) return
+    this.findPending = requestAnimationFrame(() => {
+      this.findPending = 0
+      this.sendFind()
+    })
   }
   private range(from: number, to: number, snapshot: ReadableTextSnapshot) {
     return { snapshotId: snapshot.snapshotId, from, to }
   }
   private sendFind() {
+    if (!this.finding) return
     try {
       const snapshot = this.engine.textSnapshot(this.generation)
       const visible = this.engine.visibleTextRanges(snapshot.snapshotId)
       const from = visible[0]?.from ?? 0,
         to = visible.at(-1)?.to ?? 0
-      const boxes: number[] = []
-      for (let at = from; at < to;) {
-        const length = (snapshot.text.codePointAt(at) ?? 0) > 0xffff ? 2 : 1
-        let rect
-        try {
-          rect = this.engine.textRangeRects(this.range(at, at + length, snapshot))[0]
-        } catch {}
-        for (let unit = 0; unit < length; unit++)
-          boxes.push(
-            rect?.left ?? 0,
-            (rect?.top ?? 0) + window.scrollY,
-            rect?.width ?? 0,
-            rect?.height ?? 0,
-          )
-        at += length
+      const boxes: number[] = new Array((to - from) * 4).fill(0)
+      const characters: ReturnType<NoteEditor['range']>[] = []
+      for (const range of visible) {
+        for (let at = range.from; at < range.to;) {
+          const length = (snapshot.text.codePointAt(at) ?? 0) > 0xffff ? 2 : 1
+          characters.push(this.range(at, Math.min(at + length, range.to), snapshot))
+          at += length
+        }
+      }
+      const geometry = this.engine.textRangesRects(characters)
+      for (const [index, range] of characters.entries()) {
+        const rect = geometry[index]?.[0]
+        for (let at = range.from; at < range.to; at++) {
+          const base = (at - from) * 4
+          boxes[base] = rect?.left ?? 0
+          boxes[base + 1] = (rect?.top ?? 0) + window.scrollY
+          boxes[base + 2] = rect?.width ?? 0
+          boxes[base + 3] = rect?.height ?? 0
+        }
       }
       this.events.find({
         snapshotId: snapshot.snapshotId,
@@ -435,8 +453,13 @@ export class NoteEditor {
   }
   destroy() {
     this.replacement++
+    this.setFinding(false)
     window.removeEventListener('scroll', this.scrolled, true)
-    cancelAnimationFrame(this.findPending)
+    window.removeEventListener('resize', this.scrolled)
+    this.layoutRoot?.removeEventListener('load', this.scrolled, true)
+    this.layoutRoot?.removeEventListener('loadedmetadata', this.scrolled, true)
+    document.fonts?.removeEventListener('loadingdone', this.scrolled)
+    this.layoutObserver?.disconnect()
     return this.engine.destroy()
   }
 }

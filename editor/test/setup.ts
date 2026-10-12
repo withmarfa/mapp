@@ -3,6 +3,12 @@ const none = () => [] as unknown as DOMRectList
 const zero = () => new DOMRect(0, 0, 0, 0)
 Range.prototype.getClientRects ??= none
 Range.prototype.getBoundingClientRect ??= zero
+// Tests trigger layout changes explicitly because jsdom has no layout engine.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver
 // Loading resets the reading position; scroll requests are tested with a spy.
 window.scrollTo = () => {}
 // Nor does it hit-test; a drop point then resolves to the caret.

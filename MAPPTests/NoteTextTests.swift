@@ -100,9 +100,32 @@ struct NoteTextTests {
         ("Tom &amp; Jerry &#233;t&#xE9;", "Tom & Jerry été"),
         ("Keep `\\*code\\*` as written", "Keep \\*code\\* as written"),
         ("&bogus; stays", "&bogus; stays"),
+        ("first<br>second<br />third<BR/>last", "first second third last"),
+        ("![[Dusk.png|320]] and [[Plan|the plan]]", "Dusk.png and the plan"),
+        ("[[Plan#Next steps]] and ![[Clip.mov#t=2|400]]", "Plan#Next steps and Clip.mov"),
+        ("Use `<br>` and `![[Dusk.png|320]]` literally", "Use <br> and ![[Dusk.png|320]] literally"),
+        ("\\!\\[\\[literal\\]\\]", "![[literal]]"),
+        ("Keep \\<br> literal", "Keep <br> literal"),
+        ("\\\\<br>text", "\\ text"),
+        ("[[Name\\|part]]", "Name|part"),
+        ("[[Target|Label\\|part]]", "Label|part"),
+        ("![[A\\#B.png]]", "A#B.png"),
+        ("![[A\\|B.png|400]]", "A|B.png"),
+        ("![[A\\#B.png#section|400]]", "A#B.png"),
+        ("![[A\\\\#section|400]]", "A\\"),
+        ("\\[[Name\\|part]]", "[[Name|part]]"),
+        ("Keep `\\<br>` and `[[Name\\|part]]` literal", "Keep \\<br> and [[Name\\|part]] literal"),
     ])
     func plainTextOfOneLine(line: String, expected: String) {
         #expect(NoteText.plainText(of: line[...]) == expected)
+    }
+
+    @Test func escapedWikiDelimitersRemainInTitlesAndFileNames() {
+        let body = "![[A\\#B.png]]\n\n[[Name\\|part]] and \\<br>"
+        #expect(title(body) == "A#B.png")
+        #expect(NoteText.fileName(for: body) == "A#B.png")
+        #expect(preview(body) == "Name|part and <br>")
+        #expect(NoteText.fileName(for: "[[Name\\|part]]") == "Name|part")
     }
 
     @Test(arguments: [

@@ -212,12 +212,45 @@ nonisolated enum NoteText {
 
     private static func stripInline(_ text: String) -> String {
         var text = text
+        let authored = text
+        text.replace(htmlBreak) { match in
+            isEscaped(at: match.range.lowerBound, in: authored) ? String(match.output) : " "
+        }
+        let linked = text
+        text.replace(wikiReference) { match in
+            let (whole, embedded, content) = match.output
+            guard !isEscaped(at: match.range.lowerBound, in: linked) else { return String(whole) }
+            let alias = firstUnescaped("|", in: content)
+            let target = content[..<(alias ?? content.endIndex)]
+            if !embedded.isEmpty {
+                return String(target[..<(firstUnescaped("#", in: target) ?? target.endIndex)])
+            }
+            return alias.map { String(content[content.index(after: $0)...]) } ?? String(content)
+        }
         // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
         text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
         text.replace(link) { String($0.output.1) }
         text.replace(strongOrStrike) { String($0.output.2) }
         text.replace(emphasis) { String($0.output.1) + String($0.output.2) }
         return text
+    }
+
+    private static func isEscaped(at index: String.Index, in text: String) -> Bool {
+        !text[..<index].reversed().prefix { $0 == "\\" }.count.isMultiple(of: 2)
+    }
+
+    private static func firstUnescaped(_ delimiter: Character, in text: Substring) -> String.Index? {
+        var escaped = false
+        for index in text.indices {
+            if escaped {
+                escaped = false
+            } else if text[index] == "\\" {
+                escaped = true
+            } else if text[index] == delimiter {
+                return index
+            }
+        }
+        return nil
     }
 
     // Regex is not Sendable; these are immutable and only ever read.
@@ -228,6 +261,8 @@ nonisolated enum NoteText {
     private nonisolated(unsafe) static let headingMarker = /^#{1,6}(\s+|$)/
     private nonisolated(unsafe) static let listMarker = /^([-*+]|\d{1,9}[.)])(\s+|$)(\[[ xX]\](\s+|$))?/
     private nonisolated(unsafe) static let codeSpan = /`+([^`]*)`+/
+    private nonisolated(unsafe) static let htmlBreak = /(?i)<br\s*\/?\s*>/
+    private nonisolated(unsafe) static let wikiReference = /(!?)\[\[((?:[^\\\]\n]|\\.)+)\]\]/
     private nonisolated(unsafe) static let image = /!\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/
     private nonisolated(unsafe) static let link = /\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/
     private nonisolated(unsafe) static let strongOrStrike = /(\*\*|__|~~)(\S(?:.*?\S)?)\1/

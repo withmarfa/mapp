@@ -42,7 +42,7 @@ final class EditorController: NSObject {
     @ObservationIgnored let webView: EditorWebView
     /// The page with the system find bar above it, which is what the window shows.
     @ObservationIgnored let container: EditorContainer
-    @ObservationIgnored private var pageFinder: PageFinder!
+    @ObservationIgnored private(set) var pageFinder: PageFinder!
 
     /// The note on the page, and the markdown the page holds for it as far as the app knows, read from the
     /// library at `read`.
