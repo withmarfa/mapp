@@ -1,5 +1,6 @@
 import { postToHost } from './bridge'
 import { NoteEditor, guardedCommand, type FormatCommand, type Keymap } from './editor'
+import { ItemHeader, type HeaderIcons, type HeaderLabels, type HeaderModel } from './header'
 import { InkKitError } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import type { EditorLabels } from '@aicayzer/inkkit'
@@ -43,14 +44,18 @@ declare global {
       setFullWidth(full: boolean): void
       setTextSize(points: number): void
       setReadingWidth(ems: number): void
-      setHeaderHeight(height: number): void
+      setHeader(model: HeaderModel | null): void
+      setHeaderIcons(icons: HeaderIcons): void
       setSpellcheck(spellcheck: boolean): void
     }
   }
 }
 
 const root = document.getElementById('editor')
-if (!root) throw new Error('editor root missing')
+const headerRoot = document.getElementById('item-header')
+if (!root || !headerRoot) throw new Error('editor root missing')
+const labels = (window as unknown as { mappLabels?: Partial<EditorLabels & HeaderLabels> })
+  .mappLabels
 
 const editor = await NoteEditor.mount(
   root,
@@ -71,8 +76,9 @@ const editor = await NoteEditor.mount(
       postToHost({ type: 'copy', text })
     },
   },
-  (window as unknown as { mappLabels?: Partial<EditorLabels> }).mappLabels,
+  labels,
 )
+const header = new ItemHeader(headerRoot, labels)
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -89,7 +95,8 @@ window.addEventListener(
   'paste',
   (event) => {
     const data = event.clipboardData
-    if (!data || data.types.includes('text/html')) return
+    if (!data || data.types.includes('text/html') || headerRoot.contains(event.target as Node))
+      return
     const files = [...data.items].filter((item) => item.kind === 'file')
     if (files.length === 0 || !files.every((item) => item.type.startsWith('image/'))) return
     // Text beside the image is kept for the page, unless it only names a file copied in the Finder.
@@ -121,22 +128,24 @@ window.addEventListener('blur', () => {
 window.addEventListener('focus', () => document.documentElement.classList.remove('inactive'))
 
 let generation = 0
-let scrollPending = false
-function reportScroll(): void {
-  postToHost({ type: 'scrolled', offset: window.scrollY, generation: editor.loadedGeneration })
+// The toolbar shows the title once the header has gone under it; the app hears only when that changes. A page
+// with no header to show, as for a deleted note, has its title there from the start.
+let headerScrolledAway = false
+function checkHeaderScrolledAway(): void {
+  const away = header.isHidden || window.scrollY >= header.bottom
+  if (away === headerScrolledAway) return
+  headerScrolledAway = away
+  postToHost({ type: 'headerScrolledAway', away, generation: editor.loadedGeneration })
 }
-window.addEventListener(
-  'scroll',
-  () => {
-    if (scrollPending) return
-    scrollPending = true
-    requestAnimationFrame(() => {
-      scrollPending = false
-      reportScroll()
-    })
-  },
-  { passive: true },
-)
+window.addEventListener('scroll', checkHeaderScrolledAway, { passive: true })
+window.addEventListener('resize', checkHeaderScrolledAway)
+// The note's text fills the rest of the window below the header, so a click anywhere below it places the caret
+// and a short note does not scroll.
+new ResizeObserver(() => {
+  root.style.setProperty('--inkkit-min-height', `calc(100vh - ${headerRoot.offsetHeight}px)`)
+  editor.invalidateFindGeometry()
+  checkHeaderScrolledAway()
+}).observe(headerRoot)
 
 function setPageProperty(name: string, value: string): void {
   const style = document.documentElement.style
@@ -149,12 +158,12 @@ window.editor = {
   load: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
     editor.load(markdown, nextGeneration, editable)
-    reportScroll()
+    headerScrolledAway = false
+    checkHeaderScrolledAway()
   },
   reload: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
     editor.reload(markdown, nextGeneration, editable)
-    reportScroll()
   },
   markdown: () => editor.markdown(),
   flush: (expected) => editor.flush(expected),
@@ -164,7 +173,7 @@ window.editor = {
   blurText: (expected: number) => {
     if (expected !== generation) return
     const active = document.activeElement
-    if (active instanceof HTMLElement && active.matches('.ProseMirror, .inkkit-plain'))
+    if (active instanceof HTMLElement && active.matches('.ProseMirror, .inkkit-plain, .item-title'))
       active.blur()
   },
   setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
@@ -205,7 +214,11 @@ window.editor = {
   setTextSize: (points) => setPageProperty('font-size', `${points}px`),
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
   setReadingWidth: (ems) => setPageProperty('--reading-width', `${ems}rem`),
-  setHeaderHeight: (height) => setPageProperty('--item-header-height', `${Math.max(0, height)}px`),
+  setHeader: (model) => {
+    header.set(model)
+    checkHeaderScrolledAway()
+  },
+  setHeaderIcons: (icons) => header.setIcons(icons),
 }
 
 postToHost({ type: 'ready' })

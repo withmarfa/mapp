@@ -1,4 +1,5 @@
 import type { CaretState, FindState } from './editor'
+import type { HeaderMenu } from './header'
 
 /** An embed as the note names it: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
  *  does, for the app to resolve as Marfa's core does. */
@@ -23,7 +24,18 @@ export type EditorMessage =
   | { type: 'error' | 'diagnostic'; message: string }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
-  | { type: 'scrolled'; offset: number; generation: number }
+  | { type: 'headerScrolledAway'; away: boolean; generation: number }
+  | { type: 'titleFocus'; focused: boolean }
+  | { type: 'titleInput'; item: string; text: string }
+  | { type: 'titleCommit'; item: string; text: string; startWriting: boolean }
+  | { type: 'titleDiscard'; item: string }
+  | {
+      type: 'headerMenu'
+      item: string
+      menu: HeaderMenu
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   | { type: 'openLink'; href: string }
   | { type: 'copy'; text: string }
   | { type: 'escape' }

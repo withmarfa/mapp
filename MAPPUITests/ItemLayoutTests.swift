@@ -32,7 +32,7 @@ final class ItemLayoutTests: XCTestCase {
         let bodyHeading = page.staticTexts["Kitchen quotes"].firstMatch
         XCTAssertTrue(bodyHeading.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20,
-                                    "Body content must start below the native title and property chips.")
+                                    "Body content must start below the title and property chips.")
         app.buttons["DetailsToggle"].click()
         capture("Document with inspector and narrower content")
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20)
@@ -91,7 +91,7 @@ final class ItemLayoutTests: XCTestCase {
         let controlColors = otherColumnControls.map { averageColor(of: $0.screenshot()) }
         header.scroll(byDeltaX: 0, deltaY: -40)
         Thread.sleep(forTimeInterval: 0.3)
-        XCTAssertLessThan(header.frame.minY, before - 20, "The native header follows WebKit's scroll.")
+        XCTAssertLessThan(header.frame.minY, before - 20, "The header scrolls with the page.")
         for _ in 0..<8 { page.scroll(byDeltaX: 0, deltaY: -100) }
         let compactTitle = app.staticTexts["ScrolledItemTitle"]
         XCTAssertTrue(compactTitle.waitForExistence(timeout: 3))

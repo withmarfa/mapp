@@ -16,10 +16,14 @@ final class EditorController: NSObject {
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
-    private(set) var scrollOffset: CGFloat = 0
+    /// Whether the item's header in the page has gone under the toolbar, which then shows the title.
     private(set) var isHeaderScrolledAway = false
-    private(set) var findBarHeight: CGFloat = 0
-    @ObservationIgnored private var headerHeight: CGFloat = 0
+    /// Whether the item's title in the page has the keyboard rather than the note's text.
+    private(set) var isEditingTitle = false
+    @ObservationIgnored private var header: PageHeader?
+    @ObservationIgnored private var headerIconSize: Int?
+    /// What the person does in the page's item header, for the window showing it to carry out.
+    @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
@@ -84,7 +88,6 @@ final class EditorController: NSObject {
         container.onFindBarVisibilityChange = { [weak self] visible in
             self?.call("setFinding", String(visible))
         }
-        container.onFindBarHeightChange = { [weak self] height in self?.findBarHeight = height }
         Self.open.add(self)
         webView.controller = self
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
@@ -136,7 +139,6 @@ final class EditorController: NSObject {
         let request = loadRequest
         let present = { [self] in
             guard request == loadRequest else { return }
-            scrollOffset = 0
             isHeaderScrolledAway = false
             show(item, as: "load")
         }
@@ -145,11 +147,36 @@ final class EditorController: NSObject {
         } else { present() }
     }
 
-    func setHeaderHeight(_ height: CGFloat) {
-        guard height != headerHeight else { return }
-        headerHeight = height
-        isHeaderScrolledAway = height > 0 && scrollOffset >= height
-        if isReady { call("setHeaderHeight", String(Double(height))) }
+    /// What the page's item header shows, sent whenever it changes.
+    func setHeader(_ header: PageHeader?) {
+        guard header != self.header else { return }
+        self.header = header
+        if isReady { sendHeader() }
+    }
+
+    private func sendHeader() {
+        if let size = header?.interfaceTextSize, size != headerIconSize, let icons = PageHeaderIcons(textSize: size) {
+            headerIconSize = size
+            call("setHeaderIcons", json(icons))
+        }
+        call("setHeader", header.map(json) ?? "null")
+    }
+
+    /// Shows a chip's menu under it, as a pop-up button shows its own.
+    func popUpMenu(_ menu: NSMenu, under rect: CGRect) {
+        // Tracking a menu runs its own event loop, which waits until the page's message has been handled.
+        Task { menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: container) }
+    }
+
+    /// A rect in the page's window, which starts below whatever covers the web view's top, in the container's
+    /// coordinates.
+    private func containerRect(_ rect: CGRect, viewportHeight: Double) -> CGRect {
+        let covered = max(0, webView.bounds.height - viewportHeight)
+        let top = rect.minY + covered
+        let inWebView = webView.isFlipped
+            ? CGRect(x: rect.minX, y: top, width: rect.width, height: rect.height)
+            : CGRect(x: rect.minX, y: webView.bounds.height - top - rect.height, width: rect.width, height: rect.height)
+        return container.convert(inWebView, from: webView)
     }
 
     /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
@@ -197,6 +224,7 @@ final class EditorController: NSObject {
             guard kept, request == loadRequest else { return }
             noteID = nil
             isHeaderScrolledAway = false
+            isEditingTitle = false
         }
     }
 
@@ -546,6 +574,13 @@ final class EditorController: NSObject {
             "fileOpen": String(localized: "Open"),
             "fileMissing": String(localized: "File Not Found"),
             "fileRetry": String(localized: "Try Again"),
+            "untitled": String(localized: "Untitled"),
+            "title": String(localized: "Title"),
+            "itemType": String(localized: "Item Type"),
+            "status": String(localized: "Status"),
+            "discardChanges": String(localized: "Discard Changes"),
+            "titleRejected": String(localized: "The title could not be saved. Use a unique file name without slashes or line breaks."),
+            "propertyRejected": String(localized: "The value could not be saved. Please try again."),
         ]
     }
 
@@ -588,7 +623,9 @@ final class EditorController: NSObject {
             applyAccent()
             applyKeymap()
             applyStyle()
-            call("setHeaderHeight", String(Double(headerHeight)))
+            isEditingTitle = false
+            headerIconSize = nil
+            sendHeader()
             if let noteID {
                 embeds.version += 1
                 call("setItem", json(noteID.rawValue))
@@ -602,10 +639,20 @@ final class EditorController: NSObject {
         case .state(let state):
             guard state.generation == generation else { return }
             if state != caret { caret = state }
-        case .scrolled(let offset, let generation):
-            guard generation == self.generation else { return }
-            scrollOffset = max(0, offset)
-            isHeaderScrolledAway = headerHeight > 0 && scrollOffset >= headerHeight
+        case .headerScrolledAway(let away, let generation):
+            guard generation == self.generation, away != isHeaderScrolledAway else { return }
+            isHeaderScrolledAway = away
+        case .titleFocus(let focused):
+            isEditingTitle = focused
+            if focused { webView.beginEditingTitle() }
+        case .titleInput(let item, let text):
+            onHeaderEvent(.titleInput(item, text))
+        case .titleCommit(let item, let text, let startWriting):
+            onHeaderEvent(.titleCommit(item, text, startWriting: startWriting))
+        case .titleDiscard(let item):
+            onHeaderEvent(.titleDiscard(item))
+        case .headerMenu(let menu, let item, let rect, let viewportHeight):
+            onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
                 NSWorkspace.shared.open(url)

@@ -61,38 +61,31 @@ private struct UnselectedItemContent: View {
         .frame(width: 600, height: 500)
 }
 
-/// One note as a formatted page. The same editor shows each note in turn, so moving between notes loads
-/// text into a page that is already running.
+/// One note as a formatted page, with the item's header drawn by the page above the text. The same editor shows
+/// each note in turn, so moving between notes loads text into a page that is already running.
 struct NotePage: View {
     @CurrentLibrary private var library
     let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
     let headerDrafts: DetailsPresentation
+    @State private var bannerHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .top) {
-                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top)
+                // The page runs under the toolbar and any banner, so it starts below them and scrolls beneath.
+                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
-                if item.state == .trashed {
-                    ScrollingPageHeader(editor: editor) {
+                    .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts, containerTop: proxy.safeAreaInsets.top))
+                VStack(spacing: 0) {
+                    if item.state == .trashed {
                         DeletedNoteBanner(id: item.id)
-                    }
-                } else {
-                    ScrollingPageHeader(editor: editor) {
-                        VStack(spacing: 0) {
-                            if case .conflicted(let copy?, _) = item.sync {
-                                SavedAsCopyBanner(copy: copy)
-                            }
-                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus(item.id) })
-                                .id(item.id)
-                                .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
-                                .padding(.top, 16)
-                                .padding(.bottom, 8)
-                        }
+                    } else if case .conflicted(let copy?, _) = item.sync {
+                        SavedAsCopyBanner(copy: copy)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -114,31 +107,8 @@ struct NotePage: View {
     }
 }
 
-/// WebKit owns scrolling. Its public script bridge supplies the offset for the native controls, while the
-/// page reserves their measured height. No second scroll view or copy of the item's data is involved.
-private struct ScrollingPageHeader<Content: View>: View {
-    let editor: EditorController
-    @ViewBuilder let content: () -> Content
-    @State private var height: CGFloat = 0
-
-    var body: some View {
-        ScrollingHeader(webView: editor.webView, content: content)
-            .fixedSize(horizontal: false, vertical: true)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                height = $0
-                editor.setHeaderHeight($0)
-            }
-            .offset(y: -editor.scrollOffset)
-            .frame(height: max(0, height - editor.scrollOffset), alignment: .top)
-            .clipped()
-            .padding(.top, editor.findBarHeight)
-            .accessibilityHidden(editor.isHeaderScrolledAway)
-            .allowsHitTesting(!editor.isHeaderScrolledAway)
-    }
-}
-
 /// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
-/// beside the text the server kept.
+/// beside the text the server kept. It stays above the page while the note scrolls.
 private struct SavedAsCopyBanner: View {
     @Environment(\.openWindow) private var openWindow
     let copy: ItemID

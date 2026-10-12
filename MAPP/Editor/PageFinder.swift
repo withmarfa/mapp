@@ -130,8 +130,6 @@ final class PageFinder: NSObject, NSTextFinderClient {
 /// The system find bar reserves space inside the editor so matches never sit behind it.
 final class EditorContainer: WebViewContainer, NSTextFinderBarContainer {
     var onFindBarVisibilityChange: (Bool) -> Void = { _ in }
-    var onFindBarHeightChange: (CGFloat) -> Void = { _ in }
-    private var reportedFindBarHeight: CGFloat = 0
 
     var findBarView: NSView? {
         didSet {
@@ -172,10 +170,5 @@ final class EditorContainer: WebViewContainer, NSTextFinderBarContainer {
             findBarView.frame = NSRect(x: 0, y: topInset, width: bounds.width, height: findBarHeight)
         }
         super.layout()
-        let height = findBarHeight
-        if height != reportedFindBarHeight {
-            reportedFindBarHeight = height
-            DispatchQueue.main.async { [weak self] in self?.onFindBarHeightChange(height) }
-        }
     }
 }
