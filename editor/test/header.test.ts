@@ -12,6 +12,8 @@ const ticket: HeaderModel = {
   title: 'Review the findings',
   draft: null,
   titleRejected: false,
+  titleRefusal:
+    'The title could not be saved. Use a unique file name without slashes or line breaks.',
   editable: true,
   type: 'Task',
   status: { label: 'In Progress', enabled: true },

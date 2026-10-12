@@ -14,6 +14,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var title: String
     var draft: String?
     var titleRejected: Bool
+    /// Why a title is refused, which depends on the library.
+    var titleRefusal: String
     var editable: Bool
     var type: String?
     var status: Chip?

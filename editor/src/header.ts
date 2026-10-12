@@ -14,6 +14,8 @@ export interface HeaderModel {
   /** The title the person typed and the app has not saved, kept by the app for each item. */
   draft: string | null
   titleRejected: boolean
+  /** Why the title was refused, in the words of the library the item is in. */
+  titleRefusal: string
   editable: boolean
   type: string | null
   status: HeaderChip | null
@@ -42,7 +44,6 @@ export interface HeaderLabels {
   itemType: string
   status: string
   discardChanges: string
-  titleRejected: string
   propertyRejected: string
 }
 
@@ -57,8 +58,6 @@ const englishLabels: HeaderLabels = {
   itemType: 'Item Type',
   status: 'Status',
   discardChanges: 'Discard Changes',
-  titleRejected:
-    'The title could not be saved. Use a unique file name without slashes or line breaks.',
   propertyRejected: 'The value could not be saved. Please try again.',
 }
 
@@ -80,6 +79,7 @@ export class ItemHeader {
   private readonly labels: HeaderLabels
   private readonly title: HTMLDivElement
   private readonly titleError: HTMLDivElement
+  private readonly titleRefusal: HTMLParagraphElement
   private readonly chips: HTMLDivElement
   private readonly typeChip: HTMLSpanElement
   private readonly statusChip: HTMLButtonElement
@@ -103,9 +103,8 @@ export class ItemHeader {
     this.title.spellcheck = false
     this.titleError = element('div', 'item-title-error', root)
     this.titleError.hidden = true
-    const message = element('p', 'item-error', this.titleError)
-    message.setAttribute('role', 'alert')
-    message.textContent = this.labels.titleRejected
+    this.titleRefusal = element('p', 'item-error', this.titleError)
+    this.titleRefusal.setAttribute('role', 'alert')
     const discard = element('button', 'item-discard', this.titleError)
     discard.type = 'button'
     discard.textContent = this.labels.discardChanges
@@ -231,6 +230,7 @@ export class ItemHeader {
     }
     if (!this.isEditingTitle) this.showTitle()
     this.titleError.hidden = !model.titleRejected
+    this.titleRefusal.textContent = model.titleRefusal
     this.propertyError.hidden = !model.propertyRejected
     this.typeChip.hidden = model.type == null
     this.typeChip.firstElementChild!.textContent = model.type ?? ''

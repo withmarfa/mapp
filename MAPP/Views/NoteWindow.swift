@@ -7,7 +7,7 @@ struct NoteWindow: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
     @State private var editor: EditorController
-    @State private var details = DetailsPresentation()
+    @State private var details: DetailsPresentation
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
@@ -15,7 +15,11 @@ struct NoteWindow: View {
 
     /// The library is given here as well as in the environment, since the editor is made with it.
     init(library: any ItemLibrary, id: Binding<ItemID?>) {
-        _editor = State(initialValue: EditorController(library: library))
+        let editor = EditorController(library: library)
+        let details = DetailsPresentation()
+        editor.titleDrafts = details
+        _editor = State(initialValue: editor)
+        _details = State(initialValue: details)
         _id = id
     }
 

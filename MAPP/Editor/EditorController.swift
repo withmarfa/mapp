@@ -24,8 +24,8 @@ final class EditorController: NSObject {
     @ObservationIgnored private var headerIconSize: Int?
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
-    /// Saves a title typed in the page's header and not yet left; whether the title the page shows is saved.
-    @ObservationIgnored var onCommitTitle: () -> Bool = { true }
+    /// The window's drafts of item titles, which are saved before the window closes or the library changes.
+    @ObservationIgnored var titleDrafts: DetailsPresentation?
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
@@ -259,14 +259,14 @@ final class EditorController: NSObject {
         capture()
     }
 
-    /// Destructive transitions proceed only once every editor has handed over its current text and its title.
-    /// A title that cannot be saved stops them as a failed capture does, since it would otherwise be lost.
+    /// Destructive transitions proceed only once every editor has handed over its current text and its window's
+    /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
+    /// capture does, since it would otherwise be lost; where they stay, as when a note is deleted, it waits.
     static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
         for editor in editors {
-            guard editor.onCommitTitle() else {
-                editor.library?.failure = (String(localized: "Couldn’t Save Note"), String(localized: "The title could not be saved. Use a unique file name without slashes or line breaks."))
+            guard editor.saveTitles(tellingRefusal: leaving) || !leaving else {
                 gate.arrive(false)
                 continue
             }
@@ -293,6 +293,25 @@ final class EditorController: NSObject {
             action?(success)
             action = nil
         }
+    }
+
+    /// Tries every title the window holds unsaved, since a name taken before may be free now, leaving out items that
+    /// are gone or whose title cannot be set. Whether all are saved; if not, and asked to, says which is not.
+    func saveTitles(tellingRefusal: Bool) -> Bool {
+        guard let drafts = titleDrafts, let library else { return true }
+        var refused: (draft: String, item: String)?
+        for id in drafts.unsavedTitles {
+            guard let item = library.item(id), library.canSetTitle(of: item) else { continue }
+            if !drafts.saveTitle(of: id, in: library, undoManager: webView.window?.undoManager), refused == nil {
+                refused = (drafts.draft(for: id, key: "title").text, item.title)
+            }
+        }
+        guard let refused else { return true }
+        if tellingRefusal {
+            library.failure = (String(localized: "Couldn’t Save Title"),
+                               String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes."))
+        }
+        return false
     }
 
     /// Gives the page the keyboard: now if it is ready and in a window, otherwise once it is, as when the page
@@ -589,7 +608,6 @@ final class EditorController: NSObject {
             "itemType": String(localized: "Item Type"),
             "status": String(localized: "Status"),
             "discardChanges": String(localized: "Discard Changes"),
-            "titleRejected": String(localized: "The title could not be saved. Use a unique file name without slashes or line breaks."),
             "propertyRejected": String(localized: "The value could not be saved. Please try again."),
         ]
     }

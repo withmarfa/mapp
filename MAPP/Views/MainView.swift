@@ -24,7 +24,9 @@ struct MainView: View {
 
     /// The library is given here as well as in the environment, since the editor is made with it.
     init(library: any ItemLibrary, browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
-        _editor = State(initialValue: EditorController(library: library))
+        let editor = EditorController(library: library)
+        editor.titleDrafts = details
+        _editor = State(initialValue: editor)
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
         self.settings = settings

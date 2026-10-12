@@ -34,18 +34,13 @@ struct ItemPageHeader: ViewModifier {
             .onChange(of: header, initial: true) { _, header in editor.setHeader(header) }
             .onChange(of: item.id, initial: true) { old, id in
                 if old != id {
-                    Self.commitTitle(of: old, library: library, drafts: drafts, undoManager: undoManager)
+                    drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     propertyError = false
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
-                let library = library, drafts = drafts, undoManager = undoManager
-                editor.onCommitTitle = { Self.commitTitle(of: id, library: library, drafts: drafts, undoManager: undoManager) }
             }
-            .onDisappear {
-                Self.commitTitle(of: item.id, library: library, drafts: drafts, undoManager: undoManager)
-                editor.onCommitTitle = { true }
-            }
+            .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
     }
 
     private var header: PageHeader {
@@ -58,7 +53,8 @@ struct ItemPageHeader: ViewModifier {
             title: item.title,
             draft: draft.isDirty ? draft.text : nil,
             titleRejected: draft.rejected,
-            editable: item.isEditable,
+            titleRefusal: library.titleRefusal,
+            editable: library.canSetTitle(of: item),
             type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
             status: status.map { _ in
                 PageHeader.Chip(label: (item.value(of: "status")?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status"),
@@ -88,7 +84,7 @@ struct ItemPageHeader: ViewModifier {
                     draft.isDirty = true
                     draft.rejected = false
                 }
-                if Self.commitTitle(of: id, library: library, drafts: drafts, undoManager: undoManager), startWriting {
+                if drafts.saveTitle(of: id, in: library, undoManager: undoManager), startWriting {
                     editor.focus(id)
                 }
             case .titleDiscard(let id):
@@ -122,17 +118,6 @@ struct ItemPageHeader: ViewModifier {
                 editor.popUpMenu(menu, under: rect)
             }
         }
-    }
-
-    /// Saves the person's draft of the title, if there is one; whether the title the page shows is saved.
-    @discardableResult
-    private static func commitTitle(of id: ItemID, library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?) -> Bool {
-        let draft = drafts.draft(for: id, key: "title")
-        guard draft.isDirty, library.item(id)?.isEditable == true else { return !draft.rejected }
-        let title = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        draft.rejected = !library.setItemProperty(id, key: "title", value: .string(title), undoManager: undoManager)
-        if !draft.rejected { draft.isDirty = false }
-        return !draft.rejected
     }
 
     private static func status(of item: Item, in library: any ItemLibrary) -> ItemTypeInfo.Field? {

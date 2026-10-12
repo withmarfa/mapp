@@ -816,7 +816,8 @@ struct EditorTests {
     // MARK: The item header
 
     static func header(_ title: String, id: ItemID = ItemID("note"), hidden: Bool = false) -> PageHeader {
-        PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false, editable: true,
+        PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
+                   titleRefusal: "The title could not be saved.", editable: true,
                    type: "Task", status: .init(label: "In Progress", enabled: true),
                    parent: .init(label: "Field Research", enabled: true), propertyRejected: false, interfaceTextSize: 13)
     }
@@ -975,7 +976,7 @@ struct EditorTests {
     }
 
     struct PageHost: View {
-        let library: NoteLibrary
+        let library: any ItemLibrary
         let editor: EditorController
         let drafts: DetailsPresentation
         let shown: Shown
@@ -998,8 +999,9 @@ struct EditorTests {
 
         init() async throws {
             page = try await Harness(library: library)
+            page.editor.titleDrafts = drafts
             shown = Shown(ticket)
-            window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+            window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
                 .environment(\.library, library))
@@ -1008,9 +1010,19 @@ struct EditorTests {
         }
 
         func close() {
+            // A draft left refused here must not hold up a later test's flush of every editor.
+            for id in [ItemPreviewFixtures.ticketID, ItemPreviewFixtures.noteID, ItemPreviewFixtures.projectID] {
+                drafts.draft(for: id, key: "title").isDirty = false
+            }
             window.orderOut(nil)
             window.contentView = nil
             window.close()
+        }
+
+        /// Hands over every page's edits, as quitting or changing library does, or as deleting a note does when
+        /// `leaving` is false.
+        func flushAll(leaving: Bool = true) async -> Bool {
+            await withCheckedContinuation { continuation in EditorController.flushAll(leaving: leaving) { continuation.resume(returning: $0) } }
         }
 
         func value(_ script: String) async throws -> Any? {
@@ -1018,7 +1030,7 @@ struct EditorTests {
         }
 
         func shownTitle() async throws -> String? {
-            try await value("document.getElementById('ItemPageTitle').textContent") as? String
+            try await value("document.getElementById('ItemPageTitle')?.textContent") as? String
         }
 
         func titleError() async throws -> Bool? {
@@ -1038,13 +1050,14 @@ struct EditorTests {
             try await page.run("document.getElementById('ItemPageTitle').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))")
         }
 
-        func waitFor(_ condition: () async throws -> Bool) async throws {
-            for _ in 0..<60 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
-            try #require(try await condition())
+        /// Waits for something the page or the window does in its own time, for up to ten seconds.
+        func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
+            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
+            try #require(try await condition(), "waiting for \(what)")
         }
 
         func waitForTitle(_ title: String) async throws {
-            try await waitFor { try await self.shownTitle() == title }
+            try await waitFor("the page to show the title \(title)") { try await self.shownTitle() == title }
         }
     }
 
@@ -1070,7 +1083,8 @@ struct EditorTests {
         let writing = try await host.value("document.activeElement?.matches('.ProseMirror') === true") as? Bool
         #expect(writing == true)
         #expect(!host.drafts.draft(for: ticket, key: "title").isDirty)
-        try await Task.sleep(for: .milliseconds(200))
+        // Anything the blur posted arrives before the answer to a script run after it.
+        _ = try await host.value("1")
         #expect(commits == 1, "leaving the title after Return does not save it again")
 
         // The change is undone as the app's own, from the window's undo manager, and the page shows it.
@@ -1082,7 +1096,7 @@ struct EditorTests {
         // A title the library refuses stays as typed, with the reason, and survives moving to another note and back.
         try await host.type("Review/photographs")
         try await host.pressReturn()
-        try await host.waitFor { try await host.titleError() == true }
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         #expect(library.item(ticket)?.title == "Review the findings")
         #expect(try await host.shownTitle() == "Review/photographs")
         host.shown.id = ItemPreviewFixtures.noteID
@@ -1110,26 +1124,108 @@ struct EditorTests {
         // Deleted elsewhere, the note becomes read-only and its header gives way to the banner.
         host.library.delete([host.ticket])
         try await host.page.wait { !host.page.editor.isEditable }
-        try await host.waitFor { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
+        try await host.waitFor("the header to hide") { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
         host.library.recover([host.ticket])
         try await host.page.wait { host.page.editor.isEditable }
-        try await host.waitFor { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
+        try await host.waitFor("the header to show") { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
     }
 
     @Test func aTitleTypedButNotLeftIsSavedBeforeQuittingAndARefusalStopsIt() async throws {
         let host = try await HostedPage()
         defer { host.close() }
         try await host.type("Review before quitting")
-        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
-        #expect(kept)
+        #expect(await host.flushAll())
         #expect(host.library.item(host.ticket)?.title == "Review before quitting")
         #expect(host.library.failure == nil)
 
         try await host.type("Review/before quitting")
-        let refused = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
-        #expect(!refused, "a title that cannot be saved stops quitting rather than being lost")
+        #expect(await !host.flushAll(), "a title that cannot be saved stops quitting rather than being lost")
         #expect(host.library.item(host.ticket)?.title == "Review before quitting")
-        #expect(host.library.failure != nil)
-        try await host.waitFor { try await host.titleError() == true }
+        #expect(host.library.failure?.message.contains("“Review/before quitting”") == true)
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+    }
+
+    @Test func aRefusedTitleForANoteNoLongerShownStillStopsQuittingAndNamesTheNote() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review/photos")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(await !host.flushAll())
+        let message = try #require(host.library.failure?.message)
+        #expect(message.contains("“Review/photos”") && message.contains("“Review the findings”"), "\(message)")
+        // Deleting a note keeps the window, so a refused title is tried again but stops nothing.
+        host.library.failure = nil
+        #expect(await host.flushAll(leaving: false))
+        #expect(host.library.failure == nil)
+        #expect(host.drafts.draft(for: host.ticket, key: "title").rejected)
+    }
+
+    @Test func aTitleRefusedBecauseTheNameWasTakenIsSavedOnceTheNameIsFree() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let taken = Note(path: "Tickets/Taken.md", text: "Taken\n", created: .now)
+        host.library.notes.append(taken)
+        try await host.type("Taken")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(host.library.setItemProperty(taken.id, key: "title", value: .string("Taken before"), undoManager: nil))
+        #expect(await host.flushAll())
+        #expect(host.library.item(host.ticket)?.title == "Taken")
+        #expect(!host.drafts.draft(for: host.ticket, key: "title").isDirty)
+    }
+
+    @Test func closingTheWindowWithARefusedTitleIsCancelledAndSaysWhy() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("Review/photos")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        host.window.performClose(nil)
+        try await host.waitFor("the refusal to be told") { host.library.failure != nil }
+        #expect(host.library.failure?.message.contains("“Review/photos”") == true)
+        #expect(host.window.isVisible, "the window stays open with the title that could not be saved")
+    }
+
+    @Test func aTitleTheLibraryCannotSetIsReadOnlyAndARefusalSaysWhyInItsTerms() async throws {
+        let firstLine = FakeItemLibrary.note("Shopping list", modified: .now)
+        var ticket = FakeItemLibrary.note("Review the findings", modified: .now)
+        ticket.titleRule = .property("title")
+        let library = FakeItemLibrary(items: [firstLine, ticket], bodies: [firstLine.id: "Shopping list\n", ticket.id: "Notes\n"])
+        let editor = EditorController(library: library)
+        let drafts = DetailsPresentation()
+        editor.titleDrafts = drafts
+        let shown = Shown(firstLine.id)
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: shown)
+            .environment(\.library, library))
+        window.makeKeyAndOrderFront(nil)
+        defer { drafts.draft(for: ticket.id, key: "title").isDirty = false; window.orderOut(nil); window.contentView = nil; window.close() }
+        func value(_ script: String) async throws -> Any? { try await editor.webView.evaluateJavaScript(script) }
+        func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
+            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
+            try #require(try await condition(), "waiting for \(what)")
+        }
+        let editable = "document.getElementById('ItemPageTitle').getAttribute('contenteditable')"
+        try await waitFor("the first-line title") { try await value("document.getElementById('ItemPageTitle')?.textContent") as? String == "Shopping list" }
+        #expect(try await value(editable) as? String == "false", "a library without files cannot give a first-line title another")
+
+        shown.id = ticket.id
+        try await waitFor("the property title") { try await value("document.getElementById('ItemPageTitle').textContent") as? String == "Review the findings" }
+        #expect(try await value(editable) as? String == "plaintext-only")
+        #expect(window.makeFirstResponder(editor.webView))
+        _ = try await value("""
+            const title = document.getElementById('ItemPageTitle'); title.focus()
+            document.execCommand('selectAll'); document.execCommand('insertText', false, 'Review the photographs')
+            title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
+            """)
+        try await waitFor("the refusal") { try await value("!document.querySelector('.item-title-error').hidden") as? Bool == true }
+        let reason = try await value("document.querySelector('.item-title-error .item-error').textContent") as? String
+        #expect(reason?.contains("file name") == false, "a library without files does not talk about file names: \(reason ?? "")")
     }
 }
