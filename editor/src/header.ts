@@ -48,6 +48,9 @@ export interface HeaderLabels {
 
 export type HeaderMenu = 'status' | 'parent'
 
+const lineBreak = /[\r\n\u2028\u2029\u0085]/
+const lineBreaks = /\s*[\r\n\u2028\u2029\u0085]+\s*/g
+
 const englishLabels: HeaderLabels = {
   untitled: 'Untitled',
   title: 'Title',
@@ -136,23 +139,25 @@ export class ItemHeader {
     })
     this.title.addEventListener('beforeinput', (event) => {
       if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak')
-        return event.preventDefault()
-      // A title is one line, so text brought in with line breaks comes in with spaces instead.
-      if (!['insertFromPaste', 'insertFromDrop', 'insertReplacementText'].includes(event.inputType))
-        return
-      const text = event.dataTransfer?.getData('text/plain') ?? event.data ?? ''
-      if (!/[\r\n]/.test(text)) return
+        event.preventDefault()
+    })
+    // A title is one line, so text brought in with line breaks comes in with spaces instead, as one change that
+    // one Undo takes out. WebKit does not always pass the breaks on to `beforeinput`, so the paste and the drop
+    // themselves are read.
+    this.title.addEventListener('paste', (event) => {
+      if (this.insertOnOneLine(event.clipboardData)) event.preventDefault()
+    })
+    this.title.addEventListener('drop', (event) => {
+      const caret = document.caretRangeFromPoint?.(event.clientX, event.clientY)
+      const text = event.dataTransfer?.getData('text/plain') ?? ''
+      if (!lineBreak.test(text)) return
       event.preventDefault()
-      const [range] = event.getTargetRanges?.() ?? []
       const selection = document.getSelection()
-      if (range && selection) {
-        const target = document.createRange()
-        target.setStart(range.startContainer, range.startOffset)
-        target.setEnd(range.endContainer, range.endOffset)
+      if (caret && selection) {
         selection.removeAllRanges()
-        selection.addRange(target)
+        selection.addRange(caret)
       }
-      document.execCommand('insertText', false, text.replace(/\s*[\r\n]+\s*/g, ' '))
+      this.insertOnOneLine(event.dataTransfer)
     })
     this.title.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' || event.isComposing) return
@@ -175,6 +180,14 @@ export class ItemHeader {
       this.editing = this.model.item
       postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
     })
+  }
+
+  /** Inserts the text with its line breaks as spaces, if it has any; whether it did. */
+  private insertOnOneLine(data: DataTransfer | null): boolean {
+    const text = data?.getData('text/plain') ?? ''
+    if (!lineBreak.test(text)) return false
+    document.execCommand('insertText', false, text.replace(lineBreaks, ' '))
+    return true
   }
 
   /** The title as typed. */

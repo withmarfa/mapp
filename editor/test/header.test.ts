@@ -168,7 +168,11 @@ test('Return saves the title once; moving on from it does not save it again, unl
   ])
 })
 
-test('text pasted, dropped or replaced into the title comes in on one line', () => {
+function clipboard(text: string) {
+  return { getData: (type: string) => (type === 'text/plain' ? text : ''), types: ['text/plain'] }
+}
+
+test('text pasted or dropped into the title comes in on one line, as one change', () => {
   header.set(ticket)
   title().focus()
   const inserted: string[] = []
@@ -176,24 +180,28 @@ test('text pasted, dropped or replaced into the title comes in on one line', () 
     if (command === 'insertText' && value != null) inserted.push(value)
     return true
   }
-  for (const inputType of ['insertFromPaste', 'insertFromDrop', 'insertReplacementText']) {
-    const event = new InputEvent('beforeinput', { inputType, cancelable: true })
-    Object.defineProperty(event, 'dataTransfer', {
-      value: { getData: (type: string) => (type === 'text/plain' ? 'Field\nnotes\r\nreview' : '') },
-    })
-    title().dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(true)
+  const broken = [
+    'one\ntwo',
+    'one\r\ntwo',
+    'one\u2028two',
+    'one\u2029two',
+    'one\u0085two',
+    'one\n\n \ntwo',
+  ]
+  for (const text of broken) {
+    const paste = new Event('paste', { cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: clipboard(text) })
+    title().dispatchEvent(paste)
+    expect(paste.defaultPrevented).toBe(true)
   }
-  const typed = new InputEvent('beforeinput', {
-    inputType: 'insertText',
-    data: 'x',
-    cancelable: true,
-  })
-  title().dispatchEvent(typed)
-  expect(typed.defaultPrevented).toBe(false)
-  const plain = new InputEvent('beforeinput', { inputType: 'insertFromPaste', cancelable: true })
-  Object.defineProperty(plain, 'dataTransfer', { value: { getData: () => 'One line' } })
+  const drop = new Event('drop', { cancelable: true })
+  Object.defineProperty(drop, 'dataTransfer', { value: clipboard('dropped\nline') })
+  title().dispatchEvent(drop)
+  expect(drop.defaultPrevented).toBe(true)
+  // Text on one line is left to WebKit.
+  const plain = new Event('paste', { cancelable: true })
+  Object.defineProperty(plain, 'clipboardData', { value: clipboard('One line') })
   title().dispatchEvent(plain)
   expect(plain.defaultPrevented).toBe(false)
-  expect(inserted).toEqual(['Field notes review', 'Field notes review', 'Field notes review'])
+  expect(inserted).toEqual([...broken.map(() => 'one two'), 'dropped line'])
 })

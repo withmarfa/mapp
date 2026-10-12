@@ -895,6 +895,50 @@ struct EditorTests {
         #expect(page.library.failure == nil)
     }
 
+    @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.makeKeyAndOrderFront(nil)
+        let saved = NSPasteboard.general.string(forType: .string)
+        defer {
+            NSPasteboard.general.clearContents()
+            if let saved { NSPasteboard.general.setString(saved, forType: .string) }
+            window.orderOut(nil); window.contentView = nil; window.close()
+        }
+        try await page.load("Text\n")
+        let id = try #require(page.editor.noteID)
+        page.editor.setHeader(Self.header("Title", id: id))
+        #expect(window.makeFirstResponder(page.editor.webView))
+        func title() async throws -> String? {
+            try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').textContent") as? String
+        }
+        // The last is copied from a page, with its markup beside the plain text.
+        let cases = ["one\ntwo", "one\r\ntwo", "one\u{2028}two", "one\u{2029}two", "one\n\n\ntwo", "one \n \ntwo", "<p>one</p><p>two</p>"]
+        // Pasted over the whole title, and at its end.
+        for (pasted, replacing) in cases.map({ ($0, true) }) + cases.map({ ($0, false) }) {
+            let expected = replacing ? "one two" : "Titleone two"
+            let caret = replacing ? "document.execCommand('selectAll')" : "getSelection().collapse(document.getElementById('ItemPageTitle'), 1)"
+            try await page.run("document.getElementById('ItemPageTitle').focus(); \(caret)")
+            try await page.wait { page.editor.isEditingTitle }
+            NSPasteboard.general.clearContents()
+            if pasted.hasPrefix("<") {
+                NSPasteboard.general.setString(pasted, forType: .html)
+                NSPasteboard.general.setString("one\ntwo", forType: .string)
+            } else {
+                NSPasteboard.general.setString(pasted, forType: .string)
+            }
+            NSApp.sendAction(#selector(NSText.paste(_:)), to: page.editor.webView, from: nil)
+            for _ in 0..<60 where try await title() == "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            let markup = try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').innerHTML") as? String
+            #expect(markup == expected, "pasting \(pasted.unicodeScalars.map { String($0.value, radix: 16) }) left \(markup ?? "")")
+            page.editor.webView.undo(nil)
+            for _ in 0..<60 where try await title() != "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            #expect(try await title() == "Title", "one Undo takes out what was pasted")
+        }
+    }
+
     @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
         let page = try await Harness()
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
