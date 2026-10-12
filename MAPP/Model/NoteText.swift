@@ -212,6 +212,18 @@ nonisolated enum NoteText {
 
     private static func stripInline(_ text: String) -> String {
         var text = text
+        text.replace(htmlBreak, with: " ")
+        let authored = text
+        text.replace(wikiReference) { match in
+            let (whole, embedded, content) = match.output
+            let escapes = authored[..<match.range.lowerBound].reversed().prefix { $0 == "\\" }.count
+            guard escapes.isMultiple(of: 2) else { return String(whole) }
+            let parts = content.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            if !embedded.isEmpty {
+                return String(parts[0].split(separator: "#", maxSplits: 1).first ?? parts[0])
+            }
+            return String(parts.count > 1 ? parts[1] : parts[0])
+        }
         // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
         text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
         text.replace(link) { String($0.output.1) }
@@ -228,6 +240,8 @@ nonisolated enum NoteText {
     private nonisolated(unsafe) static let headingMarker = /^#{1,6}(\s+|$)/
     private nonisolated(unsafe) static let listMarker = /^([-*+]|\d{1,9}[.)])(\s+|$)(\[[ xX]\](\s+|$))?/
     private nonisolated(unsafe) static let codeSpan = /`+([^`]*)`+/
+    private nonisolated(unsafe) static let htmlBreak = /(?i)<br\s*\/?\s*>/
+    private nonisolated(unsafe) static let wikiReference = /(!?)\[\[((?:[^\\\]\n]|\\.)+)\]\]/
     private nonisolated(unsafe) static let image = /!\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/
     private nonisolated(unsafe) static let link = /\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/
     private nonisolated(unsafe) static let strongOrStrike = /(\*\*|__|~~)(\S(?:.*?\S)?)\1/

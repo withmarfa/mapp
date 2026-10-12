@@ -51,6 +51,8 @@ class WebViewContainer: NSView {
         runsUnderToolbar = webView.fadesUnderToolbar()
         super.init(frame: .zero)
         clipsToBounds = true
+        // AppKit resizes the child with the container during live resizing, before the next layout pass.
+        webView.autoresizingMask = [.width, .height]
         addSubview(webView)
     }
 

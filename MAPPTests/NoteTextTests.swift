@@ -100,6 +100,11 @@ struct NoteTextTests {
         ("Tom &amp; Jerry &#233;t&#xE9;", "Tom & Jerry été"),
         ("Keep `\\*code\\*` as written", "Keep \\*code\\* as written"),
         ("&bogus; stays", "&bogus; stays"),
+        ("first<br>second<br />third<BR/>last", "first second third last"),
+        ("![[Dusk.png|320]] and [[Plan|the plan]]", "Dusk.png and the plan"),
+        ("[[Plan#Next steps]] and ![[Clip.mov#t=2|400]]", "Plan#Next steps and Clip.mov"),
+        ("Use `<br>` and `![[Dusk.png|320]]` literally", "Use <br> and ![[Dusk.png|320]] literally"),
+        ("\\!\\[\\[literal\\]\\]", "![[literal]]"),
     ])
     func plainTextOfOneLine(line: String, expected: String) {
         #expect(NoteText.plainText(of: line[...]) == expected)

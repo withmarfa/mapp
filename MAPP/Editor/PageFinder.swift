@@ -136,6 +136,8 @@ final class EditorContainer: WebViewContainer, NSTextFinderBarContainer {
     var findBarView: NSView? {
         didSet {
             oldValue?.removeFromSuperview()
+            findBarView?.autoresizingMask = [.width]
+            if isFindBarVisible, let findBarView { addSubview(findBarView) }
             needsLayout = true
         }
     }
