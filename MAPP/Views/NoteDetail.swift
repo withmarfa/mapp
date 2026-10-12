@@ -94,16 +94,22 @@ struct NotePage: View {
             editor.focus(item.id)
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
-        .onChange(of: style, initial: true) { editor.setStyle(style) }
-        .onChange(of: item.id, initial: true) {
+        .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
+        .onChange(of: item.id, initial: true) { _, id in
+            guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             if editor.noteID == item.id { editor.noteChanged(item) }
             else { editor.load(item) }
         }
         // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
-        // Marfa server that keeps its own text over the person's changes the text without a new version.
-        .onChange(of: item.version) { editor.noteChanged(item) }
-        .onChange(of: library.body(of: item.id)) { editor.noteChanged(item) }
+        // Marfa server that keeps its own text over the person's changes the text without a new version. The
+        // action may run on an earlier copy of this view, so the note is read as it is now.
+        .onChange(of: item.version) { noteChanged() }
+        .onChange(of: library.body(of: item.id)) { noteChanged() }
+    }
+
+    private func noteChanged() {
+        if let item = library.item(item.id) { editor.noteChanged(item) }
     }
 }
 

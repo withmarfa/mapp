@@ -941,76 +941,124 @@ struct EditorTests {
         }
     }
 
-    @Test func theTitleIsSavedFromThePageAndARefusalIsShownThere() async throws {
+    /// The preview library's ticket on a page in a window of its own, driven through the page.
+    final class HostedPage {
         let library = ItemPreviewFixtures.library
         let ticket = ItemPreviewFixtures.ticketID
-        let page = try await Harness(library: library)
+        let page: Harness
         let drafts = DetailsPresentation()
-        let shown = Shown(ticket)
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
-            .environment(\.library, library))
-        window.makeKeyAndOrderFront(nil)
-        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        let shown: Shown
+        let window: NSWindow
+
+        init() async throws {
+            page = try await Harness(library: library)
+            shown = Shown(ticket)
+            window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
+                .environment(\.library, library))
+            window.makeKeyAndOrderFront(nil)
+            try await waitForTitle("Review the findings")
+        }
+
+        func close() {
+            window.orderOut(nil)
+            window.contentView = nil
+            window.close()
+        }
+
+        func value(_ script: String) async throws -> Any? {
+            try await page.editor.webView.evaluateJavaScript(script)
+        }
+
         func shownTitle() async throws -> String? {
-            try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').textContent") as? String
+            try await value("document.getElementById('ItemPageTitle').textContent") as? String
         }
+
         func titleError() async throws -> Bool? {
-            try await page.editor.webView.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool
+            try await value("!document.querySelector('.item-title-error').hidden") as? Bool
         }
+
         func type(_ text: String) async throws {
             #expect(window.makeFirstResponder(page.editor.webView))
             try await page.run("""
                 document.getElementById('ItemPageTitle').focus()
-                document.execCommand('selectAll'); document.execCommand('insertText', false, \(Self.json(text)))
+                document.execCommand('selectAll'); document.execCommand('insertText', false, \(EditorTests.json(text)))
                 """)
+            try await page.wait { self.drafts.draft(for: self.ticket, key: "title").text == text }
         }
+
         func pressReturn() async throws {
             try await page.run("document.getElementById('ItemPageTitle').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))")
         }
-        func waitForTitle(_ title: String) async throws {
-            for _ in 0..<60 where try await shownTitle() != title { try await Task.sleep(for: .milliseconds(50)) }
-            #expect(try await shownTitle() == title)
+
+        func waitFor(_ condition: () async throws -> Bool) async throws {
+            for _ in 0..<60 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
+            try #require(try await condition())
         }
-        try await waitForTitle("Review the findings")
-        let status = try await page.editor.webView.evaluateJavaScript("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
+
+        func waitForTitle(_ title: String) async throws {
+            try await waitFor { try await self.shownTitle() == title }
+        }
+    }
+
+    @Test func theTitleIsSavedFromThePageAndARefusalIsShownThere() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let library = host.library, ticket = host.ticket, page = host.page
+        let status = try await host.value("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
         #expect(status == "In Progress")
 
         // Return saves the title as the item's, and the note's text takes the keyboard.
-        try await type("Review the photographs")
+        try await host.type("Review the photographs")
         try await page.wait { page.editor.isEditingTitle }
-        try await pressReturn()
+        try await host.pressReturn()
         try await page.wait { library.item(ticket)?.title == "Review the photographs" }
         try await page.wait { !page.editor.isEditingTitle }
-        let writing = try await page.editor.webView.evaluateJavaScript("document.activeElement?.matches('.ProseMirror') === true") as? Bool
+        let writing = try await host.value("document.activeElement?.matches('.ProseMirror') === true") as? Bool
         #expect(writing == true)
-        #expect(!drafts.draft(for: ticket, key: "title").isDirty)
+        #expect(!host.drafts.draft(for: ticket, key: "title").isDirty)
 
-        // The change is undone as the app's own, from the window's undo manager.
-        #expect(window.undoManager?.canUndo == true)
-        window.undoManager?.undo()
+        // The change is undone as the app's own, from the window's undo manager, and the page shows it.
+        #expect(host.window.undoManager?.canUndo == true)
+        host.window.undoManager?.undo()
         try await page.wait { library.item(ticket)?.title == "Review the findings" }
-        try await waitForTitle("Review the findings")
+        try await host.waitForTitle("Review the findings")
 
         // A title the library refuses stays as typed, with the reason, and survives moving to another note and back.
-        try await type("Review/photographs")
-        try await pressReturn()
-        for _ in 0..<60 where try await titleError() != true { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(try await titleError() == true)
+        try await host.type("Review/photographs")
+        try await host.pressReturn()
+        try await host.waitFor { try await host.titleError() == true }
         #expect(library.item(ticket)?.title == "Review the findings")
-        #expect(try await shownTitle() == "Review/photographs")
-        shown.id = ItemPreviewFixtures.noteID
-        try await waitForTitle("Field notes")
-        #expect(try await titleError() == false)
-        shown.id = ticket
-        try await waitForTitle("Review/photographs")
-        #expect(try await titleError() == true)
+        #expect(try await host.shownTitle() == "Review/photographs")
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        #expect(try await host.titleError() == false)
+        host.shown.id = ticket
+        try await host.waitForTitle("Review/photographs")
+        #expect(try await host.titleError() == true)
 
         // Discard Changes gives the saved title back.
         try await page.run("document.querySelector('.item-title-error button').click()")
-        try await waitForTitle("Review the findings")
-        #expect(try await titleError() == false)
+        try await host.waitForTitle("Review the findings")
+        #expect(try await host.titleError() == false)
         #expect(library.item(ticket)?.title == "Review the findings")
+    }
+
+    @Test func aChangeFromOutsideReachesThePageAsItIsNow() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        for round in 1...5 {
+            let title = "Outside title \(round)"
+            #expect(host.library.setItemProperty(host.ticket, key: "title", value: .string(title), undoManager: nil))
+            try await host.waitForTitle(title)
+        }
+        // Deleted elsewhere, the note becomes read-only and its header gives way to the banner.
+        host.library.delete([host.ticket])
+        try await host.page.wait { !host.page.editor.isEditable }
+        try await host.waitFor { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
+        host.library.recover([host.ticket])
+        try await host.page.wait { host.page.editor.isEditable }
+        try await host.waitFor { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
     }
 }

@@ -30,9 +30,10 @@ struct ItemPageHeader: ViewModifier {
                     }
                 }
             }
-            .onChange(of: header, initial: true) { editor.setHeader(header) }
-            .onChange(of: item.id, initial: true) { old, _ in
-                if old != item.id {
+            // The action may run on an earlier copy of this view, so it takes what changed from the change itself.
+            .onChange(of: header, initial: true) { _, header in editor.setHeader(header) }
+            .onChange(of: item.id, initial: true) { old, id in
+                if old != id {
                     Self.commitTitle(of: old, library: library, drafts: drafts, undoManager: undoManager)
                     propertyError = false
                     choosingParent = nil
