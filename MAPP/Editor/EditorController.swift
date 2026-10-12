@@ -26,6 +26,8 @@ final class EditorController: NSObject {
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
     /// The window's drafts of item titles, which are saved before the window closes or the library changes.
     @ObservationIgnored var titleDrafts: DetailsPresentation?
+    /// Shows the item whose refused title is being told, in the window holding the draft.
+    @ObservationIgnored var onShowRefusedTitle: (ItemID) -> Void = { _ in }
     /// Whether the note on the page can be changed; a deleted note cannot.
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
@@ -290,8 +292,11 @@ final class EditorController: NSObject {
     static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
+        // One refusal is told, from the window that holds it, which the library's single failure can carry.
+        var told = false
         for editor in editors {
-            guard editor.saveTitles(tellingRefusal: leaving) || !leaving else {
+            guard editor.saveTitles(tellingRefusal: leaving && !told) || !leaving else {
+                told = true
                 gate.arrive(false)
                 continue
             }
@@ -324,17 +329,22 @@ final class EditorController: NSObject {
     /// are gone or whose title cannot be set. Whether all are saved; if not, and asked to, says which is not.
     func saveTitles(tellingRefusal: Bool) -> Bool {
         guard let drafts = titleDrafts, let library else { return true }
-        var refused: (draft: String, item: String)?
+        var refused: (id: ItemID, draft: String, item: String)?
         for id in drafts.unsavedTitles {
             guard let item = library.item(id), library.canSetTitle(of: item) else { continue }
             if !drafts.saveTitle(of: id, in: library, undoManager: webView.window?.undoManager), refused == nil {
-                refused = (drafts.draft(for: id, key: "title").text, item.title)
+                refused = (id, drafts.draft(for: id, key: "title").text, item.title)
             }
         }
         guard let refused else { return true }
         if tellingRefusal {
-            library.failure = (String(localized: "Couldn’t Save Title"),
-                               String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes."))
+            let message = refused.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? String(localized: "The title for “\(refused.item)” is empty. Open the item to enter a title or discard your changes.")
+                : String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes.")
+            library.failure = (String(localized: "Couldn’t Save Title"), message)
+            // The draft is shown only in its own window, so that window comes forward with the item.
+            webView.window?.makeKeyAndOrderFront(nil)
+            onShowRefusedTitle(refused.id)
         }
         return false
     }

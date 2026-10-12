@@ -33,6 +33,8 @@ struct ItemPageHeader: ViewModifier {
             .onChange(of: item.id, initial: true) { old, id in
                 if old != id {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
+                    // A refused status belongs to the visit, as the page showed it before.
+                    drafts.draft(for: old, key: "status").rejected = false
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler

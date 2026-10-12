@@ -240,6 +240,9 @@ struct MainView: View {
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
+            editor.onShowRefusedTitle = { [browser, library, order] id in
+                if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
+            }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it, keeping only a draft the person was writing.

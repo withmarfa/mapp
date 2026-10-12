@@ -1244,6 +1244,53 @@ struct EditorTests {
         #expect(library.item(ticket)?.title == "Review the findings")
     }
 
+    @Test func aRefusedEmptyTitleIsToldAsEmpty() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        try await host.type("")
+        try await host.pressReturn()
+        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
+        #expect(await !host.flushAll())
+        #expect(host.library.failure?.message == "The title for “Review the findings” is empty. Open the item to enter a title or discard your changes.")
+    }
+
+    @Test func aRefusedStatusIsForgottenOnMovingToAnotherItem() async throws {
+        let host = try await HostedPage()
+        defer { host.close() }
+        let error = "!document.querySelectorAll('#item-header > .item-error')[0]?.hidden"
+        host.drafts.draft(for: host.ticket, key: "status").rejected = true
+        try await host.waitFor("the status refusal") { try await host.value(error) as? Bool == true }
+        host.shown.id = ItemPreviewFixtures.noteID
+        try await host.waitForTitle("Field notes")
+        host.shown.id = host.ticket
+        try await host.waitForTitle("Review the findings")
+        try await host.waitFor("the page to settle") { try await host.value(error) as? Bool != nil }
+        #expect(try await host.value(error) as? Bool == false, "a refused status belongs to the item's visit, as it did")
+    }
+
+    @Test func refusedTitlesInSeveralWindowsAreToldOnceAndShownWhereTheyAre() async throws {
+        let library = ItemPreviewFixtures.library
+        let first = try await HostedPage(library: library)
+        defer { first.close() }
+        let second = try await HostedPage(library: library, showing: ItemPreviewFixtures.noteID)
+        defer { second.close() }
+        var shown: [ItemID] = []
+        first.page.editor.onShowRefusedTitle = { shown.append($0) }
+        second.page.editor.onShowRefusedTitle = { shown.append($0) }
+        first.drafts.draft(for: first.ticket, key: "title").text = "Review/photos"
+        first.drafts.draft(for: first.ticket, key: "title").isDirty = true
+        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").text = "Field/notes"
+        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").isDirty = true
+        let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
+        #expect(!kept)
+        #expect(shown.count == 1, "one refusal is told, and its window shows its item")
+        let told = try #require(shown.first)
+        let message = try #require(library.failure?.message)
+        let window = told == first.ticket ? first.window : second.window
+        #expect(message.contains(told == first.ticket ? "“Review/photos”" : "“Field/notes”"), "\(message)")
+        #expect(window.isKeyWindow || window.isMainWindow || NSApp.orderedWindows.first === window, "the window holding the draft comes forward")
+    }
+
     @Test func aTitleTypedButNotLeftIsSavedBeforeQuittingAndARefusalStopsIt() async throws {
         let host = try await HostedPage()
         defer { host.close() }
