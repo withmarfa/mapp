@@ -23,6 +23,21 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
+    @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {
+        let (library, older, _, _) = makeLibrary()
+        let item = try #require(library.item(older.id))
+        let browser = Browser()
+        browser.focusRequest = .page
+        browser.reveal(item, in: library, order: NoteOrder())
+        #expect(browser.selection == [item.id])
+        #expect(browser.focusRequest == .list)
+        browser.viewMode = .gallery
+        browser.focusRequest = .page
+        browser.reveal(item, in: library, order: NoteOrder())
+        #expect(browser.isGalleryItemPresented)
+        #expect(browser.focusRequest == nil)
+    }
+
     @Test func draftDoesNotExposePreviouslySelectedNoteToCommands() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()

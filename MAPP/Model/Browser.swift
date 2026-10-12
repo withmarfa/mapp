@@ -84,7 +84,16 @@ final class Browser {
     func openGallerySelection() {
         guard usesGallery, selection.count == 1 else { return }
         isGalleryItemPresented = true
-        focusRequest = .page
+        focusRequest = nil
+    }
+
+    func reveal(_ item: Item, in library: any ItemLibrary, order: NoteOrder) {
+        if !items(in: library).contains(where: { $0.id == item.id }) {
+            show(.allNotes, in: library, order: order)
+        }
+        selection = [item.id]
+        if usesGallery { openGallerySelection() }
+        else { focusRequest = .list }
     }
 
     func returnToGallery() {

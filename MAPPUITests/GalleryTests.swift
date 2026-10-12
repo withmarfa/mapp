@@ -78,6 +78,10 @@ final class GalleryTests: XCTestCase {
         target.doubleClick()
         let editor = window.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        let reading = editor.value as? String
+        app.typeKey("q", modifierFlags: [])
+        XCTAssertEqual(editor.value as? String, reading)
+        editor.click()
         app.typeKey(.end, modifierFlags: .command)
         app.typeText("\nGallery edit retained")
         window.buttons["BackToGallery"].click()

@@ -26,6 +26,7 @@ struct EditorTests {
             let note = Note(body: body, created: .now, deleted: deleted ? .now : nil)
             library.notes.append(note)
             editor.load(try #require(library.item(note.id)))
+            try await wait { self.editor.noteID == note.id }
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
         }
@@ -70,6 +71,93 @@ struct EditorTests {
     - [ ] Book a site visit
 
     """
+
+    private final class ReadingPanel: NSPanel {
+        override var canBecomeKey: Bool { true }
+        override var canBecomeMain: Bool { false }
+    }
+
+    @Test func selectingAnotherItemReturnsTheBodyToReading() async throws {
+        let page = try await Harness()
+        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
+                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.webView
+        let other = ReadingPanel(contentRect: NSRect(x: 650, y: 100, width: 250, height: 200),
+                                 styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        defer {
+            window.orderOut(nil); window.contentView = nil; window.close()
+            other.orderOut(nil); other.close()
+        }
+        window.makeKeyAndOrderFront(nil)
+        #expect(window.isKeyWindow)
+        try await page.load("First item")
+        try await page.run("window.editor.focus()")
+        let editing = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(editing == true)
+        other.makeKeyAndOrderFront(nil)
+        #expect(other.isKeyWindow)
+        try await page.load("Second item")
+        #expect(other.isKeyWindow)
+        #expect(!window.isKeyWindow)
+        let reading = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(reading == false)
+        let outline = try await page.editor.webView.evaluateJavaScript(
+            "getComputedStyle(document.querySelector('.ProseMirror')).outlineStyle"
+        ) as? String
+        #expect(outline == "none")
+    }
+
+    @Test func deferredFocusBelongsToTheRequestedItem() async throws {
+        let first = Note(body: "First", created: .now)
+        let second = Note(body: "Second", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(first.id)))
+        page.editor.focus(first.id)
+        page.editor.load(try #require(library.item(second.id)))
+        try await page.wait { page.editor.noteID == second.id }
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
+                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        let content = NSView(frame: window.contentLayoutRect)
+        let search = NSTextField(frame: NSRect(x: 20, y: 540, width: 250, height: 28))
+        content.addSubview(search)
+        window.contentView = content
+        window.makeKeyAndOrderFront(nil)
+        #expect(window.makeFirstResponder(search))
+        page.editor.webView.frame = NSRect(x: 0, y: 0, width: 500, height: 500)
+        content.addSubview(page.editor.webView)
+        page.editor.pageDidMoveToWindow()
+        #expect(window.firstResponder === search.currentEditor())
+        let reading = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(reading == false)
+        page.editor.focus(first.id)
+        page.editor.load(try #require(library.item(first.id)))
+        try await page.wait { page.editor.noteID == first.id }
+        let composing = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(composing == true)
+        page.editor.releaseFocus()
+        window.contentView = nil
+        window.contentView = page.editor.webView
+        page.editor.noteChanged(try #require(library.item(first.id)))
+        page.editor.pageDidMoveToWindow()
+        let reopened = try await page.editor.webView.evaluateJavaScript(
+            "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
+        ) as? Bool
+        #expect(reopened == false)
+    }
 
     @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
         let first = Note(body: "First\n", created: .now)

@@ -177,7 +177,7 @@ struct CommandPalette: View {
             let snippet = body.flatMap { NoteText.snippet(of: $0.text, around: query) } ?? item.preview
             return Entry(
                 id: "note:\(item.id)", title: item.title, detail: folderName(of: item), snippet: snippet.isEmpty ? nil : snippet,
-                systemImage: symbol(for: item)
+                systemImage: symbol(for: item), takesFocus: true
             ) {
                 reveal(item)
             }
@@ -292,7 +292,7 @@ struct CommandPalette: View {
     /// Items by title, most recently edited first, each shown where it is.
     private var notes: [Entry] {
         library.items(in: .allNotes).sorted { $0.modified > $1.modified }.map { item in
-            Entry(id: "note:\(item.id)", title: item.title, detail: folderName(of: item), systemImage: symbol(for: item)) {
+            Entry(id: "note:\(item.id)", title: item.title, detail: folderName(of: item), systemImage: symbol(for: item), takesFocus: true) {
                 reveal(item)
             }
         }
@@ -307,15 +307,8 @@ struct CommandPalette: View {
         return type.conforms(to: .image) ? "photo" : "doc"
     }
 
-    /// Selects the item where the list is, or in All Notes if the list does not show it, and opens a note for
-    /// writing.
     private func reveal(_ item: Item) {
-        if !browser.items(in: library).contains(where: { $0.id == item.id }) {
-            browser.show(.allNotes, in: library, order: order)
-        }
-        browser.selection = [item.id]
-        if browser.usesGallery { browser.openGallerySelection() }
-        else { browser.focusRequest = item.isFile ? .list : .page }
+        browser.reveal(item, in: library, order: order)
     }
 
     /// Modifier keys as the menus write them.

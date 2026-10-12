@@ -14,6 +14,7 @@ declare global {
       flush(expected?: number): string | null
       format(command: FormatCommand, arg?: string | number, expected?: number): void
       focus(): void
+      blurText(expected: number): void
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
       redo(expected?: number): void
@@ -153,6 +154,12 @@ window.editor = {
   format: (command, arg, expected) =>
     guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
   focus: () => editor.focus(),
+  blurText: (expected: number) => {
+    if (expected !== generation) return
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active.matches('.ProseMirror, .inkkit-plain'))
+      active.blur()
+  },
   setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
   undo: (expected) => guardedCommand(() => editor.undo(expected)),
   redo: (expected) => guardedCommand(() => editor.redo(expected)),

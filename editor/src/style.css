@@ -448,3 +448,9 @@ body {
 [hidden] {
   display: none !important;
 }
+
+/* The caret and selection show text focus; embedded controls keep their keyboard rings. */
+.inkkit-root .ProseMirror:focus-visible,
+.inkkit-root .inkkit-plain:focus-visible {
+  outline: none;
+}

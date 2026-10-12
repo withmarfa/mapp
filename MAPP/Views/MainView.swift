@@ -49,7 +49,7 @@ struct MainView: View {
             editor.flush()
         }
         .onChange(of: browser.showsGallery) {
-            if browser.showsGallery { editor.flush() }
+            if browser.showsGallery { editor.releaseFocus(); editor.flush() }
         }
         .onChange(of: settings.isPresented) {
             if settings.isPresented {
@@ -317,6 +317,7 @@ struct MainView: View {
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .sidebar, .list:
+            editor.releaseFocus()
             // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
             let request = browser.focusRequest
             Task { pane = request }

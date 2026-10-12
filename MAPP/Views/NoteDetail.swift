@@ -31,7 +31,7 @@ struct NoteDetail: View {
     private func grantFocusRequest() {
         guard browser.focusRequest == .page else { return }
         browser.focusRequest = nil
-        editor.focus()
+        editor.focus(browser.selection.first)
     }
 }
 
@@ -85,7 +85,7 @@ struct NotePage: View {
                             if case .conflicted(let copy?, _) = item.sync {
                                 SavedAsCopyBanner(copy: copy)
                             }
-                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus() })
+                            ItemPageHeader(item: item, drafts: headerDrafts, onStartWriting: { editor.focus(item.id) })
                                 .id(item.id)
                                 .padding(.horizontal, style.horizontalInset(for: proxy.size.width))
                                 .padding(.top, 16)
@@ -98,7 +98,7 @@ struct NotePage: View {
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
-            editor.focus()
+            editor.focus(item.id)
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { editor.setStyle(style) }
