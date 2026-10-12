@@ -105,6 +105,7 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
         } detail: {
             itemPage
+                .modifier(itemInspector)
                 .toolbar(id: "main") {
                     NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
                 }
@@ -166,6 +167,7 @@ struct MainView: View {
                                 }
                         }
                     }
+                    .modifier(itemInspector)
                     .toolbar {
                         GalleryToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
                     }
@@ -176,12 +178,15 @@ struct MainView: View {
         }
     }
 
+    // On the detail column rather than the split view: an inspector on the split view makes every resize of the
+    // window lay out every column again, which made live resizing several times slower. It goes before the column's
+    // toolbar; after it, opening a new window raises an exception during layout.
+    private var itemInspector: ItemInspectorColumn {
+        ItemInspectorColumn(browser: browser, details: details)
+    }
+
     private var presentedWindow: some View {
         workspace
-        .inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
-            ItemInspectorHost(browser: browser, details: details)
-                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
-        }
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
@@ -345,4 +350,16 @@ struct MainView: View {
 private final class ColumnWidths {
     var sidebar: CGFloat = 220
     var list: CGFloat = 340
+}
+
+private struct ItemInspectorColumn: ViewModifier {
+    let browser: Browser
+    let details: DetailsPresentation
+
+    func body(content: Content) -> some View {
+        content.inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
+            ItemInspectorHost(browser: browser, details: details)
+                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+        }
+    }
 }
