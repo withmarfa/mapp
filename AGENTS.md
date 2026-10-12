@@ -32,6 +32,7 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - Use native containers and controls (`NavigationSplitView`, `List`, toolbars, commands, system materials) so the system supplies the look. Custom chrome needs a reason. What the app adds, such as the palette, the column search, and the page, is drawn to sit beside the system's own components as if it were theirs, in the manner of the Codex app or Craft Docs, never a web app's chrome.
 - Check API and design questions against Apple's documentation and the Human Interface Guidelines, not memory.
 - Every toolbar action is also a menu command, since a toolbar can be hidden or customized. The command palette (`MAPP/Views/CommandPalette.swift`) builds its own list, so add a new command there too.
+- With the gallery showing, the editor stays mounted but hidden. Menu commands get no focused editor then (`MainView`), but the palette holds the editor directly, so offer an editor command there only when `hasVisibleEditor`.
 - Every user-facing string goes through the String Catalog. `MAPP/Localizable.xcstrings` is updated by building in Xcode; `xcodebuild` alone does not update it.
 - `MainView` mounts one `NavigationSplitView` at a time (the three-column list, the two-column gallery, or Settings), and changes the workspace's identity when it switches between list and gallery, so macOS releases the outgoing toolbar. Never change the column count of a split view that is already mounted. Browser, editor, draft, undo, and column state live above that boundary.
 - App Sandbox and the hardened runtime stay on. The sandbox allows outgoing connections for two reasons: WebKit's page process needs them, and a Marfa library talks to its server. The editor page itself loads nothing from the network.
@@ -44,17 +45,17 @@ These hold across the app. The nested files say how each library keeps them.
 - Notes are held byte for byte. A note opened and left alone is never rewritten. An edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary` (`MAPP/Model/Items/ItemLibrary.swift`), read from the environment's `library` value. Never test for a concrete library type in a view.
 - Windows, selections, restoration, and drags name items by `ItemID`, never by path.
-- Tests never touch the person's data. Unit tests hosted in the app and UI tests run on `MemoryKeyStore` and a temporary store location (`Libraries.standard()`), never the Keychain, the saved server, or a person's notes folder.
+- Tests never touch the person's data. Unit tests hosted in the app and UI tests run on `MemoryKeyStore` and a temporary store location (`Libraries.standard()`), never the Keychain or the saved server. UI tests open a sample folder (`-MAPPSampleFolder`); a unit test makes its own folder and `NotesFolder(defaults:)`.
 
 ## Layout
 
 - `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/`, and `MAPPUITests/`. Add a source file by creating it on disk; do not edit `project.pbxproj` to add files.
-- Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. The nested `AGENTS.md` and `CLAUDE.md` files are listed there; list any new one too, or the build fails with duplicate resources.
+- Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. The nested `AGENTS.md` and `CLAUDE.md` files are listed there; list any new one too, or it is copied into the app, and two with one name fail the build as duplicate resources.
 - The bundle identifier, display name, and version are build settings. `MAPP/Info.plist` holds only what build settings cannot express (the note drag type) and is excluded from the app's resources.
 - `MAPP/Model/`: the data model, free of SwiftUI. `Items/` holds the library protocol and item types; `Marfa/` holds the Marfa library.
 - `MAPP/Views/`: windows, panes, toolbars, commands, and Settings. `MAPP/Types/`: the Marfa Types browser.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
-- `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` and `FakeItemSource` hold items in memory for testing view models without a folder or server.
+- `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` holds items in memory for testing view models without a folder or server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
 - `Design/`: artwork that is not built into the app.
 
@@ -68,7 +69,7 @@ These hold across the app. The nested files say how each library keeps them.
 
   The UI tests take control of the keyboard and mouse. Add `-only-testing:MAPPTests` to run the unit tests alone.
 - Replace `test` with `build` to build only. The built app is `build/Build/Products/Debug/MAPP.app`.
-- A Debug build launched with `-MAPPSampleFolder` opens a fresh folder of sample notes in the app's own storage and an isolated Marfa host. The UI tests use it.
+- A Debug build launched with `-MAPPSampleFolder` opens a fresh folder of sample notes in the app's temporary directory and an isolated Marfa host. The UI tests use it.
 - The editor page has its own commands; see `editor/AGENTS.md`.
 
 ## Signing
