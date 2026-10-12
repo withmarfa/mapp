@@ -154,7 +154,7 @@ import Observation
     static func standard() -> Libraries {
         #if DEBUG
         // The UI tests, the screenshots and the unit tests hosted in the app never reach the person's saved server,
-        // Keychain or copies.
+        // Keychain, copies or notes folder.
         let environment = ProcessInfo.processInfo.environment
         if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder")
             || environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
@@ -165,7 +165,8 @@ import Observation
             let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
             try? FileManager.default.removeItem(at: root)
             return Libraries(
-                folder: NotesFolder(), host: MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root)))
+                folder: NotesFolder(defaults: defaults),
+                host: MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root)))
         }
         #endif
         let host = MarfaHost(defaults: .standard, keys: KeychainKeyStore(), location: location())
