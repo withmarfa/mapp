@@ -7,5 +7,4 @@ editor/node_modules/
 editor/dist/
 Config/Local.xcconfig
 Config/Local.xcconfig.*
-.worktrees/
 .claude/
