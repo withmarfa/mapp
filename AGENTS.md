@@ -18,7 +18,7 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - Use American English in code, comments, commits, and repository files.
 - Use scoped Conventional Commits in the present tense, lowercase and short: `feat(app):`, `fix(editor):`, `test(model):`.
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
-- Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, since a squash merge leaves the branch unmerged to git) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
+- Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - No CI runs on pull requests: Xcode Cloud only archives tagged releases, and GitHub runs only Dependabot. Run the tests locally before you merge.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
