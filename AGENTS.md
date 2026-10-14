@@ -17,7 +17,8 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 
 - Use American English in code, comments, commits, and repository files.
 - Use scoped Conventional Commits in the present tense, lowercase and short: `feat(app):`, `fix(editor):`, `test(model):`.
-- Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it. After a merge, remove the branch's worktree with `git worktree remove`, run `git worktree prune`, and run `git pull --ff-only` on `main`. If git refuses to remove a worktree, report it rather than forcing it.
+- Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
+- Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - No CI runs on pull requests: Xcode Cloud only archives tagged releases, and GitHub runs only Dependabot. Run the tests locally before you merge.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
@@ -75,7 +76,7 @@ These hold across the app. The nested files say how each library keeps them.
 ## Signing
 
 - A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
-- To sign with the team, run `aic-infisical-run -- scripts/render-local-signing.sh`, which writes `Config/Local.xcconfig` from Infisical.
+- To sign with the team, run `infisical run -- scripts/render-local-signing.sh`, which writes `Config/Local.xcconfig` from Infisical.
 - Never commit a team identifier, and never edit the rendered file by hand.
 
 ## Versions and releases
