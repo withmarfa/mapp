@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Author Comment" : {
+
+    },
     "Collapse" : {
 
     },
@@ -47,6 +50,9 @@
 
     },
     "Plain Text" : {
+
+    },
+    "Preserved Markdown" : {
 
     },
     "Preview unavailable" : {

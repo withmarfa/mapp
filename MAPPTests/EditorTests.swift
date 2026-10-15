@@ -421,7 +421,8 @@ struct EditorTests {
         page.editor.format(.table)
         try await page.wait { !page.changes.isEmpty }
         let markdown = try #require(page.changes.last)
-        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("---") })
+        // The delimiter row is any run of dashes per column; InkKit writes the shortest, `| - | - |`.
+        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("-") && $0.allSatisfy { "|- ".contains($0) } })
         #expect(!markdown.contains(":-"))
     }
 
@@ -482,6 +483,18 @@ struct EditorTests {
         try await page.wait { library.note(note.id)?.path != "Plan.md" }
         #expect(library.note(note.id)?.path == "R&D plan.md")
         #expect(library.note(note.id)?.title == "R&D plan")
+    }
+
+    /// The page reports a heading's availability by its level, so the Format menu offers Title, Heading, and
+    /// Subheading in an editable note.
+    @Test func headingCommandsAreAvailableInANote() async throws {
+        let note = Note(body: "Milk\n", created: .now)
+        let library = NoteLibrary(notes: [note], store: RecordingStore())
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(note.id)))
+        try await page.wait { page.editor.canApply(.title) }
+        #expect(page.editor.canApply(.heading))
+        #expect(page.editor.canApply(.subheading))
     }
 
     /// An edit still waiting to be reported when another change to the note is taken in was typed on the text
@@ -574,7 +587,7 @@ struct EditorTests {
         var widths: [Int] = []
         for _ in 0..<40 {
             widths = try await page.editor.webView.evaluateJavaScript(
-                "[...document.querySelectorAll('.image img')].map((image) => image.naturalWidth)"
+                "[...document.querySelectorAll('.inkkit-image img')].map((image) => image.naturalWidth)"
             ) as? [Int] ?? []
             if widths == [4] { break }
             try await Task.sleep(for: .milliseconds(50))
@@ -644,7 +657,7 @@ struct EditorTests {
         page.editor.load(try #require(library.item(note.id)))
         let editor = page.editor
 
-        let image = try await settle(editor, "(() => { const i = document.querySelector('.image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
+        let image = try await settle(editor, "(() => { const i = document.querySelector('.inkkit-image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
         #expect(image == [5, 3], "the image loads through the scheme at the width its embed gives")
 
         let audio = try await settle(editor, "(() => { const a = document.querySelector('.inkkit-file audio'); return a && a.readyState >= 1 ? a.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }

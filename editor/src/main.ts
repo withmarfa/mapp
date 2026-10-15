@@ -1,9 +1,15 @@
 import { postToHost } from './bridge'
-import { NoteEditor, guardedCommand, type FormatCommand, type Keymap } from './editor'
-import { ItemHeader, type HeaderIcons, type HeaderLabels, type HeaderModel } from './header'
+import {
+  NoteEditor,
+  guardedCommand,
+  splitLabels,
+  type AppLabels,
+  type FormatCommand,
+  type Keymap,
+} from './editor'
+import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { InkKitError } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
-import type { EditorLabels } from '@aicayzer/inkkit'
 import './style.css'
 
 declare global {
@@ -54,8 +60,7 @@ declare global {
 const root = document.getElementById('editor')
 const headerRoot = document.getElementById('item-header')
 if (!root || !headerRoot) throw new Error('editor root missing')
-const labels = (window as unknown as { mappLabels?: Partial<EditorLabels & HeaderLabels> })
-  .mappLabels
+const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
 
 const editor = await NoteEditor.mount(
   root,
@@ -76,9 +81,10 @@ const editor = await NoteEditor.mount(
       postToHost({ type: 'copy', text })
     },
   },
-  labels,
+  labels.editor,
+  labels.noteReference,
 )
-const header = new ItemHeader(headerRoot, labels)
+const header = new ItemHeader(headerRoot, labels.header)
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -114,17 +120,8 @@ window.addEventListener(
   { capture: true },
 )
 
-// Links open on ⌘-click, so the pointer says so only while ⌘ is down.
-for (const name of ['keydown', 'keyup'] as const) {
-  window.addEventListener(name, (event) =>
-    document.documentElement.classList.toggle('meta', event.metaKey),
-  )
-}
 // A selection in a window in the background is drawn grey, as the system draws it.
-window.addEventListener('blur', () => {
-  document.documentElement.classList.remove('meta')
-  document.documentElement.classList.add('inactive')
-})
+window.addEventListener('blur', () => document.documentElement.classList.add('inactive'))
 window.addEventListener('focus', () => document.documentElement.classList.remove('inactive'))
 
 let generation = 0
@@ -180,9 +177,9 @@ window.editor = {
   focus: () => editor.focus(),
   blurText: (expected: number) => {
     if (expected !== generation) return
+    guardedCommand(() => editor.blur(expected))
     const active = document.activeElement
-    if (active instanceof HTMLElement && active.matches('.ProseMirror, .inkkit-plain, .item-title'))
-      active.blur()
+    if (active instanceof HTMLElement && active.matches('.item-title')) active.blur()
   },
   setEditingMode: (mode, expected) => guardedCommand(() => editor.setEditingMode(mode, expected)),
   undo: (expected) => guardedCommand(() => editor.undo(expected)),
@@ -197,10 +194,12 @@ window.editor = {
     guardedCommand(() => editor.findReplace(from, to, text, generation, snapshotId, batch)),
   // The app gives a drop's place in the web view; the page's window starts below whatever covers its top.
   insertImages: (images, x, y, height) =>
-    editor.insertImages(
-      images,
-      x,
-      y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
+    guardedCommand(() =>
+      editor.insertImages(
+        images,
+        x,
+        y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
+      ),
     ),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   readableSnapshot: (expected) => editor.readableSnapshot(expected),
