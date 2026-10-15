@@ -393,7 +393,8 @@ test('a refused edit stays out of the note and reaches the host, from a command 
         commandError: 'preservation',
       })
       expect(editor.snapshot().text).toBe('A <!--note--> B\n')
-      expect(posted).toEqual([])
+      expect(posted).toMatchObject([{ type: 'error' }])
+      posted.length = 0
 
       editor.setKeymap({ 'Mod-Alt-c': ['codeBlock'] })
       document.querySelector('.ProseMirror')!.dispatchEvent(

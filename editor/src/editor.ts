@@ -49,7 +49,11 @@ export function guardedCommand<T>(action: () => T): T | { commandError: string; 
   try {
     return action()
   } catch (error) {
-    if (error instanceof InkKitError) return { commandError: error.code, message: error.message }
+    if (error instanceof InkKitError) {
+      // InkKit tells only the caller of a refused edit, so the app is told here, where it tells the person.
+      if (error.code === 'preservation') postToHost({ type: 'error', message: error.message })
+      return { commandError: error.code, message: error.message }
+    }
     throw error
   }
 }

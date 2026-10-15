@@ -647,6 +647,8 @@ final class EditorController: NSObject {
             "fileOpen": String(localized: "Open"),
             "fileMissing": String(localized: "File Not Found"),
             "fileRetry": String(localized: "Try Again"),
+            "comment": String(localized: "Author Comment"),
+            "preservedMarkdown": String(localized: "Preserved Markdown"),
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
             "itemType": String(localized: "Item Type"),
