@@ -3,12 +3,12 @@
 :root {
   /* Rem-based dimensions scale with the native text-size preference. */
   font-size: 13px;
-  --accent: #0088ff;
-  --text: CanvasText;
-  --muted: color-mix(in srgb, CanvasText 55%, transparent);
-  --rule: color-mix(in srgb, CanvasText 14%, transparent);
-  --code-bg: color-mix(in srgb, CanvasText 7%, transparent);
-  --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --inkkit-accent-color: #0088ff;
+  --inkkit-text-color: CanvasText;
+  --inkkit-muted-color: color-mix(in srgb, CanvasText 55%, transparent);
+  --inkkit-rule-color: color-mix(in srgb, CanvasText 14%, transparent);
+  --inkkit-code-background: color-mix(in srgb, CanvasText 7%, transparent);
+  --inkkit-monospace-font: ui-monospace, 'SF Mono', Menlo, monospace;
   /* The header's system colors: the quaternary label color behind a chip, the placeholder text color and red. */
   --chip-fill: rgb(0 0 0 / 0.098);
   --placeholder: rgb(0 0 0 / 0.498);
@@ -42,7 +42,7 @@ html.window-background body {
 }
 
 body {
-  color: var(--text);
+  color: var(--inkkit-text-color);
   font:
     1rem/1.55 -apple-system,
     system-ui,
@@ -59,17 +59,11 @@ body {
   --inkkit-padding-top: 22px;
   --inkkit-padding-inline: 3rem;
   --inkkit-padding-bottom: 48px;
-  /* The reading column's margins, resolved against each element's own width. */
-  --column-inset: max(
+  /* The reading column's margins, which InkKit's text uses and the header, outside its root, follows. */
+  --inkkit-column-inset: max(
     var(--inkkit-padding-inline),
     calc((100% - var(--inkkit-reading-width)) / 2 + var(--inkkit-padding-inline))
   );
-}
-
-/* One rule sets the header's margins and the text's, so the two can never drift apart. */
-#item-header,
-.inkkit-root .ProseMirror {
-  padding-inline: var(--column-inset);
 }
 
 /* The item's header, drawn as the app's native header was: the system font, a bold title at nearly twice the
@@ -80,8 +74,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  padding-top: 16px;
-  padding-bottom: 8px;
+  padding: 16px var(--inkkit-column-inset) 8px;
   font-family: -apple-system, system-ui, sans-serif;
   line-height: normal;
   -webkit-user-select: none;
@@ -96,7 +89,7 @@ body {
   align-self: stretch;
   font-size: 1.9rem;
   font-weight: 700;
-  color: var(--text);
+  color: var(--inkkit-text-color);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   outline: none;
@@ -161,7 +154,7 @@ body {
   border: 0;
   border-radius: 10px;
   background: var(--chip-fill);
-  color: var(--text);
+  color: var(--inkkit-text-color);
   font:
     var(--interface-text-size) / normal -apple-system,
     system-ui,
@@ -190,11 +183,11 @@ body {
 }
 
 .item-menu-chip:disabled {
-  color: color-mix(in srgb, var(--text) 35%, transparent);
+  color: color-mix(in srgb, var(--inkkit-text-color) 35%, transparent);
 }
 
 .item-menu-chip:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--inkkit-accent-color) 50%, transparent);
   outline-offset: 0;
 }
 
@@ -236,7 +229,7 @@ body {
 }
 
 .ProseMirror-focused::highlight(inkkit-selection) {
-  background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background-color: color-mix(in srgb, var(--inkkit-accent-color) 30%, transparent);
 }
 
 .inactive .ProseMirror::highlight(inkkit-selection) {

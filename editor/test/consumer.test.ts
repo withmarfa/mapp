@@ -1,7 +1,15 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test, vi } from 'vitest'
-import { NoteEditor, isPreviewDiagnostic, guardedCommand, type FindState } from '../src/editor'
+import { InkKitError } from '@aicayzer/inkkit'
+import {
+  NoteEditor,
+  isPreviewDiagnostic,
+  guardedCommand,
+  splitLabels,
+  type CaretState,
+  type FindState,
+} from '../src/editor'
 
 async function withEditor(source: string, run: (editor: NoteEditor) => void | Promise<void>) {
   const root = document.createElement('div')
@@ -168,13 +176,10 @@ test('a rejected replacement poisons its batch rather than applying shifted late
   }))
 
 test('preview fallbacks remain diagnostic and expected command rejections stay local', async () => {
-  expect(isPreviewDiagnostic(new Error('Preview unavailable'))).toBe(true)
-  expect(
-    isPreviewDiagnostic(new Error('Local preview label'), {
-      filePreviewUnavailable: 'Local preview label',
-    }),
-  ).toBe(true)
-  expect(isPreviewDiagnostic(new Error('Unexpected failure'))).toBe(false)
+  expect(isPreviewDiagnostic(new InkKitError('file-unavailable', 'Preview unavailable'))).toBe(true)
+  expect(isPreviewDiagnostic(new InkKitError('diagram-unavailable', 'Bad diagram'))).toBe(true)
+  expect(isPreviewDiagnostic(new InkKitError('preservation', 'Refused'))).toBe(false)
+  expect(isPreviewDiagnostic(new Error('Preview unavailable'))).toBe(false)
   await withEditor('one\n', (editor) => {
     const snapshot = editor.readableSnapshot(1)
     editor.findReplace(0, 3, 'two', 1)
@@ -231,11 +236,9 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
       ranges.map((range) => [{ left: range.from, top: 20, width: 8, height: 16 }]),
     )
     Object.defineProperty(engine, 'textRangesRects', { value: batch, configurable: true })
-    const single = vi.spyOn(engine, 'textRangeRects')
     editor.setFinding(true)
     expect(batch).toHaveBeenCalledTimes(1)
     expect(batch.mock.calls[0]![0].map((range) => range.from)).toEqual([0, 1, 3, 9])
-    expect(single).not.toHaveBeenCalled()
     expect(reports[0]!.visible).toEqual([0, 10])
     expect(reports[0]!.boxes.slice(4, 8)).toEqual(reports[0]!.boxes.slice(8, 12))
     expect(reports[0]!.boxes.slice(16, 36)).toEqual(new Array(20).fill(0))
@@ -263,3 +266,169 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
     vi.unstubAllGlobals()
   }
 })
+
+test("the words the app sends mount InkKit, with the app's own kept out of its labels", async () => {
+  const swift = readFileSync(
+    resolve(import.meta.dirname, '../../MAPP/Editor/EditorController.swift'),
+    'utf8',
+  )
+  const start = swift.indexOf('static var editorLabels')
+  const block = swift.slice(start, swift.indexOf('\n        ]\n', start))
+  const sent = Object.fromEntries(
+    [...block.matchAll(/^\s+"(\w+)":\s*String\(localized: "([^"]*)"\)/gm)].map((match) => [
+      match[1]!,
+      match[2]!,
+    ]),
+  )
+  expect(Object.keys(sent).length).toBeGreaterThan(30)
+  const labels = splitLabels(sent)
+  expect(Object.keys(labels.header).sort()).toEqual(
+    ['discardChanges', 'itemType', 'propertyRejected', 'status', 'title', 'untitled'].sort(),
+  )
+  expect(labels.noteReference).toContain('%@')
+  expect(Object.keys(labels.editor)).not.toContain('noteReference')
+  expect(Object.keys(labels.editor)).not.toContain('untitled')
+
+  const root = document.createElement('div')
+  document.body.append(root)
+  const editor = await NoteEditor.mount(
+    root,
+    { find() {}, changed() {}, stateChanged() {}, openLink() {}, copy() {} },
+    labels.editor,
+    labels.noteReference,
+  )
+  editor.setItem('note')
+  editor.load('![[A note]]\n', 1)
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
+      labels.noteReference!.replace('%@', 'A note'),
+    )
+    await expect(
+      NoteEditor.mount(
+        document.createElement('div'),
+        {
+          find() {},
+          changed() {},
+          stateChanged() {},
+          openLink() {},
+          copy() {},
+        },
+        sent as never,
+      ),
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
+test('the page reports a heading by its level and applies the level the app asks for', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const states: CaretState[] = []
+  const editor = await NoteEditor.mount(root, {
+    find() {},
+    changed() {},
+    stateChanged: (state) => states.push(state),
+    openLink() {},
+    copy() {},
+  })
+  editor.setItem('note')
+  editor.load('Milk\n', 1)
+  try {
+    const formats = states.at(-1)!.formats
+    for (const level of [1, 2, 3, 4, 5, 6]) expect(formats['heading' + level]).toBe(true)
+    expect('heading' in formats).toBe(false)
+    editor.format('heading', 2)
+    expect(editor.snapshot().text).toBe('## Milk\n')
+    expect(states.at(-1)!.block).toEqual({ type: 'heading', level: 2 })
+    editor.format('heading', '3')
+    expect(editor.snapshot().text).toBe('### Milk\n')
+    expect(() =>
+      editor.setKeymap({
+        'Mod-Alt-2': ['heading', '2'],
+        'Mod-Alt-0': ['paragraph'],
+        'Mod-Alt-t': ['table'],
+      }),
+    ).not.toThrow()
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
+test('the header and the text share one column, which InkKit reads from one token', () => {
+  const css = readFileSync(resolve(import.meta.dirname, '../src/style.css'), 'utf8')
+  expect(css).toMatch(/body\s*{[^}]*--inkkit-column-inset:/)
+  expect(css).toMatch(/#item-header\s*{[^}]*padding:[^;]*var\(--inkkit-column-inset\)/)
+  expect(css).not.toMatch(/\.ProseMirror[^{]*{[^}]*padding-inline/)
+  for (const old of ['--accent', '--text', '--muted', '--rule', '--code-bg', '--mono'])
+    expect(css).not.toMatch(new RegExp(`${old}\\b`))
+})
+
+test('images go in at the caret or at a drop point, and blur leaves the focus off the text', async () => {
+  await withEditor('Milk\n', (editor) => {
+    expect(editor.insertImages([{ src: 'Attachments/a%201.png', alt: 'a' }])).toBe(true)
+    expect(editor.snapshot().text).toContain('![a](Attachments/a%201.png)')
+    expect(editor.insertImages([{ src: 'b.png', alt: 'b' }], 10, 20)).toBe(true)
+    expect(editor.insertImages([{ src: 'c.png', alt: 'c' }], 10, null)).toBe(true)
+    expect(editor.snapshot().text).toContain('![b](b.png)')
+    expect(editor.snapshot().text).toContain('![c](c.png)')
+    editor.focus()
+    expect(document.activeElement?.matches('.ProseMirror')).toBe(true)
+    editor.blur(1)
+    expect(document.activeElement?.matches('.ProseMirror')).toBe(false)
+    expect(() => editor.blur(2)).toThrow()
+  })
+})
+
+test('a refused edit stays out of the note and reaches the host, from a command or from a shortcut', async () => {
+  const posted: unknown[] = []
+  window.webkit = { messageHandlers: { host: { postMessage: (message) => posted.push(message) } } }
+  try {
+    await withEditor('A <!--note--> B\n', (editor) => {
+      // A code block cannot hold the hidden comment, so InkKit refuses the conversion.
+      expect(guardedCommand(() => editor.format('codeBlock'))).toMatchObject({
+        commandError: 'preservation',
+      })
+      expect(editor.snapshot().text).toBe('A <!--note--> B\n')
+      expect(posted).toEqual([])
+
+      editor.setKeymap({ 'Mod-Alt-c': ['codeBlock'] })
+      document.querySelector('.ProseMirror')!.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'c',
+          metaKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+      expect(editor.snapshot().text).toBe('A <!--note--> B\n')
+      expect(posted).toMatchObject([{ type: 'error' }])
+    })
+  } finally {
+    delete window.webkit
+  }
+})
+
+test('load takes the focus off the text and focus after it restores it, with CRLF kept', async () =>
+  withEditor('One\r\nTwo\r\n', (editor) => {
+    editor.focus()
+    expect(document.activeElement?.matches('.ProseMirror')).toBe(true)
+    editor.load('Three\r\n\r\nFour\r\n', 2)
+    expect(document.activeElement?.matches('.ProseMirror')).toBe(false)
+    editor.focus()
+    expect(document.activeElement?.matches('.ProseMirror')).toBe(true)
+    expect(editor.markdown()).toBeNull()
+    editor.format('heading', 1)
+    expect(editor.snapshot().text).toBe('Three\r\n\r\n# Four\r\n')
+    editor.undo()
+    expect(editor.snapshot().text).toBe('Three\r\n\r\nFour\r\n')
+    editor.reload('Five\r\n', 3, false)
+    expect(guardedCommand(() => editor.format('bold'))).toMatchObject({
+      commandError: 'read-only',
+    })
+    expect(editor.snapshot().text).toBe('Five\r\n')
+  }))

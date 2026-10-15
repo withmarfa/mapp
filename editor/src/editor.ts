@@ -5,16 +5,44 @@ import {
   type EditorLabels,
   type FileReference,
   type FormatCommand as InkFormat,
+  type ShortcutName,
   type TableCommand,
   type ReadableTextSnapshot,
 } from '@aicayzer/inkkit'
 import { postToHost, type EmbeddedFile, type EmbedRequest } from './bridge'
+import type { HeaderLabels } from './header'
 
-export function isPreviewDiagnostic(error: Error, labels: Partial<EditorLabels> = {}): boolean {
+/** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
+export function isPreviewDiagnostic(error: Error): boolean {
   return (
-    (error instanceof InkKitError && error.code === 'diagram-unavailable') ||
-    error.message === (labels.filePreviewUnavailable ?? 'Preview unavailable')
+    error instanceof InkKitError &&
+    (error.code === 'diagram-unavailable' || error.code === 'file-unavailable')
   )
+}
+
+/** The words the app hands the page. InkKit rejects a label it does not know, so only InkKit's own go to it;
+ *  the header's and the note reference's are MAPP's. */
+export type AppLabels = Partial<EditorLabels & HeaderLabels> & { noteReference?: string }
+const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
+  'untitled',
+  'title',
+  'itemType',
+  'status',
+  'discardChanges',
+  'propertyRejected',
+]
+export function splitLabels(all: AppLabels): {
+  editor: Partial<EditorLabels>
+  header: Partial<HeaderLabels>
+  noteReference?: string
+} {
+  const { noteReference, ...rest } = all
+  const header: Partial<HeaderLabels> = {}
+  for (const key of headerLabelKeys) {
+    if (key in rest) header[key] = rest[key]
+    delete rest[key]
+  }
+  return { editor: rest, header, noteReference }
 }
 
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
@@ -37,6 +65,7 @@ export type CaretState = InkCaret & {
 }
 export type FormatCommand =
   | InkFormat
+  | 'heading'
   | 'table'
   | 'addRowAbove'
   | 'addRowBelow'
@@ -74,17 +103,12 @@ const tables: Partial<Record<FormatCommand, TableCommand>> = {
 }
 function request(reference: FileReference, item: string): EmbedRequest {
   return reference.kind === 'wiki'
-    ? {
-        item,
-        name: reference.fragment
-          ? reference.reference.slice(0, -reference.fragment.length - 1)
-          : reference.reference,
-      }
+    ? { item, name: reference.target }
     : { item, path: reference.reference }
 }
 
 function isNoteReference(reference: FileReference): boolean {
-  const target = reference.reference.split('#')[0]!.split('?')[0]!
+  const target = reference.target.split('?')[0]!
   const name = target.split('/').pop() ?? target
   return /\.(md|markdown|txt)$/i.test(name) || (reference.kind === 'wiki' && !name.includes('.'))
 }
@@ -103,19 +127,19 @@ export class NoteEditor {
   static async mount(
     root: HTMLElement,
     events: EditorEvents,
-    labels: Partial<EditorLabels> & { noteReference?: string } = {},
+    labels: Partial<EditorLabels> = {},
+    noteReference?: string,
   ): Promise<NoteEditor> {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
     host.engine = await InkKitEditor.mount(
       root,
       {
-        changed(text, generation) {
+        changed({ text, generation }) {
           host.pendingChanged = { text, generation }
           queueMicrotask(() => host.flushChanges())
           host.invalidateFindGeometry()
         },
-        stateChanged() {},
         commandStateChanged(state) {
           events.stateChanged({
             ...state.caret,
@@ -133,7 +157,7 @@ export class NoteEditor {
         copy: events.copy,
         error(error) {
           postToHost({
-            type: isPreviewDiagnostic(error, labels) ? 'diagnostic' : 'error',
+            type: isPreviewDiagnostic(error) ? 'diagnostic' : 'error',
             message: error.message,
           })
         },
@@ -146,7 +170,7 @@ export class NoteEditor {
               return {
                 kind: 'file',
                 label:
-                  labels.noteReference?.replace('%@', reference.label ?? reference.reference) ??
+                  noteReference?.replace('%@', reference.label ?? reference.reference) ??
                   `Note reference: ${reference.label ?? reference.reference}. Open to edit source.`,
               }
             const embed = request(reference, context.documentId)
@@ -162,11 +186,7 @@ export class NoteEditor {
               }
             return {
               kind: file.kind,
-              url:
-                file.url +
-                ((reference.fragment ?? reference.reference.split('#')[1])
-                  ? '#' + (reference.fragment ?? reference.reference.split('#')[1])
-                  : ''),
+              url: file.url + (reference.fragment ? '#' + reference.fragment : ''),
               label: file.name,
             }
           },
@@ -198,20 +218,6 @@ export class NoteEditor {
               embed,
               opens: described.get(JSON.stringify(embed))?.opens ?? false,
             })
-          },
-        },
-        images: {
-          presentation() {
-            return undefined
-          },
-          async importImage() {
-            throw new InkKitError(
-              'image-unavailable',
-              'Use the native attachment command to add an image.',
-            )
-          },
-          async exportImage() {
-            throw new InkKitError('image-unavailable', 'The embedded image could not be read.')
           },
         },
       },
@@ -302,6 +308,9 @@ export class NoteEditor {
   focus() {
     this.engine.focus()
   }
+  blur(expected = this.generation) {
+    this.engine.blur(expected)
+  }
   setEditingMode(mode: 'source' | 'formatted', expected = this.generation) {
     this.engine.setEditingMode(mode, expected)
     this.invalidateFindGeometry()
@@ -313,24 +322,29 @@ export class NoteEditor {
     this.engine.redo(expected)
   }
   format(command: FormatCommand, arg?: string | number, expected = this.generation) {
-    this.engine.commandState(expected)
     const table =
       command === 'alignColumn'
         ? ({ left: 'alignLeft', center: 'alignCenter', right: 'alignRight' } as const)[
             arg as 'left' | 'center' | 'right'
           ]
         : tables[command]
-    if (table) return this.engine.table(table)
-    return this.engine.format(command as InkFormat, arg)
+    if (table) return this.engine.table(table, undefined, expected)
+    return this.engine.format(
+      (command === 'heading' ? 'heading' + arg : command) as InkFormat,
+      undefined,
+      expected,
+    )
   }
   setKeymap(bindings: Keymap) {
-    const keys: Record<string, string[]> = {}
+    const keys: Partial<Record<ShortcutName, string[]>> = {}
     for (const [key, [command, arg]] of Object.entries(bindings)) {
-      const name = tables[command]
-        ? 'table' + tables[command]![0]!.toUpperCase() + tables[command]!.slice(1)
-        : command === 'heading'
-          ? 'heading' + arg
-          : command
+      const name = (
+        tables[command]
+          ? 'table' + tables[command]![0]!.toUpperCase() + tables[command]!.slice(1)
+          : command === 'heading'
+            ? 'heading' + arg
+            : command
+      ) as ShortcutName
       ;(keys[name] ??= []).push(key)
     }
     this.engine.setKeymap(keys)
@@ -440,11 +454,10 @@ export class NoteEditor {
       throw error
     }
   }
-  insertImages(images: { src: string; alt: string }[], x?: number, y?: number) {
+  insertImages(images: { src: string; alt: string }[], x?: number | null, y?: number | null) {
     return this.engine.insertImages(
-      images.map((image) => ({ path: image.src, alt: image.alt })),
-      x,
-      y,
+      images.map((image) => ({ reference: image.src, alt: image.alt })),
+      x == null || y == null ? undefined : { clientX: x, clientY: y },
     )
   }
   async printable(expected = this.generation) {

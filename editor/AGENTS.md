@@ -13,7 +13,8 @@ The note editor's page: TypeScript on InkKit, built by Vite into one self-contai
 - An image's width is kept in its alt text as `![name|400](…)` or `![[name|400]]`, since Obsidian reads both. Keep both forms working.
 - Size text and the reading width in `rem`, so the text size setting scales them. The reading width comes from the page's margins, so a click beside the text still places the caret.
 - The item's header (the title and the type, status, and parent chips) is part of the page, drawn by `editor/src/header.ts` above InkKit's root, so it scrolls with the text as one surface. It belongs to MAPP's page, not to InkKit. Do not move it back into a native overlay that follows WebKit's scrolling.
-- One CSS rule in `editor/src/style.css` sets the inline padding of both `#item-header` and the text. Keep the header and the text in that one rule so their margins cannot drift.
+- `--inkkit-column-inset`, set once on `body` in `editor/src/style.css`, is the inline padding of the text, which InkKit reads, and of `#item-header`. Keep the header on that one value so their margins cannot drift, and override no InkKit selector to pad the text.
+- InkKit rejects a label it does not know. `window.mappLabels` carries the app's own words (the header's and `noteReference`) beside InkKit's labels, and `splitLabels` in `editor/src/editor.ts` hands InkKit only its own. A word of the app's own never goes to InkKit.
 - The header's actions are native: the page sends the title's input and commit and each chip's menu request to the app, and the app saves through `setItemProperty` and opens native menus. The page reports scrolling only when the header crosses under the toolbar (`headerScrolledAway`); do not post a message for every scroll.
 - The bridge has two sides: `editor/src/bridge.ts` and `MAPP/Editor/EditorMessages.swift`. Change both in the same commit.
 

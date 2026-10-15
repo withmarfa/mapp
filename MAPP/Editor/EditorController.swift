@@ -429,7 +429,9 @@ final class EditorController: NSObject {
         case "alignColumn": argument.map { "align" + $0.prefix(1).uppercased() + $0.dropFirst() }
         default: nil
         }
-        return table.map { caret.tables[$0] == true } ?? (caret.formats[name] == true)
+        // InkKit names a heading's availability by its level, as it names the command: heading1 to heading6.
+        let available = name == "heading" ? name + (argument ?? "") : name
+        return table.map { caret.tables[$0] == true } ?? (caret.formats[available] == true)
     }
 
     // MARK: Find
@@ -611,7 +613,7 @@ final class EditorController: NSObject {
             }
         }
         guard let hex else { return }
-        webView.evaluateJavaScript("document.documentElement.style.setProperty('--accent', \(json(hex)))")
+        webView.evaluateJavaScript("document.documentElement.style.setProperty('--inkkit-accent-color', \(json(hex)))")
     }
 
     /// The page's own words, from the String Catalog.
