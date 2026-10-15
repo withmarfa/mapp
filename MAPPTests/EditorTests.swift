@@ -421,7 +421,8 @@ struct EditorTests {
         page.editor.format(.table)
         try await page.wait { !page.changes.isEmpty }
         let markdown = try #require(page.changes.last)
-        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("---") })
+        // The delimiter row is any run of dashes per column; InkKit writes the shortest, `| - | - |`.
+        #expect(markdown.split(separator: "\n").contains { $0.hasPrefix("|") && $0.contains("-") && $0.allSatisfy { "|- ".contains($0) } })
         #expect(!markdown.contains(":-"))
     }
 
