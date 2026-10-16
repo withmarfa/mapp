@@ -116,6 +116,30 @@ struct MarfaSourceOfflineTests {
         await reopened.close()
     }
 
+    /// The copy drains what waited when the server is back, and tells the report. The write is answered, as for a
+    /// drain `MarfaSync` ran.
+    @Test(.timeLimit(.minutes(1)))
+    func aDrainTheCopyRunsItselfAnswersTheWrite() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let write = WriteID()
+        let id = ItemID.mint()
+        source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST follow drain", body: "One")), as: write)
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST follow drain") != nil })
+        let queued = try #require(try await source.copy.queue.all().first)
+
+        let answered = Marfa.QueuedWrite(
+            id: queued.id, kind: queued.kind, itemId: queued.itemId, idempotencyKey: queued.idempotencyKey,
+            verdict: .accepted, queuedAt: queued.queuedAt)
+        let report = MarfaSync.report(answeredIn: [answered])
+        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
+        await source.close()
+    }
+
     @Test func aMissingKeyIsDenied() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         await #expect(throws: SourceFailure.self) {
@@ -852,7 +876,7 @@ extension LiveMarfaTests {
             await relaunched.close()
         }
 
-        /// A second drain forgetting answers the engine has not taken yet could lose them, so the next drain waits.
+        /// The drain ends, and a flush returns, only once the engine has taken the answers, so the next drain waits.
         @Test(.timeLimit(.minutes(2)))
         func aDrainWaitsUntilTheLastAnswersAreTaken() async throws {
             try await withSource { source, log, made in

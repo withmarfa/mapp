@@ -24,7 +24,7 @@ nonisolated enum MarfaProblems {
         var stopped: [QueuedWrite] = []
         for write in queue + kept.filter({ !queued.contains($0.id) }) {
             switch write.verdict {
-            case nil, .blocked(.awaitingDependency, _):
+            case nil:
                 waiting.append(write)
             // A refused key parks every write together; the connection says so once, and the writes still wait.
             case .blocked(.credentialRefused, let refusal) where refusal?.grant == nil:
@@ -148,7 +148,7 @@ nonisolated enum MarfaProblems {
             kind = .refused
             reason = MarfaMapping.problem(refusal)
         case .blocked(let marfaReason, let refusal):
-            guard let blocked = MarfaMapping.blockedReason(marfaReason) else { return nil }
+            let blocked = MarfaMapping.blockedReason(marfaReason)
             kind = .blocked(blocked)
             var problem = refusal.map(MarfaMapping.problem) ?? SyncProblem(code: blocked.rawValue)
             problem.code = blocked.rawValue

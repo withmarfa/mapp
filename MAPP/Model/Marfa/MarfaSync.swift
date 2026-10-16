@@ -92,11 +92,26 @@ actor MarfaSync {
         }
     }
 
+    /// The copy's held stream drains what waited, so a refreshed copy asks for nothing else but the bin.
     func reachable() {
         hub.set(.online)
-        if refreshed { wantsDrain = true } else { wantsRefresh = true }
+        if !refreshed { wantsRefresh = true }
         wantsBin = true
         work()
+    }
+
+    /// A drain the copy ran when the server came back, whose answers the engine has taken.
+    func drainedByFollow(_ report: DrainReport) {
+        settle(report)
+        work()
+    }
+
+    /// A drain the copy ran when the server came back stopped.
+    /// The engine has taken the answers the drain recorded, or `answersTaken` is false and they wait for the next
+    /// refresh, since the next drain reports only the writes it answers itself.
+    func drainStopped(_ error: MarfaError, answersTaken: Bool) async {
+        if !answersTaken { answersWaiting = true }
+        await failed(error, retrying: .drain)
     }
 
     func unreachable(_ reason: String?) {
@@ -254,32 +269,40 @@ actor MarfaSync {
         drains += 1
         do {
             let report = try await copy.queue.drain()
-            if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
-            // The next drain waits until the engine has taken these answers, since the engine's forgetting them
-            // would also forget a later drain's answers it has not taken yet.
+            // The drain ends once the engine has taken these answers, so a flush returns with them taken.
             if !report.verdicts.isEmpty {
                 await withCheckedContinuation { taken in
                     if !tell(.drained(report, taken)) { taken.resume() }
                 }
             }
-            switch Self.result(of: report) {
-            case .parked:
-                hub.set(.keyRefused)
-                _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
-            case .offline(let reason):
-                hub.set(.offline(reason: reason))
-                schedule(.drain)
-            case .online:
-                succeeded()
-            case .idle:
-                break
-            }
+            settle(report)
         } catch {
-            // An answered write that expires the copy, a source move or a retype, is recorded before the drain
-            // throws, and the throw loses the report, so the answers are read from the queue instead, once the
-            // refresh this asks for has hydrated the copy again.
-            if case MarfaError.copyExpired = error { answersWaiting = true }
+            // A drain that throws loses its report, and the writes it answered first are recorded, so the answers
+            // are read from the queue instead, for an expired copy (a source move or a retype) once the refresh
+            // this asks for has hydrated it again.
+            if case MarfaError.copyExpired = error {
+                answersWaiting = true
+            } else if await !takeAnswersFromQueue() {
+                answersWaiting = true
+            }
             await failed(error, retrying: .drain)
+        }
+    }
+
+    /// What a drain that ended says of the server and of the bin.
+    private func settle(_ report: DrainReport) {
+        if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
+        switch Self.result(of: report) {
+        case .parked:
+            hub.set(.keyRefused)
+            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
+        case .offline(let reason):
+            hub.set(.offline(reason: reason))
+            schedule(.drain)
+        case .online:
+            succeeded()
+        case .idle:
+            break
         }
     }
 

@@ -345,7 +345,6 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.outcome(.conflicted(siblingId: "s", fields: ["body"])) ==
             .conflicted(sibling: ItemID("s"), fields: ["body"]))
         #expect(MarfaMapping.outcome(.blocked(reason: .keySpent)) == .blocked(.keySpent, nil))
-        #expect(MarfaMapping.outcome(.blocked(reason: .awaitingDependency)) == nil)
         #expect(MarfaMapping.outcome(.dead) == .dead)
     }
 
@@ -362,7 +361,7 @@ struct MarfaMappingTests {
             Self.write("3", on: "b"), Self.write("4", on: "b", .refused(refusal)),
             Self.write("5", on: "c", .accepted),
             Self.write("6", on: "d", .blocked(reason: .credentialRefused)), Self.write("7", on: "d", .refused(refusal)),
-            Self.write("8", on: "e", .blocked(reason: .awaitingDependency))
+            Self.write("8", on: "e")
         ]
         let conflict = SyncState.conflicted(sibling: ItemID("copy"), fields: ["body"])
         let states = MarfaMapping.syncStates(queue: queue, remembered: [ItemID("f"): conflict])

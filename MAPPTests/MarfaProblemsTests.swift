@@ -85,7 +85,7 @@ struct MarfaProblemsTests {
             let report = Self.report([Self.write("w", .blocked(reason: reason))])
             #expect(report.problems.map(\.kind) == [kind])
             #expect(report.problems.first?.actions == actions)
-            #expect(report.problems.first?.reason?.code == MarfaMapping.blockedReason(reason)?.rawValue)
+            #expect(report.problems.first?.reason?.code == MarfaMapping.blockedReason(reason).rawValue)
         }
         let dead = Self.report([Self.write("w", .dead)])
         #expect(dead.problems.map(\.kind) == [.dead])
@@ -97,7 +97,7 @@ struct MarfaProblemsTests {
     @Test func writesParkedForARefusedKeyStillWait() {
         let report = Self.report([
             Self.write("1", .blocked(reason: .credentialRefused), at: "2026-10-06T09:00:00Z"),
-            Self.write("2", .blocked(reason: .awaitingDependency), at: "2026-10-06T11:00:00Z"),
+            Self.write("2", at: "2026-10-06T11:00:00Z"),
             Self.write("3", at: "2026-10-06T10:00:00Z"),
             Self.write("4", .accepted), Self.write("5", .merged(fields: ["body"]))
         ])
