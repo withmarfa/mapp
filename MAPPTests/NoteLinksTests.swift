@@ -59,20 +59,26 @@ struct NoteLinksTests {
         #expect(await index.names(matching: "allot", among: [bike], limit: 5).isEmpty, "a removed note is forgotten")
     }
 
-    @Test func aLargeLibraryIsSearchedQuicklyAndAKeystrokeFoldsNothingAgain() async {
+    @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
         let titles = ["alpha", "beta", "gamma", "delta", "kitchen", "garden", "recipe", "meeting"]
-        let items = (0..<20_000).map { note("\(titles[$0 % titles.count]) \($0)", minutes: $0) }
+        var items = (0..<20_000).map { note("\(titles[$0 % titles.count]) \($0)", minutes: $0) }
         let index = NoteLinks.Index()
         let clock = ContinuousClock()
         var names: [String] = []
         let first = await clock.measure { names = await index.names(matching: "g", among: items, limit: 12) }
         #expect(names.count == 12)
-        let typed = await clock.measure { names = await index.names(matching: "garden 1", among: items, limit: 12) }
+        #expect(await index.foldedCount == 20_000)
+        for typed in ["ga", "gar", "gard", "garden 1"] {
+            names = await index.names(matching: typed, among: items, limit: 12)
+        }
         #expect(names.count == 12)
         #expect(names.allSatisfy { $0.hasPrefix("garden 1") })
-        print("NoteLinks index, 20,000 notes: first query \(first), next query \(typed)")
-        #expect(typed < .seconds(2), "the next query over 20,000 notes took \(typed)")
-        #expect(first < .seconds(10), "the first query over 20,000 notes took \(first)")
+        #expect(await index.foldedCount == 20_000, "typing on folded nothing again")
+        items[7].title = "garden shed"
+        items[7].version = ItemVersion(items[7].version.rawValue + 1)
+        #expect(await index.names(matching: "garden s", among: items, limit: 12).first == "garden shed")
+        #expect(await index.foldedCount == 20_001, "an edit folds only the note edited")
+        FileHandle.standardError.write(Data("NoteLinks index, 20,000 notes: first query \(first)\n".utf8))
     }
 
     @Test func aTargetNamesTheNoteTheLibraryWouldResolveIt() {

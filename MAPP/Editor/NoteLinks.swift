@@ -25,6 +25,8 @@ nonisolated enum NoteLinks {
         }
 
         private var entries: [ItemID: Entry] = [:]
+        /// How many titles have been folded, so a test can tell that a query folded none again.
+        private(set) var foldedCount = 0
 
         /// The titles that answer what was typed after `[[`, best first (the closest match, then the most recently
         /// edited), each once.
@@ -42,6 +44,7 @@ nonisolated enum NoteLinks {
                         version: item.version, title: item.title, folded: PaletteMatch.folded(item.title),
                         nameable: NoteLinks.canName(item.title), modified: item.modified)
                     entries[item.id] = entry
+                    foldedCount += 1
                 }
                 guard entry.nameable, let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
                 Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
