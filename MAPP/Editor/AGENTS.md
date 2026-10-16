@@ -33,6 +33,13 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - When a window goes, it calls its editor's `windowWent()`, which drops the window's drafts and removes the editor from `EditorController.open`, so neither takes part in later flushes while SwiftUI still holds the editor for a moment. Closures the editor keeps (header events, observation tracking) and the Format menu's focused editor hold it weakly. A strong capture keeps a closed window's editor, web view, and drafts alive, and `flushAll` would still visit them.
 - A chip's menu opens under the chip's frame, which the page sends in its own coordinates. `EditorController` converts it to container coordinates, allowing for the covered top and the scroll offset.
 
+## Linking to notes
+
+- The page names a note in a link by its title, `[[Title]]`, as the library's own links resolve it (`NoteLinks`). A title a link cannot name as written (`[`, `]`, `|`, `#`, `\`, a line break, or edge whitespace) is neither offered nor linked; a file is not a note.
+- `NoteRequests` is the `notes` message handler. Suggestions come from `NoteLinks.names`, which runs off the main actor on a copy of the items, so typing never waits on a large library.
+- Link to Note asks the person in `NoteLinkPicker`, a sheet of `NotePage` so every window that shows a note has it. The page's request waits on `EditorController.chooseNoteToLink`, and every way the request can end answers it with `finishLinkRequest`: a choice, Cancel or Escape (the sheet's `onDismiss`), leaving the note, the window going, and the page's process ending. A request from a note that is no longer shown is answered with nothing.
+- Opening a wiki link shows the note it names (`EditorController.onOpenNote`): the main window selects it, an item window opens it in a window of its own. A name no note answers to is told to the person.
+
 ## Printing and PDF export
 
 - `PrintDocumentRenderer` renders InkKit's frozen portable HTML in a separate WebKit view, with images supplied through the checked file path above and readable descriptions for other files.
@@ -44,4 +51,5 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - **Runnable file opened.** Flag any route that hands a file to another app without `EmbeddedFiles.opens`.
 - **Editor made for every view value.** Flag an `EditorController`, a web view, or another costly object made in a view's initializer or given to `State(initialValue:)`. Safe path: `EditorSlot`, or make it in `.task` as Apple's `State` documentation shows.
 - **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one that Apple's own `WebView` does not use.
+- **Link request left open.** Flag a path that ends Link to Note without calling `finishLinkRequest`, or that offers a title `NoteLinks.canName` refuses.
 - **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another note after the page changed notes.

@@ -23,6 +23,8 @@ File-backed items use the workbench definitions as interim input. Files without 
 
 View and the command palette switch between formatted and source editing. Native Find and Replace work with the active editor. Local images, audio, and video preview inline with the existing file-access protections. PDFs show a card with Open to view the document in its native app, because WebKit cannot display them in the protected editor frame. Note references open source editing; they do not embed the referenced note.
 
+Typing `/` on an empty line opens a menu of blocks, such as headings, lists, a table, a quote and a code block, and Link to Note, which asks which note to link to and writes `[[Title]]`. Typing `[[` offers the titles of the library's notes. Command-click on a note link opens the note. Typing a row such as `| Name | Date |` and pressing Return or Tab makes a table, and Option-Up and Option-Down move the block at the caret. Quotes and dashes stay as typed.
+
 Print and Export as PDF render a complete snapshot of the note, including local images. Other attachments use readable descriptions. PDF export is limited to 200 pages or 64 MB; a failed export leaves an existing destination unchanged.
 
 ## Reviewing components in Xcode
