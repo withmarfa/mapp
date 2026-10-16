@@ -1625,4 +1625,25 @@ struct EditorTests {
         #expect(labels?["suggestionsLoading"] == "Loading…")
         #expect(labels?["suggestionsEmpty"] == "No Results")
     }
+
+    @Test func quotesAndDashesStayAsTypedBecauseSmartPunctuationIsOff() async throws {
+        let page = try await Harness()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        try await page.load("\n")
+        page.editor.focus()
+        // One character at a time through the editing commands, as the keyboard's text input reaches the page.
+        for character in "\"quoted\" it's -- done" {
+            _ = try await page.editor.webView.evaluateJavaScript("document.execCommand('insertText', false, \(json(String(character)))); 0")
+        }
+        try await page.wait { page.changes.last?.contains("done") == true }
+        #expect(page.changes.last == "\"quoted\" it's -- done\n")
+    }
+
+    private func json(_ text: String) -> String {
+        String(decoding: (try? JSONEncoder().encode(text)) ?? Data("\"\"".utf8), as: UTF8.self)
+    }
 }
