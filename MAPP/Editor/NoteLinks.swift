@@ -12,18 +12,63 @@ nonisolated enum NoteLinks {
 
     static func link(to title: String) -> String { "[[\(title)]]" }
 
-    /// The titles that answer what was typed after `[[`, best first, each once. The work runs off the main actor
-    /// on a copy of the items, so typing in the page and the window never wait on a large library.
-    @concurrent static func names(matching query: String, among items: [Item], limit: Int) async -> [String] {
-        var matches: [(title: String, score: Int, modified: Date)] = []
-        var seen: Set<String> = []
-        for item in items where !item.isFile && canName(item.title) && !seen.contains(item.title) {
-            guard let score = PaletteMatch.score(item.title, query) else { continue }
-            seen.insert(item.title)
-            matches.append((item.title, score, item.modified))
+    /// Keeps each note's title folded for matching, so a query that grows one letter at a time folds nothing again
+    /// and a library of tens of thousands of notes is read in one pass. It works off the main actor, on a copy of
+    /// the items, so typing in the page and the window never wait on it.
+    actor Index {
+        private struct Entry {
+            let version: ItemVersion
+            let title: String
+            let folded: String
+            let nameable: Bool
+            let modified: Date
         }
-        matches.sort { ($0.score, $1.modified, $0.title) < ($1.score, $0.modified, $1.title) }
-        return matches.prefix(limit).map(\.title)
+
+        private var entries: [ItemID: Entry] = [:]
+
+        /// The titles that answer what was typed after `[[`, best first (the closest match, then the most recently
+        /// edited), each once.
+        func names(matching text: String, among items: [Item], limit: Int) -> [String] {
+            let query = PaletteMatch.Query(text)
+            var current: [ItemID: Entry] = [:]
+            current.reserveCapacity(items.count)
+            var best: [(title: String, score: Int, modified: Date)] = []
+            for item in items where !item.isFile {
+                let entry: Entry
+                if let kept = entries[item.id], kept.version == item.version, kept.title == item.title {
+                    entry = kept
+                } else {
+                    entry = Entry(
+                        version: item.version, title: item.title, folded: PaletteMatch.fold(item.title),
+                        nameable: NoteLinks.canName(item.title), modified: item.modified)
+                }
+                current[item.id] = entry
+                guard entry.nameable, let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
+                Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
+            }
+            entries = current
+            return best.map(\.title)
+        }
+
+        /// Whether `a` is offered before `b`: a closer match, then a more recent edit, then the title.
+        private static func precedes(_ a: (title: String, score: Int, modified: Date), _ b: (title: String, score: Int, modified: Date)) -> Bool {
+            if a.score != b.score { return a.score < b.score }
+            if a.modified != b.modified { return a.modified > b.modified }
+            return a.title < b.title
+        }
+
+        /// Keeps the `limit` best, one for each title, without ordering the notes that did not make it.
+        private static func keep(_ match: (title: String, score: Int, modified: Date), in best: inout [(title: String, score: Int, modified: Date)], limit: Int) {
+            if let same = best.firstIndex(where: { $0.title == match.title }) {
+                guard precedes(match, best[same]) else { return }
+                best.remove(at: same)
+            } else if best.count == limit, let last = best.last, !precedes(match, last) {
+                return
+            }
+            let at = best.firstIndex { precedes(match, $0) } ?? best.endIndex
+            best.insert(match, at: at)
+            if best.count > limit { best.removeLast() }
+        }
     }
 
     /// The same name as the library's links read it: ignoring case and the form of accents.
@@ -56,8 +101,8 @@ extension ItemLibrary {
             .sorted { $0.modified > $1.modified }
     }
 
-    func noteNames(matching query: String, limit: Int = 12) async -> [String] {
-        await NoteLinks.names(matching: query, among: items(in: .allNotes), limit: limit)
+    func noteNames(matching query: String, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
+        await index.names(matching: query, among: items(in: .allNotes), limit: limit)
     }
 
     func note(named target: String) -> Item? {

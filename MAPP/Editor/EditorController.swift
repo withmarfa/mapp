@@ -49,6 +49,7 @@ final class EditorController: NSObject {
     /// A `[[link]]` opened in the page, for the window to show the note it names.
     @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
     @ObservationIgnored private let noteRequests = NoteRequests()
+    @ObservationIgnored private let noteTitles = NoteLinks.Index()
 
     /// The Link to Note command, until the person has chosen a note or declined; the page waits on it.
     struct LinkRequest: Identifiable {
@@ -107,7 +108,10 @@ final class EditorController: NSObject {
         webView.controller = self
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
-        noteRequests.suggest = { [weak self] query in await self?.library?.noteNames(matching: query) ?? [] }
+        noteRequests.suggest = { [weak self] query in
+            guard let self, let library else { return [] }
+            return await library.noteNames(matching: query, using: noteTitles)
+        }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         #if DEBUG
