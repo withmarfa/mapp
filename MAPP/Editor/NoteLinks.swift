@@ -28,8 +28,10 @@ nonisolated enum NoteLinks {
     /// A link that names an item by its identity and shows its title: `[[identity|Title]]`, which Marfa reads as
     /// naming the identity and the page shows as the title. The title is made a single line and its `\`, `[`, `]`,
     /// `|` and `#` are escaped for the page's linked syntax; a title with nothing left shows nothing.
-    static func identityLink(to identity: String, titled title: String) -> String {
-        let shown = label(title)
+    /// A notes folder reads a link's target up to the first bracket, so a title holding one is left out of the
+    /// label there (`readsBrackets: false`) rather than make a link the folder cannot see.
+    static func identityLink(to identity: String, titled title: String, readsBrackets: Bool = true) -> String {
+        let shown = readsBrackets || !title.contains(where: { $0 == "[" || $0 == "]" }) ? label(title) : ""
         return shown.isEmpty ? "[[\(identity)]]" : "[[\(identity)|\(shown)]]"
     }
 

@@ -83,7 +83,7 @@ extension NoteLibrary {
         else { return nil }
         // An identity shows the title, as a link by identity does everywhere.
         return NoteLinks.looksLikeIdentity(spelling)
-            ? NoteLinks.identityLink(to: spelling, titled: target.title) : NoteLinks.link(to: spelling)
+            ? NoteLinks.identityLink(to: spelling, titled: target.title, readsBrackets: false) : NoteLinks.link(to: spelling)
     }
 
     private func reference(to targetID: ItemID) -> String? {

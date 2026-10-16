@@ -1715,10 +1715,12 @@ struct EditorTests {
         let identity = "22222222-2222-4222-8222-222222222222"
         let declared = Note(body: "---\nmarfa_id: \(identity)\n---\nWork on it\n", path: "Home/Chosen.md", created: .now)
         page.library.notes.append(declared)
-        for title in ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語"] {
-            let link = NoteLinks.identityLink(to: identity, titled: title)
+        for title in ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語", "line\nbreak"] {
+            let link = NoteLinks.identityLink(to: identity, titled: title, readsBrackets: false)
             #expect(resolution(of: link, in: page.library) == .resolved(declared.id), "\(link)")
         }
+        #expect(NoteLinks.identityLink(to: identity, titled: "A]B", readsBrackets: false) == "[[\(identity)]]")
+        #expect(NoteLinks.identityLink(to: identity, titled: "A|B", readsBrackets: false) == "[[\(identity)|A\\|B]]")
     }
 
     @Test func aNoteNoLinkCanNameAloneLeavesTheRequestOpenForAnotherChoice() async throws {
