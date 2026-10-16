@@ -876,7 +876,7 @@ extension LiveMarfaTests {
             await relaunched.close()
         }
 
-        /// A second drain forgetting answers the engine has not taken yet could lose them, so the next drain waits.
+        /// The drain ends, and a flush returns, only once the engine has taken the answers, so the next drain waits.
         @Test(.timeLimit(.minutes(2)))
         func aDrainWaitsUntilTheLastAnswersAreTaken() async throws {
             try await withSource { source, log, made in

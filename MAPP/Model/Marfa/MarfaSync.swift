@@ -269,8 +269,7 @@ actor MarfaSync {
         drains += 1
         do {
             let report = try await copy.queue.drain()
-            // The next drain waits until the engine has taken these answers, since the engine's forgetting them
-            // would also forget a later drain's answers it has not taken yet.
+            // The drain ends once the engine has taken these answers, so a flush returns with them taken.
             if !report.verdicts.isEmpty {
                 await withCheckedContinuation { taken in
                     if !tell(.drained(report, taken)) { taken.resume() }
