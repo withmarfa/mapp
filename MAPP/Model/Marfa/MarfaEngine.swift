@@ -127,9 +127,17 @@ actor MarfaEngine {
     private var ownText: [ItemID: OwnText] = [:]
     /// Answered writes already taken into `ownText`, so none is counted twice.
     private var counted: Set<String> = []
-    /// Answered writes whose answers this engine has taken and the copy has not yet forgotten. Only these are
-    /// forgotten: a drain the copy runs itself may have recorded others since, which their own report brings here.
+    /// Writes with an answer this engine has taken and the copy has not yet forgotten. Only these are forgotten: a
+    /// drain the copy runs itself may have recorded others since, which their own report brings here. Only a verdict
+    /// the copy can forget is kept here; a blocked or dead write stays in the queue to be released, and keeps its id.
     private var takenAnswers: Set<String> = []
+
+    nonisolated static func canForget(_ verdict: Marfa.Verdict) -> Bool {
+        switch verdict {
+        case .accepted, .merged, .conflicted, .refused: true
+        case .blocked, .dead: false
+        }
+    }
     /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.
     private var sentAsRead: Set<String> = []
     private var following: Task<Void, Never>?
@@ -142,12 +150,14 @@ actor MarfaEngine {
         answering = hook
     }
 
+    #if DEBUG
     /// Run after the queue was last read and before the answers are forgotten, for the tests.
     private var forgetting: (@Sendable () async -> Void)?
 
     func whenForgetting(_ hook: (@Sendable () async -> Void)?) {
         forgetting = hook
     }
+    #endif
 
     init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
@@ -442,12 +452,13 @@ actor MarfaEngine {
         }
         counted.formIntersection(queue.map(\.id))
         sentAsRead.formIntersection(queue.map(\.id))
-        takenAnswers.formIntersection(queue.map(\.id))
+        let forgettable = Set(queue.filter { $0.verdict.map(Self.canForget) ?? false }.map(\.id))
+        takenAnswers.formIntersection(forgettable)
         if !readQueueOnce {
             readQueueOnce = true
             for write in queue {
                 guard let verdict = write.verdict else { continue }
-                takenAnswers.insert(write.id)
+                if Self.canForget(verdict) { takenAnswers.insert(write.id) }
                 guard let itemID = write.itemId else { continue }
                 remember(MarfaMapping.outcome(verdict), of: write.kind, for: ItemID(itemID))
             }
@@ -1094,7 +1105,7 @@ actor MarfaEngine {
         for answer in report.verdicts {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict else { continue }
-            takenAnswers.insert(answer.id)
+            if Self.canForget(verdict) { takenAnswers.insert(answer.id) }
             let outcome = MarfaMapping.outcome(verdict)
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
@@ -1139,7 +1150,9 @@ actor MarfaEngine {
         if !uncounted {
             do {
                 let ids = Array(takenAnswers)
+                #if DEBUG
                 await forgetting?()
+                #endif
                 _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered(ids: ids) }
             } catch {
                 failures.append(Self.failure(error))
