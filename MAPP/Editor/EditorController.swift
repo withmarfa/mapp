@@ -597,8 +597,8 @@ final class EditorController: NSObject {
     // MARK: Linking to a note
 
     /// Asks the person which note to link to, and gives the page the link to write, or nil if they decline or the
-    /// page has moved on from the note the command was typed in. A request made after the window went, or while
-    /// another is open, is answered with nothing.
+    /// page has moved on from the note the command was typed in. A new request cancels the earlier one. A request
+    /// made after the window went is answered with nothing.
     func chooseNoteToLink(from note: ItemID) async -> String? {
         cancelLinkRequest()
         guard !windowIsGone, note == noteID, isEditable, isReady else { return nil }
