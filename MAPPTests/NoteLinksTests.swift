@@ -107,8 +107,8 @@ struct NoteLinksTests {
         let twin = note("garden IDEAS", minutes: 2)
         let odd = note("A|B", minutes: 3)
         let library = FakeItemLibrary(items: [alone, twin, odd, note("Old", minutes: 4)])
-        #expect(library.bodyLink(to: alone.id, in: nil) == "[[\(alone.id.rawValue)]]", "a twin goes by the same name, so its identity names it")
-        #expect(library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)]]", "a link cannot spell this title")
+        #expect(library.bodyLink(to: alone.id, in: nil) == "[[\(alone.id.rawValue)|Garden ideas]]", "a twin goes by the same name, so its identity names it")
+        #expect(library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)|A\\|B]]", "a link cannot spell this title, so its label is escaped")
         #expect(library.bodyLink(to: library.items[3].id, in: nil) == "[[Old]]")
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
@@ -120,7 +120,7 @@ struct NoteLinksTests {
         let plain = note("Other", minutes: 2)
         let library = FakeItemLibrary(items: [shaped, plain])
         #expect(!NoteLinks.canName(identity))
-        #expect(library.bodyLink(to: shaped.id, in: nil) == "[[\(shaped.id.rawValue)]]", "the title would name whichever item holds that identity")
+        #expect(library.bodyLink(to: shaped.id, in: nil) == "[[\(shaped.id.rawValue)|\(shaped.title)]]", "the title would name whichever item holds that identity")
         #expect(library.bodyLink(to: plain.id, in: nil) == "[[Other]]")
     }
 
@@ -137,7 +137,7 @@ struct NoteLinksTests {
         reader.establishedLinks = [NoteLinks.nameKey("Plan"): renamed.id]
         let library = FakeItemLibrary(items: [renamed, reused, reader])
         // Typed in Reader, [[Plan]] would open the renamed note, so the new one is named by its identity instead.
-        #expect(library.bodyLink(to: reused.id, in: reader.id) == "[[\(reused.id.rawValue)]]")
+        #expect(library.bodyLink(to: reused.id, in: reader.id) == "[[\(reused.id.rawValue)|Plan]]")
         #expect(library.bodyLink(to: renamed.id, in: reader.id) == "[[Plan v2]]")
         // Typed in a note with no such link, the title does name it.
         #expect(library.bodyLink(to: reused.id, in: nil) == "[[Plan]]")
@@ -146,6 +146,19 @@ struct NoteLinksTests {
         let index = NoteLinks.Index()
         #expect(await library.noteNames(matching: "plan", in: reader.id, using: index) == ["Plan v2"])
         #expect(await library.noteNames(matching: "plan", in: renamed.id, using: index) == ["Plan", "Plan v2"])
+    }
+
+    @Test func aLabelIsOneEscapedLine() {
+        let cases: [(String, String)] = [
+            ("Plan", "Plan"), ("A|B", "A\\|B"), ("A#B", "A\\#B"), ("A]B", "A\\]B"), ("[Draft]", "\\[Draft\\]"),
+            ("back\\slash", "back\\\\slash"), ("Café 日本語", "Café 日本語"), ("  padded  ", "padded"),
+            ("line one\nline two\r\n", "line one line two"), ("a\u{0}b\u{7}c", "a b c"), ("tab\tseparated", "tab separated"),
+            ("one\u{2028}two\u{2029}three", "one two three"), ("\n\u{0}\u{2028}", ""),
+        ]
+        for (title, label) in cases { #expect(NoteLinks.label(title) == label, "\(title.debugDescription)") }
+        let identity = "11111111-1111-4111-8111-111111111111"
+        #expect(NoteLinks.identityLink(to: identity, titled: "A|B") == "[[\(identity)|A\\|B]]")
+        #expect(NoteLinks.identityLink(to: identity, titled: "\n\u{0}") == "[[\(identity)]]", "a title with nothing to show leaves no label")
     }
 
     @Test func requestsFromThePageAreReadOrRefused() {

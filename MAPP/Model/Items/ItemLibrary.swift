@@ -123,8 +123,8 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
-    /// written in has not already bound that name to another. Otherwise the item's identity, which a link reads as
-    /// that item whatever any title says.
+    /// written in has not already bound that name to another. Otherwise the item's identity with its title as the label
+    /// (`[[identity|Title]]`), which Marfa reads as naming the identity.
     func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
         guard let target = item(id), !target.isFile else { return nil }
         let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
@@ -135,7 +135,7 @@ extension ItemLibrary {
             }
             if !shared { return NoteLinks.link(to: target.title) }
         }
-        return NoteLinks.looksLikeIdentity(id.rawValue) ? NoteLinks.link(to: id.rawValue) : nil
+        return NoteLinks.looksLikeIdentity(id.rawValue) ? NoteLinks.identityLink(to: id.rawValue, titled: target.title) : nil
     }
 
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out

@@ -25,6 +25,37 @@ nonisolated enum NoteLinks {
 
     static func link(to title: String) -> String { "[[\(title)]]" }
 
+    /// A link that names an item by its identity and shows its title: `[[identity|Title]]`, which Marfa reads as
+    /// naming the identity and the page shows as the title. The title is made a single line and its `\`, `[`, `]`,
+    /// `|` and `#` are escaped for the page's linked syntax; a title with nothing left shows nothing.
+    static func identityLink(to identity: String, titled title: String) -> String {
+        let shown = label(title)
+        return shown.isEmpty ? "[[\(identity)]]" : "[[\(identity)|\(shown)]]"
+    }
+
+    /// A title as one line of a link's label. Line breaks and control characters become one space.
+    static func label(_ title: String) -> String {
+        var words: [String] = []
+        var word = String.UnicodeScalarView()
+        func end() {
+            if !word.isEmpty { words.append(String(word)) }
+            word = String.UnicodeScalarView()
+        }
+        for scalar in title.unicodeScalars {
+            switch scalar.properties.generalCategory {
+            case .control, .lineSeparator, .paragraphSeparator: end()
+            default: word.append(scalar)
+            }
+        }
+        end()
+        var escaped = String.UnicodeScalarView()
+        for scalar in NoteName.trimmed(words.joined(separator: " ")).unicodeScalars {
+            if "\\[]|#".unicodeScalars.contains(scalar) { escaped.append("\\") }
+            escaped.append(scalar)
+        }
+        return String(escaped)
+    }
+
     /// A name as the library's links compare it: ignoring case and the form of accents.
     static func nameKey(_ name: String) -> String {
         name.precomposedStringWithCanonicalMapping.lowercased().precomposedStringWithCanonicalMapping

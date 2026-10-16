@@ -475,3 +475,17 @@ test("the page asks the app's notes and falls back to nothing when it cannot", a
     delete (window as { webkit?: unknown }).webkit
   }
 })
+
+test('a link by identity with an escaped title shows the title and is not rewritten', async () => {
+  const identity = '22222222-2222-4222-8222-222222222222'
+  const labels = ['A|B', 'A#B', 'A]B', '[Draft]', 'back\\slash', 'Café 日本語']
+  const escape = (label: string) => label.replace(/[\\[\]|#]/g, (c) => '\\' + c)
+  const source = labels.map((label) => `See [[${identity}|${escape(label)}]]\n`).join('\n')
+  await withEditor(source, async (editor) => {
+    expect(editor.markdown()).toBeNull()
+    expect(editor.snapshot().text).toBe(source)
+    const shown = document.querySelector('.ProseMirror')!.textContent!
+    for (const label of labels) expect(shown).toContain('See ' + label)
+    expect(shown).not.toContain(identity)
+  })
+})

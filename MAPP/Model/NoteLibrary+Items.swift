@@ -79,8 +79,11 @@ extension NoteLibrary {
         guard let target = item(id), !target.isFile else { return nil }
         let index = connectionIndex
         let candidates = [target.title, path(of: id), target.value(of: "marfa_id")?.string].compactMap { $0 }
-        return candidates.first { NoteLinks.canSpell($0) && index.resolution(of: $0) == .resolved(id) }
-            .map(NoteLinks.link(to:))
+        guard let spelling = candidates.first(where: { NoteLinks.canSpell($0) && index.resolution(of: $0) == .resolved(id) })
+        else { return nil }
+        // An identity shows the title, as a link by identity does everywhere.
+        return NoteLinks.looksLikeIdentity(spelling)
+            ? NoteLinks.identityLink(to: spelling, titled: target.title) : NoteLinks.link(to: spelling)
     }
 
     private func reference(to targetID: ItemID) -> String? {

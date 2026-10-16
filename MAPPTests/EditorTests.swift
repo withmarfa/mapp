@@ -1710,6 +1710,17 @@ struct EditorTests {
         #expect(resolution(of: link, in: library) == .resolved(chosen.id), "\(link) names the note chosen")
     }
 
+    @Test func aLinkByIdentityWithAnEscapedTitleResolvesToTheNoteThatDeclaresIt() async throws {
+        let page = try await Harness()
+        let identity = "22222222-2222-4222-8222-222222222222"
+        let declared = Note(body: "---\nmarfa_id: \(identity)\n---\nWork on it\n", path: "Home/Chosen.md", created: .now)
+        page.library.notes.append(declared)
+        for title in ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語"] {
+            let link = NoteLinks.identityLink(to: identity, titled: title)
+            #expect(resolution(of: link, in: page.library) == .resolved(declared.id), "\(link)")
+        }
+    }
+
     @Test func aNoteNoLinkCanNameAloneLeavesTheRequestOpenForAnotherChoice() async throws {
         let page = try await Harness()
         let first = Note(body: "Plan\n", path: "Home/Plan.md", created: .now)
