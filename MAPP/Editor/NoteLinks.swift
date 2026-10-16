@@ -19,7 +19,7 @@ nonisolated enum NoteLinks {
         private struct Entry {
             let version: ItemVersion
             let title: String
-            let folded: String
+            let folded: [UInt32]
             let nameable: Bool
             let modified: Date
         }
@@ -30,23 +30,26 @@ nonisolated enum NoteLinks {
         /// edited), each once.
         func names(matching text: String, among items: [Item], limit: Int) -> [String] {
             let query = PaletteMatch.Query(text)
-            var current: [ItemID: Entry] = [:]
-            current.reserveCapacity(items.count)
+            var notes = 0
             var best: [(title: String, score: Int, modified: Date)] = []
             for item in items where !item.isFile {
+                notes += 1
                 let entry: Entry
                 if let kept = entries[item.id], kept.version == item.version, kept.title == item.title {
                     entry = kept
                 } else {
                     entry = Entry(
-                        version: item.version, title: item.title, folded: PaletteMatch.fold(item.title),
+                        version: item.version, title: item.title, folded: PaletteMatch.folded(item.title),
                         nameable: NoteLinks.canName(item.title), modified: item.modified)
+                    entries[item.id] = entry
                 }
-                current[item.id] = entry
                 guard entry.nameable, let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
                 Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
             }
-            entries = current
+            if entries.count != notes {
+                let live = Set(items.lazy.filter { !$0.isFile }.map(\.id))
+                entries = entries.filter { live.contains($0.key) }
+            }
             return best.map(\.title)
         }
 

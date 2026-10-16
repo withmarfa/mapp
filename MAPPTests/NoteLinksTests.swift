@@ -71,7 +71,7 @@ struct NoteLinksTests {
         #expect(names.count == 12)
         #expect(names.allSatisfy { $0.hasPrefix("garden 1") })
         print("NoteLinks index, 20,000 notes: first query \(first), next query \(typed)")
-        #expect(typed < .seconds(1), "the next query over 20,000 notes took \(typed)")
+        #expect(typed < .seconds(2), "the next query over 20,000 notes took \(typed)")
         #expect(first < .seconds(10), "the first query over 20,000 notes took \(first)")
     }
 

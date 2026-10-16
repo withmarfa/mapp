@@ -6,40 +6,63 @@ import Foundation
 nonisolated enum PaletteMatch {
     /// A query folded once, for scoring many titles against it.
     nonisolated struct Query: Sendable {
-        let folded: String
-        /// The folded query without its whitespace, whose letters a title may hold in order.
-        fileprivate let letters: String
+        /// The folded query as Unicode scalar values.
+        fileprivate let scalars: [UInt32]
+        /// The same without whitespace, whose letters a title may hold in order.
+        fileprivate let letters: [UInt32]
 
         init(_ text: String) {
-            folded = PaletteMatch.fold(text.trimmingCharacters(in: .whitespaces))
-            letters = folded.filter { !$0.isWhitespace }
+            let folded = PaletteMatch.fold(text.trimmingCharacters(in: .whitespaces)).unicodeScalars
+            scalars = folded.map(\.value)
+            letters = folded.filter { !$0.properties.isWhitespace }.map(\.value)
         }
 
-        var isEmpty: Bool { folded.isEmpty }
+        var isEmpty: Bool { scalars.isEmpty }
+    }
+
+    /// A title folded and read as Unicode scalar values, for a caller that keeps its titles and asks again as the
+    /// query grows.
+    static func folded(_ title: String) -> [UInt32] {
+        fold(title).unicodeScalars.map(\.value)
     }
 
     /// Lower is better; nil when the title does not answer the query at all. An empty query matches everything
     /// equally.
     static func score(_ title: String, _ query: String) -> Int? {
         let query = Query(query)
-        return query.isEmpty ? 0 : score(folded: fold(title), query)
+        return query.isEmpty ? 0 : score(folded: folded(title), query)
     }
 
-    /// The score of a title already folded by `fold`, for a caller that keeps the folded titles and asks again as
-    /// the query grows.
-    static func score(folded title: String, _ query: Query) -> Int? {
+    /// The score of a title read by `folded(_:)`.
+    static func score(folded title: [UInt32], _ query: Query) -> Int? {
         guard !query.isEmpty else { return 0 }
-        if title.hasPrefix(query.folded) { return 0 }
-        if let range = title.range(of: query.folded) {
-            let wordStart = range.lowerBound == title.startIndex || !title[title.index(before: range.lowerBound)].isLetter
-            return wordStart ? 1 : 2
+        let wanted = query.scalars
+        if title.count >= wanted.count {
+            if title.starts(with: wanted) { return 0 }
+            var start = 1
+            let last = title.count - wanted.count
+            while start <= last {
+                if title[start] == wanted[0], title[start...].starts(with: wanted) {
+                    return isLetter(title[start - 1]) ? 2 : 1
+                }
+                start += 1
+            }
         }
-        var remaining = query.letters[...]
-        for character in title where character == remaining.first {
-            remaining = remaining.dropFirst()
-            if remaining.isEmpty { return 3 }
+        guard !query.letters.isEmpty else { return nil }
+        var next = 0
+        for scalar in title where scalar == query.letters[next] {
+            next += 1
+            if next == query.letters.count { return 3 }
         }
         return nil
+    }
+
+    private static func isLetter(_ value: UInt32) -> Bool {
+        guard let scalar = Unicode.Scalar(value) else { return false }
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter: return true
+        default: return false
+        }
     }
 
     /// The indices of the titles that answer the query, best first and otherwise in the order given.
@@ -47,12 +70,12 @@ nonisolated enum PaletteMatch {
         let query = Query(query)
         var scored: [(index: Int, score: Int)] = []
         for (index, title) in titles.enumerated() {
-            if let score = query.isEmpty ? 0 : score(folded: fold(title), query) { scored.append((index, score)) }
+            if let score = score(folded: folded(title), query) { scored.append((index, score)) }
         }
         return scored.sorted { ($0.score, $0.index) < ($1.score, $1.index) }.map(\.index)
     }
 
-    static func fold(_ text: String) -> String {
+    private static func fold(_ text: String) -> String {
         text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
     }
 }
