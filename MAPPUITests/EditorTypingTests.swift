@@ -1,19 +1,21 @@
 import XCTest
 
 /// Types into the real page with the real keyboard: the slash menu, Link to Note, note suggestions after `[[`, the
-/// table shortcut, moving a block, and quotes that stay as typed.
+/// table shortcut, moving a block, and quotes that stay as typed. This class holds what the suites share.
 @MainActor
-final class EditorTypingTests: XCTestCase {
-    private var app: XCUIApplication!
-    private var window: XCUIElement { app.windows.firstMatch }
-    private var page: XCUIElement { window.webViews.firstMatch }
-    private var editor: XCUIElement { page.textViews.firstMatch }
-    private var text: String { editor.value as? String ?? "" }
+class EditorTypingCase: XCTestCase {
+    var app: XCUIApplication!
+    /// Defaults the app starts with, for a test that must not depend on the person's own settings.
+    var extraLaunchArguments: [String] { [] }
+    var window: XCUIElement { app.windows.firstMatch }
+    var page: XCUIElement { window.webViews.firstMatch }
+    var editor: XCUIElement { page.textViews.firstMatch }
+    var text: String { editor.value as? String ?? "" }
 
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"] + extraLaunchArguments
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         beginNewItem(title: "Typing test")
@@ -23,7 +25,7 @@ final class EditorTypingTests: XCTestCase {
         app.terminate()
     }
 
-    private func beginNewItem(title: String) {
+    func beginNewItem(title: String) {
         app.typeKey("n", modifierFlags: .command)
         let field = window.textFields["NewItemTitle"]
         XCTAssertTrue(field.waitForExistence(timeout: 3))
@@ -34,16 +36,19 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
     }
 
-    private func waitForText(_ predicate: String, _ argument: String, timeout: TimeInterval = 4) -> Bool {
+    func waitForText(_ predicate: String, _ argument: String, timeout: TimeInterval = 4) -> Bool {
         let expectation = expectation(for: NSPredicate(format: "value \(predicate) %@", argument), evaluatedWith: editor)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// A row of the page's own menu, which shows beside the caret while it is open.
-    private func menuRow(_ name: String) -> XCUIElement {
+    func menuRow(_ name: String) -> XCUIElement {
         page.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@ OR title == %@", name, name, name)).firstMatch
     }
+}
 
+@MainActor
+final class EditorTypingTests: EditorTypingCase {
     func testTheSlashMenuListsBlocksInTheAppsWordsAndMakesATable() {
         app.typeText("/")
         for name in ["Heading 1", "Bulleted List", "Checklist", "Code Block", "Table", "Callout", "Diagram", "Link to Note"] {
@@ -107,18 +112,20 @@ final class EditorTypingTests: XCTestCase {
         app.typeKey(.downArrow, modifierFlags: .option)
         XCTAssertTrue(waitForText("BEGINSWITH", "first"), text)
     }
+}
 
-    /// InkKit's smart punctuation is off. The system's own substitution, which a person sets in Keyboard settings
-    /// and WebKit applies to any text field, is turned off for this launch so the test shows what the page adds.
-    func testThePageAddsNoCurlyQuotesOrDashes() {
-        app.terminate()
-        app.launchArguments += [
+/// InkKit's smart punctuation is off. The system's own substitution, which a person sets in Keyboard settings and
+/// WebKit applies to any text field, is turned off for this launch, so the test shows what the page itself adds.
+@MainActor
+final class EditorPunctuationTests: EditorTypingCase {
+    override var extraLaunchArguments: [String] {
+        [
             "-NSAutomaticQuoteSubstitutionEnabled", "NO", "-NSAutomaticDashSubstitutionEnabled", "NO",
             "-WebAutomaticQuoteSubstitutionEnabled", "NO", "-WebAutomaticDashSubstitutionEnabled", "NO",
         ]
-        app.launch()
-        XCTAssertTrue(window.waitForExistence(timeout: 5))
-        beginNewItem(title: "Quotes test")
+    }
+
+    func testThePageAddsNoCurlyQuotesOrDashes() {
         app.typeText("\"quoted\" it's -- done")
         XCTAssertTrue(waitForText("CONTAINS", "\"quoted\" it's -- done"), text)
     }
