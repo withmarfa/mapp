@@ -1635,6 +1635,17 @@ struct EditorTests {
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         try await page.load("\n")
         page.editor.focus()
+        // WebKit applies the system's smart quotes and dashes to editing commands, as to any Mac text field. That is
+        // the person's setting, not the page's, so it is turned off here to see what the page itself does.
+        let substitutions = [#selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)), #selector(NSTextView.toggleAutomaticDashSubstitution(_:))]
+        let switchedOff = substitutions.filter { action in
+            let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+            _ = page.editor.webView.validateUserInterfaceItem(item)
+            guard item.state == .on else { return false }
+            _ = page.editor.webView.perform(action, with: nil)
+            return true
+        }
+        defer { for action in switchedOff { _ = page.editor.webView.perform(action, with: nil) } }
         // One character at a time through the editing commands, as the keyboard's text input reaches the page.
         for character in "\"quoted\" it's -- done" {
             _ = try await page.editor.webView.evaluateJavaScript("document.execCommand('insertText', false, \(json(String(character)))); 0")
