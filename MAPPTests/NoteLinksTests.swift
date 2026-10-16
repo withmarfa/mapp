@@ -113,6 +113,23 @@ struct NoteLinksTests {
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
+    @Test func aTitleShapedLikeAnIdentityIsNeverLinkedByTitle() {
+        // A link spelled as an identity names the item with that identity, not one that has the text as its title.
+        let identity = "11111111-1111-4111-8111-111111111111"
+        let shaped = note(identity, minutes: 1)
+        let plain = note("Other", minutes: 2)
+        let library = FakeItemLibrary(items: [shaped, plain])
+        #expect(!NoteLinks.canName(identity))
+        #expect(library.bodyLink(to: shaped.id) == nil, "the spelling would name another item")
+        #expect(library.bodyLink(to: plain.id) == "[[Other]]")
+    }
+
+    @Test func aTitleShapedLikeAnIdentityIsNotSuggested() async {
+        let identity = "11111111-1111-4111-8111-111111111111"
+        let names = await NoteLinks.Index().names(matching: "1111", among: [note(identity), note("Other")], limit: 10)
+        #expect(names.isEmpty)
+    }
+
     @Test func requestsFromThePageAreReadOrRefused() {
         #expect(NoteRequest(body: ["type": "suggest", "query": "gar"]) == .suggest("gar"))
         #expect(NoteRequest(body: ["type": "suggest", "query": ""]) == .suggest(""))

@@ -1687,6 +1687,28 @@ struct EditorTests {
         #expect(try await answer(page) == "[[Allotment]]")
     }
 
+    @Test func everySuggestionAndTheLinkForAnyNoteResolvesToThatNote() async throws {
+        let page = try await Harness()
+        let identity = "11111111-1111-4111-8111-111111111111"
+        let chosen = Note(body: "\(identity)\n", path: "Chosen.md", created: .now)
+        let other = Note(body: "---\nmarfa_id: \(identity)\n---\nOther\n", path: "Other.md", created: .now)
+        let plain = Note(body: "Garden\n", path: "Garden.md", created: .now)
+        page.library.notes += [chosen, other, plain]
+        try await page.load("Intro\n")
+        let library = page.library
+        let index = NoteLinks.Index()
+        for query in ["", "1111", "gar", "oth"] {
+            for name in await library.noteNames(matching: query, using: index) {
+                let owner = try #require(library.notes.first { $0.title == name }, "\(name)")
+                #expect(resolution(of: "[[\(name)]]", in: library) == .resolved(owner.id), "suggesting \(name) for \(query)")
+            }
+        }
+        _ = try await pending(page)
+        #expect(page.editor.finishLinkRequest(choosing: chosen.id))
+        let link = try #require(try await answer(page))
+        #expect(resolution(of: link, in: library) == .resolved(chosen.id), "\(link) names the note chosen")
+    }
+
     @Test func aNoteNoLinkCanNameAloneLeavesTheRequestOpenForAnotherChoice() async throws {
         let page = try await Harness()
         let first = Note(body: "Plan\n", path: "Home/Plan.md", created: .now)
