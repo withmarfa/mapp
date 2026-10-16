@@ -455,21 +455,21 @@ test("the page asks the app's notes and falls back to nothing when it cannot", a
   })
   try {
     answer.current = ['Garden ideas', 7, 'Bike service']
-    expect(await suggestNotes('g')).toEqual(['Garden ideas', 'Bike service'])
+    expect(await suggestNotes('g', 'note')).toEqual(['Garden ideas', 'Bike service'])
     answer.current = null
-    expect(await suggestNotes('g')).toEqual([])
+    expect(await suggestNotes('g', 'note')).toEqual([])
     answer.current = '[[Garden ideas]]'
     expect(await pickNote('note')).toBe('[[Garden ideas]]')
     answer.current = null
     expect(await pickNote('note')).toBeUndefined()
     expect(requests).toEqual([
-      { type: 'suggest', query: 'g' },
-      { type: 'suggest', query: 'g' },
+      { type: 'suggest', query: 'g', item: 'note' },
+      { type: 'suggest', query: 'g', item: 'note' },
       { type: 'pick', item: 'note' },
       { type: 'pick', item: 'note' },
     ])
     delete (window as { webkit?: unknown }).webkit
-    expect(await suggestNotes('g')).toEqual([])
+    expect(await suggestNotes('g', 'note')).toEqual([])
     expect(await pickNote('note')).toBeUndefined()
   } finally {
     delete (window as { webkit?: unknown }).webkit

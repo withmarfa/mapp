@@ -95,7 +95,7 @@ nonisolated enum NoteLinks {
         /// The titles that answer what was typed after `[[`, best first (the closest match, then the most recently
         /// edited), each once. A title another note also goes by is not offered, since a link to it would not say
         /// which note.
-        func names(matching text: String, among items: [Item], limit: Int) -> [String] {
+        func names(matching text: String, among items: [Item], established: [String: ItemID] = [:], limit: Int) -> [String] {
             let query = Query(text)
             var notes = 0
             var best: [(title: String, score: Int, modified: Date)] = []
@@ -154,7 +154,8 @@ extension ItemLibrary {
         items(in: .allNotes).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
-    func noteNames(matching query: String, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
-        await index.names(matching: query, among: items(in: .allNotes), limit: limit)
+    func noteNames(matching query: String, in source: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
+        let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
+        return await index.names(matching: query, among: items(in: .allNotes), established: established, limit: limit)
     }
 }

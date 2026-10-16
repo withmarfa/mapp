@@ -231,7 +231,7 @@ export class NoteEditor {
         wikiLinks: {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: (query, context) =>
-            context.signal.aborted ? Promise.resolve([]) : suggestNotes(query),
+            context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId),
           // InkKit requires the adapter to open a link. Opening the note it names is not offered yet.
           open() {},
         },

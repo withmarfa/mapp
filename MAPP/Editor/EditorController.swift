@@ -107,9 +107,9 @@ final class EditorController: NSObject {
         webView.controller = self
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
-        noteRequests.suggest = { [weak self] query in
+        noteRequests.suggest = { [weak self] query, source in
             guard let self, let current = self.library else { return [] }
-            return await current.noteNames(matching: query, using: self.noteTitles)
+            return await current.noteNames(matching: query, in: source, using: self.noteTitles)
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
@@ -614,7 +614,7 @@ final class EditorController: NSObject {
     /// open for the person to choose another.
     @discardableResult
     func finishLinkRequest(choosing id: ItemID) -> Bool {
-        guard linking != nil, let link = library?.bodyLink(to: id) else { return false }
+        guard linking != nil, let source = linkRequest?.note, let link = library?.bodyLink(to: id, in: source) else { return false }
         answerLinkRequest(link)
         return true
     }

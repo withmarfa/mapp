@@ -69,6 +69,10 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var edgesOut: [Edge] = []
     var sync: SyncState = .settled
     var problem: ItemProblem?
+    /// The items the links in this item's text were already bound to, by the name each link is spelled with (read
+    /// as `NoteLinks.nameKey`). A library that keeps a link's first target, as Marfa does, answers a new link with
+    /// the same spelling with that target, whatever now goes by the name. Empty where links are read afresh.
+    var establishedLinks: [String: ItemID] = [:]
 
     var isFavorite: Bool { tags.contains(ItemTag.favorite) }
 

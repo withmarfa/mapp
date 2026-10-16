@@ -107,9 +107,9 @@ struct NoteLinksTests {
         let twin = note("garden IDEAS", minutes: 2)
         let odd = note("A|B", minutes: 3)
         let library = FakeItemLibrary(items: [alone, twin, odd, note("Old", minutes: 4)])
-        #expect(library.bodyLink(to: alone.id) == nil, "a twin goes by the same name")
-        #expect(library.bodyLink(to: odd.id) == nil, "a link cannot spell this title")
-        #expect(library.bodyLink(to: library.items[3].id) == "[[Old]]")
+        #expect(library.bodyLink(to: alone.id, in: nil) == nil, "a twin goes by the same name")
+        #expect(library.bodyLink(to: odd.id, in: nil) == nil, "a link cannot spell this title")
+        #expect(library.bodyLink(to: library.items[3].id, in: nil) == "[[Old]]")
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
@@ -120,8 +120,8 @@ struct NoteLinksTests {
         let plain = note("Other", minutes: 2)
         let library = FakeItemLibrary(items: [shaped, plain])
         #expect(!NoteLinks.canName(identity))
-        #expect(library.bodyLink(to: shaped.id) == nil, "the spelling would name another item")
-        #expect(library.bodyLink(to: plain.id) == "[[Other]]")
+        #expect(library.bodyLink(to: shaped.id, in: nil) == nil, "the spelling would name another item")
+        #expect(library.bodyLink(to: plain.id, in: nil) == "[[Other]]")
     }
 
     @Test func aTitleShapedLikeAnIdentityIsNotSuggested() async {
@@ -130,9 +130,27 @@ struct NoteLinksTests {
         #expect(names.isEmpty)
     }
 
+    @Test func aNameTheNoteAlreadyLinksKeepsItsFirstTarget() async {
+        let renamed = note("Plan v2", minutes: 1)
+        let reused = note("Plan", minutes: 5)
+        var reader = note("Reader", minutes: 3)
+        reader.establishedLinks = [NoteLinks.nameKey("Plan"): renamed.id]
+        let library = FakeItemLibrary(items: [renamed, reused, reader])
+        // Typed in Reader, [[Plan]] would open the renamed note, so the new one is named by its identity instead.
+        #expect(library.bodyLink(to: reused.id, in: reader.id) == "[[\(reused.id.rawValue)]]")
+        #expect(library.bodyLink(to: renamed.id, in: reader.id) == "[[Plan v2]]")
+        // Typed in a note with no such link, the title does name it.
+        #expect(library.bodyLink(to: reused.id, in: nil) == "[[Plan]]")
+        #expect(library.bodyLink(to: reused.id, in: renamed.id) == "[[Plan]]")
+        // A suggestion is only for a title that names its own note from the note it is typed in.
+        let index = NoteLinks.Index()
+        #expect(await library.noteNames(matching: "plan", in: reader.id, using: index) == ["Plan v2"])
+        #expect(await library.noteNames(matching: "plan", in: renamed.id, using: index) == ["Plan v2", "Plan"])
+    }
+
     @Test func requestsFromThePageAreReadOrRefused() {
-        #expect(NoteRequest(body: ["type": "suggest", "query": "gar"]) == .suggest("gar"))
-        #expect(NoteRequest(body: ["type": "suggest", "query": ""]) == .suggest(""))
+        #expect(NoteRequest(body: ["type": "suggest", "query": "gar"]) == .suggest("gar", in: nil))
+        #expect(NoteRequest(body: ["type": "suggest", "query": ""]) == .suggest("", in: nil))
         #expect(NoteRequest(body: ["type": "pick", "item": "abc"]) == .pick(ItemID("abc")))
         #expect(NoteRequest(body: ["type": "pick", "item": ""]) == nil)
         #expect(NoteRequest(body: ["type": "suggest"]) == nil)

@@ -75,7 +75,7 @@ extension NoteLibrary {
 
     /// The link whose spelling the connection index resolves to this note alone: its title, else its path, else the
     /// identity its file declares. Nil when none does, as when another note goes by the same title and path form.
-    func bodyLink(to id: ItemID) -> String? {
+    func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
         guard let target = item(id), !target.isFile else { return nil }
         let index = connectionIndex
         let candidates = [target.title, path(of: id), target.value(of: "marfa_id")?.string].compactMap { $0 }

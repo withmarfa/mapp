@@ -45,7 +45,8 @@ export type EditorMessage =
   | ({ type: 'find' } & FindState)
 
 /** What the page asks of the app's notes: names to offer after `[[`, and which note the person links to. */
-export type NoteRequest = { type: 'suggest'; query: string } | { type: 'pick'; item: string }
+export type NoteRequest =
+  { type: 'suggest'; query: string; item: string } | { type: 'pick'; item: string }
 
 declare global {
   interface Window {
@@ -68,8 +69,12 @@ export function postToHost(message: EditorMessage): void {
 }
 
 /** Note names that answer what was typed after `[[`, in the order to show them. */
-export async function suggestNotes(query: string): Promise<string[]> {
-  const names = await window.webkit?.messageHandlers?.notes?.postMessage({ type: 'suggest', query })
+export async function suggestNotes(query: string, item: string): Promise<string[]> {
+  const names = await window.webkit?.messageHandlers?.notes?.postMessage({
+    type: 'suggest',
+    query,
+    item,
+  })
   return Array.isArray(names) ? names.filter((name) => typeof name === 'string') : []
 }
 
