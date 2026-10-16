@@ -127,6 +127,9 @@ actor MarfaEngine {
     private var ownText: [ItemID: OwnText] = [:]
     /// Answered writes already taken into `ownText`, so none is counted twice.
     private var counted: Set<String> = []
+    /// Answered writes whose answers this engine has taken. The copy forgets every answer it holds at once, so
+    /// answers are forgotten only when all of them are in here; another drain may have recorded some since.
+    private var taken: Set<String> = []
     /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.
     private var sentAsRead: Set<String> = []
     private var following: Task<Void, Never>?
@@ -432,10 +435,13 @@ actor MarfaEngine {
         }
         counted.formIntersection(queue.map(\.id))
         sentAsRead.formIntersection(queue.map(\.id))
+        taken.formIntersection(queue.map(\.id))
         if !readQueueOnce {
             readQueueOnce = true
             for write in queue {
-                guard let itemID = write.itemId, let verdict = write.verdict else { continue }
+                guard let verdict = write.verdict else { continue }
+                taken.insert(write.id)
+                guard let itemID = write.itemId else { continue }
                 remember(MarfaMapping.outcome(verdict), of: write.kind, for: ItemID(itemID))
             }
         }
@@ -611,7 +617,7 @@ actor MarfaEngine {
         case .queueDrained(let report):
             if !report.verdicts.isEmpty { await answer(report) }
             await sync.drainedByFollow(report)
-        case .queueNotDrained(let error): await sync.drainStopped(error)
+        case .queueNotDrained(let error): await sync.drainStopped(error, answersTaken: await takeAnswers(after: error))
         case .server:
             await sync.heard()
             await reread(change)
@@ -619,6 +625,18 @@ actor MarfaEngine {
         case .saved, .refreshed: await reload()
         case .stopped(let error): await sync.stopped(error)
         }
+    }
+
+    /// A drain that stops on an error has recorded the answers it got and tells none of them. They are read from the
+    /// queue here, in the engine's own step, since `MarfaSync` would wait on this engine to take them. False where
+    /// they could not be taken yet: an expired copy refuses the reads that taking them needs, and a queue may not
+    /// be readable.
+    private func takeAnswers(after error: MarfaError) async -> Bool {
+        if case .copyExpired = error { return false }
+        guard let queued = try? await copy.queue.all() else { return false }
+        let report = MarfaSync.report(answeredIn: queued)
+        if !report.verdicts.isEmpty { await answer(report) }
+        return true
     }
 
     private func reread(_ change: Marfa.Change) async {
@@ -1069,6 +1087,7 @@ actor MarfaEngine {
         for answer in report.verdicts {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict else { continue }
+            taken.insert(answer.id)
             let outcome = MarfaMapping.outcome(verdict)
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
@@ -1110,7 +1129,9 @@ actor MarfaEngine {
         } else {
             uncounted = true
         }
-        if !uncounted {
+        // The copy forgets every answer it holds, so one a drain has recorded since this report is left in the queue
+        // until its own report, or the read of the queue after its error, brings it here.
+        if !uncounted, await holdsOnlyTakenAnswers() {
             do {
                 _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered() }
             } catch {
@@ -1120,6 +1141,12 @@ actor MarfaEngine {
         if !leaving.isEmpty { await reread(leaving) }
         await readQueue()
         publish([])
+    }
+
+    /// Whether every answer the queue holds has been taken. A queue that cannot be read holds none that is known to be.
+    private func holdsOnlyTakenAnswers() async -> Bool {
+        guard let queued = try? await copy.queue.all() else { return false }
+        return queued.allSatisfy { $0.verdict == nil || taken.contains($0.id) }
     }
 
     private func remember(_ outcome: WriteOutcome, of kind: WriteKind, for item: ItemID) {

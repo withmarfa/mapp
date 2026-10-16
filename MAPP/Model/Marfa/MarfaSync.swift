@@ -106,9 +106,11 @@ actor MarfaSync {
         work()
     }
 
-    /// A drain the copy ran when the server came back stopped. The answers it had recorded stay in the queue.
-    func drainStopped(_ error: MarfaError) async {
-        if case .copyExpired = error { answersWaiting = true }
+    /// A drain the copy ran when the server came back stopped.
+    /// The engine has taken the answers the drain recorded, or `answersTaken` is false and they wait for the next
+    /// refresh, since the next drain reports only the writes it answers itself.
+    func drainStopped(_ error: MarfaError, answersTaken: Bool) async {
+        if !answersTaken { answersWaiting = true }
         await failed(error, retrying: .drain)
     }
 
@@ -276,10 +278,14 @@ actor MarfaSync {
             }
             settle(report)
         } catch {
-            // An answered write that expires the copy, a source move or a retype, is recorded before the drain
-            // throws, and the throw loses the report, so the answers are read from the queue instead, once the
-            // refresh this asks for has hydrated the copy again.
-            if case MarfaError.copyExpired = error { answersWaiting = true }
+            // A drain that throws loses its report, and the writes it answered first are recorded, so the answers
+            // are read from the queue instead, for an expired copy (a source move or a retype) once the refresh
+            // this asks for has hydrated it again.
+            if case MarfaError.copyExpired = error {
+                answersWaiting = true
+            } else if await !takeAnswersFromQueue() {
+                answersWaiting = true
+            }
             await failed(error, retrying: .drain)
         }
     }
