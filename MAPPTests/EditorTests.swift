@@ -1690,7 +1690,7 @@ struct EditorTests {
     @Test func everySuggestionAndTheLinkForAnyNoteResolvesToThatNote() async throws {
         let page = try await Harness()
         let identity = "11111111-1111-4111-8111-111111111111"
-        let chosen = Note(body: "\(identity)\n", path: "Chosen.md", created: .now)
+        let chosen = Note(body: "---\ntitle: \(identity)\n---\nBody\n", path: "Chosen.md", created: .now)
         let other = Note(body: "---\nmarfa_id: \(identity)\n---\nOther\n", path: "Other.md", created: .now)
         let plain = Note(body: "Garden\n", path: "Garden.md", created: .now)
         page.library.notes += [chosen, other, plain]
@@ -1700,6 +1700,7 @@ struct EditorTests {
         for query in ["", "1111", "gar", "oth"] {
             for name in await library.noteNames(matching: query, using: index) {
                 let owner = try #require(library.notes.first { $0.title == name }, "\(name)")
+                #expect(!name.isEmpty)
                 #expect(resolution(of: "[[\(name)]]", in: library) == .resolved(owner.id), "suggesting \(name) for \(query)")
             }
         }
