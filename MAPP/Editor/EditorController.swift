@@ -109,8 +109,8 @@ final class EditorController: NSObject {
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         noteRequests.suggest = { [weak self] query in
-            guard let self, let library else { return [] }
-            return await library.noteNames(matching: query, using: noteTitles)
+            guard let self, let current = self.library else { return [] }
+            return await current.noteNames(matching: query, using: self.noteTitles)
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
