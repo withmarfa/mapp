@@ -145,7 +145,7 @@ struct NoteLinksTests {
         // A suggestion is only for a title that names its own note from the note it is typed in.
         let index = NoteLinks.Index()
         #expect(await library.noteNames(matching: "plan", in: reader.id, using: index) == ["Plan v2"])
-        #expect(await library.noteNames(matching: "plan", in: renamed.id, using: index) == ["Plan v2", "Plan"])
+        #expect(await library.noteNames(matching: "plan", in: renamed.id, using: index) == ["Plan", "Plan v2"])
     }
 
     @Test func requestsFromThePageAreReadOrRefused() {
