@@ -1663,8 +1663,11 @@ struct EditorTests {
         return current
     }
 
+    /// What the page was answered, or "PENDING" if it is still waiting after a moment.
     private func answer(_ page: Harness) async throws -> String? {
-        try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page) as? String
+        let script = "return await Promise.race([window.pick, new Promise(done => setTimeout(() => done('PENDING'), 1500))])"
+        let value = try await page.editor.webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)
+        return value as? String
     }
 
     /// What the library resolves a link to, written on a note of its own so the library reads it as a person's would.
@@ -1707,7 +1710,7 @@ struct EditorTests {
         _ = try await pending(page)
         try await page.load("Another note\n")
         #expect(page.editor.linkRequest == nil, "the request ended with the note it was typed in")
-        #expect(try await answer(page) == nil)
+        #expect(try await answer(page) == nil, "the page was answered")
     }
 
     private func json(_ text: String) -> String {
