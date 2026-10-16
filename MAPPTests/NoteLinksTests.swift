@@ -31,10 +31,10 @@ struct NoteLinksTests {
         #expect(await NoteLinks.Index().names(matching: "bk", among: items, limit: 10) == ["Bike service"], "letters in order")
     }
 
-    @Test func suggestionsLeaveOutFilesTitlesALinkCannotNameAndRepeats() async {
+    @Test func suggestionsLeaveOutFilesTitlesALinkCannotNameAndSharedNames() async {
         var photo = note("Garden photo")
         photo.content = .file(.png, byteCount: 3)
-        let items = [note("Garden ideas"), note("Garden ideas", minutes: 1), note("Garden | ideas"), photo, note("Garden [draft]")]
+        let items = [note("Garden ideas"), note("Garden notes"), note("Garden notes", minutes: 1), note("Garden | ideas"), photo, note("Garden [draft]")]
         let names = await NoteLinks.Index().names(matching: "garden", among: items, limit: 10)
         #expect(names == ["Garden ideas"])
     }
