@@ -1654,6 +1654,62 @@ struct EditorTests {
         #expect(page.changes.last == "\"quoted\" it's -- done\n")
     }
 
+    // MARK: Link to Note keeps which note was chosen
+
+    private func pending(_ page: Harness) async throws -> ItemID {
+        let current = try #require(page.editor.noteID)
+        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
+        try await page.wait { page.editor.linkRequest != nil }
+        return current
+    }
+
+    private func answer(_ page: Harness) async throws -> String? {
+        try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page) as? String
+    }
+
+    /// What the library resolves a link to, written on a note of its own so the library reads it as a person's would.
+    private func resolution(of link: String, in library: NoteLibrary) -> NoteReferenceResolution? {
+        let reader = Note(body: "See \(link)\n", path: "Reader of links.md", created: .now)
+        library.notes.append(reader)
+        defer { library.notes.removeAll { $0.id == reader.id } }
+        return library.connectionIndex.referencesBySource[reader.id]?.first?.resolution
+    }
+
+    @Test func choosingBetweenNotesWithTheSameTitleLinksToTheOneChosen() async throws {
+        let page = try await Harness()
+        let older = Note(body: "Garden\n", path: "Home/Garden.md", created: Date(timeIntervalSince1970: 1_700_000_000))
+        let newer = Note(body: "garden\n", path: "Work/garden.md", created: Date(timeIntervalSince1970: 1_800_000_000))
+        page.library.notes += [older, newer]
+        try await page.load("Intro\n")
+        _ = try await pending(page)
+        page.editor.finishLinkRequest(choosing: page.library.item(older.id))
+        let link = try #require(try await answer(page), "a note that can be named is linked")
+        #expect(resolution(of: link, in: page.library) == .resolved(older.id), "\(link) names the note chosen and no other")
+    }
+
+    @Test func aTargetRenamedWhileThePickerIsOpenIsLinkedByItsNewTitle() async throws {
+        let page = try await Harness()
+        let target = Note(body: "Garden\n", path: "Garden.md", created: .now)
+        page.library.notes.append(target)
+        try await page.load("Intro\n")
+        _ = try await pending(page)
+        let shown = try #require(page.library.item(target.id))
+        page.library.renameNote(target.id, to: "Allotment", undoManager: nil)
+        try #require(page.library.item(target.id)?.title == "Allotment")
+        page.editor.finishLinkRequest(choosing: shown)
+        #expect(try await answer(page) == "[[Allotment]]")
+    }
+
+    @Test func loadingAnotherNoteAnswersAPendingLinkRequestOnce() async throws {
+        let page = try await Harness()
+        page.library.notes.append(Note(body: "Garden\n", path: "Garden.md", created: .now))
+        try await page.load("Intro\n")
+        _ = try await pending(page)
+        try await page.load("Another note\n")
+        #expect(page.editor.linkRequest == nil, "the request ended with the note it was typed in")
+        #expect(try await answer(page) == nil)
+    }
+
     private func json(_ text: String) -> String {
         String(decoding: (try? JSONEncoder().encode(text)) ?? Data("\"\"".utf8), as: UTF8.self)
     }
