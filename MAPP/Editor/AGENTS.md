@@ -35,10 +35,10 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 ## Linking to notes
 
-- The page names a note in a link by its title, `[[Title]]`, as the library's own links resolve it (`NoteLinks`). A title a link cannot name as written (`[`, `]`, `|`, `#`, `\`, a line break, or edge whitespace) is neither offered nor linked; a file is not a note.
-- `NoteRequests` is the `notes` message handler. Suggestions come from `NoteLinks.names`, which runs off the main actor on a copy of the items, so typing never waits on a large library.
-- Link to Note asks the person in `NoteLinkPicker`, a sheet of `NotePage` so every window that shows a note has it. The page's request waits on `EditorController.chooseNoteToLink`, and every way the request can end answers it with `finishLinkRequest`: a choice, Cancel or Escape (the sheet's `onDismiss`), leaving the note, the window going, and the page's process ending. A request from a note that is no longer shown is answered with nothing.
-- A rendered `[[link]]` does not open its note yet. Opening one needs the library's own resolution of the link (the connection index, or Marfa's resolution with its ambiguous, missing and renamed results), not a guess by title.
+- A link names a note by a spelling the library resolves to that note alone (`ItemLibrary.bodyLink(to:)`): the title, and in a notes folder the path or declared identity when the title is shared, checked against the connection index (`NoteConnectionIndex.resolution(of:)`). Where none does, there is no link and the person is told. A spelling a link cannot hold (`[`, `]`, `|`, `#`, `\`, a line break, edge whitespace) is not used (`NoteLinks.canName`), and a file is not a note.
+- `NoteRequests` is the `notes` message handler. Suggestions come from `NoteLinks.Index`, which runs off the main actor on a copy of the items and keeps titles folded, so typing never waits on a large library. It offers only a title no other note goes by, since InkKit writes the name it is given and cannot say which note. Its scores follow `PaletteMatch` from its own cache; keep `PaletteMatch` as the palette needs it.
+- Link to Note asks the person in `NoteLinkPicker`, a sheet of `NotePage` so every window that shows a note has it. The page's request waits on `EditorController.chooseNoteToLink`. The sheet hands back the note's identity, and `finishLinkRequest(choosing:)` reads the link from the library as the note is when it is chosen, so a rename or a new twin since the list was made is seen. Every other end answers the page with nothing, exactly once: Cancel or Escape (the sheet's `onDismiss`), a document replacing the one the command was typed in (`show`), leaving the note, the window going, and the page's process ending. A request made after the window went is answered with nothing.
+- A rendered `[[link]]` does not open its note. The wiki link adapter's `open` does nothing; opening needs the library's own resolution of the link (the connection index, or Marfa's resolution with its ambiguous, missing and renamed results), not a guess by title.
 
 ## Printing and PDF export
 
@@ -51,5 +51,5 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - **Runnable file opened.** Flag any route that hands a file to another app without `EmbeddedFiles.opens`.
 - **Editor made for every view value.** Flag an `EditorController`, a web view, or another costly object made in a view's initializer or given to `State(initialValue:)`. Safe path: `EditorSlot`, or make it in `.task` as Apple's `State` documentation shows.
 - **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one that Apple's own `WebView` does not use.
-- **Link request left open.** Flag a path that ends Link to Note without calling `finishLinkRequest`, or that offers a title `NoteLinks.canName` refuses.
+- **Link request left open.** Flag a path that ends Link to Note without answering the page once, or that writes a link without `bodyLink(to:)`.
 - **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another note after the page changed notes.
