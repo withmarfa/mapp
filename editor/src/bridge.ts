@@ -44,6 +44,10 @@ export type EditorMessage =
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | ({ type: 'find' } & FindState)
 
+/** What the page asks of the app's notes: names to offer after `[[`, and which note the person links to. */
+export type NoteRequest =
+  { type: 'suggest'; query: string; item: string } | { type: 'pick'; item: string }
+
 declare global {
   interface Window {
     webkit?: {
@@ -51,6 +55,8 @@ declare global {
         host?: { postMessage(message: EditorMessage): void }
         /** Answers with what the app knows of a file a note embeds, or null when it has none. */
         embeds?: { postMessage(request: EmbedRequest): Promise<EmbeddedFile | null> }
+        /** Answers a `suggest` with note names and a `pick` with the link the person chose, or null. */
+        notes?: { postMessage(request: NoteRequest): Promise<unknown> }
       }
     }
   }
@@ -60,4 +66,21 @@ export function postToHost(message: EditorMessage): void {
   const host = window.webkit?.messageHandlers?.host
   if (host) host.postMessage(message)
   else console.debug('host', message)
+}
+
+/** Note names that answer what was typed after `[[`, in the order to show them. */
+export async function suggestNotes(query: string, item: string): Promise<string[]> {
+  const names = await window.webkit?.messageHandlers?.notes?.postMessage({
+    type: 'suggest',
+    query,
+    item,
+  })
+  return Array.isArray(names) ? names.filter((name) => typeof name === 'string') : []
+}
+
+/** The Markdown link to the note the person chooses for the item, or undefined if they decline. The app
+ *  answers when they have chosen, however long that takes. */
+export async function pickNote(item: string): Promise<string | undefined> {
+  const link = await window.webkit?.messageHandlers?.notes?.postMessage({ type: 'pick', item })
+  return typeof link === 'string' ? link : undefined
 }

@@ -297,6 +297,8 @@ struct MarfaMappingTests {
         #expect(item.edgesOut.allSatisfy { $0.origin == .body })
         #expect(Set(item.edgesOut.map(\.id)).count == item.edgesOut.count)
         #expect(MarfaMapping.unresolvedLinks(of: "n", in: nil).isEmpty)
+        // The links already bound to an item are kept by the name each is spelled with, since the package keeps them.
+        #expect(item.establishedLinks == [NoteLinks.nameKey("Plan"): ItemID("plan")])
     }
 
     @Test func aChildHoldsItsParentUnderTheReverseName() {

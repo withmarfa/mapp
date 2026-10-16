@@ -4,6 +4,12 @@
     "Author Comment" : {
 
     },
+    "Callout" : {
+
+    },
+    "Caution" : {
+
+    },
     "Collapse" : {
 
     },
@@ -13,7 +19,13 @@
     "Couldn’t Save Note" : {
 
     },
+    "Diagram" : {
+
+    },
     "Diagram unavailable:" : {
+
+    },
+    "Divider" : {
 
     },
     "Editor Couldn’t Complete the Action" : {
@@ -34,10 +46,28 @@
     "Footnote" : {
 
     },
+    "Heading 1" : {
+
+    },
+    "Heading 2" : {
+
+    },
+    "Heading 3" : {
+
+    },
+    "Important" : {
+
+    },
+    "Link to Note" : {
+
+    },
     "Link unavailable" : {
 
     },
     "Loading file…" : {
+
+    },
+    "Loading…" : {
 
     },
     "Markdown Source" : {
@@ -58,6 +88,9 @@
     "Preview unavailable" : {
 
     },
+    "Quote" : {
+
+    },
     "Rendering diagram…" : {
 
     },
@@ -70,10 +103,19 @@
     "Start typing…" : {
 
     },
+    "Suggestions" : {
+
+    },
     "The PDF exceeds the export limit of 200 pages or 64 MB." : {
 
     },
     "The editor could not finish the current change. Keep this window open and try again." : {
+
+    },
+    "Tip" : {
+
+    },
+    "Warning" : {
 
     },
     "The printable note could not finish loading." : {

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test, vi } from 'vitest'
 import { InkKitError } from '@aicayzer/inkkit'
+import { pickNote, suggestNotes } from '../src/bridge'
 import {
   NoteEditor,
   isPreviewDiagnostic,
@@ -285,8 +286,10 @@ test("the words the app sends mount InkKit, with the app's own kept out of its l
   expect(Object.keys(labels.header).sort()).toEqual(
     ['discardChanges', 'itemType', 'propertyRejected', 'status', 'title', 'untitled'].sort(),
   )
-  expect(labels.noteReference).toContain('%@')
+  expect(labels.words.noteReference).toContain('%@')
+  expect(labels.words.linkToNote).toBeTruthy()
   expect(Object.keys(labels.editor)).not.toContain('noteReference')
+  expect(Object.keys(labels.editor)).not.toContain('linkToNote')
   expect(Object.keys(labels.editor)).not.toContain('untitled')
 
   const root = document.createElement('div')
@@ -295,14 +298,14 @@ test("the words the app sends mount InkKit, with the app's own kept out of its l
     root,
     { find() {}, changed() {}, stateChanged() {}, openLink() {}, copy() {} },
     labels.editor,
-    labels.noteReference,
+    labels.words,
   )
   editor.setItem('note')
   editor.load('![[A note]]\n', 1)
   try {
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
-      labels.noteReference!.replace('%@', 'A note'),
+      labels.words.noteReference!.replace('%@', 'A note'),
     )
     await expect(
       NoteEditor.mount(
@@ -433,3 +436,56 @@ test('load takes the focus off the text and focus after it restores it, with CRL
     })
     expect(editor.snapshot().text).toBe('Five\r\n')
   }))
+
+test("the page asks the app's notes and falls back to nothing when it cannot", async () => {
+  const requests: unknown[] = []
+  const answer = { current: undefined as unknown }
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        notes: {
+          postMessage: async (request: unknown) => {
+            requests.push(request)
+            return answer.current
+          },
+        },
+      },
+    },
+  })
+  try {
+    answer.current = ['Garden ideas', 7, 'Bike service']
+    expect(await suggestNotes('g', 'note')).toEqual(['Garden ideas', 'Bike service'])
+    answer.current = null
+    expect(await suggestNotes('g', 'note')).toEqual([])
+    answer.current = '[[Garden ideas]]'
+    expect(await pickNote('note')).toBe('[[Garden ideas]]')
+    answer.current = null
+    expect(await pickNote('note')).toBeUndefined()
+    expect(requests).toEqual([
+      { type: 'suggest', query: 'g', item: 'note' },
+      { type: 'suggest', query: 'g', item: 'note' },
+      { type: 'pick', item: 'note' },
+      { type: 'pick', item: 'note' },
+    ])
+    delete (window as { webkit?: unknown }).webkit
+    expect(await suggestNotes('g', 'note')).toEqual([])
+    expect(await pickNote('note')).toBeUndefined()
+  } finally {
+    delete (window as { webkit?: unknown }).webkit
+  }
+})
+
+test('a link by identity with an escaped title shows the title and is not rewritten', async () => {
+  const identity = '22222222-2222-4222-8222-222222222222'
+  const labels = ['A|B', 'A#B', 'A]B', '[Draft]', 'back\\slash', 'Café 日本語']
+  const escape = (label: string) => label.replace(/[\\[\]|#]/g, (c) => '\\' + c)
+  const source = labels.map((label) => `See [[${identity}|${escape(label)}]]\n`).join('\n')
+  await withEditor(source, async (editor) => {
+    expect(editor.markdown()).toBeNull()
+    expect(editor.snapshot().text).toBe(source)
+    const shown = document.querySelector('.ProseMirror')!.textContent!
+    for (const label of labels) expect(shown).toContain('See ' + label)
+    expect(shown).not.toContain(identity)
+  })
+})

@@ -73,6 +73,19 @@ extension NoteLibrary {
         return self.note(id)?.file == file
     }
 
+    /// The link whose spelling the connection index resolves to this note alone: its title, else its path, else the
+    /// identity its file declares. Nil when none does, as when another note goes by the same title and path form.
+    func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
+        guard let target = item(id), !target.isFile else { return nil }
+        let index = connectionIndex
+        let candidates = [target.title, path(of: id), target.value(of: "marfa_id")?.string].compactMap { $0 }
+        guard let spelling = candidates.first(where: { NoteLinks.canSpell($0) && index.resolution(of: $0) == .resolved(id) })
+        else { return nil }
+        // An identity shows the title, as a link by identity does everywhere.
+        return NoteLinks.looksLikeIdentity(spelling)
+            ? NoteLinks.identityLink(to: spelling, titled: target.title, readsBrackets: false) : NoteLinks.link(to: spelling)
+    }
+
     private func reference(to targetID: ItemID) -> String? {
         guard let target = item(targetID) else { return nil }
         let candidates = [target.title, path(of: targetID), target.value(of: "marfa_id")?.string].compactMap { $0 }

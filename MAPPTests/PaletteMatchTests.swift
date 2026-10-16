@@ -24,4 +24,19 @@ struct PaletteMatchTests {
     @Test func anEmptyQueryKeepsEveryTitleInOrder() {
         #expect(PaletteMatch.ranked(["b", "a"], "  ") == [0, 1])
     }
+
+    @Test func scoresForNonASCIITitlesArePinned() {
+        // A word starts after a character that is not a letter. A vowel sign belongs to the letter before it.
+        #expect(PaletteMatch.score("किताब", "ताब") == 2)
+        #expect(PaletteMatch.score("किताब", "ता") == 2)
+        #expect(PaletteMatch.score("किताब", "ब") == 2)
+        #expect(PaletteMatch.score("किताब", "किता") == 0)
+        #expect(PaletteMatch.score("किTable", "Table") == 2)
+        #expect(PaletteMatch.score("Café plans", "plans") == 1)
+        #expect(PaletteMatch.score("Éclair", "ECL") == 0)
+        // Half of a joined emoji is not a character of its own.
+        #expect(PaletteMatch.score("👩‍💻 project", "👩") == nil)
+        #expect(PaletteMatch.score("👩‍💻 project", "project") == 1)
+        #expect(PaletteMatch.score("日本語のノート", "ノート") == 2)
+    }
 }

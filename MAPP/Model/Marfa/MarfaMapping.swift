@@ -128,12 +128,19 @@ nonisolated enum MarfaMapping {
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
+        var established: [String: ItemID] = [:]
+        for name in bodyLinks?.links ?? [] {
+            if case .item(let target) = name.target {
+                let key = NoteLinks.nameKey(NoteName.trimmed(name.name))
+                if established[key] == nil { established[key] = ItemID(target) }
+            }
+        }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync)
+            sync: sync, establishedLinks: established)
     }
 
     /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads

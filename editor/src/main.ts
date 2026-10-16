@@ -82,7 +82,7 @@ const editor = await NoteEditor.mount(
     },
   },
   labels.editor,
-  labels.noteReference,
+  labels.words,
 )
 const header = new ItemHeader(headerRoot, labels.header)
 

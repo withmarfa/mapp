@@ -46,6 +46,17 @@ final class EditorController: NSObject {
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
+    @ObservationIgnored private let noteRequests = NoteRequests()
+    @ObservationIgnored private let noteTitles = NoteLinks.Index()
+
+    /// The Link to Note command, until the person has chosen a note or declined; the page waits on it.
+    struct LinkRequest: Identifiable {
+        let id = UUID()
+        let note: ItemID
+    }
+    var linkRequest: LinkRequest?
+    @ObservationIgnored private var linking: CheckedContinuation<String?, Never>?
+    @ObservationIgnored private var windowIsGone = false
 
     @ObservationIgnored let webView: EditorWebView
     /// The page with the system find bar above it, which is what the window shows.
@@ -96,6 +107,12 @@ final class EditorController: NSObject {
         webView.controller = self
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
+        noteRequests.suggest = { [weak self] query, source in
+            guard let self, let current = self.library else { return [] }
+            return await current.noteNames(matching: query, in: source, using: self.noteTitles)
+        }
+        noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
+        configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -225,6 +242,8 @@ final class EditorController: NSObject {
     /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
     /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
+        // The request was typed into the text now being replaced, which the page would refuse an answer for.
+        cancelLinkRequest()
         guard let body = library?.body(of: item.id) else { return close() }
         if function == "load" { isPresented = true }
         noteID = item.id
@@ -245,6 +264,7 @@ final class EditorController: NSObject {
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
+        cancelLinkRequest()
         wantsFocus = nil
         isPresented = false
         loadRequest += 1
@@ -328,6 +348,8 @@ final class EditorController: NSObject {
     /// The window is gone and its text already flushed, so its drafts and page take no part in later flushes, even
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
+        windowIsGone = true
+        cancelLinkRequest()
         titleDrafts = nil
         Self.open.remove(self)
     }
@@ -572,6 +594,41 @@ final class EditorController: NSObject {
         return menuEmbed
     }
 
+    // MARK: Linking to a note
+
+    /// Asks the person which note to link to, and gives the page the link to write, or nil if they decline or the
+    /// page has moved on from the note the command was typed in. A new request cancels the earlier one. A request
+    /// made after the window went is answered with nothing.
+    func chooseNoteToLink(from note: ItemID) async -> String? {
+        cancelLinkRequest()
+        guard !windowIsGone, note == noteID, isEditable, isReady else { return nil }
+        return await withCheckedContinuation { continuation in
+            linking = continuation
+            linkRequest = LinkRequest(note: note)
+        }
+    }
+
+    /// Answers the page with the link to the note chosen, read from the library as the note is now, not as the
+    /// picker listed it, and by identity, so a note renamed meanwhile is linked by its new name and one that shares
+    /// its name is not mistaken for it. Whether it was answered: a note no link can name alone leaves the request
+    /// open for the person to choose another.
+    @discardableResult
+    func finishLinkRequest(choosing id: ItemID) -> Bool {
+        guard linking != nil, let source = linkRequest?.note, let link = library?.bodyLink(to: id, in: source) else { return false }
+        answerLinkRequest(link)
+        return true
+    }
+
+    /// Any other end of the request answers the page with nothing, so it is never left waiting.
+    func cancelLinkRequest() { answerLinkRequest(nil) }
+
+    private func answerLinkRequest(_ link: String?) {
+        let continuation = linking
+        linking = nil
+        linkRequest = nil
+        continuation?.resume(returning: link)
+    }
+
     func setSourceMode(_ source: Bool) {
         guard hasNote, isReady else { return }
         call("setEditingMode", json(source ? "source" : "formatted"), String(generation))
@@ -649,6 +706,27 @@ final class EditorController: NSObject {
             "fileRetry": String(localized: "Try Again"),
             "comment": String(localized: "Author Comment"),
             "preservedMarkdown": String(localized: "Preserved Markdown"),
+            "suggestions": String(localized: "Suggestions"),
+            "suggestionsLoading": String(localized: "Loading…"),
+            "suggestionsEmpty": String(localized: "No Results"),
+            "slashHeading1": String(localized: "Heading 1"),
+            "slashHeading2": String(localized: "Heading 2"),
+            "slashHeading3": String(localized: "Heading 3"),
+            "slashBulletList": String(localized: "Bulleted List"),
+            "slashOrderedList": String(localized: "Numbered List"),
+            "slashTaskList": String(localized: "Checklist"),
+            "slashQuote": String(localized: "Quote"),
+            "slashCodeBlock": String(localized: "Code Block"),
+            "slashTable": String(localized: "Table"),
+            "slashCallout": String(localized: "Callout"),
+            "slashDivider": String(localized: "Divider"),
+            "slashDiagram": String(localized: "Diagram"),
+            "slashNote": String(localized: "Note"),
+            "slashTip": String(localized: "Tip"),
+            "slashImportant": String(localized: "Important"),
+            "slashWarning": String(localized: "Warning"),
+            "slashCaution": String(localized: "Caution"),
+            "linkToNote": String(localized: "Link to Note"),
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
             "itemType": String(localized: "Item Type"),
@@ -799,6 +877,7 @@ extension EditorController: WKNavigationDelegate {
             return
         }
         log.error("web content process ended; reloading")
+        cancelLinkRequest()
         isReady = false
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
     }

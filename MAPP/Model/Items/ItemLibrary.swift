@@ -45,6 +45,10 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
+    /// The `[[link]]` that the text of `source` can hold and the library resolves, from that note, to this item and
+    /// no other, or nil when no spelling does. A name `source` already links keeps its first target, so it is not
+    /// used for another item.
+    func bodyLink(to id: ItemID, in source: ItemID?) -> String?
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
@@ -118,6 +122,22 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
+    /// written in has not already bound that name to another. Otherwise the item's identity with its title as the label
+    /// (`[[identity|Title]]`), which Marfa reads as naming the identity.
+    func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
+        guard let target = item(id), !target.isFile else { return nil }
+        let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
+        if NoteLinks.canName(target.title), established[NoteLinks.nameKey(target.title)].map({ $0 == id }) ?? true {
+            let key = NoteLinks.nameKey(target.title)
+            let shared = items(in: .allNotes).contains {
+                $0.id != id && !$0.isFile && NoteLinks.nameKey(NoteName.trimmed($0.title)) == key
+            }
+            if !shared { return NoteLinks.link(to: target.title) }
+        }
+        return NoteLinks.looksLikeIdentity(id.rawValue) ? NoteLinks.identityLink(to: id.rawValue, titled: target.title) : nil
+    }
+
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
