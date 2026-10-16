@@ -79,7 +79,7 @@ extension NoteLibrary {
         guard let target = item(id), !target.isFile else { return nil }
         let index = connectionIndex
         let candidates = [target.title, path(of: id), target.value(of: "marfa_id")?.string].compactMap { $0 }
-        return candidates.first { NoteLinks.canName($0) && index.resolution(of: $0) == .resolved(id) }
+        return candidates.first { NoteLinks.canSpell($0) && index.resolution(of: $0) == .resolved(id) }
             .map(NoteLinks.link(to:))
     }
 

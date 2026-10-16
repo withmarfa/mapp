@@ -6,9 +6,21 @@ nonisolated enum NoteLinks {
     /// Whether `[[title]]` names the title as written. A link ends at `]]`, reads `|` as an alias and `#` as a
     /// heading, and the page reads `\` as an escape, so a title holding one is left out rather than linked to
     /// something else.
+    static func canSpell(_ text: String) -> Bool {
+        !text.isEmpty && text == NoteName.trimmed(text)
+            && !text.unicodeScalars.contains { "[]|#\\\r\n".unicodeScalars.contains($0) }
+    }
+
+    /// Whether the text is spelled as an identity, which a link reads as the item with that identity before it
+    /// looks at any title, as the folder index (`declaredID`) and Marfa (`is_id`) both do.
+    static func looksLikeIdentity(_ text: String) -> Bool {
+        text.count == 36 && UUID(uuidString: text) != nil
+    }
+
+    /// Whether a title can be the spelling of a link to its own note: it can be written, and it is not read as
+    /// an identity, which would name whichever item holds that identity.
     static func canName(_ title: String) -> Bool {
-        !title.isEmpty && title == NoteName.trimmed(title)
-            && !title.unicodeScalars.contains { "[]|#\\\r\n".unicodeScalars.contains($0) }
+        canSpell(title) && !looksLikeIdentity(title)
     }
 
     static func link(to title: String) -> String { "[[\(title)]]" }
