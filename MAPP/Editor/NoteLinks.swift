@@ -94,7 +94,7 @@ nonisolated enum NoteLinks {
 
         /// The titles that answer what was typed after `[[`, best first (the closest match, then the most recently
         /// edited), each once. A title another note also goes by is not offered, since a link to it would not say
-        /// which note.
+        /// which note, nor one the note it is typed in already links to another note (`established`).
         func names(matching text: String, among items: [Item], established: [String: ItemID] = [:], limit: Int) -> [String] {
             let query = Query(text)
             var notes = 0
@@ -120,6 +120,7 @@ nonisolated enum NoteLinks {
             }
             for item in items where !item.isFile {
                 guard let entry = entries[item.id], entry.nameable, holders[entry.key] == 1,
+                      established[entry.key].map({ $0 == item.id }) ?? true,
                       let score = NoteLinks.score(folded: entry.folded, query) else { continue }
                 Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
             }

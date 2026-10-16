@@ -122,14 +122,20 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
-    /// The title as a link where no other note goes by it, as the library's links compare names.
+    /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
+    /// written in has not already bound that name to another. Otherwise the item's identity, which a link reads as
+    /// that item whatever any title says.
     func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
-        guard let target = item(id), !target.isFile, NoteLinks.canName(target.title) else { return nil }
-        let key = NoteLinks.nameKey(target.title)
-        let shared = items(in: .allNotes).contains {
-            $0.id != id && !$0.isFile && NoteLinks.nameKey(NoteName.trimmed($0.title)) == key
+        guard let target = item(id), !target.isFile else { return nil }
+        let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
+        if NoteLinks.canName(target.title), established[NoteLinks.nameKey(target.title)].map({ $0 == id }) ?? true {
+            let key = NoteLinks.nameKey(target.title)
+            let shared = items(in: .allNotes).contains {
+                $0.id != id && !$0.isFile && NoteLinks.nameKey(NoteName.trimmed($0.title)) == key
+            }
+            if !shared { return NoteLinks.link(to: target.title) }
         }
-        return shared ? nil : NoteLinks.link(to: target.title)
+        return NoteLinks.looksLikeIdentity(id.rawValue) ? NoteLinks.link(to: id.rawValue) : nil
     }
 
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out

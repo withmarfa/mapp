@@ -102,13 +102,13 @@ struct NoteLinksTests {
         }
     }
 
-    @Test func aLibraryNamesTheNoteChosenOrNoneWhenOnlyAnotherCouldBeMeant() {
+    @Test func aLibraryNamesTheNoteChosenByTitleOrByIdentity() {
         let alone = note("Garden ideas", minutes: 1)
         let twin = note("garden IDEAS", minutes: 2)
         let odd = note("A|B", minutes: 3)
         let library = FakeItemLibrary(items: [alone, twin, odd, note("Old", minutes: 4)])
-        #expect(library.bodyLink(to: alone.id, in: nil) == nil, "a twin goes by the same name")
-        #expect(library.bodyLink(to: odd.id, in: nil) == nil, "a link cannot spell this title")
+        #expect(library.bodyLink(to: alone.id, in: nil) == "[[\(alone.id.rawValue)]]", "a twin goes by the same name, so its identity names it")
+        #expect(library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)]]", "a link cannot spell this title")
         #expect(library.bodyLink(to: library.items[3].id, in: nil) == "[[Old]]")
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
@@ -120,7 +120,7 @@ struct NoteLinksTests {
         let plain = note("Other", minutes: 2)
         let library = FakeItemLibrary(items: [shaped, plain])
         #expect(!NoteLinks.canName(identity))
-        #expect(library.bodyLink(to: shaped.id, in: nil) == nil, "the spelling would name another item")
+        #expect(library.bodyLink(to: shaped.id, in: nil) == "[[\(shaped.id.rawValue)]]", "the title would name whichever item holds that identity")
         #expect(library.bodyLink(to: plain.id, in: nil) == "[[Other]]")
     }
 
