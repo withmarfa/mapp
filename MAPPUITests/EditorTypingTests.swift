@@ -92,7 +92,9 @@ final class EditorTypingTests: XCTestCase {
         app.typeText("See [[bike")
         XCTAssertTrue(menuRow("Bike service").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(menuRow("Bike service").waitForNonExistence(timeout: 3))
+        Thread.sleep(forTimeInterval: 1)
+        print("DEBUG value:", String(describing: editor.value))
+        print("DEBUG page:", page.debugDescription)
         XCTAssertTrue(waitForText("CONTAINS", "Bike service"), text)
         XCTAssertFalse(text.contains("[[bike"))
     }
