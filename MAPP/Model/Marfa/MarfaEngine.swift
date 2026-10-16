@@ -435,9 +435,8 @@ actor MarfaEngine {
         if !readQueueOnce {
             readQueueOnce = true
             for write in queue {
-                guard let itemID = write.itemId, let verdict = write.verdict, let outcome = MarfaMapping.outcome(verdict)
-                else { continue }
-                remember(outcome, of: write.kind, for: ItemID(itemID))
+                guard let itemID = write.itemId, let verdict = write.verdict else { continue }
+                remember(MarfaMapping.outcome(verdict), of: write.kind, for: ItemID(itemID))
             }
         }
         for write in queue {
@@ -608,6 +607,11 @@ actor MarfaEngine {
         case .local, .answered, .refreshed(.drained): break
         case .serverReachable: await sync.reachable()
         case .serverUnreachable(let error): await sync.unreachable(error.message)
+        // The copy drains what waited when the server is back; its answers are taken as a drain of the sync lane's.
+        case .queueDrained(let report):
+            if !report.verdicts.isEmpty { await answer(report) }
+            await sync.drainedByFollow(report)
+        case .queueNotDrained(let error): await sync.drainStopped(error)
         case .server:
             await sync.heard()
             await reread(change)
@@ -781,10 +785,8 @@ actor MarfaEngine {
                 // The copy's own version of the edge, since the move is refused on any other; an edge it shows
                 // moved by a move still waiting is read from its new ends.
                 let held = try await heldEdge(edge)
-                // The edge is already there, as when an undo follows a refused move. The package would queue an
-                // update that changes nothing, which the server refuses.
-                if (end == .source ? held.sourceId : held.targetId) == to.rawValue { return [] }
-                return [try await copy.edges.update(edge.id, EdgeEdit(baseVersion: held.version, move: move))]
+                // The edge is already there, as when an undo follows a refused move: the package queues nothing.
+                return try await copy.edges.update(edge.id, EdgeEdit(baseVersion: held.version, move: move)).map { [$0] } ?? []
             } catch let error as MarfaError {
                 if let problem = Self.moveProblem(error) { throw Refused(problem: problem) }
                 throw error
@@ -1066,7 +1068,8 @@ actor MarfaEngine {
         var leaving: Set<String> = []
         for answer in report.verdicts {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
-            guard let verdict = answer.verdict, let outcome = MarfaMapping.outcome(verdict) else { continue }
+            guard let verdict = answer.verdict else { continue }
+            let outcome = MarfaMapping.outcome(verdict)
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
                 ids.insert(itemID)

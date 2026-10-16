@@ -20,6 +20,7 @@
 - Disconnecting forgets the address before it removes the key and the copy, so a quit partway through never reopens that server. Switching server shows the new server's library before the old key and copy are removed.
 - A refused key parks the queue until Settings gives another key; the parked writes go with the next drain. Writes made while the key changes wait for the copy rather than fail. A key that works is kept until the server has taken the new one.
 - `MarfaHost.handOverEdits` has the pages hand over their edits as a step starts and again right before it reads or closes a copy.
+- When the server is back, the copy's held stream drains the queue itself, once, and tells `queueDrained` with the report or `queueNotDrained` with the error. The engine takes those answers as it takes a drain of `MarfaSync`'s own, and `MarfaSync` starts no drain on `serverReachable`. Never start a second drain there.
 - When a drain answer expires the copy (`copyExpired`, for example after a retype), `MarfaSync` hydrates again, which keeps the queue, and only then reads the answers from the queue. Never clear the queue to recover from an expired copy.
 - A refused write that carried content stays listed until the person discards it, and discarding one that carried text is confirmed, since the write holds the only copy.
 
@@ -35,7 +36,7 @@
 
 - A relationship is an edge, named as the end that holds it writes it (`child-of`), with the other end as `inverse:` and the edge type. Check links against the catalogue's types, roles, how many each end may hold, and the contract's cycle rule (`conformance/spec/edges.md`) before sending.
 - An end that holds one link of its type has it replaced by moving the edge's other end: one queued `edges.update` with an `EdgeEdit`, which keeps the edge's ID. Never remove and add, which leaves the end holding none or two for a moment and loses the link on a refusal.
-- A move to the end the edge already holds queues nothing, because the server refuses an update that changes nothing.
+- A move to the end the edge already holds queues nothing: the package returns `nil` from `edges.update`, since the server refuses an update that changes nothing.
 - Never take a link that a third item holds as its own; tell the person which item holds it. A change that would need two edges to move is told and not sent.
 - Where a field that holds many swaps one item for another, add the new links first and remove the old ones only once the source has taken them.
 - What an item's text links or embeds is written as edges by the package when the text is saved. Change a link in the text, never as a relationship.

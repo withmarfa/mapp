@@ -293,16 +293,13 @@ nonisolated enum MarfaMapping {
 
     // MARK: Verdicts and sync
 
-    /// Nil for a write with no verdict yet, or held behind another, which the package still names as blocked
-    /// `awaitingDependency`.
-    static func outcome(_ verdict: Marfa.Verdict) -> WriteOutcome? {
+    static func outcome(_ verdict: Marfa.Verdict) -> WriteOutcome {
         switch verdict {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
         case .conflicted(let sibling, let fields): .conflicted(sibling: ItemID(sibling), fields: fields)
         case .refused(let refusal): .refused(problem(refusal))
-        case .blocked(let reason, let refusal):
-            blockedReason(reason).map { .blocked($0, refusal.map(problem)) }
+        case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map(problem))
         case .dead: .dead
         }
     }
@@ -324,13 +321,12 @@ nonisolated enum MarfaMapping {
         return SyncProblem.Grant(kind: kind, name: grant.name, level: grant.level == .read ? .read : .write)
     }
 
-    static func blockedReason(_ reason: Marfa.BlockedReason) -> BlockedReason? {
+    static func blockedReason(_ reason: Marfa.BlockedReason) -> BlockedReason {
         switch reason {
         case .credentialRefused: .credentialRefused
         case .keySpent: .keySpent
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
-        case .awaitingDependency: nil
         }
     }
 
@@ -343,11 +339,11 @@ nonisolated enum MarfaMapping {
         for write in queue {
             guard let itemID = write.itemId else { continue }
             let id = ItemID(itemID)
-            guard let verdict = write.verdict, let outcome = outcome(verdict) else {
+            guard let verdict = write.verdict else {
                 waiting[id, default: 0] += 1
                 continue
             }
-            let state = outcome.syncState
+            let state = outcome(verdict).syncState
             if state != .settled, rank(state) > rank(answered[id]) { answered[id] = state }
         }
         for (id, count) in waiting where answered[id] == nil {
