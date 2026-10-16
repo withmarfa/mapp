@@ -9,7 +9,7 @@ import {
   type TableCommand,
   type ReadableTextSnapshot,
 } from '@aicayzer/inkkit'
-import { postToHost, type EmbeddedFile, type EmbedRequest } from './bridge'
+import { pickNote, postToHost, suggestNotes, type EmbeddedFile, type EmbedRequest } from './bridge'
 import type { HeaderLabels } from './header'
 
 /** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
@@ -21,8 +21,12 @@ export function isPreviewDiagnostic(error: Error): boolean {
 }
 
 /** The words the app hands the page. InkKit rejects a label it does not know, so only InkKit's own go to it;
- *  the header's and the note reference's are MAPP's. */
-export type AppLabels = Partial<EditorLabels & HeaderLabels> & { noteReference?: string }
+ *  the header's, the note reference's and the Link to Note command's are MAPP's. */
+export interface AppWords {
+  noteReference?: string
+  linkToNote?: string
+}
+export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
 const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'untitled',
   'title',
@@ -34,15 +38,15 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
 export function splitLabels(all: AppLabels): {
   editor: Partial<EditorLabels>
   header: Partial<HeaderLabels>
-  noteReference?: string
+  words: AppWords
 } {
-  const { noteReference, ...rest } = all
+  const { noteReference, linkToNote, ...rest } = all
   const header: Partial<HeaderLabels> = {}
   for (const key of headerLabelKeys) {
     if (key in rest) header[key] = rest[key]
     delete rest[key]
   }
-  return { editor: rest, header, noteReference }
+  return { editor: rest, header, words: { noteReference, linkToNote } }
 }
 
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
@@ -132,7 +136,7 @@ export class NoteEditor {
     root: HTMLElement,
     events: EditorEvents,
     labels: Partial<EditorLabels> = {},
-    noteReference?: string,
+    words: AppWords = {},
   ): Promise<NoteEditor> {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
@@ -174,7 +178,7 @@ export class NoteEditor {
               return {
                 kind: 'file',
                 label:
-                  noteReference?.replace('%@', reference.label ?? reference.reference) ??
+                  words.noteReference?.replace('%@', reference.label ?? reference.reference) ??
                   `Note reference: ${reference.label ?? reference.reference}. Open to edit source.`,
               }
             const embed = request(reference, context.documentId)
@@ -223,6 +227,25 @@ export class NoteEditor {
               opens: described.get(JSON.stringify(embed))?.opens ?? false,
             })
           },
+        },
+        wikiLinks: {
+          // The app matches names against its library; a request the person has typed past is not sent.
+          suggest: (query, context) =>
+            context.signal.aborted ? Promise.resolve([]) : suggestNotes(query),
+          open(reference) {
+            if (reference.target) postToHost({ type: 'openNote', target: reference.target })
+          },
+        },
+        slashMenu: {
+          enabled: true,
+          customCommands: [
+            {
+              name: words.linkToNote ?? 'Link to Note',
+              keywords: ['note', 'wiki', 'reference'],
+              // The app asks the person which note, and answers with the link, or nothing if they decline.
+              action: (context) => pickNote(context.documentId),
+            },
+          ],
         },
       },
     )

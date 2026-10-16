@@ -89,6 +89,13 @@ struct NotePage: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .sheet(item: $editor.linkRequest, onDismiss: {
+            // Escape closes the sheet without answering, so the page's command is answered here as declined.
+            editor.cancelLinkRequest()
+            editor.focus(item.id)
+        }) { request in
+            NoteLinkPicker(editor: editor, note: request.note)
+        }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             editor.focus(item.id)

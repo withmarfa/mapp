@@ -1525,4 +1525,104 @@ struct EditorTests {
         let reason = try await value("document.querySelector('.item-title-error .item-error').textContent") as? String
         #expect(reason?.contains("file name") == false, "a library without files does not talk about file names: \(reason ?? "")")
     }
+
+    // MARK: Notes the page links to
+
+    private func addNotes(_ titles: [String], to page: Harness) -> [ItemID] {
+        titles.map { title in
+            let note = Note(body: title + "\n", created: .now)
+            page.library.notes.append(note)
+            return note.id
+        }
+    }
+
+    private func ask(_ page: Harness, _ request: String) async throws -> Any? {
+        try await page.editor.webView.callAsyncJavaScript(
+            "return await window.webkit.messageHandlers.notes.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
+    }
+
+    @Test func theNotesAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
+        let page = try await Harness()
+        _ = addNotes(["Garden ideas", "Bike service", "Gardening tools"], to: page)
+        try await page.load("Intro\n")
+        let names = try await ask(page, "{ type: 'suggest', query: 'gard' }") as? [String]
+        #expect(Set(names ?? []) == ["Garden ideas", "Gardening tools"])
+        #expect(try await ask(page, "{ type: 'suggest', query: 'zzz' }") as? [String] == [])
+        let unread = try await ask(page, "{ type: 'nonsense' }")
+        #expect(unread == nil || unread is NSNull, "a request that cannot be read is answered, not left waiting")
+    }
+
+    @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
+        let page = try await Harness()
+        let ids = addNotes(["Garden ideas"], to: page)
+        try await page.load("Intro\n")
+        let current = try #require(page.editor.noteID)
+        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: \(JSON.stringify(current.rawValue)) })")
+        try await page.wait { page.editor.linkRequest != nil }
+        #expect(page.editor.linkRequest?.note == current)
+        page.editor.finishLinkRequest(choosing: page.library.item(ids[0]))
+        #expect(page.editor.linkRequest == nil)
+        let link = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
+        #expect(link as? String == "[[Garden ideas]]")
+    }
+
+    @Test func linkToNoteDeclinedClosedOrAskedFromAnotherNoteAnswersWithNothing() async throws {
+        let page = try await Harness()
+        let ids = addNotes(["Garden ideas"], to: page)
+        try await page.load("Intro\n")
+        let current = try #require(page.editor.noteID)
+        func ask(from item: ItemID) async throws {
+            try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: \(JSON.stringify(item.rawValue)) })")
+        }
+        func answered() async throws -> Bool {
+            let value = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
+            return value == nil || value is NSNull
+        }
+        try await ask(from: current)
+        try await page.wait { page.editor.linkRequest != nil }
+        page.editor.cancelLinkRequest()
+        #expect(try await answered(), "declining answers the page with nothing")
+
+        try await ask(from: current)
+        try await page.wait { page.editor.linkRequest != nil }
+        page.editor.close()
+        #expect(page.editor.linkRequest == nil)
+        #expect(try await answered(), "leaving the note answers the page with nothing")
+
+        try await page.load("Another\n")
+        try await ask(from: ids[0])
+        #expect(try await answered())
+        #expect(page.editor.linkRequest == nil, "a command typed in a note no longer shown opens nothing")
+
+        let editor = page.editor
+        try await ask(from: try #require(editor.noteID))
+        try await page.wait { editor.linkRequest != nil }
+        editor.windowWent()
+        #expect(try await answered(), "closing the window answers the page with nothing")
+    }
+
+    @Test func openingALinkShowsTheNoteItNamesOrSaysThereIsNone() async throws {
+        let page = try await Harness()
+        let ids = addNotes(["Garden ideas"], to: page)
+        try await page.load("Intro\n")
+        var opened: [ItemID] = []
+        page.editor.onOpenNote = { opened.append($0) }
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'openNote', target: 'garden IDEAS' })")
+        try await page.wait { !opened.isEmpty }
+        #expect(opened == [ids[0]])
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'openNote', target: 'Nowhere' })")
+        try await page.wait { page.library.failure != nil }
+        #expect(page.library.failure?.title == "Note Not Found")
+        #expect(opened == [ids[0]])
+    }
+
+    @Test func theSlashMenuAndItsWordsComeFromTheAppsStrings() async throws {
+        let page = try await Harness()
+        try await page.load("\n")
+        let labels = try await page.editor.webView.evaluateJavaScript("window.mappLabels") as? [String: String]
+        #expect(labels?["linkToNote"] == "Link to Note")
+        #expect(labels?["slashTable"] == "Table")
+        #expect(labels?["suggestionsLoading"] == "Loading…")
+        #expect(labels?["suggestionsEmpty"] == "No Results")
+    }
 }

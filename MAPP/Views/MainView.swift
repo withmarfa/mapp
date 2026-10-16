@@ -245,6 +245,9 @@ struct MainView: View {
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
+            editor.onOpenNote = { [browser, library, order] id in
+                if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
+            }
             editor.onShowRefusedTitle = { [browser, library, order] id in
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
             }

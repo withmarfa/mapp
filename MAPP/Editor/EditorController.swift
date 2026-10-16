@@ -46,6 +46,17 @@ final class EditorController: NSObject {
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
+    /// A `[[link]]` opened in the page, for the window to show the note it names.
+    @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
+    @ObservationIgnored private let noteRequests = NoteRequests()
+
+    /// The Link to Note command, until the person has chosen a note or declined; the page waits on it.
+    struct LinkRequest: Identifiable {
+        let id = UUID()
+        let note: ItemID
+    }
+    var linkRequest: LinkRequest?
+    @ObservationIgnored private var linking: CheckedContinuation<String?, Never>?
 
     @ObservationIgnored let webView: EditorWebView
     /// The page with the system find bar above it, which is what the window shows.
@@ -96,6 +107,9 @@ final class EditorController: NSObject {
         webView.controller = self
         embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
+        noteRequests.suggest = { [weak self] query in await self?.library?.noteNames(matching: query) ?? [] }
+        noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
+        configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         #if DEBUG
         webView.isInspectable = true
         #endif
@@ -245,6 +259,7 @@ final class EditorController: NSObject {
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
+        cancelLinkRequest()
         wantsFocus = nil
         isPresented = false
         loadRequest += 1
@@ -328,6 +343,7 @@ final class EditorController: NSObject {
     /// The window is gone and its text already flushed, so its drafts and page take no part in later flushes, even
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
+        cancelLinkRequest()
         titleDrafts = nil
         Self.open.remove(self)
     }
@@ -572,6 +588,29 @@ final class EditorController: NSObject {
         return menuEmbed
     }
 
+    // MARK: Linking to a note
+
+    /// Asks the person which note to link to, and gives the page the link to write, or nil if they decline or the
+    /// page has moved on from the note the command was typed in.
+    func chooseNoteToLink(from note: ItemID) async -> String? {
+        cancelLinkRequest()
+        guard note == noteID, isEditable, isReady else { return nil }
+        return await withCheckedContinuation { continuation in
+            linking = continuation
+            linkRequest = LinkRequest(note: note)
+        }
+    }
+
+    /// The person's answer, nil for none. Any answer closes the request, so the page is never left waiting.
+    func finishLinkRequest(choosing note: Item?) {
+        let continuation = linking
+        linking = nil
+        linkRequest = nil
+        continuation?.resume(returning: note.map { NoteLinks.link(to: $0.title) })
+    }
+
+    func cancelLinkRequest() { finishLinkRequest(choosing: nil) }
+
     func setSourceMode(_ source: Bool) {
         guard hasNote, isReady else { return }
         call("setEditingMode", json(source ? "source" : "formatted"), String(generation))
@@ -649,6 +688,27 @@ final class EditorController: NSObject {
             "fileRetry": String(localized: "Try Again"),
             "comment": String(localized: "Author Comment"),
             "preservedMarkdown": String(localized: "Preserved Markdown"),
+            "suggestions": String(localized: "Suggestions"),
+            "suggestionsLoading": String(localized: "Loading…"),
+            "suggestionsEmpty": String(localized: "No Results"),
+            "slashHeading1": String(localized: "Heading 1"),
+            "slashHeading2": String(localized: "Heading 2"),
+            "slashHeading3": String(localized: "Heading 3"),
+            "slashBulletList": String(localized: "Bulleted List"),
+            "slashOrderedList": String(localized: "Numbered List"),
+            "slashTaskList": String(localized: "Checklist"),
+            "slashQuote": String(localized: "Quote"),
+            "slashCodeBlock": String(localized: "Code Block"),
+            "slashTable": String(localized: "Table"),
+            "slashCallout": String(localized: "Callout"),
+            "slashDivider": String(localized: "Divider"),
+            "slashDiagram": String(localized: "Diagram"),
+            "slashNote": String(localized: "Note"),
+            "slashTip": String(localized: "Tip"),
+            "slashImportant": String(localized: "Important"),
+            "slashWarning": String(localized: "Warning"),
+            "slashCaution": String(localized: "Caution"),
+            "linkToNote": String(localized: "Link to Note"),
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
             "itemType": String(localized: "Item Type"),
@@ -731,6 +791,12 @@ final class EditorController: NSObject {
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
                 NSWorkspace.shared.open(url)
             }
+        case .openNote(let target):
+            if let note = library?.note(named: target) {
+                onOpenNote(note.id)
+            } else {
+                library?.failure = (String(localized: "Note Not Found"), String(localized: "No note is named “\(target)”."))
+            }
         case .copy(let text):
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -799,6 +865,7 @@ extension EditorController: WKNavigationDelegate {
             return
         }
         log.error("web content process ended; reloading")
+        cancelLinkRequest()
         isReady = false
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
     }

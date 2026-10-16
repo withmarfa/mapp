@@ -44,6 +44,8 @@ nonisolated enum EditorMessage: Sendable {
     /// A chip asks for its menu, with the chip's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
     case openLink(String)
+    /// A `[[link]]` was opened, with the target it names.
+    case openNote(String)
     case copy(String)
     case escape
     case pasteImages
@@ -82,6 +84,9 @@ nonisolated enum EditorMessage: Sendable {
         case "openLink":
             guard let href = dict["href"] as? String else { return nil }
             self = .openLink(href)
+        case "openNote":
+            guard let target = dict["target"] as? String else { return nil }
+            self = .openNote(target)
         case "headerScrolledAway":
             guard let away = dict["away"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
             self = .headerScrolledAway(away, generation: generation)
