@@ -489,3 +489,22 @@ test('a link by identity with an escaped title shows the title and is not rewrit
     expect(shown).not.toContain(identity)
   })
 })
+
+test('a note link typed in double brackets becomes a link and is saved as typed', async () => {
+  const identity = '22222222-2222-4222-8222-222222222222'
+  const links = ['[[Garden ideas]]', `[[${identity}|Garden ideas]]`, '[[Garden ideas#Soil|soil]]']
+  for (const link of links)
+    await withEditor('See\n', (editor) => {
+      const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor })
+        .engine
+      const text = engine.textSnapshot(1)
+      engine.selectTextRange({
+        snapshotId: text.snapshotId,
+        from: text.text.length,
+        to: text.text.length,
+      })
+      for (const character of link) engine.insertText(character, 1)
+      expect(document.querySelectorAll('.inkkit-wiki-link')).toHaveLength(1)
+      expect(editor.snapshot().text).toBe(`See${link}\n`)
+    })
+})
