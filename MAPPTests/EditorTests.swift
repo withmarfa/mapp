@@ -1557,7 +1557,7 @@ struct EditorTests {
         let ids = addNotes(["Garden ideas"], to: page)
         try await page.load("Intro\n")
         let current = try #require(page.editor.noteID)
-        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: \(JSON.stringify(current.rawValue)) })")
+        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         #expect(page.editor.linkRequest?.note == current)
         page.editor.finishLinkRequest(choosing: page.library.item(ids[0]))
@@ -1572,7 +1572,7 @@ struct EditorTests {
         try await page.load("Intro\n")
         let current = try #require(page.editor.noteID)
         func ask(from item: ItemID) async throws {
-            try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: \(JSON.stringify(item.rawValue)) })")
+            try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(item.rawValue)' })")
         }
         func answered() async throws -> Bool {
             let value = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
