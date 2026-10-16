@@ -92,11 +92,10 @@ final class EditorTypingTests: XCTestCase {
         app.typeText("See [[bike")
         XCTAssertTrue(menuRow("Bike service").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        Thread.sleep(forTimeInterval: 1)
-        print("DEBUG value:", String(describing: editor.value))
-        print("DEBUG page:", page.debugDescription)
-        XCTAssertTrue(waitForText("CONTAINS", "Bike service"), text)
-        XCTAssertFalse(text.contains("[[bike"))
+        XCTAssertTrue(waitForText("CONTAINS", "See Bike service"), text)
+        XCTAssertFalse(text.contains("[["))
+        app.typeText(" and more")
+        XCTAssertTrue(waitForText("CONTAINS", "Bike service and more"), "typing carries on after the link: \(text)")
     }
 
     func testOptionUpAndOptionDownMoveTheBlock() {
@@ -109,7 +108,17 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "first"), text)
     }
 
-    func testQuotesAndDashesStayAsTyped() {
+    /// InkKit's smart punctuation is off. The system's own substitution, which a person sets in Keyboard settings
+    /// and WebKit applies to any text field, is turned off for this launch so the test shows what the page adds.
+    func testThePageAddsNoCurlyQuotesOrDashes() {
+        app.terminate()
+        app.launchArguments += [
+            "-NSAutomaticQuoteSubstitutionEnabled", "NO", "-NSAutomaticDashSubstitutionEnabled", "NO",
+            "-WebAutomaticQuoteSubstitutionEnabled", "NO", "-WebAutomaticDashSubstitutionEnabled", "NO",
+        ]
+        app.launch()
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        beginNewItem(title: "Quotes test")
         app.typeText("\"quoted\" it's -- done")
         XCTAssertTrue(waitForText("CONTAINS", "\"quoted\" it's -- done"), text)
     }
