@@ -6,7 +6,6 @@ struct NoteWindow: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
     @State private var editorSlot = EditorSlot()
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
@@ -25,7 +24,6 @@ struct NoteWindow: View {
             editor.titleDrafts = details
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [library] id in library.leave(id) }
-            editor.onOpenNote = { [openWindow] id in openWindow(value: id) }
             return editor
         }
     }

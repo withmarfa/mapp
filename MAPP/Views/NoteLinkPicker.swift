@@ -10,6 +10,8 @@ struct NoteLinkPicker: View {
     @State private var highlighted = 0
     /// Read once, so typing in the field narrows a list that is already sorted.
     @State private var notes: [Item] = []
+    /// A note was chosen that no link can name alone, so the person is asked for another.
+    @State private var refused = false
     @FocusState private var isFieldFocused: Bool
 
     private static let limit = 50
@@ -44,6 +46,10 @@ struct NoteLinkPicker: View {
             .overlay {
                 if matches.isEmpty { ContentUnavailableView.search(text: query) }
             }
+            if refused {
+                Text("The item's title and path cannot be represented as an unambiguous file link.")
+                    .interfaceFont(.callout).foregroundStyle(.red)
+            }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { editor.cancelLinkRequest() }
@@ -60,9 +66,9 @@ struct NoteLinkPicker: View {
             highlighted = max(highlighted - 1, 0)
             return .handled
         }
-        .onChange(of: query) { highlighted = 0 }
+        .onChange(of: query) { highlighted = 0; refused = false }
         .task {
-            notes = library.linkableNotes(excluding: note)
+            notes = library.notesToLink(excluding: note)
             isFieldFocused = true
         }
         .accessibilityElement(children: .contain)
@@ -93,6 +99,7 @@ struct NoteLinkPicker: View {
 
     private func choose(_ matches: [Item], at index: Int) {
         guard matches.indices.contains(index) else { return }
-        editor.finishLinkRequest(choosing: matches[index])
+        // The note is read again by identity as it is chosen, so a rename or a new twin since the list was made is seen.
+        refused = !editor.finishLinkRequest(choosing: matches[index].id)
     }
 }

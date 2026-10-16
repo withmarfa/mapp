@@ -45,6 +45,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
+    /// The `[[link]]` a note's text can hold that the library resolves to this item and no other, or nil when no
+    /// spelling does: the title where it is the item's alone, otherwise a spelling the library resolves uniquely.
+    func bodyLink(to id: ItemID) -> String?
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
@@ -118,6 +121,16 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    /// The title as a link where no other note goes by it, as the library's links compare names.
+    func bodyLink(to id: ItemID) -> String? {
+        guard let target = item(id), !target.isFile, NoteLinks.canName(target.title) else { return nil }
+        let key = NoteLinks.nameKey(target.title)
+        let shared = items(in: .allNotes).contains {
+            $0.id != id && !$0.isFile && NoteLinks.nameKey(NoteName.trimmed($0.title)) == key
+        }
+        return shared ? nil : NoteLinks.link(to: target.title)
+    }
+
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {

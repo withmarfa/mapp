@@ -54,6 +54,31 @@ nonisolated struct NoteConnectionIndex: Sendable {
     let edges: Set<NoteConnectionEdge>
     /// Configured fields containing malformed target references.
     let issues: [NoteConnectionIssue]
+    private let names: [String: [ItemID]]
+    private let declaredIDs: [UUID: [ItemID]]
+
+    /// What a reference spelled `title` resolves to in these records, as a note's own `[[title]]` does.
+    func resolution(of title: String) -> NoteReferenceResolution {
+        Self.resolve(title, names: names, declaredIDs: declaredIDs)
+    }
+
+    private static func resolve(_ title: String, names: [String: [ItemID]], declaredIDs: [UUID: [ItemID]]) -> NoteReferenceResolution {
+        func matches(_ name: String) -> [ItemID] {
+            if let id = declaredID(name) { return declaredIDs[id, default: []] }
+            return names[nameKey(NoteName.trimmed(name)), default: []]
+        }
+        let name = baseName(title)
+        var found = matches(name)
+        // Choosing the base when the whole spelling names another record would guess.
+        if !found.isEmpty, title != name {
+            for id in matches(title) where !found.contains(id) { found.append(id) }
+        }
+        switch found.count {
+        case 0: return .missing
+        case 1: return .resolved(found[0])
+        default: return .ambiguous(found)
+        }
+    }
 
     init(records: [NoteProjection], rulesByType: [String: [NoteConnectionRule]]) {
         var names: [String: [ItemID]] = [:]
@@ -71,22 +96,8 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 declaredIDs[id, default: []].append(record.id)
             }
         }
-        func matches(_ name: String) -> [ItemID] {
-            if let id = Self.declaredID(name) { return declaredIDs[id, default: []] }
-            return names[Self.nameKey(NoteName.trimmed(name)), default: []]
-        }
         func resolve(_ title: String) -> NoteReferenceResolution {
-            let name = Self.baseName(title)
-            var found = matches(name)
-            // Choosing the base when the whole spelling names another record would guess.
-            if !found.isEmpty, title != name {
-                for id in matches(title) where !found.contains(id) { found.append(id) }
-            }
-            switch found.count {
-            case 0: return .missing
-            case 1: return .resolved(found[0])
-            default: return .ambiguous(found)
-            }
+            Self.resolve(title, names: names, declaredIDs: declaredIDs)
         }
 
         var references: [NoteIndexedReference] = []
@@ -117,6 +128,8 @@ nonisolated struct NoteConnectionIndex: Sendable {
                 }
             }
         }
+        self.names = names
+        self.declaredIDs = declaredIDs
         self.references = references
         referencesBySource = Dictionary(grouping: references, by: \.sourceID)
         self.edges = edges

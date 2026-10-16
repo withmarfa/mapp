@@ -81,32 +81,36 @@ struct NoteLinksTests {
         FileHandle.standardError.write(Data("NoteLinks index, 20,000 notes: first query \(first)\n".utf8))
     }
 
-    @Test func aTargetNamesTheNoteTheLibraryWouldResolveIt() {
-        let garden = note("Garden ideas", minutes: 1)
-        let newer = note("garden IDEAS", minutes: 5)
-        let cafe = note("Cafe\u{301} menu")
-        var photo = note("Garden photo")
-        photo.content = .file(.png, byteCount: 3)
-        let paths = [garden.id: "Home/garden-notes.md", cafe.id: "Cafe menu.md"]
-        let items = [garden, newer, cafe, photo]
-        func resolve(_ target: String) -> Item? { NoteLinks.note(named: target, among: items, pathOf: { paths[$0] }) }
-        #expect(resolve("Garden ideas")?.id == newer.id, "equal titles answer with the most recently edited")
-        #expect(resolve("  GARDEN IDEAS ")?.id == newer.id)
-        #expect(resolve("Café menu")?.id == cafe.id, "accents compare in one form")
-        #expect(resolve("Home/garden-notes.md")?.id == garden.id)
-        #expect(resolve("Home/garden-notes")?.id == garden.id)
-        #expect(resolve("garden-notes")?.id == garden.id)
-        #expect(resolve("Garden photo") == nil, "a file is not a note")
-        #expect(resolve("Nowhere") == nil)
-        #expect(resolve("   ") == nil)
+    @Test func aTitleAnotherNoteAlsoGoesByIsNotOffered() async {
+        let items = [note("Garden", minutes: 1), note("garden", minutes: 2), note("Gardening", minutes: 3), note("Café", minutes: 4), note("Cafe\u{301}", minutes: 5)]
+        let index = NoteLinks.Index()
+        #expect(await index.names(matching: "gard", among: items, limit: 10) == ["Gardening"], "case-only twins are one name")
+        #expect(await index.names(matching: "caf", among: items, limit: 10).isEmpty, "accent forms compare as the library compares them")
+        // Once a twin goes, the other is offered.
+        #expect(await index.names(matching: "gard", among: Array(items.dropFirst()), limit: 10).contains("garden"))
     }
 
-    @Test func theLibraryAnswersWithOnlyNotesItCanLinkTo() async {
-        let current = note("Current", minutes: 3)
-        let library = FakeItemLibrary(items: [note("Old", minutes: 1), current, note("A|B", minutes: 5), note("New", minutes: 4)])
-        #expect(library.linkableNotes(excluding: current.id).map(\.title) == ["New", "Old"])
-        #expect(await library.noteNames(matching: "n", using: NoteLinks.Index()) == ["New", "Current"])
-        #expect(library.note(named: "old")?.title == "Old")
+    @Test func theSuggestionScoresAreTheCommandPalettesForTheSameTitles() {
+        let pairs = [
+            ("किताब", "ताब"), ("किताब", "ता"), ("किताब", "ब"), ("किताब", "किता"), ("किTable", "Table"),
+            ("Café plans", "plans"), ("Café plans", "CAFE"), ("Éclair", "ECL"), ("👩‍💻 project", "👩"), ("👩‍💻 project", "project"),
+            ("日本語のノート", "ノート"), ("New Note", "nn"), ("New Note", "nx"), ("Move to Inbox", "inb"), ("Unpin Note", "pin"),
+            ("Spinach", "pin"), ("Pin Note", "pin"),
+        ]
+        for (title, typed) in pairs {
+            #expect(NoteLinks.score(folded: Array(NoteLinks.fold(title)), NoteLinks.Query(typed)) == PaletteMatch.score(title, typed), "\(title) for \(typed)")
+        }
+    }
+
+    @Test func aLibraryNamesTheNoteChosenOrNoneWhenOnlyAnotherCouldBeMeant() {
+        let alone = note("Garden ideas", minutes: 1)
+        let twin = note("garden IDEAS", minutes: 2)
+        let odd = note("A|B", minutes: 3)
+        let library = FakeItemLibrary(items: [alone, twin, odd, note("Old", minutes: 4)])
+        #expect(library.bodyLink(to: alone.id) == nil, "a twin goes by the same name")
+        #expect(library.bodyLink(to: odd.id) == nil, "a link cannot spell this title")
+        #expect(library.bodyLink(to: library.items[3].id) == "[[Old]]")
+        #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
     @Test func requestsFromThePageAreReadOrRefused() {

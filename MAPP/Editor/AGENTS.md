@@ -38,7 +38,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - The page names a note in a link by its title, `[[Title]]`, as the library's own links resolve it (`NoteLinks`). A title a link cannot name as written (`[`, `]`, `|`, `#`, `\`, a line break, or edge whitespace) is neither offered nor linked; a file is not a note.
 - `NoteRequests` is the `notes` message handler. Suggestions come from `NoteLinks.names`, which runs off the main actor on a copy of the items, so typing never waits on a large library.
 - Link to Note asks the person in `NoteLinkPicker`, a sheet of `NotePage` so every window that shows a note has it. The page's request waits on `EditorController.chooseNoteToLink`, and every way the request can end answers it with `finishLinkRequest`: a choice, Cancel or Escape (the sheet's `onDismiss`), leaving the note, the window going, and the page's process ending. A request from a note that is no longer shown is answered with nothing.
-- Opening a wiki link shows the note it names (`EditorController.onOpenNote`): the main window selects it, an item window opens it in a window of its own. A name no note answers to is told to the person.
+- A rendered `[[link]]` does not open its note yet. Opening one needs the library's own resolution of the link (the connection index, or Marfa's resolution with its ambiguous, missing and renamed results), not a guess by title.
 
 ## Printing and PDF export
 

@@ -46,8 +46,6 @@ final class EditorController: NSObject {
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
-    /// A `[[link]]` opened in the page, for the window to show the note it names.
-    @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
 
@@ -58,6 +56,7 @@ final class EditorController: NSObject {
     }
     var linkRequest: LinkRequest?
     @ObservationIgnored private var linking: CheckedContinuation<String?, Never>?
+    @ObservationIgnored private var windowIsGone = false
 
     @ObservationIgnored let webView: EditorWebView
     /// The page with the system find bar above it, which is what the window shows.
@@ -243,6 +242,8 @@ final class EditorController: NSObject {
     /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
     /// note. The note shown before is left, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
+        // The request was typed into the text now being replaced, which the page would refuse an answer for.
+        cancelLinkRequest()
         guard let body = library?.body(of: item.id) else { return close() }
         if function == "load" { isPresented = true }
         noteID = item.id
@@ -347,6 +348,7 @@ final class EditorController: NSObject {
     /// The window is gone and its text already flushed, so its drafts and page take no part in later flushes, even
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
+        windowIsGone = true
         cancelLinkRequest()
         titleDrafts = nil
         Self.open.remove(self)
@@ -595,25 +597,37 @@ final class EditorController: NSObject {
     // MARK: Linking to a note
 
     /// Asks the person which note to link to, and gives the page the link to write, or nil if they decline or the
-    /// page has moved on from the note the command was typed in.
+    /// page has moved on from the note the command was typed in. A request made after the window went, or while
+    /// another is open, is answered with nothing.
     func chooseNoteToLink(from note: ItemID) async -> String? {
         cancelLinkRequest()
-        guard note == noteID, isEditable, isReady else { return nil }
+        guard !windowIsGone, note == noteID, isEditable, isReady else { return nil }
         return await withCheckedContinuation { continuation in
             linking = continuation
             linkRequest = LinkRequest(note: note)
         }
     }
 
-    /// The person's answer, nil for none. Any answer closes the request, so the page is never left waiting.
-    func finishLinkRequest(choosing note: Item?) {
+    /// Answers the page with the link to the note chosen, read from the library as the note is now, not as the
+    /// picker listed it, and by identity, so a note renamed meanwhile is linked by its new name and one that shares
+    /// its name is not mistaken for it. Whether it was answered: a note no link can name alone leaves the request
+    /// open for the person to choose another.
+    @discardableResult
+    func finishLinkRequest(choosing id: ItemID) -> Bool {
+        guard linking != nil, let link = library?.bodyLink(to: id) else { return false }
+        answerLinkRequest(link)
+        return true
+    }
+
+    /// Any other end of the request answers the page with nothing, so it is never left waiting.
+    func cancelLinkRequest() { answerLinkRequest(nil) }
+
+    private func answerLinkRequest(_ link: String?) {
         let continuation = linking
         linking = nil
         linkRequest = nil
-        continuation?.resume(returning: note.map { NoteLinks.link(to: $0.title) })
+        continuation?.resume(returning: link)
     }
-
-    func cancelLinkRequest() { finishLinkRequest(choosing: nil) }
 
     func setSourceMode(_ source: Bool) {
         guard hasNote, isReady else { return }
@@ -794,12 +808,6 @@ final class EditorController: NSObject {
         case .openLink(let href):
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
                 NSWorkspace.shared.open(url)
-            }
-        case .openNote(let target):
-            if let note = library?.note(named: target) {
-                onOpenNote(note.id)
-            } else {
-                library?.failure = (String(localized: "Note Not Found"), String(localized: "No note is named “\(target)”."))
             }
         case .copy(let text):
             NSPasteboard.general.clearContents()

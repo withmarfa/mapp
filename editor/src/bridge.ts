@@ -40,7 +40,6 @@ export type EditorMessage =
   | { type: 'copy'; text: string }
   | { type: 'escape' }
   | { type: 'pasteImages' }
-  | { type: 'openNote'; target: string }
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | ({ type: 'find' } & FindState)

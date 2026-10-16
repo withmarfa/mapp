@@ -1560,7 +1560,7 @@ struct EditorTests {
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         #expect(page.editor.linkRequest?.note == current)
-        page.editor.finishLinkRequest(choosing: page.library.item(ids[0]))
+        page.editor.finishLinkRequest(choosing: ids[0])
         #expect(page.editor.linkRequest == nil)
         let link = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
         #expect(link as? String == "[[Garden ideas]]")
@@ -1599,21 +1599,6 @@ struct EditorTests {
         try await page.wait { editor.linkRequest != nil }
         editor.windowWent()
         #expect(try await answered(), "closing the window answers the page with nothing")
-    }
-
-    @Test func openingALinkShowsTheNoteItNamesOrSaysThereIsNone() async throws {
-        let page = try await Harness()
-        let ids = addNotes(["Garden ideas"], to: page)
-        try await page.load("Intro\n")
-        var opened: [ItemID] = []
-        page.editor.onOpenNote = { opened.append($0) }
-        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'openNote', target: 'garden IDEAS' })")
-        try await page.wait { !opened.isEmpty }
-        #expect(opened == [ids[0]])
-        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'openNote', target: 'Nowhere' })")
-        try await page.wait { page.library.failure != nil }
-        #expect(page.library.failure?.title == "Note Not Found")
-        #expect(opened == [ids[0]])
     }
 
     @Test func theSlashMenuAndItsWordsComeFromTheAppsStrings() async throws {
@@ -1685,7 +1670,7 @@ struct EditorTests {
         page.library.notes += [older, newer]
         try await page.load("Intro\n")
         _ = try await pending(page)
-        page.editor.finishLinkRequest(choosing: page.library.item(older.id))
+        page.editor.finishLinkRequest(choosing: older.id)
         let link = try #require(try await answer(page), "a note that can be named is linked")
         #expect(resolution(of: link, in: page.library) == .resolved(older.id), "\(link) names the note chosen and no other")
     }
@@ -1696,11 +1681,35 @@ struct EditorTests {
         page.library.notes.append(target)
         try await page.load("Intro\n")
         _ = try await pending(page)
-        let shown = try #require(page.library.item(target.id))
         page.library.renameNote(target.id, to: "Allotment", undoManager: nil)
         try #require(page.library.item(target.id)?.title == "Allotment")
-        page.editor.finishLinkRequest(choosing: shown)
+        page.editor.finishLinkRequest(choosing: target.id)
         #expect(try await answer(page) == "[[Allotment]]")
+    }
+
+    @Test func aNoteNoLinkCanNameAloneLeavesTheRequestOpenForAnotherChoice() async throws {
+        let page = try await Harness()
+        let first = Note(body: "Plan\n", path: "Home/Plan.md", created: .now)
+        let second = Note(body: "plan\n", path: "Home/plan.md", created: .now)
+        let other = Note(body: "Garden\n", path: "Garden.md", created: .now)
+        page.library.notes += [first, second, other]
+        try await page.load("Intro\n")
+        _ = try await pending(page)
+        #expect(!page.editor.finishLinkRequest(choosing: first.id), "no spelling names it alone")
+        #expect(page.editor.linkRequest != nil, "the request stays open")
+        #expect(page.editor.finishLinkRequest(choosing: other.id))
+        #expect(try await answer(page) == "[[Garden]]")
+    }
+
+    @Test func aLinkRequestAfterTheWindowWentIsAnsweredWithNothing() async throws {
+        let page = try await Harness()
+        try await page.load("Intro\n")
+        let editor = page.editor
+        editor.windowWent()
+        let current = try #require(editor.noteID)
+        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
+        #expect(try await answer(page) == nil)
+        #expect(editor.linkRequest == nil)
     }
 
     @Test func loadingAnotherNoteAnswersAPendingLinkRequestOnce() async throws {

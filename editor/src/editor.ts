@@ -232,9 +232,8 @@ export class NoteEditor {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: (query, context) =>
             context.signal.aborted ? Promise.resolve([]) : suggestNotes(query),
-          open(reference) {
-            if (reference.target) postToHost({ type: 'openNote', target: reference.target })
-          },
+          // InkKit requires the adapter to open a link. Opening the note it names is not offered yet.
+          open() {},
         },
         slashMenu: {
           enabled: true,
