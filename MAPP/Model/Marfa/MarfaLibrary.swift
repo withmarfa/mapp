@@ -479,29 +479,18 @@ import Observation
 
     // MARK: Links
 
-    /// A link names what the copy bound it to when the note was saved (`Item.linkTargets`, the package's own
-    /// answer, which keeps the first note a name was bound to), and an identity names the item that holds it, whatever
-    /// other items are titled (`device/body-link-id-first`). A link the copy has not read yet, as one just typed, or
-    /// one it has not been able to look up, is read against the titles the library holds, since the copy cannot tell
-    /// a title names one item until the server has answered; a title nobody here goes by stays `pending`, not
-    /// `missing`, because the server may hold the note.
-    func resolveLink(_ name: String, in source: ItemID) -> NoteReferenceResolution {
-        let name = NoteName.trimmed(name)
-        guard !name.isEmpty else { return .missing }
-        if NoteLinks.looksLikeIdentity(name), let held = item(ItemID(name)) { return Self.named(held) }
-        let key = NoteLinks.nameKey(name)
-        switch item(source)?.linkTargets[key] {
-        case .resolved(let id)?: return item(id).map(Self.named) ?? .pending
-        case let recorded? where recorded != .pending: return recorded
-        default: break
-        }
-        if NoteLinks.looksLikeIdentity(name) { return .pending }
-        let holders = index.notes(titled: name)
-        switch holders.count {
-        case 0: return .pending
-        case 1: return .resolved(holders.first!)
-        default: return .ambiguous(holders.sorted { $0.rawValue < $1.rawValue })
-        }
+    /// A link names what the copy bound that very link to when the note was saved (`Item.boundLinks`, the package's
+    /// own answer): Marfa binds each spelling on its own and keeps the first note a spelling was bound to, so two
+    /// links to one name can name two notes. An identity names the item that holds it, whatever other items are
+    /// titled (`device/body-link-id-first`). A link the copy has not bound, as one just typed, or has not been able
+    /// to look up is `pending`, never guessed from the titles held, since the server may hold another note with that
+    /// title; it opens once the copy binds it.
+    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
+        guard !link.name.isEmpty else { return .missing }
+        if NoteLinks.looksLikeIdentity(link.name), let held = item(ItemID(link.name)) { return Self.named(held) }
+        guard let bound = item(source)?.boundLinks.first(where: { $0.link == link }) else { return .pending }
+        guard case .resolved(let id) = bound.resolution else { return bound.resolution }
+        return item(id).map(Self.named) ?? .pending
     }
 
     /// An item in the bin is not a note a link names.

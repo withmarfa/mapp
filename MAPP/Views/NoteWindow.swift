@@ -19,13 +19,18 @@ struct NoteWindow: View {
 
     /// The window's editor, holding the window's title drafts.
     private var editor: EditorController {
-        editorSlot.editor {
-            let editor = EditorController(library: library)
-            editor.titleDrafts = details
-            editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onLeave = { [library] id in library.leave(id) }
-            return editor
-        }
+        editorSlot.editor { Self.makeEditor(library: library, details: details, showing: $id) }
+    }
+
+    /// An editor for a window of its own: a link followed in the page shows the note it names in this window, by
+    /// handing the window's item over, and the window remembers that item for the next launch.
+    static func makeEditor(library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>) -> EditorController {
+        let editor = EditorController(library: library)
+        editor.titleDrafts = details
+        editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
+        editor.onLeave = { [library] id in library.leave(id) }
+        editor.onOpenNote = { linked in id.wrappedValue = linked }
+        return editor
     }
 
     private var item: Item? { id.flatMap { library.item($0) } }

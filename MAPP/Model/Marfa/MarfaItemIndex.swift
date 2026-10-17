@@ -18,27 +18,14 @@ nonisolated struct MarfaItemIndex {
     /// Active items in the feed tier, which the Inbox shows.
     private(set) var feed: Set<ItemID> = []
     private(set) var links: [EdgeID: Link] = [:]
-    /// The notes going by each title, read as a link reads a name (`NoteLinks.nameKey`): those not deleted and not
-    /// files, since a link names a note.
-    private var notesByTitle: [String: Set<ItemID>] = [:]
     private var linksFrom: [ItemID: Set<EdgeID>] = [:]
     private var linksTo: [ItemID: Set<EdgeID>] = [:]
     private var held: [ItemID: [EdgeID]] = [:]
 
     func ids(in state: ItemState) -> Set<ItemID> { byState[state] ?? [] }
 
-    /// The notes going by `title` as a link names a note, in no particular order.
-    func notes(titled title: String) -> Set<ItemID> {
-        notesByTitle[NoteLinks.nameKey(NoteName.trimmed(title))] ?? []
-    }
-
-    private static func isNameable(_ item: Item) -> Bool {
-        !item.isFile && item.state != .trashed
-    }
-
     mutating func insert(_ item: Item, catalogue: Catalogue) {
         byState[item.state, default: []].insert(item.id)
-        if Self.isNameable(item) { notesByTitle[NoteLinks.nameKey(NoteName.trimmed(item.title)), default: []].insert(item.id) }
         if item.state == .active {
             activeByType[item.type, default: []].insert(item.id)
             if item.isFavorite { favorites.insert(item.id) }
@@ -57,11 +44,6 @@ nonisolated struct MarfaItemIndex {
 
     mutating func remove(_ item: Item) {
         byState[item.state]?.remove(item.id)
-        if Self.isNameable(item) {
-            let key = NoteLinks.nameKey(NoteName.trimmed(item.title))
-            notesByTitle[key]?.remove(item.id)
-            if notesByTitle[key]?.isEmpty == true { notesByTitle[key] = nil }
-        }
         activeByType[item.type]?.remove(item.id)
         favorites.remove(item.id)
         feed.remove(item.id)

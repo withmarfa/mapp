@@ -134,7 +134,7 @@ struct NoteLinksTests {
         let renamed = note("Plan v2", minutes: 1)
         let reused = note("Plan", minutes: 5)
         var reader = note("Reader", minutes: 3)
-        reader.linkTargets = [NoteLinks.nameKey("Plan"): .resolved(renamed.id)]
+        reader.boundLinks = [BoundLink(link: NoteLink(name: "Plan"), resolution: .resolved(renamed.id))]
         let library = FakeItemLibrary(items: [renamed, reused, reader])
         // Typed in Reader, [[Plan]] would open the renamed note, so the new one is named by its identity instead.
         #expect(library.bodyLink(to: reused.id, in: reader.id) == "[[\(reused.id.rawValue)|Plan]]")
@@ -166,10 +166,12 @@ struct NoteLinksTests {
         #expect(NoteRequest(body: ["type": "suggest", "query": ""]) == .suggest("", in: nil))
         #expect(NoteRequest(body: ["type": "pick", "item": "abc"]) == .pick(ItemID("abc")))
         #expect(NoteRequest(body: ["type": "pick", "item": ""]) == nil)
-        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "names": ["Plan", "B"]]) == .resolve(["Plan", "B"], in: ItemID("abc")))
-        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "names": []]) == .resolve([], in: ItemID("abc")))
-        #expect(NoteRequest(body: ["type": "resolve", "item": "", "names": ["Plan"]]) == nil)
-        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "names": ["Plan", 3]]) == nil)
+        let links: [[String: Any]] = [["target": "Plan"], ["target": "Plan", "alias": "new", "heading": "Soil"]]
+        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "links": links])
+            == .resolve([NoteLink(name: "Plan"), NoteLink(name: "Plan", heading: "Soil", alias: "new")], in: ItemID("abc")))
+        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "links": []]) == .resolve([], in: ItemID("abc")))
+        #expect(NoteRequest(body: ["type": "resolve", "item": "", "links": links]) == nil)
+        #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "links": [["heading": "Soil"]]]) == nil)
         #expect(NoteRequest(body: ["type": "resolve", "item": "abc"]) == nil)
         #expect(NoteRequest(body: ["type": "suggest"]) == nil)
         #expect(NoteRequest(body: ["type": "delete", "item": "abc"]) == nil)

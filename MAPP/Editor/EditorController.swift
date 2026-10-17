@@ -119,9 +119,9 @@ final class EditorController: NSObject {
             return await current.noteNames(matching: query, in: source, using: self.noteTitles)
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
-        noteRequests.missing = { [weak self] names, source in
-            guard let library = self?.library else { return names.map { _ in false } }
-            return names.map { library.resolveLink($0, in: source) == .missing }
+        noteRequests.missing = { [weak self] links, source in
+            guard let library = self?.library else { return links.map { _ in false } }
+            return links.map { library.resolveLink($0, in: source) == .missing }
         }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         #if DEBUG
@@ -645,16 +645,15 @@ final class EditorController: NSObject {
 
     // MARK: Following a link
 
-    /// Opens the note a link in `source` names, as the library reads the link, and scrolls to the heading it asks
+    /// Opens the note a link in `source` names, as the library reads that very link, and scrolls to the heading it asks
     /// for. A link that names no note, or more than one, or that the library has not been able to look up, opens
     /// nothing and beeps; no note is made for it. A click in a note the page has since left is ignored.
-    func openNote(named target: String, heading: String?, from source: ItemID) {
+    func openNote(_ link: NoteLink, from source: ItemID) {
         guard !windowIsGone, source == noteID, let library else { return }
-        guard case .resolved(let id) = library.resolveLink(target, in: source), library.item(id) != nil else {
+        guard case .resolved(let id) = library.resolveLink(link, in: source), library.item(id) != nil else {
             return onUnopenableLink()
         }
-        let text = heading.map(NoteName.trimmed).flatMap { $0.isEmpty ? nil : $0 }
-        pendingHeading = text.map { (id, $0) }
+        pendingHeading = link.heading.map { (id, $0) }
         if id == noteID { revealPendingHeading(in: id) } else { onOpenNote(id) }
     }
 
@@ -873,8 +872,8 @@ final class EditorController: NSObject {
             insertImages(PastedImages.sources(on: .general))
         case .openEmbed(let item, let reference):
             openEmbed(reference, in: item)
-        case .openNote(let item, let target, let heading):
-            openNote(named: target, heading: heading, from: item)
+        case .openNote(let item, let link):
+            openNote(link, from: item)
         case .embedMenu(let embed):
             menuEmbed = embed
         case .find(let state):

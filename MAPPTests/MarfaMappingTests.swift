@@ -298,12 +298,15 @@ struct MarfaMappingTests {
         #expect(item.edgesOut.allSatisfy { $0.origin == .body })
         #expect(Set(item.edgesOut.map(\.id)).count == item.edgesOut.count)
         #expect(MarfaMapping.unresolvedLinks(of: "n", in: nil).isEmpty)
-        // Each link is kept with what the package bound it to, by the name it is spelled with, since the package keeps
-        // the first note a name was bound to: a second link with that name that names none does not undo it.
-        #expect(item.linkTargets == [
-            NoteLinks.nameKey("Plan"): .resolved(ItemID("plan")), NoteLinks.nameKey("Later"): .pending,
-            NoteLinks.nameKey("Nowhere"): .missing, NoteLinks.nameKey("Twin"): .ambiguous([]),
-            NoteLinks.nameKey("Banned"): .refused("forbidden")
+        // Each link is kept in order with what the package bound that very spelling to, so two links to one name can
+        // name two notes, and a name's first note is what a new link with that name would take.
+        #expect(item.boundLinks == [
+            BoundLink(link: NoteLink(name: "Plan"), resolution: .resolved(ItemID("plan"))),
+            BoundLink(link: NoteLink(name: "Plan", alias: "again"), resolution: .missing),
+            BoundLink(link: NoteLink(name: "Later"), resolution: .pending),
+            BoundLink(link: NoteLink(name: "Nowhere"), resolution: .missing),
+            BoundLink(link: NoteLink(name: "Twin"), resolution: .ambiguous([])),
+            BoundLink(link: NoteLink(name: "Banned"), resolution: .refused("forbidden"))
         ])
         #expect(item.establishedLinks == [NoteLinks.nameKey("Plan"): ItemID("plan")])
     }

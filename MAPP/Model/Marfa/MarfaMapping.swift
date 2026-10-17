@@ -128,27 +128,21 @@ nonisolated enum MarfaMapping {
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
-        var bound: [String: NoteReferenceResolution] = [:]
-        for name in bodyLinks?.links ?? [] {
-            let key = NoteLinks.nameKey(NoteName.trimmed(name.name))
-            let resolution = resolution(of: name.target)
-            switch bound[key] {
-            case .resolved:
-                // The first note a name was bound to keeps it.
-                continue
-            case nil:
-                bound[key] = resolution
-            default:
-                // A name that no note answers to yields to a link that did name one.
-                if case .resolved = resolution { bound[key] = resolution }
-            }
+        let bound = (bodyLinks?.links ?? []).map { name in
+            BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, linkTargets: bound)
+            sync: sync, boundLinks: bound)
+    }
+
+    /// The text between the brackets of a link as the package renders it, `[[text]]`.
+    static func inside(brackets text: String) -> String {
+        guard text.hasPrefix("[["), text.hasSuffix("]]"), text.count >= 4 else { return text }
+        return String(text.dropFirst(2).dropLast(2))
     }
 
     /// What a link in an item's text names, as the package reads it from the copy.

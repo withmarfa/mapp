@@ -6,6 +6,7 @@ import {
   type FileReference,
   type FormatCommand as InkFormat,
   type ShortcutName,
+  type WikiLinkReference,
   type TableCommand,
   type ReadableTextSnapshot,
 } from '@aicayzer/inkkit'
@@ -16,6 +17,7 @@ import {
   suggestNotes,
   type EmbeddedFile,
   type EmbedRequest,
+  type LinkRef,
 } from './bridge'
 import type { HeaderLabels } from './header'
 import { NoteLinkStatus } from './links'
@@ -136,6 +138,16 @@ export function wikiSuggest(
  *  link then asks the adapter again. A test mounts the real InkKit and fails if a release stops hearing it. */
 function redrawWikiLinks(root: HTMLElement): void {
   root.querySelector('.ProseMirror')?.dispatchEvent(new Event('inkkit-media-policy'))
+}
+
+/** A link as the app tells links apart: the alias is what the link shows beyond its name and heading. */
+function linkRef(reference: WikiLinkReference): LinkRef {
+  const shown = reference.fragment ? `${reference.target}#${reference.fragment}` : reference.target
+  return {
+    target: reference.target,
+    ...(reference.fragment ? { heading: reference.fragment } : {}),
+    ...(reference.label !== shown ? { alias: reference.label } : {}),
+  }
 }
 
 /** The heading text as a link names it: compared ignoring case and the spacing around and inside it. */
@@ -262,7 +274,8 @@ export class NoteEditor {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: wikiSuggest,
           // The app tells which names no note answers to, and InkKit draws those links as missing.
-          resolve: (reference, context) => host.links.status(reference.target, context.documentId),
+          resolve: (reference, context) =>
+            host.links.status(linkRef(reference), context.documentId),
           // A link to this note's own heading is the page's to follow. Any other names a note, which only the
           // app can find, so the app opens it and scrolls to the heading once it is shown.
           open(reference, context) {
@@ -270,12 +283,7 @@ export class NoteEditor {
               if (reference.fragment) host.revealHeading(reference.fragment)
               return
             }
-            postToHost({
-              type: 'openNote',
-              item: context.documentId,
-              target: reference.target,
-              ...(reference.fragment ? { heading: reference.fragment } : {}),
-            })
+            postToHost({ type: 'openNote', item: context.documentId, ...linkRef(reference) })
           },
         },
         slashMenu: {

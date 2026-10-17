@@ -42,15 +42,23 @@ export type EditorMessage =
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
-  | { type: 'openNote'; item: string; target: string; heading?: string }
+  | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
+
+/** A `[[link]]` as the page reads it: the name, any heading after `#`, and the alias after `|` when it has one.
+ *  The app tells links apart by all three, since the library binds each spelling on its own. */
+export interface LinkRef {
+  target: string
+  heading?: string
+  alias?: string
+}
 
 /** What the page asks of the app's notes: names to offer after `[[`, which note the person links to, and which
  *  names the links of a note use that no note answers to. */
 export type NoteRequest =
   | { type: 'suggest'; query: string; item: string }
   | { type: 'pick'; item: string }
-  | { type: 'resolve'; item: string; names: string[] }
+  | { type: 'resolve'; item: string; links: LinkRef[] }
 
 declare global {
   interface Window {
@@ -90,16 +98,16 @@ export async function pickNote(item: string): Promise<string | undefined> {
   return typeof link === 'string' ? link : undefined
 }
 
-/** Whether each name, as a link in the item spells it, names no note, in the order asked; null when the app
- *  does not answer, so the page assumes nothing. */
-export async function askMissing(item: string, names: string[]): Promise<boolean[] | null> {
+/** Whether each link of the item names no note, in the order asked; null when the app does not answer, so the
+ *  page assumes nothing. */
+export async function askMissing(item: string, links: LinkRef[]): Promise<boolean[] | null> {
   const answer = await window.webkit?.messageHandlers?.notes?.postMessage({
     type: 'resolve',
     item,
-    names,
+    links,
   })
   return Array.isArray(answer) &&
-    answer.length === names.length &&
+    answer.length === links.length &&
     answer.every((missing) => typeof missing === 'boolean')
     ? answer
     : null

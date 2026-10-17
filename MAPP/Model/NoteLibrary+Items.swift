@@ -88,8 +88,8 @@ extension NoteLibrary {
 
     /// A link reads as the connection index does: its title, else its path, else the identity its file declares.
     /// A name holding `|` or `#` is a link's alias or heading, never part of the name, so the index cannot read it.
-    func resolveLink(_ name: String, in source: ItemID) -> NoteReferenceResolution {
-        let name = NoteName.trimmed(name)
+    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
+        let name = link.name
         guard !name.isEmpty, !name.contains(where: { $0 == "|" || $0 == "#" }) else { return .missing }
         return connectionIndex.resolution(of: name)
     }

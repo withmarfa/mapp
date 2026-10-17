@@ -78,8 +78,8 @@ final class FakeItemLibrary: ItemLibrary {
         guard let item = item(id), !item.isFile else { return nil }
         return ItemBody(id: id, text: bodies[id] ?? "", version: item.version)
     }
-    func resolveLink(_ name: String, in source: ItemID) -> NoteReferenceResolution {
-        let name = NoteName.trimmed(name)
+    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
+        let name = link.name
         let named = items.filter {
             $0.state == .active && !$0.isFile
                 && ($0.id.rawValue == name || NoteLinks.nameKey($0.title) == NoteLinks.nameKey(name))

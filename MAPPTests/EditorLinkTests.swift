@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import WebKit
 @testable import MAPP
@@ -115,10 +116,10 @@ extension EditorTests {
         var opened = 0, beeps = 0
         page.editor.onOpenNote = { _ in opened += 1 }
         page.editor.onUnopenableLink = { beeps += 1 }
-        page.editor.openNote(named: "Plan", heading: nil, from: ItemID("another"))
+        page.editor.openNote(NoteLink(name: "Plan"), from: ItemID("another"))
         #expect(opened == 0 && beeps == 0)
         page.editor.windowWent()
-        page.editor.openNote(named: "Plan", heading: nil, from: try #require(page.editor.noteID))
+        page.editor.openNote(NoteLink(name: "Plan"), from: try #require(page.editor.noteID))
         #expect(opened == 0 && beeps == 0)
     }
 
@@ -171,5 +172,32 @@ extension EditorTests {
         }
         #expect(heading == "Soil")
         #expect(opened == 0 && beeps == 0)
+    }
+
+    private final class ShownItem {
+        var id: ItemID?
+    }
+
+    @Test func aLinkFollowedInANoteWindowShowsTheLinkedNoteInThatWindow() async throws {
+        let plan = Note(body: "Plan\n", created: .now)
+        let reader = Note(body: "Reader\n\nSee [[Plan]] and [[Gone]].\n", created: .now)
+        let library = NoteLibrary(notes: [plan, reader], store: RecordingStore())
+        let shown = ShownItem()
+        shown.id = reader.id
+        let editor = NoteWindow.makeEditor(
+            library: library, details: DetailsPresentation(), showing: Binding { shown.id } set: { shown.id = $0 })
+        var waited = 0
+        while !editor.isReady, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
+        editor.load(try #require(library.item(reader.id)))
+        waited = 0
+        while editor.noteID != reader.id, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
+        var beeps = 0
+        editor.onUnopenableLink = { beeps += 1 }
+
+        editor.openNote(NoteLink(name: "Gone"), from: reader.id)
+        #expect(shown.id == reader.id && beeps == 1, "a link to no note leaves the window as it is")
+        editor.openNote(NoteLink(name: "Plan"), from: reader.id)
+        #expect(shown.id == plan.id, "the window now shows the linked note, which it will find again at the next launch")
+        editor.windowWent()
     }
 }
