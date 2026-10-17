@@ -352,7 +352,9 @@ nonisolated enum MarfaMapping {
         return answered
     }
 
-    private static func rank(_ state: SyncState?) -> Int {
+    /// How much a state needs the person: a conflict outranks writes that merely wait, and a refusal or a block
+    /// outranks a conflict.
+    static func rank(_ state: SyncState?) -> Int {
         switch state {
         case nil, .settled: 0
         case .waiting: 1

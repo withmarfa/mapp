@@ -89,9 +89,7 @@ actor MarfaEngine {
     private var restoring: [String: Marfa.Item] = [:]
     /// What each item's text names, read by the package from the copy, for the items whose text can name anything.
     private var bodyLinks: [String: BodyLinks] = [:]
-    private var edges: [String: Marfa.Edge] = [:]
-    /// The edges touching each row, so mapping an item reads its own edges rather than every edge.
-    private var edgesByItem: [String: Set<String>] = [:]
+    private var edges = MarfaEdgeTable()
     private var queue: [Marfa.QueuedWrite] = []
     private var items: [ItemID: Item] = [:]
     private var bodies: [ItemID: Int] = [:]
@@ -298,9 +296,8 @@ actor MarfaEngine {
         let departed = self.rows.filter { gone.contains($0.key) }.values
         self.catalogue = catalogue
         self.rows = rows
-        self.edges = [:]
-        edgesByItem = [:]
-        for edge in edges { insert(edge) }
+        self.edges.removeAll()
+        for edge in edges { self.edges.insert(edge) }
         binned = binned.filter { rows[$0.key] == nil }
         for row in departed { await left(row) }
         bodyLinks = [:]
@@ -353,9 +350,13 @@ actor MarfaEngine {
         return changed
     }
 
-    /// Reads again the rows named, with every edge they hold or are held by.
+    /// Reads again the rows named, with every edge they hold or are held by. All are read before any is taken in, and
+    /// every edge held before is dropped before any is put back: an edge that moved to other ends is listed under
+    /// the item it left, so taking the items in one at a time, in whatever order, could drop the edge as it is now
+    /// after putting it back.
     private func reread(_ ids: Set<String>) async {
         var affected = Set(ids)
+        var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
             for id in ids {
                 let (row, held) = try await Self.asking(hub) {
@@ -365,25 +366,30 @@ actor MarfaEngine {
                     }
                     return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
                 }
-                let previous = rows[id]
-                rows[id] = row
-                if let row {
-                    binned[id] = nil
-                    await readLinks(of: row)
-                } else {
-                    bodyLinks[id] = nil
-                    if let previous { await left(previous) }
-                }
-                for edgeID in edgesByItem[id] ?? [] {
-                    if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
-                }
-                for edge in held {
-                    insert(edge)
-                    affected.formUnion([edge.sourceId, edge.targetId])
-                }
+                read.append((row, id, held))
             }
         } catch {
             failures.append(Self.failure(error))
+        }
+        for (row, id, _) in read {
+            let previous = rows[id]
+            rows[id] = row
+            if let row {
+                binned[id] = nil
+                await readLinks(of: row)
+            } else {
+                bodyLinks[id] = nil
+                if let previous { await left(previous) }
+            }
+            for edgeID in edges.ids(touching: id) {
+                if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
+            }
+        }
+        for (_, _, held) in read {
+            for edge in held {
+                insert(edge)
+                affected.formUnion([edge.sourceId, edge.targetId])
+            }
         }
         await readConflictLinks(affected)
         await readQueue()
@@ -472,25 +478,24 @@ actor MarfaEngine {
 
     private func restate() {
         var states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
-        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch.
-        for (original, copies) in linkedCopies where states[ItemID(original)] == nil {
-            if let first = copies.first { states[ItemID(original)] = .conflicted(sibling: ItemID(first), fields: []) }
+        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch. A
+        // conflict outranks writes that merely wait, as an original with its own writes still queued shows it; a
+        // refusal or a block of the original's own is shown instead, as it needs the person more.
+        for (original, copies) in linkedCopies {
+            guard let first = copies.first else { continue }
+            let conflict = SyncState.conflicted(sibling: ItemID(first), fields: [])
+            if MarfaMapping.rank(states[ItemID(original)]) < MarfaMapping.rank(conflict) { states[ItemID(original)] = conflict }
         }
         changedSync.formUnion(Set(states.keys).union(syncStates.keys).filter { states[$0] != syncStates[$0] })
         syncStates = states
     }
 
     private func insert(_ edge: Marfa.Edge) {
-        edges[edge.id] = edge
-        edgesByItem[edge.sourceId, default: []].insert(edge.id)
-        edgesByItem[edge.targetId, default: []].insert(edge.id)
+        edges.insert(edge)
     }
 
     private func remove(_ id: String) -> Marfa.Edge? {
-        guard let edge = edges.removeValue(forKey: id) else { return nil }
-        edgesByItem[edge.sourceId]?.remove(id)
-        edgesByItem[edge.targetId]?.remove(id)
-        return edge
+        edges.remove(id)
     }
 
     /// Maps `ids` again and tells readers what differs: the first time, everything as `.loaded`. Failures gathered
@@ -511,7 +516,7 @@ actor MarfaEngine {
                 bodies[id] = nil
                 continue
             }
-            let held = (edgesByItem[row.id] ?? []).compactMap { edges[$0] }.sorted { $0.createdAt < $1.createdAt }
+            let held = edges.edges(touching: row.id).sorted { $0.createdAt < $1.createdAt }
             let item = MarfaMapping.item(
                 row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled, bodyLinks: bodyLinks[row.id],
                 isHeld: { self.rows[$0] != nil })
@@ -917,7 +922,7 @@ actor MarfaEngine {
     /// The file's name, or that name with a number when another attachment of the item already has it.
     private func attachmentTitle(for file: URL, on host: Marfa.Item) -> String {
         let taken = Set(
-            (edgesByItem[host.id] ?? []).compactMap { edges[$0] }
+            edges.edges(touching: host.id)
                 .filter { $0.edgeType == MarfaMapping.attachmentEdge && $0.targetId == host.id }
                 .compactMap { rows[$0.sourceId]?.title?.lowercased() })
         let name = file.lastPathComponent
