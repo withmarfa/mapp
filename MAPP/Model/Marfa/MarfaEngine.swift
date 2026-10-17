@@ -472,9 +472,13 @@ actor MarfaEngine {
 
     private func restate() {
         var states = MarfaMapping.syncStates(queue: queue, remembered: remembered.mapValues(\.state))
-        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch.
-        for (original, copies) in linkedCopies where states[ItemID(original)] == nil {
-            if let first = copies.first { states[ItemID(original)] = .conflicted(sibling: ItemID(first), fields: []) }
+        // An original knows its copies, which outlive the write that made them, so it shows one after a relaunch. A
+        // conflict outranks writes that merely wait, as an original with its own writes still queued shows it; a
+        // refusal or a block of the original's own is shown instead, as it needs the person more.
+        for (original, copies) in linkedCopies {
+            guard let first = copies.first else { continue }
+            let conflict = SyncState.conflicted(sibling: ItemID(first), fields: [])
+            if MarfaMapping.rank(states[ItemID(original)]) < MarfaMapping.rank(conflict) { states[ItemID(original)] = conflict }
         }
         changedSync.formUnion(Set(states.keys).union(syncStates.keys).filter { states[$0] != syncStates[$0] })
         syncStates = states
