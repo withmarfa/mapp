@@ -353,9 +353,13 @@ actor MarfaEngine {
         return changed
     }
 
-    /// Reads again the rows named, with every edge they hold or are held by.
+    /// Reads again the rows named, with every edge they hold or are held by. All are read before any is taken in, and
+    /// every edge held before is dropped before any is put back: an edge that moved to other ends is listed under
+    /// the item it left, so taking the items in one at a time, in whatever order, could drop the edge as it is now
+    /// after putting it back.
     private func reread(_ ids: Set<String>) async {
         var affected = Set(ids)
+        var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
             for id in ids {
                 let (row, held) = try await Self.asking(hub) {
@@ -365,25 +369,30 @@ actor MarfaEngine {
                     }
                     return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
                 }
-                let previous = rows[id]
-                rows[id] = row
-                if let row {
-                    binned[id] = nil
-                    await readLinks(of: row)
-                } else {
-                    bodyLinks[id] = nil
-                    if let previous { await left(previous) }
-                }
-                for edgeID in edgesByItem[id] ?? [] {
-                    if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
-                }
-                for edge in held {
-                    insert(edge)
-                    affected.formUnion([edge.sourceId, edge.targetId])
-                }
+                read.append((row, id, held))
             }
         } catch {
             failures.append(Self.failure(error))
+        }
+        for (row, id, _) in read {
+            let previous = rows[id]
+            rows[id] = row
+            if let row {
+                binned[id] = nil
+                await readLinks(of: row)
+            } else {
+                bodyLinks[id] = nil
+                if let previous { await left(previous) }
+            }
+            for edgeID in edgesByItem[id] ?? [] {
+                if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
+            }
+        }
+        for (_, _, held) in read {
+            for edge in held {
+                insert(edge)
+                affected.formUnion([edge.sourceId, edge.targetId])
+            }
         }
         await readConflictLinks(affected)
         await readQueue()

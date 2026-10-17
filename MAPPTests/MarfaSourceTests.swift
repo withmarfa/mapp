@@ -304,6 +304,31 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// The engine reads again every item a move touches, and the edge it moved is the same edge at its new ends, so
+    /// the order the items are read in must not decide whether the child ends up holding it. Moved back and forth,
+    /// every order is met.
+    @Test(.timeLimit(.minutes(2)))
+    func aChildMovedBackAndForthAlwaysShowsItsCurrentParent() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let ids = try await parentAndChild(source, log, "parent one", "parent two", "moved child")
+        let (first, second, child) = (ids[0], ids[1], ids[2])
+        let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+        for step in 0..<16 {
+            let parent = step.isMultiple(of: 2) ? second : first
+            source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: WriteID())
+            let shown = await log.wait(for: .seconds(10)) { state in
+                state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.target) == [.item(parent)]
+            }
+            #expect(shown != nil, "after move \(step) the child shows \(parent == second ? "parent two" : "parent one")")
+            if shown == nil { break }
+        }
+        await source.close()
+    }
+
     /// What the package refuses before it queues anything is told in plain words, and nothing is queued.
     @Test(.timeLimit(.minutes(1)))
     func aMoveThePackageRefusesIsToldPlainlyAndQueuesNothing() async throws {
