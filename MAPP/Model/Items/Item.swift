@@ -81,7 +81,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
         var established: [String: ItemID] = [:]
         for bound in boundLinks {
             guard case .resolved(let id) = bound.resolution else { continue }
-            let key = NoteLinks.nameKey(bound.link.name)
+            let key = NoteLinks.nameKey(bound.link.lookupName)
             if established[key] == nil { established[key] = id }
         }
         return established

@@ -486,8 +486,8 @@ import Observation
     /// to look up is `pending`, never guessed from the titles held, since the server may hold another note with that
     /// title; it opens once the copy binds it.
     func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
-        guard !link.name.isEmpty else { return .missing }
-        if NoteLinks.looksLikeIdentity(link.name), let held = item(ItemID(link.name)) { return Self.named(held) }
+        guard !link.lookupName.isEmpty else { return .missing }
+        if NoteLinks.looksLikeIdentity(link.lookupName), let held = item(ItemID(link.lookupName)) { return Self.named(held) }
         guard let bound = item(source)?.boundLinks.first(where: { $0.link == link }) else { return .pending }
         guard case .resolved(let id) = bound.resolution else { return bound.resolution }
         return item(id).map(Self.named) ?? .pending

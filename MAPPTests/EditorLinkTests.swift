@@ -191,13 +191,30 @@ extension EditorTests {
         editor.load(try #require(library.item(reader.id)))
         waited = 0
         while editor.noteID != reader.id, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = editor.container
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
         var beeps = 0
         editor.onUnopenableLink = { beeps += 1 }
 
         editor.openNote(NoteLink(name: "Gone"), from: reader.id)
         #expect(shown.id == reader.id && beeps == 1, "a link to no note leaves the window as it is")
+        window.makeFirstResponder(nil)
         editor.openNote(NoteLink(name: "Plan"), from: reader.id)
         #expect(shown.id == plan.id, "the window now shows the linked note, which it will find again at the next launch")
+        // The window's page loads the note it now shows, and the keyboard goes there with it.
+        editor.load(try #require(library.item(plan.id)))
+        func typing() async throws -> Bool {
+            try await editor.webView.evaluateJavaScript("document.activeElement?.matches('.ProseMirror') === true") as? Bool ?? false
+        }
+        var focused = false
+        for _ in 0..<60 where !focused {
+            try await Task.sleep(for: .milliseconds(50))
+            focused = try await typing()
+        }
+        #expect(focused && window.firstResponder === editor.webView, "the caret is in the linked note, so typing goes on there")
         editor.windowWent()
     }
 }

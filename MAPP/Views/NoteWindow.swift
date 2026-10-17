@@ -29,7 +29,11 @@ struct NoteWindow: View {
         editor.titleDrafts = details
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         editor.onLeave = { [library] id in library.leave(id) }
-        editor.onOpenNote = { linked in id.wrappedValue = linked }
+        // The keyboard follows the link to the note it opened, as it does in a main window.
+        editor.onOpenNote = { [weak editor] linked in
+            id.wrappedValue = linked
+            editor?.focus(linked)
+        }
         return editor
     }
 

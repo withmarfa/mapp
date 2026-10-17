@@ -138,12 +138,34 @@ import UniformTypeIdentifiers
         #expect(library.resolveLink(NoteLink(name: "Plan", alias: "other"), in: reader) == .pending)
     }
 
-    @Test func whitespaceAndAnAliasThatRepeatsTheLinkDoNotMakeAnotherSpelling() async throws {
+    @Test func spacesInsideTheBracketsMakeAnotherSpellingMarfaBindsOnItsOwn() async throws {
+        let a = item(ItemID("a"), "Plan"), b = item(ItemID("b"), "Plan two")
+        let source = item(reader, "Reader", links: [bound("Plan | alias", .resolved(a.id)), bound("Plan|alias", .resolved(b.id))])
+        let (library, _) = try await loaded([source, a, b])
+        // InkKit hands the page the parts as written, spaces included.
+        #expect(library.resolveLink(NoteLink(name: "Plan ", alias: " alias"), in: reader) == .resolved(a.id))
+        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "alias"), in: reader) == .resolved(b.id))
+        // Spaces around the whole text are trimmed, as Marfa trims it.
+        #expect(library.resolveLink(NoteLink(name: " Plan", alias: "alias "), in: reader) == .resolved(b.id))
+    }
+
+    @Test func anAliasThatRepeatsTheLinkIsTheLinkItself() async throws {
         let plan = item(ItemID("plan"), "Plan")
-        let source = item(reader, "Reader", links: [bound("Plan | alias", .resolved(plan.id)), bound("Plan#Soil|Plan#Soil", .resolved(plan.id))])
+        let source = item(reader, "Reader", links: [bound("Plan#Soil|Plan#Soil", .resolved(plan.id))])
         let (library, _) = try await loaded([source, plan])
-        #expect(library.resolveLink(NoteLink(name: " Plan ", alias: "alias "), in: reader) == .resolved(plan.id))
         #expect(library.resolveLink(NoteLink(name: "Plan", heading: "Soil"), in: reader) == .resolved(plan.id))
+    }
+
+    @Test func aLinkWithEscapedCharactersIsMatchedToWhatMarfaBoundItTo() async throws {
+        let a = item(ItemID("a"), "A"), b = item(ItemID("b"), "B")
+        // Marfa keeps the backslashes in the text it reports; InkKit hands the page the characters they stand for.
+        let source = item(reader, "Reader", links: [
+            bound("Plan|a\\#b", .resolved(a.id)), bound("Plan#A\\#B", .resolved(b.id)), bound("Plan#Soil|a\\|b", .missing)])
+        let (library, _) = try await loaded([source, a, b])
+        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "a#b"), in: reader) == .resolved(a.id))
+        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "A#B"), in: reader) == .resolved(b.id))
+        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "Soil", alias: "a|b"), in: reader) == .missing)
+        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "a\\#b"), in: reader) == .pending, "the backslash is not part of the alias")
     }
 
     @Test func anIdentityNamesThatNoteWhateverOtherNotesAreTitled() async throws {
@@ -204,11 +226,17 @@ import UniformTypeIdentifiers
         #expect(NoteLink(reading: "Plan") == NoteLink(name: "Plan"))
         #expect(NoteLink(reading: " Plan ") == NoteLink(name: "Plan"))
         #expect(NoteLink(reading: "Plan|alias") == NoteLink(name: "Plan", alias: "alias"))
-        #expect(NoteLink(reading: "Plan | alias") == NoteLink(name: "Plan", alias: "alias"))
+        #expect(NoteLink(reading: "Plan | alias") == NoteLink(name: "Plan ", alias: " alias"), "the spaces between the brackets stay")
+        #expect(NoteLink(reading: "Plan | alias") != NoteLink(reading: "Plan|alias"))
+        #expect(NoteLink(reading: "Plan | alias").lookupName == "Plan")
         #expect(NoteLink(reading: "Plan#Soil") == NoteLink(name: "Plan", heading: "Soil"))
         #expect(NoteLink(reading: "Plan#Soil|soil") == NoteLink(name: "Plan", heading: "Soil", alias: "soil"))
         #expect(NoteLink(reading: "Plan|a#b") == NoteLink(name: "Plan", alias: "a#b"))
         #expect(NoteLink(reading: "Plan#Soil|Plan#Soil") == NoteLink(name: "Plan", heading: "Soil"), "an alias that repeats the link is none")
+        #expect(NoteLink(reading: "Plan|a\\#b") == NoteLink(name: "Plan", alias: "a#b"), "escapes are taken out")
+        #expect(NoteLink(reading: "Plan#A\\#B") == NoteLink(name: "Plan", heading: "A#B"))
+        #expect(NoteLink(reading: "Plan#Soil|a\\|b|c") == NoteLink(name: "Plan", heading: "Soil", alias: "a|b|c"))
+        #expect(NoteLink(reading: "Plan|a\\x\\") == NoteLink(name: "Plan", alias: "a\\x\\"), "a backslash that escapes nothing stays")
         #expect(NoteLink(reading: "Plan|").alias == nil)
         #expect(NoteLink(reading: "Plan#").heading == nil)
     }
