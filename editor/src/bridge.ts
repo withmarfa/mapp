@@ -42,11 +42,23 @@ export type EditorMessage =
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
+  | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 
-/** What the page asks of the app's notes: names to offer after `[[`, and which note the person links to. */
+/** A `[[link]]` as the page reads it: the name, any heading after `#`, and the alias after `|` when it has one.
+ *  The app tells links apart by all three, since the library binds each spelling on its own. */
+export interface LinkRef {
+  target: string
+  heading?: string
+  alias?: string
+}
+
+/** What the page asks of the app's notes: names to offer after `[[`, which note the person links to, and which
+ *  names the links of a note use that no note answers to. */
 export type NoteRequest =
-  { type: 'suggest'; query: string; item: string } | { type: 'pick'; item: string }
+  | { type: 'suggest'; query: string; item: string }
+  | { type: 'pick'; item: string }
+  | { type: 'resolve'; item: string; links: LinkRef[] }
 
 declare global {
   interface Window {
@@ -55,7 +67,8 @@ declare global {
         host?: { postMessage(message: EditorMessage): void }
         /** Answers with what the app knows of a file a note embeds, or null when it has none. */
         embeds?: { postMessage(request: EmbedRequest): Promise<EmbeddedFile | null> }
-        /** Answers a `suggest` with note names and a `pick` with the link the person chose, or null. */
+        /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
+         *  `resolve` with whether each name is missing. */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }
       }
     }
@@ -83,4 +96,19 @@ export async function suggestNotes(query: string, item: string): Promise<string[
 export async function pickNote(item: string): Promise<string | undefined> {
   const link = await window.webkit?.messageHandlers?.notes?.postMessage({ type: 'pick', item })
   return typeof link === 'string' ? link : undefined
+}
+
+/** Whether each link of the item names no note, in the order asked; null when the app does not answer, so the
+ *  page assumes nothing. */
+export async function askMissing(item: string, links: LinkRef[]): Promise<boolean[] | null> {
+  const answer = await window.webkit?.messageHandlers?.notes?.postMessage({
+    type: 'resolve',
+    item,
+    links,
+  })
+  return Array.isArray(answer) &&
+    answer.length === links.length &&
+    answer.every((missing) => typeof missing === 'boolean')
+    ? answer
+    : null
 }

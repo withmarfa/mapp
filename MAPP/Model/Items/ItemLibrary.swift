@@ -49,6 +49,11 @@ protocol ItemLibrary: AnyObject, Observable {
     /// no other, or nil when no spelling does. A name `source` already links keeps its first target, so it is not
     /// used for another item.
     func bodyLink(to id: ItemID, in source: ItemID?) -> String?
+    /// What `link` written in the note `source` names. Its name may be a title, a path or an identity. The library
+    /// answers as it reads links itself, so the app and the library never disagree about which note a link opens: a
+    /// notes folder by its connection index, a Marfa library by what the copy bound that very link to. A link names a
+    /// note only when the answer is `resolved`; `missing` is the one that names none at all.
+    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]

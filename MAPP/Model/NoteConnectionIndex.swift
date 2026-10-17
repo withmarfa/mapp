@@ -10,7 +10,7 @@ nonisolated struct NoteConnectionRule: Equatable, Sendable {
     let direction: Direction
 }
 
-nonisolated enum NoteReferenceResolution: Equatable, Sendable {
+nonisolated enum NoteReferenceResolution: Hashable, Sendable {
     case resolved(ItemID)
     case missing
     case ambiguous([ItemID])

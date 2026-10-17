@@ -128,19 +128,33 @@ nonisolated enum MarfaMapping {
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
-        var established: [String: ItemID] = [:]
-        for name in bodyLinks?.links ?? [] {
-            if case .item(let target) = name.target {
-                let key = NoteLinks.nameKey(NoteName.trimmed(name.name))
-                if established[key] == nil { established[key] = ItemID(target) }
-            }
+        let bound = (bodyLinks?.links ?? []).map { name in
+            BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, establishedLinks: established)
+            sync: sync, boundLinks: bound)
+    }
+
+    /// The text between the brackets of a link as the package renders it, `[[text]]`.
+    static func inside(brackets text: String) -> String {
+        guard text.hasPrefix("[["), text.hasSuffix("]]"), text.count >= 4 else { return text }
+        return String(text.dropFirst(2).dropLast(2))
+    }
+
+    /// What a link in an item's text names, as the package reads it from the copy.
+    static func resolution(of target: BodyTarget) -> NoteReferenceResolution {
+        switch target {
+        case .item(let id): .resolved(ItemID(id))
+        case .pending: .pending
+        case .missing: .missing
+        // The package says only that more than one item answers to the name.
+        case .ambiguous: .ambiguous([])
+        case .refused(let reason): .refused(reason)
+        }
     }
 
     /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads

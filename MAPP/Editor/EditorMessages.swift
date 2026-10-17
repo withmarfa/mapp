@@ -52,6 +52,8 @@ nonisolated enum EditorMessage: Sendable {
     /// The context menu is opening over an embedded file, or over anything else when nil, with whether the
     /// app said it may be opened.
     case embedMenu((item: ItemID, reference: EmbedReference, opens: Bool)?)
+    /// A `[[link]]` to a note was command-clicked in the note `item`.
+    case openNote(ItemID, NoteLink)
     case find(FindState)
     case diagnostic(String)
     case error(String)
@@ -117,6 +119,9 @@ nonisolated enum EditorMessage: Sendable {
             self = .openEmbed(item, reference)
         case "embedMenu":
             self = .embedMenu(EmbedReference.request(dict["embed"]).map { ($0.item, $0.reference, dict["opens"] as? Bool ?? false) })
+        case "openNote":
+            guard let item = dict["item"] as? String, !item.isEmpty, let link = NoteLink(page: dict) else { return nil }
+            self = .openNote(ItemID(item), link)
         case "find":
             guard let text = dict["text"] as? String,
                   let selection = dict["selection"] as? [Int], selection.count == 2,
