@@ -143,6 +143,8 @@ actor MarfaEngine {
     private var following: Task<Void, Never>?
     private var painted = false
     private var closed = false
+
+    #if DEBUG
     /// Run before each drain's answers are taken, for the tests.
     private var answering: (@Sendable () async -> Void)?
 
@@ -150,7 +152,6 @@ actor MarfaEngine {
         answering = hook
     }
 
-    #if DEBUG
     /// Run after the queue was last read and before the answers are forgotten, for the tests.
     private var forgetting: (@Sendable () async -> Void)?
 
@@ -1098,7 +1099,9 @@ actor MarfaEngine {
     /// then forgets the answered writes. A refusal or conflict stays shown after that through `remembered`, and
     /// refused writes that carried content stay queued until discarded.
     private func answer(_ report: DrainReport) async {
+        #if DEBUG
         await answering?()
+        #endif
         var ids: Set<String> = []
         // The copy lets an item go once its delete is answered, which may be only as the answers are forgotten.
         var leaving: Set<String> = []
