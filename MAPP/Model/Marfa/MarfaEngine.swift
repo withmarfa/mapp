@@ -89,9 +89,7 @@ actor MarfaEngine {
     private var restoring: [String: Marfa.Item] = [:]
     /// What each item's text names, read by the package from the copy, for the items whose text can name anything.
     private var bodyLinks: [String: BodyLinks] = [:]
-    private var edges: [String: Marfa.Edge] = [:]
-    /// The edges touching each row, so mapping an item reads its own edges rather than every edge.
-    private var edgesByItem: [String: Set<String>] = [:]
+    private var edges = MarfaEdgeTable()
     private var queue: [Marfa.QueuedWrite] = []
     private var items: [ItemID: Item] = [:]
     private var bodies: [ItemID: Int] = [:]
@@ -298,9 +296,8 @@ actor MarfaEngine {
         let departed = self.rows.filter { gone.contains($0.key) }.values
         self.catalogue = catalogue
         self.rows = rows
-        self.edges = [:]
-        edgesByItem = [:]
-        for edge in edges { insert(edge) }
+        self.edges.removeAll()
+        for edge in edges { self.edges.insert(edge) }
         binned = binned.filter { rows[$0.key] == nil }
         for row in departed { await left(row) }
         bodyLinks = [:]
@@ -384,7 +381,7 @@ actor MarfaEngine {
                 bodyLinks[id] = nil
                 if let previous { await left(previous) }
             }
-            for edgeID in edgesByItem[id] ?? [] {
+            for edgeID in edges.ids(touching: id) {
                 if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
             }
         }
@@ -494,16 +491,11 @@ actor MarfaEngine {
     }
 
     private func insert(_ edge: Marfa.Edge) {
-        edges[edge.id] = edge
-        edgesByItem[edge.sourceId, default: []].insert(edge.id)
-        edgesByItem[edge.targetId, default: []].insert(edge.id)
+        edges.insert(edge)
     }
 
     private func remove(_ id: String) -> Marfa.Edge? {
-        guard let edge = edges.removeValue(forKey: id) else { return nil }
-        edgesByItem[edge.sourceId]?.remove(id)
-        edgesByItem[edge.targetId]?.remove(id)
-        return edge
+        edges.remove(id)
     }
 
     /// Maps `ids` again and tells readers what differs: the first time, everything as `.loaded`. Failures gathered
@@ -524,7 +516,7 @@ actor MarfaEngine {
                 bodies[id] = nil
                 continue
             }
-            let held = (edgesByItem[row.id] ?? []).compactMap { edges[$0] }.sorted { $0.createdAt < $1.createdAt }
+            let held = edges.edges(touching: row.id).sorted { $0.createdAt < $1.createdAt }
             let item = MarfaMapping.item(
                 row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled, bodyLinks: bodyLinks[row.id],
                 isHeld: { self.rows[$0] != nil })
@@ -930,7 +922,7 @@ actor MarfaEngine {
     /// The file's name, or that name with a number when another attachment of the item already has it.
     private func attachmentTitle(for file: URL, on host: Marfa.Item) -> String {
         let taken = Set(
-            (edgesByItem[host.id] ?? []).compactMap { edges[$0] }
+            edges.edges(touching: host.id)
                 .filter { $0.edgeType == MarfaMapping.attachmentEdge && $0.targetId == host.id }
                 .compactMap { rows[$0.sourceId]?.title?.lowercased() })
         let name = file.lastPathComponent
