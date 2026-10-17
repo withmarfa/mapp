@@ -219,6 +219,19 @@ body {
   mask-image: var(--icon-indicator);
 }
 
+/* InkKit 0.1.4 draws a wiki link as plain text, and one that names no note only with a tooltip
+   (aicayzer/inkkit#159). A link takes the link color; one that names no note is muted and underlined with
+   dashes, so the cue is not color alone. Drop this when InkKit styles wiki links itself. */
+.inkkit-wiki-link {
+  color: var(--inkkit-accent-color);
+}
+
+.inkkit-wiki-link[data-missing='true'] {
+  color: var(--inkkit-muted-color);
+  text-decoration: underline dashed;
+  text-underline-offset: 2px;
+}
+
 /* InkKit draws text selection without filling the page margins. */
 .ProseMirror ::selection {
   background: transparent;

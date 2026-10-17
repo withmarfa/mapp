@@ -40,7 +40,7 @@
 - A move to the end the edge already holds queues nothing: the package returns `nil` from `edges.update`, since the server refuses an update that changes nothing.
 - Never take a link that a third item holds as its own; tell the person which item holds it. A change that would need two edges to move is told and not sent.
 - Where a field that holds many swaps one item for another, add the new links first and remove the old ones only once the source has taken them.
-- What an item's text links or embeds is written as edges by the package when the text is saved. Change a link in the text, never as a relationship.
+- What an item's text links or embeds is written as edges by the package when the text is saved. Change a link in the text, never as a relationship. What each link was bound to, including a name that names no item or more than one, is kept on the item (`Item.linkTargets`), and `resolveLink` answers from it so the app opens what Marfa's core would.
 - Attachments go through the package's `attach(to:file:)`, and the editor inserts the returned name into the text. Do not use the package's `embed(file:in:_:)`, which edits the body itself, outside the editor's versioned saves. Make a file's name unique among the item's attachments first, since an embed must name one file.
 
 ## Server-only actions

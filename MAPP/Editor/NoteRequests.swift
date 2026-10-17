@@ -7,6 +7,8 @@ nonisolated enum NoteRequest: Equatable, Sendable {
     case suggest(String, in: ItemID?)
     /// The Link to Note command, from the note it was typed in.
     case pick(ItemID)
+    /// Which of the names the links of a note use name no note.
+    case resolve([String], in: ItemID)
 
     init?(body: Any) {
         guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return nil }
@@ -17,6 +19,9 @@ nonisolated enum NoteRequest: Equatable, Sendable {
         case "pick":
             guard let item = dict["item"] as? String, !item.isEmpty else { return nil }
             self = .pick(ItemID(item))
+        case "resolve":
+            guard let item = dict["item"] as? String, !item.isEmpty, let names = dict["names"] as? [String] else { return nil }
+            self = .resolve(names, in: ItemID(item))
         default:
             return nil
         }
@@ -30,6 +35,8 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
     var suggest: (String, ItemID?) async -> [String] = { _, _ in [] }
     /// The link the person chose from the note, which may take as long as they do; nil if they chose none.
     var pick: (ItemID) async -> String? = { _ in nil }
+    /// Whether each name, as a link in the note spells it, names no note.
+    var missing: ([String], ItemID) -> [Bool] = { names, _ in names.map { _ in false } }
 
     func userContentController(
         _ controller: WKUserContentController,
@@ -41,6 +48,7 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
             switch request {
             case .suggest(let query, let source): replyHandler(await suggest(query, source), nil)
             case .pick(let item): replyHandler(await pick(item), nil)
+            case .resolve(let names, let source): replyHandler(missing(names, source), nil)
             }
         }
     }

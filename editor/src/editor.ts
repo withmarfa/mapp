@@ -9,8 +9,16 @@ import {
   type TableCommand,
   type ReadableTextSnapshot,
 } from '@aicayzer/inkkit'
-import { pickNote, postToHost, suggestNotes, type EmbeddedFile, type EmbedRequest } from './bridge'
+import {
+  askMissing,
+  pickNote,
+  postToHost,
+  suggestNotes,
+  type EmbeddedFile,
+  type EmbedRequest,
+} from './bridge'
 import type { HeaderLabels } from './header'
+import { NoteLinkStatus } from './links'
 
 /** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
 export function isPreviewDiagnostic(error: Error): boolean {
@@ -115,6 +123,26 @@ function request(reference: FileReference, item: string): EmbedRequest {
     : { item, path: reference.reference }
 }
 
+/** The names of notes to offer after `[[`, unless the person has typed past the request. */
+export function wikiSuggest(
+  query: string,
+  context: { documentId: string; signal: AbortSignal },
+): Promise<string[]> {
+  return context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId)
+}
+
+/** Draws the note's links again. InkKit offers no call for it, so this sends the event it hears itself when
+ *  something that changes how links are drawn changes, such as a load or a switch of editing mode; every
+ *  link then asks the adapter again. A test mounts the real InkKit and fails if a release stops hearing it. */
+function redrawWikiLinks(root: HTMLElement): void {
+  root.querySelector('.ProseMirror')?.dispatchEvent(new Event('inkkit-media-policy'))
+}
+
+/** The heading text as a link names it: compared ignoring case and the spacing around and inside it. */
+function headingKey(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
 function isNoteReference(reference: FileReference): boolean {
   const target = reference.target.split('?')[0]!
   const name = target.split('/').pop() ?? target
@@ -129,6 +157,7 @@ export class NoteEditor {
   private layoutObserver?: ResizeObserver
   private generation = 0
   private item = ''
+  private links!: NoteLinkStatus
   private reported = ''
   private original = ''
   private constructor(private events: EditorEvents) {}
@@ -140,6 +169,7 @@ export class NoteEditor {
   ): Promise<NoteEditor> {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
+    host.links = new NoteLinkStatus(askMissing, () => redrawWikiLinks(root))
     host.engine = await InkKitEditor.mount(
       root,
       {
@@ -230,10 +260,23 @@ export class NoteEditor {
         },
         wikiLinks: {
           // The app matches names against its library; a request the person has typed past is not sent.
-          suggest: (query, context) =>
-            context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId),
-          // InkKit requires the adapter to open a link. Opening the note it names is not offered yet.
-          open() {},
+          suggest: wikiSuggest,
+          // The app tells which names no note answers to, and InkKit draws those links as missing.
+          resolve: (reference, context) => host.links.status(reference.target, context.documentId),
+          // A link to this note's own heading is the page's to follow. Any other names a note, which only the
+          // app can find, so the app opens it and scrolls to the heading once it is shown.
+          open(reference, context) {
+            if (!reference.target) {
+              if (reference.fragment) host.revealHeading(reference.fragment)
+              return
+            }
+            postToHost({
+              type: 'openNote',
+              item: context.documentId,
+              target: reference.target,
+              ...(reference.fragment ? { heading: reference.fragment } : {}),
+            })
+          },
         },
         slashMenu: {
           enabled: true,
@@ -261,6 +304,18 @@ export class NoteEditor {
   }
   setItem(id: string) {
     this.item = id
+  }
+  /** The app's library changed: which notes the links name is asked again. */
+  linksChanged() {
+    this.links.refresh()
+  }
+  /** Moves to the heading of the note on the page that has this text. Whether there was one. */
+  revealHeading(text: string, expected = this.generation): boolean {
+    const wanted = headingKey(text)
+    const heading = this.engine
+      .headings(expected)
+      .find((entry) => headingKey(entry.text) === wanted)
+    return heading ? this.engine.navigateHeading(heading) : false
   }
   private pendingChanged?: { text: string; generation: number }
   private flushChanges() {
@@ -491,6 +546,7 @@ export class NoteEditor {
     return { ...result, assets: undefined, assetCount: result.assets.length }
   }
   destroy() {
+    this.links.end()
     this.replacement++
     this.setFinding(false)
     window.removeEventListener('scroll', this.scrolled, true)

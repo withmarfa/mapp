@@ -275,6 +275,7 @@ struct MarfaMappingTests {
         let links = BodyLinks(
             links: [
                 BodyName(text: "[[Plan]]", name: "Plan", target: .item(id: "plan")),
+                BodyName(text: "[[Plan|again]]", name: "Plan", target: .missing),
                 BodyName(text: "[[Later]]", name: "Later", target: .pending),
                 BodyName(text: "[[Nowhere]]", name: "Nowhere", target: .missing),
                 BodyName(text: "[[Twin]]", name: "Twin", target: .ambiguous),
@@ -289,15 +290,21 @@ struct MarfaMappingTests {
             bodyLinks: links, isHeld: { $0 == "plan" })
         // Those that name an item are the copy's own edges; the rest are the package's word that none is there.
         #expect(item.edgesOut.map(\.target) == [
-            .item(ItemID("plan")), .pending(spelling: "Later"), .unresolved(spelling: "Nowhere", ambiguous: false),
+            .item(ItemID("plan")), .unresolved(spelling: "Plan", ambiguous: false), .pending(spelling: "Later"), .unresolved(spelling: "Nowhere", ambiguous: false),
             .unresolved(spelling: "Twin", ambiguous: true), .refused(spelling: "Banned", reason: "forbidden"),
             .unresolved(spelling: "dog.png", ambiguous: false)
         ])
-        #expect(item.edgesOut.map(\.type) == ["references", "references", "references", "references", "references", "attached-to"])
+        #expect(item.edgesOut.map(\.type) == ["references", "references", "references", "references", "references", "references", "attached-to"])
         #expect(item.edgesOut.allSatisfy { $0.origin == .body })
         #expect(Set(item.edgesOut.map(\.id)).count == item.edgesOut.count)
         #expect(MarfaMapping.unresolvedLinks(of: "n", in: nil).isEmpty)
-        // The links already bound to an item are kept by the name each is spelled with, since the package keeps them.
+        // Each link is kept with what the package bound it to, by the name it is spelled with, since the package keeps
+        // the first note a name was bound to: a second link with that name that names none does not undo it.
+        #expect(item.linkTargets == [
+            NoteLinks.nameKey("Plan"): .resolved(ItemID("plan")), NoteLinks.nameKey("Later"): .pending,
+            NoteLinks.nameKey("Nowhere"): .missing, NoteLinks.nameKey("Twin"): .ambiguous([]),
+            NoteLinks.nameKey("Banned"): .refused("forbidden")
+        ])
         #expect(item.establishedLinks == [NoteLinks.nameKey("Plan"): ItemID("plan")])
     }
 

@@ -46,6 +46,13 @@ final class EditorController: NSObject {
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
+    /// A link in the page names this note, which the window opens as choosing it in the list does.
+    @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
+    /// A link in the page names no note the window can open, which is told only by a beep: nothing is made.
+    @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
+    /// The heading a link asked for in the note it is opening, scrolled to once that note is on the page.
+    @ObservationIgnored private var pendingHeading: (note: ItemID, text: String)?
+    @ObservationIgnored private var isWatchingLinks = false
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
 
@@ -112,6 +119,10 @@ final class EditorController: NSObject {
             return await current.noteNames(matching: query, in: source, using: self.noteTitles)
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
+        noteRequests.missing = { [weak self] names, source in
+            guard let library = self?.library else { return names.map { _ in false } }
+            return names.map { library.resolveLink($0, in: source) == .missing }
+        }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         #if DEBUG
         webView.isInspectable = true
@@ -156,6 +167,7 @@ final class EditorController: NSObject {
     /// left once its last edit is in.
     func load(_ item: Item) {
         if wantsFocus != item.id { wantsFocus = nil }
+        if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
         let request = loadRequest
         let present = { [self] in
@@ -258,6 +270,7 @@ final class EditorController: NSObject {
         shown = shown.filter { $0.key >= generation - 8 }
         shown[generation] = Shown(id: item.id, read: body.version)
         call(function, json(body.text), String(generation), String(isEditable))
+        revealPendingHeading(in: item.id)
         if let requested = wantsFocus { focus(requested) }
     }
 
@@ -266,6 +279,7 @@ final class EditorController: NSObject {
     func close() {
         cancelLinkRequest()
         wantsFocus = nil
+        pendingHeading = nil
         isPresented = false
         loadRequest += 1
         let request = loadRequest
@@ -629,6 +643,46 @@ final class EditorController: NSObject {
         continuation?.resume(returning: link)
     }
 
+    // MARK: Following a link
+
+    /// Opens the note a link in `source` names, as the library reads the link, and scrolls to the heading it asks
+    /// for. A link that names no note, or more than one, or that the library has not been able to look up, opens
+    /// nothing and beeps; no note is made for it. A click in a note the page has since left is ignored.
+    func openNote(named target: String, heading: String?, from source: ItemID) {
+        guard !windowIsGone, source == noteID, let library else { return }
+        guard case .resolved(let id) = library.resolveLink(target, in: source), library.item(id) != nil else {
+            return onUnopenableLink()
+        }
+        let text = heading.map(NoteName.trimmed).flatMap { $0.isEmpty ? nil : $0 }
+        pendingHeading = text.map { (id, $0) }
+        if id == noteID { revealPendingHeading(in: id) } else { onOpenNote(id) }
+    }
+
+    private func revealPendingHeading(in note: ItemID) {
+        guard let pending = pendingHeading, pending.note == note, isReady else { return }
+        pendingHeading = nil
+        call("revealHeading", json(pending.text), String(generation))
+    }
+
+    /// Tells the page when the library's notes change, since a link there may then name a note or none. Changes
+    /// come in bursts, as typing is saved, so the page hears once they pause. Followed here, as the header is, so
+    /// the page keeps up whether or not a view is updated.
+    private func watchLinks() {
+        guard !isWatchingLinks, let library else { return }
+        isWatchingLinks = true
+        withObservationTracking {
+            _ = library.items(in: .allNotes)
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let self, !windowIsGone else { return }
+                isWatchingLinks = false
+                if noteID != nil, isReady { call("linksChanged") }
+                watchLinks()
+            }
+        }
+    }
+
     func setSourceMode(_ source: Bool) {
         guard hasNote, isReady else { return }
         call("setEditingMode", json(source ? "source" : "formatted"), String(generation))
@@ -775,6 +829,7 @@ final class EditorController: NSObject {
             applyAccent()
             applyKeymap()
             applyStyle()
+            watchLinks()
             isEditingTitle = false
             headerIconSize = nil
             sendHeader()
@@ -818,6 +873,8 @@ final class EditorController: NSObject {
             insertImages(PastedImages.sources(on: .general))
         case .openEmbed(let item, let reference):
             openEmbed(reference, in: item)
+        case .openNote(let item, let target, let heading):
+            openNote(named: target, heading: heading, from: item)
         case .embedMenu(let embed):
             menuEmbed = embed
         case .find(let state):

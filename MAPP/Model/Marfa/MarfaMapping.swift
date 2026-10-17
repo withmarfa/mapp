@@ -128,11 +128,19 @@ nonisolated enum MarfaMapping {
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
-        var established: [String: ItemID] = [:]
+        var bound: [String: NoteReferenceResolution] = [:]
         for name in bodyLinks?.links ?? [] {
-            if case .item(let target) = name.target {
-                let key = NoteLinks.nameKey(NoteName.trimmed(name.name))
-                if established[key] == nil { established[key] = ItemID(target) }
+            let key = NoteLinks.nameKey(NoteName.trimmed(name.name))
+            let resolution = resolution(of: name.target)
+            switch bound[key] {
+            case .resolved:
+                // The first note a name was bound to keeps it.
+                continue
+            case nil:
+                bound[key] = resolution
+            default:
+                // A name that no note answers to yields to a link that did name one.
+                if case .resolved = resolution { bound[key] = resolution }
             }
         }
         return Item(
@@ -140,7 +148,19 @@ nonisolated enum MarfaMapping {
             preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, establishedLinks: established)
+            sync: sync, linkTargets: bound)
+    }
+
+    /// What a link in an item's text names, as the package reads it from the copy.
+    static func resolution(of target: BodyTarget) -> NoteReferenceResolution {
+        switch target {
+        case .item(let id): .resolved(ItemID(id))
+        case .pending: .pending
+        case .missing: .missing
+        // The package says only that more than one item answers to the name.
+        case .ambiguous: .ambiguous([])
+        case .refused(let reason): .refused(reason)
+        }
     }
 
     /// Where an item's title is read and written: the field the type's hints name, else `title`, as Marfa reads

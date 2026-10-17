@@ -86,6 +86,14 @@ extension NoteLibrary {
             ? NoteLinks.identityLink(to: spelling, titled: target.title, readsBrackets: false) : NoteLinks.link(to: spelling)
     }
 
+    /// A link reads as the connection index does: its title, else its path, else the identity its file declares.
+    /// A name holding `|` or `#` is a link's alias or heading, never part of the name, so the index cannot read it.
+    func resolveLink(_ name: String, in source: ItemID) -> NoteReferenceResolution {
+        let name = NoteName.trimmed(name)
+        guard !name.isEmpty, !name.contains(where: { $0 == "|" || $0 == "#" }) else { return .missing }
+        return connectionIndex.resolution(of: name)
+    }
+
     private func reference(to targetID: ItemID) -> String? {
         guard let target = item(targetID) else { return nil }
         let candidates = [target.title, path(of: targetID), target.value(of: "marfa_id")?.string].compactMap { $0 }
