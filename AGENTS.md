@@ -52,7 +52,7 @@ These hold across the app. The nested files say how each library keeps them.
 
 - `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/`, and `MAPPUITests/`. Add a source file by creating it on disk; do not edit `project.pbxproj` to add files.
 - Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. The nested `AGENTS.md` and `CLAUDE.md` files are listed there; list any new one too, or it is copied into the app, and two with one name fail the build as duplicate resources.
-- The bundle identifier, display name, and version are build settings. `MAPP/Info.plist` holds only what build settings cannot express (the note drag type) and is excluded from the app's resources.
+- The bundle identifier, display name, and version are build settings. A Debug build has its own bundle identifier, `com.withmarfa.mapp.debug`, so it never shares the installed app's container, defaults, saved server, Marfa store or keychain items; Release is `com.withmarfa.mapp`. Key anything that must differ between them (the keychain service) on `Bundle.main.bundleIdentifier`, never a literal. `MAPP/Info.plist` holds only what build settings cannot express (the note drag type) and is excluded from the app's resources.
 - `MAPP/Model/`: the data model, free of SwiftUI. `Items/` holds the library protocol and item types; `Marfa/` holds the Marfa library.
 - `MAPP/Views/`: windows, panes, toolbars, commands, and Settings. `MAPP/Types/`: the Marfa Types browser.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
