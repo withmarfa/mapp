@@ -11,7 +11,9 @@ nonisolated protocol KeyStore: Sendable {
 
 /// The person's keys, in their default keychain.
 nonisolated struct KeychainKeyStore: KeyStore {
-    static let service = "com.withmarfa.mapp.marfa-key"
+    /// Named for the bundle identifier, so a Debug build, which has its own, never reads or replaces the keys of the
+    /// installed app. The installed app's is `com.withmarfa.mapp.marfa-key`.
+    static var service: String { "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").marfa-key" }
 
     private let keychain: Keychain
 
