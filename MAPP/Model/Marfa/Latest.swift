@@ -2,6 +2,9 @@ import Foundation
 import Synchronization
 
 /// A value that changes, told to each watcher from the value it had when the watcher came.
+///
+/// Values are told inside the lock, so every watcher hears them in the order they were set. Nothing that runs under
+/// the runtime's task locks may wait for that lock.
 nonisolated final class Latest<Value: Hashable & Sendable>: Sendable {
     private struct State {
         var value: Value
@@ -20,7 +23,12 @@ nonisolated final class Latest<Value: Hashable & Sendable>: Sendable {
     func values() -> AsyncStream<Value> {
         let (stream, continuation) = AsyncStream<Value>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let token = UUID()
-        continuation.onTermination = { [weak self] _ in self?.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
+        // Cancelling a watching task runs this while the runtime holds the task's status lock, and `update` tells a
+        // watcher a value, which needs that lock, while it holds ours. Taking our lock here would make the two wait
+        // on each other, so the watcher is taken out from elsewhere. A value told to it before then is dropped.
+        continuation.onTermination = { [weak self] _ in
+            DispatchQueue.global(qos: .utility).async { self?.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
+        }
         let finished = state.withLock { state in
             guard !state.finished else { return true }
             continuation.yield(state.value)
