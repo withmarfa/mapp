@@ -195,7 +195,11 @@ actor MarfaEngine {
             }
             switch event {
             case .paint: await paint()
-            case .resumed: await reload()
+            case .resumed:
+                await reload()
+                // The follow of the server is new with the stream, so the copy is brought up to date, which also
+                // sets the library right again after a fault.
+                await sync.refresh()
             case .write(let write, let id): await perform(write, as: id)
             case .change(let change): await handle(change)
             case .binned(let found, let complete): take(bin: found, complete: complete)
@@ -302,6 +306,7 @@ actor MarfaEngine {
         let departed = self.rows.filter { gone.contains($0.key) }.values
         self.catalogue = catalogue
         self.rows = rows
+        await sync.unreadable(Set(rows.values.filter { $0.unreadableProperties != nil }.map(\.id)))
         self.edges.removeAll()
         for edge in edges { self.edges.insert(edge) }
         binned = binned.filter { rows[$0.key] == nil }
@@ -377,6 +382,7 @@ actor MarfaEngine {
         } catch {
             failures.append(Self.failure(error))
         }
+        await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
         for (row, id, _) in read {
             let previous = rows[id]
             rows[id] = row
@@ -718,18 +724,22 @@ actor MarfaEngine {
             await reread(touched)
             await sync.drain()
         } catch let error as Unsupported {
-            hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message))))
+            hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message, notQueued: true))))
         } catch let error as Refused {
-            hub.publish(.answered(id, .refused(error.problem)))
+            var problem = error.problem
+            problem.notQueued = true
+            hub.publish(.answered(id, .refused(problem)))
         } catch let error as MarfaError {
             // Refused before it was queued, such as a property the type does not allow: nothing is waiting.
-            hub.publish(.answered(id, .refused(Self.problem(for: error))))
+            var problem = Self.problem(for: error)
+            problem.notQueued = true
+            hub.publish(.answered(id, .refused(problem)))
             switch error {
             case .hydrationIncomplete, .copyExpired: await sync.refresh()
             default: break
             }
         } catch {
-            hub.publish(.answered(id, .refused(SyncProblem(code: "failed", message: error.localizedDescription))))
+            hub.publish(.answered(id, .refused(SyncProblem(code: "failed", message: error.localizedDescription, notQueued: true))))
         }
     }
 

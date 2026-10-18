@@ -11,9 +11,10 @@ nonisolated enum MarfaProblems {
     static let conflictedCopyTag = "conflicted-copy"
 
     /// What the person is told of a row whose stored properties the copy could not read, such as a store another
-    /// program wrote to. The server still holds the item, and the copy reads it again when it is next hydrated.
+    /// program wrote to. The server still holds the item. The copy is hydrated once for it, which replaces the row; if
+    /// it is still unreadable after that, only a new copy helps.
     static var unreadableMessage: String {
-        String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The copy on the server is not affected.")
+        String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.")
     }
 
     static var unreadable: SyncProblem {
