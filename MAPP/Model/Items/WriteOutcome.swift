@@ -22,6 +22,8 @@ nonisolated struct SyncProblem: Hashable, Sendable {
     /// The item is in the bin and can be restored.
     var isTrashed = false
     var grant: Grant?
+    /// Refused before it was queued, so no queue holds what it carried and the person's content is theirs to keep.
+    var notQueued = false
 }
 
 /// The contract's closed set, less `awaiting_dependency`, which is never a verdict's reason.

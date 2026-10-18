@@ -1,5 +1,10 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.ListFilters
+import struct MarfaCore.SearchFilters
+import struct MarfaCore.SearchHit
+import enum MarfaCore.ItemState
 import Synchronization
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
@@ -41,7 +46,7 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
     /// another.
     case keyRefused
-    /// Following the server stopped, and stays stopped until the next refresh. The copy still reads and queues.
+    /// Following the server stopped, and stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended the stream on a fault and a new one is taken. The copy still reads and queues.
     case stopped(code: String, message: String)
 }
 

@@ -1075,4 +1075,63 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { !told.isEmpty })
         #expect(told.map(\.text) == ["Typed as it closed"])
     }
+
+    /// A save that arrives after the row can no longer be written reaches nothing, so the person is told and the text
+    /// goes where they can get it back.
+    @Test func textTypedOverAnItemThatCannotBeWrittenIsGivenBack() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        var damaged = try #require(library.item(LibraryFixture.n1))
+        damaged.problem = ItemProblem(message: "Damaged", withholdsText: true)
+        source.send(.upserted([damaged]))
+        try #require(await eventually { library.item(LibraryFixture.n1)?.problem != nil })
+
+        library.updateBody(of: LibraryFixture.n1, to: "Typed as the row turned unreadable")
+        #expect(told.map(\.text) == ["Typed as the row turned unreadable"])
+        #expect(told.first?.reason == MarfaLibrary.cantChange)
+        #expect(source.writes.isEmpty)
+    }
+
+    @Test func textThatChangesNothingIsNotTold() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        var damaged = try #require(library.item(LibraryFixture.n1))
+        damaged.problem = ItemProblem(message: "Damaged", withholdsText: true)
+        source.send(.upserted([damaged]))
+        try #require(await eventually { library.item(LibraryFixture.n1)?.problem != nil })
+        let held = try #require(library.body(of: LibraryFixture.n1)?.text)
+
+        library.updateBody(of: LibraryFixture.n1, to: held)
+        library.updateBody(of: ItemID("nowhere"), to: "Nobody's")
+        #expect(told.isEmpty)
+    }
+
+    /// A text save the package refused before queueing it is in no queue, so the typed text is given back with the
+    /// reason, in place of an alert the page then replaces with the server's text.
+    @Test func textRefusedBeforeItWasQueuedIsGivenBackWithTheReason() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        library.updateBody(of: LibraryFixture.n1, to: "Typed while the copy was brought up to date")
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: "copy_expired", message: "Try again in a moment.", notQueued: true))))
+        #expect(await eventually { !told.isEmpty })
+        #expect(told.map(\.text) == ["Typed while the copy was brought up to date"])
+        #expect(told.first?.reason == "Try again in a moment.")
+        #expect(library.failure == nil, "the person is told once")
+    }
+
+    /// A text save the server refused is in the queue, listed with its text, so it is told as it was.
+    @Test func textTheServerRefusedStaysInTheQueueAndIsToldAsAFailure() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        library.updateBody(of: LibraryFixture.n1, to: "Refused later")
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: "validation_error", message: "Too long."))))
+        #expect(await eventually { library.failure != nil })
+        #expect(told.isEmpty)
+    }
 }

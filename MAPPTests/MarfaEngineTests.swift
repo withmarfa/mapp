@@ -1,5 +1,9 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import enum MarfaCore.ItemState
+import enum MarfaCore.Tier
+import enum MarfaCore.JsonValue
 import Testing
 @testable import MAPP
 
@@ -37,6 +41,44 @@ struct MarfaEngineTests {
         // A type with no text has none to ask about, and a type the catalogue lacks is read as having none.
         #expect(!asks("[[Plan]]", type: "core.entity"))
         #expect(!asks("[[Plan]]", type: "aic.unknown"))
+    }
+
+    // MARK: Editing properties
+
+    @Test func aPropertyGivenAValueIsMergedAndTheRestStay() throws {
+        let edit = try MarfaEngine.propertyEdit(["b": .string("2"), "a": .number(1)], of: Self.row("core.note", ["title": "T"]))
+        #expect(edit.properties == ["a": .integer(1), "b": .string("2")], "in key order, so the same change is the same write")
+        #expect(!edit.replacing)
+    }
+
+    @Test func takingAPropertyAwayReplacesTheWholeWithoutIt() throws {
+        let row = Self.row("core.note", ["title": "T", "status": "open", "body": "Text"])
+        let cleared = try MarfaEngine.propertyEdit(["status": nil, "title": .string("New")], of: row)
+        #expect(cleared.properties == ["title": "New", "body": "Text"], "the others keep their place, and a new value takes the old one's")
+        #expect(cleared.replacing)
+
+        // A null clears nothing on the server, so it is taken as taking the property away.
+        let nulled = try MarfaEngine.propertyEdit(["status": .null], of: row)
+        #expect(nulled.properties == ["title": "T", "body": "Text"])
+        #expect(nulled.replacing)
+    }
+
+    @Test func aRowTheCopyCouldNotReadIsNeverTheBaseOfAReplacement() {
+        var damaged = Self.row("core.note", [:])
+        damaged.unreadableProperties = "stored properties are not a JSON object"
+        // Replacing from the empty properties it shows would clear everything it holds.
+        #expect(throws: MarfaEngine.Refused.self) { try MarfaEngine.propertyEdit(["status": nil], of: damaged) }
+        do {
+            _ = try MarfaEngine.propertyEdit(["status": nil], of: damaged)
+        } catch let refused as MarfaEngine.Refused {
+            #expect(refused.problem == MarfaProblems.unreadable)
+        } catch {
+            Issue.record("refused another way: \(error)")
+        }
+    }
+
+    @Test func takingAPropertyFromAnItemTheCopyLacksIsRefused() {
+        #expect(throws: MarfaError.self) { try MarfaEngine.propertyEdit(["status": nil], of: nil) }
     }
 
     @Test func anEmbedIsReadBackAsTheNameTheFileWasGiven() {

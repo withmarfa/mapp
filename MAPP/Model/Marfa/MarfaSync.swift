@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.BinPage
 
 /// Everything the source asks of the server: hydrating, catching up and draining, one at a time, apart from the
 /// engine, so a write reaches the copy's queue at once however long the network takes.
@@ -35,6 +36,34 @@ actor MarfaSync {
     private var draining: [CheckedContinuation<Void, Never>] = []
     /// How many drains this lane has sent, for the tests.
     private(set) var drains = 0
+    /// How many times it has hydrated, for the tests.
+    private(set) var hydrations = 0
+    /// Rows the copy could not read, which only a hydration replaces.
+    private var rehydration = Rehydration()
+    /// Whether the person has been told of a stop since something last succeeded, so a fault the core ends a stream
+    /// on again and again is told once.
+    private var told = false
+
+    /// Rows the copy could not read and the hydration they wait for. A hydration replaces such a row from the server,
+    /// but a row that is unreadable again after it would ask again for ever, so each row asks once.
+    nonisolated struct Rehydration {
+        private var asked: Set<String> = []
+        private(set) var wanted = false
+
+        /// Whether any of `ids` is new, which wants a hydration.
+        mutating func ask(about ids: Set<String>) -> Bool {
+            let fresh = ids.subtracting(asked)
+            guard !fresh.isEmpty else { return false }
+            asked.formUnion(fresh)
+            wanted = true
+            return true
+        }
+
+        /// A hydration succeeded.
+        mutating func finished() {
+            wanted = false
+        }
+    }
 
     nonisolated enum DrainResult: Hashable, Sendable {
         /// The server refused the key and the core parked the queue until a new one is given.
@@ -73,6 +102,13 @@ actor MarfaSync {
 
     func drain() {
         wantsDrain = true
+        work()
+    }
+
+    /// Rows the copy could not read, found by a read: the copy replaces them on a hydration, which keeps its queue.
+    func unreadable(_ ids: Set<String>) {
+        guard rehydration.ask(about: ids) else { return }
+        wantsRefresh = true
         work()
     }
 
@@ -252,7 +288,7 @@ actor MarfaSync {
             _ = try await copy.catchUp()
             // A copy hydrated for one tier, as an earlier version of the app made them, takes the other too.
             let namespaces = try await MarfaMapping.namespaces(of: catalogue())
-            if status.sliceTier != Self.tier || Set(namespaces) != Set(status.sliceTypes) {
+            if rehydration.wanted || status.sliceTier != Self.tier || Set(namespaces) != Set(status.sliceTypes) {
                 try await hydrate()
             }
         } else {
@@ -365,6 +401,7 @@ actor MarfaSync {
     private func hydrate() async throws {
         hub.report.update { $0.phase = .catchingUp }
         defer { hub.report.update { $0.phase = .current } }
+        hydrations += 1
         var slice = MarfaMapping.namespaces(of: try await catalogue())
         for _ in 0..<2 {
             _ = try await copy.hydrate(types: slice, tier: Self.tier)
@@ -372,6 +409,7 @@ actor MarfaSync {
             if Set(wanted) == Set(slice) { break }
             slice = wanted
         }
+        rehydration.finished()
     }
 
     private func catalogue() async throws -> Catalogue {
@@ -379,6 +417,7 @@ actor MarfaSync {
     }
 
     private func succeeded() {
+        told = false
         failures = 0
         retry?.cancel()
         retry = nil
@@ -429,6 +468,8 @@ actor MarfaSync {
             schedule(kind)
         default:
             hub.set(.stopped(code: error.code(), message: error.message))
+            guard !told else { return }
+            told = true
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
         }
     }

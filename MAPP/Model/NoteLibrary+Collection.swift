@@ -367,8 +367,9 @@ nonisolated extension Item {
     /// note or front matter that does not parse is read only.
     var isEditable: Bool { state == .active && problem == nil && !isFile }
 
-    /// Whether its text can be written in: front matter that does not parse leaves the text as writable as ever.
-    var isWritable: Bool { state == .active && !isFile }
+    /// Whether its text can be written in: front matter that does not parse leaves the text as writable as ever, but
+    /// text the library could not read is not shown, so nothing typed over the empty page is written.
+    var isWritable: Bool { state == .active && !isFile && problem?.withholdsText != true }
 
     var isFile: Bool {
         if case .file = content { true } else { false }

@@ -1,5 +1,10 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.Edge
+import enum MarfaCore.ItemState
+import enum MarfaCore.Tier
+import enum MarfaCore.JsonValue
 import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
@@ -62,6 +67,28 @@ struct MarfaMappingTests {
 
     private static func item(_ row: Marfa.Item, edges: [Marfa.Edge] = [], held: Set<String> = []) -> MAPP.Item {
         MarfaMapping.item(row, edges: edges, catalogue: catalogue, isHeld: { held.contains($0) })
+    }
+
+    // MARK: Rows the copy could not read
+
+    @Test func aRowTheCopyCouldNotReadIsShownAsDamagedNotAsEmpty() {
+        var damaged = Self.row("d", properties: [:], version: 7, tags: ["favorite"])
+        damaged.unreadableProperties = "stored properties are not a JSON object"
+        let shown = Self.item(damaged)
+
+        #expect(shown.problem == ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true))
+        #expect(shown.preview == MarfaProblems.unreadableMessage, "the list says why, rather than showing a blank row")
+        #expect(!shown.isEditable, "nothing is written from a row that shows none of what it holds")
+        #expect(!shown.isWritable, "and nothing typed over its empty page is written")
+        #expect(shown.version == ItemVersion(7) && shown.tags == ["favorite"] && shown.state == .active)
+        #expect(shown.properties.isEmpty)
+    }
+
+    @Test func aRowTheCopyReadsHasNoProblem() {
+        let shown = Self.item(Self.row("r"))
+        #expect(shown.problem == nil)
+        #expect(shown.preview == "Body")
+        #expect(shown.isEditable && shown.isWritable)
     }
 
     // MARK: Catalogue

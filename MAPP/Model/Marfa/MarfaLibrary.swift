@@ -69,10 +69,17 @@ import Observation
     /// the library's own `failure` says so.
     @ObservationIgnored var onNotKept: ((NotKept) -> Void)?
 
-    /// A write no queue holds, since the source had closed.
+    /// A write no queue holds: the source had closed, or it could not be made. `reason`, in the person's words, says
+    /// why when it was not that the source had closed.
     nonisolated struct NotKept: Hashable, Sendable {
         var title: String
         var text: String?
+        var reason: String?
+    }
+
+    /// Why text typed over an item that can no longer be written is not kept.
+    static var cantChange: String {
+        String(localized: "This item can’t be changed now, so MAPP couldn’t keep what you typed.")
     }
 
     /// A place's order changes only with what it holds, so a change to one item maps the items again without
@@ -274,6 +281,10 @@ import Observation
         if case .refused(let problem) = outcome, let refusal {
             if problem.code == MarfaEngine.closedCode {
                 notKept(refusal.title, text: typed ?? refusal.text)
+            } else if problem.notQueued, let typed {
+                // Nothing queued it, so the text is in no write the person could copy it from, and the page is
+                // about to show the text the library holds.
+                notKept(refusal.title, text: typed, reason: problem.message ?? String(localized: "The Marfa server refused this change."))
             } else {
                 failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
             }
@@ -330,11 +341,11 @@ import Observation
     }
 
     /// Told where the person sees it, with the text they typed, since nothing else holds that text.
-    private func notKept(_ title: String, text: String?) {
+    func notKept(_ title: String, text: String?, reason: String? = nil) {
         if let onNotKept {
-            onNotKept(NotKept(title: title, text: text))
+            onNotKept(NotKept(title: title, text: text, reason: reason))
         } else {
-            failure = (title, MarfaEngine.notKept)
+            failure = (title, reason ?? MarfaEngine.notKept)
         }
     }
 

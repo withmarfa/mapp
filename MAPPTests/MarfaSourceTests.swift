@@ -1,5 +1,12 @@
 import Foundation
 import Marfa
+import struct MarfaCore.BinPage
+import struct MarfaCore.Edge
+import struct MarfaCore.Edit
+import struct MarfaCore.Item
+import struct MarfaCore.ListFilters
+import enum MarfaCore.JsonValue
+import enum MarfaCore.Tier
 import Synchronization
 import Testing
 @testable import MAPP
@@ -195,7 +202,7 @@ struct MarfaSourceOfflineTests {
         let write = WriteID()
         source.submit(.create(id: .mint(), ItemDraft(type: entity.id, title: "Ada", body: "Typed text")), as: write)
         let answered = try #require(await log.wait { $0.answer(to: write) != nil })
-        #expect(answered.answer(to: write) == .refused(SyncProblem(code: "unsupported", message: MarfaEngine.noText)))
+        #expect(answered.answer(to: write) == .refused(SyncProblem(code: "unsupported", message: MarfaEngine.noText, notQueued: true)))
         #expect(try await source.copy.queue.all().isEmpty)
         await source.close()
     }
@@ -239,6 +246,122 @@ struct MarfaSourceOfflineTests {
         })
         #expect(failed.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1))
         await source.close()
+    }
+
+    /// The package takes properties as values: a text edit names the body alone, which the server merges, and a
+    /// property taken away is the item's whole properties without it. Both are read back from the queue.
+    @Test(.timeLimit(.minutes(1)))
+    func aTextEditMergesTheBodyAndAPropertyTakenAwayReplacesTheWhole() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let id = ItemID.mint()
+        let draft = ItemDraft(
+            type: TypeID("core.note"), title: "MAPPTEST edits", body: "First", properties: ["description": .string("Kept")])
+        source.submit(.create(id: id, draft), as: WriteID())
+        let made = try #require(await log.wait { $0.item(titled: "MAPPTEST edits") != nil })
+        let version = try #require(made.item(titled: "MAPPTEST edits")?.version)
+
+        source.submit(.editBody(id, "Second", base: version, merge: .ifUnchanged), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 2) })
+        let merge = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
+        #expect(merge.body["properties"]?.object == ["body": "Second"], "only the text is named, so the server merges it")
+        #expect(merge.body["properties_mode"] == nil)
+
+        source.submit(.editProperties(id, ["description": nil], base: version, undoing: nil), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 3) })
+        let replace = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
+        #expect(replace.body["properties_mode"]?.string == "replace")
+        let whole = try #require(replace.body["properties"]?.object)
+        #expect(whole["description"] == nil, "the property taken away is not in the whole")
+        #expect(whole["body"]?.string == "Second" && whole["title"]?.string == "MAPPTEST edits", "every other keeps its value")
+        await source.close()
+    }
+
+    private func unavailable(_ state: ChangeLog.State) -> Int {
+        state.changes.count { if case .unavailable = $0 { true } else { false } }
+    }
+
+    /// A stream the core ended on a fault is followed by `.resumed`, which refreshes the copy so the library leaves
+    /// "stopped" once the server answers, and the person is told of the fault once until it has.
+    @Test(.timeLimit(.minutes(1)))
+    func aFaultTheCoreEndedAStreamOnIsToldOnceAndTheNextStreamRefreshes() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let fault = Change(origin: .stopped(.store(message: "the store failed")), itemId: nil, edgeId: nil)
+
+        source.events.yield(.change(fault))
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+        #expect(await waitForConnection(source) { if case .stopped = $0 { true } else { false } })
+
+        source.events.yield(.change(fault))
+        source.events.yield(.resumed)
+        // The refresh is made against a server nothing answers, so it ends offline: the library left "stopped".
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        #expect(unavailable(log.current) == 1, "a fault told again before anything succeeded is not told again")
+
+        // Something succeeded: the next fault is news.
+        let report = DrainReport(answered: 1)
+        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        #expect(await waitForConnection(source) { $0 == .online })
+        source.events.yield(.change(fault))
+        _ = try #require(await log.wait { unavailable($0) == 2 })
+        await source.close()
+    }
+
+    /// A row the copy could not read is replaced only by a hydration, which the sync asks for once for each row.
+    @Test(.timeLimit(.minutes(1)))
+    func aRowTheCopyCouldNotReadIsHydratedForOnceAtMost() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let sync = await source.engine.sync
+        #expect(await sync.hydrations == 0)
+
+        await sync.unreadable(["a"])
+        let clock = ContinuousClock()
+        let end = clock.now + .seconds(20)
+        while await sync.hydrations == 0, clock.now < end { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await sync.hydrations == 1)
+
+        // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
+        await sync.unreadable(["a"])
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await sync.hydrations == 1)
+        await source.close()
+    }
+
+    @Test func aRowIsHydratedForOnlyOnceAndAnotherRowAsksAgain() {
+        var asking = MarfaSync.Rehydration()
+        #expect(!asking.wanted)
+        let none = asking.ask(about: [])
+        #expect(!none)
+        let first = asking.ask(about: ["a"])
+        #expect(first)
+        #expect(asking.wanted)
+        asking.finished()
+        #expect(!asking.wanted)
+        let again = asking.ask(about: ["a"])
+        #expect(!again, "the row stays unreadable after the hydration: no loop")
+        #expect(!asking.wanted)
+        let other = asking.ask(about: ["a", "b"])
+        #expect(other, "a row not asked about before does")
+        #expect(asking.wanted)
+    }
+
+    @Test func aHydrationThatDidNotHappenIsStillWanted() {
+        var asking = MarfaSync.Rehydration()
+        _ = asking.ask(about: ["a"])
+        let again = asking.ask(about: ["a"])
+        #expect(!again)
+        #expect(asking.wanted, "until a hydration succeeds, a retry still hydrates")
     }
 
     /// The follow stops when the copy expires, and only a new hydration starts it again.
@@ -350,8 +473,11 @@ struct MarfaSourceOfflineTests {
         let selfLoop = WriteID()
         source.submit(.moveEdge(EdgeID(parentOf.id), end: .source, to: child), as: selfLoop)
         let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
-        let validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "")))
-        let cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "")))
+        var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "")))
+        var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "")))
+        // Refused before anything was queued.
+        validation.notQueued = true
+        cycle.notQueued = true
         #expect(answered.answer(to: notReplaceable) == .refused(validation))
         #expect(answered.answer(to: selfLoop) == .refused(cycle))
         #expect(try await source.copy.queue.all().filter { $0.kind == .updateEdge }.isEmpty)
@@ -778,7 +904,7 @@ extension LiveMarfaTests {
                     store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
                 let row = try #require(try await other.items.get(id.rawValue))
-                _ = try await other.items.update(id.rawValue, Edit(.merge(["description": .string("From another device")]), baseVersion: row.version))
+                _ = try await other.items.update(id.rawValue, Edit(properties: ["description": .string("From another device")], baseVersion: row.version))
                 _ = try await other.queue.drain()
                 await other.close()
                 _ = try #require(await log.wait { ($0.item(titled: title)?.version ?? version) > version })
@@ -843,13 +969,13 @@ extension LiveMarfaTests {
             let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(a.rawValue))
-            _ = try await other.items.update(a.rawValue, Edit(.merge(["body": .string("Another device")]), baseVersion: row.version))
+            _ = try await other.items.update(a.rawValue, Edit(properties: ["body": .string("Another device")], baseVersion: row.version))
             _ = try await other.queue.drain()
             await other.close()
 
             // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
             let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
-            _ = try await raw.items.update(a.rawValue, Edit(.merge(["body": .string("This device")]), baseVersion: version.rawValue))
+            _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": .string("This device")], baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
                 if case .conflicted(let sibling, _)? = answer.verdict { sibling } else { nil }

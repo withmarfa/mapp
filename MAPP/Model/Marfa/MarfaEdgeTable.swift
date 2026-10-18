@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Edge
 
 /// The edges the engine holds, by identifier, and the edges touching each row, so mapping an item reads its own edges
 /// rather than every edge. An edge keeps its identifier when it moves to other ends, so putting an edge in drops what

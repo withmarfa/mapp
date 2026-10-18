@@ -1,5 +1,7 @@
 import Foundation
 import Marfa
+import struct MarfaCore.BinPage
+import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 

@@ -88,6 +88,24 @@ import Testing
         #expect(libraries.unkept?.text == "Book the hotel\n\nPack")
     }
 
+    @Test func textNotKeptForAReasonIsToldWithTheReasonAndOnlyThatReasonIsShared() async throws {
+        let bench = try HostBench()
+        let libraries = try libraries(bench)
+        try await libraries.host.connect(address: address, key: "key")
+        let library = try #require(libraries.current as? MarfaLibrary)
+
+        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Book the hotel", reason: "This item can’t be changed now."))
+        #expect(libraries.unkept?.message == "This item can’t be changed now. Your text is on the clipboard, so you can paste it back.")
+
+        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Pack", reason: "This item can’t be changed now."))
+        #expect(libraries.unkept?.message == "This item can’t be changed now. Your text is on the clipboard, so you can paste it back.")
+
+        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Plan”", text: "Rest", reason: "Try again in a moment."))
+        #expect(libraries.unkept?.title == "Some Changes Weren’t Saved")
+        #expect(libraries.unkept?.text == "Book the hotel\n\nPack\n\nRest")
+        #expect(libraries.unkept?.message == "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
+    }
+
     @Test func anotherServerIsAnotherLibrary() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)

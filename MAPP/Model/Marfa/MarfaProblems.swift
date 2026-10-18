@@ -1,5 +1,7 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import enum MarfaCore.JsonValue
 
 /// Reads the queue, and the conflicted copies the copy holds, into what waits and what needs the person. Pure, so
 /// the rules are tested on values made by hand.
@@ -7,6 +9,17 @@ nonisolated enum MarfaProblems {
     /// The server tags each conflicted copy it makes, and the tag stays until the person keeps or bins the copy.
     /// Which item a copy was made from is the package's to say (`Items.original(ofConflictedCopy:)`).
     static let conflictedCopyTag = "conflicted-copy"
+
+    /// What the person is told of a row whose stored properties the copy could not read, such as a store another
+    /// program wrote to. The server still holds the item. The copy is hydrated once for it, which replaces the row; if
+    /// it is still unreadable after that, only a new copy helps.
+    static var unreadableMessage: String {
+        String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.")
+    }
+
+    static var unreadable: SyncProblem {
+        SyncProblem(code: "unreadable_properties", message: unreadableMessage)
+    }
 
     nonisolated struct ConflictedCopy: Hashable, Sendable {
         var row: Marfa.Item

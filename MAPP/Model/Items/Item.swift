@@ -37,6 +37,8 @@ nonisolated enum ItemTag {
 /// Something about an item as read that keeps it from being edited, such as front matter that does not parse.
 nonisolated struct ItemProblem: Hashable, Sendable {
     let message: String
+    /// The library could not read the item's text either, so the page shows none and says why.
+    var withholdsText = false
 }
 
 nonisolated struct Item: Identifiable, Hashable, Sendable {

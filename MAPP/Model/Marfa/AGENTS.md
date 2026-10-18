@@ -6,9 +6,12 @@
 
 - `MarfaSource` is the `ItemSource` over the copy. The copy answers every read, so the app paints before and without the network, and writes go to the copy's queue at once.
 - `MarfaEngine` is the one place the source changes what it holds. `MarfaSync` does all the server work beside it: hydrate, catch up, drain, read the bin, change the key.
+- `MarfaFollow` keeps the engine hearing the copy's `changes()`. The core finishes a stream it ended on a fault, after telling it `.stopped`, and one it refused a place in its watch, so `MarfaFollow` asks for a new stream at a falling rate and has the engine read the copy again, since neither stream heard what changed between them. A stream that finishes without `.stopped` last is the copy closing, so the follow ends. A failed follow of the server is different: its stream stays open and `MarfaSync` restarts the follow. After a new stream the engine also asks `MarfaSync` to refresh, which sets the library right again once the server answers. `MarfaSync` tells the person of a stop once until something succeeds, so a core that faults again and again is not an alert at every retry.
 - `MarfaLibrary` changes nothing itself. Every write goes to the source.
+- The package's `LiveQuery` is not used here. It reads a whole result again after each change and does not say what changed, and the engine reads again only the items and edges a change names, orders every write, answer and change on one stream, and reflects a write at once. `LiveQuery` suits a view that shows one read of a copy; MAPP's views read through `ItemLibrary`, never the package.
 - The copy holds both tiers (`hydrate(types:tier: .all)`), so the Inbox and the rest of the library read from one copy, offline too.
-- An item's properties keep the order the server gives them (`JSONObject`).
+- An item's properties keep the order the server gives them (`JSONObject`). Properties, bodies and answers cross the package as values, never as JSON text; the app parses none.
+- The package's `Item`, `Edge`, `Edit`, `Draft`, `ListFilters`, `SearchFilters`, `SearchHit`, `BinPage`, `ItemState`, `Tier` and `JSONValue` are the core's own types. `MemberImportVisibility` is on, so a file that reads their members imports each one by name (`import struct MarfaCore.Item`). Never `import MarfaCore` whole: it makes `QueuedWrite`, `MarfaError`, `DrainReport` and other names the package declares itself ambiguous.
 - Each server address has its own copy in the app's own storage (`MarfaStoreLocation`), never inside a notes folder.
 - `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`). The key is never shown again once entered. Tests use `MemoryKeyStore` and a temporary store location.
 
@@ -24,6 +27,11 @@
 - A drain the copy runs itself can record answers while the engine is still taking an earlier report. The engine forgets only the answers it has taken (`forgetAnswered(ids:)` with `MarfaEngine.takenAnswers`), never all of them at once. A blocked or dead answer is applied but not marked taken: the copy keeps it for a release, which gives the write the same id and a new answer. A drain that stops on any error loses its report, so the engine reads the answers from the queue before anything forgets them (`MarfaEngine.takeAnswers`).
 - When a drain answer expires the copy (`copyExpired`, for example after a retype), `MarfaSync` hydrates again, which keeps the queue, and only then reads the answers from the queue. Never clear the queue to recover from an expired copy.
 - A refused write that carried content stays listed until the person discards it, and discarding one that carried text is confirmed, since the write holds the only copy.
+
+## Rows the copy cannot read
+
+- A row whose stored properties the copy could not read comes back with no properties and `Item.unreadableProperties` set. It is shown as damaged: the item carries a problem that keeps it from being edited, the list row and the page say why, and it is never shown as an item the person emptied. `MarfaEngine.propertyEdit` refuses to build a replacement from such a row, since the properties it shows are not what it holds. The package refuses any write to the row until a hydration replaces it from the server, so a read that finds such a row has `MarfaSync` hydrate (`MarfaSync.unreadable`), once for each row while the copy is open. A row still unreadable after that stays damaged, and the message says to disconnect the library and connect it again. A save that arrives for an item that can no longer be written, or that the package refused before queueing it (`SyncProblem.notQueued`), is in no queue, so the text goes to the person through `MarfaLibrary.notKept` like a write after the source closed.
+- An edge with `unreadableProperties` is read as its ends alone; a move of it is refused by the package in its own words.
 
 ## Text and versions
 
