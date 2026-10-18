@@ -37,8 +37,12 @@ extension MarfaLibrary {
     // MARK: Text
 
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
-        guard let item = item(id), item.isWritable, self.body(of: id)?.text != body else { return }
-        saveText(body, of: id, readAt: readAt, failing: String(localized: "Couldn’t Save “\(item.title)”"))
+        guard let item = item(id), self.body(of: id)?.text != body else { return }
+        let title = String(localized: "Couldn’t Save “\(item.title)”")
+        // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
+        // could not read, is kept nowhere, so the person gets the text back.
+        guard item.isWritable else { return notKept(title, text: body, reason: Self.cantChange) }
+        saveText(body, of: id, readAt: readAt, failing: title)
     }
 
     func leave(_ id: ItemID) {

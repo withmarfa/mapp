@@ -1334,7 +1334,19 @@
     "This library was closed before the change could be kept.": {
       "extractionState": "manual"
     },
-    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The copy on the server is not affected.": {
+    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.": {
+      "extractionState": "manual"
+    },
+    "This item can’t be changed now, so MAPP couldn’t keep what you typed.": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.": {
+      "extractionState": "manual"
+    },
+    "MAPP couldn’t keep some of your changes. Make them again.": {
+      "extractionState": "manual"
+    },
+    "%@ Your text is on the clipboard, so you can paste it back.": {
       "extractionState": "manual"
     },
     "Switched Servers, but Not Everything Was Removed": {
