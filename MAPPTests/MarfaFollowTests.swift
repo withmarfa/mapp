@@ -61,15 +61,14 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
     }
 
     @Test func aStreamTheCoreEndedOnAFaultIsReplacedAndTheCopyIsReadAgain() async {
-        let streams = Streams([finished(saved, stopped), finished(saved)])
+        let streams = Streams([finished(saved, stopped), finished(saved, stopped), finished(saved)])
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
-        await settle { streams.taken >= 3 && streams.heard.count >= 3 }
-        task.cancel()
+        await task.value
 
-        #expect(streams.heard == [saved, stopped, saved], "every stream's changes reach the engine, in order")
-        #expect(streams.resumed >= 2, "a change between two streams is not heard, so the copy is read again after each new one")
-        #expect(streams.taken >= 3)
+        #expect(streams.heard == [saved, stopped, saved, stopped, saved], "every stream's changes reach the engine, in order")
+        #expect(streams.resumed == 2, "a change between two streams is not heard, so the copy is read again after each new one")
+        #expect(streams.taken == 3, "the third stream finished without `.stopped`, which is the copy closing, so no fourth is asked for")
     }
 
     @Test func aNewStreamIsAskedForOnlyAfterAWait() async {
@@ -135,5 +134,28 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         await task.value
 
         #expect(streams.taken == 1, "no stream is asked for once the follow is cancelled")
+    }
+
+    @Test func aStreamThatFinishesWithoutStoppedIsTheCopyClosingAndEndsTheFollow() async {
+        let streams = Streams([finished(saved)])
+        let task = MarfaFollow.start(
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+        await task.value
+
+        #expect(streams.heard == [saved])
+        #expect(streams.taken == 1, "a closed copy is not asked for streams, which it finishes at once")
+        #expect(streams.resumed == 0)
+        #expect(streams.waits.isEmpty)
+    }
+
+    @Test func aReplacementThatIsAlreadyFinishedMeansTheCopyClosedMeanwhile() async {
+        // `changes()` on a closed copy answers a stream that is finished and told nothing.
+        let streams = Streams([finished(stopped), finished()])
+        let task = MarfaFollow.start(
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+        await task.value
+
+        #expect(streams.taken == 2)
+        #expect(streams.waits.count == 1, "the follow waited once, for the stream that was replaced")
     }
 }
