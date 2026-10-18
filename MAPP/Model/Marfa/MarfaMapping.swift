@@ -133,15 +133,18 @@ nonisolated enum MarfaMapping {
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
+        // A row the copy could not read shows no properties and no text. Saying why, rather than showing an empty
+        // item, keeps it from being taken for one the person emptied; the problem also keeps it from being edited.
+        let damaged = row.unreadableProperties != nil
         let bound = (bodyLinks?.links ?? []).map { name in
             BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
-            preview: preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
+            preview: damaged ? MarfaProblems.unreadableMessage : preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, boundLinks: bound)
+            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound)
     }
 
     /// The text between the brackets of a link as the package renders it, `[[text]]`.

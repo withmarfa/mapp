@@ -83,6 +83,8 @@ struct NotePage: View {
                         DeletedNoteBanner(id: item.id)
                     } else if case .conflicted(let copy?, _) = item.sync {
                         SavedAsCopyBanner(copy: copy)
+                    } else if let problem = item.problem, problem.withholdsText {
+                        UnreadableNoteBanner(message: problem.message)
                     }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
@@ -137,6 +139,22 @@ private struct SavedAsCopyBanner: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.bar)
+    }
+}
+
+/// The library could not read this note, so the page is empty and read-only. This says why, so an empty page is not
+/// taken for text the person lost.
+private struct UnreadableNoteBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .interfaceFont(.callout)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.bar)
     }
 }
 
