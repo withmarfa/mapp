@@ -1,5 +1,12 @@
 import Foundation
 import Marfa
+import struct MarfaCore.BinPage
+import struct MarfaCore.Edge
+import struct MarfaCore.Edit
+import struct MarfaCore.Item
+import struct MarfaCore.ListFilters
+import enum MarfaCore.JsonValue
+import enum MarfaCore.Tier
 import Synchronization
 import Testing
 @testable import MAPP
@@ -238,6 +245,38 @@ struct MarfaSourceOfflineTests {
             state.changes.contains { if case .unavailable = $0 { true } else { false } }
         })
         #expect(failed.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1))
+        await source.close()
+    }
+
+    /// The package takes properties as values: a text edit names the body alone, which the server merges, and a
+    /// property taken away is the item's whole properties without it. Both are read back from the queue.
+    @Test(.timeLimit(.minutes(1)))
+    func aTextEditMergesTheBodyAndAPropertyTakenAwayReplacesTheWhole() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try await open(root)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let id = ItemID.mint()
+        let draft = ItemDraft(
+            type: TypeID("core.note"), title: "MAPPTEST edits", body: "First", properties: ["description": .string("Kept")])
+        source.submit(.create(id: id, draft), as: WriteID())
+        let made = try #require(await log.wait { $0.item(titled: "MAPPTEST edits") != nil })
+        let version = try #require(made.item(titled: "MAPPTEST edits")?.version)
+
+        source.submit(.editBody(id, "Second", base: version, merge: .ifUnchanged), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 2) })
+        let merge = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
+        #expect(merge.body["properties"]?.object == ["body": "Second"], "only the text is named, so the server merges it")
+        #expect(merge.body["properties_mode"] == nil)
+
+        source.submit(.editProperties(id, ["description": nil], base: version, undoing: nil), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 3) })
+        let replace = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
+        #expect(replace.body["properties_mode"]?.string == "replace")
+        let whole = try #require(replace.body["properties"]?.object)
+        #expect(whole["description"] == nil, "the property taken away is not in the whole")
+        #expect(whole["body"]?.string == "Second" && whole["title"]?.string == "MAPPTEST edits", "every other keeps its value")
         await source.close()
     }
 
@@ -778,7 +817,7 @@ extension LiveMarfaTests {
                     store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
                 let row = try #require(try await other.items.get(id.rawValue))
-                _ = try await other.items.update(id.rawValue, Edit(.merge(["description": .string("From another device")]), baseVersion: row.version))
+                _ = try await other.items.update(id.rawValue, Edit(properties: ["description": .string("From another device")], baseVersion: row.version))
                 _ = try await other.queue.drain()
                 await other.close()
                 _ = try #require(await log.wait { ($0.item(titled: title)?.version ?? version) > version })
@@ -843,13 +882,13 @@ extension LiveMarfaTests {
             let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(a.rawValue))
-            _ = try await other.items.update(a.rawValue, Edit(.merge(["body": .string("Another device")]), baseVersion: row.version))
+            _ = try await other.items.update(a.rawValue, Edit(properties: ["body": .string("Another device")], baseVersion: row.version))
             _ = try await other.queue.drain()
             await other.close()
 
             // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
             let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
-            _ = try await raw.items.update(a.rawValue, Edit(.merge(["body": .string("This device")]), baseVersion: version.rawValue))
+            _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": .string("This device")], baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
                 if case .conflicted(let sibling, _)? = answer.verdict { sibling } else { nil }

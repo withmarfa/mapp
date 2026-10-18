@@ -1,5 +1,10 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.Edge
+import enum MarfaCore.ItemState
+import enum MarfaCore.Tier
+import enum MarfaCore.JsonValue
 import Testing
 import UniformTypeIdentifiers
 @testable import MAPP

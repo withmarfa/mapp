@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.BinPage
 
 /// Everything the source asks of the server: hydrating, catching up and draining, one at a time, apart from the
 /// engine, so a write reaches the copy's queue at once however long the network takes.

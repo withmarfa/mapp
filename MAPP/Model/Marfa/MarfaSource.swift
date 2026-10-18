@@ -1,5 +1,10 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.ListFilters
+import struct MarfaCore.SearchFilters
+import struct MarfaCore.SearchHit
+import enum MarfaCore.ItemState
 import Synchronization
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose

@@ -1334,6 +1334,9 @@
     "This library was closed before the change could be kept.": {
       "extractionState": "manual"
     },
+    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The copy on the server is not affected.": {
+      "extractionState": "manual"
+    },
     "Switched Servers, but Not Everything Was Removed": {
       "extractionState": "manual"
     },

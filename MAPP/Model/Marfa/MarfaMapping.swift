@@ -1,5 +1,10 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.Edge
+import enum MarfaCore.ItemState
+import enum MarfaCore.Tier
+import enum MarfaCore.JsonValue
 import UniformTypeIdentifiers
 
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.

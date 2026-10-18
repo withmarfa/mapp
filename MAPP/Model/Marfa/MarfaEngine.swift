@@ -1,5 +1,12 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Item
+import struct MarfaCore.Edge
+import struct MarfaCore.Edit
+import struct MarfaCore.Draft
+import struct MarfaCore.ListFilters
+import enum MarfaCore.ItemState
+import enum MarfaCore.JsonValue
 
 /// The one place the source changes what it holds. Writes, the copy's changes and the server's answers arrive on
 /// one stream and are taken one at a time, so a re-read never lands behind an older one. Each step reads or writes
@@ -41,7 +48,7 @@ actor MarfaEngine {
     }
 
     /// A write the package refused before queueing it, in the person's words.
-    private nonisolated struct Refused: Error {
+    nonisolated struct Refused: Error {
         var problem: SyncProblem
     }
 
@@ -768,14 +775,14 @@ actor MarfaEngine {
             guard let bodyField = MarfaMapping.bodyField(of: catalogue.itemTypes[try itemType(of: id)]) else {
                 throw Unsupported(message: Self.noText)
             }
-            let properties = Edit.Properties.merge(JSONObject([(bodyField, .string(text))]))
+            let properties = JSONObject([(bodyField, .string(text))])
             // Read before the edit is sent: an answer that lands during the send is not in the version it was sent
             // on, so it is counted later, as it comes.
             let answeredBefore = merge == .following && ownText[id] != nil ? [] : try await answeredWrites(of: id)
             let queued: Marfa.QueuedWrite
             switch merge {
             case .ifUnchanged:
-                queued = try await copy.items.update(id.rawValue, Edit(properties, baseVersion: base.rawValue))
+                queued = try await copy.items.update(id.rawValue, Edit(properties: properties, baseVersion: base.rawValue))
             case .asRead:
                 queued = try await send(id, properties) { base.rawValue }
             case .following:
@@ -786,11 +793,12 @@ actor MarfaEngine {
             counted.formUnion(answeredBefore)
             return [queued]
         case .editProperties(let id, let changes, let base, _):
-            return [try await send(id, try properties(editing: id, by: changes)) { base.rawValue }]
+            let (properties, replacing) = try Self.propertyEdit(changes, of: rows[id.rawValue])
+            return [try await send(id, properties, replacing: replacing) { base.rawValue }]
         case .retype(let id, let type, let base):
-            return [try await send(id, .merge(JSONObject()), type: type.rawValue) { base.rawValue }]
+            return [try await send(id, JSONObject(), type: type.rawValue) { base.rawValue }]
         case .retier(let id, let tier, let base):
-            return [try await send(id, .merge(JSONObject()), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
+            return [try await send(id, JSONObject(), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
         case .tag(let id, let tag, let on):
             return [
                 on ? try await copy.tags.add(tag, to: id.rawValue) : try await copy.tags.remove(tag, from: id.rawValue)
@@ -966,7 +974,7 @@ actor MarfaEngine {
     /// (`queue-and-verdicts/edit-on-answer`). The copy moves as answers and catch-ups land, so the version is
     /// decided against one reading of the copy, and again if the copy moved meanwhile.
     private func send(
-        _ id: ItemID, _ properties: Edit.Properties, type: String? = nil, tier: Marfa.Tier? = nil,
+        _ id: ItemID, _ properties: JSONObject, replacing: Bool = false, type: String? = nil, tier: Marfa.Tier? = nil,
         typedOn: () async throws -> Int64
     ) async throws -> Marfa.QueuedWrite {
         var attempt = 0
@@ -975,7 +983,8 @@ actor MarfaEngine {
             let held = try await heldVersion(id)
             let version = try await typedOn()
             let steady = try await heldVersion(id) == held && version <= held
-            let edit = Edit(properties, baseVersion: version, type: type, tier: tier)
+            let edit = Edit(
+                properties: properties, replaceProperties: replacing, baseVersion: version, type: type, tier: tier)
             do {
                 if steady, version < held {
                     let queued = try await copy.items.updateAsRead(id.rawValue, edit)
@@ -991,7 +1000,11 @@ actor MarfaEngine {
 
     /// A property is given a value or taken away. A merge keeps a property it names no value for, and a null clears
     /// nothing, so taking one away replaces the item's properties with those it holds less that one.
-    private func properties(editing id: ItemID, by changes: [String: PropertyValue?]) throws -> Edit.Properties {
+    /// A replacement is built from the row's own properties, so a row whose stored properties could not be read,
+    /// and so shows none, is never the base of one: it would clear everything the copy cannot show.
+    nonisolated static func propertyEdit(
+        _ changes: [String: PropertyValue?], of row: Marfa.Item?
+    ) throws -> (properties: JSONObject, replacing: Bool) {
         func clears(_ value: PropertyValue?) -> Bool {
             guard let value else { return true }
             return value == .null
@@ -1001,13 +1014,15 @@ actor MarfaEngine {
             return (key, MarfaMapping.json(value))
         }
         let cleared = changes.filter { clears($0.value) }.keys
-        guard !cleared.isEmpty else { return .merge(JSONObject(given)) }
-        guard var whole = rows[id.rawValue]?.properties else {
+        guard !cleared.isEmpty else { return (JSONObject(given), false) }
+        guard let row else {
             throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
         }
+        guard row.unreadableProperties == nil else { throw Refused(problem: MarfaProblems.unreadable) }
+        var whole = row.properties
         for key in cleared { whole.removeValue(forKey: key) }
         for (key, value) in given { whole[key] = value }
-        return .replace(whole)
+        return (whole, true)
     }
 
     /// The version an edit that follows the person's last edit of the text was typed on: the version their own
