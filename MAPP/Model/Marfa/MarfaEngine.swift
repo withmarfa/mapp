@@ -14,6 +14,8 @@ import enum MarfaCore.JsonValue
 actor MarfaEngine {
     nonisolated enum Event: Sendable {
         case paint
+        /// The copy's changes have a new stream after the last one ended, so what changed between them was not heard.
+        case resumed
         case write(ItemWrite, WriteID)
         case change(Marfa.Change)
         /// Resumed once the answers are taken and forgotten.
@@ -193,6 +195,7 @@ actor MarfaEngine {
             }
             switch event {
             case .paint: await paint()
+            case .resumed: await reload()
             case .write(let write, let id): await perform(write, as: id)
             case .change(let change): await handle(change)
             case .binned(let found, let complete): take(bin: found, complete: complete)
@@ -270,12 +273,7 @@ actor MarfaEngine {
     private func paint() async {
         await reload()
         guard following == nil else { return }
-        let changes = copy.changes()
-        following = Task { [tell] in
-            for await change in changes {
-                if !tell(.change(change)) { return }
-            }
-        }
+        following = MarfaFollow.start(copy.changes(), next: { [copy] in copy.changes() }, tell: tell)
         await sync.start()
     }
 
