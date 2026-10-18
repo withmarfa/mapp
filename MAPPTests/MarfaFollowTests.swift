@@ -83,7 +83,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         #expect(Array(streams.waits.prefix(3)) == [MarfaSync.delay(after: 1), MarfaSync.delay(after: 2), MarfaSync.delay(after: 3)])
     }
 
-    @Test func aStreamThatHeardTheServerStartsTheWaitOver() async {
+    @Test func aStreamThatToldAChangeStartsTheWaitOver() async {
         let streams = Streams([finished(stopped), finished(stopped), finished(saved, stopped), finished(stopped)])
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
@@ -95,7 +95,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         ])
     }
 
-    @Test func aStoppedFollowAloneDoesNotCountAsHearingTheServer() async {
+    @Test func aStreamLeftOpenAfterStoppedIsNotReplaced() async {
         // `.stopped` is told on a stream that stays open as well; only a stream that finishes is replaced.
         let open = AsyncStream<Change> { continuation in
             continuation.yield(stopped)

@@ -15,7 +15,7 @@ nonisolated enum MarfaFollow {
     ) -> Task<Void, Never> {
         Task {
             var stream = first
-            // Streams in a row that ended without the server being heard, which are asked for at a falling rate.
+            // Streams in a row that ended having told nothing but `.stopped`, which are asked for at a falling rate.
             var ended = 0
             while !Task.isCancelled {
                 var heard = false
