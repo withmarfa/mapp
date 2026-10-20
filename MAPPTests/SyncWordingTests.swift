@@ -188,6 +188,12 @@ struct ProblemWordingTests {
         let conflict = wording(entry(.blocked(.conflictUnresolved)))
         #expect(conflict.actions.map(\.action) == [.withdraw])
 
+        let alone = wording(entry(.blocked(.failingAlone)))
+        #expect(alone.actions.map(\.title) == ["Try Again", "Undo Change"])
+        #expect(alone.actions.map(\.action) == [.tryAgain, .withdraw])
+        #expect(alone.headline == "A change to “Plan the launch” is on hold")
+        #expect(alone.explanation == "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
+
         let key = wording(entry(.blocked(.credentialRefused)))
         #expect(key.actions.isEmpty)
         #expect(key.explanation == "It will be sent once the server accepts a key. Enter a new one in Settings.")
@@ -213,7 +219,7 @@ struct ProblemWordingTests {
     @Test func everyActionOfferedIsOneTheContractAllows() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .dead, .conflicted(sibling: ItemID("c"), original: nil)
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .dead, .conflicted(sibling: ItemID("c"), original: nil)
         ]
         for kind in kinds {
             #expect(wording(entry(kind)).actions.map(\.action) == MarfaProblems.actions(for: kind))
@@ -223,7 +229,7 @@ struct ProblemWordingTests {
     @Test func noWordIsJargon() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .dead, .conflicted(sibling: ItemID("c"), original: nil)
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .dead, .conflicted(sibling: ItemID("c"), original: nil)
         ]
         for kind in kinds {
             let wording = wording(entry(kind))

@@ -1590,6 +1590,9 @@
     "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.": {
       "extractionState": "manual"
     },
+    "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.": {
+      "extractionState": "manual"
+    },
     "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it.": {
       "extractionState": "manual"
     },
