@@ -349,6 +349,7 @@ nonisolated enum MarfaMapping {
         case .keySpent: .keySpent
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
+        case .failingAlone: .failingAlone
         }
     }
 

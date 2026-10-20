@@ -32,6 +32,7 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
     case keySpent = "key_spent"
     case ancestorUnavailable = "ancestor_unavailable"
     case conflictUnresolved = "conflict_unresolved"
+    case failingAlone = "failing_alone"
 }
 
 /// One of the contract's six verdicts on a write. A files source answers `accepted`, or `refused` when the disk

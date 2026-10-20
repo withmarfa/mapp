@@ -192,11 +192,14 @@ nonisolated enum MarfaProblems {
     /// What the contract lets the person do. A refused write is never sent again, only discarded. A blocked
     /// write whose reason clears on its own, a refused key or a missing grant, needs nothing from the queue. A
     /// write the server answers the same way however often it is sent is withdrawn rather than sent again.
+    /// A write set aside `failing_alone` met failures that were no answer to it, so it may still be sent again, and
+    /// the person may instead withdraw it.
     static func actions(for kind: SyncProblemEntry.Kind) -> [SyncAction] {
         switch kind {
         case .refused: [.discard]
         case .blocked(.credentialRefused): []
         case .blocked(.keySpent), .dead: [.tryAgain]
+        case .blocked(.failingAlone): [.tryAgain, .withdraw]
         case .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved): [.withdraw]
         case .conflicted: [.keep, .discard]
         }

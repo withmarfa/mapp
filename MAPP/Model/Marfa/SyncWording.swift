@@ -185,6 +185,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             case .keySpent: String(localized: "The server stopped this change from going through. Try again to send it.")
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")
+            case .failingAlone: String(localized: "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
             }
         case .dead:
             headline = Self.stoppedHeadline(name: name)

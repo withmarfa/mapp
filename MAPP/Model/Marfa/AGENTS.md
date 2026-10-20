@@ -61,7 +61,7 @@
 
 - The model gives states and counts; `SyncWording.swift` turns them into words, so each sentence is tested without a window.
 - Show a `MarfaHost.Problem` as what happened and what to do (`MarfaSettingsModel.notice(for:)`), never as the error.
-- A problem offers only the actions the contract allows for it (`MarfaProblems`).
+- A problem offers only the actions the contract allows for it (`MarfaProblems`). A write set aside `failing_alone` is offered both Try Again and Undo Change, since its failures were no answer to it.
 
 ## Code Review Rules
 

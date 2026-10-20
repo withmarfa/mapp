@@ -83,7 +83,8 @@ struct MarfaProblemsTests {
         let cases: [(Marfa.BlockedReason, SyncProblemEntry.Kind, [SyncAction])] = [
             (.keySpent, .blocked(.keySpent), [.tryAgain]),
             (.ancestorUnavailable, .blocked(.ancestorUnavailable), [.withdraw]),
-            (.conflictUnresolved, .blocked(.conflictUnresolved), [.withdraw])
+            (.conflictUnresolved, .blocked(.conflictUnresolved), [.withdraw]),
+            (.failingAlone, .blocked(.failingAlone), [.tryAgain, .withdraw])
         ]
         for (reason, kind, actions) in cases {
             let report = Self.report([Self.write("w", .blocked(reason: reason))])
