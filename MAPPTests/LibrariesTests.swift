@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// Which library the windows read, and when. Every host is on its own defaults, key store and store directory,
+/// Which library the windows read, and when. Every host is on its own defaults, sign-ins and store directory,
 /// never the person's Keychain or saved server.
 @MainActor struct LibrariesTests {
     private let address = "http://first.test:8210"
@@ -13,7 +13,7 @@ import Testing
     }
 
     @Test func withNoServerSetTheFolderIsAlwaysTheLibrary() {
-        for state in [MarfaHost.State.disconnected, .online, .keyRefused] {
+        for state in [MarfaHost.State.disconnected, .online, .signedOut] {
             for flag in [false, true] {
                 #expect(Libraries.mode(hasSource: false, isConfigured: false, state: state, isLaunching: flag, isBusy: flag) == .files)
             }
@@ -21,7 +21,7 @@ import Testing
     }
 
     @Test func anOpenCopyIsTheLibraryWhateverTheServerSays() {
-        for state in [MarfaHost.State.connecting, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
+        for state in [MarfaHost.State.connecting, .online, .offline(reason: nil), .signedOut, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: true, isConfigured: true, state: state, isLaunching: false, isBusy: false) == .marfa)
         }
     }
@@ -32,16 +32,16 @@ import Testing
     }
 
     @Test func aSavedServerWhoseCopyWillNotOpenIsNeverAnsweredWithTheFolder() {
-        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .keyRefused, isLaunching: false, isBusy: false) == .failed)
+        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .signedOut, isLaunching: false, isBusy: false) == .failed)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .unavailable(message: "x"), isLaunching: false, isBusy: false) == .failed)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .disconnected, isLaunching: false, isBusy: false) == .failed)
     }
 
-    /// A copy closed to open again, as when a key is replaced, is waited for: the windows never show the notes
+    /// A copy closed to open again, as when the person signs in again, is waited for: the windows never show the notes
     /// folder, nor say the library can't open, in between. Leaving a server forgets its address first, so the
     /// folder follows at once.
     @Test func aCopyBeingReopenedIsWaitedForNeverShownAsTheFolder() {
-        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
+        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .signedOut, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: false, isConfigured: true, state: state, isLaunching: false, isBusy: true) == .opening)
         }
     }
@@ -59,7 +59,7 @@ import Testing
     @Test func connectingChoosesTheServersLibraryAndDisconnectingGivesTheFolderBack() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
-        try await libraries.host.connect(address: address, key: "key")
+        try await libraries.host.connect(address: address, with: testBrowser)
         #expect(libraries.mode == .marfa)
         let library = try #require(libraries.current as? MarfaLibrary)
         #expect(libraries.current as? MarfaLibrary === library, "one library for as long as its source is open")
@@ -74,7 +74,7 @@ import Testing
     @Test func whatALeftLibraryCouldNotKeepIsGatheredForTheWindowInFront() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
-        try await libraries.host.connect(address: address, key: "key")
+        try await libraries.host.connect(address: address, with: testBrowser)
         let library = try #require(libraries.current as? MarfaLibrary)
         try await libraries.host.disconnect()
 
@@ -91,7 +91,7 @@ import Testing
     @Test func textNotKeptForAReasonIsToldWithTheReasonAndOnlyThatReasonIsShared() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
-        try await libraries.host.connect(address: address, key: "key")
+        try await libraries.host.connect(address: address, with: testBrowser)
         let library = try #require(libraries.current as? MarfaLibrary)
 
         library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Book the hotel", reason: "This item can’t be changed now."))
@@ -109,9 +109,9 @@ import Testing
     @Test func anotherServerIsAnotherLibrary() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
-        try await libraries.host.connect(address: address, key: "key")
+        try await libraries.host.connect(address: address, with: testBrowser)
         let first = try #require(libraries.current as? MarfaLibrary)
-        try await libraries.host.changeAddress(to: "http://second.test:8210", key: "other")
+        try await libraries.host.changeAddress(to: "http://second.test:8210", with: testBrowser)
         let second = try #require(libraries.current as? MarfaLibrary)
         #expect(first !== second)
     }
@@ -120,7 +120,7 @@ import Testing
         let bench = try HostBench()
         let connection = try MarfaConnection(address: address)
         bench.defaults.set(address, forKey: "MarfaAddress")
-        bench.keys.save("key", for: connection)
+        bench.signIns.keep("key", for: connection)
         let libraries = try libraries(bench)
         #expect(libraries.mode == .opening)
         #expect(libraries.current == nil)
@@ -132,13 +132,13 @@ import Testing
         #expect(libraries.host.state == .connecting, "the library shows before the server has answered")
     }
 
-    @Test func aSavedServerWithNoKeyShowsAPageNotTheFolder() async throws {
+    @Test func aSavedServerWithNoSignInShowsAPageNotTheFolder() async throws {
         let bench = try HostBench()
         bench.defaults.set(address, forKey: "MarfaAddress")
         let libraries = try libraries(bench)
         await libraries.launch()
         #expect(libraries.mode == .failed)
         #expect(libraries.current == nil)
-        #expect(libraries.host.state == .keyRefused)
+        #expect(libraries.host.state == .signedOut)
     }
 }

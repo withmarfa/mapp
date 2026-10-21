@@ -46,7 +46,7 @@ These hold across the app. The nested files say how each library keeps them.
 - Notes are held byte for byte. A note opened and left alone is never rewritten. An edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary` (`MAPP/Model/Items/ItemLibrary.swift`), read from the environment's `library` value. Never test for a concrete library type in a view.
 - Windows, selections, restoration, and drags name items by `ItemID`, never by path.
-- Tests never touch the person's data. Under unit tests hosted in the app and UI tests, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location, and a `NotesFolder` on its own defaults, never the Keychain, the saved server, or the person's notes folder. UI tests open a sample folder (`-MAPPSampleFolder`); a unit test that needs a folder makes its own and a `NotesFolder(defaults:)`.
+- Tests never touch the person's data. Under unit tests hosted in the app and UI tests, `Libraries.standard()` uses `NoSignIn`, a temporary store location, and a `NotesFolder` on its own defaults, never the Keychain, the saved server, or the person's notes folder. UI tests open a sample folder (`-MAPPSampleFolder`); a unit test that needs a folder makes its own and a `NotesFolder(defaults:)`.
 
 ## Layout
 

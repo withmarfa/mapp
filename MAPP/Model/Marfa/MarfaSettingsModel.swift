@@ -25,9 +25,9 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             title = String(localized: "Offline")
             detail = String(localized: "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can.")
             isProblem = false
-        case .keyRefused:
-            title = String(localized: "Key refused")
-            detail = String(localized: "The server doesn’t accept the key. Enter a new one below.")
+        case .signedOut:
+            title = String(localized: "Signed out")
+            detail = String(localized: "MAPP needs your approval again. Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
             isProblem = true
         case .unavailable(let message):
             title = String(localized: "Library unavailable")
@@ -38,9 +38,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 }
 
-/// What the Marfa section of Settings does: it holds what the person types, takes each step through the host,
-/// and turns what the host says into words. Leaving a copy while changes wait is the person's to decide, so the
-/// model keeps the question, with the text of what would be lost, until they answer it.
+/// What the Marfa section of Settings does: it holds the address the person types, takes each step through the
+/// host, and turns what the host says into words. Each step that signs in takes the browser the view gives it.
+/// Leaving a copy while changes wait is the person's to decide, so the model keeps the question, with the text of
+/// what would be lost, until they answer it.
 @Observable @MainActor final class MarfaSettingsModel {
     /// What went wrong and what to do, never the error itself.
     nonisolated struct Notice: Hashable, Sendable {
@@ -70,15 +71,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     let host: MarfaHost
     var address = ""
-    var key = ""
-    var newKey = ""
     var otherAddress = ""
-    var otherKey = ""
     private(set) var notice: Notice?
     private(set) var isWorking = false
     private(set) var departure: Departure?
-    /// Whether the step under way failed after the host kept the key it was given.
-    @ObservationIgnored private var keyKept = false
     /// Whether the person is asked to confirm a disconnect that has nothing waiting.
     var isConfirmingDisconnect = false
 
@@ -87,67 +83,48 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     var isConnected: Bool { host.configuredConnection != nil }
+    var isSignedOut: Bool { host.state == .signedOut }
     var status: ConnectionStatus { ConnectionStatus(host.state) }
 
-    var canConnect: Bool { !isWorking && !Self.trimmed(address).isEmpty && !Self.trimmed(key).isEmpty }
-    var canReplaceKey: Bool { !isWorking && !Self.trimmed(newKey).isEmpty }
-    var canSwitch: Bool { !isWorking && !Self.trimmed(otherAddress).isEmpty && !Self.trimmed(otherKey).isEmpty }
+    var canSignIn: Bool { !isWorking && !Self.trimmed(address).isEmpty }
+    var canSwitch: Bool { !isWorking && !Self.trimmed(otherAddress).isEmpty }
 
     // MARK: Steps
 
-    func connect() async {
-        guard canConnect else { return }
+    /// Signs in to the server the person typed and connects to it.
+    func signIn(with browser: @escaping MarfaBrowser) async {
+        guard canSignIn else { return }
         let target = address
-        let typed = key
         await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
-            try await keepingNoKey(typed, for: target, { address = ""; key = "" }) { () async throws(MarfaHost.Problem) in
-                try await host.connect(address: target, key: typed)
-            }
+            try await host.connect(address: target, with: browser)
+            address = ""
         }
     }
 
-    func replaceKey() async {
-        guard canReplaceKey, let connection = host.connection else { return }
-        let typed = newKey
-        await run(.replacingKey) { () async throws(MarfaHost.Problem) in
-            try await keepingNoKey(typed, for: connection.address.absoluteString, { newKey = "" }) { () async throws(MarfaHost.Problem) in
-                try await host.replaceKey(typed)
-            }
+    /// Signs in again to the server connected to, for a sign-in the server ended.
+    func signInAgain(with browser: @escaping MarfaBrowser) async {
+        await run(.signingInAgain) { () async throws(MarfaHost.Problem) in
+            try await host.signInAgain(with: browser)
         }
     }
 
-    /// Moves to another server, asking first what becomes of this one's copy if changes wait in it.
-    func switchServer(_ choice: Choice? = nil) async {
+    /// Moves to another server, asking first what becomes of this one's copy if changes wait in it, then signing
+    /// in to the other.
+    func switchServer(with browser: @escaping MarfaBrowser, _ choice: Choice? = nil) async {
         guard choice != nil || canSwitch else { return }
         let target = otherAddress
-        let typed = otherKey
         await run(.reaching(target)) { () async throws(MarfaHost.Problem) in
-            try await keepingNoKey(typed, for: target, { otherAddress = ""; otherKey = "" }) { () async throws(MarfaHost.Problem) in
-                try await host.changeAddress(to: target, key: typed, choice: hostChoice(choice))
+            do throws(MarfaHost.Problem) {
+                try await host.changeAddress(to: target, with: browser, choice: hostChoice(choice))
+            } catch {
+                if isConnected(to: target) { otherAddress = "" }
+                throw error
             }
+            otherAddress = ""
             departure = nil
         } onWaiting: { [self] unsent in
             ask(.switchServer, unsent, askedAgain: choice != nil)
         }
-    }
-
-    /// Runs a step that gives the host `key` for `address` and forgets what was typed once the host holds it:
-    /// when the step is done, and when it failed after the host kept the key, as a switch done but for removing
-    /// the previous server's key or copy does, or a new key kept while the copy could not be opened again.
-    private func keepingNoKey(
-        _ key: String, for address: String, _ forget: () -> Void, _ step: () async throws(MarfaHost.Problem) -> Void
-    ) async throws(MarfaHost.Problem) {
-        do {
-            try await step()
-        } catch {
-            if case .changesWaiting = error {
-            } else if let connection = try? MarfaConnection(address: address), await host.holds(key, for: connection) {
-                forget()
-                keyKept = true
-            }
-            throw error
-        }
-        forget()
     }
 
     private func isConnected(to address: String) -> Bool {
@@ -155,7 +132,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         return host.connection == target
     }
 
-    /// A disconnect with nothing waiting is confirmed once, since it forgets the key. With changes waiting, the
+    /// A disconnect with nothing waiting is confirmed once, since it signs out. With changes waiting, the
     /// question about them is the confirmation, so it is not asked twice.
     func requestDisconnect() {
         if host.waitingChanges == 0 {
@@ -175,12 +152,13 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    /// The person's answer to the question: the copy is kept, or discarded with the changes they were shown.
-    func answer(_ choice: Choice) async {
+    /// The person's answer to the question: the copy is kept, or discarded with the changes they were shown. A
+    /// switch then signs in to the other server through `browser`.
+    func answer(_ choice: Choice, with browser: @escaping MarfaBrowser) async {
         guard let kind = departure?.kind else { return }
         switch kind {
         case .disconnect: await disconnect(choice)
-        case .switchServer: await switchServer(choice)
+        case .switchServer: await switchServer(with: browser, choice)
         }
     }
 
@@ -199,68 +177,57 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case switched
         /// No other server was opened.
         case notOpened
-        /// A new key was given for the server connected to: whether the host kept it, and whether the library
-        /// is open again.
-        case newKey(kept: Bool, open: Bool)
+        /// The person signed in again to the server connected to.
+        case signedInAgain
     }
 
     /// A problem in the app's words: what happened, and what to do. Nil for the question about changes that
-    /// wait, which is asked rather than told.
+    /// wait, which is asked rather than told, and for a sign-in the person canceled, which changed nothing.
     static func notice(for problem: MarfaHost.Problem, reached: Reached = .left) -> Notice? {
         switch problem {
-        case .changesWaiting:
+        case .changesWaiting, .signInCanceled:
             nil
         case .notAServer:
             Notice(
                 title: String(localized: "Check the Address"),
                 message: String(localized: "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://."))
-        case .noKey:
-            Notice(title: String(localized: "Enter a Key"), message: String(localized: "Paste the key for this server."))
+        case .notApproved:
+            Notice(
+                title: String(localized: "MAPP Wasn’t Approved"),
+                message: String(localized: "To use your library in MAPP, sign in again and approve MAPP."))
+        case .signInFailed:
+            Notice(
+                title: String(localized: "Can’t Sign In"),
+                message: String(localized: "MAPP couldn’t finish signing in to the server. Check the address and your connection, then try again."))
+        case .signedOut:
+            Notice(
+                title: String(localized: "Signed Out"),
+                message: String(localized: "MAPP needs your approval again. Sign in again to approve MAPP."))
         case .unavailable(let message):
             switch reached {
-            case .newKey(kept: true, open: true):
-                Notice(
-                    title: String(localized: "Can’t Check the Key"),
-                    message: sentences(
-                        String(localized: "MAPP kept the new key and opened your library again, but couldn’t check the key with the server."),
-                        message))
-            case .newKey(kept: false, open: true):
-                Notice(
-                    title: String(localized: "Can’t Use the New Key"),
-                    message: sentences(
-                        String(localized: "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again."),
-                        message))
-            case .newKey(kept: true, open: false):
+            case .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: sentences(
-                        String(localized: "MAPP kept the new key, but the copy of your library on this Mac can’t be opened."), message))
+                        String(localized: "MAPP signed in again, but the copy of your library on this Mac can’t be opened."), message))
             default:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: sentences(String(localized: "The copy of your library on this Mac can’t be opened."), message))
             }
-        case .keyStore:
+        case .keychain:
             Notice(
-                title: String(localized: "Can’t Keep the Key"),
-                message: String(localized: "The Keychain wouldn’t take the key. Check that MAPP can use the Keychain, then try again."))
-        case .keyRefused:
-            Notice(
-                title: String(localized: "Key refused"),
-                message: String(localized: "The server doesn’t accept that key. Check it and try again. The key you had is kept."))
-        case .serverUnreachable:
-            Notice(
-                title: String(localized: "Can’t Reach the Server"),
-                message: String(localized: "MAPP couldn’t ask the server about the key. Check the address and your connection, then try again. The key you had is kept."))
-        case .notRemoved(let key, let copy):
+                title: String(localized: "Can’t Read Your Sign-In"),
+                message: String(localized: "The Keychain wouldn’t give MAPP its sign-in. Check that MAPP can use the Keychain, then try again."))
+        case .notRemoved(let signIn, let copy):
             switch reached {
             case .left:
-                Notice(title: String(localized: "Disconnected, but Not Everything Was Removed"), message: removalMessage(key: key, copy: copy))
+                Notice(title: String(localized: "Disconnected, but Not Everything Was Removed"), message: removalMessage(signIn: signIn, copy: copy))
             case .switched:
                 Notice(
                     title: String(localized: "Switched Servers, but Not Everything Was Removed"),
-                    message: previousRemovalMessage(key: key, copy: copy))
-            case .notOpened, .newKey:
+                    message: previousRemovalMessage(signIn: signIn, copy: copy))
+            case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again."))
@@ -276,23 +243,23 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         detail.isEmpty ? first : first + " " + detail
     }
 
-    private static func removalMessage(key: String?, copy: String?) -> String {
-        switch (key != nil, copy != nil) {
+    private static func removalMessage(signIn: String?, copy: String?) -> String {
+        switch (signIn != nil, copy != nil) {
         case (true, true):
-            String(localized: "The key is still in your Keychain, and the copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.")
+            String(localized: "MAPP is still signed in, and the copy is still on this Mac. To remove MAPP’s access, revoke it on your Marfa server. MAPP removes the copy before it connects to that server again.")
         case (true, false):
-            String(localized: "The key is still in your Keychain. Remove it in Keychain Access.")
+            String(localized: "MAPP is still signed in. To remove MAPP’s access, revoke it on your Marfa server.")
         default:
             String(localized: "The copy is still on this Mac. MAPP removes it before it connects to that server again.")
         }
     }
 
-    private static func previousRemovalMessage(key: String?, copy: String?) -> String {
-        switch (key != nil, copy != nil) {
+    private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
+        switch (signIn != nil, copy != nil) {
         case (true, true):
-            String(localized: "The previous server’s key is still in your Keychain, and its copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again.")
+            String(localized: "MAPP is still signed in to the previous server, and its copy is still on this Mac. To remove MAPP’s access, revoke it on that server. MAPP removes the copy before it connects to that server again.")
         case (true, false):
-            String(localized: "The previous server’s key is still in your Keychain. Remove it in Keychain Access.")
+            String(localized: "MAPP is still signed in to the previous server. To remove MAPP’s access, revoke it on that server.")
         default:
             String(localized: "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again.")
         }
@@ -303,7 +270,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// What a step sets out to do, so a problem is told against what it did.
     private enum Step {
         case reaching(String)
-        case replacingKey
+        case signingInAgain
         case leaving
     }
 
@@ -328,7 +295,6 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         isWorking = true
         defer { isWorking = false }
         notice = nil
-        keyKept = false
         do {
             try await work()
         } catch {
@@ -346,7 +312,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         switch step {
         case .leaving: .left
         case .reaching(let address): isConnected(to: address) ? .switched : .notOpened
-        case .replacingKey: .newKey(kept: keyKept, open: host.source != nil)
+        case .signingInAgain: .signedInAgain
         }
     }
 

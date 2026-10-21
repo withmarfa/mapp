@@ -242,7 +242,7 @@ actor MarfaEngine {
 
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
     private func unsentWrites() async -> UnsentWrites? {
-        guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
+        guard let queue = try? await copy.queue.all() else { return nil }
         let named = Set(queue.compactMap(\.itemId))
         let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
         return UnsentWrites(
@@ -254,21 +254,6 @@ actor MarfaEngine {
         following?.cancel()
         await sync.stop()
         await copy.close()
-    }
-
-    /// The package refuses every call while the copy changes its key, as `invalid`, and asks for it again; that
-    /// is a wait, never a refusal or a failure to show. Any other `invalid` is passed on.
-    nonisolated static func asking<T>(_ hub: MarfaHub, _ work: () async throws -> T) async throws -> T {
-        while true {
-            let mark = hub.keyChanges
-            do {
-                return try await work()
-            } catch let error as MarfaError {
-                guard case .invalid = error, hub.keyChanged(since: mark) else { throw error }
-                // Throws once the task is cancelled, which ends the asking.
-                try await Task.sleep(for: .milliseconds(20))
-            }
-        }
     }
 
     // MARK: Reading
@@ -288,15 +273,14 @@ actor MarfaEngine {
         let edges: [Marfa.Edge]
         let catalogue: Catalogue
         do {
-            (catalogue, rows, edges) = try await Self.asking(hub) {
-                let catalogue = try await MarfaMapping.catalogue(
-                    itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
-                var rows: [String: Marfa.Item] = [:]
-                var edges: [Marfa.Edge] = []
-                for row in try await copy.items.list(ListFilters(allStates: true)) { rows[row.id] = row }
-                for type in catalogue.edgeTypes.keys { edges += try await copy.edges.ofType(type) }
-                return (catalogue, rows, edges)
-            }
+            catalogue = try await MarfaMapping.catalogue(
+                itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
+            var read: [String: Marfa.Item] = [:]
+            var held: [Marfa.Edge] = []
+            for row in try await copy.items.list(ListFilters(allStates: true)) { read[row.id] = row }
+            for type in catalogue.edgeTypes.keys { held += try await copy.edges.ofType(type) }
+            rows = read
+            edges = held
         } catch {
             failures.append(Self.failure(error))
             publish([])
@@ -342,7 +326,7 @@ actor MarfaEngine {
             return
         }
         do {
-            bodyLinks[row.id] = try await Self.asking(hub) { try await copy.items.links(in: row.id) }
+            bodyLinks[row.id] = try await copy.items.links(in: row.id)
         } catch {
             // An item the copy cannot name links for shows the edges it holds, and no more.
             bodyLinks[row.id] = nil
@@ -370,13 +354,11 @@ actor MarfaEngine {
         var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
             for id in ids {
-                let (row, held) = try await Self.asking(hub) {
-                    var row = try await copy.items.get(id)
-                    if row == nil {
-                        row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
-                    }
-                    return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
+                var row = try await copy.items.get(id)
+                if row == nil {
+                    row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
                 }
+                let held = row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id)
                 read.append((row, id, held))
             }
         } catch {
@@ -418,7 +400,7 @@ actor MarfaEngine {
                 continue
             }
             do {
-                let original = try await Self.asking(hub) { try await copy.items.original(ofConflictedCopy: id) }
+                let original = try await copy.items.original(ofConflictedCopy: id)
                 if let previous = linkedOriginals[id], previous != original { originalsToRead.insert(previous) }
                 linkedOriginals[id] = original
                 if let original { originalsToRead.insert(original) }
@@ -429,7 +411,7 @@ actor MarfaEngine {
         }
         for original in originalsToRead {
             do {
-                let copies = try await Self.asking(hub) { try await copy.items.conflictedCopies(of: original) }.map(\.id)
+                let copies = try await copy.items.conflictedCopies(of: original).map(\.id)
                 linkedCopies[original] = copies.isEmpty ? nil : copies
             } catch {
                 continue
@@ -463,7 +445,7 @@ actor MarfaEngine {
     /// A queue that cannot be read leaves each item's sync as it was, rather than settling it.
     private func readQueue() async {
         do {
-            queue = try await Self.asking(hub) { try await copy.queue.all() }
+            queue = try await copy.queue.all()
         } catch {
             failures.append(Self.failure(error))
             return
@@ -606,7 +588,7 @@ actor MarfaEngine {
         do {
             for write in entry.dependents + [id] {
                 if held.contains(write) {
-                    guard try await Self.asking(hub, { try await copy.queue.discard(write) }) else { continue }
+                    guard try await copy.queue.discard(write) else { continue }
                 }
                 refusals[write] = nil
             }
@@ -627,7 +609,7 @@ actor MarfaEngine {
         guard let entry = entry(id), entry.actions.contains(.tryAgain) else { return .success(false) }
         let released: Bool
         do {
-            released = try await Self.asking(hub) { try await copy.queue.release(id) }
+            released = try await copy.queue.release(id)
         } catch {
             return .failure(Self.failure(error))
         }
@@ -697,7 +679,7 @@ actor MarfaEngine {
         do {
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
-                let created = try await Self.asking(hub) { try await create(itemID, draft) }
+                let created = try await create(itemID, draft)
                 record(id, [created])
                 touched = [itemID.rawValue]
                 if let parent = draft.parent {
@@ -716,7 +698,7 @@ actor MarfaEngine {
                     if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.sourceId, edge.targetId]) }
                 default: break
                 }
-                let queued = try await Self.asking(hub) { try await queue(write) }
+                let queued = try await queue(write)
                 record(id, queued)
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
@@ -881,9 +863,7 @@ actor MarfaEngine {
     /// trying the create again makes no second item.
     private func place(_ child: ItemID, under parent: ItemID) async {
         do {
-            _ = try await Self.asking(hub) {
-                try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)
-            }
+            _ = try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)
         } catch {
             let reason = Self.failure(error).message
             failures.append(SourceFailure(
@@ -896,11 +876,11 @@ actor MarfaEngine {
     /// takes no call to the server, and its verdict arrives as an event. The copy and the bin follow from the
     /// copy's own word that the item was purged.
     private func purge(_ id: ItemID, at version: ItemVersion, as write: WriteID) {
-        Task { [copy, hub, sync, tell] in
+        Task { [copy, sync, tell] in
             await sync.flush()
             let outcome: WriteOutcome
             do {
-                try await Self.asking(hub) { try await copy.items.purge(id.rawValue, version: version.rawValue) }
+                try await copy.items.purge(id.rawValue, version: version.rawValue)
                 outcome = .accepted
             } catch let error as MarfaError {
                 outcome = .refused(Self.problem(for: error))
@@ -920,9 +900,7 @@ actor MarfaEngine {
                 throw SourceFailure(kind: .missing, message: String(localized: "This item isn’t in the library."))
             }
             let title = attachmentTitle(for: file, on: row)
-            let attached = try await Self.asking(hub) {
-                try await copy.items.attach(to: id.rawValue, file: file, Attachment(title: title))
-            }
+            let attached = try await copy.items.attach(to: id.rawValue, file: file, Attachment(title: title))
             await reread(Set([id.rawValue] + [attached.item.itemId].compactMap(\.self)))
             await sync.drain()
             // Where the package says no embed names the file alone, the file is attached all the same, so the text
@@ -1184,7 +1162,7 @@ actor MarfaEngine {
                 #if DEBUG
                 await forgetting?()
                 #endif
-                _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered(ids: ids) }
+                _ = try await copy.queue.forgetAnswered(ids: ids)
             } catch {
                 failures.append(Self.failure(error))
             }

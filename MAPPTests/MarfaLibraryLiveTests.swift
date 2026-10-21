@@ -17,7 +17,7 @@ extension LiveMarfaTests {
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, server: Server(url: connection.address, key: try #require(LiveMarfa.key)),
                 location: try MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
@@ -254,7 +254,7 @@ extension LiveMarfaTests {
                 defer { try? FileManager.default.removeItem(at: root) }
                 let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
                 let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                    connection, server: Server(url: connection.address, key: try #require(LiveMarfa.key)),
                     location: try MarfaStoreLocation(root: root))
                 let fresh = MarfaLibrary(source: second)
                 second.refresh()

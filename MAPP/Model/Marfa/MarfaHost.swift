@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 
 /// A source read from a server: its items, what it has yet to send, and how the server stands.
@@ -12,8 +13,6 @@ nonisolated protocol ConnectedItemSource: ItemSource, SyncReporting {
 nonisolated protocol MarfaHostedSource: ConnectedItemSource {
     /// Hydrates or catches up, then sends what waits; never waited on.
     func refresh()
-    /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck
     /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
     /// cannot be read.
     func unsentWrites() async -> UnsentWrites?
@@ -24,11 +23,11 @@ nonisolated protocol MarfaHostedSource: ConnectedItemSource {
 
 extension MarfaSource: MarfaHostedSource {}
 
-/// The Marfa library the app is connected to, from the address and key the person gives to the copy it opens.
-/// The address is kept in defaults, the key in the key store, and the copy in its own directory, so a launch
-/// paints from the copy before asking the server anything. The words for each state are the app's.
+/// The Marfa library the app is connected to, from the address the person gives and the sign-in they approve in
+/// the browser. The address is kept in defaults, the sign-in by `MarfaSignIn`, and the copy in its own directory,
+/// so a launch paints from the copy before asking the server anything. The words for each state are the app's.
 @Observable @MainActor final class MarfaHost {
-    typealias Opener = @Sendable (MarfaConnection, any KeyStore, MarfaStoreLocation) async throws -> any MarfaHostedSource
+    typealias Opener = @Sendable (MarfaConnection, Server, MarfaStoreLocation) async throws -> any MarfaHostedSource
 
     nonisolated enum State: Hashable, Sendable {
         case disconnected
@@ -37,8 +36,9 @@ extension MarfaSource: MarfaHostedSource {}
         case online
         /// Writes wait in the copy and go when the server can be reached.
         case offline(reason: String?)
-        /// Settings takes another key.
-        case keyRefused
+        /// The server ended the sign-in, or none is kept; the person signs in again in Settings, and writes wait
+        /// in the copy until then.
+        case signedOut
         /// The copy cannot be opened or followed; the message is the package's.
         case unavailable(message: String)
     }
@@ -55,26 +55,28 @@ extension MarfaSource: MarfaHostedSource {}
 
     nonisolated enum Problem: Error, Hashable, Sendable {
         case notAServer
-        /// None was given, or the key store holds none for the address.
-        case noKey
+        /// The person closed the browser before deciding, so nothing changed.
+        case signInCanceled
+        /// The person declined to approve MAPP on the server.
+        case notApproved
+        /// The sign-in could not finish; the message is the package's.
+        case signInFailed(message: String)
+        /// No sign-in is kept for the server, or the server ended it.
+        case signedOut
         /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
         /// to discard names these; asked again when others arrive after it. Nil where the copy could not be
         /// read and may hold some.
         case changesWaiting(UnsentWrites?)
         /// The copy could not be opened or read.
         case unavailable(message: String)
-        /// The key store would not take or give the key.
-        case keyStore(message: String)
-        /// The server refused the key given; the key that was there is kept.
-        case keyRefused
-        /// The server could not be asked whether it takes the key given, so the key that was there is kept.
-        case serverUnreachable(reason: String?)
-        /// The connection was left, but its key is still in the key store, or the copy the person discarded is
-        /// still on disk, or both; each message says why. A discarded copy is never opened as it is:
-        /// connecting its address again removes it first, or fails with this.
-        case notRemoved(key: String?, copy: String?)
+        /// The keychain would not give the sign-in.
+        case keychain(message: String)
+        /// The connection was left, but its sign-in is still kept, or the copy the person discarded is still on
+        /// disk, or both; each message says why. A discarded copy is never opened as it is: connecting its
+        /// address again removes it first, or fails with this.
+        case notRemoved(signIn: String?, copy: String?)
         case notConnected
-        /// Another connect, disconnect or change of key is under way.
+        /// Another connect, disconnect or sign-in is under way.
         case busy
     }
 
@@ -83,11 +85,11 @@ extension MarfaSource: MarfaHostedSource {}
     private static let discardedKey = "MarfaDiscardedCopies"
 
     private let defaults: UserDefaults
-    private let keys: any KeyStore
+    private let signIns: any MarfaSignIn
     private let location: MarfaStoreLocation
     private let opener: Opener
 
-    /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
+    /// The address connected to, kept while its copy cannot be opened, so Settings can sign in to it again.
     private(set) var connection: MarfaConnection?
     private(set) var state = State.disconnected
     /// The library to show, once its copy is open.
@@ -101,11 +103,11 @@ extension MarfaSource: MarfaHostedSource {}
     @ObservationIgnored var handOverEdits: () async -> Bool = { true }
 
     init(
-        defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
-        opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) }
+        defaults: UserDefaults, signIns: any MarfaSignIn, location: MarfaStoreLocation,
+        opener: @escaping Opener = { try await MarfaSource.open($0, server: $1, location: $2) }
     ) {
         self.defaults = defaults
-        self.keys = keys
+        self.signIns = signIns
         self.location = location
         self.opener = opener
     }
@@ -124,14 +126,6 @@ extension MarfaSource: MarfaHostedSource {}
         return hasCopy(connection) ? nil : 0
     }
 
-    /// Whether the key kept for `connection` is `key`, so Settings forgets what was typed once the host holds it,
-    /// whatever became of the step that gave it.
-    func holds(_ key: String, for connection: MarfaConnection) async -> Bool {
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection) }) else { return false }
-        return kept == key
-    }
-
     /// Opens the saved library's copy and paints from it, then asks the server.
     func launch() async {
         guard !isBusy, source == nil, let saved = defaults.string(forKey: Self.addressKey),
@@ -143,31 +137,31 @@ extension MarfaSource: MarfaHostedSource {}
         _ = try? await open(connection)
     }
 
-    /// Connects to `address` with `key`, keeping both once the copy opens. Connecting while connected changes
-    /// the address, or only the key where the address is the same.
-    func connect(address: String, key: String) async throws(Problem) {
-        let (connection, key) = try Self.validated(address, key)
+    /// Signs in to the server at `address` through `browser` and connects to it, keeping the address once the
+    /// copy opens. Connecting while connected changes the address, or signs in again where it is the same.
+    func connect(address: String, with browser: @escaping MarfaBrowser) async throws(Problem) {
+        let connection = try Self.validated(address)
         if let current = self.connection {
-            if current == connection { return try await replaceKey(key) }
-            return try await changeAddress(to: address, key: key)
+            if current == connection { return try await signInAgain(with: browser) }
+            return try await changeAddress(to: address, with: browser)
         }
         try begin()
         defer { isBusy = false }
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
-        try await save(key, for: connection)
+        guard await handOverEdits() else { throw Self.editing }
+        try await signIn(to: connection, with: browser)
         do {
             try await open(connection)
         } catch {
-            try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+            await signOutQuietly(connection)
             state = .disconnected
             throw error
         }
         remember(connection)
     }
 
-    /// Closes the copy and forgets the address and key. `choice` is needed while writes wait in the copy, and is
-    /// asked for again when more arrive after it; with nothing waiting and no choice the copy is removed, since a
-    /// later connection pulls it again.
+    /// Closes the copy, signs out and forgets the address. `choice` is needed while writes wait in the copy, and
+    /// is asked for again when more arrive after it; with nothing waiting and no choice the copy is removed, since
+    /// a later connection pulls it again.
     func disconnect(_ choice: DisconnectChoice? = nil) async throws(Problem) {
         guard let connection else { return }
         try begin()
@@ -178,8 +172,8 @@ extension MarfaSource: MarfaHostedSource {}
             throw .changesWaiting(nil)
         }
         detach()
-        // The address goes first, so a quit while the key and the copy are removed never opens this server again
-        // at the next launch, with a key already gone.
+        // The address goes first, so a quit while the sign-in and the copy are removed never opens this server
+        // again at the next launch, signed out.
         defaults.removeObject(forKey: Self.addressKey)
         self.connection = nil
         state = .disconnected
@@ -187,83 +181,36 @@ extension MarfaSource: MarfaHostedSource {}
         if let problem = await finishLeaving(connection, discarding: choice != .keepCopy) { throw problem }
     }
 
-    /// Takes a new key for the address connected to, for a key refused or replaced on the server. A key that
-    /// works is kept until the server has taken the new one: a key the server refuses, or cannot be asked
-    /// about, is not stored and the copy goes back to the old one. Where the old key was already refused there
-    /// is nothing to keep, so a new key the server cannot be asked about is kept to try later. Writes the
-    /// refused key held back go with the next drain, as the contract has them clear on their own.
-    func replaceKey(_ key: String) async throws(Problem) {
+    /// Signs in to the server connected to again, for a sign-in the server ended. The copy is opened again on
+    /// the new sign-in and keeps every write waiting in it; the server takes the writes the old sign-in held
+    /// back at the next drain. A sign-in that does not finish changes nothing.
+    func signInAgain(with browser: @escaping MarfaBrowser) async throws(Problem) {
         guard let connection else { throw .notConnected }
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { throw .noKey }
         try begin()
         defer { isBusy = false }
-        let old = try? await Self.offMain { [keys] in try keys.key(for: connection) }
-        guard let source else {
-            // With no copy open there is no server to ask first; the copy opens with the new key or not at all.
-            try await save(key, for: connection)
-            do {
-                try await open(connection)
-            } catch {
-                if let old { try? await save(old, for: connection) }
-                throw error
-            }
-            return
+        try await signIn(to: connection, with: browser)
+        if let source {
+            guard await handOverEdits() else { throw Self.editing }
+            detach()
+            state = .connecting
+            await source.close()
         }
-        let oldRefused = old == nil || source.connectionState == .keyRefused
-        let check: MarfaSync.KeyCheck
-        do {
-            check = try await source.tryKey(key)
-        } catch {
-            if oldRefused { try await save(key, for: connection) }
-            try await reopen(source, connection, after: error)
-        }
-        switch check {
-        case .accepted:
-            try await save(key, for: connection)
-        case .refused:
-            try await giveBack(old, to: source, connection)
-            throw .keyRefused
-        case .unanswered(let reason):
-            if oldRefused { return try await save(key, for: connection) }
-            try await giveBack(old, to: source, connection)
-            throw .serverUnreachable(reason: reason)
-        }
-    }
-
-    /// Whatever the server makes of the old key, the copy goes on with it; a copy that closes on it is opened
-    /// again, as one that closed on the new key is.
-    private func giveBack(_ old: String?, to source: any MarfaHostedSource, _ connection: MarfaConnection) async throws(Problem) {
-        guard let old else { return }
-        do {
-            _ = try await source.tryKey(old)
-        } catch {
-            try await reopen(source, connection, after: error)
-        }
-    }
-
-    /// Once pending edits are saved, a copy that could not take a key reopens with the stored key.
-    /// Recovery is deferred while an editor cannot hand over its changes.
-    private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
-        detach()
-        state = .connecting
-        await source.close()
         try await open(connection)
-        throw .unavailable(message: Self.message(error))
     }
 
-    /// Moves to another server's library. Another address is another copy, so writes waiting in this one need
-    /// the person's `choice`, asked for again when more arrive while the new copy opens. The new copy is opened
-    /// before this one is left, so a failure leaves things as they were.
-    func changeAddress(to address: String, key: String, choice: DisconnectChoice? = nil) async throws(Problem) {
-        let (connection, key) = try Self.validated(address, key)
-        guard let old = self.connection else { return try await connect(address: address, key: key) }
-        if connection == old { return try await replaceKey(key) }
+    /// Moves to another server's library, signing in to it through `browser` first. Another address is another
+    /// copy, so writes waiting in this one need the person's `choice`, asked for again when more arrive while the
+    /// new copy opens. The new copy is opened before this one is left, so a failure leaves things as they were.
+    func changeAddress(
+        to address: String, with browser: @escaping MarfaBrowser, choice: DisconnectChoice? = nil
+    ) async throws(Problem) {
+        let connection = try Self.validated(address)
+        guard let old = self.connection else { return try await connect(address: address, with: browser) }
+        if connection == old { return try await signInAgain(with: browser) }
         try begin()
         defer { isBusy = false }
         let current = source
-        if current != nil { guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
+        if current != nil { guard await handOverEdits() else { throw Self.editing } }
         if let current, choice == nil {
             let unsent = await current.unsentWrites()
             if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
@@ -271,28 +218,28 @@ extension MarfaSource: MarfaHostedSource {}
             throw .changesWaiting(nil)
         }
         let fresh = !hasCopy(connection)
-        try await save(key, for: connection)
+        try await signIn(to: connection, with: browser)
         let opened: any MarfaHostedSource
         do {
             try await clearDiscarded(connection)
-            opened = try await Self.open(connection, keys: keys, location: location, with: opener)
+            opened = try await Self.open(connection, signIns: signIns, location: location, with: opener)
         } catch {
-            try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+            await signOutQuietly(connection)
             throw error
         }
         if let current {
             do {
                 try await close(current, for: choice)
             } catch {
-                // The move is abandoned, so the copy made for it goes too.
+                // The move is abandoned, so the sign-in and the copy made for it go too.
                 await opened.close()
-                try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+                await signOutQuietly(connection)
                 if fresh { try? await removeCopy(connection) }
                 throw error
             }
         }
-        // The new copy is shown before the old one's key and copy are removed, so the windows go from one library
-        // to the other and never show the notes folder between them.
+        // The new copy is shown before the old one's sign-in and copy are removed, so the windows go from one
+        // library to the other and never show the notes folder between them.
         remember(connection)
         attach(opened)
         if let problem = await finishLeaving(old, discarding: choice != .keepCopy) { throw problem }
@@ -305,16 +252,16 @@ extension MarfaSource: MarfaHostedSource {}
         isBusy = true
     }
 
-    private static func validated(_ address: String, _ key: String) throws(Problem) -> (MarfaConnection, String) {
-        let connection: MarfaConnection
+    private static var editing: Problem {
+        .unavailable(message: String(localized: "Finish editing the current note before changing libraries."))
+    }
+
+    private static func validated(_ address: String) throws(Problem) -> MarfaConnection {
         do {
-            connection = try MarfaConnection(address: address)
+            return try MarfaConnection(address: address)
         } catch {
             throw .notAServer
         }
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { throw .noKey }
-        return (connection, key)
     }
 
     private func remember(_ connection: MarfaConnection) {
@@ -326,19 +273,39 @@ extension MarfaSource: MarfaHostedSource {}
         FileManager.default.fileExists(atPath: location.directory(for: connection).path)
     }
 
-    private func save(_ key: String, for connection: MarfaConnection) async throws(Problem) {
+    /// Shows the server's sign-in through `browser` and keeps what the person approves, in place of any sign-in
+    /// kept before. Nothing else changes until it has finished.
+    private func signIn(to connection: MarfaConnection, with browser: MarfaBrowser) async throws(Problem) {
         do {
-            try await Self.offMain { [keys] in try keys.save(key, for: connection) }
+            try await signIns.signIn(to: connection, with: browser)
+        } catch let error as SignInError {
+            throw Self.problem(error)
         } catch {
-            throw .keyStore(message: Self.message(error))
+            throw .signInFailed(message: Self.message(error))
         }
+    }
+
+    nonisolated static func problem(_ error: SignInError) -> Problem {
+        switch error {
+        case .canceled: .signInCanceled
+        case .denied: .notApproved
+        case .notAServer: .notAServer
+        case .notSignedIn: .signedOut
+        case .unavailable(let message), .unreadable(let message): .signInFailed(message: message)
+        default: .signInFailed(message: error.description)
+        }
+    }
+
+    /// For a sign-in made for a step that did not finish. The keychain no longer holds it either way.
+    private func signOutQuietly(_ connection: MarfaConnection) async {
+        try? await signIns.signOut(of: connection)
     }
 
     /// Closes `source` as `choice` allows. A kept copy loses nothing, so it closes whatever waits. Otherwise the
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
+        guard await handOverEdits() else { throw Self.editing }
         let agreed: UnsentWrites?
         switch choice {
         case .keepCopy:
@@ -355,10 +322,10 @@ extension MarfaSource: MarfaHostedSource {}
         state = .connecting
         do {
             try await clearDiscarded(connection)
-            attach(try await Self.open(connection, keys: keys, location: location, with: opener))
+            attach(try await Self.open(connection, signIns: signIns, location: location, with: opener))
         } catch {
             switch error {
-            case .noKey: state = .keyRefused
+            case .signedOut: state = .signedOut
             case .unavailable(let message): state = .unavailable(message: message)
             default: state = .disconnected
             }
@@ -366,14 +333,26 @@ extension MarfaSource: MarfaHostedSource {}
         }
     }
 
+    /// Reads the sign-in off the main actor, since the keychain can take a while, and opens the copy with it.
     private static func open(
-        _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation, with opener: Opener
+        _ connection: MarfaConnection, signIns: any MarfaSignIn, location: MarfaStoreLocation, with opener: Opener
     ) async throws(Problem) -> any MarfaHostedSource {
+        let server: Server
         do {
-            return try await opener(connection, keys, location)
+            guard let kept = try await offMain({ try signIns.server(for: connection) }) else { throw Problem.signedOut }
+            server = kept
+        } catch let problem as Problem {
+            throw problem
+        } catch let error as SignInError {
+            throw problem(error)
+        } catch {
+            throw .keychain(message: Self.message(error))
+        }
+        do {
+            return try await opener(connection, server, location)
         } catch let failure as SourceFailure {
-            // A source refuses to open only for want of a key.
-            if failure.kind == .denied { throw .noKey }
+            // A source refuses to open only for a sign-in gone since it was read.
+            if failure.kind == .denied { throw .signedOut }
             throw .unavailable(message: failure.message)
         } catch {
             throw .unavailable(message: Self.message(error))
@@ -405,17 +384,17 @@ extension MarfaSource: MarfaHostedSource {}
         source = nil
     }
 
-    /// Removes the key, and the copy where it was discarded, once the copy is closed. A discarded copy is marked
+    /// Signs out, and removes the copy where it was discarded, once the copy is closed. A discarded copy is marked
     /// before anything is removed and unmarked only once it is gone, so neither a removal that fails nor a quit
     /// part way lets it be opened again as it was.
     private func finishLeaving(_ connection: MarfaConnection, discarding: Bool) async -> Problem? {
         if discarding { markDiscarded(connection, true) }
-        var key: String?
+        var signIn: String?
         var copy: String?
         do {
-            try await Self.offMain { [keys] in try keys.delete(for: connection) }
+            try await signIns.signOut(of: connection)
         } catch {
-            key = Self.message(error)
+            signIn = Self.message(error)
         }
         if discarding {
             do {
@@ -425,7 +404,7 @@ extension MarfaSource: MarfaHostedSource {}
                 copy = Self.message(error)
             }
         }
-        return key == nil && copy == nil ? nil : .notRemoved(key: key, copy: copy)
+        return signIn == nil && copy == nil ? nil : .notRemoved(signIn: signIn, copy: copy)
     }
 
     private func markDiscarded(_ connection: MarfaConnection, _ marked: Bool) {
@@ -443,7 +422,7 @@ extension MarfaSource: MarfaHostedSource {}
         do {
             try await removeCopy(connection)
         } catch {
-            throw .notRemoved(key: nil, copy: Self.message(error))
+            throw .notRemoved(signIn: nil, copy: Self.message(error))
         }
         markDiscarded(connection, false)
     }
@@ -466,7 +445,7 @@ extension MarfaSource: MarfaHostedSource {}
         case .connecting: .connecting
         case .online: .online
         case .offline(let reason): .offline(reason: reason)
-        case .keyRefused: .keyRefused
+        case .signedOut: .signedOut
         case .stopped(_, let message): .unavailable(message: message)
         }
     }

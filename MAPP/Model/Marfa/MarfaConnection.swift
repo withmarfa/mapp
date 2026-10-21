@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Marfa
 
 /// The Marfa server a library reads from, by its address.
 nonisolated struct MarfaConnection: Hashable, Sendable {
@@ -25,10 +24,6 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         while components.path.hasSuffix("/") { components.path.removeLast() }
         guard let address = components.url else { throw .notAServer }
         self.address = address
-    }
-
-    func server(key: String) -> Server {
-        Server(url: address, key: key)
     }
 }
 

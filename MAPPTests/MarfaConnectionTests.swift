@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MAPP
 
@@ -40,15 +41,15 @@ struct MarfaConnectionTests {
         }
     }
 
-    @Test func aKeyIsKeptForItsServerAlone() throws {
-        let one = try MarfaConnection(address: "http://one.example")
-        let two = try MarfaConnection(address: "http://two.example")
-        let keys = MemoryKeyStore()
-        keys.save("first", for: one)
-        #expect(keys.key(for: one) == "first")
-        #expect(keys.key(for: two) == nil)
-        keys.delete(for: one)
-        #expect(keys.key(for: one) == nil)
-        #expect(KeychainKeyStore.account(for: one) == "http://one.example")
+    /// The sign-in is asked for the server's origin, which is the address a connection keeps, so the server the
+    /// copy opens on is the one signed in to. Making an `Authorization` reads no keychain and asks no server.
+    @Test func aSignInIsForTheServerTheAddressNames() throws {
+        let connection = try MarfaConnection(address: " HTTPS://Marfa.Example.com/ ")
+        let authorization = try KeychainSignIn.authorization(for: connection)
+        #expect(authorization.server.absoluteString == "https://marfa.example.com")
+        #expect(authorization.server == connection.address)
+        #expect(authorization.client.name == "MAPP")
+        #expect(authorization.client.scopes == ["content:write", "edge.*:write", "items.purge"])
     }
+
 }

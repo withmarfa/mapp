@@ -98,7 +98,7 @@ nonisolated enum MarfaMapping {
         return words.prefix(1).uppercased() + words.dropFirst()
     }
 
-    /// One wildcard for each namespace the catalogue holds, so the slice is every type the key reads, each with
+    /// One wildcard for each namespace the catalogue holds, so the slice is every type the sign-in reads, each with
     /// its subtypes. Marfa refuses `*`, and `system` holds the server's own bookkeeping, not the person's items.
     static func namespaces(of catalogue: Catalogue) -> [String] {
         let roots = catalogue.itemTypes.keys.compactMap { $0.rawValue.split(separator: ".").first.map(String.init) }

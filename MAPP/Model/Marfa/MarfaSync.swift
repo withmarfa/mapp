@@ -18,8 +18,6 @@ actor MarfaSync {
     private let tell: @Sendable (MarfaEngine.Event) -> Bool
     private var started = false
     private var stopped = false
-    /// Set while the copy changes key, when every call on it is refused.
-    private var paused = false
     private var wantsRefresh = false
     private var wantsDrain = false
     /// The bin is read from the server alone, so it is read again when something may have changed it.
@@ -66,7 +64,7 @@ actor MarfaSync {
     }
 
     nonisolated enum DrainResult: Hashable, Sendable {
-        /// The server refused the key and the core parked the queue until a new one is given.
+        /// The server refused the sign-in and the core parked the queue until the person signs in again.
         case parked(String)
         case offline(String?)
         case online
@@ -74,7 +72,7 @@ actor MarfaSync {
         case idle
     }
 
-    /// What a drain says of the server. A refused key is answered `blocked`, which counts as answered, before the
+    /// What a drain says of the server. A refused sign-in is answered `blocked`, which counts as answered, before the
     /// core parks the queue, and a drain that got partway answered some writes, so neither is judged by `answered`.
     nonisolated static func result(of report: DrainReport) -> DrainResult {
         if let stopped = report.stopped { return .parked(stopped) }
@@ -173,12 +171,12 @@ actor MarfaSync {
         draining = []
     }
 
-    /// Why a copy expires when the server ends its key, the contract's word for it.
+    /// Why a copy expires when the server ends its credential, the contract's word for it.
     nonisolated static let credentialEnded = "credential_ended"
 
-    /// The person gives a new key in Settings; nothing is sent until then.
-    nonisolated static var keyRefused: String {
-        String(localized: "The Marfa server refused this library’s key. Check the key in Settings.")
+    /// The person signs in again in Settings; nothing is sent until then.
+    nonisolated static var signedOut: String {
+        String(localized: "MAPP is signed out of your Marfa server. Sign in again in Settings to send your changes.")
     }
 
     /// Five seconds, doubling to five minutes.
@@ -186,53 +184,8 @@ actor MarfaSync {
         .seconds(min(5 * (1 << min(max(failures, 1) - 1, 10)), 300))
     }
 
-    /// What the server made of a key the copy was given.
-    nonisolated enum KeyCheck: Hashable, Sendable {
-        case accepted
-        case refused
-        /// The server could not be asked; the copy goes on with the key and asks again later.
-        case unanswered(String?)
-    }
-
-    /// Gives the copy `key` between server calls and refreshes with it at once, so the caller learns whether the
-    /// server takes it. Writes made meanwhile wait for the copy rather than fail. Writes a refused key parked
-    /// clear on their own at the next drain, which follows an accepted key, so nothing is released here.
-    func tryKey(_ key: String) async throws -> KeyCheck {
-        paused = true
-        retry?.cancel()
-        retry = nil
-        working?.cancel()
-        defer {
-            paused = false
-            work()
-        }
-        hub.changingKey(true)
-        do {
-            try await copy.useKey(key)
-        } catch {
-            hub.changingKey(false)
-            throw error
-        }
-        hub.changingKey(false)
-        failures = 0
-        if hub.connection != .online { hub.set(.connecting) }
-        do {
-            try await refreshNow()
-            refreshed = true
-            succeeded()
-            wantsDrain = true
-            return .accepted
-        } catch let error as MarfaError where Self.refusesKey(error) {
-            if case .copyExpired = error { refreshed = false }
-            hub.set(.keyRefused)
-            return .refused
-        } catch {
-            await failed(error, retrying: .refresh)
-            return .unanswered((error as? MarfaError)?.message ?? error.localizedDescription)
-        }
-    }
-
-    nonisolated static func refusesKey(_ error: MarfaError) -> Bool {
+    /// Whether `error` means the server no longer takes this sign-in, which only signing in again mends.
+    nonisolated static func endsSignIn(_ error: MarfaError) -> Bool {
         switch error {
         case .unauthorized, .forbidden, .signedOut: true
         case .copyExpired(let reason, _): reason == credentialEnded
@@ -241,12 +194,12 @@ actor MarfaSync {
     }
 
     private func work() {
-        guard started, !stopped, !paused, working == nil else { return }
+        guard started, !stopped, working == nil else { return }
         working = Task { await self.loop() }
     }
 
     private func loop() async {
-        while !stopped, !paused, !Task.isCancelled {
+        while !stopped, !Task.isCancelled {
             if wantsRefresh {
                 wantsRefresh = false
                 await runRefresh()
@@ -265,8 +218,6 @@ actor MarfaSync {
             }
         }
         working = nil
-        // A loop cancelled for a change of key leaves what it was asked for to the next one.
-        if Task.isCancelled { work() }
     }
 
     private func runRefresh() async {
@@ -330,8 +281,8 @@ actor MarfaSync {
         if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
         switch Self.result(of: report) {
         case .parked:
-            hub.set(.keyRefused)
-            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
+            hub.set(.signedOut)
+            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.signedOut)))
         case .offline(let reason):
             hub.set(.offline(reason: reason))
             schedule(.drain)
@@ -449,12 +400,12 @@ actor MarfaSync {
         case .network, .io, .unnamed, .redirected, .rateLimited:
             hub.set(.offline(reason: error.message))
             schedule(kind)
-        case _ where Self.refusesKey(error):
-            // A key refused for good also expires the copy; hydrating again before a new key is given would only
-            // be refused again.
+        case _ where Self.endsSignIn(error):
+            // A sign-in the server ends also expires the copy; hydrating again before the person signs in again
+            // would only be refused again.
             if case .copyExpired = error { refreshed = false }
-            hub.set(.keyRefused)
-            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.keyRefused)))
+            hub.set(.signedOut)
+            _ = tell(.failed(SourceFailure(kind: .denied, message: Self.signedOut)))
         case .copyExpired:
             // The server asks for a new hydration, which keeps the queue. The follow that stopped for it runs
             // outside the loop, so the work starts here.
@@ -464,7 +415,7 @@ actor MarfaSync {
         case .hydrationIncomplete, .noCursor, .canceled, .closed:
             break
         case .invalid:
-            // The copy was changing its key or moved during the call; the package asks for it again.
+            // The copy moved during the call; the package asks for it again.
             schedule(kind)
         default:
             hub.set(.stopped(code: error.code(), message: error.message))

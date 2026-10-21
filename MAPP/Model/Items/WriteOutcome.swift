@@ -2,7 +2,7 @@ import Foundation
 
 /// Why a write was refused or stopped, read into the parts the app shows.
 nonisolated struct SyncProblem: Hashable, Sendable {
-    /// A permission the key lacks, which the person restores on the server rather than in the app.
+    /// A permission the sign-in lacks, which the person restores on the server rather than in the app.
     struct Grant: Hashable, Sendable {
         enum Kind: Hashable, Sendable { case type, edgeType, `extension` }
         enum Level: Hashable, Sendable { case read, write }
