@@ -784,10 +784,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
         #expect(library.capabilities == [.archive, .retype, .retier])
-        source.state.set(.keyRefused)
-        #expect(await eventually { library.connection == .keyRefused })
-        source.state.set(.stopped(code: "x", message: "Stopped."))
-        #expect(await eventually { library.connection == .unavailable(message: "Stopped.") })
+        source.state.set(.signedOut)
+        #expect(await eventually { library.connection == .signedOut })
+        source.state.set(.stopped(.other))
+        #expect(await eventually { library.connection == .unavailable(.other) })
     }
 
     @Test func syncStateFollowsTheSource() async throws {
@@ -1059,8 +1059,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         var told: [MarfaLibrary.NotKept] = []
         library.onNotKept = { told.append($0) }
         await source.close()
-        library.updateBody(of: LibraryFixture.n1, to: "Typed while the key changed")
-        #expect(told.map(\.text) == ["Typed while the key changed"])
+        library.updateBody(of: LibraryFixture.n1, to: "Typed while signing in again")
+        #expect(told.map(\.text) == ["Typed while signing in again"])
         #expect(library.failure == nil, "this library is shown nowhere, so it is not told here")
     }
 

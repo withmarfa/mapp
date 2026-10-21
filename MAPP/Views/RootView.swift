@@ -49,7 +49,7 @@ struct RootView: View {
     }
 }
 
-/// A server is set, but its library can't be shown, because its key was refused or its copy can't be opened.
+/// A server is set, but its library can't be shown, because MAPP is signed out of it or its copy can't be opened.
 /// The notes folder is not shown in its place, which is not what the app was set to read.
 struct LibraryUnavailableView: View {
     @Environment(Libraries.self) private var libraries
@@ -58,8 +58,8 @@ struct LibraryUnavailableView: View {
     var body: some View {
         let status = ConnectionStatus(libraries.host.state)
         // The pane's own line points "below", which here is only this button.
-        let detail = libraries.host.state == .keyRefused
-            ? String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
+        let detail = libraries.host.state == .signedOut
+            ? String(localized: "MAPP is signed out of your Marfa server. Sign in again in Settings.")
             : status.detail
         ContentUnavailableView {
             Label("Can’t Open Your Marfa Library", systemImage: "exclamationmark.triangle")

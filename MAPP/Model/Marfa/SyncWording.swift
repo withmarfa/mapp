@@ -7,7 +7,7 @@ import Foundation
 nonisolated struct SyncStatus: Hashable, Sendable {
     nonisolated struct Note: Hashable, Sendable, Identifiable {
         enum Kind: Hashable, Sendable {
-            case keyRefused, unavailable, needsAttention, offline, catchingUp, sending
+            case signedOut, unavailable, needsAttention, offline, catchingUp, sending
         }
 
         let kind: Kind
@@ -29,15 +29,15 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
     var isQuiet: Bool { notes.isEmpty }
     var primary: Note? { notes.first }
-    /// Whether what the person has to do is in Settings: a key to replace, a library to open.
-    var pointsToSettings: Bool { notes.contains { $0.kind == .keyRefused || $0.kind == .unavailable } }
+    /// Whether what the person has to do is in Settings: signing in again, a library to open.
+    var pointsToSettings: Bool { notes.contains { $0.kind == .signedOut || $0.kind == .unavailable } }
 
     init(state: MarfaHost.State, report: SyncReport, now: Date) {
         guard state != .disconnected else { return }
         let waiting = report.waiting
         switch state {
-        case .keyRefused:
-            notes.append(Self.keyRefused(waiting: waiting))
+        case .signedOut:
+            notes.append(Self.signedOut(waiting: waiting))
         case .unavailable:
             notes.append(Self.unavailable)
         default:
@@ -55,10 +55,10 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
     // MARK: Words
 
-    private static func keyRefused(waiting: Int) -> Note {
-        var detail = String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
+    private static func signedOut(waiting: Int) -> Note {
+        var detail = String(localized: "MAPP needs your approval again. Sign in again in Settings.")
         if waiting > 0 { detail += " " + Words.waiting(waiting) }
-        return Note(kind: .keyRefused, title: String(localized: "Key refused"), detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
+        return Note(kind: .signedOut, title: String(localized: "Signed out"), detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
     }
 
     private static var unavailable: Note {
@@ -92,6 +92,30 @@ nonisolated struct SyncStatus: Hashable, Sendable {
         Note(
             kind: .sending, title: Words.sending(waiting), detail: Words.waiting(waiting),
             symbol: "arrow.up.circle", isWarning: false)
+    }
+}
+
+nonisolated extension CopyFailure {
+    /// What to do about it, following a sentence that says the copy can't be opened.
+    var advice: String {
+        switch self {
+        case .openElsewhere:
+            String(localized: "It’s open in another app or another copy of MAPP. Quit that app, then try again.")
+        case .storageFull:
+            String(localized: "This Mac is out of space. Free up some space, then try again.")
+        case .needsUpdate:
+            String(localized: "It needs a newer version of MAPP. Update MAPP, then try again.")
+        case .keychain:
+            String(localized: "The Keychain wouldn’t give MAPP its sign-in. Check that MAPP can use the Keychain, then try again.")
+        case .otherServer:
+            String(localized: "The server at this address isn’t the one the copy came from. Disconnect, then connect to the server again.")
+        case .files:
+            String(localized: "Check that MAPP can change its own files on this Mac, then try again.")
+        case .damaged:
+            String(localized: "The copy may be damaged. Disconnect, then connect to the server again.")
+        case .other:
+            String(localized: "Try again. If it keeps happening, disconnect, then connect to the server again.")
+        }
     }
 }
 
@@ -168,7 +192,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             headline = Self.refusedHeadline(entry.change, name: name)
             let reason = entry.reason
             if let grant = reason?.grant {
-                explanation = String(localized: "Your key doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
+                explanation = String(localized: "MAPP doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
             } else if reason?.isTrashed == true {
                 explanation = String(localized: "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.")
             } else if let message = reason?.message, !message.isEmpty {
@@ -181,7 +205,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
         case .blocked(let reason):
             headline = Self.stoppedHeadline(name: name)
             explanation = switch reason {
-            case .credentialRefused: String(localized: "It will be sent once the server accepts a key. Enter a new one in Settings.")
+            case .credentialRefused: String(localized: "It will be sent once you sign in again in Settings.")
             case .keySpent: String(localized: "The server stopped this change from going through. Try again to send it.")
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")

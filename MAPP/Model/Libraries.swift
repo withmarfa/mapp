@@ -15,7 +15,7 @@ import Observation
         /// A server is set and its copy is being opened, so a window waits rather than show another library or
         /// give up what it was restored with.
         case opening
-        /// A server is set and its copy is not open: its key was refused, or the copy cannot be opened.
+        /// A server is set and its copy is not open: MAPP is signed out, or the copy cannot be opened.
         case failed
     }
 
@@ -64,13 +64,13 @@ import Observation
     /// Which library the windows show. A server's copy is shown whenever it is open; a server set whose copy is
     /// not open is never answered with the notes folder, which is not what the person asked to read. Leaving a
     /// server forgets its address first, so the folder is what comes next; a copy closed to open again, as when
-    /// a key is replaced, is waited for, never shown as the folder in between.
+    /// the person signs in again, is waited for, never shown as the folder in between.
     nonisolated static func mode(hasSource: Bool, isConfigured: Bool, state: MarfaHost.State, isLaunching: Bool, isBusy: Bool) -> Mode {
         if hasSource { return .marfa }
         guard isConfigured else { return .files }
         switch state {
         case .connecting: return .opening
-        case .keyRefused, .unavailable: return isBusy ? .opening : .failed
+        case .signedOut, .unavailable: return isBusy ? .opening : .failed
         case .disconnected, .online, .offline: return isLaunching || isBusy ? .opening : .failed
         }
     }
@@ -181,10 +181,10 @@ import Observation
             try? FileManager.default.removeItem(at: root)
             return Libraries(
                 folder: NotesFolder(defaults: defaults),
-                host: MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root)))
+                host: MarfaHost(defaults: defaults, signIns: NoSignIn(), location: location(root: root)))
         }
         #endif
-        let host = MarfaHost(defaults: .standard, keys: KeychainKeyStore(), location: location())
+        let host = MarfaHost(defaults: .standard, signIns: KeychainSignIn(), location: location())
         return Libraries(folder: NotesFolder(), host: host)
     }
 

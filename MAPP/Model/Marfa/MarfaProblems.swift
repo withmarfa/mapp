@@ -39,7 +39,7 @@ nonisolated enum MarfaProblems {
             switch write.verdict {
             case nil:
                 waiting.append(write)
-            // A refused key parks every write together; the connection says so once, and the writes still wait.
+            // A sign-in the server refuses parks every write together; the connection says so once, and the writes still wait.
             case .blocked(.credentialRefused, let refusal) where refusal?.grant == nil:
                 waiting.append(write)
             case .refused, .blocked, .dead:

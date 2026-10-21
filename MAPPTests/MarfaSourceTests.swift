@@ -82,6 +82,18 @@ private func scratch() -> URL {
 }
 
 /// A server that refuses every connection, so a copy made for it never hears from it.
+/// Delete Permanently needs `items.purge`, which the owner approves on its own and may leave off.
+struct MarfaSourceCapabilityTests {
+    @Test func deletePermanentlyIsOfferedOnlyToASignInThatHoldsItemsPurge() {
+        let declined = MarfaSource.capabilities(scopes: ["content:write", "edge.*:write", "offline_access"])
+        #expect(declined == [.archive, .retype, .retier])
+        let approved = MarfaSource.capabilities(scopes: ["content:write", "edge.*:write", "items.purge", "offline_access"])
+        #expect(approved == [.archive, .retype, .retier, .purge])
+        #expect(!MarfaSource.capabilities(scopes: []).contains(.purge))
+        #expect(MarfaSource.capabilities(scopes: nil).contains(.purge), "a key, the tests' alone, is judged by the server")
+    }
+}
+
 @Suite(.serialized)
 struct MarfaSourceOfflineTests {
     @Test(.timeLimit(.minutes(1)))
@@ -89,10 +101,10 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let server = Server(url: connection.address, key: "unused")
         let location = try MarfaStoreLocation(root: root)
 
-        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        let source = try await MarfaSource.open(connection, server: server, location: location)
         let log = ChangeLog(source)
         let painted = try #require(await log.wait { $0.snapshot != nil })
         guard case .loaded(let first) = painted.changes.first else { Issue.record("the first change is not loaded"); return }
@@ -113,7 +125,7 @@ struct MarfaSourceOfflineTests {
         await source.flush()
         await source.close()
 
-        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        let reopened = try await MarfaSource.open(connection, server: server, location: location)
         let again = ChangeLog(reopened)
         let repainted = try #require(await again.wait { $0.snapshot != nil })
         let kept = try #require(repainted.item(titled: "MAPPTEST offline"))
@@ -147,17 +159,10 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    @Test func aMissingKeyIsDenied() async throws {
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        await #expect(throws: SourceFailure.self) {
-            _ = try await MarfaSource.open(connection, keys: MemoryKeyStore(), location: try MarfaStoreLocation(root: scratch()))
-        }
-    }
-
     private func open(_ root: URL, at address: String = "http://127.0.0.1:9") async throws -> MarfaSource {
         let connection = try MarfaConnection(address: address)
         return try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection: "unused"]), location: try MarfaStoreLocation(root: root))
+            connection, server: Server(url: connection.address, key: "unused"), location: try MarfaStoreLocation(root: root))
     }
 
     /// An address nothing answers holds a connection open until it times out, which must not hold up a write.
@@ -184,7 +189,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let first = try await open(root)
-        await #expect(throws: SourceFailure.self) { _ = try await open(root) }
+        await #expect(throws: CopyFailure.openElsewhere) { _ = try await open(root) }
         await first.close()
         let again = try await open(root)
         await again.close()
@@ -694,7 +699,7 @@ extension LiveMarfaTests {
         private func open(_ root: URL) async throws -> MarfaSource {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             return try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, server: Server(url: connection.address, key: try #require(LiveMarfa.key)),
                 location: try MarfaStoreLocation(root: root))
         }
 
@@ -947,11 +952,11 @@ extension LiveMarfaTests {
             let address = try #require(LiveMarfa.address), key = try #require(LiveMarfa.key)
             let connection = try MarfaConnection(address: address)
             let location = try MarfaStoreLocation(root: root)
-            let keys = MemoryKeyStore([connection: key])
+            let server = Server(url: connection.address, key: key)
             let a = made.mint(), b = made.mint()
             let tag = UUID().uuidString.prefix(8)
 
-            var source = try await MarfaSource.open(connection, keys: keys, location: location)
+            var source = try await MarfaSource.open(connection, server: server, location: location)
             var log = ChangeLog(source)
             source.refresh()
             _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
@@ -966,7 +971,7 @@ extension LiveMarfaTests {
             let otherRoot = scratch()
             defer { try? FileManager.default.removeItem(at: otherRoot) }
             try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
-            let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
+            let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: server)
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(a.rawValue))
             _ = try await other.items.update(a.rawValue, Edit(properties: ["body": .string("Another device")], baseVersion: row.version))
@@ -974,7 +979,7 @@ extension LiveMarfaTests {
             await other.close()
 
             // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
-            let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            let raw = try await WorkingCopy.open(store: location.store(for: connection), server: server)
             _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": .string("This device")], baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
@@ -984,7 +989,7 @@ extension LiveMarfaTests {
             await raw.close()
             _ = try #require(sibling)
 
-            source = try await MarfaSource.open(connection, keys: keys, location: location)
+            source = try await MarfaSource.open(connection, server: server, location: location)
             log = ChangeLog(source)
             let reopened = try #require(await log.wait { $0.snapshot != nil })
             guard case .conflicted? = reopened.snapshot?.items.first(where: { $0.id == a })?.sync else {
@@ -1009,7 +1014,7 @@ extension LiveMarfaTests {
             await source.close()
 
             // The answer is forgotten by now; the copy and its original still know each other, from the copy alone.
-            let relaunched = try await MarfaSource.open(connection, keys: keys, location: location)
+            let relaunched = try await MarfaSource.open(connection, server: server, location: location)
             let relaunchedLog = ChangeLog(relaunched)
             let painted = try #require(await relaunchedLog.wait { $0.snapshot != nil })
             guard case .conflicted(let copy?, _)? = painted.snapshot?.items.first(where: { $0.id == a })?.sync else {
@@ -1220,27 +1225,27 @@ nonisolated enum LiveMarfa {
 /// before the connect review's fixes.
 @Suite(.serialized)
 struct MarfaSourceClosingTests {
-    private func open() async throws -> (MarfaSource, MarfaConnection, MemoryKeyStore, MarfaStoreLocation, URL) {
+    private func open() async throws -> (MarfaSource, MarfaConnection, Server, MarfaStoreLocation, URL) {
         let root = scratch()
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let server = Server(url: connection.address, key: "unused")
         let location = try MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: keys, location: location)
-        return (source, connection, keys, location, root)
+        let source = try await MarfaSource.open(connection, server: server, location: location)
+        return (source, connection, server, location, root)
     }
 
     /// A write made the moment before quitting is in the queue once `queueSubmitted` returns, which never waits
     /// for the server, so it is there at the next launch.
     @Test(.timeLimit(.minutes(1)))
     func aWriteMadeJustBeforeQuittingIsKept() async throws {
-        let (source, connection, keys, location, root) = try await open()
+        let (source, connection, server, location, root) = try await open()
         defer { try? FileManager.default.removeItem(at: root) }
         let id = ItemID.mint()
         source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST quit", body: "Typed at once")), as: WriteID())
         await source.queueSubmitted()
         await source.close()
 
-        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        let reopened = try await MarfaSource.open(connection, server: server, location: location)
         let log = ChangeLog(reopened)
         let painted = try #require(await log.wait { $0.snapshot != nil })
         let kept = try #require(painted.item(titled: "MAPPTEST quit"))

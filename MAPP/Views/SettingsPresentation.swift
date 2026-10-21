@@ -70,7 +70,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: String(localized: "Base Text Size Font Sidebar Sort By Group by Date List Preview Notes List")
         case .editor: String(localized: "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing")
         case .library: String(localized: "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete")
-        case .marfa: String(localized: "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting")
+        case .marfa: String(localized: "Marfa Server Address Sign In Switch Try Again Disconnect Offline Sync Changes Waiting")
         case .about: String(localized: "MAPP Version Build")
         }
     }

@@ -5,7 +5,10 @@ import struct MarfaCore.ListFilters
 import struct MarfaCore.SearchFilters
 import struct MarfaCore.SearchHit
 import enum MarfaCore.ItemState
+import os
 import Synchronization
+
+nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: "marfa")
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
@@ -43,29 +46,64 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     case online
     /// The server cannot be reached; writes wait in the queue and go when it can.
     case offline(reason: String?)
-    /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
-    /// another.
-    case keyRefused
+    /// The server ended the sign-in or refused it, or it lacks what reading the library needs. Writes wait until
+    /// the person signs in again.
+    case signedOut
     /// Following the server stopped, and stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended the stream on a fault and a new one is taken. The copy still reads and queues.
-    case stopped(code: String, message: String)
+    case stopped(CopyFailure)
+}
+
+/// Why a copy can't be opened or followed, as the app tells it. The package's own text is for the log only.
+nonisolated enum CopyFailure: Error, Hashable, Sendable {
+    /// Another app, or another MAPP, has the copy open.
+    case openElsewhere
+    /// The Mac has no room for the copy.
+    case storageFull
+    /// The copy or the server needs a newer MAPP.
+    case needsUpdate
+    /// The Keychain wouldn't give MAPP its sign-in or the copy's key.
+    case keychain
+    /// The server at the address isn't the one the copy came from.
+    case otherServer
+    /// MAPP can't make or change the copy's files.
+    case files
+    /// The copy's store can't be read.
+    case damaged
+    case other
+
+    init(_ error: MarfaError) {
+        switch error {
+        case .storageFull: self = .storageFull
+        case .wrongSchema, .contractMismatch: self = .needsUpdate
+        case .noKeychain: self = .keychain
+        case .wrongServer: self = .otherServer
+        case .io: self = .files
+        case .store, .decoding, .readingHandle, .noCatalog, .closed: self = .damaged
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network, .unnamed,
+            .signedOut, .redirected, .noServer, .noCursor, .hydrationIncomplete, .copyExpired, .streamIncomplete,
+            .bytesAbsent, .canceled, .firstSyncWaiting, .invalid:
+            self = .other
+        }
+    }
 }
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
 /// library shows what it holds before, and without, the network.
 nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
-    /// Purge needs the server, which the library offers only while it can be reached; moving, renaming files,
-    /// folders and importing are a files library's.
-    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier]
+    /// Read from the sign-in when the source opens. Moving, renaming files, folders and importing are a files
+    /// library's.
+    let capabilities: SourceCapabilities
     let embeds: any EmbedResolver
     let copy: WorkingCopy
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    private init(copy: WorkingCopy, connection: MarfaConnection) {
+    private init(copy: WorkingCopy, connection: MarfaConnection, capabilities: SourceCapabilities) {
         self.copy = copy
         self.connection = connection
+        self.capabilities = capabilities
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
         embeds = MarfaEmbeds(events: events)
@@ -75,31 +113,46 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         Task { [engine] in await engine.run(stream) }
     }
 
-    /// Opens the working copy for `connection` and paints from it, asking the server nothing; `refresh()` then
-    /// brings it up to date. `location` keeps each server's copy apart, outside any notes folder. It reads the
-    /// keychain and makes the directory, so it never runs on the main actor.
+    /// Opens the working copy for `connection` on `server` and paints from it, asking the server nothing;
+    /// `refresh()` then brings it up to date. `location` keeps each server's copy apart, outside any notes folder.
+    /// It makes the directory and opens the store, so it never runs on the main actor.
     @concurrent static func open(
-        _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation
+        _ connection: MarfaConnection, server: Server, location: MarfaStoreLocation
     ) async throws -> MarfaSource {
-        guard let key = try keys.key(for: connection) else {
-            throw SourceFailure(kind: .denied, message: String(localized: "There’s no key for this Marfa server."))
-        }
         let directory = location.directory(for: connection)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            log.error("the copy's directory could not be made: \(error.localizedDescription, privacy: .public)")
+            throw CopyFailure.files
+        }
         let copy: WorkingCopy
         do {
-            copy = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            copy = try await WorkingCopy.open(store: location.store(for: connection), server: server)
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            log.error("the copy could not be opened: \(error.code(), privacy: .public): \(error.message, privacy: .public)")
+            throw CopyFailure(error)
+        } catch SignInError.notSignedIn {
+            // Signed out since the server was made.
+            throw SourceFailure(kind: .denied, message: SignInError.notSignedIn.description)
         }
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
             await copy.close()
-            throw SourceFailure(kind: .failed, message: String(localized: "This library is already open in MAPP or another app."))
+            throw CopyFailure.openElsewhere
         }
-        let source = MarfaSource(copy: copy, connection: connection)
+        let source = MarfaSource(copy: copy, connection: connection, capabilities: capabilities(scopes: server.credential?.scopes))
         source.events.yield(.paint)
         return source
+    }
+
+    /// Delete Permanently needs `items.purge`, which the owner approves on its own and may leave off, so it is
+    /// offered only to a sign-in that holds it. A server opened with a key (`scopes` nil) is the tests' alone, and
+    /// the server's answer is the verdict there.
+    static func capabilities(scopes: [String]?) -> SourceCapabilities {
+        var offered: SourceCapabilities = [.archive, .retype, .retier]
+        if scopes?.contains("items.purge") ?? true { offered.insert(.purge) }
+        return offered
     }
 
     func changes() -> AsyncStream<SourceChange> {
@@ -125,18 +178,6 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         return true
     }
 
-    /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
-    /// with it whatever the answer, so a caller that keeps another key gives that one back.
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
-        do {
-            return try await engine.sync.tryKey(key)
-        } catch let error as MarfaError {
-            // A copy that could not open its store again is closed for good, and is opened again.
-            if case .closed = error { throw SourceFailure(kind: .missing, message: error.message) }
-            throw SourceFailure(kind: .failed, message: error.message)
-        }
-    }
-
     // MARK: Sync problems
 
     var syncReport: SyncReport { hub.report.value }
@@ -157,7 +198,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
             // copy announces the withdrawal, which the engine reads again.
             do {
-                return try await MarfaEngine.asking(hub) { try await copy.queue.withdraw(id) }
+                return try await copy.queue.withdraw(id)
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: error.message)
             }
@@ -192,13 +233,12 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         guard !items.isEmpty else { return [] }
         let rows: [Marfa.Item]
         do {
-            rows = try await MarfaEngine.asking(hub) { () async throws -> [Marfa.Item] in
-                if items.count <= 12 {
-                    var rows: [Marfa.Item] = []
-                    for id in items { if let row = try await copy.items.get(id.rawValue) { rows.append(row) } }
-                    return rows
-                }
-                return try await copy.items.list(ListFilters(allStates: true)).filter { items.contains(ItemID($0.id)) }
+            if items.count <= 12 {
+                var read: [Marfa.Item] = []
+                for id in items { if let row = try await copy.items.get(id.rawValue) { read.append(row) } }
+                rows = read
+            } else {
+                rows = try await copy.items.list(ListFilters(allStates: true)).filter { items.contains(ItemID($0.id)) }
             }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
@@ -219,7 +259,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
         do {
-            return try await MarfaEngine.asking(hub) { try await copy.blobs.get(hash) }
+            return try await copy.blobs.get(hash)
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -237,7 +277,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
         let hits: [SearchHit]
         do {
-            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500) }
+            hits = try await copy.search(text, filters: filters, limit: 500)
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -303,10 +343,8 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     /// the server's bin gave.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
-            let row = try await MarfaEngine.asking(hub) { () async throws -> Marfa.Item? in
-                if let row = try await copy.items.get(id.rawValue) { return row }
-                return try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue }
-            }
+            var row = try await copy.items.get(id.rawValue)
+            if row == nil { row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue } }
             if let row = row ?? hub.binnedRow(id.rawValue) { return row }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
@@ -343,7 +381,6 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     private let state = Mutex(State())
-    private let keyChange = Mutex((changing: false, count: 0))
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())
     /// The rows of the server's bin that the copy does not hold, for the readers of their text.
@@ -351,20 +388,6 @@ nonisolated final class MarfaHub: Sendable {
 
     var connection: MarfaConnectionState { connectionState.value }
 
-    /// Counts each start and end of a change of key, so a call refused during one is told from one refused for
-    /// its own sake.
-    var keyChanges: Int { keyChange.withLock { $0.count } }
-
-    func keyChanged(since mark: Int) -> Bool {
-        keyChange.withLock { $0.changing || $0.count != mark }
-    }
-
-    func changingKey(_ changing: Bool) {
-        keyChange.withLock {
-            $0.changing = changing
-            $0.count += 1
-        }
-    }
     func setBinned(_ rows: [String: Marfa.Item]) {
         bin.withLock { $0 = rows }
     }

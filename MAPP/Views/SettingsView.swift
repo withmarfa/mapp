@@ -66,7 +66,7 @@ struct SettingsView: View {
         .confirmationDialog("Disconnect from this server?", isPresented: Bindable(libraries.marfaSettings).isConfirmingDisconnect) {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
         } message: {
-            Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes. Your notes folder is used again.")
+            Text("MAPP signs out and removes its copy of your library from this Mac. Your items on the server don’t change. Your notes folder is used again.")
         }
         .confirmationDialog(
             "^[Delete \(deleted.count) note](inflect: true) immediately?",
@@ -202,7 +202,7 @@ private enum SettingsPreview {
         .environment(Libraries(
             folder: NotesFolder(defaults: SettingsPreview.defaults),
             host: MarfaHost(
-                defaults: SettingsPreview.defaults, keys: MemoryKeyStore(),
+                defaults: SettingsPreview.defaults, signIns: NoSignIn(),
                 location: try! MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "SettingsPreview")))))
         .defaultAppStorage(SettingsPreview.defaults)
         .frame(width: 1100, height: 720)

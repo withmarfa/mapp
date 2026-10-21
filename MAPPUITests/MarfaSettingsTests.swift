@@ -1,8 +1,8 @@
 import XCTest
 
-/// The Marfa pane of Settings. The sample folder's app has a host of its own, on a Keychain held in memory, so
-/// nothing here reaches the person's saved server or keys; the steps used need no server, since an address that
-/// is no server is refused before anything is asked of the network.
+/// The Marfa pane of Settings. The sample folder's app has a host of its own that never signs in, so nothing here
+/// reaches the person's saved server, sign-in or the Keychain; the steps used need no server, since an address that
+/// is no server is refused before the browser opens.
 @MainActor
 final class MarfaSettingsTests: XCTestCase {
     private var app: XCUIApplication!
@@ -32,29 +32,25 @@ final class MarfaSettingsTests: XCTestCase {
     }
 
     private var address: XCUIElement { window.textFields["MarfaAddress"] }
-    private var key: XCUIElement { window.secureTextFields["MarfaKey"] }
-    private var connect: XCUIElement { window.buttons["MarfaConnect"] }
+    private var signIn: XCUIElement { window.buttons["MarfaSignIn"] }
 
-    func testThePaneAsksForAnAddressAndAKeyThePersonPastes() {
+    func testThePaneAsksForAnAddressAndSignsInInTheBrowser() {
         openMarfaPane()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
-        XCTAssertTrue(key.exists, "the key is typed into a secure field, so it is never shown")
-        XCTAssertTrue(connect.exists)
+        XCTAssertTrue(signIn.exists)
+        XCTAssertFalse(window.secureTextFields.firstMatch.exists, "nothing is pasted: MAPP signs in through the browser")
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
         XCTAssertTrue(window.toolbars.staticTexts["Marfa"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsMarfaDisconnected")
     }
 
-    func testConnectWaitsForBothAnAddressAndAKey() {
+    func testSignInWaitsForAnAddress() {
         openMarfaPane()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
-        XCTAssertFalse(connect.isEnabled)
+        XCTAssertFalse(signIn.isEnabled)
         address.click()
         address.typeText("https://marfa.example.com")
-        XCTAssertFalse(connect.isEnabled, "a key is needed too")
-        key.click()
-        key.typeText("pasted-key")
-        XCTAssertTrue(connect.isEnabled)
+        XCTAssertTrue(signIn.isEnabled)
     }
 
     func testAnAddressThatIsNoServerIsToldInPlainWords() {
@@ -62,9 +58,7 @@ final class MarfaSettingsTests: XCTestCase {
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
         address.typeText("marfa.example")
-        key.click()
-        key.typeText("pasted-key")
-        connect.click()
+        signIn.click()
         let notice = window.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
         XCTAssertTrue(notice.label.contains("Check the Address"), "the notice reads as one element, with its title in its label")

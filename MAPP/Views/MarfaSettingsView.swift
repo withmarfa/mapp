@@ -1,12 +1,21 @@
 import AppKit
+import AuthenticationServices
+import Marfa
 import SwiftUI
 
-/// The Marfa pane of Settings: the server the app reads from, how the connection stands, and the key. The
+/// The Marfa pane of Settings: the server the app reads from, how the connection stands, and signing in. The
 /// sections go in the pane's grouped form.
 struct MarfaSettingsView: View {
     @Bindable var model: MarfaSettingsModel
+    @Environment(\.webAuthenticationSession) private var session
 
     private var host: MarfaHost { model.host }
+    private var browser: MarfaBrowser { MarfaSettingsView.browser(session) }
+
+    /// Shows the server's sign-in and approval pages in a web authentication session over the Settings window.
+    static func browser(_ session: WebAuthenticationSession) -> MarfaBrowser {
+        { authorization in try await authorization.signIn(using: session) }
+    }
 
     var body: some View {
         Group {
@@ -26,18 +35,17 @@ struct MarfaSettingsView: View {
                 TextField("Address", text: $model.address, prompt: Text("https://marfa.example.com"))
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("MarfaAddress")
-                SecureField("Key", text: $model.key, prompt: Text("Paste your key"))
-                    .accessibilityIdentifier("MarfaKey")
+                    .onSubmit { Task { await model.signIn(with: browser) } }
                 HStack {
-                    Button("Connect") { Task { await model.connect() } }
-                        .disabled(!model.canConnect)
-                        .accessibilityIdentifier("MarfaConnect")
+                    Button("Sign In") { Task { await model.signIn(with: browser) } }
+                        .disabled(!model.canSignIn)
+                        .accessibilityIdentifier("MarfaSignIn")
                     if model.isWorking { ProgressView().controlSize(.small) }
                 }
             } header: {
                 Text("Marfa Server")
             } footer: {
-                Text("Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again. Your notes folder is used again if you disconnect.")
+                Text("Sign in to your Marfa server to read and edit its items here. Your browser opens so you can approve MAPP. Your notes folder is used again if you disconnect.")
             }
             notice
         }
@@ -68,6 +76,11 @@ struct MarfaSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
+                    if model.canTryAgain {
+                        Button("Try Again") { Task { await model.tryAgain() } }
+                            .disabled(model.isWorking)
+                            .accessibilityIdentifier("MarfaTryAgain")
+                    }
                     Button("Disconnect") { model.requestDisconnect() }
                         .disabled(model.isWorking)
                         .accessibilityIdentifier("MarfaDisconnect")
@@ -76,29 +89,21 @@ struct MarfaSettingsView: View {
             } header: {
                 Text("Marfa Server")
             }
-            keySection
+            if model.isSignedOut { signInAgain }
             notice
             otherServer
         }
     }
 
-    private var isKeyRefused: Bool { host.state == .keyRefused }
-
-    private var keySection: some View {
+    private var signInAgain: some View {
         Section {
-            SecureField("New Key", text: $model.newKey, prompt: Text("Paste a new key"))
-                .accessibilityIdentifier("MarfaNewKey")
-            Button(isKeyRefused ? "Use New Key" : "Replace Key") { Task { await model.replaceKey() } }
-                .disabled(!model.canReplaceKey)
-                .accessibilityIdentifier("MarfaReplaceKey")
+            Button("Sign In Again") { Task { await model.signInAgain(with: browser) } }
+                .disabled(model.isWorking)
+                .accessibilityIdentifier("MarfaSignInAgain")
         } header: {
-            Text(isKeyRefused ? "Key refused" : "Key")
+            Text("Signed Out")
         } footer: {
-            if isKeyRefused {
-                Text("The server doesn’t accept your key. Changes you make are kept on this Mac and sent once a key works.")
-            } else {
-                Text("MAPP keeps the key in your Keychain and doesn’t show it again.")
-            }
+            Text("Approve MAPP again to keep using your library. Changes you make are kept on this Mac and sent once you sign in.")
         }
     }
 
@@ -108,9 +113,8 @@ struct MarfaSettingsView: View {
                 TextField("Address", text: $model.otherAddress, prompt: Text("https://marfa.example.com"))
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("MarfaOtherAddress")
-                SecureField("Key", text: $model.otherKey, prompt: Text("Paste its key"))
-                    .accessibilityIdentifier("MarfaOtherKey")
-                Button("Switch Server") { Task { await model.switchServer() } }
+                    .onSubmit { Task { await model.switchServer(with: browser) } }
+                Button("Sign In and Switch") { Task { await model.switchServer(with: browser) } }
                     .disabled(!model.canSwitch)
                     .accessibilityIdentifier("MarfaSwitch")
             }
@@ -142,6 +146,7 @@ struct MarfaSettingsView: View {
 struct DepartureSheet: View {
     let model: MarfaSettingsModel
     let departure: MarfaSettingsModel.Departure
+    @Environment(\.webAuthenticationSession) private var session
 
     private var isDisconnecting: Bool { departure.kind == .disconnect }
 
@@ -168,11 +173,11 @@ struct DepartureSheet: View {
                     .accessibilityIdentifier("DepartureCancel")
                 Spacer()
                 Button(isDisconnecting ? "Discard Changes and Disconnect" : "Discard Changes and Switch", role: .destructive) {
-                    Task { await model.answer(.discardCopy) }
+                    Task { await model.answer(.discardCopy, with: MarfaSettingsView.browser(session)) }
                 }
                 .accessibilityIdentifier("DepartureDiscard")
                 Button(isDisconnecting ? "Keep Copy and Disconnect" : "Keep Copy and Switch") {
-                    Task { await model.answer(.keepCopy) }
+                    Task { await model.answer(.keepCopy, with: MarfaSettingsView.browser(session)) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("DepartureKeep")

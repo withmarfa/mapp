@@ -5,7 +5,7 @@ import Testing
 @testable import MAPP
 
 /// The Marfa section of Settings, through the model the view holds, so its steps and words are tested without a
-/// window. The host is on fakes, in memory, and a temporary store location: never the Keychain, and never the
+/// window. The host is on fakes, in memory, and a temporary store location: never the Keychain, a browser, or the
 /// default location.
 @MainActor struct MarfaSettingsModelTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
@@ -23,29 +23,25 @@ import Testing
         var count = 0
     }
 
-    private func connect(_ model: MarfaSettingsModel, to address: String = "http://first.test:8210", key: String = "key-1") async {
+    private func connect(_ model: MarfaSettingsModel, to address: String = "http://first.test:8210") async {
         model.address = address
-        model.key = key
-        await model.connect()
+        await model.signIn(with: testBrowser)
     }
 
-    // MARK: Connecting
+    // MARK: Signing in
 
-    @Test func connectingKeepsTheKeyOutOfTheFormAndHandsOverEditsFirst() async throws {
+    @Test func signingInClearsTheFormAndHandsOverEditsFirst() async throws {
         let bench = try HostBench()
         let (model, flushed) = model(bench)
-        #expect(!model.canConnect)
-        model.address = " http://first.test:8210/ "
-        #expect(!model.canConnect, "a key is needed")
-        model.key = "  "
-        #expect(!model.canConnect, "a blank key is no key")
-        model.key = "key-1"
-        #expect(model.canConnect)
+        #expect(!model.canSignIn)
+        model.address = "   "
+        #expect(!model.canSignIn, "a blank address is no address")
+        model.address = " HTTP://First.test:8210/ "
+        #expect(model.canSignIn)
 
-        await model.connect()
+        await model.signIn(with: testBrowser)
         #expect(model.host.connection == first)
-        #expect(bench.keys.key(for: first) == "key-1")
-        #expect(model.key == "", "the key is never shown again")
+        #expect(bench.signIns.calls == ["signIn http://first.test:8210"])
         #expect(model.address == "")
         #expect(model.notice == nil)
         #expect(flushed.count == 1)
@@ -55,32 +51,56 @@ import Testing
     @Test func anAddressThatIsNoServerIsToldInWords() async throws {
         let bench = try HostBench()
         let (model, flushed) = model(bench)
-        await connect(model, to: "marfa.example", key: "k")
+        await connect(model, to: "marfa.example")
         let notice = try #require(model.notice)
         #expect(notice.title == "Check the Address")
         #expect(notice.message == "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.")
-        #expect(model.key == "k", "what was typed is kept for another try")
+        #expect(model.address == "marfa.example", "what was typed is kept for another try")
         #expect(!model.isConnected)
+        #expect(bench.signIns.calls.isEmpty, "the browser never opened")
         #expect(bench.servers.opened.isEmpty)
         #expect(flushed.count == 0, "nothing changed, so nothing was handed over")
     }
 
+    /// Closing the browser is the person's own choice, so it is not told as a problem.
+    @Test func aCanceledSignInSaysNothingAndKeepsTheAddress() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        bench.signIns.answers.withLock { $0 = [.canceled] }
+        await connect(model)
+        #expect(model.notice == nil)
+        #expect(model.address == "http://first.test:8210")
+        #expect(!model.isConnected)
+    }
+
+    @Test func aDeclinedSignInSaysHowToApproveMAPP() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        bench.signIns.answers.withLock { $0 = [.denied] }
+        await connect(model)
+        #expect(model.notice?.title == "MAPP Wasn’t Approved")
+        #expect(model.notice?.message == "To use your library in MAPP, sign in and approve MAPP.")
+        #expect(!model.isConnected)
+    }
+
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
         let bench = try HostBench()
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        bench.servers.failure.withLock { $0 = CopyFailure.damaged }
         let (model, _) = model(bench)
         await connect(model)
         let notice = try #require(model.notice)
         #expect(notice.title == "Can’t Open the Library")
-        #expect(notice.message == "The copy of your library on this Mac can’t be opened. The store is damaged.")
+        #expect(notice.message == "The copy of your library on this Mac can’t be opened. The copy may be damaged. Disconnect, then connect to the server again.")
         #expect(!model.isConnected)
-        #expect(bench.keys.key(for: first) == nil, "a key for a server that did not open is not kept")
+        #expect(bench.signIns.token(for: first) == nil, "a sign-in for a server that did not open is not kept")
     }
 
     @Test(arguments: [
-        MarfaHost.Problem.noKey, .keyStore(message: "SecItemAdd failed: -25299"), .keyRefused,
-        .serverUnreachable(reason: "network: refused"), .notRemoved(key: "errSecItemNotFound", copy: nil),
-        .notRemoved(key: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer
+        MarfaHost.Problem.notApproved, .signInFailed, .signedOut, .keychain, .notRemoved(signIn: true, copy: false),
+        .notRemoved(signIn: false, copy: true), .notRemoved(signIn: true, copy: true), .notConnected, .busy, .notAServer,
+        .editing, .unavailable(.openElsewhere), .unavailable(.storageFull), .unavailable(.needsUpdate),
+        .unavailable(.keychain), .unavailable(.otherServer), .unavailable(.files), .unavailable(.damaged),
+        .unavailable(.other),
     ])
     func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
         let notice = try #require(MarfaSettingsModel.notice(for: problem))
@@ -93,107 +113,119 @@ import Testing
 
     @Test func theQuestionAboutWaitingChangesIsAskedNotTold() {
         #expect(MarfaSettingsModel.notice(for: .changesWaiting(.fake(2))) == nil)
+        #expect(MarfaSettingsModel.notice(for: .signInCanceled) == nil)
     }
 
-    // MARK: The connect review
+    // MARK: Signing in again
 
-    /// A copy that cannot take the new key is closed and opened again, so the pages hand over their edits right
-    /// before it closes, after the wait on the server, when the person may have typed more.
-    @Test func aCopyClosedOnANewKeyTakesThePagesEditsRightBeforeItCloses() async throws {
+    /// Signing in again closes the copy and opens it on the new sign-in, so the pages hand over their edits right
+    /// before it closes, after the browser, when the person may have typed more.
+    @Test func signingInAgainTakesThePagesEditsRightBeforeTheCopyCloses() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
-        source.closesOn.withLock { $0 = ["key-2"] }
+        source.state.set(.signedOut)
+        #expect(await eventually { model.isSignedOut })
         var seen: [[String]] = []
-        model.host.handOverEdits = { seen.append(source.calls); return true }
-        model.newKey = "key-2"
-        await model.replaceKey()
-        #expect(seen == [["refresh", "tryKey key-2"]])
-        #expect(source.calls == ["refresh", "tryKey key-2", "close"])
+        model.host.handOverEdits = { seen.append(source.calls + bench.signIns.calls); return true }
+        await model.signInAgain(with: testBrowser)
+        #expect(seen == [["refresh", "signIn http://first.test:8210", "signIn http://first.test:8210"]])
+        #expect(source.calls == ["refresh", "close"])
     }
 
-    // MARK: Forgetting a new key the host holds
-
-    /// The old key was refused, so the new one is kept even though the copy closed on it; the field forgets it,
-    /// and the person is told the key is kept and the library open again.
-    @Test func aNewKeyKeptAsTheCopyOpensAgainIsForgottenAndToldAsKept() async throws {
+    @Test func aSignedOutLibraryShowsAsSuchAndSignsInAgain() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
-        source.state.set(.keyRefused)
-        source.closesOn.withLock { $0 = ["key-2"] }
-        model.newKey = "key-2"
-        await model.replaceKey()
+        source.state.set(.signedOut)
+        #expect(await eventually { model.host.state == .signedOut })
+        #expect(model.isSignedOut)
+        #expect(model.status.title == "Signed out")
+        #expect(model.status.detail == "Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
+        #expect(model.status.isProblem)
 
-        #expect(bench.keys.key(for: first) == "key-2")
-        #expect(model.host.source != nil)
-        #expect(model.newKey == "", "the host holds the key, so the form does not")
-        #expect(model.notice?.title == "Can’t Check the Key")
-        #expect(model.notice?.message == "MAPP kept the new key and opened your library again, but couldn’t check the key with the server. The copy closed.")
+        await model.signInAgain(with: testBrowser)
+        #expect(model.notice == nil)
+        #expect(!model.isSignedOut)
+        #expect(model.host.source === bench.servers.last)
+        #expect(bench.servers.opened.count == 2)
     }
 
-    /// A key that works is kept, so a new key the copy closed on is not, and stays in the field for another try.
-    @Test func aNewKeyNotKeptStaysInTheFieldAndIsToldAsNotUsed() async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        await connect(model)
-        let source = try #require(bench.servers.last)
-        source.closesOn.withLock { $0 = ["key-2"] }
-        model.newKey = "key-2"
-        await model.replaceKey()
-
-        #expect(bench.keys.key(for: first) == "key-1")
-        #expect(model.newKey == "key-2")
-        #expect(model.notice?.title == "Can’t Use the New Key")
-        #expect(model.notice?.message == "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again. The copy closed.")
-    }
-
-    /// With no copy open and no old key, the new key is kept though the copy still cannot be opened.
-    @Test func aNewKeyKeptWhileTheCopyCannotOpenIsForgotten() async throws {
+    @Test func aSignInAgainThatOpensNoCopyIsToldAsSignedIn() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         let (model, _) = model(bench)
         await model.host.launch()
-        #expect(model.host.state == .keyRefused)
-        #expect(model.host.source == nil)
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        #expect(model.isSignedOut)
+        bench.servers.failure.withLock { $0 = CopyFailure.openElsewhere }
 
-        model.newKey = "key-2"
-        await model.replaceKey()
-        #expect(bench.keys.key(for: first) == "key-2")
-        #expect(model.newKey == "")
+        await model.signInAgain(with: testBrowser)
+        #expect(bench.signIns.token(for: first) != nil)
         #expect(model.notice?.title == "Can’t Open the Library")
-        #expect(model.notice?.message == "MAPP kept the new key, but the copy of your library on this Mac can’t be opened. The store is damaged.")
+        #expect(model.notice?.message == "MAPP signed in again, but the copy of your library on this Mac can’t be opened. It’s open in another app or another copy of MAPP. Quit that app, then try again.")
     }
 
-    /// A switch that is done but for removing the old server's key forgets the new key it was given, and says it
-    /// switched rather than disconnected.
-    @Test func aSwitchThatLeavesTheOldKeyBehindForgetsTheNewKeyAndSaysItSwitched() async throws {
+    /// A switch that is done but for signing out of the old server says it switched rather than disconnected.
+    @Test func aSwitchThatLeavesTheOldSignInBehindSaysItSwitched() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
-        bench.keys.failsDelete.withLock { $0 = true }
+        bench.signIns.failsSignOut.withLock { $0 = true }
         model.otherAddress = "http://second.test:8210"
-        model.otherKey = "key-2"
-        await model.switchServer()
+        await model.switchServer(with: testBrowser)
 
         #expect(model.host.connection == second)
-        #expect(model.otherKey == "", "the key is held by the host, not the form")
         #expect(model.otherAddress == "")
         let notice = try #require(model.notice)
         #expect(notice.title == "Switched Servers, but Not Everything Was Removed")
-        #expect(notice.message == "The previous server’s key is still in your Keychain. Remove it in Keychain Access.")
+        #expect(notice.message == "MAPP is still signed in to the previous server. To remove MAPP’s access, revoke it on that server.")
     }
 
     @Test func aCopyLeftBehindIsToldAgainstWhatTheStepDid() throws {
-        let problem = MarfaHost.Problem.notRemoved(key: nil, copy: "NSCocoaErrorDomain 513")
+        let problem = MarfaHost.Problem.notRemoved(signIn: false, copy: true)
         #expect(MarfaSettingsModel.notice(for: problem, reached: .left)?.title == "Disconnected, but Not Everything Was Removed")
         #expect(MarfaSettingsModel.notice(for: problem, reached: .switched)?.title == "Switched Servers, but Not Everything Was Removed")
         let notOpened = try #require(MarfaSettingsModel.notice(for: problem, reached: .notOpened))
         #expect(notOpened.title == "Can’t Open the Library")
-        #expect(!notOpened.message.contains("NSCocoa"))
+    }
+
+    /// A disconnect whose revocation the server doesn't confirm says how to remove MAPP's access.
+    @Test func aRevocationTheServerDoesNotConfirmSaysHowToRemoveAccess() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        bench.signIns.revokes.withLock { $0 = false }
+        await model.disconnect()
+        #expect(!model.isConnected)
+        let notice = try #require(model.notice)
+        #expect(notice.title == "Disconnected, but Not Everything Was Removed")
+        #expect(notice.message == "MAPP is still signed in. To remove MAPP’s access, revoke it on your Marfa server.")
+    }
+
+    /// A library the Keychain kept from opening at launch offers Try Again, which opens it once the Keychain gives
+    /// the sign-in.
+    @Test func aLibraryTheKeychainKeptClosedOffersTryAgain() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.signIns.keep("k", for: first)
+        bench.signIns.failsRead.withLock { $0 = true }
+        let (model, _) = model(bench)
+        await model.host.launch()
+        #expect(model.canTryAgain)
+        #expect(model.status.title == "Library unavailable")
+        #expect(model.status.detail == "MAPP can’t open or follow the copy of your library on this Mac. The Keychain wouldn’t give MAPP its sign-in. Check that MAPP can use the Keychain, then try again.")
+
+        await model.tryAgain()
+        #expect(model.notice?.title == "Can’t Read Your Sign-In")
+        #expect(model.canTryAgain)
+
+        bench.signIns.failsRead.withLock { $0 = false }
+        await model.tryAgain()
+        #expect(model.notice == nil)
+        #expect(!model.canTryAgain)
+        #expect(model.host.source === bench.servers.last)
     }
 
     // MARK: Leaving a copy
@@ -212,7 +244,7 @@ import Testing
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(!bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(bench.signIns.token(for: first) == nil)
         #expect(model.departure == nil)
         #expect(flushed.count == before + 1)
     }
@@ -249,11 +281,11 @@ import Testing
         await model.disconnect()
         #expect(model.departure != nil)
 
-        await model.answer(.keepCopy)
+        await model.answer(.keepCopy, with: testBrowser)
         #expect(model.departure == nil)
         #expect(!model.isConnected)
         #expect(bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil, "the key goes, the copy stays")
+        #expect(bench.signIns.token(for: first) == nil, "the sign-in goes, the copy stays")
     }
 
     @Test func discardingPassesTheChangesThePersonWasShownAndRemovesTheCopy() async throws {
@@ -266,7 +298,7 @@ import Testing
         await model.disconnect()
         #expect(model.departure?.unsent == .fake(2))
 
-        await model.answer(.discardCopy)
+        await model.answer(.discardCopy, with: testBrowser)
         #expect(model.departure == nil)
         #expect(model.notice == nil)
         #expect(!model.isConnected)
@@ -286,14 +318,14 @@ import Testing
 
         source.report.set(SyncReport(waiting: 3, queueRead: true))
         #expect(await eventually { model.host.waitingChanges == 3 })
-        await model.answer(.discardCopy)
+        await model.answer(.discardCopy, with: testBrowser)
         let departure = try #require(model.departure)
         #expect(departure.isAskedAgain)
         #expect(departure.unsent?.count == 3)
         #expect(model.isConnected)
         #expect(bench.hasCopy(first), "nothing is discarded that the person was not shown")
 
-        await model.answer(.discardCopy)
+        await model.answer(.discardCopy, with: testBrowser)
         #expect(model.departure == nil)
         #expect(!bench.hasCopy(first))
     }
@@ -322,7 +354,7 @@ import Testing
         #expect(model.departure == nil)
         #expect(model.isConnected)
         #expect(model.host.source != nil)
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(bench.signIns.token(for: first) != nil)
         #expect(bench.hasCopy(first))
     }
 
@@ -335,52 +367,18 @@ import Testing
         let before = flushed.count
 
         model.otherAddress = "http://second.test:8210"
-        model.otherKey = "key-2"
-        await model.switchServer()
+        await model.switchServer(with: testBrowser)
         #expect(model.departure?.kind == .switchServer)
+        #expect(!bench.signIns.calls.contains("signIn http://second.test:8210"), "the browser waits for the answer")
         #expect(model.host.connection == first, "nothing moved yet")
         #expect(flushed.count == before + 1)
 
-        await model.answer(.keepCopy)
+        await model.answer(.keepCopy, with: testBrowser)
         #expect(model.departure == nil)
         #expect(model.host.connection == second)
         #expect(bench.hasCopy(first))
-        #expect(model.otherKey == "")
+        #expect(bench.signIns.calls.contains("signIn http://second.test:8210"))
         #expect(model.otherAddress == "")
-    }
-
-    // MARK: Keys
-
-    @Test func aRefusedKeyShowsAsSuchAndTakesANewOne() async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        await connect(model)
-        let source = try #require(bench.servers.last)
-        source.state.set(.keyRefused)
-        #expect(await eventually { model.host.state == .keyRefused })
-        #expect(model.status.title == "Key refused")
-        #expect(model.status.isProblem)
-
-        #expect(!model.canReplaceKey)
-        model.newKey = "key-2"
-        #expect(model.canReplaceKey)
-        await model.replaceKey()
-        #expect(model.notice == nil)
-        #expect(model.newKey == "")
-        #expect(bench.keys.key(for: first) == "key-2")
-    }
-
-    @Test func aNewKeyTheServerRefusesIsToldAndTheOldOneKept() async throws {
-        let bench = try HostBench()
-        let (model, _) = model(bench)
-        await connect(model)
-        let source = try #require(bench.servers.last)
-        source.verdicts.withLock { $0["bad"] = .refused }
-        model.newKey = "bad"
-        await model.replaceKey()
-        #expect(model.notice?.title == "Key refused")
-        #expect(bench.keys.key(for: first) == "key-1")
-        #expect(model.newKey == "bad", "what was typed is kept for another try")
     }
 
     // MARK: Words and what shows
@@ -403,11 +401,10 @@ import Testing
         bench.servers.slow.withLock { $0 = true }
         let (model, flushed) = model(bench)
         model.address = "http://first.test:8210"
-        model.key = "key"
-        async let one: Void = model.connect()
+        async let one: Void = model.signIn(with: testBrowser)
         #expect(await eventually { model.isWorking })
-        #expect(!model.canConnect)
-        await model.connect()
+        #expect(!model.canSignIn)
+        await model.signIn(with: testBrowser)
         #expect(flushed.count == 1)
         bench.servers.slow.withLock { $0 = false }
         await one

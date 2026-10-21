@@ -9,7 +9,16 @@ struct AppConfigurationTests {
         #expect(Bundle.main.bundleIdentifier == "com.withmarfa.mapp.debug")
     }
 
-    @Test func keysAreKeptUnderTheBundleIdentifier() {
-        #expect(KeychainKeyStore.service == "com.withmarfa.mapp.debug.marfa-key")
+    @Test func signInsAreKeptUnderTheBundleIdentifier() {
+        #expect(KeychainSignIn.service == "com.withmarfa.mapp.debug.marfa-sign-in")
+    }
+
+    /// The browser returns to a private-use address whose scheme is the bundle identifier, which the app claims.
+    @Test func theSignInRedirectIsOneTheAppClaims() throws {
+        let redirect = try #require(KeychainSignIn.redirect)
+        #expect(redirect.absoluteString == "com.withmarfa.mapp.debug:/signed-in")
+        let types = try #require(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])
+        let schemes = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+        #expect(schemes.contains(try #require(redirect.scheme)))
     }
 }
