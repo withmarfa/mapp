@@ -27,7 +27,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             isProblem = false
         case .signedOut:
             title = String(localized: "Signed out")
-            detail = String(localized: "MAPP needs your approval again. Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
+            detail = String(localized: "Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
             isProblem = true
         case .unavailable(let message):
             title = String(localized: "Library unavailable")
@@ -194,7 +194,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .notApproved:
             Notice(
                 title: String(localized: "MAPP Wasn’t Approved"),
-                message: String(localized: "To use your library in MAPP, sign in again and approve MAPP."))
+                message: String(localized: "To use your library in MAPP, sign in and approve MAPP."))
         case .signInFailed:
             Notice(
                 title: String(localized: "Can’t Sign In"),
@@ -202,7 +202,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .signedOut:
             Notice(
                 title: String(localized: "Signed Out"),
-                message: String(localized: "MAPP needs your approval again. Sign in again to approve MAPP."))
+                message: String(localized: "Sign in again to approve MAPP."))
         case .unavailable(let message):
             switch reached {
             case .signedInAgain:

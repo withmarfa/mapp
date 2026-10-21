@@ -79,7 +79,7 @@ import Testing
         bench.signIns.answers.withLock { $0 = [.denied] }
         await connect(model)
         #expect(model.notice?.title == "MAPP Wasn’t Approved")
-        #expect(model.notice?.message == "To use your library in MAPP, sign in again and approve MAPP.")
+        #expect(model.notice?.message == "To use your library in MAPP, sign in and approve MAPP.")
         #expect(!model.isConnected)
     }
 
@@ -142,7 +142,7 @@ import Testing
         #expect(await eventually { model.host.state == .signedOut })
         #expect(model.isSignedOut)
         #expect(model.status.title == "Signed out")
-        #expect(model.status.detail == "MAPP needs your approval again. Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
+        #expect(model.status.detail == "Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
         #expect(model.status.isProblem)
 
         await model.signInAgain(with: testBrowser)
