@@ -85,21 +85,22 @@ import Testing
 
     @Test func aFailureToOpenTheCopyIsToldWithoutRawErrorText() async throws {
         let bench = try HostBench()
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        bench.servers.failure.withLock { $0 = CopyFailure.damaged }
         let (model, _) = model(bench)
         await connect(model)
         let notice = try #require(model.notice)
         #expect(notice.title == "Can’t Open the Library")
-        #expect(notice.message == "The copy of your library on this Mac can’t be opened. The store is damaged.")
+        #expect(notice.message == "The copy of your library on this Mac can’t be opened. The copy may be damaged. Disconnect, then connect to the server again.")
         #expect(!model.isConnected)
         #expect(bench.signIns.token(for: first) == nil, "a sign-in for a server that did not open is not kept")
     }
 
     @Test(arguments: [
-        MarfaHost.Problem.notApproved, .signInFailed(message: "network: refused"), .signedOut,
-        .keychain(message: "SecItemCopyMatching failed: -25300"), .notRemoved(signIn: "errSecItemNotFound", copy: nil),
-        .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
-        .unavailable(message: ""),
+        MarfaHost.Problem.notApproved, .signInFailed, .signedOut, .keychain, .notRemoved(signIn: true, copy: false),
+        .notRemoved(signIn: false, copy: true), .notRemoved(signIn: true, copy: true), .notConnected, .busy, .notAServer,
+        .editing, .unavailable(.openElsewhere), .unavailable(.storageFull), .unavailable(.needsUpdate),
+        .unavailable(.keychain), .unavailable(.otherServer), .unavailable(.files), .unavailable(.damaged),
+        .unavailable(.other),
     ])
     func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
         let notice = try #require(MarfaSettingsModel.notice(for: problem))
@@ -158,12 +159,12 @@ import Testing
         let (model, _) = model(bench)
         await model.host.launch()
         #expect(model.isSignedOut)
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        bench.servers.failure.withLock { $0 = CopyFailure.openElsewhere }
 
         await model.signInAgain(with: testBrowser)
         #expect(bench.signIns.token(for: first) != nil)
         #expect(model.notice?.title == "Can’t Open the Library")
-        #expect(model.notice?.message == "MAPP signed in again, but the copy of your library on this Mac can’t be opened. The store is damaged.")
+        #expect(model.notice?.message == "MAPP signed in again, but the copy of your library on this Mac can’t be opened. It’s open in another app or another copy of MAPP. Quit that app, then try again.")
     }
 
     /// A switch that is done but for signing out of the old server says it switched rather than disconnected.
@@ -183,12 +184,48 @@ import Testing
     }
 
     @Test func aCopyLeftBehindIsToldAgainstWhatTheStepDid() throws {
-        let problem = MarfaHost.Problem.notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513")
+        let problem = MarfaHost.Problem.notRemoved(signIn: false, copy: true)
         #expect(MarfaSettingsModel.notice(for: problem, reached: .left)?.title == "Disconnected, but Not Everything Was Removed")
         #expect(MarfaSettingsModel.notice(for: problem, reached: .switched)?.title == "Switched Servers, but Not Everything Was Removed")
         let notOpened = try #require(MarfaSettingsModel.notice(for: problem, reached: .notOpened))
         #expect(notOpened.title == "Can’t Open the Library")
-        #expect(!notOpened.message.contains("NSCocoa"))
+    }
+
+    /// A disconnect whose revocation the server doesn't confirm says how to remove MAPP's access.
+    @Test func aRevocationTheServerDoesNotConfirmSaysHowToRemoveAccess() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        bench.signIns.revokes.withLock { $0 = false }
+        await model.disconnect()
+        #expect(!model.isConnected)
+        let notice = try #require(model.notice)
+        #expect(notice.title == "Disconnected, but Not Everything Was Removed")
+        #expect(notice.message == "MAPP is still signed in. To remove MAPP’s access, revoke it on your Marfa server.")
+    }
+
+    /// A library the Keychain kept from opening at launch offers Try Again, which opens it once the Keychain gives
+    /// the sign-in.
+    @Test func aLibraryTheKeychainKeptClosedOffersTryAgain() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.signIns.keep("k", for: first)
+        bench.signIns.failsRead.withLock { $0 = true }
+        let (model, _) = model(bench)
+        await model.host.launch()
+        #expect(model.canTryAgain)
+        #expect(model.status.title == "Library unavailable")
+        #expect(model.status.detail == "MAPP can’t open or follow the copy of your library on this Mac. The Keychain wouldn’t give MAPP its sign-in. Check that MAPP can use the Keychain, then try again.")
+
+        await model.tryAgain()
+        #expect(model.notice?.title == "Can’t Read Your Sign-In")
+        #expect(model.canTryAgain)
+
+        bench.signIns.failsRead.withLock { $0 = false }
+        await model.tryAgain()
+        #expect(model.notice == nil)
+        #expect(!model.canTryAgain)
+        #expect(model.host.source === bench.servers.last)
     }
 
     // MARK: Leaving a copy

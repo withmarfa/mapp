@@ -29,10 +29,9 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             title = String(localized: "Signed out")
             detail = String(localized: "Sign in again to approve MAPP. Your changes stay on this Mac and are sent once you do.")
             isProblem = true
-        case .unavailable(let message):
+        case .unavailable(let failure):
             title = String(localized: "Library unavailable")
-            let sentence = String(localized: "MAPP can’t open or follow the copy of your library on this Mac.")
-            detail = message.isEmpty ? sentence : sentence + " " + message
+            detail = String(localized: "MAPP can’t open or follow the copy of your library on this Mac.") + " " + failure.advice
             isProblem = true
         }
     }
@@ -84,6 +83,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
 
     var isConnected: Bool { host.configuredConnection != nil }
     var isSignedOut: Bool { host.state == .signedOut }
+    /// Whether the copy can be opened, or followed, again, after it could not be.
+    var canTryAgain: Bool {
+        if case .unavailable = host.state { true } else { false }
+    }
     var status: ConnectionStatus { ConnectionStatus(host.state) }
 
     var canSignIn: Bool { !isWorking && !Self.trimmed(address).isEmpty }
@@ -105,6 +108,13 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     func signInAgain(with browser: @escaping MarfaBrowser) async {
         await run(.signingInAgain) { () async throws(MarfaHost.Problem) in
             try await host.signInAgain(with: browser)
+        }
+    }
+
+    /// Opens the copy again, or follows the server again, after either stopped.
+    func tryAgain() async {
+        await run(.reopening) { () async throws(MarfaHost.Problem) in
+            try await host.reopen()
         }
     }
 
@@ -195,6 +205,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             Notice(
                 title: String(localized: "MAPP Wasn’t Approved"),
                 message: String(localized: "To use your library in MAPP, sign in and approve MAPP."))
+        case .editing:
+            Notice(
+                title: String(localized: "Can’t Change Libraries"),
+                message: String(localized: "Finish editing the current note, then try again."))
         case .signInFailed:
             Notice(
                 title: String(localized: "Can’t Sign In"),
@@ -203,17 +217,16 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             Notice(
                 title: String(localized: "Signed Out"),
                 message: String(localized: "Sign in again to approve MAPP."))
-        case .unavailable(let message):
+        case .unavailable(let failure):
             switch reached {
             case .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
-                    message: sentences(
-                        String(localized: "MAPP signed in again, but the copy of your library on this Mac can’t be opened."), message))
+                    message: String(localized: "MAPP signed in again, but the copy of your library on this Mac can’t be opened.") + " " + failure.advice)
             default:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
-                    message: sentences(String(localized: "The copy of your library on this Mac can’t be opened."), message))
+                    message: String(localized: "The copy of your library on this Mac can’t be opened.") + " " + failure.advice)
             }
         case .keychain:
             Notice(
@@ -239,12 +252,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private static func sentences(_ first: String, _ detail: String) -> String {
-        detail.isEmpty ? first : first + " " + detail
-    }
-
-    private static func removalMessage(signIn: String?, copy: String?) -> String {
-        switch (signIn != nil, copy != nil) {
+    private static func removalMessage(signIn: Bool, copy: Bool) -> String {
+        switch (signIn, copy) {
         case (true, true):
             String(localized: "MAPP is still signed in, and the copy is still on this Mac. To remove MAPP’s access, revoke it on your Marfa server. MAPP removes the copy before it connects to that server again.")
         case (true, false):
@@ -254,8 +263,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
-        switch (signIn != nil, copy != nil) {
+    private static func previousRemovalMessage(signIn: Bool, copy: Bool) -> String {
+        switch (signIn, copy) {
         case (true, true):
             String(localized: "MAPP is still signed in to the previous server, and its copy is still on this Mac. To remove MAPP’s access, revoke it on that server. MAPP removes the copy before it connects to that server again.")
         case (true, false):
@@ -271,6 +280,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     private enum Step {
         case reaching(String)
         case signingInAgain
+        case reopening
         case leaving
     }
 
@@ -313,6 +323,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .leaving: .left
         case .reaching(let address): isConnected(to: address) ? .switched : .notOpened
         case .signingInAgain: .signedInAgain
+        case .reopening: .notOpened
         }
     }
 

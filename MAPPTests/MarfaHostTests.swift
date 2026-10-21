@@ -91,7 +91,7 @@ nonisolated extension UnsentWrites {
 /// Opens a fake library for each address on the server it is given, making the copy's directory as
 /// `MarfaSource.open` does.
 nonisolated final class FakeServers: Sendable {
-    let failure = Mutex<SourceFailure?>(nil)
+    let failure = Mutex<(any Error & Sendable)?>(nil)
     /// While set, an open waits, as a slow store would.
     let slow = Mutex(false)
     let opening = Mutex(false)
@@ -115,7 +115,7 @@ nonisolated final class FakeServers: Sendable {
 
 /// Sign-ins held in memory, made without a browser: each sign-in is approved and keeps `token` as the server's
 /// key, unless `answers` says otherwise. Its sign-out and its keychain read can be made to fail as a keychain's
-/// can.
+/// can, and the server can be made to leave a revocation unconfirmed.
 nonisolated final class FakeSignIn: MarfaSignIn {
     private let kept = Mutex<[MarfaConnection: String]>([:])
     private let log = Mutex<[String]>([])
@@ -125,6 +125,8 @@ nonisolated final class FakeSignIn: MarfaSignIn {
     let token = Mutex("token")
     let failsSignOut = Mutex(false)
     let failsRead = Mutex(false)
+    /// Whether the server confirms the revocation of a sign-in that was kept.
+    let revokes = Mutex(true)
     /// Run as each sign-out begins.
     let onSignOut = Mutex<(@Sendable () -> Void)?>(nil)
 
@@ -143,11 +145,12 @@ nonisolated final class FakeSignIn: MarfaSignIn {
         return kept.withLock { $0[connection] }.map { Server(url: connection.address, key: $0) }
     }
 
-    func signOut(of connection: MarfaConnection) async throws {
+    func signOut(of connection: MarfaConnection) async throws -> Bool {
         onSignOut.withLock { $0 }?()
         log.withLock { $0.append("signOut \(connection.address.absoluteString)") }
         if failsSignOut.withLock({ $0 }) { throw SourceFailure(kind: .denied, message: "The keychain refused.") }
-        _ = kept.withLock { $0.removeValue(forKey: connection) }
+        let removed = kept.withLock { $0.removeValue(forKey: connection) }
+        return removed == nil || revokes.withLock { $0 }
     }
 
     /// The token kept for `connection`, nil when signed out.
@@ -242,8 +245,8 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
         #expect(await eventually { host.state == .online })
         source.state.set(.offline(reason: "network: refused"))
         #expect(await eventually { host.state == .offline(reason: "network: refused") })
-        source.state.set(.stopped(code: "store", message: "The store is damaged."))
-        #expect(await eventually { host.state == .unavailable(message: "The store is damaged.") })
+        source.state.set(.stopped(.damaged))
+        #expect(await eventually { host.state == .unavailable(.damaged) })
     }
 
     /// An address that names no server is refused before the browser opens.
@@ -268,8 +271,9 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
     @Test(arguments: [
         (SignInError.canceled, MarfaHost.Problem.signInCanceled),
         (.denied, .notApproved),
-        (.unavailable(message: "network: refused"), .signInFailed(message: "network: refused")),
-        (.refused(code: "invalid_scope", message: "No such scope."), .signInFailed(message: SignInError.refused(code: "invalid_scope", message: "No such scope.").description)),
+        (.unavailable(message: "network: refused"), .signInFailed),
+        (.refused(code: "invalid_scope", message: "No such scope."), .signInFailed),
+        (.stateMismatch, .signInFailed),
     ])
     func aSignInThatDoesNotFinishChangesNothing(answer: SignInError, problem: MarfaHost.Problem) async throws {
         let bench = try HostBench()
@@ -287,8 +291,8 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
     @Test func aCopyThatCannotBeOpenedIsAPlainProblemAndSignsOut() async throws {
         let bench = try HostBench()
         let host = bench.host()
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
-        await expect(.unavailable(message: "The store is damaged.")) { () throws(MarfaHost.Problem) in
+        bench.servers.failure.withLock { $0 = CopyFailure.damaged }
+        await expect(.unavailable(.damaged)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", with: testBrowser)
         }
         #expect(host.state == .disconnected)
@@ -356,6 +360,8 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
         #expect(host.connection == first)
     }
 
+    /// A launch the Keychain refuses shows the library as unavailable, in the app's words, and Try Again opens it
+    /// once the Keychain gives the sign-in.
     @Test func aSignInTheKeychainWontGiveIsAPlainProblem() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
@@ -364,10 +370,42 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
         let host = bench.host()
         await host.launch()
         #expect(host.source == nil)
-        #expect(host.state == .disconnected)
-        await expect(.keychain(message: "The keychain refused.")) { () throws(MarfaHost.Problem) in
+        #expect(host.state == .unavailable(.keychain))
+        #expect(host.connection == first)
+        await expect(.keychain) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(with: testBrowser)
         }
+        #expect(host.state == .unavailable(.keychain))
+
+        bench.signIns.failsRead.withLock { $0 = false }
+        try await host.reopen()
+        #expect(host.source === bench.servers.last)
+        #expect(host.state == .connecting)
+    }
+
+    /// Try Again on a copy whose following stopped asks it to follow the server again, and opens nothing.
+    @Test func tryingAgainOnAnOpenCopyFollowsTheServerAgain() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", with: testBrowser)
+        let source = try #require(bench.servers.last)
+        source.state.set(.stopped(.other))
+        #expect(await eventually { host.state == .unavailable(.other) })
+        try await host.reopen()
+        #expect(source.calls == ["refresh", "refresh"])
+        #expect(bench.servers.opened.count == 1)
+    }
+
+    /// A server that doesn't confirm the revocation leaves MAPP's access standing there, which the person is told.
+    @Test func aRevocationTheServerDoesNotConfirmIsReported() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", with: testBrowser)
+        bench.signIns.revokes.withLock { $0 = false }
+        await expect(.notRemoved(signIn: true, copy: false)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        #expect(host.connection == nil)
+        #expect(bench.signIns.token(for: first) == nil, "the Keychain no longer holds it")
+        #expect(!bench.hasCopy(first))
     }
 
     @Test func leavingWithWritesWaitingNeedsAChoice() async throws {
@@ -427,7 +465,7 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
         let source = try #require(host.source as? FakeMarfaSource)
         host.handOverEdits = { false }
         do { try await host.disconnect(.keepCopy); Issue.record("Leaving was approved after the editor rejected saving") }
-        catch { if case .unavailable = error {} else { Issue.record("Unexpected failure: \(error)") } }
+        catch { #expect(error == .editing) }
         #expect(host.source === source)
         #expect(!source.calls.contains("close"))
         #expect(!host.isBusy)
@@ -479,8 +517,8 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
         await expect(.changesWaiting(.fake(1))) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://second.test:8210", with: testBrowser)
         }
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
-        await expect(.unavailable(message: "No room.")) { () throws(MarfaHost.Problem) in
+        bench.servers.failure.withLock { $0 = CopyFailure.storageFull }
+        await expect(.unavailable(.storageFull)) { () throws(MarfaHost.Problem) in
             try await host.changeAddress(to: "http://second.test:8210", with: testBrowser, choice: .keepCopy)
         }
         #expect(host.connection == first)
@@ -638,8 +676,7 @@ let testBrowser: MarfaBrowser = { _ in throw SignInError.canceled }
             try await host.disconnect()
             Issue.record("said the sign-in and the copy were removed")
         } catch {
-            #expect("\(error)".contains("The keychain refused."), "\(error)")
-            #expect("\(error)".contains("copy"), "\(error)")
+            #expect(error == .notRemoved(signIn: true, copy: true))
         }
     }
 }
@@ -803,11 +840,7 @@ struct MarfaHostOfflineTests {
             try await host.connect(address: address, with: testBrowser)
             Issue.record("opened a damaged copy")
         } catch {
-            guard case .unavailable(let message) = error else {
-                Issue.record("the damaged copy answered \(error)")
-                return
-            }
-            #expect(!message.isEmpty)
+            #expect(error == .unavailable(.damaged))
         }
         #expect(host.state == .disconnected)
         #expect(host.source == nil)

@@ -12,8 +12,10 @@ nonisolated protocol MarfaSignIn: Sendable {
     @MainActor func signIn(to connection: MarfaConnection, with browser: MarfaBrowser) async throws
     /// The server to open a copy on with the sign-in kept for `connection`; nil when none is kept.
     func server(for connection: MarfaConnection) throws -> Server?
-    /// Removes the sign-in kept for `connection` and revokes it at the server. Throws only when it is still kept.
-    func signOut(of connection: MarfaConnection) async throws
+    /// Removes the sign-in kept for `connection` and revokes it at the server. Answers false when a sign-in was
+    /// kept and the server did not confirm its revocation, so MAPP's access stands there until the owner revokes
+    /// it. Throws only when the sign-in is still kept.
+    @discardableResult func signOut(of connection: MarfaConnection) async throws -> Bool
 }
 
 /// The person's sign-ins, made through the package's `Authorization` and kept in their default keychain.
@@ -53,8 +55,11 @@ nonisolated struct KeychainSignIn: MarfaSignIn {
         }
     }
 
-    func signOut(of connection: MarfaConnection) async throws {
-        try await Self.authorization(for: connection).signOut()
+    func signOut(of connection: MarfaConnection) async throws -> Bool {
+        let authorization = try Self.authorization(for: connection)
+        // The package answers false for a sign-in it no longer held as well, which leaves nothing to revoke.
+        guard try authorization.credential() != nil else { return true }
+        return try await authorization.signOut()
     }
 }
 
@@ -68,6 +73,6 @@ nonisolated struct NoSignIn: MarfaSignIn {
 
     func server(for connection: MarfaConnection) -> Server? { nil }
 
-    func signOut(of connection: MarfaConnection) {}
+    func signOut(of connection: MarfaConnection) -> Bool { true }
 }
 #endif

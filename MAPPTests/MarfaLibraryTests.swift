@@ -786,8 +786,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.capabilities == [.archive, .retype, .retier])
         source.state.set(.signedOut)
         #expect(await eventually { library.connection == .signedOut })
-        source.state.set(.stopped(code: "x", message: "Stopped."))
-        #expect(await eventually { library.connection == .unavailable(message: "Stopped.") })
+        source.state.set(.stopped(.other))
+        #expect(await eventually { library.connection == .unavailable(.other) })
     }
 
     @Test func syncStateFollowsTheSource() async throws {

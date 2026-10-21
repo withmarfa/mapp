@@ -76,6 +76,11 @@ struct MarfaSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
+                    if model.canTryAgain {
+                        Button("Try Again") { Task { await model.tryAgain() } }
+                            .disabled(model.isWorking)
+                            .accessibilityIdentifier("MarfaTryAgain")
+                    }
                     Button("Disconnect") { model.requestDisconnect() }
                         .disabled(model.isWorking)
                         .accessibilityIdentifier("MarfaDisconnect")

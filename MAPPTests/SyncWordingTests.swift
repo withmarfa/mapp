@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MAPP
 
@@ -74,7 +75,7 @@ struct SyncStatusTests {
     }
 
     @Test func aLibraryThatCannotBeOpenedPointsToSettings() throws {
-        let status = SyncStatus(state: .unavailable(message: "The store is damaged."), report: report(), now: now)
+        let status = SyncStatus(state: .unavailable(.damaged), report: report(), now: now)
         #expect(status.primary?.kind == .unavailable)
         #expect(status.pointsToSettings)
     }
@@ -107,7 +108,7 @@ struct SyncStatusTests {
     }
 
     @Test func noWordIsJargon() {
-        let all = [MarfaHost.State.online, .offline(reason: nil), .signedOut, .unavailable(message: "")].flatMap { state in
+        let all = [MarfaHost.State.online, .offline(reason: nil), .signedOut, .unavailable(.other)].flatMap { state in
             SyncStatus(state: state, report: report(waiting: 2, oldest: 60, phase: .catchingUp, problems: [entry()]), now: now)
                 .notes.flatMap { [$0.title, $0.detail] }
         }
@@ -251,7 +252,31 @@ struct ConnectionStatusTests {
         #expect(ConnectionStatus(.signedOut).title == "Signed out")
         #expect(ConnectionStatus(.signedOut).detail?.contains("approve MAPP") == true)
         #expect(ConnectionStatus(.signedOut).isProblem)
-        #expect(ConnectionStatus(.unavailable(message: "The store is damaged.")).detail?.hasSuffix("The store is damaged.") == true)
+        #expect(ConnectionStatus(.unavailable(.damaged)).detail == "MAPP can’t open or follow the copy of your library on this Mac. The copy may be damaged. Disconnect, then connect to the server again.")
+        #expect(ConnectionStatus(.unavailable(.keychain)).isProblem)
+    }
+
+    /// Each way a copy can fail is told in the app's words, as what happened and what to do.
+    @Test(arguments: [
+        CopyFailure.openElsewhere, .storageFull, .needsUpdate, .keychain, .otherServer, .files, .damaged, .other,
+    ])
+    func eachWayACopyFailsIsToldInTheAppsWords(failure: CopyFailure) throws {
+        let detail = try #require(ConnectionStatus(.unavailable(failure)).detail)
+        #expect(detail.hasPrefix("MAPP can’t open or follow the copy of your library on this Mac. "))
+        #expect(detail.hasSuffix("."))
+        #expect(!failure.advice.isEmpty)
+    }
+
+    /// The package's errors reach the person only as one of the app's own failures.
+    @Test func thePackagesErrorsAreReadAsTheAppsOwnFailures() {
+        #expect(CopyFailure(.storageFull(message: "disk full")) == .storageFull)
+        #expect(CopyFailure(.wrongSchema(path: "/x", reason: "newer", unsent: nil, message: "schema 9")) == .needsUpdate)
+        #expect(CopyFailure(.contractMismatch(served: "9", expected: 1, status: 200, writeSent: false, message: "m")) == .needsUpdate)
+        #expect(CopyFailure(.noKeychain(message: "m")) == .keychain)
+        #expect(CopyFailure(.wrongServer(expected: "a", got: "b", message: "m")) == .otherServer)
+        #expect(CopyFailure(.io(message: "EACCES")) == .files)
+        #expect(CopyFailure(.store(message: "file is not a database")) == .damaged)
+        #expect(CopyFailure(.server(status: 500, code: "internal", message: "m")) == .other)
     }
 
     @Test func theReasonOfBeingOfflineIsNotShown() {

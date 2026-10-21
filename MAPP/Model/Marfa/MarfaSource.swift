@@ -5,7 +5,10 @@ import struct MarfaCore.ListFilters
 import struct MarfaCore.SearchFilters
 import struct MarfaCore.SearchHit
 import enum MarfaCore.ItemState
+import os
 import Synchronization
+
+nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: "marfa")
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
@@ -47,25 +50,60 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// the person signs in again.
     case signedOut
     /// Following the server stopped, and stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended the stream on a fault and a new one is taken. The copy still reads and queues.
-    case stopped(code: String, message: String)
+    case stopped(CopyFailure)
+}
+
+/// Why a copy can't be opened or followed, as the app tells it. The package's own text is for the log only.
+nonisolated enum CopyFailure: Error, Hashable, Sendable {
+    /// Another app, or another MAPP, has the copy open.
+    case openElsewhere
+    /// The Mac has no room for the copy.
+    case storageFull
+    /// The copy or the server needs a newer MAPP.
+    case needsUpdate
+    /// The Keychain wouldn't give MAPP its sign-in or the copy's key.
+    case keychain
+    /// The server at the address isn't the one the copy came from.
+    case otherServer
+    /// MAPP can't make or change the copy's files.
+    case files
+    /// The copy's store can't be read.
+    case damaged
+    case other
+
+    init(_ error: MarfaError) {
+        switch error {
+        case .storageFull: self = .storageFull
+        case .wrongSchema, .contractMismatch: self = .needsUpdate
+        case .noKeychain: self = .keychain
+        case .wrongServer: self = .otherServer
+        case .io: self = .files
+        case .store, .decoding, .readingHandle, .noCatalog, .closed: self = .damaged
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network, .unnamed,
+            .signedOut, .redirected, .noServer, .noCursor, .hydrationIncomplete, .copyExpired, .streamIncomplete,
+            .bytesAbsent, .canceled, .firstSyncWaiting, .invalid:
+            self = .other
+        }
+    }
 }
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
 /// library shows what it holds before, and without, the network.
 nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
-    /// Purge needs the server, which the library offers only while it can be reached; moving, renaming files,
-    /// folders and importing are a files library's.
-    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier]
+    /// Read from the sign-in when the source opens. Moving, renaming files, folders and importing are a files
+    /// library's.
+    let capabilities: SourceCapabilities
     let embeds: any EmbedResolver
     let copy: WorkingCopy
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    private init(copy: WorkingCopy, connection: MarfaConnection) {
+    private init(copy: WorkingCopy, connection: MarfaConnection, capabilities: SourceCapabilities) {
         self.copy = copy
         self.connection = connection
+        self.capabilities = capabilities
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
         embeds = MarfaEmbeds(events: events)
@@ -82,12 +120,18 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         _ connection: MarfaConnection, server: Server, location: MarfaStoreLocation
     ) async throws -> MarfaSource {
         let directory = location.directory(for: connection)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            log.error("the copy's directory could not be made: \(error.localizedDescription, privacy: .public)")
+            throw CopyFailure.files
+        }
         let copy: WorkingCopy
         do {
             copy = try await WorkingCopy.open(store: location.store(for: connection), server: server)
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            log.error("the copy could not be opened: \(error.code(), privacy: .public): \(error.message, privacy: .public)")
+            throw CopyFailure(error)
         } catch SignInError.notSignedIn {
             // Signed out since the server was made.
             throw SourceFailure(kind: .denied, message: SignInError.notSignedIn.description)
@@ -95,11 +139,20 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
             await copy.close()
-            throw SourceFailure(kind: .failed, message: String(localized: "This library is already open in MAPP or another app."))
+            throw CopyFailure.openElsewhere
         }
-        let source = MarfaSource(copy: copy, connection: connection)
+        let source = MarfaSource(copy: copy, connection: connection, capabilities: capabilities(scopes: server.credential?.scopes))
         source.events.yield(.paint)
         return source
+    }
+
+    /// Delete Permanently needs `items.purge`, which the owner approves on its own and may leave off, so it is
+    /// offered only to a sign-in that holds it. A server opened with a key (`scopes` nil) is the tests' alone, and
+    /// the server's answer is the verdict there.
+    static func capabilities(scopes: [String]?) -> SourceCapabilities {
+        var offered: SourceCapabilities = [.archive, .retype, .retier]
+        if scopes?.contains("items.purge") ?? true { offered.insert(.purge) }
+        return offered
     }
 
     func changes() -> AsyncStream<SourceChange> {

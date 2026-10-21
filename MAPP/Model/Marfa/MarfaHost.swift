@@ -1,6 +1,9 @@
 import Foundation
 import Marfa
 import Observation
+import os
+
+nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: "marfa")
 
 /// A source read from a server: its items, what it has yet to send, and how the server stands.
 nonisolated protocol ConnectedItemSource: ItemSource, SyncReporting {
@@ -39,8 +42,8 @@ extension MarfaSource: MarfaHostedSource {}
         /// The server ended the sign-in, or none is kept; the person signs in again in Settings, and writes wait
         /// in the copy until then.
         case signedOut
-        /// The copy cannot be opened or followed; the message is the package's.
-        case unavailable(message: String)
+        /// The copy cannot be opened or followed, or the Keychain would not give the sign-in to open it with.
+        case unavailable(CopyFailure)
     }
 
     /// What becomes of the copy, and every write still in it, when it is left.
@@ -59,8 +62,8 @@ extension MarfaSource: MarfaHostedSource {}
         case signInCanceled
         /// The person declined to approve MAPP on the server.
         case notApproved
-        /// The sign-in could not finish; the message is the package's.
-        case signInFailed(message: String)
+        /// The sign-in could not finish.
+        case signInFailed
         /// No sign-in is kept for the server, or the server ended it.
         case signedOut
         /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
@@ -68,13 +71,16 @@ extension MarfaSource: MarfaHostedSource {}
         /// read and may hold some.
         case changesWaiting(UnsentWrites?)
         /// The copy could not be opened or read.
-        case unavailable(message: String)
+        case unavailable(CopyFailure)
         /// The keychain would not give the sign-in.
-        case keychain(message: String)
-        /// The connection was left, but its sign-in is still kept, or the copy the person discarded is still on
-        /// disk, or both; each message says why. A discarded copy is never opened as it is: connecting its
-        /// address again removes it first, or fails with this.
-        case notRemoved(signIn: String?, copy: String?)
+        case keychain
+        /// The connection was left, but MAPP's access stands at the server (the sign-in is still kept, or the
+        /// server did not confirm its revocation), or the copy the person discarded is still on disk, or both. A
+        /// discarded copy is never opened as it is: connecting its address again removes it first, or fails with
+        /// this.
+        case notRemoved(signIn: Bool, copy: Bool)
+        /// An open page could not hand over its last edit, so the library was not changed.
+        case editing
         case notConnected
         /// Another connect, disconnect or sign-in is under way.
         case busy
@@ -137,6 +143,16 @@ extension MarfaSource: MarfaHostedSource {}
         _ = try? await open(connection)
     }
 
+    /// Opens the copy of the server connected to again, with the sign-in kept, after it could not be opened; an
+    /// open copy whose following stopped follows the server again.
+    func reopen() async throws(Problem) {
+        guard let connection else { throw .notConnected }
+        if let source { return source.refresh() }
+        try begin()
+        defer { isBusy = false }
+        try await open(connection)
+    }
+
     /// Signs in to the server at `address` through `browser` and connects to it, keeping the address once the
     /// copy opens. Connecting while connected changes the address, or signs in again where it is the same.
     func connect(address: String, with browser: @escaping MarfaBrowser) async throws(Problem) {
@@ -147,7 +163,7 @@ extension MarfaSource: MarfaHostedSource {}
         }
         try begin()
         defer { isBusy = false }
-        guard await handOverEdits() else { throw Self.editing }
+        guard await handOverEdits() else { throw .editing }
         try await signIn(to: connection, with: browser)
         do {
             try await open(connection)
@@ -190,7 +206,7 @@ extension MarfaSource: MarfaHostedSource {}
         defer { isBusy = false }
         try await signIn(to: connection, with: browser)
         if let source {
-            guard await handOverEdits() else { throw Self.editing }
+            guard await handOverEdits() else { throw .editing }
             detach()
             state = .connecting
             await source.close()
@@ -210,7 +226,7 @@ extension MarfaSource: MarfaHostedSource {}
         try begin()
         defer { isBusy = false }
         let current = source
-        if current != nil { guard await handOverEdits() else { throw Self.editing } }
+        if current != nil { guard await handOverEdits() else { throw .editing } }
         if let current, choice == nil {
             let unsent = await current.unsentWrites()
             if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
@@ -252,10 +268,6 @@ extension MarfaSource: MarfaHostedSource {}
         isBusy = true
     }
 
-    private static var editing: Problem {
-        .unavailable(message: String(localized: "Finish editing the current note before changing libraries."))
-    }
-
     private static func validated(_ address: String) throws(Problem) -> MarfaConnection {
         do {
             return try MarfaConnection(address: address)
@@ -281,31 +293,33 @@ extension MarfaSource: MarfaHostedSource {}
         } catch let error as SignInError {
             throw Self.problem(error)
         } catch {
-            throw .signInFailed(message: Self.message(error))
+            log.error("signing in failed: \(error.localizedDescription, privacy: .public)")
+            throw .signInFailed
         }
     }
 
     nonisolated static func problem(_ error: SignInError) -> Problem {
         switch error {
-        case .canceled: .signInCanceled
-        case .denied: .notApproved
-        case .notAServer: .notAServer
-        case .notSignedIn: .signedOut
-        case .unavailable(let message), .unreadable(let message): .signInFailed(message: message)
-        default: .signInFailed(message: error.description)
+        case .canceled: return .signInCanceled
+        case .denied: return .notApproved
+        case .notAServer: return .notAServer
+        case .notSignedIn: return .signedOut
+        case .expired, .stateMismatch, .otherServer, .noRedirect, .refused, .unavailable, .unreadable:
+            log.error("signing in failed: \(error.description, privacy: .public)")
+            return .signInFailed
         }
     }
 
     /// For a sign-in made for a step that did not finish. The keychain no longer holds it either way.
     private func signOutQuietly(_ connection: MarfaConnection) async {
-        try? await signIns.signOut(of: connection)
+        _ = try? await signIns.signOut(of: connection)
     }
 
     /// Closes `source` as `choice` allows. A kept copy loses nothing, so it closes whatever waits. Otherwise the
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
-        guard await handOverEdits() else { throw Self.editing }
+        guard await handOverEdits() else { throw .editing }
         let agreed: UnsentWrites?
         switch choice {
         case .keepCopy:
@@ -326,7 +340,9 @@ extension MarfaSource: MarfaHostedSource {}
         } catch {
             switch error {
             case .signedOut: state = .signedOut
-            case .unavailable(let message): state = .unavailable(message: message)
+            case .unavailable(let failure): state = .unavailable(failure)
+            // A sign-in the Keychain won't give is told in Settings, where the person can try again.
+            case .keychain: state = .unavailable(.keychain)
             default: state = .disconnected
             }
             throw error
@@ -346,16 +362,19 @@ extension MarfaSource: MarfaHostedSource {}
         } catch let error as SignInError {
             throw problem(error)
         } catch {
-            throw .keychain(message: Self.message(error))
+            log.error("the Keychain would not give the sign-in: \(error.localizedDescription, privacy: .public)")
+            throw .keychain
         }
         do {
             return try await opener(connection, server, location)
-        } catch let failure as SourceFailure {
+        } catch let failure as CopyFailure {
+            throw .unavailable(failure)
+        } catch let failure as SourceFailure where failure.kind == .denied {
             // A source refuses to open only for a sign-in gone since it was read.
-            if failure.kind == .denied { throw .signedOut }
-            throw .unavailable(message: failure.message)
+            throw .signedOut
         } catch {
-            throw .unavailable(message: Self.message(error))
+            log.error("the copy could not be opened: \(error.localizedDescription, privacy: .public)")
+            throw .unavailable(.other)
         }
     }
 
@@ -389,22 +408,27 @@ extension MarfaSource: MarfaHostedSource {}
     /// part way lets it be opened again as it was.
     private func finishLeaving(_ connection: MarfaConnection, discarding: Bool) async -> Problem? {
         if discarding { markDiscarded(connection, true) }
-        var signIn: String?
-        var copy: String?
+        var signIn = false
+        var copy = false
         do {
-            try await signIns.signOut(of: connection)
+            if try await !signIns.signOut(of: connection) {
+                log.error("the server did not confirm the sign-in's revocation")
+                signIn = true
+            }
         } catch {
-            signIn = Self.message(error)
+            log.error("the sign-in could not be removed: \(error.localizedDescription, privacy: .public)")
+            signIn = true
         }
         if discarding {
             do {
                 try await removeCopy(connection)
                 markDiscarded(connection, false)
             } catch {
-                copy = Self.message(error)
+                log.error("the copy could not be removed: \(error.localizedDescription, privacy: .public)")
+                copy = true
             }
         }
-        return signIn == nil && copy == nil ? nil : .notRemoved(signIn: signIn, copy: copy)
+        return signIn || copy ? .notRemoved(signIn: signIn, copy: copy) : nil
     }
 
     private func markDiscarded(_ connection: MarfaConnection, _ marked: Bool) {
@@ -422,7 +446,8 @@ extension MarfaSource: MarfaHostedSource {}
         do {
             try await removeCopy(connection)
         } catch {
-            throw .notRemoved(signIn: nil, copy: Self.message(error))
+            log.error("a discarded copy could not be removed: \(error.localizedDescription, privacy: .public)")
+            throw .notRemoved(signIn: false, copy: true)
         }
         markDiscarded(connection, false)
     }
@@ -436,17 +461,13 @@ extension MarfaSource: MarfaHostedSource {}
         }
     }
 
-    private static func message(_ error: any Error) -> String {
-        error.localizedDescription
-    }
-
     static func state(_ state: MarfaConnectionState) -> State {
         switch state {
         case .connecting: .connecting
         case .online: .online
         case .offline(let reason): .offline(reason: reason)
         case .signedOut: .signedOut
-        case .stopped(_, let message): .unavailable(message: message)
+        case .stopped(let failure): .unavailable(failure)
         }
     }
 

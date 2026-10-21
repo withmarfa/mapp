@@ -82,6 +82,18 @@ private func scratch() -> URL {
 }
 
 /// A server that refuses every connection, so a copy made for it never hears from it.
+/// Delete Permanently needs `items.purge`, which the owner approves on its own and may leave off.
+struct MarfaSourceCapabilityTests {
+    @Test func deletePermanentlyIsOfferedOnlyToASignInThatHoldsItemsPurge() {
+        let declined = MarfaSource.capabilities(scopes: ["content:write", "edge.*:write", "offline_access"])
+        #expect(declined == [.archive, .retype, .retier])
+        let approved = MarfaSource.capabilities(scopes: ["content:write", "edge.*:write", "items.purge", "offline_access"])
+        #expect(approved == [.archive, .retype, .retier, .purge])
+        #expect(!MarfaSource.capabilities(scopes: []).contains(.purge))
+        #expect(MarfaSource.capabilities(scopes: nil).contains(.purge), "a key, the tests' alone, is judged by the server")
+    }
+}
+
 @Suite(.serialized)
 struct MarfaSourceOfflineTests {
     @Test(.timeLimit(.minutes(1)))
@@ -177,7 +189,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let first = try await open(root)
-        await #expect(throws: SourceFailure.self) { _ = try await open(root) }
+        await #expect(throws: CopyFailure.openElsewhere) { _ = try await open(root) }
         await first.close()
         let again = try await open(root)
         await again.close()

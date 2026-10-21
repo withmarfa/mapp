@@ -95,6 +95,30 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     }
 }
 
+nonisolated extension CopyFailure {
+    /// What to do about it, following a sentence that says the copy can't be opened.
+    var advice: String {
+        switch self {
+        case .openElsewhere:
+            String(localized: "It’s open in another app or another copy of MAPP. Quit that app, then try again.")
+        case .storageFull:
+            String(localized: "This Mac is out of space. Free up some space, then try again.")
+        case .needsUpdate:
+            String(localized: "It needs a newer version of MAPP. Update MAPP, then try again.")
+        case .keychain:
+            String(localized: "The Keychain wouldn’t give MAPP its sign-in. Check that MAPP can use the Keychain, then try again.")
+        case .otherServer:
+            String(localized: "The server at this address isn’t the one the copy came from. Disconnect, then connect to the server again.")
+        case .files:
+            String(localized: "Check that MAPP can change its own files on this Mac, then try again.")
+        case .damaged:
+            String(localized: "The copy may be damaged. Disconnect, then connect to the server again.")
+        case .other:
+            String(localized: "Try again. If it keeps happening, disconnect, then connect to the server again.")
+        }
+    }
+}
+
 /// Sentences that carry a count, which the String Catalog gives each plural form of.
 nonisolated enum Words {
     static func waiting(_ count: Int) -> String {

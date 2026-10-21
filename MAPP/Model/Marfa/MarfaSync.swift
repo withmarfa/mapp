@@ -1,6 +1,9 @@
 import Foundation
 import Marfa
 import struct MarfaCore.BinPage
+import os
+
+nonisolated private let log = Logger(subsystem: "com.withmarfa.mapp", category: "marfa")
 
 /// Everything the source asks of the server: hydrating, catching up and draining, one at a time, apart from the
 /// engine, so a write reaches the copy's queue at once however long the network takes.
@@ -393,7 +396,10 @@ actor MarfaSync {
 
     private func failed(_ error: any Error, retrying kind: Retry) async {
         guard !stopped, let error = error as? MarfaError else {
-            if !stopped { hub.set(.stopped(code: "failed", message: error.localizedDescription)) }
+            if !stopped {
+                log.error("following the server stopped: \(error.localizedDescription, privacy: .public)")
+                hub.set(.stopped(.other))
+            }
             return
         }
         switch error {
@@ -418,7 +424,8 @@ actor MarfaSync {
             // The copy moved during the call; the package asks for it again.
             schedule(kind)
         default:
-            hub.set(.stopped(code: error.code(), message: error.message))
+            log.error("following the server stopped: \(error.code(), privacy: .public): \(error.message, privacy: .public)")
+            hub.set(.stopped(CopyFailure(error)))
             guard !told else { return }
             told = true
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))

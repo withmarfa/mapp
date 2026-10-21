@@ -21,7 +21,7 @@ import Testing
     }
 
     @Test func anOpenCopyIsTheLibraryWhateverTheServerSays() {
-        for state in [MarfaHost.State.connecting, .online, .offline(reason: nil), .signedOut, .unavailable(message: "x")] {
+        for state in [MarfaHost.State.connecting, .online, .offline(reason: nil), .signedOut, .unavailable(.other)] {
             #expect(Libraries.mode(hasSource: true, isConfigured: true, state: state, isLaunching: false, isBusy: false) == .marfa)
         }
     }
@@ -33,7 +33,7 @@ import Testing
 
     @Test func aSavedServerWhoseCopyWillNotOpenIsNeverAnsweredWithTheFolder() {
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .signedOut, isLaunching: false, isBusy: false) == .failed)
-        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .unavailable(message: "x"), isLaunching: false, isBusy: false) == .failed)
+        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .unavailable(.other), isLaunching: false, isBusy: false) == .failed)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .disconnected, isLaunching: false, isBusy: false) == .failed)
     }
 
@@ -41,7 +41,7 @@ import Testing
     /// folder, nor say the library can't open, in between. Leaving a server forgets its address first, so the
     /// folder follows at once.
     @Test func aCopyBeingReopenedIsWaitedForNeverShownAsTheFolder() {
-        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .signedOut, .unavailable(message: "x")] {
+        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .signedOut, .unavailable(.other)] {
             #expect(Libraries.mode(hasSource: false, isConfigured: true, state: state, isLaunching: false, isBusy: true) == .opening)
         }
     }
