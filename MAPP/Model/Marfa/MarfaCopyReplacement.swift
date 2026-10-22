@@ -30,6 +30,26 @@ nonisolated enum MarfaCopyReplacement {
         return aside
     }
 
+    /// Puts a copy `setAside` moved back where it was, as one rename that does not replace anything, and says
+    /// whether it did. The copy held nothing the server had not taken when it moved, and nothing has written to it
+    /// since, so putting it back leaves everything as it was.
+    static func putBack(_ aside: URL, as directory: URL) -> Bool {
+        renamex_np(aside.path, directory.path, UInt32(RENAME_EXCL)) == 0
+    }
+
+    /// Removes every copy `setAside` moved beside `directory`. Each was moved under its writer lock with nothing
+    /// unsent, so it holds nothing the server lacks; the caller has a new copy open by now.
+    static func removeSetAside(beside directory: URL) {
+        let parent = directory.deletingLastPathComponent()
+        let prefix = directory.lastPathComponent + ".replaced-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: parent.path)) ?? []
+        for name in names where name.hasPrefix(prefix) {
+            let stamp = name.dropFirst(prefix.count)
+            guard !stamp.isEmpty, stamp.allSatisfy({ $0.isASCII && $0.isNumber }) else { continue }
+            try? FileManager.default.removeItem(at: parent.appending(path: name, directoryHint: .isDirectory))
+        }
+    }
+
     /// The core's claim: an exclusive transaction on the lock file, with no wait, on a connection that can write,
     /// since SQLite opens a file it cannot write read-only without saying so and grants that only a shared lock.
     private static func claim(_ path: String) throws(Refusal) -> OpaquePointer {

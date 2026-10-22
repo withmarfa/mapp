@@ -150,9 +150,15 @@ nonisolated enum Words {
         String(localized: "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
     }
 
-    /// A copy a different version made, holding nothing unsent, that couldn't be set aside; nothing changed.
+    /// A copy a different version made, holding nothing unsent, that couldn't be replaced; it is as it was.
     static var notReplaced: String {
         String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.")
+    }
+
+    /// The same, but the copy could not be put back either. It held nothing the server lacks, and the next open makes
+    /// a new one, so nothing is lost; the sentence must not say that nothing changed.
+    static var notRestored: String {
+        String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. It held nothing that the server lacks, so nothing is lost. Quit and reopen MAPP to make a new copy from the server.")
     }
 }
 

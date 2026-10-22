@@ -1815,6 +1815,9 @@
     "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.": {
       "extractionState": "manual"
     },
+    "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. It held nothing that the server lacks, so nothing is lost. Quit and reopen MAPP to make a new copy from the server.": {
+      "extractionState": "manual"
+    },
     "Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.": {
       "extractionState": "manual"
     }
