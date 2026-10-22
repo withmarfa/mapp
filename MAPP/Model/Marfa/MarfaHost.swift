@@ -41,6 +41,10 @@ extension MarfaSource: MarfaHostedSource {}
         case keyRefused
         /// The copy cannot be opened or followed; the message is the package's.
         case unavailable(message: String)
+        /// A different version of the app made the copy, so this one can't open it, and leaves it as it is. The
+        /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can
+        /// only be sent by that version.
+        case otherVersion(unsent: UInt64?)
     }
 
     /// What becomes of the copy, and every write still in it, when it is left.
@@ -63,6 +67,8 @@ extension MarfaSource: MarfaHostedSource {}
         case changesWaiting(UnsentWrites?)
         /// The copy could not be opened or read.
         case unavailable(message: String)
+        /// The copy was made by a different version of the app; see `State.otherVersion`.
+        case otherVersion(unsent: UInt64?)
         /// The key store would not take or give the key.
         case keyStore(message: String)
         /// The server refused the key given; the key that was there is kept.
@@ -117,9 +123,10 @@ extension MarfaSource: MarfaHostedSource {}
     }
 
     /// Writes in the copy that the server has not taken, problems included, as last reported, for showing; nil
-    /// where no open copy can say. Leaving a copy asks the copy itself.
+    /// where no open copy can say. A copy made by a different version says how many it held when it was refused. Leaving a copy asks the copy itself.
     var waitingChanges: Int? {
         if source != nil, report.queueRead { return report.changesNotSent }
+        if case .otherVersion(let unsent?) = state { return Int(clamping: unsent) }
         guard let connection else { return 0 }
         return hasCopy(connection) ? nil : 0
     }
@@ -360,6 +367,7 @@ extension MarfaSource: MarfaHostedSource {}
             switch error {
             case .noKey: state = .keyRefused
             case .unavailable(let message): state = .unavailable(message: message)
+            case .otherVersion(let unsent): state = .otherVersion(unsent: unsent)
             default: state = .disconnected
             }
             throw error
@@ -373,8 +381,11 @@ extension MarfaSource: MarfaHostedSource {}
             return try await opener(connection, keys, location)
         } catch let failure as SourceFailure {
             // A source refuses to open only for want of a key.
-            if failure.kind == .denied { throw .noKey }
-            throw .unavailable(message: failure.message)
+            switch failure.kind {
+            case .denied: throw .noKey
+            case .otherVersion(let unsent): throw .otherVersion(unsent: unsent)
+            case .missing, .failed: throw .unavailable(message: failure.message)
+            }
         } catch {
             throw .unavailable(message: Self.message(error))
         }

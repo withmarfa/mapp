@@ -1799,6 +1799,21 @@
     },
     "The title for “%@” is empty. Open the item to enter a title or discard your changes.": {
       "extractionState": "manual"
+    },
+    "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.": {
+      "extractionState": "manual"
+    },
+    "They’re still in that copy. To send them, install the previous build of MAPP in TestFlight, open it until they’re sent, then update MAPP again.": {
+      "extractionState": "manual"
+    },
+    "MAPP can’t tell whether it holds changes that haven’t reached the server.": {
+      "extractionState": "manual"
+    },
+    "To be safe, install the previous build of MAPP in TestFlight, open it so it can send them, then update MAPP again.": {
+      "extractionState": "manual"
+    },
+    "Keep the copy and the changes stay on this Mac. Install the previous build of MAPP in TestFlight, connect to the same server in it, and it sends them. Discard the copy and they’re lost.": {
+      "extractionState": "manual"
     }
   },
   "version" : "1.1"

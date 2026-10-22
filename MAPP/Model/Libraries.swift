@@ -70,7 +70,7 @@ import Observation
         guard isConfigured else { return .files }
         switch state {
         case .connecting: return .opening
-        case .keyRefused, .unavailable: return isBusy ? .opening : .failed
+        case .keyRefused, .unavailable, .otherVersion: return isBusy ? .opening : .failed
         case .disconnected, .online, .offline: return isLaunching || isBusy ? .opening : .failed
         }
     }

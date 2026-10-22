@@ -34,6 +34,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             let sentence = String(localized: "MAPP can’t open or follow the copy of your library on this Mac.")
             detail = message.isEmpty ? sentence : sentence + " " + message
             isProblem = true
+        case .otherVersion(let unsent):
+            title = String(localized: "Library unavailable")
+            detail = Words.otherVersion(unsent: unsent)
+            isProblem = true
         }
     }
 }
@@ -240,6 +244,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
                     title: String(localized: "Can’t Open the Library"),
                     message: sentences(String(localized: "The copy of your library on this Mac can’t be opened."), message))
             }
+        case .otherVersion(let unsent):
+            Notice(title: String(localized: "Can’t Open the Library"), message: Words.otherVersion(unsent: unsent))
         case .keyStore:
             Notice(
                 title: String(localized: "Can’t Keep the Key"),

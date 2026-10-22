@@ -88,7 +88,9 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let copy: WorkingCopy
         do {
-            copy = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            copy = try await openCopy(connection, key: key, location: location)
+        } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
+            throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -100,6 +102,21 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
+    }
+
+    /// A copy a different version of the app made is refused with the count of changes in it the server has not
+    /// taken, and left as it is. With none, it holds only what the server holds, so it is removed and made again
+    /// from the server, which loses nothing. With any, or where the count can't be read, only that version can
+    /// send them, and the person is told.
+    private static func openCopy(_ connection: MarfaConnection, key: String, location: MarfaStoreLocation) async throws -> WorkingCopy {
+        do {
+            return try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+        } catch MarfaError.wrongSchema(_, _, 0?, _) {
+            let directory = location.directory(for: connection)
+            try FileManager.default.removeItem(at: directory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            return try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+        }
     }
 
     func changes() -> AsyncStream<SourceChange> {

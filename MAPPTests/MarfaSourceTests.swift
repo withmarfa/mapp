@@ -7,6 +7,7 @@ import struct MarfaCore.Item
 import struct MarfaCore.ListFilters
 import enum MarfaCore.JsonValue
 import enum MarfaCore.Tier
+import SQLite3
 import Synchronization
 import Testing
 @testable import MAPP
@@ -145,6 +146,84 @@ struct MarfaSourceOfflineTests {
         source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
         _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
         await source.close()
+    }
+
+    /// A copy an earlier version made is refused with what it holds that the server has not taken, and nothing in
+    /// it is removed.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeIsRefusedWithItsUnsentChangesAndKept() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        source.submit(.create(id: ItemID.mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Kept")), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
+        await source.flush()
+        await source.close()
+        try Self.makeItAnEarlierVersion(location.store(for: connection))
+
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        #expect(failure?.kind == .otherVersion(unsent: 1))
+        #expect(try Self.count(location.store(for: connection), "SELECT COUNT(*) FROM queue") == 1)
+    }
+
+    /// With nothing the server has not taken, a copy is only what the server holds, so it is made again.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeWithNothingUnsentIsMadeAgain() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        await source.close()
+        try Self.makeItAnEarlierVersion(location.store(for: connection))
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+
+        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        #expect(!FileManager.default.fileExists(atPath: leftover.path))
+        #expect(FileManager.default.fileExists(atPath: location.store(for: connection).path))
+        let log = ChangeLog(reopened)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        await reopened.close()
+    }
+
+    /// Gives the queue the shape and write kind an earlier build used, as the package's own test does.
+    private static func makeItAnEarlierVersion(_ store: URL) throws {
+        try execute(
+            store,
+            """
+            PRAGMA writable_schema = ON;
+            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+              WHERE type = 'table' AND name = 'queue';
+            """)
+        // A new connection, since the first still holds the schema it read.
+        try execute(store, "UPDATE queue SET kind = 'merge_metadata'")
+    }
+
+    private static func execute(_ store: URL, _ statements: String) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        try #require(sqlite3_exec(database, statements, nil, nil, nil) == SQLITE_OK)
+    }
+
+    private static func count(_ store: URL, _ query: String) throws -> Int64 {
+        var database: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        try #require(sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK)
+        defer { sqlite3_finalize(statement) }
+        try #require(sqlite3_step(statement) == SQLITE_ROW)
+        return sqlite3_column_int64(statement, 0)
     }
 
     @Test func aMissingKeyIsDenied() async throws {

@@ -248,6 +248,47 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(bench.keys.key(for: first) == nil)
     }
 
+    /// The copy stays on disk and the person decides: keeping it loses nothing, and a discard needs the answer to
+    /// the question about the changes in it.
+    @Test func aCopyADifferentVersionMadeKeepsItsChangesUntilThePersonChooses() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.keys.save("k", for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 3), message: "The package’s words.") }
+        let host = bench.host()
+
+        await host.launch()
+        #expect(host.state == .otherVersion(unsent: 3))
+        #expect(host.source == nil)
+        #expect(host.waitingChanges == 3)
+        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: host.state, isLaunching: false, isBusy: false) == .failed)
+
+        await expect(.changesWaiting(nil)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        #expect(host.connection == first)
+        #expect(bench.hasCopy(first))
+        #expect(bench.keys.key(for: first) == "k")
+
+        try await host.disconnect(.keepCopy)
+        #expect(host.connection == nil)
+        #expect(bench.hasCopy(first), "keeping the copy leaves it for the version that can send what it holds")
+        #expect(bench.keys.key(for: first) == nil)
+    }
+
+    @Test func connectingToAServerWhoseCopyADifferentVersionMadeIsAPlainProblem() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: nil), message: "The package’s words.") }
+        await expect(.otherVersion(unsent: nil)) { () throws(MarfaHost.Problem) in
+            try await host.connect(address: "http://first.test:8210", key: "k")
+        }
+        #expect(host.state == .disconnected)
+        #expect(host.connection == nil)
+        #expect(bench.hasCopy(first))
+        #expect(bench.keys.key(for: first) == nil)
+    }
+
     @Test func aRefusedKeyIsReplacedInPlace() async throws {
         let bench = try HostBench()
         let host = bench.host()

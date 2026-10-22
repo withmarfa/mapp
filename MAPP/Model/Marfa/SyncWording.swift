@@ -38,7 +38,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
         switch state {
         case .keyRefused:
             notes.append(Self.keyRefused(waiting: waiting))
-        case .unavailable:
+        case .unavailable, .otherVersion:
             notes.append(Self.unavailable)
         default:
             break
@@ -123,6 +123,24 @@ nonisolated enum Words {
 
     static func moreNotShown(_ count: Int) -> String {
         String(localized: "And \(count) more changes whose text can’t be shown.")
+    }
+
+    /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
+    /// version can send the changes in it that the server has not taken, so the way forward is through it.
+    static func otherVersion(unsent: UInt64?) -> String {
+        let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
+        switch unsent {
+        case let count?:
+            return [
+                lead, notSent(Int(clamping: count)),
+                String(localized: "They’re still in that copy. To send them, install the previous build of MAPP in TestFlight, open it until they’re sent, then update MAPP again."),
+            ].joined(separator: " ")
+        case nil:
+            return [
+                lead, String(localized: "MAPP can’t tell whether it holds changes that haven’t reached the server."),
+                String(localized: "To be safe, install the previous build of MAPP in TestFlight, open it so it can send them, then update MAPP again."),
+            ].joined(separator: " ")
+        }
     }
 }
 
