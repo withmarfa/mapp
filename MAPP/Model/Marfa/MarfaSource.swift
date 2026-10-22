@@ -77,9 +77,11 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
 
     /// Opens the working copy for `connection` and paints from it, asking the server nothing; `refresh()` then
     /// brings it up to date. `location` keeps each server's copy apart, outside any notes folder. It reads the
-    /// keychain and makes the directory, so it never runs on the main actor.
+    /// keychain and makes the directory, so it never runs on the main actor. `recreate` makes the directory a new
+    /// copy goes in after the old one is set aside; tests replace it to make that step fail.
     @concurrent static func open(
-        _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation
+        _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation,
+        recreate: @Sendable (URL) throws -> Void = { try FileManager.default.createDirectory(at: $0, withIntermediateDirectories: true) }
     ) async throws -> MarfaSource {
         guard let key = try keys.key(for: connection) else {
             throw SourceFailure(kind: .denied, message: String(localized: "There’s no key for this Marfa server."))
@@ -88,18 +90,56 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let copy: WorkingCopy
         do {
-            copy = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            copy = try await openCopy(connection, key: key, location: location, recreate: recreate)
+        } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
+            throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
             await copy.close()
-            throw SourceFailure(kind: .failed, message: String(localized: "This library is already open in MAPP or another app."))
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
         }
+        // Any copy set aside earlier, by this open or one that failed, held nothing unsent. The new copy is open.
+        MarfaCopyReplacement.removeSetAside(beside: directory)
         let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
+    }
+
+    /// The package refuses a copy a different version of the app made, removing nothing, with the count of changes
+    /// in it the server has not taken. With none, it holds only what the server holds, so it is set aside and made again
+    /// from the server, which loses nothing, unless another process holds it as its writer and may still write to
+    /// it. If the place for the new copy can't be made, the old one is put back. The copy set aside is removed by `open`
+    /// once the new one has opened. With any changes, or where the count can't be read, only that version can send
+    /// them, and the person is told.
+    private static func openCopy(
+        _ connection: MarfaConnection, key: String, location: MarfaStoreLocation, recreate: @Sendable (URL) throws -> Void
+    ) async throws -> WorkingCopy {
+        let store = location.store(for: connection)
+        do {
+            return try await WorkingCopy.open(store: store, server: connection.server(key: key))
+        } catch MarfaError.wrongSchema(_, _, 0?, _) {
+            let directory = location.directory(for: connection)
+            let aside: URL
+            do {
+                aside = try MarfaCopyReplacement.setAside(directory, store: store)
+            } catch .held {
+                throw SourceFailure(kind: .inUse, message: Words.inUse)
+            } catch {
+                throw SourceFailure(kind: .failed, message: Words.notReplaced)
+            }
+            do {
+                try recreate(directory)
+            } catch {
+                // Nothing has opened the new place, so the old copy goes back whole. Where it can't, the next open
+                // makes a new copy and removes it, since it holds nothing the server lacks.
+                let restored = MarfaCopyReplacement.putBack(aside, as: directory)
+                throw SourceFailure(kind: .failed, message: restored ? Words.notReplaced : Words.notRestored)
+            }
+            return try await WorkingCopy.open(store: store, server: connection.server(key: key))
+        }
     }
 
     func changes() -> AsyncStream<SourceChange> {

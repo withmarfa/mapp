@@ -107,7 +107,7 @@ struct SyncStatusTests {
     }
 
     @Test func noWordIsJargon() {
-        let all = [MarfaHost.State.online, .offline(reason: nil), .keyRefused, .unavailable(message: "")].flatMap { state in
+        let all = [MarfaHost.State.online, .offline(reason: nil), .keyRefused, .unavailable(message: ""), .otherVersion(unsent: 2), .inUse].flatMap { state in
             SyncStatus(state: state, report: report(waiting: 2, oldest: 60, phase: .catchingUp, problems: [entry()]), now: now)
                 .notes.flatMap { [$0.title, $0.detail] }
         }
@@ -251,6 +251,37 @@ struct ConnectionStatusTests {
         #expect(ConnectionStatus(.keyRefused).title == "Key refused")
         #expect(ConnectionStatus(.keyRefused).isProblem)
         #expect(ConnectionStatus(.unavailable(message: "The store is damaged.")).detail?.hasSuffix("The store is damaged.") == true)
+    }
+
+    @Test func aCopyADifferentVersionMadeSaysWhatToDoWithoutTheErrorOrThePath() throws {
+        let some = ConnectionStatus(.otherVersion(unsent: 3))
+        #expect(some.title == "Library unavailable")
+        #expect(some.isProblem)
+        #expect(some.detail == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. 3 changes on this Mac haven’t reached the server. They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again.")
+        #expect(Words.otherVersion(unsent: 1).contains("1 change on this Mac hasn’t reached the server."))
+
+        // The count stays unread after the previous build sends everything, so the way out is to discard the copy.
+        let unknown = try #require(ConnectionStatus(.otherVersion(unsent: nil)).detail)
+        #expect(unknown == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. MAPP can’t tell whether that copy holds changes that haven’t reached the server. To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again.")
+
+        let inUse = ConnectionStatus(.inUse)
+        #expect(inUse.title == "Library unavailable")
+        #expect(inUse.isProblem)
+        #expect(inUse.detail == "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
+
+        for text in [some.detail, unknown, inUse.detail, Words.notReplaced].compactMap({ $0 }) {
+            for raw in ["core", "schema", "hydrat", "queue", "drain", ".sqlite", "/"] {
+                #expect(!text.localizedCaseInsensitiveContains(raw), "“\(text)” says “\(raw)”")
+            }
+        }
+    }
+
+    @Test(arguments: [MarfaHost.State.otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse])
+    func theWindowPointsToSettingsForACopyThisVersionCantOpen(state: MarfaHost.State) {
+        let status = SyncStatus(state: state, report: SyncReport(), now: Date())
+        #expect(status.primary?.kind == .unavailable)
+        #expect(status.primary?.detail == "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do.")
+        #expect(status.pointsToSettings)
     }
 
     @Test func theReasonOfBeingOfflineIsNotShown() {

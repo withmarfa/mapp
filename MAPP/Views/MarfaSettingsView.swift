@@ -145,6 +145,16 @@ struct DepartureSheet: View {
 
     private var isDisconnecting: Bool { departure.kind == .disconnect }
 
+    /// Whether the copy is one a different version of the app made. This version can't send what it holds, so
+    /// keeping the copy does not send it on connecting again.
+    private var isOtherVersion: Bool {
+        if case .otherVersion = model.host.state { true } else { false }
+    }
+
+    private var otherVersionUnsent: UInt64? {
+        if case .otherVersion(let unsent) = model.host.state { unsent } else { nil }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Changes Haven’t Been Sent")
@@ -156,12 +166,20 @@ struct DepartureSheet: View {
             if let unsent = departure.unsent {
                 Text(Words.notSent(unsent.count))
                 changes(unsent)
+            } else if let held = otherVersionUnsent {
+                Text(Words.notSent(Int(clamping: held)))
             } else {
                 Text("MAPP can’t tell what’s waiting in the copy on this Mac.")
             }
-            Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if isOtherVersion {
+                    Text("Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
+                } else {
+                    Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
+                }
+            }
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button("Cancel", role: .cancel) { model.cancelDeparture() }
                     .keyboardShortcut(.cancelAction)

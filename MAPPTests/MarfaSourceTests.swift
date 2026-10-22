@@ -7,6 +7,7 @@ import struct MarfaCore.Item
 import struct MarfaCore.ListFilters
 import enum MarfaCore.JsonValue
 import enum MarfaCore.Tier
+import SQLite3
 import Synchronization
 import Testing
 @testable import MAPP
@@ -81,6 +82,44 @@ private func scratch() -> URL {
     URL.temporaryDirectory.appending(path: "MarfaSourceTests-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
+/// Holds a copy's writer lock from a child `sqlite3` process, with an exclusive transaction kept open on its input.
+/// POSIX locks belong to a process, so this is a holder that SQLite in the test's own process knows nothing of.
+private final class OtherProcessLock {
+    enum Failure: Error {
+        case notStarted(String)
+        case notHeld
+    }
+
+    private let process = Process()
+    private let input = Pipe()
+
+    init(_ store: URL) async throws {
+        let output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/sqlite3")
+        process.arguments = [store.path + ".writer-lock"]
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            throw Failure.notStarted(String(describing: error))
+        }
+        input.fileHandleForWriting.write(Data("BEGIN EXCLUSIVE;\nSELECT 'held';\n".utf8))
+        // The line comes back only once the transaction has begun.
+        for try await line in output.fileHandleForReading.bytes.lines where line == "held" { return }
+        release()
+        throw Failure.notHeld
+    }
+
+    /// Ends the process, which ends its transaction. It is safe to call twice.
+    func release() {
+        guard process.isRunning else { return }
+        process.terminate()
+        process.waitUntilExit()
+    }
+}
+
 /// A server that refuses every connection, so a copy made for it never hears from it.
 @Suite(.serialized)
 struct MarfaSourceOfflineTests {
@@ -147,6 +186,331 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
+    /// A copy an earlier version made is refused with what it holds that the server has not taken, and nothing in
+    /// it is removed.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeIsRefusedWithItsUnsentChangesAndKept() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        source.submit(.create(id: ItemID.mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST kept", body: "Kept")), as: WriteID())
+        _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
+        await source.flush()
+        await source.close()
+        try Self.makeItAnEarlierVersion(location.store(for: connection))
+
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        #expect(failure?.kind == .otherVersion(unsent: 1))
+        #expect(try Self.count(location.store(for: connection), "SELECT COUNT(*) FROM queue") == 1)
+    }
+
+    /// With nothing the server has not taken, a copy is only what the server holds, so it is made again.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeWithNothingUnsentIsMadeAgain() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: keys, location: location)
+        await source.close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+        let before = try Self.inode(store)
+
+        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        #expect(!FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Self.inode(store) != before)
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty, "the copy set aside is removed once the new one opens")
+        let log = ChangeLog(reopened)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        await reopened.close()
+    }
+
+    /// Another process holding the copy as its writer may still write to it, so it is never removed.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeThatAnotherCopyOfTheAppHoldsIsKept() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+        let before = try Self.inode(store)
+
+        let holder = try Self.holdWriterLock(store)
+        defer { sqlite3_close(holder) }
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        #expect(failure?.kind == .inUse)
+        #expect(try Self.inode(store) == before)
+        #expect(FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty)
+    }
+
+    /// Without a count, the copy may hold changes only the version that made it can send.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeWhoseChangesCantBeCountedIsKept() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.execute(store, "ALTER TABLE queue RENAME COLUMN depends_on TO depends")
+        let before = try Self.inode(store)
+
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        #expect(failure?.kind == .otherVersion(unsent: nil))
+        #expect(try Self.inode(store) == before)
+        #expect(try Self.count(store, "SELECT COUNT(*) FROM pragma_table_info('queue') WHERE name = 'depends'") == 1)
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty)
+    }
+
+    /// A copy that can't be set aside in one step is left whole, and the person is told in plain words.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyThatCantBeSetAsideIsLeftAsItWas() async throws {
+        let root = scratch()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+        let before = try Self.inode(store)
+        // The copy's own directory stays writable; only a rename out of its parent is refused.
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: root.path)
+
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        #expect(failure?.kind == .failed)
+        let message = try #require(failure?.message)
+        for raw in ["/", "copy.sqlite", "Cocoa", "error", "replaced-"] {
+            #expect(!message.localizedCaseInsensitiveContains(raw), "“\(message)” says “\(raw)”")
+        }
+        #expect(try Self.inode(store) == before)
+        #expect(FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty)
+        let claim = try Self.holdWriterLock(store)
+        sqlite3_close(claim)
+    }
+
+    /// If the place for the new copy can't be made once the old one is set aside, the old one goes back, so
+    /// "nothing changed" is true.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyThatCantBeReplacedIsPutBack() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+        let before = try Self.inode(store)
+
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location, recreate: { _ in throw CocoaError(.fileWriteNoPermission) })
+        }
+        #expect(failure?.kind == .failed)
+        #expect(failure?.message == Words.notReplaced)
+        #expect(try Self.inode(store) == before)
+        #expect(FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty)
+        let claim = try Self.holdWriterLock(store)
+        sqlite3_close(claim)
+    }
+
+    /// Where the old copy can't be put back either, the message doesn't say nothing changed; the next open makes a new
+    /// copy and removes the one set aside.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyThatCantBePutBackIsSaidSoAndRemovedByTheNextOpen() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let directory = location.directory(for: connection)
+
+        // Something takes the old copy's place before it can go back.
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(
+                connection, keys: keys, location: location,
+                recreate: { url in
+                    try Data().write(to: url)
+                    throw CocoaError(.fileWriteNoPermission)
+                })
+        }
+        #expect(failure?.kind == .failed)
+        #expect(failure?.message == Words.notRestored)
+        let message = try #require(failure?.message)
+        #expect(message != Words.notReplaced)
+        for raw in ["/", "copy.sqlite", "Cocoa", "error", "replaced-", "nothing changed"] {
+            #expect(!message.localizedCaseInsensitiveContains(raw), "“\(message)” says “\(raw)”")
+        }
+        #expect(try Self.siblings(of: directory).count == 1, "the copy stays set aside until a new one opens")
+
+        try FileManager.default.removeItem(at: directory)
+        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        #expect(try Self.siblings(of: directory).isEmpty)
+        await reopened.close()
+    }
+
+    /// A copy is set aside under the writer lock with nothing unsent, so once any open succeeds, those left by an earlier
+    /// open that failed are removed. Nothing else beside the copy is.
+    @Test(.timeLimit(.minutes(1)))
+    func copiesSetAsideEarlierAreRemovedOnceACopyOpens() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        let directory = location.directory(for: connection)
+        let parent = directory.deletingLastPathComponent()
+        let name = directory.lastPathComponent
+        let fileManager = FileManager.default
+        let earlier = ["\(name).replaced-1792649615000", "\(name).replaced-1792649615001"]
+        let others = ["\(name).replaced-soon", "\(name).replaced-", "other.replaced-1792649615000"]
+        for sibling in earlier + others {
+            let aside = parent.appending(path: sibling, directoryHint: .isDirectory)
+            try fileManager.createDirectory(at: aside, withIntermediateDirectories: true)
+            try Data("old".utf8).write(to: aside.appending(path: "copy.sqlite"))
+        }
+        // None is removed while no copy has opened.
+        await #expect(throws: SourceFailure.self) { _ = try await MarfaSource.open(connection, keys: MemoryKeyStore(), location: location) }
+        for sibling in earlier { #expect(fileManager.fileExists(atPath: parent.appending(path: sibling).path)) }
+
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        for sibling in earlier { #expect(!fileManager.fileExists(atPath: parent.appending(path: sibling).path), "\(sibling) is still there") }
+        for sibling in others { #expect(fileManager.fileExists(atPath: parent.appending(path: sibling).path), "\(sibling) was removed") }
+    }
+
+    /// The lock is held by a different process, as another copy of the app sharing the container would hold it. A
+    /// holder in this process is seen through the SQLite the core and the app share, which shows less.
+    @Test(.timeLimit(.minutes(1)))
+    func aCopyADifferentVersionMadeThatAnotherProcessHoldsIsKept() async throws {
+        let root = scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let keys = MemoryKeyStore([connection: "unused"])
+        let location = try MarfaStoreLocation(root: root)
+        try await MarfaSource.open(connection, keys: keys, location: location).close()
+        let store = location.store(for: connection)
+        try Self.makeItAnEarlierVersion(store)
+        let leftover = location.directory(for: connection).appending(path: "leftover")
+        try Data("old".utf8).write(to: leftover)
+        let before = try Self.inode(store)
+
+        let holder: OtherProcessLock
+        do {
+            holder = try await OtherProcessLock(store)
+        } catch OtherProcessLock.Failure.notStarted(let reason) {
+            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
+            return
+        }
+        defer { holder.release() }
+        let failure = await #expect(throws: SourceFailure.self) {
+            _ = try await MarfaSource.open(connection, keys: keys, location: location)
+        }
+        #expect(failure?.kind == .inUse)
+        #expect(try Self.inode(store) == before)
+        #expect(FileManager.default.fileExists(atPath: leftover.path))
+        #expect(try Self.siblings(of: location.directory(for: connection)).isEmpty)
+
+        // Once that process lets go, the copy is replaced.
+        holder.release()
+        let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
+        #expect(try Self.inode(store) != before)
+        await reopened.close()
+    }
+
+    /// Takes the copy's writer lock as the core does. It is held in this process, through the SQLite the core and the
+    /// app share, so this shows only that a holder SQLite knows of is refused, not the POSIX lock another process holds.
+    private static func holdWriterLock(_ store: URL) throws -> OpaquePointer? {
+        var database: OpaquePointer?
+        let path = store.path + ".writer-lock"
+        try #require(sqlite3_open_v2(path, &database, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK)
+        sqlite3_busy_timeout(database, 0)
+        guard sqlite3_exec(database, "BEGIN EXCLUSIVE", nil, nil, nil) == SQLITE_OK else {
+            sqlite3_close(database)
+            Issue.record("the writer lock is held")
+            throw CancellationError()
+        }
+        return database
+    }
+
+    private static func inode(_ file: URL) throws -> UInt64 {
+        try #require(FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber] as? UInt64)
+    }
+
+    /// Whatever sits beside a copy's directory with its name, such as a copy set aside.
+    private static func siblings(of directory: URL) throws -> [String] {
+        let name = directory.lastPathComponent
+        return try FileManager.default.contentsOfDirectory(atPath: directory.deletingLastPathComponent().path)
+            .filter { $0 != name && $0.hasPrefix(name) }
+    }
+
+    /// Gives the queue the shape and write kind an earlier build used, as the package's own test does.
+    private static func makeItAnEarlierVersion(_ store: URL) throws {
+        try execute(
+            store,
+            """
+            PRAGMA writable_schema = ON;
+            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+              WHERE type = 'table' AND name = 'queue';
+            """)
+        // A new connection, since the first still holds the schema it read.
+        try execute(store, "UPDATE queue SET kind = 'merge_metadata'")
+    }
+
+    private static func execute(_ store: URL, _ statements: String) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        try #require(sqlite3_exec(database, statements, nil, nil, nil) == SQLITE_OK)
+    }
+
+    private static func count(_ store: URL, _ query: String) throws -> Int64 {
+        var database: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        try #require(sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK)
+        defer { sqlite3_finalize(statement) }
+        try #require(sqlite3_step(statement) == SQLITE_ROW)
+        return sqlite3_column_int64(statement, 0)
+    }
+
     @Test func aMissingKeyIsDenied() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         await #expect(throws: SourceFailure.self) {
@@ -184,7 +548,8 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let first = try await open(root)
-        await #expect(throws: SourceFailure.self) { _ = try await open(root) }
+        let failure = await #expect(throws: SourceFailure.self) { _ = try await open(root) }
+        #expect(failure?.kind == .inUse)
         await first.close()
         let again = try await open(root)
         await again.close()

@@ -216,7 +216,7 @@ nonisolated enum MarfaProblems {
         case .removeTag: .untag
         case .createEdge, .updateEdge: .link
         case .deleteEdge: .unlink
-        case .replaceMetadata, .mergeMetadata, .writeExtension, .deleteExtension, .uploadBlob: .other
+        case .replaceMetadata, .writeExtension, .deleteExtension, .uploadBlob: .other
         }
     }
 

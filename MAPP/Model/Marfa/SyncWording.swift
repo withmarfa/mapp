@@ -38,7 +38,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
         switch state {
         case .keyRefused:
             notes.append(Self.keyRefused(waiting: waiting))
-        case .unavailable:
+        case .unavailable, .otherVersion, .inUse:
             notes.append(Self.unavailable)
         default:
             break
@@ -123,6 +123,42 @@ nonisolated enum Words {
 
     static func moreNotShown(_ count: Int) -> String {
         String(localized: "And \(count) more changes whose text can’t be shown.")
+    }
+
+    /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
+    /// version can send the changes in it that the server has not taken, so the way forward is through it. A count
+    /// that can't be read stays unread after that version sends everything, so the way out then is to discard the
+    /// copy.
+    static func otherVersion(unsent: UInt64?) -> String {
+        let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
+        switch unsent {
+        case let count?:
+            return [
+                lead, notSent(Int(clamping: count)),
+                String(localized: "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again."),
+            ].joined(separator: " ")
+        case nil:
+            return [
+                lead, String(localized: "MAPP can’t tell whether that copy holds changes that haven’t reached the server."),
+                String(localized: "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again."),
+            ].joined(separator: " ")
+        }
+    }
+
+    /// Another process holds the copy as its writer, which on this Mac is another copy of MAPP.
+    static var inUse: String {
+        String(localized: "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
+    }
+
+    /// A copy a different version made, holding nothing unsent, that couldn't be replaced; it is as it was.
+    static var notReplaced: String {
+        String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.")
+    }
+
+    /// The same, but the copy could not be put back either. It held nothing the server lacks, and the next open makes
+    /// a new one, so nothing is lost; the sentence must not say that nothing changed.
+    static var notRestored: String {
+        String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. It held nothing that the server lacks, so nothing is lost. Quit and reopen MAPP to make a new copy from the server.")
     }
 }
 

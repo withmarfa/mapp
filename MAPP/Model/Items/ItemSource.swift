@@ -13,6 +13,11 @@ nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
         /// Permission or a credential was refused.
         case denied
         case failed
+        /// A different version of the app made the library's copy, so this one can't read it. `unsent` counts the
+        /// changes in it that the server has not taken, which only that version can send; nil where it can't tell.
+        case otherVersion(unsent: UInt64?)
+        /// Another process, such as another copy of the app, holds the library's copy as its writer.
+        case inUse
     }
 
     var kind: Kind
