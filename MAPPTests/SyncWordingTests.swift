@@ -262,7 +262,7 @@ struct ConnectionStatusTests {
 
         // The count stays unread after the previous build sends everything, so the way out is to discard the copy.
         let unknown = try #require(ConnectionStatus(.otherVersion(unsent: nil)).detail)
-        #expect(unknown == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. MAPP can’t tell whether that copy holds changes that haven’t reached the server. To send any it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP, choose Disconnect, and discard the copy. Then connect to the server again.")
+        #expect(unknown == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. MAPP can’t tell whether that copy holds changes that haven’t reached the server. To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again.")
 
         let inUse = ConnectionStatus(.inUse)
         #expect(inUse.title == "Library unavailable")

@@ -1809,7 +1809,7 @@
     "MAPP can’t tell whether that copy holds changes that haven’t reached the server.": {
       "extractionState": "manual"
     },
-    "To send any it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP, choose Disconnect, and discard the copy. Then connect to the server again.": {
+    "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again.": {
       "extractionState": "manual"
     },
     "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.": {

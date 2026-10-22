@@ -282,7 +282,8 @@ struct MarfaSourceOfflineTests {
         sqlite3_close(claim)
     }
 
-    /// Takes the copy's writer lock as the core does, so this test is the other process that holds it.
+    /// Takes the copy's writer lock as the core does. It is held in this process, through the SQLite the core and the
+    /// app share, so this shows only that a holder SQLite knows of is refused, not the POSIX lock another process holds.
     private static func holdWriterLock(_ store: URL) throws -> OpaquePointer? {
         var database: OpaquePointer?
         let path = store.path + ".writer-lock"

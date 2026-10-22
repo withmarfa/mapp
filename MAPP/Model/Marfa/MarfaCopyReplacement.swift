@@ -6,6 +6,10 @@ import SQLite3
 /// its writer, and a process that holds it as writer, such as another copy of the app sharing the container, may
 /// still write to it. So the copy is moved only under the writer lock the core takes (`lock.rs` in Marfa's core),
 /// and in one rename, which happens whole or not at all.
+///
+/// The SQLite this calls is the core's own, linked into the app with it. SQLite tracks the locks of every connection
+/// it has open in this process, so a core connection here holding the lock is seen, and closing this connection
+/// keeps a core connection's lock. POSIX locks belong to the process, so a separate SQLite library would do neither.
 nonisolated enum MarfaCopyReplacement {
     enum Refusal: Error, Hashable {
         /// Another process holds the copy as its writer.
