@@ -123,7 +123,8 @@ extension MarfaSource: MarfaHostedSource {}
     }
 
     /// Writes in the copy that the server has not taken, problems included, as last reported, for showing; nil
-    /// where no open copy can say. A copy made by a different version says how many it held when it was refused. Leaving a copy asks the copy itself.
+    /// where no open copy can say. A copy made by a different version says how many it held when it was refused.
+    /// Leaving a copy asks the copy itself.
     var waitingChanges: Int? {
         if source != nil, report.queueRead { return report.changesNotSent }
         if case .otherVersion(let unsent?) = state { return Int(clamping: unsent) }

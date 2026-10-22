@@ -173,7 +173,7 @@ struct DepartureSheet: View {
             }
             Group {
                 if isOtherVersion {
-                    Text("Keep the copy and the changes stay on this Mac. Install the previous build of MAPP in TestFlight, connect to the same server in it, and it sends them. Discard the copy and they’re lost.")
+                    Text("Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
                 } else {
                     Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
                 }

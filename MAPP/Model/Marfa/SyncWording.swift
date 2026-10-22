@@ -133,12 +133,12 @@ nonisolated enum Words {
         case let count?:
             return [
                 lead, notSent(Int(clamping: count)),
-                String(localized: "They’re still in that copy. To send them, install the previous build of MAPP in TestFlight, open it until they’re sent, then update MAPP again."),
+                String(localized: "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again."),
             ].joined(separator: " ")
         case nil:
             return [
-                lead, String(localized: "MAPP can’t tell whether it holds changes that haven’t reached the server."),
-                String(localized: "To be safe, install the previous build of MAPP in TestFlight, open it so it can send them, then update MAPP again."),
+                lead, String(localized: "MAPP can’t tell whether that copy holds changes that haven’t reached the server."),
+                String(localized: "To be safe, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already, so it can send them, then update MAPP again."),
             ].joined(separator: " ")
         }
     }
