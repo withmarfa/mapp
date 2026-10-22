@@ -81,7 +81,7 @@ import Testing
         MarfaHost.Problem.noKey, .keyStore(message: "SecItemAdd failed: -25299"), .keyRefused,
         .serverUnreachable(reason: "network: refused"), .notRemoved(key: "errSecItemNotFound", copy: nil),
         .notRemoved(key: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
-        .otherVersion(unsent: 2), .otherVersion(unsent: nil)
+        .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse
     ])
     func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
         let notice = try #require(MarfaSettingsModel.notice(for: problem))

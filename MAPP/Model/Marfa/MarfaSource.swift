@@ -97,25 +97,40 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
             await copy.close()
-            throw SourceFailure(kind: .failed, message: String(localized: "This library is already open in MAPP or another app."))
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
         }
         let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
     }
 
-    /// A copy a different version of the app made is refused with the count of changes in it the server has not
-    /// taken, and left as it is. With none, it holds only what the server holds, so it is removed and made again
-    /// from the server, which loses nothing. With any, or where the count can't be read, only that version can
-    /// send them, and the person is told.
+    /// The package refuses a copy a different version of the app made, removing nothing, with the count of changes
+    /// in it the server has not taken. With none, it holds only what the server holds, so it is set aside and made again
+    /// from the server, which loses nothing, unless another process holds it as its writer and may still write to
+    /// it. The copy set aside goes only once the new one has opened. With any changes, or where the count can't be
+    /// read, only that version can send them, and the person is told.
     private static func openCopy(_ connection: MarfaConnection, key: String, location: MarfaStoreLocation) async throws -> WorkingCopy {
+        let store = location.store(for: connection)
         do {
-            return try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            return try await WorkingCopy.open(store: store, server: connection.server(key: key))
         } catch MarfaError.wrongSchema(_, _, 0?, _) {
             let directory = location.directory(for: connection)
-            try FileManager.default.removeItem(at: directory)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            return try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            let aside: URL
+            do {
+                aside = try MarfaCopyReplacement.setAside(directory, store: store)
+            } catch .held {
+                throw SourceFailure(kind: .inUse, message: Words.inUse)
+            } catch {
+                throw SourceFailure(kind: .failed, message: Words.notReplaced)
+            }
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            } catch {
+                throw SourceFailure(kind: .failed, message: Words.notReplaced)
+            }
+            let copy = try await WorkingCopy.open(store: store, server: connection.server(key: key))
+            try? FileManager.default.removeItem(at: aside)
+            return copy
         }
     }
 

@@ -275,6 +275,21 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(bench.keys.key(for: first) == nil)
     }
 
+    @Test func aCopyAnotherCopyOfTheAppHoldsIsLeftForThePersonToQuitIt() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.keys.save("k", for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .inUse, message: "The package’s words.") }
+        let host = bench.host()
+
+        await host.launch()
+        #expect(host.state == .inUse)
+        #expect(host.source == nil)
+        #expect(bench.hasCopy(first))
+        #expect(Libraries.mode(hasSource: false, isConfigured: true, state: host.state, isLaunching: false, isBusy: false) == .failed)
+    }
+
     @Test func connectingToAServerWhoseCopyADifferentVersionMadeIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host()

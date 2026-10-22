@@ -45,6 +45,8 @@ extension MarfaSource: MarfaHostedSource {}
         /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can
         /// only be sent by that version.
         case otherVersion(unsent: UInt64?)
+        /// Another copy of the app on this Mac holds the copy, so this one can't open it.
+        case inUse
     }
 
     /// What becomes of the copy, and every write still in it, when it is left.
@@ -69,6 +71,8 @@ extension MarfaSource: MarfaHostedSource {}
         case unavailable(message: String)
         /// The copy was made by a different version of the app; see `State.otherVersion`.
         case otherVersion(unsent: UInt64?)
+        /// Another copy of the app holds the copy; see `State.inUse`.
+        case inUse
         /// The key store would not take or give the key.
         case keyStore(message: String)
         /// The server refused the key given; the key that was there is kept.
@@ -369,6 +373,7 @@ extension MarfaSource: MarfaHostedSource {}
             case .noKey: state = .keyRefused
             case .unavailable(let message): state = .unavailable(message: message)
             case .otherVersion(let unsent): state = .otherVersion(unsent: unsent)
+            case .inUse: state = .inUse
             default: state = .disconnected
             }
             throw error
@@ -385,6 +390,7 @@ extension MarfaSource: MarfaHostedSource {}
             switch failure.kind {
             case .denied: throw .noKey
             case .otherVersion(let unsent): throw .otherVersion(unsent: unsent)
+            case .inUse: throw .inUse
             case .missing, .failed: throw .unavailable(message: failure.message)
             }
         } catch {

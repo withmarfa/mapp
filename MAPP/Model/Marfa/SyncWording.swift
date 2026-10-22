@@ -38,7 +38,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
         switch state {
         case .keyRefused:
             notes.append(Self.keyRefused(waiting: waiting))
-        case .unavailable, .otherVersion:
+        case .unavailable, .otherVersion, .inUse:
             notes.append(Self.unavailable)
         default:
             break
@@ -126,7 +126,9 @@ nonisolated enum Words {
     }
 
     /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
-    /// version can send the changes in it that the server has not taken, so the way forward is through it.
+    /// version can send the changes in it that the server has not taken, so the way forward is through it. A count
+    /// that can't be read stays unread after that version sends everything, so the way out then is to discard the
+    /// copy.
     static func otherVersion(unsent: UInt64?) -> String {
         let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
         switch unsent {
@@ -138,9 +140,19 @@ nonisolated enum Words {
         case nil:
             return [
                 lead, String(localized: "MAPP can’t tell whether that copy holds changes that haven’t reached the server."),
-                String(localized: "To be safe, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already, so it can send them, then update MAPP again."),
+                String(localized: "To send any it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP, choose Disconnect, and discard the copy. Then connect to the server again."),
             ].joined(separator: " ")
         }
+    }
+
+    /// Another process holds the copy as its writer, which on this Mac is another copy of MAPP.
+    static var inUse: String {
+        String(localized: "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.")
+    }
+
+    /// A copy a different version made, holding nothing unsent, that couldn't be set aside; nothing changed.
+    static var notReplaced: String {
+        String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.")
     }
 }
 

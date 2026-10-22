@@ -989,7 +989,7 @@
     "This kind of item has no text to edit.": {
       "extractionState": "manual"
     },
-    "This library is already open in MAPP or another app.": {
+    "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one.": {
       "extractionState": "manual"
     },
     "The item was made, but it couldn’t be put under its parent: %@": {
@@ -1809,7 +1809,10 @@
     "MAPP can’t tell whether that copy holds changes that haven’t reached the server.": {
       "extractionState": "manual"
     },
-    "To be safe, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already, so it can send them, then update MAPP again.": {
+    "To send any it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP, choose Disconnect, and discard the copy. Then connect to the server again.": {
+      "extractionState": "manual"
+    },
+    "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.": {
       "extractionState": "manual"
     },
     "Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.": {

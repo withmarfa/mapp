@@ -38,6 +38,10 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             title = String(localized: "Library unavailable")
             detail = Words.otherVersion(unsent: unsent)
             isProblem = true
+        case .inUse:
+            title = String(localized: "Library unavailable")
+            detail = Words.inUse
+            isProblem = true
         }
     }
 }
@@ -246,6 +250,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             }
         case .otherVersion(let unsent):
             Notice(title: String(localized: "Can’t Open the Library"), message: Words.otherVersion(unsent: unsent))
+        case .inUse:
+            Notice(title: String(localized: "Can’t Open the Library"), message: Words.inUse)
         case .keyStore:
             Notice(
                 title: String(localized: "Can’t Keep the Key"),
