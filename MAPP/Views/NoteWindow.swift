@@ -39,12 +39,15 @@ struct NoteWindow: View {
 
     private var item: Item? { id.flatMap { library.item($0) } }
 
-    /// A note's More menu acts on its page; a file has none, so only Details sits above its inspector.
+    /// A note's More menu acts on its page; a file has none, so only Details sits above its inspector. Nothing
+    /// while the inspector is closed, as the window's own Details button is then the only one.
     @ToolbarContentBuilder private var inspectorToolbar: some ToolbarContent {
-        if let item, !item.isFile {
-            InspectorToolbar(browser: nil, items: [item], editor: editor, details: details)
-        } else {
-            ToolbarItem { DetailsToggle(details: details) }
+        if details.isPresented {
+            if let item, !item.isFile {
+                InspectorToolbar(browser: nil, items: [item], editor: editor, details: details)
+            } else {
+                ToolbarItem { DetailsToggle(details: details) }
+            }
         }
     }
 

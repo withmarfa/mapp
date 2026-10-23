@@ -44,6 +44,8 @@ struct NoteToolbar: CustomizableToolbarContent {
 
 /// Details and More above the inspector column, where the system sets a toolbar declared inside the inspector's
 /// content. Details is on while the inspector is open and is never dimmed, so the inspector can always be closed.
+/// It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
+/// and would show Details and More a second time beside the page's own.
 struct InspectorToolbar: ToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
@@ -53,9 +55,11 @@ struct InspectorToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
-        ToolbarItemGroup {
-            DetailsToggle(details: details)
-            tools.moreMenu
+        if tools.showsInspector {
+            ToolbarItemGroup {
+                DetailsToggle(details: details)
+                tools.moreMenu
+            }
         }
     }
 }
