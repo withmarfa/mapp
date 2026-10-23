@@ -112,7 +112,7 @@ private struct FileQuickLookView: NSViewRepresentable {
         view.autostarts = true
         // Closed once, by `dismantleNSView`: closing it again after its window closed it is a crash.
         view.shouldCloseWithWindow = false
-        context.coordinator.file = QuickLookFile.link(to: url, titled: title, as: type)
+        context.coordinator.file = QuickLookFile.copy(of: url, titled: title, as: type)
         view.previewItem = (context.coordinator.file?.url ?? url) as NSURL
         return view
     }
