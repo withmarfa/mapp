@@ -208,7 +208,7 @@ private struct MoreMenu: View {
                 .keyboardShortcut("o")
                 .disabled(ids.isEmpty)
             }
-            NoteShareLink(title: note?.title ?? "", text: note.flatMap { library.body(of: $0.id)?.text }, fileURL: fileURL)
+            NoteShareLink(title: note?.title ?? "", text: note.flatMap { library.body(of: $0.id)?.text }, fileURL: fileURL, showsIcon: false)
             Divider()
             NoteOrganizeActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
             Divider()
@@ -248,15 +248,25 @@ struct NoteShareLink: View {
     /// Nil when there is no one note to share.
     let text: String?
     var fileURL: URL? = nil
+    /// The More menu shows titles alone, so its Share does too.
+    var showsIcon = true
 
     var body: some View {
         if let fileURL {
-            ShareLink(item: fileURL)
+            ShareLink(item: fileURL) { label }
         } else if let text {
-            ShareLink(item: text, subject: Text(title), preview: SharePreview(title))
+            ShareLink(item: text, subject: Text(title), preview: SharePreview(title)) { label }
         } else {
-            ShareLink(item: "")
+            ShareLink(item: "") { label }
                 .disabled(true)
+        }
+    }
+
+    @ViewBuilder private var label: some View {
+        if showsIcon {
+            Label("Share…", systemImage: "square.and.arrow.up")
+        } else {
+            Text("Share…")
         }
     }
 }
