@@ -13,6 +13,9 @@
     "Collapse" : {
 
     },
+    "Collapsed" : {
+
+    },
     "Couldn’t Print Note" : {
 
     },
@@ -28,10 +31,16 @@
     "Divider" : {
 
     },
+    "Edited" : {
+
+    },
     "Editor Couldn’t Complete the Action" : {
 
     },
     "Expand" : {
+
+    },
+    "Expanded" : {
 
     },
     "File Not Found" : {
@@ -88,6 +97,12 @@
     "Open to view this PDF" : {
 
     },
+    "Path" : {
+
+    },
+    "Place" : {
+
+    },
     "Plain Text" : {
 
     },
@@ -98,6 +113,9 @@
 
     },
     "Quote" : {
+
+    },
+    "Relationships" : {
 
     },
     "Remove Parent" : {
@@ -169,6 +187,9 @@
     "Add Attachment…" : {
 
     },
+    "Add Relationship…" : {
+
+    },
     "Items" : {
 
     },
@@ -214,19 +235,7 @@
     "MAPP Version Build" : {
 
     },
-    "Add %@…" : {
-
-    },
-    "Add Connection" : {
-
-    },
-    "Add Relationship" : {
-
-    },
     "Change Parent…" : {
-
-    },
-    "Change Relationship" : {
 
     },
     "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
@@ -293,6 +302,9 @@
 
     },
     "A note named “%@” is already in this folder. Please choose a different name." : {
+
+    },
+    "Add" : {
 
     },
     "Add Column" : {
@@ -797,9 +809,6 @@
     "File Unavailable": {
       "extractionState": "manual"
     },
-    "File properties cannot be edited in this file-backed library.": {
-      "extractionState": "manual"
-    },
     "Hide Details": {
       "extractionState": "manual"
     },
@@ -842,9 +851,6 @@
     "Medium": {
       "extractionState": "manual"
     },
-    "Modified": {
-      "extractionState": "manual"
-    },
     "More than one item matches": {
       "extractionState": "manual"
     },
@@ -872,9 +878,6 @@
       "extractionState": "manual"
     },
     "Not Set": {
-      "extractionState": "manual"
-    },
-    "Other Properties": {
       "extractionState": "manual"
     },
     "Parent": {
@@ -941,9 +944,6 @@
       "extractionState": "manual"
     },
     "The value could not be saved. Your input has been kept.": {
-      "extractionState": "manual"
-    },
-    "These links come from the document text.": {
       "extractionState": "manual"
     },
     "Type": {

@@ -39,20 +39,24 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     ItemInspectorHost(itemID: ItemPreviewFixtures.ticketID)
         .environment(\.library, library)
+        .interfaceTextStyle()
         .frame(width: 330, height: 750)
 }
 
 #Preview("Project and Related Work") {
     ItemInspectorHost(itemID: ItemPreviewFixtures.projectID)
         .environment(\.library, ItemPreviewFixtures.library)
+        .interfaceTextStyle()
         .frame(width: 330, height: 600)
 }
 
 #Preview("Missing and Unfamiliar Values") {
     ItemInspector(item: ItemPreviewFixtures.unresolved,
                   type: WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")],
+                  place: "Tickets",
                   relationships: [.init(field: "child-of", label: "Parent", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
                   mentions: [], onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in })
+        .interfaceTextStyle()
         .frame(width: 330, height: 650)
 }
 
@@ -80,12 +84,11 @@ enum ItemPreviewFixtures {
 }
 
 #Preview("Unsaved Property Input") {
-    Form {
-        ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text, declaredBy: TypeID("aic.ticket.task")),
-                        value: .string("Edit this value and press Return to see the save error."),
-                        isEditable: true, onChange: { _ in false })
-    }
-    .formStyle(.grouped)
-    .frame(width: 330, height: 220)
+    ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text, declaredBy: TypeID("aic.ticket.task")),
+                    value: .string("Edit this value and press Return to see the save error."),
+                    isEditable: true, onChange: { _ in false })
+        .padding(16)
+        .interfaceTextStyle()
+        .frame(width: 330, height: 220)
 }
 #endif

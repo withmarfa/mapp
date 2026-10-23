@@ -1,61 +1,104 @@
 import SwiftUI
 
-struct ItemRelationshipSection: View {
+/// A relationship as a row of the property sheet: its name, then each item it reaches by title, which opens it. An
+/// editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the context menu.
+struct ItemRelationshipRow: View {
     let relationship: ItemRelationship
     let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
-
     var onRemove: ((ItemID) -> Bool)? = nil
     @State private var rejected = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(LocalizedStringKey(relationship.label))
-                .interfaceFont(.subheadline).foregroundStyle(.secondary)
-            ForEach(relationship.targets) { target in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    ItemTargetRow(target: target, onOpen: onOpen)
-                    if relationship.isEditable {
-                        Menu {
-                            if let id = target.itemID {
-                                Button("Open Item") { onOpen(id) }
-                            }
-                            Button(relationship.allowsMultiple ? "Manage Connections…" : "Replace…", action: onEdit)
-                                .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
-                            if let id = target.itemID, let onRemove {
-                                Button("Remove Connection", role: .destructive) { rejected = !onRemove(id) }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                        }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                        .accessibilityLabel("Connection Actions")
-                        .accessibilityIdentifier("RelationshipActions.\(relationship.field).\(target.id)")
+        InspectorRow(name: LocalizedStringKey(relationship.label)) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(relationship.targets) { target in
+                    ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
+                        rejected = !(onRemove?(id) ?? false)
                     }
+                    .frame(minHeight: InspectorMetrics.rowHeight)
                 }
-                .padding(.vertical, 4)
-            }
-            if relationship.isEditable && (relationship.targets.isEmpty || relationship.allowsMultiple) {
-                Button(action: onEdit) {
-                    Label {
-                        Text("Add \(Text(LocalizedStringKey(relationship.label)))…")
-                    } icon: {
-                        Image(systemName: "plus")
-                    }
+                if rejected {
+                    Text("The connection could not be removed.")
+                        .interfaceFont(.caption).foregroundStyle(.red)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 4)
-                .accessibilityIdentifier("RelationshipAdd.\(relationship.field)")
-            }
-            if rejected {
-                Text("The connection could not be removed.")
-                    .interfaceFont(.caption).foregroundStyle(.red)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// One item a relationship reaches. The title is the control: plain text until hovered, then filled.
+struct ItemRelationshipTargetRow: View {
+    let target: ItemRelationshipTarget
+    let relationship: ItemRelationship
+    let onOpen: (ItemID) -> Void
+    let onEdit: () -> Void
+    let onRemove: (ItemID) -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            ItemTargetRow(target: target, onOpen: onOpen)
+            if relationship.isEditable {
+                actions
+                    .opacity(hovering ? 1 : 0)
+            }
+        }
+        .onHover { hovering = $0 }
+        .contextMenu { menuItems }
+    }
+
+    private var actions: some View {
+        Menu {
+            menuItems
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Connection Actions")
+        .accessibilityIdentifier("RelationshipActions.\(relationship.field).\(target.id)")
+    }
+
+    @ViewBuilder private var menuItems: some View {
+        if let id = target.itemID {
+            Button("Open Item") { onOpen(id) }
+        }
+        if relationship.isEditable {
+            Button(relationship.allowsMultiple ? "Manage Connections…" : "Replace…", action: onEdit)
+                .accessibilityIdentifier("RelationshipEdit.\(relationship.field)")
+            if let id = target.itemID {
+                Button("Remove Connection", role: .destructive) { onRemove(id) }
+            }
+        }
+    }
+}
+
+/// The last row of the Relationships section: the relationships the item can still take, each opening the
+/// chooser. It offers one only when it is empty or takes several, since a single one that is set is changed from
+/// its own row.
+struct ItemAddRelationshipRow: View {
+    let options: [ItemRelationship]
+    let onEdit: (ItemRelationship) -> Void
+
+    var body: some View {
+        InspectorRow(name: nil) {
+            Menu {
+                ForEach(options) { option in
+                    Button(LocalizedStringKey(option.label)) { onEdit(option) }
+                        .accessibilityIdentifier("RelationshipAdd.\(option.field)")
+                }
+            } label: {
+                InspectorPlaceholder(text: "Add Relationship…")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .inspectorValue()
+            .accessibilityIdentifier("RelationshipAddMenu")
+        }
     }
 }
 
@@ -70,9 +113,9 @@ struct ItemTargetRow: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .inspectorValue()
             .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
         } else {
             VStack(alignment: .leading, spacing: 3) {
@@ -81,6 +124,7 @@ struct ItemTargetRow: View {
                 Label(resolutionLabel, systemImage: "exclamationmark.triangle")
                     .interfaceFont(.caption).foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -183,24 +227,22 @@ struct ItemRelationshipPicker: View {
 
 #Preview("Wrapping Connections") {
     let id = ItemID("10000000-0000-0000-0000-000000000001")
-    VStack(alignment: .leading, spacing: 18) {
-        ItemRelationshipSection(
-            relationship: .init(field: "child-of", label: "Parent", targets: [
-                .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
-            ], isEditable: true, allowsMultiple: false),
-            onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
-        )
-        ItemRelationshipSection(
-            relationship: .init(field: "about", label: "About", targets: [
-                .init(title: "Field notes", itemID: id, resolution: .resolved(id))
-            ], isEditable: true, allowsMultiple: true),
-            onOpen: { _ in }, onEdit: {}, onRemove: { _ in true }
-        )
-        ItemRelationshipSection(
-            relationship: .init(field: "supersedes", label: "Supersedes", targets: [], isEditable: true, allowsMultiple: false),
-            onOpen: { _ in }, onEdit: {}
-        )
+    let parent = ItemRelationship(
+        field: "child-of", label: "Parent", targets: [
+            .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
+        ], isEditable: true, allowsMultiple: false)
+    let about = ItemRelationship(
+        field: "about", label: "About", targets: [
+            .init(title: "Field notes", itemID: id, resolution: .resolved(id)),
+            .init(title: "Interview with the site manager", itemID: nil, resolution: .missing)
+        ], isEditable: true, allowsMultiple: true)
+    let supersedes = ItemRelationship(field: "supersedes", label: "Supersedes", targets: [], isEditable: true, allowsMultiple: false)
+    VStack(alignment: .leading, spacing: 0) {
+        ItemRelationshipRow(relationship: parent, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
+        ItemRelationshipRow(relationship: about, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
+        ItemAddRelationshipRow(options: [supersedes, about], onEdit: { _ in })
     }
     .padding(16)
+    .interfaceTextStyle()
     .frame(width: 300)
 }

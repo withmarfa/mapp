@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Each row keeps unfinished input until it is committed; unrelated inspector updates do not replace it.
+/// One property of an item as a row of the inspector's property sheet. Each row keeps unfinished input until it
+/// is committed; unrelated inspector updates do not replace it.
 struct ItemPropertyRow: View {
     let definition: ItemTypeInfo.Field
     let value: PropertyValue?
@@ -8,27 +9,32 @@ struct ItemPropertyRow: View {
     let onChange: (PropertyValue?) -> Bool
     var retainedDraft: ItemPropertyDraft? = nil
     @State private var localDraft = ItemPropertyDraft()
+    @State private var rowHovering = false
+    @State private var choosingDate = false
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            control
-                .disabled(!isEditable)
-            if let invalidValue {
-                Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
-            }
-            if input.rejected {
-                Text("The value could not be saved. Your input has been kept.")
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.red)
-                Button("Discard Changes") {
-                    input.isDirty = false
-                    seed(value)
+        InspectorRow(name: LocalizedStringKey(definition.label)) {
+            VStack(alignment: .leading, spacing: 4) {
+                control
+                    .disabled(!isEditable)
+                if let invalidValue {
+                    Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
-                .interfaceFont(.caption)
+                if input.rejected {
+                    Text("The value could not be saved. Your input has been kept.")
+                        .interfaceFont(.caption)
+                        .foregroundStyle(.red)
+                    Button("Discard Changes") {
+                        input.isDirty = false
+                        seed(value)
+                    }
+                    .interfaceFont(.caption)
+                }
             }
         }
+        .onHover { rowHovering = $0 }
         .onAppear { if !input.isDirty { seed(value) } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
         .onChange(of: value) { _, value in if !input.isDirty { seed(value) } }
@@ -39,77 +45,112 @@ struct ItemPropertyRow: View {
     @ViewBuilder private var control: some View {
         switch definition.kind {
         case .choice(let choices):
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
-                value?.string ?? ""
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
-            }) {
-                Text("Not Set").tag("")
-                if let current = value?.string, !choices.contains(current) {
-                    Text(current).tag(current)
-                }
-                ForEach(choices, id: \.self) { Text(LocalizedStringKey(Self.choiceLabel($0))).tag($0) }
-            }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
-        case .boolean:
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
-                if case .bool(let selected) = value { selected ? "true" : "false" } else { "" }
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
-            }) {
-                Text("Not Set").tag("")
-                Text("Yes").tag("true")
-                Text("No").tag("false")
-            }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
-        case .date:
-            VStack(alignment: .leading, spacing: 6) {
-                textField
-                if let date = Self.date(value?.string) {
-                    DatePicker("Choose Date", selection: Binding {
-                        date
-                    } set: { selected in
-                        let dateOnly = value?.string?.count == 10
-                        let text = dateOnly
-                            ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                            : selected.ISO8601Format()
-                        input.rejected = !onChange(.string(text))
-                        if !input.rejected { input.text = text; input.isDirty = false }
-                    }, displayedComponents: value?.string?.count == 10 ? [.date] : [.date, .hourAndMinute])
-                    .labelsHidden()
-                } else if value == nil || value?.string == "" {
-                    Button("Set Date") {
-                        let text = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                        input.rejected = !onChange(.string(text))
+            let current = value?.string
+            menu(current: current.map { Text(LocalizedStringKey(Self.choiceLabel($0))) }) {
+                Picker(LocalizedStringKey(definition.label), selection: Binding {
+                    current ?? ""
+                } set: { selected in
+                    input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
+                }) {
+                    Text("Not Set").tag("")
+                    if let current, !choices.contains(current) {
+                        Text(current).tag(current)
                     }
+                    ForEach(choices, id: \.self) { Text(LocalizedStringKey(Self.choiceLabel($0))).tag($0) }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+        case .boolean:
+            let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
+            menu(current: current.map { Text($0 ? "Yes" : "No") }) {
+                Picker(LocalizedStringKey(definition.label), selection: Binding {
+                    current.map { $0 ? "true" : "false" } ?? ""
+                } set: { selected in
+                    input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
+                }) {
+                    Text("Not Set").tag("")
+                    Text("Yes").tag("true")
+                    Text("No").tag("false")
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+        case .date:
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                textField
+                if isEditable && (rowHovering || isFocused || choosingDate) {
+                    Button { choosingDate = true } label: { Image(systemName: "calendar") }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Choose Date")
+                        .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
                 }
             }
         case .text, .number:
             textField
         // A list or an object is shown as written, since a text field would replace it with a string.
         case .other:
-            textField
-                .disabled(true)
+            if let value {
+                Text(ItemValueText.string(value))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    private var textField: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(LocalizedStringKey(definition.label))
-                .interfaceFont(.subheadline).foregroundStyle(.secondary)
-            TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
-                input.text = $0
-                input.isDirty = true
-                input.rejected = false
-            }, axis: definition.key == "description" ? .vertical : .horizontal)
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.leading)
+    /// A choice as plain text that opens a menu: the borderless control has no chevron and no fill until hovered.
+    private func menu<Content: View>(current: Text?, @ViewBuilder content: () -> Content) -> some View {
+        Menu {
+            content()
+        } label: {
+            Group {
+                if let current { current } else { InspectorPlaceholder() }
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .lineLimit(definition.key == "description" ? 2...5 : 1...1)
-            .focused($isFocused)
-            .onSubmit { commit() }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .foregroundStyle(current == nil ? .tertiary : .primary)
+        .inspectorValue()
+        .accessibilityLabel(LocalizedStringKey(definition.label))
+        .accessibilityValue(current == nil ? Text("Not Set") : current!)
+        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    }
+
+    private var datePicker: some View {
+        let dateOnly = value?.string == nil || value?.string?.count == 10
+        return DatePicker("Choose Date", selection: Binding {
+            Self.date(value?.string) ?? Date()
+        } set: { selected in
+            let text = dateOnly
+                ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+                : selected.ISO8601Format()
+            input.rejected = !onChange(.string(text))
+            if !input.rejected { input.text = text; input.isDirty = false }
+        }, displayedComponents: dateOnly ? [.date] : [.date, .hourAndMinute])
+        .datePickerStyle(.graphical)
+        .labelsHidden()
+        .padding(12)
+    }
+
+    private var textField: some View {
+        TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
+            input.text = $0
+            input.isDirty = true
+            input.rejected = false
+        }, prompt: Text("Add"), axis: definition.kind == .number ? .horizontal : .vertical)
+        .labelsHidden()
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .multilineTextAlignment(.leading)
+        .lineLimit(definition.kind == .number ? 1...1 : 1...12)
+        .focused($isFocused)
+        .onSubmit { commit() }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .inspectorValue(isFocused: isFocused)
+        .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
     private var invalidValue: String? {
@@ -183,7 +224,7 @@ nonisolated enum ItemValueText {
 
 #Preview("Property Controls") {
     ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")]?.fields ?? []) { definition in
                 ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
@@ -193,5 +234,6 @@ nonisolated enum ItemValueText {
         }
         .padding(16)
     }
-    .frame(width: 320, height: 440)
+    .interfaceTextStyle()
+    .frame(width: 300, height: 440)
 }
