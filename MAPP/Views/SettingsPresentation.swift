@@ -41,7 +41,7 @@ extension FocusedValues {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case appearance, editor, library, marfa, about
+    case appearance, editor, library, sidebar, marfa, about
 
     var id: Self { self }
 
@@ -50,6 +50,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: String(localized: "Appearance")
         case .editor: String(localized: "Editor")
         case .library: String(localized: "Library")
+        case .sidebar: String(localized: "Sidebar")
         case .marfa: String(localized: "Marfa")
         case .about: String(localized: "About")
         }
@@ -60,6 +61,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: "paintpalette"
         case .editor: "square.and.pencil"
         case .library: "folder"
+        case .sidebar: "sidebar.left"
         case .marfa: "server.rack"
         case .about: "info.circle"
         }
@@ -70,6 +72,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .appearance: String(localized: "Base Text Size Font Sidebar Sort By Group by Date List Preview Notes List")
         case .editor: String(localized: "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing")
         case .library: String(localized: "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete")
+        case .sidebar: String(localized: "Show Hide Reorder Places Inbox All Items Favorites Projects Types Folders Files Recently Deleted Customize")
         case .marfa: String(localized: "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting")
         case .about: String(localized: "MAPP Version Build")
         }

@@ -1332,9 +1332,11 @@ struct EditorTests {
         let library = ItemPreviewFixtures.library
         let browser = ItemPreviewFixtures.browser
         let details = DetailsPresentation()
+        let libraries = ItemPreviewFixtures.libraries(named: "MAPP.EditorTests")
         let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
             MainView(browser: browser, details: details, restoresWindow: false)
                 .environment(\.library, library)
+                .environment(libraries)
         }
         #expect(made.count == 1, "one editor for the window, not one for each time its view is made")
         #expect(made.first === shown)

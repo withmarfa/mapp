@@ -101,7 +101,11 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        if let pane = presentation.displayedPane {
+        if presentation.displayedPane == .sidebar {
+            SidebarSettings()
+                .navigationTitle(SettingsPane.sidebar.title)
+                .accessibilityIdentifier("SettingsDetail")
+        } else if let pane = presentation.displayedPane {
             Form {
                 switch pane {
                 case .appearance:
@@ -124,6 +128,8 @@ struct SettingsView: View {
                     Section("Text") { TextOptions() }
                 case .library:
                     librarySettings
+                case .sidebar:
+                    EmptyView()
                 case .marfa:
                     MarfaSettingsView(model: libraries.marfaSettings)
                 case .about:

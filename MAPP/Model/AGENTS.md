@@ -30,6 +30,11 @@ The folder is shaped so Marfa's folder device can sync it. Keep it readable by M
 - A write a library cannot make is left out of its `capabilities` (`SourceCapabilities`), and the views dim or hide the command and refuse the drop. Moving, permanent deletion, renaming files, editing folders, and importing files each have one. Add a capability for a new write that only one library can make.
 - Rename Note names a note's file, which only files have. A title is a property, which any library edits.
 
+## The sidebar
+
+- A library says what its sidebar holds, so no view tests for a library type: `ItemLibrary.itemTypeCounts` lists the catalogue's types that hold active items, each with its label and the count of the place it opens, and `capabilities.contains(.folders)` says whether the sidebar shows Folders or Types. A Marfa library lists a type's subtypes in its place (`types/listing-subtree`) and counts them in the type; a notes folder counts a type's own items. Type labels come from the catalogue. `WorkbenchSchema` is the notes folder's own schema and nothing else reads it for the sidebar.
+- `SidebarLayouts` keeps what the person hid or moved, one `SidebarLayout` for each library, in the defaults: a server by its address, a notes folder by its path (`Libraries.sidebarLayoutKey`). A place a layout does not mention, such as a type the catalogue has just gained, is shown, after the placed ones. `SidebarPlan` is what the sidebar and Settings > Sidebar both read.
+
 ## Changing libraries and quitting
 
 - `Libraries` owns the notes folder, the `MarfaHost`, and the library the windows read: the host's `MarfaLibrary` while its copy is open, otherwise the folder's `NoteLibrary`. With no server set, nothing about Marfa shows.

@@ -354,9 +354,8 @@ final class NoteLibrary: ItemLibrary {
         case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
-        case .marfaTypes: String(localized: "Marfa Types")
         case .files: String(localized: "Files")
-        case .itemType(let typeID): typeID == "aic.project" ? String(localized: "Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
+        case .itemType(let typeID): TypeID(typeID) == .project ? String(localized: "Projects") : catalogue.itemTypes[TypeID(typeID)]?.label ?? typeID
         case .project(let id): self.item(id)?.title ?? ""
         }
     }

@@ -59,7 +59,6 @@ final class FakeItemLibrary: ItemLibrary {
             case .project(let id): item.state == .active && item.id == id
             case .files: item.state == .active && item.isFile
             case .recentlyDeleted: item.state == .trashed
-            case .marfaTypes: false
             }
         }
     }
