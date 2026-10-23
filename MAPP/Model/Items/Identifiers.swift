@@ -27,6 +27,10 @@ nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
     let rawValue: String
     init(rawValue: String) { self.rawValue = rawValue }
     init(_ rawValue: String) { self.rawValue = rawValue }
+
+    /// The root of the file types: a file and every kind of file below it, which the sidebar reaches through All
+    /// Items and search rather than as a type.
+    static let file = TypeID("core.file")
 }
 
 nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {

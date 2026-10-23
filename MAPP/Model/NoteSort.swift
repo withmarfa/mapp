@@ -4,7 +4,7 @@ import Foundation
 /// defaults here are the only ones; stored settings fall back to them.
 nonisolated struct NoteOrder: Equatable {
     var sort: NoteSort = .dateEdited
-    var groupsByDate = false
+    var groupsByDate = true
 }
 
 nonisolated enum NoteSort: String, CaseIterable {

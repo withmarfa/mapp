@@ -393,7 +393,7 @@ final class EditorController: NSObject {
     }
 
     /// Gives the page the keyboard: now if it is ready and in a window, otherwise once it is, as when the page
-    /// comes back after Marfa Types. One request, never repeated.
+    /// comes back after the gallery. One request, never repeated.
     func focus(_ itemID: ItemID? = nil) {
         guard let requested = itemID ?? noteID else { return }
         guard requested == noteID, isReady, let window = webView.window else {

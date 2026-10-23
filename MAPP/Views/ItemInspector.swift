@@ -38,7 +38,8 @@ struct ItemInspectorHost: View {
                 )
                 .id(id)
             } else {
-                ContentUnavailableView("No Item Selected", systemImage: "sidebar.right")
+                // The page beside it already says that nothing is selected.
+                Color.clear
             }
         }
         .sheet(item: $editing) { relationship in
@@ -96,6 +97,11 @@ struct ItemInspector: View {
     let onRemove: (ItemRelationship, ItemID) -> Bool
     var drafts: DetailsPresentation? = nil
     @State private var detailsOpen = false
+    /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
+    /// The host remakes the inspector for another item, which forgets them.
+    @State private var revealed: Set<String> = []
+    /// The property just added, whose row opens ready to edit.
+    @State private var adding: String?
 
     var body: some View {
         ScrollView {
@@ -105,15 +111,27 @@ struct ItemInspector: View {
                         .interfaceFont(.callout).foregroundStyle(.red)
                         .padding(.vertical, 8)
                 }
-                if !fields.isEmpty {
+                if hasProperties {
                     InspectorHeading(title: "Properties", topPadding: 2)
                     ForEach(fields) { field in
                         ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
-                                        onChange: { onProperty(field.key, $0) }, retainedDraft: drafts?.draft(for: item.id, key: field.key))
+                                        // A property the person has touched stays listed, even once cleared.
+                                        onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
+                                        retainedDraft: drafts?.draft(for: item.id, key: field.key),
+                                        startsEditing: adding == field.key)
+                    }
+                    if !emptyFields.isEmpty {
+                        InspectorAddMenu(title: "Add Property", identifier: "ItemInspectorAddProperty") {
+                            ForEach(emptyFields) { field in
+                                Button(field.displayLabel) { add(field) }
+                                    .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
+                            }
+                        }
                     }
                 }
-                if !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty {
-                    InspectorHeading(title: "Relationships", topPadding: fields.isEmpty ? 2 : 18)
+                if hasRelationships {
+                    if hasProperties { InspectorSectionDivider() }
+                    InspectorHeading(title: "Relationships", topPadding: hasProperties ? 10 : 2)
                     ForEach(shownRelationships) { relationship in
                         ItemRelationshipRow(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
                                             onRemove: { onRemove(relationship, $0) })
@@ -132,6 +150,7 @@ struct ItemInspector: View {
                         ItemAddRelationshipRow(options: addable, onEdit: onEdit)
                     }
                 }
+                if hasProperties || hasRelationships { InspectorSectionDivider() }
                 detailsHeading
                 if detailsOpen { details }
             }
@@ -143,7 +162,25 @@ struct ItemInspector: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
-    private var fields: [ItemTypeInfo.Field] { InspectorFields.properties(of: item, type: type, hidden: hiddenKeys) }
+    /// The properties that have a value, then any the person added or cleared since the inspector showed this item.
+    private var fields: [ItemTypeInfo.Field] {
+        InspectorFields.properties(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
+    }
+
+    private var emptyFields: [ItemTypeInfo.Field] {
+        InspectorFields.addable(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
+    }
+
+    private var hasProperties: Bool { !fields.isEmpty || !emptyFields.isEmpty }
+
+    private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty }
+
+    private func add(_ field: ItemTypeInfo.Field) {
+        withAnimation(.snappy(duration: 0.2)) {
+            revealed.insert(field.key)
+            adding = field.key
+        }
+    }
 
     private var shownRelationships: [ItemRelationship] {
         relationships.filter { !$0.targets.isEmpty }
@@ -169,7 +206,7 @@ struct ItemInspector: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .padding(.top, 18)
+        .padding(.top, hasProperties || hasRelationships ? 10 : 2)
         .padding(.bottom, 6)
         .accessibilityAddTraits(.isHeader)
         .accessibilityValue(detailsOpen ? Text("Expanded") : Text("Collapsed"))
@@ -210,9 +247,9 @@ struct ItemInspector: View {
 
     /// The catalogue's label for a key, else the key written for reading.
     private static func name(of key: String, label: String?) -> LocalizedStringKey {
-        if let label { return LocalizedStringKey(label) }
+        if let label { return LocalizedStringKey(ItemTypeInfo.Field.displayLabel(label)) }
         let words = key.split { $0 == "_" || $0 == "-" || $0 == "." }.joined(separator: " ")
-        return LocalizedStringKey(words.prefix(1).uppercased() + words.dropFirst())
+        return LocalizedStringKey(ItemTypeInfo.Field.displayLabel(words))
     }
 
     /// Every property the type does not name or show elsewhere, in the order the item holds them. A source that

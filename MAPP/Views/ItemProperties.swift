@@ -8,6 +8,9 @@ struct ItemPropertyRow: View {
     let isEditable: Bool
     let onChange: (PropertyValue?) -> Bool
     var retainedDraft: ItemPropertyDraft? = nil
+    /// A row the person has just added opens ready to edit: a text field takes the keyboard and a date shows its
+    /// picker. A menu cannot be opened from code, so it reads "Choose" instead.
+    var startsEditing = false
     @State private var localDraft = ItemPropertyDraft()
     @State private var rowHovering = false
     @State private var choosingDate = false
@@ -19,7 +22,7 @@ struct ItemPropertyRow: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        InspectorRow(name: LocalizedStringKey(definition.label)) {
+        InspectorRow(name: LocalizedStringKey(definition.displayLabel)) {
             VStack(alignment: .leading, spacing: 4) {
                 if isEditable {
                     control
@@ -48,10 +51,22 @@ struct ItemPropertyRow: View {
         }
         .onHover { rowHovering = $0 }
         .onAppear { if !input.isDirty { seed(value) } }
+        .task { if startsEditing { await beginEditing() } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
         .onChange(of: value) { _, value in if !input.isDirty { seed(value) } }
         .onChange(of: isFocused) { if !isFocused { commit(); typingOwnValue = false } }
         .onDisappear { commit() }
+    }
+
+    private func beginEditing() async {
+        // The control is in the tree one turn after the row appears.
+        await Task.yield()
+        switch definition.kind {
+        case .date: choosingDate = true
+        case .text where !definition.isPicked: isFocused = true
+        case .number: isFocused = true
+        default: break
+        }
     }
 
     @ViewBuilder private var control: some View {
@@ -61,7 +76,7 @@ struct ItemPropertyRow: View {
         case .boolean:
             let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
             menu(current: current.map { Text($0 ? "Yes" : "No") }) {
-                Picker(LocalizedStringKey(definition.label), selection: Binding {
+                Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
                     current.map { $0 ? "true" : "false" } ?? ""
                 } set: { selected in
                     input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
@@ -121,7 +136,7 @@ struct ItemPropertyRow: View {
     private func choiceMenu(allowsOther: Bool = false) -> some View {
         let current = value?.string
         return menu(current: current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }) {
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
+            Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
                 current ?? ""
             } set: { selected in
                 input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
@@ -148,7 +163,7 @@ struct ItemPropertyRow: View {
             content()
         } label: {
             Group {
-                if let current { current } else { InspectorPlaceholder() }
+                if let current { current } else { InspectorPlaceholder(text: "Choose") }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
@@ -158,7 +173,7 @@ struct ItemPropertyRow: View {
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
         .inspectorValue()
-        .accessibilityLabel(LocalizedStringKey(definition.label))
+        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
         .accessibilityValue(current == nil ? Text("Not Set") : current!)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
@@ -191,7 +206,7 @@ struct ItemPropertyRow: View {
     }
 
     private var textField: some View {
-        TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
+        TextField(LocalizedStringKey(definition.displayLabel), text: Binding { input.text } set: {
             input.text = $0
             input.isDirty = true
             input.rejected = false
@@ -206,7 +221,7 @@ struct ItemPropertyRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
         .overlay(alignment: .topLeading) {
-            if input.text.isEmpty { InspectorPlaceholder().allowsHitTesting(false).accessibilityHidden(true) }
+            if input.text.isEmpty && !isFocused { InspectorPlaceholder(text: "None").allowsHitTesting(false).accessibilityHidden(true) }
         }
         .inspectorValue(isFocused: isFocused)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")

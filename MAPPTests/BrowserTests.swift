@@ -23,6 +23,41 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
+    @Test func settingsIsAPlaceThatKeepsTheListAndSelectionBehindIt() {
+        let (library, _, newer, _) = makeLibrary()
+        let browser = Browser()
+        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.selection = [newer.id]
+        browser.showSettings(.library)
+        #expect(browser.showsSettings)
+        #expect(browser.settingsPage == .library)
+        #expect(browser.sidebarItem == .inbox)
+        #expect(browser.selection == [newer.id])
+        browser.showSettings()
+        #expect(browser.settingsPage == .library, "opening Settings again keeps the page it was on")
+    }
+
+    @Test func choosingAPlaceOrAnItemLeavesSettings() throws {
+        let (library, older, _, _) = makeLibrary()
+        let item = try #require(library.item(older.id))
+        let browser = Browser()
+        browser.showSettings()
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        #expect(!browser.showsSettings)
+        browser.showSettings()
+        browser.reveal(item, in: library, order: NoteOrder())
+        #expect(!browser.showsSettings)
+        browser.showSettings()
+        browser.startItemDraft()
+        #expect(!browser.showsSettings)
+    }
+
+    @Test func everySettingsPageIsListedOnceAndNamed() {
+        #expect(SettingsPage.groups.flatMap { $0 } == SettingsPage.allCases)
+        #expect(Set(SettingsPage.allCases.map(\.title)).count == SettingsPage.allCases.count)
+        #expect(SettingsPage.allCases.allSatisfy { !$0.summary.isEmpty && !$0.symbol.isEmpty })
+    }
+
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {
         let (library, older, _, _) = makeLibrary()
         let item = try #require(library.item(older.id))
@@ -34,7 +69,7 @@ struct BrowserTests {
         browser.viewMode = .gallery
         browser.focusRequest = .page
         browser.reveal(item, in: library, order: NoteOrder())
-        #expect(browser.isGalleryItemPresented)
+        #expect(browser.isCollectionItemPresented)
         #expect(browser.focusRequest == nil)
     }
 
@@ -145,7 +180,7 @@ struct BrowserTests {
         let library = NoteLibrary(notes: [])
         let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes).flatMap { library.note($0) })
         let browser = Browser()
-        browser.sidebarItem = .project(project.id)
+        browser.sidebarItem = .collection(project.id)
         browser.startItemDraft()
         browser.itemDraft?.typeID = "aic.ticket.task"
         browser.itemDraft?.title = "Unparented task"
@@ -191,7 +226,7 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
-    @Test(arguments: [SidebarItem.recentlyDeleted, .marfaTypes])
+    @Test(arguments: [SidebarItem.files])
     func aNewItemFromAPlaceWithoutNotesOpensADraftThenRevealsTheCreatedItem(from item: SidebarItem) {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
@@ -248,7 +283,7 @@ struct BrowserTests {
         let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\n", created: start)
         let library = NoteLibrary(notes: [existing, project])
         let browser = Browser()
-        browser.sidebarItem = .project(project.id)
+        browser.sidebarItem = .collection(project.id)
         browser.startItemDraft()
         #expect(browser.itemDraft?.parentID == project.id)
         let created = browser.createDraft(in: library, undoManager: nil).flatMap { library.note($0) }
@@ -302,11 +337,11 @@ struct BrowserTests {
         library.capabilities = []
         #expect(!Browser.canDrop(on: .inbox, in: library))
         #expect(!Browser.canDrop(on: .folder(work.id), in: library))
-        #expect(Browser.canDrop(on: .recentlyDeleted, in: library), "deleting needs no capability")
+        #expect(!Browser.canDrop(on: .recentlyDeleted, in: library), "Recently Deleted is no longer a place to drop on")
         library.capabilities = .move
         #expect(Browser.canDrop(on: .inbox, in: library))
         #expect(Browser.canDrop(on: .folder(work.id), in: library))
-        for place: SidebarItem in [.allNotes, .favorites, .files, .marfaTypes, .itemType("core.note")] {
+        for place: SidebarItem in [.allNotes, .favorites, .files, .itemType("core.note")] {
             #expect(!Browser.canDrop(on: place, in: library))
         }
     }
@@ -354,38 +389,15 @@ struct BrowserTests {
         #expect(restored.selection == [older.id])
     }
 
-    @Test func marfaTypesKeepsItsChoiceButNotItsSearchWhenAnotherPlaceIsShown() {
-        let (library, _, _, _) = makeFakeLibrary()
-        let browser = Browser()
-        browser.types.catalogue = library.catalogue
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        browser.types.searchText = "task"
-        browser.types.selectFirstMatch()
-        let chosen = browser.types.selection
-        #expect(chosen == .item(TypeID("aic.ticket.task")))
-        browser.show(.inbox, in: library, order: NoteOrder())
-        #expect(browser.types.searchText.isEmpty)
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        #expect(browser.types.selection == chosen)
-        #expect(!browser.types.isSearching)
-    }
-
-    @Test func marfaTypesListsTheFilesLibrarysTypes() {
+    @Test func aRestoredWindowShowsATypeTheLibraryHoldsAndLeavesOneItDoesNot() {
         let (library, _, _, _) = makeLibrary()
+        let held = library.itemTypeCounts.first.map(\.id.rawValue) ?? ""
+        #expect(!held.isEmpty)
         let browser = Browser()
-        browser.types.catalogue = library.catalogue
-        let labels = browser.types.itemRows.map(\.type.label)
-        #expect(labels.contains("Task") && labels.contains("Note") && labels.contains("Image"))
-        #expect(browser.types.edgeTypes.map(\.id).contains("parent-of"))
-    }
-
-    @Test func aRestoredWindowShowsMarfaTypesAgain() {
-        let (library, _, _, _) = makeLibrary()
-        let saved = Browser()
-        saved.show(.marfaTypes, in: library, order: NoteOrder())
-        let restored = Browser()
-        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
-        #expect(restored.showsTypes)
+        browser.restore(Browser.Snapshot(place: .itemType(held), selection: []), in: library, order: NoteOrder())
+        #expect(browser.item == .itemType(held))
+        browser.restore(Browser.Snapshot(place: .itemType("aic.nothing"), selection: []), in: library, order: NoteOrder())
+        #expect(browser.item == .allNotes)
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {

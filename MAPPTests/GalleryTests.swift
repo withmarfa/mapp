@@ -33,11 +33,11 @@ struct GalleryTests {
         let saved = Browser()
         saved.viewMode = .gallery
         saved.selection = [newer.id]
-        saved.openGallerySelection()
+        saved.openCollectionSelection()
         let data = try JSONEncoder().encode(saved.snapshot())
         let restored = Browser()
         restored.restore(from: data, in: library, order: NoteOrder())
-        #expect(restored.showsGallery)
+        #expect(restored.showsCollection)
         #expect(restored.selection == [newer.id])
     }
 
@@ -46,20 +46,18 @@ struct GalleryTests {
         let browser = Browser()
         browser.viewMode = .gallery
         browser.show(.allNotes, in: library, order: NoteOrder())
-        browser.openGallerySelection()
-        #expect(!browser.showsGallery)
+        browser.openCollectionSelection()
+        #expect(!browser.showsCollection)
         browser.startItemDraft()
         browser.itemDraft?.body = "Keep this text"
-        browser.returnToGallery()
-        #expect(browser.showsGallery)
+        browser.returnToCollection()
+        #expect(browser.showsCollection)
         #expect(browser.itemDraft?.body == "Keep this text")
-        browser.openGallerySelection()
+        browser.openCollectionSelection()
         browser.show(.inbox, in: library, order: NoteOrder())
-        #expect(browser.showsGallery)
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        #expect(!browser.usesGallery)
+        #expect(browser.showsCollection)
         browser.show(.allNotes, in: library, order: NoteOrder())
-        #expect(browser.showsGallery)
+        #expect(browser.showsCollection)
     }
 
     @Test func imageCandidatesIgnoreCodeAndRemoteAddresses() {

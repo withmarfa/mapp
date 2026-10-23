@@ -16,7 +16,6 @@ struct CommandPalette: View {
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
     let browser: Browser
     let editor: EditorController
-    let settings: SettingsPresentation
     let mode: Browser.Palette
     @State private var query = ""
     @State private var highlighted = 0
@@ -192,7 +191,7 @@ struct CommandPalette: View {
         let selected = browser.selectedItems(in: library).filter { !$0.isFile }
         let ids = Set(selected.map(\.id))
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
-        let hasVisibleEditor = !browser.showsGallery && one?.id == editor.noteID && editor.hasNote
+        let hasVisibleEditor = !browser.showsCollection && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
@@ -202,25 +201,21 @@ struct CommandPalette: View {
         func historyKey(_ key: String) -> String? { returnFocus == .page ? nil : key }
 
         if library.isLoaded {
-            if !browser.showsTypes {
-                add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
-                add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
-                for choice in NoteSort.allCases where choice != sort {
-                    add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
-                }
-                if sort != .title {
-                    add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
-                        groupsByDate.toggle()
-                    }
+            add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
+            add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
+            add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
+            for choice in NoteSort.allCases where choice != sort {
+                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
+            }
+            if sort != .title {
+                add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
+                    groupsByDate.toggle()
                 }
             }
-            if browser.usesGallery {
-                if !browser.showsGallery {
-                    add(String(localized: "Back to Gallery"), "chevron.backward", historyKey("⌘[")) { browser.returnToGallery() }
+            if browser.usesCollection {
+                if !browser.showsCollection {
+                    add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘[")) { browser.returnToCollection() }
                 }
-            } else if browser.showsTypes {
-                if browser.types.canGoBack { add(String(localized: "Back"), "chevron.backward", historyKey("⌘[")) { browser.types.goBack() } }
-                if browser.types.canGoForward { add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.types.goForward() } }
             } else {
                 if browser.canGoBack(in: library) {
                     add(String(localized: "Back"), "chevron.backward", historyKey("⌘[")) { browser.go(.back, in: library) }
@@ -307,21 +302,30 @@ struct CommandPalette: View {
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
         let settingsTitle = String(localized: "Settings…")
-        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gear", shortcut: "⌘,", takesFocus: true) {
-            settings.show()
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gearshape", shortcut: "⌘,", takesFocus: true) {
+            browser.showSettings()
         })
+        for page in SettingsPage.allCases {
+            let title = String(localized: "Settings: \(page.title)")
+            entries.append(Entry(id: "command:" + title, title: title, systemImage: page.symbol, takesFocus: true) {
+                browser.showSettings(page)
+            })
+        }
         return entries
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.favorites, "star")]
-        items += library.items(in: .itemType("aic.project")).map { (.project($0.id), "square.stack") }
-        items += WorkbenchSchema.types.map { (.itemType($0.id), "doc.text") }
-        items += [(.files, "doc")]
-        items += library.folders.map { (.folder($0.id), "folder") }
-        items += [(.recentlyDeleted, "trash"), (.marfaTypes, "cube")]
-        return items.map { item, systemImage in
-            Entry(id: "place:\(item)", title: library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
+        var items: [(SidebarItem, String, String?)] = [
+            (.inbox, "tray", nil), (.recents, "clock", nil), (.allNotes, "note.text", nil), (.favorites, "star", nil),
+        ]
+        if library.count(in: .files) > 0 { items += [(.files, "doc", nil)] }
+        // The collections the sidebar shows, its two levels of them.
+        items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
+        // The types the sidebar shows, under the names it gives them.
+        items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
+        items += library.folders.map { (.folder($0.id), "folder", nil) }
+        return items.map { item, systemImage, title in
+            Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)
                 browser.focusRequest = .list
             }

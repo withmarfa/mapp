@@ -1,9 +1,8 @@
 import Foundation
 
 nonisolated enum PlaceID: Hashable, Codable, Sendable {
-    case inbox, all, favorites, archive, recentlyDeleted, marfaTypes
+    case inbox, all, favorites, archive, recentlyDeleted
     case type(TypeID)
-    case beneath(ItemID)
     case folder(ItemID)
 }
 
@@ -39,15 +38,14 @@ nonisolated enum DropAction: Hashable, Sendable {
 /// A sidebar entry, published by the source so no view needs to know which source is open.
 nonisolated struct Place: Identifiable, Hashable, Sendable {
     enum Section: Hashable, Sendable {
-        case library, favorites, projects, types, folders, footer
+        case library, favorites, types, folders, footer
     }
 
     let id: PlaceID
     var title: String
     var symbol: String
     var section: Section
-    /// Nil for a place that shows something other than items, such as Marfa Types.
-    var query: ItemQuery?
+    var query: ItemQuery
     var drop: DropAction?
     var editing: PlaceEditing = []
 }

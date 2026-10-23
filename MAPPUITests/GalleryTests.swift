@@ -20,10 +20,8 @@ final class GalleryTests: XCTestCase {
     override func tearDown() async throws { app.terminate() }
 
     private func choose(_ mode: String) {
-        let more = window.descendants(matching: .any).matching(identifier: "ViewOptionsToolbar").element(boundBy: 0)
-        XCTAssertTrue(more.waitForExistence(timeout: 3))
-        more.click()
-        let option = window.menuItems[mode].firstMatch
+        app.menuBars.menuBarItems["View"].click()
+        let option = app.menuBars.menuItems["View as \(mode)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))
         option.click()
     }
@@ -46,6 +44,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertGreaterThan(second.frame.minX, first.frame.maxX)
         XCTAssertGreaterThan(gallery.frame.width, window.frame.width / 2)
         XCTAssertEqual(card("Garden ideas").frame.width, first.frame.width, accuracy: 2)
+        XCTAssertEqual(card("Garden ideas").frame.height, first.frame.height, accuracy: 2, "a card with an image is as tall as one without")
         let screenshot = XCTAttachment(screenshot: window.screenshot())
         screenshot.name = "GalleryGrid"
         screenshot.lifetime = .keepAlways
@@ -75,6 +74,11 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(target.waitForExistence(timeout: 3))
         target.click()
         XCTAssertEqual(target.value as? String, "Selected")
+        let neighbour = card("Reading list")
+        let gap = gallery.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: (target.frame.maxX + neighbour.frame.minX) / 2 - gallery.frame.minX, dy: target.frame.midY - gallery.frame.minY))
+        gap.click()
+        XCTAssertNotEqual(target.value as? String, "Selected", "a click between the cards clears the selection")
         target.doubleClick()
         let editor = window.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
@@ -185,7 +189,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
     }
 
-    func testSettingsTypesAndHiddenSidebarReturnToGallery() throws {
+    func testLeavingSettingsAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
         choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min { abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX) })
@@ -193,12 +197,14 @@ final class GalleryTests: XCTestCase {
         edge.click(forDuration: 0.2, thenDragTo: edge.withOffset(CGVector(dx: 45, dy: 0)))
         let width = sidebar.frame.width
         app.typeKey(",", modifierFlags: .command)
-        XCTAssertTrue(window.buttons["SettingsBack"].waitForExistence(timeout: 3))
-        window.buttons["SettingsBack"].click()
+        let settings = window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertFalse(gallery.exists, "Settings shows its pages in place of the gallery")
+        sidebar.staticTexts["All Notes"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertEqual(sidebar.frame.width, width, accuracy: 3)
-        window.outlines["SidebarPlaces"].staticTexts["Marfa Types"].click()
-        XCTAssertTrue(window.outlines["MarfaTypesList"].waitForExistence(timeout: 3))
+        sidebar.staticTexts["Inbox"].click()
+        XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         sidebar.staticTexts["All Notes"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         app.typeKey("s", modifierFlags: [.command, .control])

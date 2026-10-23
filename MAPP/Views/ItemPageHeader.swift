@@ -168,7 +168,7 @@ struct ItemPageHeader: ViewModifier {
     }
 
     /// A catalogue's words, looked up in the String Catalog as SwiftUI's text would look them up.
-    private static func localized(_ key: String) -> String {
+    static func localized(_ key: String) -> String {
         Bundle.main.localizedString(forKey: key, value: key, table: nil)
     }
 }

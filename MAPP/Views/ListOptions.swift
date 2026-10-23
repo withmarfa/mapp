@@ -7,8 +7,8 @@ enum ListKey {
     static let all = [previewLines]
 }
 
-/// How many lines of each note's text its row shows under the title, as Mail offers for its messages. Every row
-/// reserves the lines whether its note fills them or not, so the rows stay one height.
+/// How many lines of each item's text its row shows under the title, as Mail offers for its messages. A row with
+/// less text takes less room.
 struct ListPreviewOptions: View {
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
 

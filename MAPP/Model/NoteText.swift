@@ -1,27 +1,11 @@
 import Foundation
 
 /// Reads a note's words out of its markdown, as they read on screen: the first line, which names a note, and
-/// the preview that follows it.
+/// the lines a preview is made of.
 nonisolated enum NoteText {
-    static let previewLimit = 240
-
     /// The first line with words in it, as it reads; nil for a note with nothing in it yet.
     static func firstLine(of body: String) -> String? {
         readableLines(of: body, limit: 1).first
-    }
-
-    /// What follows the title: the body's text, less a first line that only repeats the title.
-    static func preview(of body: String, title: String) -> String {
-        var lines = readableLines(of: body, limit: 64)
-        if let first = lines.first, first.localizedCaseInsensitiveCompare(title) == .orderedSame {
-            lines.removeFirst()
-        }
-        var preview = ""
-        for line in lines {
-            preview += preview.isEmpty ? line : " " + line
-            if preview.count >= previewLimit { break }
-        }
-        return preview.isEmpty ? String(localized: "No additional text") : String(preview.prefix(previewLimit))
     }
 
     /// The note's text around the first place a search finds, as one line, to show why a note was found.
@@ -129,19 +113,29 @@ nonisolated enum NoteText {
     private nonisolated(unsafe) static let markdownLink = /(!?\[(?:[^\]\\]|\\.)*\]\()(<[^>\n]*>|[^)\s]+)/
 
     /// The body's lines as they read on screen, blank lines dropped, up to a limit, since a title and preview
-    /// need only the first few. Code inside fences is kept as written.
-    static func readableLines(of body: String, limit: Int = .max) -> [String] {
+    /// need only the first few. Code inside fences is kept as written. A preview skips headings, which only name
+    /// what follows, and stops once its lines hold `characters` characters.
+    static func readableLines(
+        of body: String, limit: Int = .max, skippingHeadings: Bool = false, characters: Int = .max
+    ) -> [String] {
         var lines: [String] = []
+        var count = 0
         var inFence = false
         for line in body.split(whereSeparator: \.isNewline) {
-            if lines.count >= limit { break }
+            if lines.count >= limit || count >= characters { break }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.wholeMatch(of: fence) != nil {
                 inFence.toggle()
                 continue
             }
+            if skippingHeadings, !inFence, trimmed.replacing(quoteMarkers, with: "").firstMatch(of: headingMarker) != nil {
+                continue
+            }
             let text = inFence ? trimmed : plainText(of: line)
-            if !text.isEmpty { lines.append(text) }
+            if !text.isEmpty {
+                lines.append(text)
+                count += text.count
+            }
         }
         return lines
     }

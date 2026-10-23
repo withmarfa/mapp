@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The Marfa pane of Settings: the server the app reads from, how the connection stands, and the key. The
-/// sections go in the pane's grouped form.
+/// The connection sections of the Library page: the server the app reads from, and the key. How the connection
+/// stands is told by the summary at the top of the page. The sections go in the page's grouped form.
 struct MarfaSettingsView: View {
     @Bindable var model: MarfaSettingsModel
 
@@ -47,34 +47,11 @@ struct MarfaSettingsView: View {
 
     private func connected(to connection: MarfaConnection) -> some View {
         Group {
-            Section {
-                LabeledContent("Address") {
-                    Text(connection.address.absoluteString)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                .accessibilityIdentifier("MarfaConnectedAddress")
-                LabeledContent("Status") {
-                    Text(model.status.title)
-                        .foregroundStyle(model.status.isProblem ? Color.red : Color.secondary)
-                        .accessibilityIdentifier("MarfaStatus")
-                }
-                if let waiting = host.waitingChanges, waiting > 0 {
+            // The page's summary already names the server, so only what it does not say is listed here.
+            if let waiting = host.waitingChanges, waiting > 0 {
+                Section {
                     LabeledContent("Waiting to Send") { Text(Words.changes(waiting)).foregroundStyle(.secondary) }
                 }
-                if let detail = model.status.detail {
-                    Text(detail)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack {
-                    Button("Disconnect") { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier("MarfaDisconnect")
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                }
-            } header: {
-                Text("Marfa Server")
             }
             keySection
             notice

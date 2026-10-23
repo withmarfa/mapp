@@ -6,8 +6,6 @@ final class WindowTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines.matching(NSPredicate(format: "identifier == 'Sidebar'")).firstMatch }
-    /// Marfa Types and Recently Deleted, a list of their own at the sidebar's foot.
-    private var places: XCUIElement { window.outlines["SidebarPlaces"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
     private var page: XCUIElement { window.webViews.firstMatch }
     /// The note's text as the page shows it: formatted, so without markdown's marks.
@@ -33,27 +31,16 @@ final class WindowTests: XCTestCase {
     }
 
     private func sidebarItem(_ name: String) -> XCUIElement {
-        let source = name == "Marfa Types" || name == "Recently Deleted" ? places : sidebar
         if let identifier = groupIdentifier(for: name) {
             // Use the full indexed query: firstMatch omitted native outline labels visible in its own snapshot.
             return sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
         }
-        if ["Note", "Epic", "Feature", "Question", "Task", "Decision", "Session", "Log", "Files"].contains(name) {
-            let row = sidebar.outlineRows.containing(.any, identifier: "SidebarItems").element(boundBy: 0)
-            let disclosure = row.disclosureTriangles.element(boundBy: 0)
-            XCTAssertTrue(disclosure.waitForExistence(timeout: 2))
-            let expanded = (disclosure.value as? NSNumber)?.boolValue ?? ((disclosure.value as? String) == "1")
-            if !expanded { disclosure.click() }
-        }
-        return source.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", name, name)).firstMatch
+        return sidebar.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", name, name)).firstMatch
     }
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
         case "Favorites": "SidebarFavoritesSection"
-        case "Library": "SidebarLibrarySection"
-        case "Projects": "SidebarProjects"
-        case "Items": "SidebarItems"
         case "Folders": "SidebarFolders"
         default: nil
         }
@@ -68,7 +55,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "Favorites", "Library", "Projects", "Items", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted", "Marfa Types"] {
+        for name in ["Inbox", "Recents", "All Notes", "Favorites", "Folders", "Work", "Home", "Personal", "Reading"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -125,28 +112,32 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "All Notes"), before + 1)
     }
 
-    func testDeletingFromTheContextMenuMovesToRecentlyDeletedAndUndoes() {
-        let deletedBefore = count(of: "Recently Deleted")
+    func testDeletingFromTheContextMenuRemovesTheNoteAndUndoes() {
+        let before = count(of: "All Notes")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(count(of: "Recently Deleted"), deletedBefore + 1)
+        XCTAssertEqual(count(of: "All Notes"), before - 1)
         app.typeKey("z", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
-        XCTAssertEqual(count(of: "Recently Deleted"), deletedBefore)
+        XCTAssertEqual(count(of: "All Notes"), before)
     }
 
-    func testRecentlyDeletedNotesCanBeRecoveredButNotEdited() {
-        sidebarItem("Recently Deleted").click()
-        row(titled: "Old packing list").click()
-        // A read-only page is text to read, not a text view.
-        XCTAssertTrue(page.staticTexts["Old packing list"].waitForExistence(timeout: 3))
-        page.staticTexts["Old packing list"].click()
-        app.typeText("zzz")
-        let typed = page.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "zzz"))
-        XCTAssertEqual(typed.count, 0, "a deleted note takes no typing")
-        window.buttons["Recover"].click()
-        XCTAssertTrue(row(titled: "Old packing list").waitForNonExistence(timeout: 2))
+    func testRecentlyDeletedInSettingsRestoresANote() {
+        app.typeKey(",", modifierFlags: .command)
+        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").element(boundBy: 0)
+        XCTAssertTrue(page.waitForExistence(timeout: 3))
+        page.click()
+        let detail = window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0)
+        let deleted = detail.staticTexts["Old packing list"]
+        XCTAssertTrue(deleted.waitForExistence(timeout: 3))
+        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists)
+        let restores = detail.buttons.matching(identifier: "RecentlyDeletedRestore").allElementsBoundByIndex
+        let restore = restores.min { abs($0.frame.midY - deleted.frame.midY) < abs($1.frame.midY - deleted.frame.midY) }
+        XCTAssertNotNil(restore, "each deleted item has its own Restore")
+        restore?.click()
+        XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists, "only the one restored leaves")
         sidebarItem("Personal").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
@@ -318,17 +309,16 @@ final class WindowTests: XCTestCase {
         wait(for: [twoWindows], timeout: 3)
     }
 
-    func testGroupingByDateFromTheViewMenuAddsSectionsThatTitleOrderDrops() {
-        XCTAssertFalse(list.staticTexts["Today"].exists)
-        toggleGroupByDate()
-        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
+    func testTheListIsGroupedByDateUntilTheViewMenuOrTitleOrderDropsIt() {
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2), "lists group by date from the start")
         sortBy("Title")
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
         sortBy("Date Edited")
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
-        // The setting outlives the app, so the next test starts from the default again.
         toggleGroupByDate()
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
+        toggleGroupByDate()
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
     }
 
     func testUndoInTheEditMenuUndoesTypingInThePage() {
@@ -385,17 +375,6 @@ final class WindowTests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
 
-    func testMarfaTypesAndRecentlyDeletedStayAtTheFootOfTheSidebar() {
-        let lastFolder = sidebarItem("Work").frame
-        let types = sidebarItem("Marfa Types").frame
-        let deleted = sidebarItem("Recently Deleted").frame
-        XCTAssertGreaterThan(types.minY, lastFolder.maxY + 100, "a gap is left below the folders")
-        XCTAssertGreaterThan(deleted.minY, types.maxY - 1, "Recently Deleted comes last")
-        XCTAssertLessThan(window.frame.maxY - deleted.maxY, 30, "at the window's foot")
-        sidebarItem("Recently Deleted").click()
-        XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
-    }
-
     func testTheFoldersHeadingCreatesANewFolderFromItsContextMenu() {
         let heading = sidebarItem("Folders")
         heading.rightClick()
@@ -449,153 +428,16 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
     }
 
-    func testShareAndMoreSitAtTheToolbarsEnd() {
+    func testMoreAndDetailsSitAtTheToolbarsEnd() {
         let more = window.menuButtons["More"]
+        let details = window.descendants(matching: .any).matching(identifier: "DetailsToggle").element(boundBy: 0)
         XCTAssertTrue(more.waitForExistence(timeout: 2))
-        XCTAssertLessThan(window.frame.maxX - more.frame.maxX, 30, "More is at the end, not mid-toolbar")
+        XCTAssertTrue(details.exists)
+        XCTAssertLessThan(window.frame.maxX - details.frame.maxX, 30, "Details is at the end, not mid-toolbar")
+        XCTAssertLessThan(more.frame.maxX, details.frame.minX, "More comes just before it")
     }
 
-    // MARK: Marfa Types
-
-    /// The list of types, where the note list would be.
-    private var typesList: XCUIElement { window.descendants(matching: .any)["MarfaTypesList"] }
-    /// The chosen type, where a note would be.
-    private var typeDetail: XCUIElement { window.descendants(matching: .any)["MarfaTypes"] }
-
-    private func typeRow(_ id: String) -> XCUIElement {
-        window.descendants(matching: .any)["MarfaTypeRow.\(id)"]
-    }
-
-    /// Waits for the chosen type's page to show the type with this id under its name.
-    private func waitForType(_ id: String) -> Bool {
-        let shown = NSPredicate(format: "identifier == 'MarfaTypeID' AND (label == %@ OR value == %@)", id, id)
-        return typeDetail.descendants(matching: .any).matching(shown).firstMatch.waitForExistence(timeout: 3)
-    }
-
-    /// The list's column before and after Marfa Types is picked, which must not move: the window keeps its columns.
-    private func assertTheColumnsStay(_ column: CGRect, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertEqual(typesList.frame.minX, column.minX, accuracy: 2, "the types take the list's column", file: file, line: line)
-        XCTAssertEqual(typesList.frame.width, column.width, accuracy: 2, "at the list's width", file: file, line: line)
-    }
-
-    func testMarfaTypesTakesTheListAndThePageUntilAnotherPlaceIsPicked() {
-        XCTAssertTrue(list.waitForExistence(timeout: 2))
-        let column = list.frame
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        XCTAssertTrue(list.waitForNonExistence(timeout: 2), "the types take the list's column")
-        XCTAssertTrue(editor.waitForNonExistence(timeout: 2), "and the note's")
-        assertTheColumnsStay(column)
-        typeRow("aic.ticket.task").click()
-        XCTAssertTrue(waitForType("aic.ticket.task"))
-        typeDetail.links["Parent"].firstMatch.click()
-        XCTAssertTrue(waitForType("parent-of"), "a link on the page chooses the type it names")
-        let chosen = typesList.outlineRows.containing(.any, identifier: "MarfaTypeRow.parent-of").firstMatch
-        XCTAssertTrue(chosen.isSelected, "and the list follows")
-        sidebarItem("Inbox").click()
-        XCTAssertTrue(list.waitForExistence(timeout: 2))
-        XCTAssertTrue(typesList.waitForNonExistence(timeout: 2))
-    }
-
-    func testTheArrowKeysMoveThroughTheTypes() {
-        // The palette hands the keyboard to the list, as it does for the note list.
-        app.typeKey("k", modifierFlags: .command)
-        app.typeText("marfa types\r")
-        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForType("aic.decision"), "the list has the keyboard and starts at its first type")
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForType("aic.epic"))
-        app.typeKey(.upArrow, modifierFlags: [])
-        XCTAssertTrue(waitForType("aic.decision"))
-    }
-
-    func testSearchListFromMarfaTypesGoesToAllNotesAndSearches() {
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        app.typeKey("f", modifierFlags: [.command, .option])
-        XCTAssertTrue(list.waitForExistence(timeout: 2))
-        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
-        app.typeText("ragu")
-        XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
-        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(listSearch.value as? String, "ragu")
-    }
-
-    func testSwitchingToAndFromMarfaTypesWithTheSidebarHiddenWorks() {
-        // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar hidden.
-        let open = { (place: String) in
-            self.app.typeKey("k", modifierFlags: .command)
-            self.app.typeText(place + "\r")
-        }
-        app.typeKey("s", modifierFlags: [.command, .control])
-        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(list.waitForExistence(timeout: 2))
-        let column = list.frame
-        open("marfa types")
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        assertTheColumnsStay(column)
-        open("inbox")
-        XCTAssertTrue(list.waitForExistence(timeout: 5))
-        open("marfa types")
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        XCTAssertFalse(sidebar.exists, "the sidebar stays as it was left")
-        app.typeKey("s", modifierFlags: [.command, .control])
-        XCTAssertTrue(sidebar.waitForExistence(timeout: 2))
-        XCTAssertTrue(typesList.exists, "the sidebar comes back beside the types")
-    }
-
-    func testPickingMarfaTypesAfterResizingTheSidebarWorks() throws {
-        // When Marfa Types changed the window's columns, the system crashed doing so with the sidebar resized.
-        XCTAssertTrue(window.splitters.firstMatch.waitForExistence(timeout: 2))
-        let divider = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min {
-            abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX)
-        })
-        XCTAssertLessThan(abs(divider.frame.midX - sidebar.frame.maxX), 8)
-        let before = sidebar.frame.width
-        let edge = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 60, dy: 0)))
-        XCTAssertGreaterThan(sidebar.frame.width, before + 30, "the sidebar is wider")
-        let column = list.frame
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        assertTheColumnsStay(column)
-        sidebarItem("Inbox").click()
-        XCTAssertTrue(list.waitForExistence(timeout: 5))
-        let width = sidebar.frame.width
-        let moved = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        moved.click(forDuration: 0.3, thenDragTo: moved.withOffset(CGVector(dx: -60, dy: 0)))
-        XCTAssertLessThan(sidebar.frame.width, width - 30, "the sidebar is narrower")
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        XCTAssertTrue(sidebar.exists)
-    }
-
-    func testAMarfaTypesSearchEndsWhenAnotherPlaceIsPicked() {
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
-        app.typeKey("f", modifierFlags: .command)
-        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
-        app.typeText("decision")
-        XCTAssertTrue(typeRow("core.note").waitForNonExistence(timeout: 2))
-        sidebarItem("Inbox").click()
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 3), "the whole list is back")
-        XCTAssertFalse(listSearch.exists)
-    }
-
-    func testTheListColumnsSearchSearchesMarfaTypes() {
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
-        app.typeKey("f", modifierFlags: .command)
-        XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
-        XCTAssertEqual(listSearch.placeholderValue, "Search", "the field reads as the notes' search does")
-        app.typeText("ticket.task")
-        XCTAssertTrue(typeRow("core.note").waitForNonExistence(timeout: 2), "the list narrows")
-        XCTAssertTrue(typeRow("aic.ticket.task").exists)
-        app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(waitForType("aic.ticket.task"), "Return chooses the first match")
-    }
+    // MARK: Back and forward
 
     func testBackAndForwardMoveThroughTheItemsOpened() {
         let back = window.descendants(matching: .any).matching(identifier: "BackToolbar").element(boundBy: 0)
@@ -630,33 +472,6 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"), "the list has the keyboard again, so ⌘[ goes back")
     }
 
-    func testBackAndForwardMoveThroughTheTypesShown() {
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
-        typeRow("core.note").click()
-        XCTAssertTrue(waitForType("core.note"))
-        typeRow("aic.ticket.task").click()
-        XCTAssertTrue(waitForType("aic.ticket.task"))
-        app.typeKey("[", modifierFlags: .command)
-        XCTAssertTrue(waitForType("core.note"))
-        app.typeKey("]", modifierFlags: .command)
-        XCTAssertTrue(waitForType("aic.ticket.task"))
-        app.menuBars.menuBarItems["View"].click()
-        XCTAssertTrue(app.menuBars.menuItems["Back"].isEnabled)
-        XCTAssertFalse(app.menuBars.menuItems["Forward"].isEnabled, "nothing lies ahead")
-        app.typeKey(.escape, modifierFlags: [])
-    }
-
-    func testANewNoteFromMarfaTypesGoesToTheInbox() {
-        sidebarItem("Marfa Types").click()
-        XCTAssertTrue(typesList.waitForExistence(timeout: 5))
-        beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
-        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3), "the new item opens its own page")
-        app.typeText("Shopping")
-        XCTAssertTrue(waitForText("CONTAINS", "Shopping"))
-    }
-
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
         // Some findings belong to the system rather than the app: List reports its section headers outside
         // their table, SwiftUI wraps columns and section headers in unlabelled groups that VoiceOver passes
@@ -665,7 +480,7 @@ final class WindowTests: XCTestCase {
         // Menu rather than Press. The list's title and count in the toolbar above it are the system's too.
         // Controls and text are still audited everywhere else.
         let windowFrame = window.frame
-        let sidebarFrame = sidebar.frame.union(places.frame)
+        let sidebarFrame = sidebar.frame
         let listFrame = list.frame
         try app.performAccessibilityAudit { issue in
             guard let element = issue.element else { return false }

@@ -191,7 +191,7 @@ extension EditorTests {
         editor.load(try #require(library.item(reader.id)))
         waited = 0
         while editor.noteID != reader.id, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = editor.container
         window.makeKeyAndOrderFront(nil)

@@ -12,7 +12,7 @@ nonisolated enum LibraryFixture {
     static let ticket = TypeID("aic.ticket")
     static let task = TypeID("aic.ticket.task")
     static let bug = TypeID("aic.ticket.bug")
-    static let project = MarfaMapping.projectType
+    static let project = TypeID("aic.project")
     static let entity = TypeID("core.entity")
     static let image = TypeID("core.image")
     static let album = TypeID("core.album")
@@ -156,16 +156,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.items(in: .favorites)) == [F.t1, F.n1])
         #expect(ids(library.items(in: .favoriteItem(F.n1))) == [F.n1])
         #expect(library.items(in: .favoriteItem(F.n2)).isEmpty)
-        #expect(ids(library.items(in: .itemType("aic.ticket"))) == [F.e1, F.t1])
+        // A type's place lists that type's own items and none of its subtypes'.
+        #expect(library.items(in: .itemType("aic.ticket")).isEmpty)
+        #expect(ids(library.items(in: .itemType("aic.ticket.task"))) == [F.e1])
         #expect(ids(library.items(in: .itemType("aic.ticket.bug"))) == [F.t1])
-        #expect(ids(library.items(in: .project(F.p1))) == [F.p1, F.e1, F.t1])
-        #expect(ids(library.items(in: .project(F.p2))) == [F.p2])
+        #expect(ids(library.items(in: .collection(F.p1))) == [F.e1, F.t1])
+        #expect(library.items(in: .collection(F.p2)).isEmpty)
         #expect(ids(library.items(in: .files)) == [F.f1])
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
         #expect(library.items(in: .folder(F.p1)).isEmpty)
-        #expect(library.items(in: .marfaTypes).isEmpty)
         #expect(library.folders.isEmpty)
-        for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .project(F.p1), .files, .recentlyDeleted] {
+        for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
         // Newest first, as the source paints them.
@@ -176,19 +177,23 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, _) = try await loaded()
         #expect(library.name(of: .inbox) == String(localized: "Inbox"))
         #expect(library.name(of: .allNotes) == String(localized: "All Items"))
-        #expect(library.name(of: .itemType("aic.project")) == String(localized: "Projects"))
+        #expect(library.name(of: .itemType("aic.project")) == "Project")
         #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bug")
-        #expect(library.name(of: .project(F.p1)) == "Alpha")
+        #expect(library.name(of: .collection(F.p1)) == "Alpha")
         #expect(library.name(of: .favoriteItem(F.n1)) == "Plain note")
     }
 
     @Test func changesFromTheSourceReplaceWhatWasHeld() async throws {
         let (library, source) = try await loaded()
+        #expect(library.items(in: .recents).first?.id == F.p1)
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Renamed"
         renamed.tier = .library
+        renamed.modified = Date(timeIntervalSince1970: 2_000_000)
         source.send(.upserted([renamed]))
         #expect(await eventually { library.item(F.n2)?.title == "Renamed" })
+        // An edit moves an item to the top of Recents, though what the library holds is the same.
+        #expect(library.items(in: .recents).first?.id == F.n2)
         #expect(library.items(in: .inbox).isEmpty)
 
         let added = F.item(ItemID("new"), F.task, "New task", age: 0, edges: [F.child("c9", ItemID("new"), of: F.p2)])
@@ -196,8 +201,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([added]))
         #expect(await eventually { library.item(added.id) != nil })
         #expect(library.body(of: added.id)?.text == "Fresh")
-        #expect(ids(library.items(in: .project(F.p2))) == [F.p2, added.id])
-        #expect(library.count(in: .itemType("aic.ticket")) == 3)
+        #expect(ids(library.items(in: .collection(F.p2))) == [added.id])
+        #expect(library.count(in: .itemType("aic.ticket.task")) == 2)
 
         source.send(.removed([F.n1]))
         #expect(await eventually { library.isGone(F.n1) })
@@ -893,7 +898,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let load = (clock.now - start)
 
         let places: [SidebarItem] = [
-            .allNotes, .inbox, .favorites, .itemType("aic.ticket"), .project(ItemID("item-00030")), .recentlyDeleted,
+            .allNotes, .inbox, .favorites, .itemType("aic.ticket"), .collection(ItemID("item-00030")), .recentlyDeleted,
         ]
         let cold = milliseconds { for place in places { _ = library.items(in: place) } }
         let warm = milliseconds { for place in places { _ = library.items(in: place) } }
@@ -920,8 +925,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             keystroke \(keystroke) ms, search \(search), search read \(searchRead) ms
             """, named: "MarfaLibrary performance.txt")
         #expect(library.count(in: .allNotes) == 2_850)
-        // The project and its children, less the two of them in the bin.
-        #expect(library.count(in: .project(ItemID("item-00030"))) == 28)
+        // The project's children, less the two of them in the bin.
+        #expect(library.count(in: .collection(ItemID("item-00030"))) == 27)
         #expect(warm < 1)
         #expect(keystroke < 50)
         #expect(searchRead < 20)

@@ -8,6 +8,18 @@ enum ItemPreviewFixtures {
     static let noteID = ItemID("10000000-0000-0000-0000-000000000003")
     static let date = Date(timeIntervalSince1970: 1_791_000_000)
 
+    /// The libraries a main window reads, on defaults and a store of their own that each call empties.
+    @MainActor static func libraries(named name: String = "MAPP.ItemPreview") -> Libraries {
+        let defaults = UserDefaults(suiteName: name) ?? .standard
+        defaults.removePersistentDomain(forName: name)
+        return Libraries(
+            folder: NotesFolder(defaults: defaults),
+            host: MarfaHost(
+                defaults: defaults, keys: MemoryKeyStore(),
+                location: try! MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: name))),
+            defaults: defaults)
+    }
+
     static var library: NoteLibrary {
         NoteLibrary(notes: [
             Note(id: projectID, path: "Projects/Field Research.md", text: "---\ntype: aic.project\ntitle: Field Research\n---\n# Field Research\n\nA project with connected work.\n", created: date),
@@ -74,6 +86,7 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     MainView(browser: browser, restoresWindow: false)
         .environment(\.library, library)
+        .environment(ItemPreviewFixtures.libraries())
         .frame(width: 1180, height: 760)
 }
 
@@ -81,6 +94,7 @@ enum ItemPreviewFixtures {
     let library = ItemPreviewFixtures.library
     MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)
         .environment(\.library, library)
+        .environment(ItemPreviewFixtures.libraries())
         .frame(width: 1280, height: 800)
 }
 

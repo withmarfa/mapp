@@ -349,15 +349,15 @@ final class NoteLibrary: ItemLibrary {
     func name(of item: SidebarItem) -> String {
         switch item {
         case .inbox: String(localized: "Inbox")
+        case .recents: String(localized: "Recents")
         case .allNotes: String(localized: "All Notes")
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
-        case .marfaTypes: String(localized: "Marfa Types")
         case .files: String(localized: "Files")
-        case .itemType(let typeID): typeID == "aic.project" ? String(localized: "Projects") : WorkbenchSchema.definition(typeID)?.label ?? typeID
-        case .project(let id): self.item(id)?.title ?? ""
+        case .itemType(let typeID): catalogue.itemTypes[TypeID(typeID)]?.label ?? typeID
+        case .collection(let id): self.item(id)?.title ?? ""
         }
     }
 

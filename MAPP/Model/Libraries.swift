@@ -41,9 +41,13 @@ import Observation
 
     @ObservationIgnored private var marfaLibrary: MarfaLibrary?
 
-    init(folder: NotesFolder, host: MarfaHost) {
+    /// What each library's person chose to show in the sidebar.
+    let sidebarLayouts: SidebarLayouts
+
+    init(folder: NotesFolder, host: MarfaHost, defaults: UserDefaults = .standard) {
         self.folder = folder
         self.host = host
+        sidebarLayouts = SidebarLayouts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
@@ -83,6 +87,21 @@ import Observation
         case .marfa: marfa()
         case .opening, .failed: nil
         }
+    }
+
+    /// Names the library the windows read, so its sidebar layout is its own: a server by its address, the notes
+    /// folder by its path.
+    var sidebarLayoutKey: String {
+        switch mode {
+        case .marfa: "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
+        case .files, .opening, .failed: "folder:" + (folder.url?.standardizedFileURL.path ?? "")
+        }
+    }
+
+    var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: sidebarLayoutKey) }
+
+    func updateSidebarLayout(_ change: (inout SidebarLayout) -> Void) {
+        sidebarLayouts.update(sidebarLayoutKey, change)
     }
 
     /// One library for as long as its source is the one open, so a window keeps what it holds as items change.
@@ -192,7 +211,7 @@ import Observation
             }
             let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore(presets), location: location(root: root))
             if let server { host.presetTestServer(server) }
-            return Libraries(folder: NotesFolder(defaults: defaults), host: host)
+            return Libraries(folder: NotesFolder(defaults: defaults), host: host, defaults: defaults)
         }
         #endif
         let host = MarfaHost(defaults: .standard, keys: KeychainKeyStore(), location: location())

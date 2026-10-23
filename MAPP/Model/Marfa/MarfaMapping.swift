@@ -9,8 +9,7 @@ import UniformTypeIdentifiers
 
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.
 nonisolated enum MarfaMapping {
-    static let fileType = TypeID("core.file")
-    static let projectType = TypeID("aic.project")
+    static let fileType = TypeID.file
     /// The core.file fields naming the bytes, their kind and their length, which the server sets.
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
@@ -141,9 +140,16 @@ nonisolated enum MarfaMapping {
         let bound = (bodyLinks?.links ?? []).map { name in
             BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
+        let content = content(of: row, catalogue: catalogue)
+        let preview: String
+        if case .file(let fileType, let byteCount) = content {
+            preview = ItemPreview.file(fileType, byteCount: byteCount)
+        } else {
+            preview = ItemPreview.text(of: body, title: title, fallback: row.properties["description"]?.string)
+        }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
-            preview: damaged ? MarfaProblems.unreadableMessage : preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
+            preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
@@ -305,10 +311,6 @@ nonisolated enum MarfaMapping {
         body.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
     }
 
-    private static func preview(of body: String) -> String {
-        String(body.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(240))
-    }
-
     private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let whole = Date.ISO8601FormatStyle()
 
@@ -408,33 +410,24 @@ nonisolated enum MarfaMapping {
                 query: ItemQuery(states: [.archived]), drop: .transition(.archived))
         ]
         let active = items.filter { $0.state == .active }
-        if catalogue.itemTypes[projectType] != nil {
-            places.append(
-                Place(
-                    id: .type(projectType), title: String(localized: "Projects"), symbol: "square.stack",
-                    section: .projects, query: ItemQuery(types: [projectType])))
-            let projects = active.filter { $0.type == projectType }
-                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-            places += projects.map { project in
-                Place(
-                    id: .beneath(project.id), title: project.title, symbol: "square.stack", section: .projects,
-                    query: ItemQuery(beneath: project.id))
-            }
-        }
-        let held = Set(active.map(\.type)).subtracting([projectType])
+        // Each type's place lists that type's own items, most first, so a count and its list agree.
+        let counts = Dictionary(grouping: active, by: \.type).mapValues(\.count)
+        let held = counts.keys.filter { !catalogue.isFileType($0) }
+        let labels = catalogue.displayLabels(for: held)
         places += held.compactMap { catalogue.itemTypes[$0] }
-            .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+            .sorted {
+                let (a, b) = (counts[$0.id] ?? 0, counts[$1.id] ?? 0)
+                return a != b ? a > b : $0.label.localizedStandardCompare($1.label) == .orderedAscending
+            }
             .map { type in
                 Place(
-                    id: .type(type.id), title: type.label, symbol: type.id == fileType ? "doc" : "doc.text",
-                    section: .types, query: ItemQuery(types: [type.id]))
+                    id: .type(type.id), title: labels[type.id] ?? type.label, symbol: TypeSymbol.name(for: type.id, in: catalogue),
+                    section: .types, query: ItemQuery(types: [type.id], includesSubtypes: false))
             }
-        places += [
+        places.append(
             Place(
                 id: .recentlyDeleted, title: String(localized: "Recently Deleted"), symbol: "trash", section: .footer,
-                query: ItemQuery(states: [.trashed]), drop: .transition(.trashed)),
-            Place(id: .marfaTypes, title: String(localized: "Marfa Types"), symbol: "cube", section: .footer, query: nil)
-        ]
+                query: ItemQuery(states: [.trashed]), drop: .transition(.trashed)))
         return places
     }
 }

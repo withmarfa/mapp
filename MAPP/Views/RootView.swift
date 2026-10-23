@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 /// A main window: the notes of the library the app reads once there is one, and until then a page saying why not.
 struct RootView: View {
     @Environment(Libraries.self) private var libraries
-    @State private var settings = SettingsPresentation()
     /// The window's browser lives here, above the library, so what the person was writing outlives a change of
     /// library, which starts the rest of the window afresh.
     @State private var browser = Browser()
@@ -12,8 +11,8 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if settings.isPresented && libraries.current == nil {
-                SettingsView(presentation: settings)
+            if browser.showsSettings && libraries.current == nil {
+                SettingsWorkspace(browser: browser)
             } else {
                 workspace
             }
@@ -21,11 +20,11 @@ struct RootView: View {
         // Settings reads the library too, so it is given to both.
         .environment(\.library, libraries.current)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-        .focusedSceneValue(\.settingsPresentation, settings)
+        .focusedSceneValue(\.browser, browser)
         .onAppear {
             if settingsRequest.isPending {
                 settingsRequest.isPending = false
-                settings.show()
+                browser.showSettings()
             }
         }
     }
@@ -34,7 +33,7 @@ struct RootView: View {
         switch libraries.mode {
         case .files, .marfa:
             if let library = libraries.current {
-                MainView(browser: browser, settings: settings)
+                MainView(browser: browser)
                     // A different library is a different set of items, and the window starts afresh with it.
                     .id(ObjectIdentifier(library))
             } else {
@@ -44,7 +43,7 @@ struct RootView: View {
             ProgressView("Opening Your Library…")
                 .frame(minWidth: 480, minHeight: 360)
         case .failed:
-            LibraryUnavailableView(settings: settings)
+            LibraryUnavailableView(browser: browser)
         }
     }
 }
@@ -53,7 +52,7 @@ struct RootView: View {
 /// The notes folder is not shown in its place, which is not what the app was set to read.
 struct LibraryUnavailableView: View {
     @Environment(Libraries.self) private var libraries
-    let settings: SettingsPresentation
+    let browser: Browser
 
     var body: some View {
         let status = ConnectionStatus(libraries.host.state)
@@ -66,7 +65,7 @@ struct LibraryUnavailableView: View {
         } description: {
             Text(detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
         } actions: {
-            Button("Open Settings…") { settings.show(.marfa) }
+            Button("Open Settings…") { browser.showSettings(.library) }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("LibraryUnavailableSettings")
         }

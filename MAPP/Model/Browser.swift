@@ -21,14 +21,21 @@ final class Browser {
     @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
-            isGalleryItemPresented = false
-            if viewMode == .gallery {
+            isCollectionItemPresented = false
+            if viewMode.spansWindow {
                 isCreatingItem = false
                 focusRequest = .list
             }
         }
     }
-    var isGalleryItemPresented = false
+    var isCollectionItemPresented = false
+    /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
+    var tableOptions: [SidebarItem: ItemTableOptions] = [:]
+    /// Whether the window shows Settings in place of the list and the item page. The place the window was
+    /// showing, its selection and its draft are kept, so choosing that place again returns to them.
+    private(set) var showsSettings = false
+    /// The page of Settings shown, and the one shown next time Settings is.
+    var settingsPage = SettingsPage.appearance
     var searchText = ""
     /// The note whose file name is being asked for.
     var renamingNote: ItemID?
@@ -43,8 +50,6 @@ final class Browser {
     var palette: Palette?
     /// Whether the list's search is out as a field, rather than a button beside View Options.
     var isSearchExpanded = false
-    /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
-    let types = TypesBrowser()
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
     var isCreatingItem = false
@@ -74,11 +79,18 @@ final class Browser {
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
-        /// The search of Marfa Types, which searches the types rather than the notes.
-        case typesSearch
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
+
+    /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
+    func showSettings(_ page: SettingsPage? = nil) {
+        if let page { settingsPage = page }
+        showsSettings = true
+    }
+
+    /// Settings gives way to whatever the window showed, or to a place chosen in the sidebar.
+    func leaveSettings() { showsSettings = false }
 
     /// The folder the sidebar has selected, which the folder commands act on.
     var selectedFolder: ItemID? {
@@ -87,24 +99,24 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// Whether the window shows Marfa's types in place of the list and the note.
-    var showsTypes: Bool { item == .marfaTypes }
+    /// Whether the window shows the gallery or the table, which span it, rather than the list beside the page.
+    var usesCollection: Bool { viewMode.spansWindow }
+    var showsCollection: Bool { usesCollection && !isCollectionItemPresented && !isCreatingItem }
 
-    var usesGallery: Bool { viewMode == .gallery && !showsTypes }
-    var showsGallery: Bool { usesGallery && !isGalleryItemPresented && !isCreatingItem }
-
-    func openGallerySelection() {
-        guard usesGallery, selection.count == 1 else { return }
-        isGalleryItemPresented = true
+    func openCollectionSelection() {
+        leaveSettings()
+        guard usesCollection, selection.count == 1 else { return }
+        isCollectionItemPresented = true
         focusRequest = nil
     }
 
     func reveal(_ item: Item, in library: any ItemLibrary, order: NoteOrder) {
+        leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
             show(.allNotes, in: library, order: order)
         }
         selection = [item.id]
-        if usesGallery { openGallerySelection() }
+        if usesCollection { openCollectionSelection() }
         else { focusRequest = .list }
     }
 
@@ -113,7 +125,7 @@ final class Browser {
     /// The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: NoteOrder) {
         reveal(item, in: library, order: order)
-        if !usesGallery { focusRequest = .page }
+        if !usesCollection { focusRequest = .page }
     }
 
     /// Whether an earlier item the window showed can still be shown again.
@@ -129,10 +141,11 @@ final class Browser {
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
+        leaveSettings()
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         if isSearching || sidebarItem != entry.place {
             searchText = ""
             isSearchExpanded = false
@@ -144,9 +157,9 @@ final class Browser {
         focusRequest = .list
     }
 
-    func returnToGallery() {
+    func returnToCollection() {
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         focusRequest = .list
     }
 
@@ -161,12 +174,12 @@ final class Browser {
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// note is one, nor in Recently Deleted or search results.
+    /// note is one, nor in search results.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
             of: items(in: library),
             sort: order.sort,
-            favoritesFirst: !isSearching && !showsOnlyFavorites && item != .recentlyDeleted,
+            favoritesFirst: !isSearching && !showsOnlyFavorites,
             groupsByDate: order.groupsByDate,
             now: now
         )
@@ -174,7 +187,20 @@ final class Browser {
 
     /// Whether the list mixes notes from several places, so each row says where its note lives.
     var showsFolders: Bool {
-        isSearching || item == .allNotes || showsOnlyFavorites || item == .recentlyDeleted
+        isSearching || item == .allNotes || showsOnlyFavorites
+    }
+
+    /// What the rows of the list say about themselves: the type where the list holds several, the place where it
+    /// mixes places, and nothing that the list itself already says.
+    func metaContext(for items: [Item]) -> ItemMeta.Context {
+        var context = ItemMeta.Context()
+        context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
+        context.showsPlaces = showsFolders
+        if !isSearching {
+            if case .collection(let id) = item { context.collection = id }
+            context.isInbox = item == .inbox
+        }
+        return context
     }
 
     private var showsOnlyFavorites: Bool {
@@ -184,10 +210,10 @@ final class Browser {
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
+        leaveSettings()
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         searchText = ""
-        types.searchText = ""
         isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)
@@ -213,6 +239,7 @@ final class Browser {
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
     func startItemDraft() {
+        leaveSettings()
         if itemDraft == nil { itemDraft = NewItemDraft(place: item) }
         isCreatingItem = true
         focusRequest = .page
@@ -270,7 +297,7 @@ final class Browser {
         self.creation = nil
         isCreatingItem = false
         itemDraft = nil
-        isGalleryItemPresented = usesGallery
+        isCollectionItemPresented = usesCollection
         searchText = ""
         isSearchExpanded = false
         if !library.items(in: item).contains(where: { $0.id == creation.id }) {
@@ -300,7 +327,7 @@ final class Browser {
         undoManager?.removeAllActions()
         selection = []
         history = SelectionHistory()
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         sidebarItem = .allNotes
         searchText = ""
         isSearchExpanded = false
@@ -309,7 +336,6 @@ final class Browser {
         folderToDelete = nil
         palette = nil
         fetchedFile = nil
-        types.searchText = ""
         if let creation, left?.item(creation.id) != nil {
             self.creation = nil
             itemDraft = nil
@@ -351,21 +377,24 @@ final class Browser {
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 
-    /// Dropped items move into a folder or the Inbox, where the library moves items, or go to Recently Deleted.
+    /// Dropped items move into a folder or the Inbox, where the library moves items.
     static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
         switch place {
         case .inbox, .folder: library.capabilities.contains(.move)
-        case .recentlyDeleted: true
-        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .marfaTypes: false
+        case .recents, .allNotes, .favorites, .favoriteItem, .itemType, .collection, .files, .recentlyDeleted: false
         }
     }
 
-    /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
+    /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is. So is a type that no longer holds an item.
     func folderRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
-        if case .project(let id) = sidebarItem, library.item(id)?.state != .active {
+        if case .collection(let id) = sidebarItem, library.item(id)?.state != .active {
+            show(.allNotes, in: library, order: order)
+        }
+        // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
+        if case .itemType(let type) = sidebarItem, library.isLoaded, library.count(in: .itemType(type)) == 0 {
             show(.allNotes, in: library, order: order)
         }
         if case .favoriteItem(let id) = sidebarItem,
@@ -424,10 +453,13 @@ final class Browser {
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
-        case .project(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
+        case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
         case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
-        case .itemType(let type): WorkbenchSchema.definition(type).map { _ in snapshot.place } ?? .allNotes
-        case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
+        case .itemType(let type):
+            library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
+        case .inbox, .recents, .allNotes, .favorites, .files: snapshot.place
+        // Recently Deleted is a page of Settings now, so a window kept from before it moved opens on All Items.
+        case .recentlyDeleted: .allNotes
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
@@ -465,13 +497,12 @@ struct SelectionHistory {
     }
 
     /// The nearest entry in a direction whose item still exists and is not the one shown now (the app can move the
-    /// selection off the entry the history is at). A deleted item is shown only where it was left, in Recently
-    /// Deleted, since no other place lists it.
+    /// selection off the entry the history is at). A deleted item is not shown, since no place lists it.
     func target(_ direction: Direction, in library: any ItemLibrary, shown: Set<ItemID>) -> (index: Int, entry: Entry)? {
         let candidates = direction == .back ? Array(entries.indices.prefix(max(position, 0)).reversed()) : Array(entries.indices.dropFirst(position + 1))
         return candidates.lazy.map { ($0, entries[$0]) }.first { _, entry in
             guard shown != [entry.id], let item = library.item(entry.id) else { return false }
-            return item.state != .trashed || entry.place == .recentlyDeleted
+            return item.state != .trashed
         }
     }
 }
@@ -487,7 +518,7 @@ final class NewItemDraft {
     init(place: SidebarItem) {
         self.place = place
         if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
-        if case .project(let id) = place { parentID = id }
+        if case .collection(let id) = place { parentID = id }
     }
 
     /// A draft carried to another library keeps its text and what the loaded library can still hold: a parent it

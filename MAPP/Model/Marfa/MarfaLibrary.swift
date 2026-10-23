@@ -410,8 +410,11 @@ import Observation
         let content = contentRevision
         let membership = membershipRevision
         if let held = listed[place], held.content == content { return held.items }
-        var listing = listed[place].flatMap { $0.membership == membership ? $0 : nil }
-            ?? Listing(membership: membership, ids: Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id))
+        // Which items are recent, and in what order, changes with any edit, not only with membership.
+        var listing = listed[place].flatMap { $0.membership == membership && place != .recents ? $0 : nil }
+            ?? Listing(membership: membership, ids: place == .recents
+                ? Self.recent(index.ids(in: .active).compactMap { records[$0]?.item }).map(\.id)
+                : Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id))
         listing.content = content
         listing.items = listing.ids.compactMap { records[$0]?.item }
         listed[place] = listing
@@ -419,6 +422,7 @@ import Observation
     }
 
     func count(in place: SidebarItem) -> Int {
+        if place == .recents { return min(index.ids(in: .active).count, Self.recentLimit) }
         let revision = membershipRevision
         if let held = counted[place], held.revision == revision { return held.count }
         let count = members(of: place).count
@@ -432,24 +436,27 @@ import Observation
     }
 
     /// The Inbox is the feed tier. All Items is every active item in either tier, files among them, as All Notes
-    /// is in a folder. A type's place holds its subtypes too.
+    /// is in a folder. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
         case .inbox: return index.feed
         case .allNotes: return index.ids(in: .active)
+        // Listed in its own order by `items(in:)` and counted by its limit, so never read here.
+        case .recents: return []
         case .favorites: return index.favorites
         case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
-        case .itemType(let type): return active(ofType: TypeID(type))
-        case .files: return active(ofType: MarfaMapping.fileType)
-        case .project(let id):
+        case .itemType(let type): return index.activeByType[TypeID(type)] ?? []
+        case .files: return active(withSubtypesOf: MarfaMapping.fileType)
+        // What is filed under the item, at any depth; the item itself is the place, not one of its members.
+        case .collection(let id):
             let active = index.ids(in: .active)
-            return index.reachable(from: id, type: MarfaMapping.parentEdge).union([id]).intersection(active)
+            return index.reachable(from: id, type: MarfaMapping.parentEdge).subtracting([id]).intersection(active)
         case .recentlyDeleted: return index.ids(in: .trashed)
-        case .folder, .marfaTypes: return []
+        case .folder: return []
         }
     }
 
-    private func active(ofType type: TypeID) -> Set<ItemID> {
+    private func active(withSubtypesOf type: TypeID) -> Set<ItemID> {
         catalogue.descendants(of: type).union([type]).reduce(into: Set<ItemID>()) { found, type in
             found.formUnion(index.activeByType[type] ?? [])
         }
@@ -458,15 +465,14 @@ import Observation
     func name(of place: SidebarItem) -> String {
         switch place {
         case .inbox: String(localized: "Inbox")
+        case .recents: String(localized: "Recents")
         case .allNotes: String(localized: "All Items")
         case .favorites: String(localized: "Favorites")
-        case .favoriteItem(let id), .project(let id): item(id)?.title ?? ""
+        case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
         case .folder: ""
-        case .itemType(let type) where TypeID(type) == MarfaMapping.projectType: String(localized: "Projects")
         case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
         case .files: String(localized: "Files")
         case .recentlyDeleted: String(localized: "Recently Deleted")
-        case .marfaTypes: String(localized: "Marfa Types")
         }
     }
 

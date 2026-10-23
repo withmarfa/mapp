@@ -9,7 +9,7 @@ import Testing
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
-        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host())
+        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host(), defaults: defaults)
     }
 
     @Test func withNoServerSetTheFolderIsAlwaysTheLibrary() {
@@ -54,6 +54,19 @@ import Testing
         #expect(libraries.current == nil, "no notes folder is chosen yet")
         #expect(libraries.host.source == nil)
         #expect(bench.servers.opened.isEmpty)
+    }
+
+    @Test func eachLibraryKeepsItsOwnSidebarLayout() async throws {
+        let bench = try HostBench()
+        let libraries = try libraries(bench)
+        try await libraries.host.connect(address: address, key: "key")
+        #expect(libraries.sidebarLayoutKey == "marfa:\(address)")
+        libraries.updateSidebarLayout { $0.setHidden(.favorites, true) }
+        #expect(libraries.sidebarLayout.isHidden(.favorites))
+
+        try await libraries.host.disconnect()
+        #expect(libraries.sidebarLayoutKey.hasPrefix("folder:"))
+        #expect(!libraries.sidebarLayout.isHidden(.favorites), "the folder's sidebar is its own")
     }
 
     @Test func connectingChoosesTheServersLibraryAndDisconnectingGivesTheFolderBack() async throws {

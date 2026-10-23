@@ -12,21 +12,18 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
-    @State private var sidebarWidth: CGFloat = 220
-    @State private var listWidth: CGFloat = 340
+    @State private var sidebarWidth: CGFloat = 230
+    @State private var listWidth: CGFloat = 330
     @State private var measuredWidths = ColumnWidths()
-    @State private var typesListWidth: CGFloat = 340
     @State private var galleryWidth: CGFloat = 900
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var importRequestID: UUID?
-    private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
-        self.settings = settings
         self.restoresWindow = restoresWindow
     }
 
@@ -41,29 +38,24 @@ struct MainView: View {
 
     var body: some View { lifecycleWindow }
 
+    /// The gallery and the table have no list column, so they mount the two-column split view. Settings
+    /// shows in the three-column one, in place of the list and the page, whatever the window is set to show.
+    private var usesCollectionLayout: Bool { browser.usesCollection && !browser.showsSettings }
+
     private var activeWindow: some View {
-        Group {
-            if settings.isPresented {
-                SettingsView(presentation: settings)
-            } else {
-                // Release the split view's toolbar provider before changing its native column count.
-                // Browser, editor, drafts, and column preferences remain above this presentation identity.
-                renamingWindow.id(browser.usesGallery)
-            }
-        }
-        .onChange(of: browser.usesGallery) {
+        // Release the split view's toolbar provider before changing its native column count.
+        // Browser, editor, drafts, and column preferences remain above this presentation identity.
+        renamingWindow.id(usesCollectionLayout)
+        .onChange(of: usesCollectionLayout) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
             editor.flush()
         }
-        .onChange(of: browser.showsGallery) {
-            if browser.showsGallery { editor.releaseFocus(); editor.flush() }
+        .onChange(of: browser.showsCollection) {
+            if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }
-        .onChange(of: settings.isPresented) {
-            if settings.isPresented {
-                // Changing the ideal during a resize feeds transient layout sizes back into the split view.
-                sidebarWidth = measuredWidths.sidebar
-                listWidth = measuredWidths.list
+        .onChange(of: browser.showsSettings) {
+            if browser.showsSettings {
                 editor.flush()
                 browser.palette = nil
                 pane = nil
@@ -81,28 +73,13 @@ struct MainView: View {
     }
 
     private var splitView: some View {
-        // The list workspace keeps three columns even when Marfa Types replaces its content.
-        // Gallery replaces this entire split view rather than changing the columns inside it.
+        // The gallery and the table replace this entire split view rather than changing the columns inside it.
         NavigationSplitView(columnVisibility: listColumnVisibility) {
             sidebarColumn
         } content: {
             Group {
-                if browser.showsTypes {
-                    TypesListView(browser: browser.types, pane: $pane)
-                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(library.name(of: .marfaTypes))
-                        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
-                        .toolbar {
-                            ColumnSearch(
-                                isExpanded: $browser.isSearchExpanded,
-                                text: Bindable(browser.types).searchText,
-                                prompt: String(localized: "Search"),
-                                columnWidth: typesListWidth,
-                                focusRequests: browser.searchFocusRequests,
-                                onSubmit: browser.types.selectFirstMatch,
-                                onDown: { browser.focusRequest = .list }
-                            ) {}
-                        }
+                if browser.showsSettings {
+                    SettingsPageList(browser: browser)
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane)
                 }
@@ -112,11 +89,15 @@ struct MainView: View {
             }
             .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
         } detail: {
-            itemPage
-                .modifier(itemInspector)
-                .toolbar(id: "main") {
-                    NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
-                }
+            if browser.showsSettings {
+                SettingsPageView(page: browser.settingsPage)
+            } else {
+                itemPage
+                    .modifier(itemInspector)
+                    .toolbar(id: "main") {
+                        NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                    }
+            }
         }
     }
 
@@ -124,20 +105,14 @@ struct MainView: View {
         Sidebar(browser: browser, order: order)
             // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
             .focused($pane, equals: .sidebar)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                SyncStatusBar { settings.show(.marfa) }
+            // A bar, not an inset, so the list's rows soften under it as they scroll past.
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                SidebarFoot(browser: browser)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0.isFinite, $0 >= 180 { measuredWidths.sidebar = $0 }
+                if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
-            .toolbar {
-                ToolbarItem {
-                    Button("Settings…", systemImage: "gearshape") { settings.show() }
-                        .help("Settings")
-                        .accessibilityIdentifier("SettingsToolbar")
-                }
-            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
     }
 
     private var itemPage: some View {
@@ -145,10 +120,6 @@ struct MainView: View {
             if browser.isCreatingItem, let draft = browser.itemDraft {
                 NewItemPage(browser: browser, draft: draft)
                     .disabled(browser.isAwaitingCreation)
-                    .onAppear { editor.close() }
-            } else if browser.showsTypes {
-                TypeDetailView(browser: browser.types)
-                    // The note that was on the page is out of sight, so it is left.
                     .onAppear { editor.close() }
             } else {
                 NoteDetail(browser: browser, editor: editor, details: details)
@@ -158,18 +129,22 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if browser.usesGallery {
+            if usesCollectionLayout {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
                     Group {
-                        if browser.showsGallery {
-                            ItemGallery(browser: browser, order: order, pane: $pane)
+                        if browser.showsCollection {
+                            if browser.viewMode == .table {
+                                ItemTable(browser: browser, order: order, pane: $pane)
+                            } else {
+                                ItemGallery(browser: browser, order: order, pane: $pane)
+                            }
                         } else {
                             itemPage
                                 .toolbar {
                                     ToolbarItem(placement: .navigation) {
-                                        Button("Back to Gallery", systemImage: "chevron.backward") { browser.returnToGallery() }
+                                        Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
                                             .accessibilityIdentifier("BackToGallery")
                                     }
                                 }
@@ -180,7 +155,14 @@ struct MainView: View {
                     .toolbar {
                         GalleryToolbar(
                             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            columnWidth: min(galleryWidth, 400))
+                            columnWidth: min(galleryWidth, 400)
+                        ) {
+                            if browser.viewMode == .table {
+                                ItemTableControls(browser: browser)
+                            } else {
+                                ViewOptionsMenu()
+                            }
+                        }
                     }
                 }
             } else {
@@ -197,7 +179,6 @@ struct MainView: View {
         workspace
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
-        .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 ZStack(alignment: .top) {
@@ -208,7 +189,7 @@ struct MainView: View {
                             browser.palette = nil
                             browser.focusRequest = .list
                         }
-                    CommandPalette(browser: browser, editor: editor, settings: settings, mode: palette)
+                    CommandPalette(browser: browser, editor: editor, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
                         .id(palette)
                         .padding(.top, 72)
@@ -216,15 +197,15 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, browser.showsGallery ? nil : editor)
+        .focusedSceneValue(\.editor, browser.showsCollection ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
         activeWindow
-        // The gallery disappears while an item is open; selection must still follow deletes and moves.
+        // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
         .onChange(of: galleryItemIDs) { old, new in
-            guard browser.usesGallery, !browser.isCreatingItem else { return }
+            guard browser.usesCollection, !browser.isCreatingItem else { return }
             browser.keepSelection(from: old, to: new)
         }
         .onChange(of: library.folders) {
@@ -277,7 +258,7 @@ struct MainView: View {
     }
 
     private var galleryItemIDs: [ItemID] {
-        guard browser.usesGallery else { return [] }
+        guard browser.usesCollection else { return [] }
         return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 
@@ -332,27 +313,23 @@ struct MainView: View {
         guard let requestID = importRequestID, let id = completedImportID,
               library.item(id) != nil else { return }
         browser.isCreatingItem = false
+        browser.leaveSettings()
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]
-        browser.openGallerySelection()
+        browser.openCollectionSelection()
         library.consumeImportCompletion(requestID)
         importRequestID = nil
     }
 
-    /// The list's search comes out as a field, which takes the keyboard. Search List over Marfa Types searches
-    /// All Notes, since Find there searches the types.
+    /// The list's search comes out as a field, which takes the keyboard.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.showsTypes { browser.show(.allNotes, in: library, order: order) }
-            if browser.usesGallery {
+            if browser.usesCollection {
                 browser.isCreatingItem = false
-                browser.isGalleryItemPresented = false
+                browser.isCollectionItemPresented = false
             }
-            browser.isSearchExpanded = true
-            browser.searchFocusRequests += 1
-        case .typesSearch:
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .sidebar, .list:
@@ -361,7 +338,7 @@ struct MainView: View {
             let request = browser.focusRequest
             Task { pane = request }
         case .page:
-            if browser.showsGallery { browser.isGalleryItemPresented = true }
+            if browser.showsCollection { browser.isCollectionItemPresented = true }
             return
         case nil: return
         }
@@ -382,8 +359,8 @@ struct MainView: View {
 
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.
 private final class ColumnWidths {
-    var sidebar: CGFloat = 220
-    var list: CGFloat = 340
+    var sidebar: CGFloat = 230
+    var list: CGFloat = 330
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

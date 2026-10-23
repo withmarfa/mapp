@@ -138,8 +138,8 @@ struct ItemLayerTests {
     }
 
     @Test(arguments: [
-        PlaceID.inbox, .all, .favorites, .archive, .recentlyDeleted, .marfaTypes,
-        .type(TypeID("core.note")), .beneath(ItemID("project")), .folder(ItemID("folder"))
+        PlaceID.inbox, .all, .favorites, .archive, .recentlyDeleted,
+        .type(TypeID("core.note")), .folder(ItemID("folder"))
     ])
     func aPlaceSurvivesEncoding(place: PlaceID) throws {
         let data = try JSONEncoder().encode(place)

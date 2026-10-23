@@ -32,6 +32,16 @@
     "%@ Your text is on the clipboard, so you can paste it back." : {
       "extractionState" : "manual"
     },
+    "%@, %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld"
+          }
+        }
+      }
+    },
     "%lld changes" : {
       "localizations" : {
         "en" : {
@@ -69,6 +79,28 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld changes are waiting to be sent."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes need attention" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change needs attention"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes need attention"
                 }
               }
             }
@@ -142,6 +174,16 @@
         }
       }
     },
+    "%lld of %lld items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld items"
+          }
+        }
+      }
+    },
     "%lld pt" : {
 
     },
@@ -153,9 +195,6 @@
     },
     "^[%lld result](inflect: true)" : {
 
-    },
-    "^[%lld subtype](inflect: true)" : {
-      "extractionState" : "manual"
     },
     "^[Delete %lld note](inflect: true) immediately?" : {
 
@@ -202,20 +241,20 @@
     "A note named “%@” is already in this folder. Please choose a different name." : {
 
     },
+    "A notes app for Marfa." : {
+
+    },
     "A related file's metadata cannot be safely updated." : {
 
     },
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
     },
-    "A type that is compatible with another claims to have at least the other’s fields." : {
-      "extractionState" : "manual"
+    "A to Z" : {
+
     },
     "About" : {
       "extractionState" : "manual"
-    },
-    "Add" : {
-
     },
     "Add Attachment…" : {
 
@@ -227,6 +266,9 @@
 
     },
     "Add Column Before" : {
+
+    },
+    "Add Property" : {
 
     },
     "Add Relationship…" : {
@@ -262,9 +304,6 @@
     "All Notes" : {
 
     },
-    "An edge points from one item to another." : {
-      "extractionState" : "manual"
-    },
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
@@ -293,13 +332,16 @@
     "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
       "extractionState" : "manual"
     },
-    "Any type" : {
-      "extractionState" : "manual"
+    "Anything other items are filed under is a collection." : {
+
     },
     "Appearance" : {
 
     },
     "Archive" : {
+
+    },
+    "Ascending" : {
 
     },
     "Assignee" : {
@@ -314,13 +356,10 @@
     "Back to Gallery" : {
 
     },
-    "Back to MAPP" : {
+    "Back to Table" : {
 
     },
     "Base Text Size" : {
-
-    },
-    "Base Text Size Font Sidebar Sort By Group by Date List Preview Notes List" : {
 
     },
     "Block Quote" : {
@@ -425,9 +464,6 @@
     "Change Parent…" : {
 
     },
-    "Change…" : {
-
-    },
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
@@ -452,20 +488,29 @@
     "Choice" : {
       "extractionState" : "manual"
     },
+    "Choose" : {
+
+    },
     "Choose a Folder for Your Notes" : {
 
     },
     "Choose a kind of item and give it a title." : {
       "extractionState" : "manual"
     },
-    "Choose a type to see its fields and connections." : {
-      "extractionState" : "manual"
+    "Choose a single item to read or edit it." : {
+
     },
     "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
 
     },
     "Choose a unique title without characters that cannot be used in a file name." : {
       "extractionState" : "manual"
+    },
+    "Choose an item from the list to read or edit it." : {
+
+    },
+    "Choose Another Folder…" : {
+
     },
     "Choose Date" : {
       "extractionState" : "manual"
@@ -475,6 +520,9 @@
     },
     "Choose one item here, or remove the link first." : {
       "extractionState" : "manual"
+    },
+    "Clear Filters" : {
+
     },
     "Clear Selection" : {
       "extractionState" : "manual"
@@ -494,20 +542,20 @@
     "Collapsed" : {
 
     },
+    "Collection" : {
+
+    },
+    "Collections" : {
+
+    },
     "Column" : {
+
+    },
+    "Columns" : {
 
     },
     "Command Palette" : {
 
-    },
-    "Compatibility" : {
-      "extractionState" : "manual"
-    },
-    "Compatible from" : {
-      "extractionState" : "manual"
-    },
-    "Compatible with" : {
-      "extractionState" : "manual"
     },
     "Completed" : {
       "extractionState" : "manual"
@@ -523,6 +571,12 @@
     },
     "Connected" : {
       "extractionState" : "manual"
+    },
+    "Connected, up to date" : {
+
+    },
+    "Connecting to a Marfa server below reads its library instead. This folder is used again if you disconnect." : {
+
     },
     "Connecting…" : {
       "extractionState" : "manual"
@@ -596,26 +650,45 @@
     "Delete Notes" : {
 
     },
+    "Delete Permanently" : {
+
+    },
     "Delete Row" : {
 
     },
     "Delete the folder “%@”?" : {
 
     },
-    "Deleted notes stay in Recently Deleted for %lld days, then they’re deleted for good." : {
+    "Deleted %@" : {
 
     },
-    "Deleting either item is refused while the connection exists" : {
-      "extractionState" : "manual"
-    },
-    "Deleting either item keeps the other" : {
-      "extractionState" : "manual"
-    },
-    "Deleting the item it points from also deletes the item it points to" : {
-      "extractionState" : "manual"
+    "Deleted items stay here for %lld days, then they’re deleted for good." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted items stay here for %lld day, then they’re deleted for good."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted items stay here for %lld days, then they’re deleted for good."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Derived From" : {
       "extractionState" : "manual"
+    },
+    "Descending" : {
+
     },
     "Description" : {
       "extractionState" : "manual"
@@ -659,25 +732,13 @@
     "Divider" : {
 
     },
-    "Each can be pointed to by many items." : {
-      "extractionState" : "manual"
+    "Done" : {
+
     },
-    "Each can be pointed to by one item at most." : {
-      "extractionState" : "manual"
-    },
-    "Each can point to many items." : {
-      "extractionState" : "manual"
-    },
-    "Each can point to one item at most." : {
-      "extractionState" : "manual"
+    "Duration" : {
+
     },
     "Each server has its own copy on this Mac." : {
-      "extractionState" : "manual"
-    },
-    "Edge types" : {
-      "extractionState" : "manual"
-    },
-    "Edge types that do not limit their types connect every type, so they are not listed here." : {
       "extractionState" : "manual"
     },
     "Edit Property" : {
@@ -698,7 +759,10 @@
     "Editor Couldn’t Complete the Action" : {
 
     },
-    "Empty Now…" : {
+    "Empty" : {
+
+    },
+    "Empty Recently Deleted…" : {
 
     },
     "Ends" : {
@@ -717,6 +781,9 @@
 
     },
     "Export as PDF…" : {
+
+    },
+    "Favorite" : {
 
     },
     "Favorites" : {
@@ -743,6 +810,9 @@
     "Files" : {
       "extractionState" : "manual"
     },
+    "Filter" : {
+
+    },
     "Find" : {
 
     },
@@ -759,6 +829,9 @@
 
     },
     "Finish editing the current note before changing libraries." : {
+
+    },
+    "Finished First" : {
 
     },
     "Fit" : {
@@ -785,9 +858,6 @@
     "From" : {
       "extractionState" : "manual"
     },
-    "From or to" : {
-      "extractionState" : "manual"
-    },
     "Full Width" : {
 
     },
@@ -799,6 +869,9 @@
     },
     "Getting the latest changes from the server." : {
       "extractionState" : "manual"
+    },
+    "Group By" : {
+
     },
     "Group by Date" : {
 
@@ -818,8 +891,23 @@
     "Hide Details" : {
       "extractionState" : "manual"
     },
+    "Hide from Sidebar" : {
+
+    },
+    "Hides the group’s items" : {
+
+    },
     "High" : {
       "extractionState" : "manual"
+    },
+    "Highest First" : {
+
+    },
+    "How a page looks while you write." : {
+
+    },
+    "How text and lists look." : {
+
     },
     "https://marfa.example.com" : {
       "extractionState" : "manual"
@@ -846,11 +934,11 @@
     "In Progress" : {
       "extractionState" : "manual"
     },
-    "Inbox" : {
+    "In Progress First" : {
 
     },
-    "Inherited from" : {
-      "extractionState" : "manual"
+    "Inbox" : {
+
     },
     "Insert Table" : {
 
@@ -882,9 +970,6 @@
     "Item Type" : {
 
     },
-    "Item types" : {
-      "extractionState" : "manual"
-    },
     "Item unavailable" : {
       "extractionState" : "manual"
     },
@@ -893,6 +978,12 @@
     },
     "Items About This" : {
       "extractionState" : "manual"
+    },
+    "Items you delete appear here before they’re deleted for good." : {
+
+    },
+    "Items you’ve deleted. Restore them, or delete them for good." : {
+
     },
     "Its metadata cannot be safely changed." : {
 
@@ -920,6 +1011,28 @@
     },
     "Key refused" : {
       "extractionState" : "manual"
+    },
+    "Key refused, %lld changes waiting" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Key refused, %lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Key refused, %lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Kind" : {
       "extractionState" : "manual"
@@ -960,13 +1073,13 @@
     "Low" : {
       "extractionState" : "manual"
     },
+    "Lowest First" : {
+
+    },
     "Made by" : {
 
     },
     "Manage Connections…" : {
-
-    },
-    "MAPP" : {
 
     },
     "MAPP can’t open or follow the copy of your library on this Mac." : {
@@ -1029,9 +1142,6 @@
     "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
       "extractionState" : "manual"
     },
-    "MAPP Version Build" : {
-
-    },
     "Marfa" : {
       "extractionState" : "manual"
     },
@@ -1040,9 +1150,6 @@
     },
     "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting" : {
       "extractionState" : "manual"
-    },
-    "Marfa Types" : {
-
     },
     "Markdown Source" : {
 
@@ -1062,6 +1169,9 @@
     "Move" : {
 
     },
+    "Move Down" : {
+
+    },
     "Move Folder" : {
 
     },
@@ -1072,6 +1182,9 @@
 
     },
     "Move to Inbox" : {
+
+    },
+    "Move Up" : {
 
     },
     "Name" : {
@@ -1109,17 +1222,26 @@
     "New Note" : {
 
     },
+    "New types appear here automatically." : {
+
+    },
     "New Window" : {
+
+    },
+    "Newest First" : {
 
     },
     "No" : {
       "extractionState" : "manual"
     },
-    "No additional text" : {
+    "No %@" : {
 
     },
     "No Files" : {
       "extractionState" : "manual"
+    },
+    "No folder chosen" : {
+
     },
     "No Item Selected" : {
       "extractionState" : "manual"
@@ -1127,20 +1249,20 @@
     "No Items" : {
       "extractionState" : "manual"
     },
+    "No items match the filters." : {
+
+    },
+    "No Library Is Open" : {
+
+    },
+    "No Matching Items" : {
+
+    },
     "No Results" : {
 
     },
-    "No Type Selected" : {
-      "extractionState" : "manual"
-    },
-    "No Types" : {
-      "extractionState" : "manual"
-    },
     "None" : {
 
-    },
-    "Not a field of this type" : {
-      "extractionState" : "manual"
     },
     "Not connected" : {
       "extractionState" : "manual"
@@ -1166,10 +1288,10 @@
     "Notes Folder" : {
 
     },
-    "Notes Folder Change Show in Finder Recently Deleted Empty Now Delete" : {
+    "Notes List" : {
 
     },
-    "Notes List" : {
+    "Nothing Deleted" : {
 
     },
     "Number" : {
@@ -1181,6 +1303,31 @@
     "Offline" : {
       "extractionState" : "manual"
     },
+    "Offline, %lld changes waiting" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Oldest First" : {
+
+    },
     "Only one item can be chosen here." : {
       "extractionState" : "manual"
     },
@@ -1188,6 +1335,12 @@
 
     },
     "Open %@" : {
+
+    },
+    "Open a library to choose what its sidebar shows." : {
+
+    },
+    "Open a library to see what you’ve deleted from it." : {
 
     },
     "Open Copy" : {
@@ -1214,6 +1367,9 @@
     "Opening Your Library…" : {
       "extractionState" : "manual"
     },
+    "Order" : {
+
+    },
     "Other" : {
       "extractionState" : "manual"
     },
@@ -1226,13 +1382,7 @@
     "Page Width" : {
 
     },
-    "Page Width Standard Full Width Reading Width Text Size Check Spelling While Typing" : {
-
-    },
     "Parent" : {
-      "extractionState" : "manual"
-    },
-    "Parent types" : {
       "extractionState" : "manual"
     },
     "Paste a new key" : {
@@ -1283,10 +1433,10 @@
     "Priority" : {
       "extractionState" : "manual"
     },
-    "Project" : {
-      "extractionState" : "manual"
+    "Problems" : {
+
     },
-    "Projects" : {
+    "Project" : {
       "extractionState" : "manual"
     },
     "Properties" : {
@@ -1298,10 +1448,16 @@
     "Quote" : {
 
     },
+    "Reading notes from this folder" : {
+
+    },
     "Recently Deleted" : {
 
     },
     "Recently deleted notes can’t be edited." : {
+
+    },
+    "Recents" : {
 
     },
     "Recover" : {
@@ -1349,17 +1505,14 @@
     "Replace…" : {
 
     },
-    "Required" : {
-      "extractionState" : "manual"
+    "Reset Columns" : {
+
     },
     "Resolve the existing target before replacing this relationship." : {
       "extractionState" : "manual"
     },
-    "Reverse name" : {
-      "extractionState" : "manual"
-    },
-    "Reverse name: %@" : {
-      "extractionState" : "manual"
+    "Restore" : {
+
     },
     "Roles" : {
       "extractionState" : "manual"
@@ -1389,12 +1542,6 @@
 
     },
     "Search Notes…" : {
-
-    },
-    "Search Settings" : {
-
-    },
-    "Select an item" : {
 
     },
     "Selected" : {
@@ -1428,6 +1575,9 @@
     "Settings" : {
 
     },
+    "Settings: %@" : {
+
+    },
     "Settings…" : {
 
     },
@@ -1435,6 +1585,12 @@
 
     },
     "Show" : {
+
+    },
+    "Show %@" : {
+
+    },
+    "Show Collections" : {
 
     },
     "Show Details" : {
@@ -1449,11 +1605,20 @@
     "Show Markdown Source" : {
 
     },
+    "Show only some items" : {
+
+    },
+    "Show Types" : {
+
+    },
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
-    "Shown because a type below it matches the search." : {
-      "extractionState" : "manual"
+    "Shows the group’s items" : {
+
+    },
+    "Sidebar" : {
+
     },
     "Size" : {
       "extractionState" : "manual"
@@ -1539,6 +1704,9 @@
     "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://." : {
       "extractionState" : "manual"
     },
+    "The app, and the library it’s reading." : {
+
+    },
     "The connection could not be removed." : {
 
     },
@@ -1567,12 +1735,6 @@
       "extractionState" : "manual"
     },
     "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again." : {
-      "extractionState" : "manual"
-    },
-    "The item it points from" : {
-      "extractionState" : "manual"
-    },
-    "The item it points to" : {
       "extractionState" : "manual"
     },
     "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy." : {
@@ -1686,6 +1848,9 @@
     "There’s no key for this Marfa server." : {
       "extractionState" : "manual"
     },
+    "These changes need you. Until you decide, they stay on this Mac." : {
+
+    },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
       "extractionState" : "manual"
     },
@@ -1719,8 +1884,8 @@
     "This kind of item has no text to edit." : {
       "extractionState" : "manual"
     },
-    "This library has no types to show." : {
-      "extractionState" : "manual"
+    "This library can’t delete items for good right now." : {
+
     },
     "This library is being brought up to date. Try again in a moment." : {
       "extractionState" : "manual"
@@ -1741,9 +1906,6 @@
       "extractionState" : "manual"
     },
     "This needs the server. Try again when you’re back online." : {
-      "extractionState" : "manual"
-    },
-    "This type has no fields." : {
       "extractionState" : "manual"
     },
     "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it." : {
@@ -1770,6 +1932,9 @@
     "Today" : {
 
     },
+    "Tomorrow" : {
+
+    },
     "Try Again" : {
       "extractionState" : "manual"
     },
@@ -1777,8 +1942,8 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "Types with the role %@" : {
-      "extractionState" : "manual"
+    "Types" : {
+
     },
     "Undo" : {
 
@@ -1813,6 +1978,9 @@
     "Version" : {
 
     },
+    "Version %@" : {
+
+    },
     "View As" : {
 
     },
@@ -1820,6 +1988,9 @@
 
     },
     "View as List" : {
+
+    },
+    "View as Table" : {
 
     },
     "View Options" : {
@@ -1834,22 +2005,19 @@
     "Warning" : {
 
     },
+    "What the sidebar shows, and in what order." : {
+
+    },
     "What you wrote is lost unless you copy it first." : {
       "extractionState" : "manual"
     },
-    "When an item is deleted" : {
-      "extractionState" : "manual"
+    "Where your notes are kept." : {
+
     },
     "Wide" : {
 
     },
-    "Written at" : {
-      "extractionState" : "manual"
-    },
     "Yes" : {
-      "extractionState" : "manual"
-    },
-    "Yes or no" : {
       "extractionState" : "manual"
     },
     "Yesterday" : {
@@ -1872,6 +2040,9 @@
     },
     "Your key doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
+    },
+    "Z to A" : {
+
     },
     "Zoom In" : {
 

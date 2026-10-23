@@ -1,45 +1,59 @@
 import SwiftUI
 
-/// List or Gallery, each with its shortcut: under a View As header in the list's View Options menu, or as View as
-/// List and View as Gallery in the View menu, which keeps them whatever the window in front is.
+/// List, Gallery or Table, each with its shortcut, as View as List, Gallery and Table in the View menu, which keeps
+/// them whatever the window in front is.
 struct ItemViewOptions: View {
-    enum Style { case sections, menuBar }
-
     /// Nil while no window is in front, which leaves the choices in the menu, dimmed.
     let browser: Browser?
-    var style = Style.sections
 
     var body: some View {
         Group {
-            switch style {
-            case .sections:
-                Section("View As") {
-                    choice("List", systemImage: "list.bullet", .list, key: "1")
-                    choice("Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
-                }
-            case .menuBar:
-                choice("View as List", systemImage: "list.bullet", .list, key: "1")
-                choice("View as Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
-            }
+            choice("View as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
+            choice("View as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
+            choice("View as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
         }
-        .disabled(browser?.showsTypes != false)
+        .disabled(browser == nil)
+    }
+
+    private func identifier(_ mode: ItemViewMode) -> String {
+        switch mode {
+        case .list: "ViewAsList"
+        case .gallery: "ViewAsGallery"
+        case .table: "ViewAsTable"
+        }
     }
 
     private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, key: KeyEquivalent) -> some View {
         Toggle(title, systemImage: systemImage, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
             .keyboardShortcut(key)
-            .accessibilityIdentifier(mode == .list ? "ViewAsList" : "ViewAsGallery")
+            .accessibilityIdentifier(identifier(mode))
     }
 }
 
-/// How the list looks: its view, its order and its grouping, in one menu on the list's toolbar.
-struct ViewOptionsMenu: View {
+/// List, Gallery or Table, as one pop-up button that shows the view in use, as Finder's View button does. It
+/// stays at the window's trailing side whichever view is shown.
+struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        Menu("View Options", systemImage: "line.3.horizontal.decrease") {
-            ItemViewOptions(browser: browser)
-            Divider()
+        Picker("View As", selection: $browser.viewMode) {
+            Label("List", systemImage: ItemViewMode.list.symbol).tag(ItemViewMode.list)
+            Label("Gallery", systemImage: ItemViewMode.gallery.symbol).tag(ItemViewMode.gallery)
+            Label("Table", systemImage: ItemViewMode.table.symbol).tag(ItemViewMode.table)
+        }
+        .pickerStyle(.menu)
+        .labelStyle(.iconOnly)
+        .help("View As")
+        .accessibilityLabel("View As")
+        .accessibilityIdentifier("ViewModeMenu")
+    }
+}
+
+/// How the list and the gallery are ordered and grouped, in one menu on their toolbar. The table has its own
+/// (`ItemTableControls`), which adds its columns.
+struct ViewOptionsMenu: View {
+    var body: some View {
+        Menu("View Options", systemImage: "slider.horizontal.3") {
             OrderOptions(style: .sections)
         }
         .menuIndicator(.hidden)

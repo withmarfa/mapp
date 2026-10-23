@@ -35,6 +35,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Every item not deleted whose title or text has the query.
     func items(matching query: String) -> [Item]
     func count(in place: SidebarItem) -> Int
+    /// The catalogue's types that hold items, with their labels and counts, for a sidebar that lists them. The
+    /// default is built from `catalogue` and `count(in:)`, so a library answers it without a view asking what kind
+    /// of library it is.
+    var itemTypeCounts: [ItemTypeCount] { get }
     func name(of place: SidebarItem) -> String
     func folder(_ id: ItemID) -> Folder?
     /// Nil for an item in no folder.

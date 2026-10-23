@@ -47,19 +47,31 @@ final class FakeItemLibrary: ItemLibrary {
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
 
+    private func isBelow(_ item: Item, _ ancestor: ItemID) -> Bool {
+        var visited: Set<ItemID> = [item.id]
+        var current = item
+        while let parent = current.parentID, visited.insert(parent).inserted {
+            if parent == ancestor { return true }
+            guard let next = self.item(parent) else { return false }
+            current = next
+        }
+        return false
+    }
+
     func items(in place: SidebarItem) -> [Item] {
-        items.filter { item in
+        if place == .recents { return Self.recent(items) }
+        return items.filter { item in
             switch place {
             case .inbox: item.state == .active && item.container == nil
             case .allNotes: item.state == .active
+            case .recents: false
             case .favorites: item.state == .active && item.isFavorite
             case .favoriteItem(let id): item.id == id && item.state == .active && item.isFavorite
             case .folder(let id): item.state == .active && item.container == ContainerID(id)
             case .itemType(let type): item.state == .active && item.type == TypeID(type)
-            case .project(let id): item.state == .active && item.id == id
+            case .collection(let id): item.state == .active && isBelow(item, id)
             case .files: item.state == .active && item.isFile
             case .recentlyDeleted: item.state == .trashed
-            case .marfaTypes: false
             }
         }
     }
