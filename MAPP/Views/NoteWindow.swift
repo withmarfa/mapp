@@ -39,6 +39,15 @@ struct NoteWindow: View {
 
     private var item: Item? { id.flatMap { library.item($0) } }
 
+    /// A note's More menu acts on its page; a file has none, so only Details sits above its inspector.
+    @ToolbarContentBuilder private var inspectorToolbar: some ToolbarContent {
+        if let item, !item.isFile {
+            InspectorToolbar(browser: nil, items: [item], editor: editor, details: details)
+        } else {
+            ToolbarItem { DetailsToggle(details: details) }
+        }
+    }
+
     var body: some View {
         Group {
             if let item, !item.isFile {
@@ -62,15 +71,21 @@ struct NoteWindow: View {
                                 ShareLink(item: "").disabled(true)
                             }
                         }
-                        ToolbarItem {
-                            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-                                .accessibilityIdentifier("DetailsToggle")
+                        // Above the inspector while it is open.
+                        if !details.isPresented {
+                            ToolbarItem {
+                                Button("Details", systemImage: "sidebar.right") { details.isPresented = true }
+                                    .accessibilityIdentifier("DetailsToggle")
+                            }
                         }
                     }
             }
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-            if let id { ItemInspectorHost(itemID: id, details: details) }
+            if let id {
+                ItemInspectorHost(itemID: id, details: details)
+                    .toolbar { inspectorToolbar }
+            }
         }
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }

@@ -190,7 +190,7 @@ struct MainView: View {
     }
 
     private var itemInspector: ItemInspectorColumn {
-        ItemInspectorColumn(browser: browser, details: details)
+        ItemInspectorColumn(browser: browser, details: details, editor: editor)
     }
 
     private var presentedWindow: some View {
@@ -375,13 +375,18 @@ private final class ColumnWidths {
 /// resize of the window lay out every column again, which made live resizing several times slower, and one applied
 /// after the column's toolbar raises an exception during layout when a new window opens.
 private struct ItemInspectorColumn: ViewModifier {
+    @CurrentLibrary private var library
     let browser: Browser
     let details: DetailsPresentation
+    let editor: EditorController
 
     func body(content: Content) -> some View {
-        content.inspector(isPresented: Binding { details.isPresented && !browser.showsTypes && !browser.isCreatingItem } set: { details.isPresented = $0 }) {
+        content.inspector(isPresented: Binding { details.showsInspector(in: browser) } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+                .toolbar {
+                    InspectorToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                }
         }
     }
 }

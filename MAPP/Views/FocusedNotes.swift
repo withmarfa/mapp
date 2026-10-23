@@ -32,6 +32,11 @@ private struct FocusedEditorKey: FocusedValueKey {
 @Observable
 final class DetailsPresentation {
     var isPresented = false
+
+    /// Whether the inspector is on screen: asked for, and not over the Types browser or a new item's draft.
+    func showsInspector(in browser: Browser?) -> Bool {
+        isPresented && browser?.showsTypes != true && browser?.isCreatingItem != true
+    }
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
