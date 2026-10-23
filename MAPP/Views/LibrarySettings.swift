@@ -74,36 +74,84 @@ struct LibrarySettings: View {
     }
 }
 
-/// The top of the Library page: the library in use, with a dot and a few words for how it stands.
+/// The top of the Library page: the library in use as a hero row, with its symbol, name, address, how it stands
+/// (a dot and a few words) and how many items it holds. A server's row ends in the button that disconnects from it.
 private struct LibrarySummary: View {
     @Environment(Libraries.self) private var libraries
+    @Environment(\.library) private var library
 
     private var host: MarfaHost { libraries.host }
+    private var isServer: Bool { host.configuredConnection != nil }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: isServer ? "server.rack" : "folder")
-                .interfaceFont(.title2)
-                .foregroundStyle(.secondary)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .center, spacing: 16) {
+            symbol
+            VStack(alignment: .leading, spacing: 3) {
                 Text(LibraryDescription.name(libraries))
-                    .interfaceFont(.headline)
+                    .interfaceFont(.title3.weight(.semibold))
+                    .lineLimit(1)
                     .textSelection(.enabled)
+                if let address {
+                    Text(address)
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
                 SyncStatusReading(host: host) { status in
                     standing(status)
                 }
+                .padding(.top, 2)
                 .accessibilityIdentifier("LibraryStanding")
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 12)
+            if isServer { disconnect }
         }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("LibrarySummary")
     }
 
-    private var isServer: Bool { libraries.host.configuredConnection != nil }
+    /// A server is its symbol in a rounded square tinted with the accent; a folder is the icon Finder gives it.
+    private var symbol: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color.accentColor.opacity(isServer ? 0.14 : 0.08))
+            if isServer {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(Color.accentColor)
+            } else if let url = libraries.folder.url {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .scaledToFit()
+                    .padding(8)
+            } else {
+                Image(systemName: "folder")
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .accessibilityHidden(true)
+    }
+
+    /// The full address of a server, or the path of a folder.
+    private var address: String? {
+        if let connection = host.configuredConnection { return connection.address.absoluteString }
+        return libraries.folder.url?.path(percentEncoded: false)
+    }
+
+    private var disconnect: some View {
+        HStack(spacing: 8) {
+            if libraries.marfaSettings.isWorking { ProgressView().controlSize(.small) }
+            Button("Disconnect") { libraries.marfaSettings.requestDisconnect() }
+                .buttonStyle(.bordered)
+                .disabled(libraries.marfaSettings.isWorking)
+                .accessibilityIdentifier("MarfaDisconnect")
+        }
+    }
 
     @ViewBuilder private func standing(_ status: SyncStatus) -> some View {
         let words = self.words(status)
@@ -111,6 +159,12 @@ private struct LibrarySummary: View {
             HStack(spacing: 6) {
                 Circle().fill(words.color).frame(width: 7, height: 7)
                 Text(words.line).foregroundStyle(.secondary)
+                if let library {
+                    Text("^[\(library.count(in: .allNotes)) item](inflect: true)")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .padding(.leading, 10)
+                }
             }
             if let detail = words.detail {
                 Text(detail)

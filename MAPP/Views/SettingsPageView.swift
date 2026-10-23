@@ -1,31 +1,27 @@
 import AppKit
 import SwiftUI
 
-/// One page of Settings: a heading with a line under it, then the page's grouped form, centered in a column that
-/// stays readable however wide the window is.
+/// One page of Settings: a title with a line under it, then the page's grouped form, centered in a column that
+/// stays readable however wide the window is. The whole page scrolls as one.
 struct SettingsPageView: View {
     let page: SettingsPage
 
     private static let contentWidth: CGFloat = 620
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(page.title)
-                    .interfaceFont(.title2.weight(.semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Text(page.summary)
-                    .interfaceFont(.body)
-                    .foregroundStyle(.secondary)
+        // The page is at least as tall as the window, so a page with an empty state centers it in the space under
+        // the title.
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    content
+                }
+                .frame(maxWidth: Self.contentWidth)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .top)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-            .accessibilityElement(children: .combine)
-            content
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(maxWidth: Self.contentWidth)
-        .frame(maxWidth: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .navigationTitle(page.title)
         .id(page)
@@ -33,7 +29,26 @@ struct SettingsPageView: View {
         .accessibilityIdentifier("SettingsDetail")
     }
 
-    @ViewBuilder private var content: some View {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(page.title)
+                .interfaceFont(.title.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+            Text(page.summary)
+                .interfaceFont(.body)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, Self.headerInset)
+        .padding(.top, 32)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Where a grouped form starts its text: the form's own margin, then the section's inset.
+    private static let headerInset: CGFloat = 30
+
+@ViewBuilder private var content: some View {
         switch page {
         case .appearance: AppearanceSettings()
         case .editor: EditorSettings()
@@ -51,6 +66,7 @@ extension View {
         self
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
+            .scrollDisabled(true)
     }
 }
 
@@ -109,31 +125,32 @@ private struct AboutSettings: View {
     @Environment(Libraries.self) private var libraries
 
     var body: some View {
-        Form {
-            Section {
-                VStack(spacing: 6) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .accessibilityHidden(true)
-                    Text(Self.name)
-                        .interfaceFont(.title2.weight(.semibold))
-                    Text("Version \(Self.version)")
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    Text("A notes app for Marfa.")
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            VStack(spacing: 4) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 112, height: 112)
+                    .accessibilityHidden(true)
+                    .padding(.bottom, 8)
+                Text(Self.name)
+                    .interfaceFont(.title2.weight(.semibold))
+                Text("Version \(Self.version)")
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Text("A notes app for Marfa.")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("AboutApp")
+            Form {
+                Section {
+                    LabeledContent("Library", value: LibraryDescription.name(libraries))
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("AboutApp")
             }
-            Section {
-                LabeledContent("Library", value: LibraryDescription.name(libraries))
-            }
+            .settingsForm()
         }
-        .settingsForm()
     }
 
     private static var name: String {

@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The list of Settings pages, which the content column shows while Settings is the place. It is a sidebar-style
-/// list in groups, so a page is chosen the way a place is.
+/// The list of Settings pages, which the content column shows while Settings is the place. It is drawn as the item
+/// list is, on the window's content background with the same rounded selection, and its groups are told apart by
+/// space rather than by headings.
 struct SettingsPageList: View {
     let browser: Browser
 
@@ -11,23 +12,43 @@ struct SettingsPageList: View {
         } set: { page in
             if let page { browser.settingsPage = page }
         }) {
-            ForEach(Array(SettingsPage.groups.enumerated()), id: \.offset) { _, pages in
-                Section {
-                    ForEach(pages) { page in
-                        Label {
-                            Text(page.title).interfaceFont(.body)
-                        } icon: {
-                            Image(systemName: page.symbol).interfaceFont(.body)
-                        }
-                        .tag(page)
-                        .accessibilityIdentifier("SettingsPage-\(page.rawValue)")
+            ForEach(Array(SettingsPage.groups.enumerated()), id: \.offset) { index, pages in
+                if index > 0 {
+                    // A row of its own, since a section header would be a heading and a row's padding would be
+                    // part of its selection.
+                    Color.clear
+                        .frame(height: 12)
+                        .selectionDisabled()
+                        .listRowSeparator(.hidden)
+                        .accessibilityHidden(true)
+                }
+                ForEach(pages) { page in
+                    Label {
+                        Text(page.title).interfaceFont(.body)
+                    } icon: {
+                        Image(systemName: page.symbol).interfaceFont(.body)
                     }
+                    .labelStyle(SettingsPageLabelStyle())
+                    .frame(minHeight: 30)
+                    .tag(page)
+                    .listRowSeparator(.hidden)
+                    .accessibilityIdentifier("SettingsPage-\(page.rawValue)")
                 }
             }
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
         .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsPageList")
+    }
+}
+
+/// A symbol in a column of its own, so the labels of the rows line up whichever symbol is wider.
+private struct SettingsPageLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 10) {
+            configuration.icon.frame(width: 22)
+            configuration.title
+        }
     }
 }
 
