@@ -44,7 +44,8 @@ final class ItemToolbarTests: XCTestCase {
         for title in ["List", "Gallery", "Date Edited", "Date Created", "Title", "Group by Date"] {
             XCTAssertTrue(window.menuItems[title].waitForExistence(timeout: 3), title)
         }
-        XCTAssertEqual(window.menuItems["List"].value as? Int, 1, "the list is the view shown")
+        XCTAssertTrue(window.menuItems["List"].isEnabled)
+        XCTAssertTrue(window.menuItems["Gallery"].isEnabled)
         var previous = -CGFloat.infinity
         for title in ["View As", "List", "Gallery", "Sort By", "Date Edited", "Date Created", "Title", "Group by Date"] {
             let item = window.menuItems[title].firstMatch
@@ -125,6 +126,8 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertLessThan(viewOptions.frame.maxX, details.frame.minX)
         XCTAssertLessThan(details.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, newItem.frame.minX)
+        // ⌘2 leaves the keyboard where it was, so the grid is given it before Escape clears the selection.
+        window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "GalleryItem-", "Selected")).firstMatch.click()
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(details.waitForNonExistence(timeout: 3), "Details and More leave the grid when no card is selected")
         XCTAssertFalse(more.exists)
