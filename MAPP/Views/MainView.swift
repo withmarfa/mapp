@@ -12,8 +12,8 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
-    @State private var sidebarWidth: CGFloat = 220
-    @State private var listWidth: CGFloat = 340
+    @State private var sidebarWidth: CGFloat = 230
+    @State private var listWidth: CGFloat = 330
     @State private var measuredWidths = ColumnWidths()
     @State private var galleryWidth: CGFloat = 900
     @State private var noteName = ""
@@ -109,9 +109,9 @@ struct MainView: View {
                 SidebarFoot(browser: browser)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0.isFinite, $0 >= 180 { measuredWidths.sidebar = $0 }
+                if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
+            .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
     }
 
     private var itemPage: some View {
@@ -347,8 +347,8 @@ struct MainView: View {
 
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.
 private final class ColumnWidths {
-    var sidebar: CGFloat = 220
-    var list: CGFloat = 340
+    var sidebar: CGFloat = 230
+    var list: CGFloat = 330
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

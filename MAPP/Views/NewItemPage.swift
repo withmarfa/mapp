@@ -30,18 +30,18 @@ struct NewItemPage: View {
                 .accessibilityIdentifier("NewItemTitle")
             ItemPinLayout {
                 Menu {
-                    ForEach(WorkbenchSchema.types) { type in
-                        Button { draft.typeID = type.id } label: {
-                            if draft.typeID == type.id {
-                                Label(LocalizedStringKey(type.label), systemImage: "checkmark")
+                    ForEach(creatableTypes) { type in
+                        Button { draft.typeID = type.id.rawValue } label: {
+                            if draft.typeID == type.id.rawValue {
+                                Label(type.label, systemImage: "checkmark")
                             } else {
-                                Text(LocalizedStringKey(type.label))
+                                Label(type.label, systemImage: type.symbol)
                             }
                         }
                     }
                 } label: {
-                    ItemPinLabel(title: Text(LocalizedStringKey(WorkbenchSchema.definition(draft.typeID)?.label ?? "Type")),
-                                 systemImage: "doc.text")
+                    ItemPinLabel(title: Text(chosenType?.label ?? String(localized: "Type")),
+                                 systemImage: chosenType?.symbol ?? TypeSymbol.fallback)
                 }
                 .itemPinMenuStyle()
                 .accessibilityLabel("Type")
@@ -56,7 +56,7 @@ struct NewItemPage: View {
                     }
                 } label: {
                     ItemPinLabel(title: Text(parents.first { $0.id == draft.parentID }?.title ?? String(localized: "Parent")),
-                                 systemImage: "square.stack", isEmpty: draft.parentID == nil)
+                                 systemImage: "folder", isEmpty: draft.parentID == nil)
                 }
                 .itemPinMenuStyle(isEmpty: draft.parentID == nil)
                 .accessibilityLabel("Parent")
@@ -93,6 +93,11 @@ struct NewItemPage: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NewItemPage")
     }
+
+    /// Every kind of item the library can make, by name.
+    private var creatableTypes: [ItemTypeOption] { library.creatableTypes }
+
+    private var chosenType: ItemTypeOption? { creatableTypes.first { $0.id.rawValue == draft.typeID } }
 
     private var parents: [Item] { library.creationParentCandidates(typeID: draft.typeID) }
 

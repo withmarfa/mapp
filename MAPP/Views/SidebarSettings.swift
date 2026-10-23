@@ -76,7 +76,7 @@ struct SidebarSettings: View {
             Label {
                 Text(title ?? self.title(place, in: library, plan: plan)).interfaceFont(.body)
             } icon: {
-                Image(systemName: symbol(place)).interfaceFont(.body)
+                Image(systemName: symbol(place, plan: plan)).interfaceFont(.body).foregroundStyle(.tint)
             }
         }
         .toggleStyle(.switch)
@@ -109,16 +109,16 @@ struct SidebarSettings: View {
         }
     }
 
-    private func symbol(_ place: SidebarPlace) -> String {
+    private func symbol(_ place: SidebarPlace, plan: SidebarPlan) -> String {
         switch place {
         case .inbox: "tray"
         case .all: "note.text"
         case .favorites: "star"
-        case .projects: "square.stack"
+        case .projects: "folder"
         case .types: "square.grid.2x2"
         case .folders: "folder"
         case .files: "doc"
-        case .type(let id): TypeSymbol.name(for: id)
+        case .type(let id): plan.types.first { $0.id == id }?.symbol ?? TypeSymbol.fallback
         }
     }
 }

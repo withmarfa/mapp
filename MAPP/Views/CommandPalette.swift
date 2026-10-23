@@ -314,14 +314,15 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, String)] = [(.inbox, "tray"), (.allNotes, "note.text"), (.favorites, "star")]
-        if library.hasProjectType { items.append((.itemType(TypeID.project.rawValue), "square.stack")) }
-        items += library.items(in: .itemType(TypeID.project.rawValue)).map { (.project($0.id), "square.stack") }
-        items += library.itemTypeCounts.filter { $0.id != .project }.map { (.itemType($0.id.rawValue), "doc.text") }
-        if library.capabilities.contains(.folders) { items += [(.files, "doc")] }
-        items += library.folders.map { (.folder($0.id), "folder") }
-        return items.map { item, systemImage in
-            Entry(id: "place:\(item)", title: library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
+        var items: [(SidebarItem, String, String?)] = [(.inbox, "tray", nil), (.allNotes, "note.text", nil), (.favorites, "star", nil)]
+        if library.hasProjectType { items.append((.itemType(TypeID.project.rawValue), "folder", nil)) }
+        items += library.items(in: .itemType(TypeID.project.rawValue)).map { (.project($0.id), "folder", nil) }
+        // The types the sidebar shows, under the names it gives them.
+        items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
+        if library.capabilities.contains(.folders) { items += [(.files, "doc", nil)] }
+        items += library.folders.map { (.folder($0.id), "folder", nil) }
+        return items.map { item, systemImage, title in
+            Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)
                 browser.focusRequest = .list
             }
