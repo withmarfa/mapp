@@ -58,7 +58,7 @@ struct SidebarSettings: View {
                 } header: {
                     Text("Types")
                 } footer: {
-                    Text("A type appears here once the library holds an item of it. Drag to change the order.")
+                    Text("A type appears when the library has an item of that type. Drag to reorder.")
                 }
             }
         }

@@ -205,7 +205,7 @@
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
     },
-    "A type appears here once the library holds an item of it. Drag to change the order." : {
+    "A type appears when the library has an item of that type. Drag to reorder." : {
 
     },
     "About" : {
