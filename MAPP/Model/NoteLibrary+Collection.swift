@@ -374,6 +374,11 @@ nonisolated extension Item {
     var isFile: Bool {
         if case .file = content { true } else { false }
     }
+
+    /// What the library says a file item is, which is nil for a note and `.data` where it does not know.
+    var fileType: UTType? {
+        if case .file(let type, _) = content { type } else { nil }
+    }
 }
 
 nonisolated extension ContainerID {

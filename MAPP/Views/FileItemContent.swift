@@ -10,9 +10,18 @@ struct FileItemContent: View {
     let url: URL
     /// The item's title. A Marfa file is kept under its hash, so the file's own name says nothing to the person.
     let title: String
+    /// What the item's library says the file is. A Marfa file is kept under its hash with no extension, so the
+    /// name says nothing there; a type the library does not know leaves it to the name.
+    var contentType: UTType?
     @State private var zoom = 1.0
 
-    private var type: UTType { UTType(filenameExtension: url.pathExtension) ?? .data }
+    /// What a file is shown with: the library's type where it gives one, and the file's name where it does not.
+    nonisolated static func type(of url: URL, contentType: UTType?) -> UTType {
+        if let contentType, contentType != .data { return contentType }
+        return UTType(filenameExtension: url.pathExtension) ?? .data
+    }
+
+    private var type: UTType { Self.type(of: url, contentType: contentType) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,7 +45,7 @@ struct FileItemContent: View {
             } else if type.conforms(to: .image) {
                 FileImageView(url: url, title: title, zoom: zoom)
             } else {
-                FileQuickLookView(url: url)
+                FileQuickLookView(url: url, title: title, type: type)
             }
         }
         .id(url)
@@ -87,14 +96,32 @@ private struct FileImageView: View {
 
 private struct FileQuickLookView: NSViewRepresentable {
     let url: URL
+    let title: String
+    let type: UTType
+
+    final class Coordinator {
+        var file: QuickLookFile?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// The item is set once. `FileItemContent` makes a new view for another file, and setting it again on every
+    /// update would have Quick Look load the file again each time.
     func makeNSView(context: Context) -> QLPreviewView {
         let view = QLPreviewView(frame: .zero, style: .normal)!
         view.autostarts = true
-        view.previewItem = url as NSURL
+        // Closed once, by `dismantleNSView`: closing it again after its window closed it is a crash.
+        view.shouldCloseWithWindow = false
+        context.coordinator.file = QuickLookFile.copy(of: url, titled: title, as: type)
+        view.previewItem = (context.coordinator.file?.url ?? url) as NSURL
         return view
     }
-    func updateNSView(_ view: QLPreviewView, context: Context) {
-        view.previewItem = url as NSURL
+
+    func updateNSView(_ view: QLPreviewView, context: Context) {}
+
+    static func dismantleNSView(_ view: QLPreviewView, coordinator: Coordinator) {
+        view.close()
+        coordinator.file?.remove()
     }
 }
 
