@@ -170,14 +170,14 @@ nonisolated enum MarfaMapping {
     /// property the type lacks. A type the catalogue lacks is read as Marfa reads one with no hints.
     static func titleField(of type: ItemTypeInfo?) -> String? {
         guard let type else { return "title" }
-        return type.titleField ?? (type.declares("title") ? "title" : nil)
+        return type.titleKey
     }
 
     /// Where an item's text is read and written: the field the type's hints name, else `body` where the type
     /// declares it. Marfa reads `body` even where it is not declared; the app refuses text for such a type rather
     /// than write a property the type lacks.
     static func bodyField(of type: ItemTypeInfo?) -> String? {
-        type.flatMap { $0.bodyField ?? ($0.declares("body") ? "body" : nil) }
+        type?.bodyKey
     }
 
     static func body(of row: Marfa.Item, catalogue: Catalogue) -> String? {

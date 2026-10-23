@@ -16,7 +16,7 @@ struct ItemRelationshipRow: View {
                     ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
                         rejected = !(onRemove?(id) ?? false)
                     }
-                    .frame(minHeight: InspectorMetrics.rowHeight)
+                    .inspectorMinimumHeight()
                 }
                 if rejected {
                     Text("The connection could not be removed.")
@@ -37,7 +37,7 @@ struct ItemRelationshipTargetRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
+        HStack(spacing: 4) {
             ItemTargetRow(target: target, onOpen: onOpen)
             if relationship.isEditable {
                 actions
@@ -92,8 +92,9 @@ struct ItemAddRelationshipRow: View {
             } label: {
                 InspectorPlaceholder(text: "Add Relationship…")
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
             .menuIndicator(.hidden)
             .buttonStyle(.plain)
             .inspectorValue()

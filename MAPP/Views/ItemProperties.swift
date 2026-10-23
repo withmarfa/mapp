@@ -45,22 +45,7 @@ struct ItemPropertyRow: View {
     @ViewBuilder private var control: some View {
         switch definition.kind {
         case .choice(let choices):
-            let current = value?.string
-            menu(current: current.map { Text(LocalizedStringKey(Self.choiceLabel($0))) }) {
-                Picker(LocalizedStringKey(definition.label), selection: Binding {
-                    current ?? ""
-                } set: { selected in
-                    input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
-                }) {
-                    Text("Not Set").tag("")
-                    if let current, !choices.contains(current) {
-                        Text(current).tag(current)
-                    }
-                    ForEach(choices, id: \.self) { Text(LocalizedStringKey(Self.choiceLabel($0))).tag($0) }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            }
+            choiceMenu(choices)
         case .boolean:
             let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
             menu(current: current.map { Text($0 ? "Yes" : "No") }) {
@@ -77,7 +62,7 @@ struct ItemPropertyRow: View {
                 .labelsHidden()
             }
         case .date:
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            HStack(spacing: 4) {
                 textField
                 if isEditable && (rowHovering || isFocused || choosingDate) {
                     Button { choosingDate = true } label: { Image(systemName: "calendar") }
@@ -87,6 +72,9 @@ struct ItemPropertyRow: View {
                         .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
                 }
             }
+        // A text field that recommends values is picked from them, as a status is, and keeps a value of its own.
+        case .text where definition.isPicked:
+            choiceMenu(definition.options)
         case .text, .number:
             textField
         // A list or an object is shown as written, since a text field would replace it with a string.
@@ -99,7 +87,27 @@ struct ItemPropertyRow: View {
         }
     }
 
-    /// A choice as plain text that opens a menu: the borderless control has no chevron and no fill until hovered.
+    private func choiceMenu(_ choices: [String]) -> some View {
+        let current = value?.string
+        return menu(current: current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }) {
+            Picker(LocalizedStringKey(definition.label), selection: Binding {
+                current ?? ""
+            } set: { selected in
+                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
+            }) {
+                Text("Not Set").tag("")
+                if let current, !choices.contains(current) {
+                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: current))).tag(current)
+                }
+                ForEach(choices, id: \.self) { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
+    }
+
+    /// A choice as plain text that opens a menu: no chevron and no fill until hovered. The button style with a plain
+    /// label, unlike the borderless one, adds no inset of its own, so the text starts where a text value does.
     private func menu<Content: View>(current: Text?, @ViewBuilder content: () -> Content) -> some View {
         Menu {
             content()
@@ -108,11 +116,12 @@ struct ItemPropertyRow: View {
                 if let current { current } else { InspectorPlaceholder() }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .foregroundStyle(current == nil ? .tertiary : .primary)
+        .foregroundStyle(.primary)
         .inspectorValue()
         .accessibilityLabel(LocalizedStringKey(definition.label))
         .accessibilityValue(current == nil ? Text("Not Set") : current!)
@@ -140,7 +149,7 @@ struct ItemPropertyRow: View {
             input.text = $0
             input.isDirty = true
             input.rejected = false
-        }, prompt: Text("Add"), axis: definition.kind == .number ? .horizontal : .vertical)
+        }, prompt: Text(""), axis: definition.kind == .number ? .horizontal : .vertical)
         .labelsHidden()
         .textFieldStyle(.plain)
         .focusEffectDisabled()
@@ -149,6 +158,10 @@ struct ItemPropertyRow: View {
         .focused($isFocused)
         .onSubmit { commit() }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
+        .overlay(alignment: .topLeading) {
+            if input.text.isEmpty { InspectorPlaceholder().allowsHitTesting(false).accessibilityHidden(true) }
+        }
         .inspectorValue(isFocused: isFocused)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
@@ -190,10 +203,6 @@ struct ItemPropertyRow: View {
         }
         input.rejected = !onChange(value)
         if !input.rejected { input.isDirty = false }
-    }
-
-    static func choiceLabel(_ value: String) -> String {
-        value.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
     private static func date(_ value: String?) -> Date? {

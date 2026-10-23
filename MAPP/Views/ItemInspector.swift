@@ -129,7 +129,7 @@ struct ItemInspector: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 ForEach(mentions) { target in
                                     ItemTargetRow(target: target, onOpen: onOpen)
-                                        .frame(minHeight: InspectorMetrics.rowHeight)
+                                        .inspectorMinimumHeight()
                                 }
                             }
                         }
@@ -149,14 +149,7 @@ struct ItemInspector: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
-    private var fields: [ItemTypeInfo.Field] {
-        (type?.fields ?? []).filter { field in
-            // An empty value that cannot be added to is not worth a row.
-            if item.value(of: field.key) != nil { return true }
-            if case .other = field.kind { return false }
-            return item.isEditable
-        }
-    }
+    private var fields: [ItemTypeInfo.Field] { InspectorFields.properties(of: item, type: type) }
 
     private var shownRelationships: [ItemRelationship] {
         relationships.filter { !$0.targets.isEmpty }
@@ -229,7 +222,7 @@ struct ItemInspector: View {
     /// Every property the type does not name or show elsewhere, in the order the item holds them. A source that
     /// keeps no tags field still shows the item's tags among them.
     private var otherProperties: [Property] {
-        var shown = Set((type?.fields ?? []).map(\.key) + ["title", "type", "marfa_id", "marfa_version"])
+        var shown = InspectorFields.accountedFor(item: item, type: type)
         shown.formUnion(relationships.map(\.field))
         var properties = item.properties.filter { !shown.contains($0.key) }
         if !item.tags.isEmpty && item.value(of: "tags") == nil {
