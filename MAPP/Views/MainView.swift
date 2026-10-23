@@ -268,6 +268,12 @@ struct MainView: View {
         .onChange(of: creationIsSettled) {
             if creationIsSettled { browser.finishCreation(in: library) }
         }
+        #if DEBUG
+        // A sample launch can open an item without a click, as `-MAPPSelectItem <id>`, once the library holds it.
+        .onChange(of: launchSelection.map { library.item($0) != nil }, initial: true) {
+            if let id = launchSelection, library.item(id) != nil { browser.selection = [id] }
+        }
+        #endif
     }
 
     private var galleryItemIDs: [ItemID] {
@@ -308,6 +314,15 @@ struct MainView: View {
     }
 
     private var creationIsSettled: Bool { browser.isCreationSettled(in: library) }
+
+    #if DEBUG
+    private var launchSelection: ItemID? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-MAPPSampleFolder"), let flag = arguments.firstIndex(of: "-MAPPSelectItem"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return ItemID(arguments[flag + 1])
+    }
+    #endif
 
     private var completedImportID: ItemID? {
         importRequestID.flatMap { library.completedImports[$0] }
