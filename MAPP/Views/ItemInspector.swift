@@ -23,7 +23,7 @@ struct ItemInspectorHost: View {
                     type: library.catalogue.itemTypes[item.type],
                     path: library.path(of: id),
                     place: Self.place(of: item, in: library),
-                    otherLabels: Self.labels(in: library.catalogue),
+                    catalogue: library.catalogue,
                     relationships: library.relationships(for: id),
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
@@ -59,15 +59,6 @@ struct ItemInspectorHost: View {
         return item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library")
     }
 
-    /// Every property key the catalogue names, so one the item's type does not define is still called by its label.
-    private static func labels(in catalogue: Catalogue) -> [String: String] {
-        var labels: [String: String] = [:]
-        for type in catalogue.itemTypes.values {
-            for field in type.fields where labels[field.key] == nil { labels[field.key] = field.label }
-        }
-        return labels
-    }
-
     private func open(_ id: ItemID) {
         guard let browser else {
             if library.item(id) != nil { openWindow(value: id) }
@@ -92,8 +83,8 @@ struct ItemInspector: View {
     var path: String? = nil
     /// The folder, the Inbox or the Library the item is in.
     var place: String? = nil
-    /// The catalogue's labels by property key, for properties the item's type does not define.
-    var otherLabels: [String: String] = [:]
+    /// Calls a property the item's type does not define by the label another type gives it.
+    var catalogue = Catalogue()
     let relationships: [ItemRelationship]
     let mentions: [ItemRelationshipTarget]
     let onProperty: (String, PropertyValue?) -> Bool
@@ -198,7 +189,7 @@ struct ItemInspector: View {
         }
         if let path { detail("Path", path) }
         ForEach(otherProperties) { property in
-            InspectorRow(name: Self.name(of: property.key, labels: otherLabels)) {
+            InspectorRow(name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type))) {
                 Text(ItemValueText.string(property.value))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -215,8 +206,8 @@ struct ItemInspector: View {
     }
 
     /// The catalogue's label for a key, else the key written for reading.
-    private static func name(of key: String, labels: [String: String]) -> LocalizedStringKey {
-        if let label = labels[key] { return LocalizedStringKey(label) }
+    private static func name(of key: String, label: String?) -> LocalizedStringKey {
+        if let label { return LocalizedStringKey(label) }
         let words = key.split { $0 == "_" || $0 == "-" || $0 == "." }.joined(separator: " ")
         return LocalizedStringKey(words.prefix(1).uppercased() + words.dropFirst())
     }

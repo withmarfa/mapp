@@ -171,4 +171,28 @@ struct InspectorFieldsTests {
         let full = Self.item("aic.x", properties: [Property(key: "tags", value: .array([.string("a")]))])
         #expect(InspectorFields.properties(of: full, type: list).map(\.key) == ["tags"])
     }
+
+    // MARK: Labels for other properties
+
+    @Test func aKeyEveryTypeLabelsTheSameKeepsThatLabel() {
+        func type(_ id: String, _ label: String) -> ItemTypeInfo {
+            ItemTypeInfo(id: TypeID(id), label: id, fields: [.init(key: "due", label: label, kind: .date, declaredBy: TypeID(id))], titleField: nil, bodyField: nil, parent: nil)
+        }
+        let types = [type("aic.b", "Due B"), type("aic.a", "Due A"), type("aic.c", "Due C")]
+        // The same answer whatever order the types arrive in and however the dictionary lays them out.
+        for order in [types, types.reversed(), [types[1], types[2], types[0]]] {
+            let catalogue = Catalogue(itemTypes: order)
+            #expect(catalogue.label(ofField: "due", for: nil) == "Due A")
+            #expect(catalogue.label(ofField: "due", for: TypeID("aic.x")) == "Due A")
+            #expect(catalogue.label(ofField: "due", for: TypeID("aic.c")) == "Due C", "the item's own type labels it first")
+            #expect(catalogue.label(ofField: "missing", for: TypeID("aic.c")) == nil)
+        }
+    }
+
+    @Test func theLabelsFollowTheCatalogueWhenItsTypesChange() {
+        var catalogue = Catalogue(itemTypes: [Self.task])
+        #expect(catalogue.label(ofField: "priority", for: nil) == "Priority")
+        catalogue.itemTypes[Self.task.id] = nil
+        #expect(catalogue.label(ofField: "priority", for: nil) == nil)
+    }
 }

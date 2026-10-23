@@ -131,12 +131,33 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
 }
 
 nonisolated struct Catalogue: Hashable, Sendable {
-    var itemTypes: [TypeID: ItemTypeInfo]
+    var itemTypes: [TypeID: ItemTypeInfo] {
+        didSet { fieldLabels = Self.fieldLabels(of: itemTypes) }
+    }
     var edgeTypes: [String: EdgeTypeInfo]
+    /// The label for each property key some type defines. Types are read in the order of their identifiers, so a
+    /// key several types label differently always has the same label.
+    private(set) var fieldLabels: [String: String]
 
     init(itemTypes: [ItemTypeInfo] = [], edgeTypes: [EdgeTypeInfo] = []) {
-        self.itemTypes = Dictionary(itemTypes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        let types = Dictionary(itemTypes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        self.itemTypes = types
         self.edgeTypes = Dictionary(edgeTypes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        fieldLabels = Self.fieldLabels(of: types)
+    }
+
+    private static func fieldLabels(of itemTypes: [TypeID: ItemTypeInfo]) -> [String: String] {
+        var labels: [String: String] = [:]
+        for type in itemTypes.values.sorted(by: { $0.id.rawValue < $1.id.rawValue }) {
+            for field in type.fields where labels[field.key] == nil { labels[field.key] = field.label }
+        }
+        return labels
+    }
+
+    /// The label for a property key: the item's own type's, else the one the catalogue gives it for any type. Nil
+    /// for a key no type defines.
+    func label(ofField key: String, for type: TypeID?) -> String? {
+        type.flatMap { itemTypes[$0]?.fields.first { $0.key == key }?.label } ?? fieldLabels[key]
     }
 
     /// Every type below `type` through `parent`, not including `type` itself.
