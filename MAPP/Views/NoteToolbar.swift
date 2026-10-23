@@ -41,13 +41,17 @@ struct NoteToolbar: CustomizableToolbarContent {
     }
 }
 
-/// Gallery shares the item actions without a second customizable toolbar configuration.
+/// The gallery's toolbar, one for the grid and the page it opens, so the order across its single column is set here:
+/// View Options and Search together, then Details and More, then New Item, as the list and page toolbars have them
+/// across two columns. Opened on an item, View Options and Search give way; Details and More stay.
 struct GalleryToolbar: ToolbarContent {
     @CurrentLibrary private var library
-    let browser: Browser
+    @Bindable var browser: Browser
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
+    /// The width the search field spans when it is out.
+    let columnWidth: CGFloat
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
@@ -60,14 +64,30 @@ struct GalleryToolbar: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
-        // The gallery's own toolbar has New Item while the grid shows; with an item or a draft open it stays here.
-        if !browser.showsGallery {
-            ToolbarItem(placement: .primaryAction) { NewItemButton(browser: browser) }
-            ToolbarSpacer(.fixed, placement: .primaryAction)
+        if browser.showsGallery {
+            ColumnSearch(
+                isExpanded: $browser.isSearchExpanded,
+                text: $browser.searchText,
+                prompt: String(localized: "Search"),
+                columnWidth: columnWidth,
+                focusRequests: browser.searchFocusRequests,
+                onDown: { browser.focusRequest = .list }
+            ) {
+                ViewOptionsMenu(browser: browser)
+            }
         }
-        ToolbarItemGroup(placement: .primaryAction) {
-            tools.detailsButton
-            tools.moreMenu
+        // Over the grid, Details and More act on the cards selected, so they wait for one.
+        if !browser.showsGallery || !browser.selection.isEmpty {
+            if browser.showsGallery { ToolbarSpacer(.fixed) }
+            ToolbarItemGroup {
+                tools.detailsButton
+                tools.moreMenu
+            }
+        }
+        // The field spans the column, so there is no room beside it.
+        if !browser.isSearchExpanded || !browser.showsGallery {
+            ToolbarSpacer(.fixed)
+            ToolbarItem { NewItemButton(browser: browser) }
         }
     }
 }

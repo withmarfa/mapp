@@ -43,7 +43,6 @@ struct ItemGallery: View {
         }
         .navigationTitle(title)
         .navigationSubtitle(browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
-        .toolbar { ListToolbar(browser: browser, columnWidth: min(width, 400)) }
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
