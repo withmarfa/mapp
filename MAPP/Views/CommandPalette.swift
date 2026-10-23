@@ -198,6 +198,9 @@ struct CommandPalette: View {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
         }
 
+        // The page keeps ⌘[ and ⌘] while it has the keyboard (see AppCommands), so the palette does not suggest them.
+        func historyKey(_ key: String) -> String? { returnFocus == .page ? nil : key }
+
         if library.isLoaded {
             if !browser.showsTypes {
                 add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
@@ -213,17 +216,17 @@ struct CommandPalette: View {
             }
             if browser.usesGallery {
                 if !browser.showsGallery {
-                    add(String(localized: "Back to Gallery"), "chevron.backward", "⌘[") { browser.returnToGallery() }
+                    add(String(localized: "Back to Gallery"), "chevron.backward", historyKey("⌘[")) { browser.returnToGallery() }
                 }
             } else if browser.showsTypes {
-                if browser.types.canGoBack { add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.types.goBack() } }
-                if browser.types.canGoForward { add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.types.goForward() } }
+                if browser.types.canGoBack { add(String(localized: "Back"), "chevron.backward", historyKey("⌘[")) { browser.types.goBack() } }
+                if browser.types.canGoForward { add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.types.goForward() } }
             } else {
                 if browser.canGoBack(in: library) {
-                    add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.go(.back, in: library) }
+                    add(String(localized: "Back"), "chevron.backward", historyKey("⌘[")) { browser.go(.back, in: library) }
                 }
                 if browser.canGoForward(in: library) {
-                    add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.go(.forward, in: library) }
+                    add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
                 }
             }
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
@@ -266,11 +269,11 @@ struct CommandPalette: View {
                 for id in library.idsForWindows(browser.selection) { openWindow(value: id) }
             }
         }
-        if let one {
+        let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
+        let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0, in: library) }, in: library)
+        if share.isAvailable {
             add(String(localized: "Share…"), "square.and.arrow.up") {
-                let text = library.body(of: one.id)?.text ?? ""
-                guard let view = NSApp.keyWindow?.contentView else { return }
-                NSSharingServicePicker(items: [text]).show(relativeTo: .zero, of: view, preferredEdge: .minY)
+                share.present(near: hasVisibleEditor ? editor.webView : nil)
             }
         }
 
