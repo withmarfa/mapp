@@ -434,6 +434,9 @@
     "Can’t Read This Library" : {
       "extractionState" : "manual"
     },
+    "Can’t Read This Text File" : {
+      "extractionState" : "manual"
+    },
     "Can’t Recover" : {
       "extractionState" : "manual"
     },
@@ -1726,6 +1729,9 @@
 
     },
     "The file was attached, but its name can’t be written into the text." : {
+      "extractionState" : "manual"
+    },
+    "The file may have moved or become unavailable. Select it again to retry." : {
       "extractionState" : "manual"
     },
     "The images weren’t added to the note. %@" : {
