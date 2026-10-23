@@ -23,7 +23,8 @@ struct ItemGallery: View {
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = sections.flatMap { $0.items.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        keyboardCollection(sections, ids: ids)
+        let context = browser.metaContext(for: sections.flatMap(\.items))
+        keyboardCollection(sections, ids: ids, context: context)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -53,12 +54,12 @@ struct ItemGallery: View {
         .dragContainerSelection(Array(browser.selection))
     }
 
-    private func collection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
+    private func collection(_ sections: [NoteSection], ids: [ItemID], context: ItemMeta.Context) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(sections) { section in
-                        sectionGrid(section, ids: ids)
+                        sectionGrid(section, ids: ids, context: context)
                     }
                 }
                 .padding(24)
@@ -79,7 +80,7 @@ struct ItemGallery: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0.isFinite, $0 > 0 { width = $0 } }
     }
 
-    private func sectionGrid(_ section: NoteSection, ids: [ItemID]) -> some View {
+    private func sectionGrid(_ section: NoteSection, ids: [ItemID], context: ItemMeta.Context) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
@@ -89,7 +90,7 @@ struct ItemGallery: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: columnCount), spacing: 20) {
                 ForEach(section.items) { item in
-                    card(item, ids: ids).id(item.id)
+                    card(item, ids: ids, context: context).id(item.id)
                 }
             }
             .accessibilityElement(children: .contain)
@@ -97,8 +98,8 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
-        collection(sections, ids: ids)
+    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID], context: ItemMeta.Context) -> some View {
+        collection(sections, ids: ids, context: context)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
             let destination: ItemID?
@@ -135,14 +136,16 @@ struct ItemGallery: View {
         .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:)), perform: deleteSelection)
     }
 
-    private func card(_ item: Item, ids: [ItemID]) -> some View {
+    private func card(_ item: Item, ids: [ItemID], context: ItemMeta.Context) -> some View {
         Button {
             // SwiftUI Button actions do not expose the click's modifiers; AppKit supplies just that event.
             let modifiers = NSApp.currentEvent?.modifierFlags ?? []
             select(item.id, ids: ids, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(item: item, selected: browser.selection.contains(item.id), date: NoteDate.listLabel(for: order.sort.date(of: item), now: library.now()), folder: browser.showsFolders ? library.folder(of: item)?.name ?? String(localized: "Inbox") : nil)
+            GalleryCard(
+                item: item, selected: browser.selection.contains(item.id), context: context,
+                date: NoteDate.listLabel(for: order.sort.date(of: item), now: library.now()))
         }
         .buttonStyle(.plain)
         .focusable(false)
@@ -200,8 +203,8 @@ private struct GalleryCard: View {
     @CurrentLibrary private var library
     let item: Item
     let selected: Bool
+    let context: ItemMeta.Context
     let date: String
-    let folder: String?
     @State private var image: CGImage?
 
     var body: some View {
@@ -219,7 +222,9 @@ private struct GalleryCard: View {
                     Rectangle().fill(.background)
                     VStack(alignment: .leading, spacing: 12) {
                         if item.isFile {
-                            Image(systemName: "doc").interfaceFont(.largeTitle).foregroundStyle(.secondary)
+                            Image(systemName: TypeSymbol.name(for: item.type, in: library.catalogue))
+                                .interfaceFont(.largeTitle).foregroundStyle(.secondary)
+                            Text(item.preview).interfaceFont(.subheadline).lineLimit(2).foregroundStyle(.secondary)
                         } else {
                             Text(item.preview).interfaceFont(.body).lineLimit(6).foregroundStyle(.secondary)
                         }
@@ -233,9 +238,9 @@ private struct GalleryCard: View {
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title).interfaceFont(.headline).lineLimit(2)
-                    HStack {
+                    HStack(spacing: 12) {
                         if item.isFavorite { Image(systemName: "star.fill") }
-                        if let folder { Text(folder).lineLimit(1) }
+                        ItemMetaLine(meta: ItemMeta.make(for: item, in: library, context: context))
                         Spacer(minLength: 4)
                         Text(date).lineLimit(1)
                     }
