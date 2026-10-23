@@ -202,8 +202,8 @@ struct CommandPalette: View {
             if !browser.showsTypes {
                 add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
                 add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
-                for order in NoteSort.allCases where order != sort {
-                    add(String(localized: "Sort by \(String(localized: order.title))"), "arrow.up.arrow.down") { sort = order }
+                for choice in NoteSort.allCases where choice != sort {
+                    add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
                 }
                 if sort != .title {
                     add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
@@ -220,10 +220,10 @@ struct CommandPalette: View {
                 if browser.types.canGoForward { add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.types.goForward() } }
             } else {
                 if browser.canGoBack(in: library) {
-                    add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.go(.back, in: library, order: order) }
+                    add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.go(.back, in: library) }
                 }
                 if browser.canGoForward(in: library) {
-                    add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.go(.forward, in: library, order: order) }
+                    add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.go(.forward, in: library) }
                 }
             }
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
@@ -246,17 +246,15 @@ struct CommandPalette: View {
 
         if let one, one.isWritable {
             if hasVisibleEditor {
-            add(editor.caret.sourceMode ? String(localized: "Show Formatted Text") : String(localized: "Show Markdown Source"), "doc.plaintext") {
-                editor.setSourceMode(!editor.caret.sourceMode)
-            }
+                add(editor.caret.sourceMode ? String(localized: "Show Formatted Text") : String(localized: "Show Markdown Source"), "doc.plaintext") {
+                    editor.setSourceMode(!editor.caret.sourceMode)
+                }
                 for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                                .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
                     let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
                     add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
                 }
-            }
-            if hasVisibleEditor {
                 add(String(localized: "Add Attachment…"), "paperclip", "⇧⌘A") { editor.isChoosingImages = true }
             }
             if library.canRenameFile(of: one) {

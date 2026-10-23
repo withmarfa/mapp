@@ -34,7 +34,7 @@ final class Browser {
     var focusRequest: Pane?
     /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note.
     var palette: Palette?
-    /// Whether the list's search is out as a field, rather than a button beside Sort.
+    /// Whether the list's search is out as a field, rather than a button beside View Options.
     var isSearchExpanded = false
     /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
     let types = TypesBrowser()
@@ -120,7 +120,7 @@ final class Browser {
 
     /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
-    func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary, order: NoteOrder) {
+    func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library) else { return }
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
@@ -278,9 +278,7 @@ final class Browser {
         shownLibrary = library
         guard !isFirst else { return }
         undoManager?.removeAllActions()
-        isMovingThroughHistory = true
         selection = []
-        isMovingThroughHistory = false
         history = SelectionHistory()
         isGalleryItemPresented = false
         sidebarItem = .allNotes

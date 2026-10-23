@@ -137,7 +137,6 @@ private struct ItemToolbarActions {
 /// Back or Forward through the items this window has shown.
 private struct HistoryButton: View {
     @CurrentLibrary private var library
-    @StoredOrder private var order
     let browser: Browser?
     let direction: SelectionHistory.Direction
 
@@ -145,7 +144,7 @@ private struct HistoryButton: View {
         let isBack = direction == .back
         let isEnabled = browser.map { isBack ? $0.canGoBack(in: library) : $0.canGoForward(in: library) } ?? false
         Button(isBack ? "Back" : "Forward", systemImage: isBack ? "chevron.backward" : "chevron.forward") {
-            browser?.go(direction, in: library, order: order)
+            browser?.go(direction, in: library)
         }
         .help(isBack ? "Back" : "Forward")
         .disabled(!isEnabled)

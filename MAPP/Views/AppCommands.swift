@@ -105,13 +105,13 @@ struct AppCommands: Commands {
             Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
                 if browser?.usesGallery == true { browser?.returnToGallery() }
                 else if let marfaTypes { marfaTypes.goBack() }
-                else if let browser, let library { browser.go(.back, in: library, order: order) }
+                else if let browser, let library { browser.go(.back, in: library) }
             }
                 .keyboardShortcut("[")
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
                 if let marfaTypes { marfaTypes.goForward() }
-                else if let browser, let library { browser.go(.forward, in: library, order: order) }
+                else if let browser, let library { browser.go(.forward, in: library) }
             }
                 .keyboardShortcut("]")
                 .disabled(!canGoForward)
@@ -151,7 +151,7 @@ extension AppCommands {
     }
 }
 
-/// The list's own search, beside Sort, from ⌥⌘F under Find, as Notes has it.
+/// The list's own search, beside View Options, from ⌥⌘F under Find, as Notes has it.
 struct SearchListButton: View {
     @FocusedValue(\.browser) private var browser
 

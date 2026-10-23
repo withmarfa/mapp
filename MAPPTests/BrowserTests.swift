@@ -41,24 +41,23 @@ struct BrowserTests {
     @Test func backAndForwardMoveThroughTheItemsOpenedAndForgetWhatLiesAheadOnANewChoice() {
         let (library, older, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
-        let order = NoteOrder()
         #expect(!browser.canGoBack(in: library))
         browser.selection = [older.id]
         browser.selection = [newer.id]
         browser.selection = [favorite.id]
         #expect(browser.canGoBack(in: library))
         #expect(!browser.canGoForward(in: library))
-        browser.go(.back, in: library, order: order)
+        browser.go(.back, in: library)
         #expect(browser.selection == [newer.id])
         #expect(browser.canGoForward(in: library))
-        browser.go(.back, in: library, order: order)
+        browser.go(.back, in: library)
         #expect(browser.selection == [older.id])
         #expect(!browser.canGoBack(in: library))
-        browser.go(.forward, in: library, order: order)
+        browser.go(.forward, in: library)
         #expect(browser.selection == [newer.id])
         browser.selection = [favorite.id]
         #expect(!browser.canGoForward(in: library), "a new choice drops what lay ahead")
-        browser.go(.back, in: library, order: order)
+        browser.go(.back, in: library)
         #expect(browser.selection == [newer.id], "going back did not add the entry again")
     }
 
@@ -75,18 +74,17 @@ struct BrowserTests {
     @Test func historySkipsDeletedItemsAndShowsAnItemInItsPlaceOrAllItems() {
         let (library, older, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
-        let order = NoteOrder()
         browser.sidebarItem = .favorites
         browser.selection = [favorite.id]
         browser.sidebarItem = .allNotes
         browser.selection = [older.id]
         browser.selection = [newer.id]
         library.delete([older.id], undoManager: nil)
-        browser.go(.back, in: library, order: order)
+        browser.go(.back, in: library)
         #expect(browser.selection == [favorite.id], "the deleted item is skipped")
         #expect(browser.sidebarItem == .favorites, "the place it was seen in comes back")
         #expect(browser.canGoForward(in: library))
-        browser.go(.forward, in: library, order: order)
+        browser.go(.forward, in: library)
         #expect(browser.selection == [newer.id])
     }
 
