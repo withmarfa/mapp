@@ -16,8 +16,13 @@ const ticket: HeaderModel = {
     'The title could not be saved. Use a unique file name without slashes or line breaks.',
   editable: true,
   type: 'Task',
-  status: { label: 'In Progress', enabled: true },
-  parent: { label: 'Field Research', enabled: true },
+  status: {
+    label: 'In Progress',
+    enabled: true,
+    empty: false,
+    mark: { tone: 'orange', fill: 'half' },
+  },
+  parent: { label: 'Field Research', enabled: true, empty: false },
   propertyRejected: false,
   interfaceTextSize: 13,
 }
@@ -37,7 +42,7 @@ afterEach(() => {
 
 const title = () => root.querySelector<HTMLElement>('#ItemPageTitle')!
 const chip = (id: string) => root.querySelector<HTMLElement>('#' + id)!
-const label = (id: string) => chip(id).querySelector('.item-chip-label')!.textContent
+const label = (id: string) => chip(id).querySelector('.item-pin-label')!.textContent
 
 test('the header shows the item it is given, and nothing before', () => {
   expect(root.hidden).toBe(true)
@@ -65,6 +70,43 @@ test('the header shows the item it is given, and nothing before', () => {
   expect(root.hidden).toBe(true)
   header.set(null)
   expect(root.hidden).toBe(true)
+})
+
+test('a pin without a value is drawn empty, and a status pin carries its mark', () => {
+  header.set(ticket)
+  const mark = () => chip('ItemStatusChip').querySelector<HTMLElement>('.item-status-mark')!
+  expect(chip('ItemParentChip').classList.contains('empty')).toBe(false)
+  expect(mark().dataset.tone).toBe('orange')
+  expect(mark().dataset.fill).toBe('half')
+  header.set({
+    ...ticket,
+    status: {
+      label: 'Completed',
+      enabled: true,
+      empty: false,
+      mark: { tone: 'green', fill: 'full' },
+    },
+    parent: { label: 'Parent', enabled: true, empty: true },
+  })
+  expect(mark().dataset.tone).toBe('green')
+  expect(mark().dataset.fill).toBe('full')
+  expect(chip('ItemParentChip').classList.contains('empty')).toBe(true)
+  expect(label('ItemParentChip')).toBe('Parent')
+  // An empty pin still opens its menu; the app decides whether that is a menu or the picker.
+  chip('ItemParentChip').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
+  expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
+  header.set({ ...ticket, status: { label: 'Status', enabled: true, empty: true } })
+  expect(chip('ItemStatusChip').classList.contains('empty')).toBe(true)
+  expect(chip('ItemStatusChip').getAttribute('aria-description')).toBe('')
+})
+
+test('every pin is one height and the icons the app draws reach the page as masks', () => {
+  header.set(ticket)
+  const icon = { url: 'data:image/png;base64,AAAA', width: 13, height: 12 }
+  header.setIcons({ type: icon, parent: icon, plus: icon, indicator: icon })
+  expect(root.style.getPropertyValue('--icon-plus')).toBe('url("data:image/png;base64,AAAA")')
+  expect(root.style.getPropertyValue('--icon-type-width')).toBe('13px')
+  expect(root.querySelectorAll('.item-pin').length).toBe(3)
 })
 
 test('a refused title shows why and offers to discard the draft', () => {
@@ -140,7 +182,7 @@ test('a chip asks for its menu with its frame, from the mouse or the keyboard', 
       viewportHeight: window.innerHeight,
     },
   ])
-  header.set({ ...ticket, status: { label: 'Set Status', enabled: false } })
+  header.set({ ...ticket, status: { label: 'Status', enabled: false, empty: true } })
   posted = []
   chip('ItemStatusChip').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
   expect(posted).toEqual([])

@@ -9,10 +9,17 @@
   --inkkit-rule-color: color-mix(in srgb, CanvasText 14%, transparent);
   --inkkit-code-background: color-mix(in srgb, CanvasText 7%, transparent);
   --inkkit-monospace-font: ui-monospace, 'SF Mono', Menlo, monospace;
-  /* The header's system colors: the quaternary label color behind a chip, the placeholder text color and red. */
-  --chip-fill: rgb(0 0 0 / 0.098);
+  /* The header's system colors: the label levels and the separator a pin is drawn in, the placeholder text color,
+     red, and the status marks. */
+  --label-primary: rgb(0 0 0 / 0.85);
+  --label-secondary: rgb(0 0 0 / 0.5);
+  --label-quinary: rgb(0 0 0 / 0.05);
+  --separator: rgb(0 0 0 / 0.1);
   --placeholder: rgb(0 0 0 / 0.498);
   --error: rgb(255 56 60);
+  --status-orange: rgb(245 134 37);
+  --status-red: rgb(255 56 60);
+  --status-green: rgb(52 199 89);
   --reading-width: 54rem;
   --page-width: var(--reading-width);
   color-scheme: light dark;
@@ -20,9 +27,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --chip-fill: rgb(255 255 255 / 0.098);
+    --label-primary: rgb(255 255 255 / 0.85);
+    --label-secondary: rgb(255 255 255 / 0.55);
+    --label-quinary: rgb(255 255 255 / 0.05);
+    --separator: rgb(255 255 255 / 0.1);
     --placeholder: rgb(255 255 255 / 0.549);
     --error: rgb(255 66 69);
+    --status-orange: rgb(255 159 10);
+    --status-green: rgb(48 209 88);
   }
 }
 
@@ -66,8 +78,8 @@ body {
   );
 }
 
-/* The item's header, drawn as the app's native header was: the system font, a bold title at nearly twice the
-   text's size, and chips in the interface's text size. */
+/* The item's header: the system font, a bold title at nearly twice the text's size, and pins sized from the
+   interface's text size (the pin measures are the 13 point design scaled). */
 #item-header {
   --interface-text-size: 13px;
   display: flex;
@@ -117,7 +129,7 @@ body {
 
 .item-title-error[hidden],
 .item-error[hidden],
-.item-chip[hidden] {
+.item-pin[hidden] {
   display: none;
 }
 
@@ -134,75 +146,85 @@ body {
     sans-serif;
 }
 
-.item-chips {
+.item-pins {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
+  gap: calc(var(--interface-text-size) * 6 / 13);
   max-width: 100%;
 }
 
-.item-chip {
+/* One shape for every pin: a hairline edge, no fill, a symbol in the secondary color. Only hover fills. */
+.item-pin {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: calc(var(--interface-text-size) * 5 / 13);
   max-width: 100%;
   min-width: 0;
+  height: calc(var(--interface-text-size) * 24 / 13);
   margin: 0;
-  padding: 5px 10px;
+  padding: 0 calc(var(--interface-text-size) * 8 / 13);
   border: 0;
-  border-radius: 10px;
-  background: var(--chip-fill);
-  color: var(--inkkit-text-color);
+  border-radius: calc(var(--interface-text-size) * 6 / 13);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--separator);
+  color: var(--label-primary);
   font:
-    var(--interface-text-size) / normal -apple-system,
+    500 calc(var(--interface-text-size) * 12 / 13) / normal -apple-system,
     system-ui,
     sans-serif;
   -webkit-appearance: none;
   appearance: none;
 }
 
-.item-chip-label {
+.item-pin-label {
   overflow: hidden;
   min-width: 0;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-/* AppKit draws a menu chip's button inside the chip's padding, with its own spacing and its arrow after the
-   label. */
-.item-menu-chip {
-  gap: 4px;
-  padding-inline: 13px 15px;
+.item-menu-pin {
   cursor: default;
 }
 
-.item-menu-chip .item-icon-indicator {
-  margin-inline-start: -2px;
+.item-menu-pin:enabled:hover {
+  background: var(--label-quinary);
 }
 
-.item-menu-chip:disabled {
-  color: color-mix(in srgb, var(--inkkit-text-color) 35%, transparent);
+.item-menu-pin.empty {
+  color: var(--label-secondary);
+  box-shadow: inset 0 0 0 1px var(--label-quinary);
 }
 
-.item-menu-chip:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--inkkit-accent-color) 50%, transparent);
-  outline-offset: 0;
+.item-menu-pin:disabled {
+  opacity: 0.5;
 }
 
-.item-chip-icon {
+.item-menu-pin:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline-offset: 1px;
+}
+
+/* A filled pin shows its own symbol, an empty one a plus. */
+.item-menu-pin.empty .item-pin-symbol,
+.item-menu-pin:not(.empty) .item-icon-plus {
+  display: none;
+}
+
+.item-pin-icon {
   flex: none;
-  background: currentColor;
+  background: var(--label-secondary);
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
 
-.item-icon-status {
-  width: var(--icon-status-width, 1em);
-  height: var(--icon-status-height, 1em);
-  -webkit-mask-image: var(--icon-status);
-  mask-image: var(--icon-status);
+.item-icon-type {
+  width: var(--icon-type-width, 1em);
+  height: var(--icon-type-height, 1em);
+  -webkit-mask-image: var(--icon-type);
+  mask-image: var(--icon-type);
 }
 
 .item-icon-parent {
@@ -212,11 +234,53 @@ body {
   mask-image: var(--icon-parent);
 }
 
+.item-icon-plus {
+  width: var(--icon-plus-width, 1em);
+  height: var(--icon-plus-height, 1em);
+  -webkit-mask-image: var(--icon-plus);
+  mask-image: var(--icon-plus);
+}
+
 .item-icon-indicator {
   width: var(--icon-indicator-width, 0.6em);
   height: var(--icon-indicator-height, 0.6em);
   -webkit-mask-image: var(--icon-indicator);
   mask-image: var(--icon-indicator);
+}
+
+/* The status mark: a ring in the status's color, with half or all of it filled. */
+.item-status-mark {
+  --mark: var(--label-secondary);
+  flex: none;
+  box-sizing: border-box;
+  width: calc(var(--interface-text-size) * 12 / 13);
+  height: calc(var(--interface-text-size) * 12 / 13);
+  border: 1.5px solid var(--mark);
+  border-radius: 50%;
+}
+
+.item-status-mark[data-tone='orange'] {
+  --mark: var(--status-orange);
+}
+
+.item-status-mark[data-tone='red'] {
+  --mark: var(--status-red);
+}
+
+.item-status-mark[data-tone='green'] {
+  --mark: var(--status-green);
+}
+
+.item-status-mark[data-tone='grey'] {
+  --mark: var(--label-secondary);
+}
+
+.item-status-mark[data-fill='half'] {
+  background: linear-gradient(90deg, var(--mark) 50%, transparent 50%);
+}
+
+.item-status-mark[data-fill='full'] {
+  background: var(--mark);
 }
 
 /* InkKit 0.1.4 draws a wiki link as plain text, and one that names no note only with a tooltip

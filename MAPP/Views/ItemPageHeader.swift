@@ -2,13 +2,13 @@ import AppKit
 import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
-/// title and chips above the note, so they scroll with it as one surface, and this carries out what the person
-/// does there: the title is saved as the item's property, and each chip opens a native menu. Applied to the
-/// editor's view, whose container the chips' frames arrive in.
+/// title and pinned properties above the note, so they scroll with it as one surface, and this carries out what
+/// the person does there: the title is saved as the item's property, and each pin opens a native menu (the parent
+/// pin opens the chooser directly while the item has no parent). Applied to the editor's view, whose container
+/// the pins' frames arrive in.
 struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.openWindow) private var openWindow
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     let item: Item
     let editor: EditorController
@@ -16,7 +16,7 @@ struct ItemPageHeader: ViewModifier {
     /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
     /// the safe area leaves, while the container runs up under the toolbar.
     let containerTop: CGFloat
-    /// The parent chip's frame while its chooser is open.
+    /// The parent pin's frame while its chooser is open.
     @State private var choosingParent: CGRect?
 
     func body(content: Content) -> some View {
@@ -61,10 +61,16 @@ struct ItemPageHeader: ViewModifier {
             editable: library.canSetTitle(of: item),
             type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
             status: status.map { _ in
-                PageHeader.Chip(label: (item.value(of: "status")?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status"),
-                                enabled: item.isEditable)
+                let value = item.value(of: "status")?.string
+                return PageHeader.Pin(label: value.map(ItemPropertyRow.choiceLabel) ?? String(localized: "Status"),
+                                      enabled: item.isEditable, empty: value == nil, mark: .init(status: value))
             },
-            parent: parent.map { PageHeader.Chip(label: $0.targets.first?.title ?? String(localized: "Add Parent"), enabled: true) },
+            parent: parent.map {
+                // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
+                let title = $0.targets.first?.title
+                return PageHeader.Pin(label: title ?? String(localized: "Parent"), enabled: title != nil || $0.isEditable,
+                                      empty: title == nil)
+            },
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
         )
@@ -72,7 +78,7 @@ struct ItemPageHeader: ViewModifier {
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left.
     private var handler: (PageHeaderEvent) -> Void {
-        let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow
+        let library = library, drafts = drafts, undoManager = undoManager
         let choosingParent = $choosingParent
         // The editor keeps this, so it holds the editor weakly; otherwise neither would ever be released.
         return { [weak editor] event in
@@ -111,16 +117,26 @@ struct ItemPageHeader: ViewModifier {
                 editor.popUpMenu(menu, under: rect)
             case .menu(.parent, let id, let rect):
                 guard let parent = Self.parent(of: id, in: library) else { return }
+                guard let target = parent.targets.first else {
+                    if parent.isEditable { choosingParent.wrappedValue = rect }
+                    return
+                }
                 let menu = NSMenu()
                 menu.autoenablesItems = false
-                if let target = parent.targets.first?.itemID, library.item(target) != nil {
-                    menu.addItem(actionItem(String(localized: "Open Parent")) { openWindow(value: target) })
+                let open = actionItem(String(localized: "Open \(target.title)")) { [weak editor] in
+                    if let id = target.itemID { editor?.onOpenNote(id) }
                 }
-                let choose = actionItem(parent.targets.isEmpty ? String(localized: "Choose Parent…") : String(localized: "Change Parent…")) {
-                    choosingParent.wrappedValue = rect
+                open.isEnabled = target.itemID.map { library.item($0) != nil } ?? false
+                menu.addItem(open)
+                let change = actionItem(String(localized: "Change Parent…")) { choosingParent.wrappedValue = rect }
+                change.isEnabled = parent.isEditable
+                menu.addItem(change)
+                menu.addItem(.separator())
+                let remove = actionItem(String(localized: "Remove Parent")) {
+                    library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
                 }
-                choose.isEnabled = parent.isEditable
-                menu.addItem(choose)
+                remove.isEnabled = parent.isEditable
+                menu.addItem(remove)
                 editor.popUpMenu(menu, under: rect)
             }
         }

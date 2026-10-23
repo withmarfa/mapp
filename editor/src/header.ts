@@ -1,9 +1,16 @@
 import { postToHost } from './bridge'
 
-/** A chip whose menu the app shows. */
-export interface HeaderChip {
+/** How a status pin draws its mark: the color the status carries and how much of the ring it fills. */
+export type HeaderTone = 'neutral' | 'orange' | 'red' | 'green' | 'grey'
+export type HeaderFill = 'none' | 'half' | 'full'
+
+/** A pin under the title. An empty pin has no value yet and shows a plus in place of its symbol. */
+export interface HeaderPin {
   label: string
   enabled: boolean
+  empty: boolean
+  /** Only the status pin has a mark. */
+  mark?: { tone: HeaderTone; fill: HeaderFill }
 }
 
 /** What the app says the header shows for the item on the page. */
@@ -18,10 +25,10 @@ export interface HeaderModel {
   titleRefusal: string
   editable: boolean
   type: string | null
-  status: HeaderChip | null
-  parent: HeaderChip | null
+  status: HeaderPin | null
+  parent: HeaderPin | null
   propertyRejected: boolean
-  /** The interface's text size in points, which the chips and messages follow. */
+  /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
 }
 
@@ -33,8 +40,9 @@ export interface HeaderIcon {
 }
 
 export interface HeaderIcons {
-  status: HeaderIcon
+  type: HeaderIcon
   parent: HeaderIcon
+  plus: HeaderIcon
   indicator: HeaderIcon
 }
 
@@ -72,18 +80,19 @@ function element<K extends keyof HTMLElementTagNameMap>(
   return node
 }
 
-/** The item's title and chips, drawn in the page above the note so they scroll with it as one surface. What
- *  they do is the app's: the title is saved as the item's property, and each chip opens a native menu. */
+/** The item's title and pinned properties, drawn in the page above the note so they scroll with it as one
+ *  surface. What they do is the app's: the title is saved as the item's property, and each pin opens a native
+ *  menu. */
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
   private readonly title: HTMLDivElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
-  private readonly chips: HTMLDivElement
-  private readonly typeChip: HTMLSpanElement
-  private readonly statusChip: HTMLButtonElement
-  private readonly parentChip: HTMLButtonElement
+  private readonly pins: HTMLDivElement
+  private readonly typePin: HTMLSpanElement
+  private readonly statusPin: HTMLButtonElement
+  private readonly parentPin: HTMLButtonElement
   private readonly propertyError: HTMLParagraphElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
@@ -111,14 +120,18 @@ export class ItemHeader {
     discard.addEventListener('click', () => {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
-    this.chips = element('div', 'item-chips', root)
-    this.typeChip = element('span', 'item-chip', this.chips)
-    this.typeChip.id = 'ItemTypeChip'
-    this.typeChip.title = this.labels.itemType
-    element('span', 'item-chip-label', this.typeChip)
-    this.statusChip = this.menuChip('ItemStatusChip', 'status')
-    this.statusChip.setAttribute('aria-label', this.labels.status)
-    this.parentChip = this.menuChip('ItemParentChip', 'parent')
+    this.pins = element('div', 'item-pins', root)
+    this.typePin = element('span', 'item-pin', this.pins)
+    this.typePin.id = 'ItemTypeChip'
+    this.typePin.title = this.labels.itemType
+    element('span', 'item-pin-icon item-icon-type', this.typePin).setAttribute(
+      'aria-hidden',
+      'true',
+    )
+    element('span', 'item-pin-label', this.typePin)
+    this.statusPin = this.menuPin('ItemStatusChip', 'status')
+    this.statusPin.setAttribute('aria-label', this.labels.status)
+    this.parentPin = this.menuPin('ItemParentChip', 'parent')
     this.propertyError = element('p', 'item-error', root)
     this.propertyError.setAttribute('role', 'alert')
     this.propertyError.textContent = this.labels.propertyRejected
@@ -234,12 +247,15 @@ export class ItemHeader {
     this.titleError.hidden = !model.titleRejected
     this.titleRefusal.textContent = model.titleRefusal
     this.propertyError.hidden = !model.propertyRejected
-    this.typeChip.hidden = model.type == null
-    this.typeChip.firstElementChild!.textContent = model.type ?? ''
-    this.showChip(this.statusChip, model.status)
-    this.showChip(this.parentChip, model.parent)
-    // The status chip is named for what it sets; what it is set to is read after.
-    this.statusChip.setAttribute('aria-description', model.status?.label ?? '')
+    this.typePin.hidden = model.type == null
+    this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
+    this.showPin(this.statusPin, model.status)
+    this.showPin(this.parentPin, model.parent)
+    // The status pin is named for what it sets; what it is set to is read after.
+    this.statusPin.setAttribute(
+      'aria-description',
+      model.status && !model.status.empty ? model.status.label : '',
+    )
   }
 
   setIcons(icons: HeaderIcons) {
@@ -259,37 +275,50 @@ export class ItemHeader {
     this.title.classList.toggle('empty', text === '')
   }
 
-  private showChip(chip: HTMLButtonElement, model: HeaderChip | null) {
-    chip.hidden = model == null
-    chip.disabled = !(model?.enabled ?? false)
-    chip.querySelector('.item-chip-label')!.textContent = model?.label ?? ''
+  private showPin(pin: HTMLButtonElement, model: HeaderPin | null) {
+    pin.hidden = model == null
+    pin.disabled = !(model?.enabled ?? false)
+    pin.classList.toggle('empty', model?.empty ?? false)
+    pin.querySelector('.item-pin-label')!.textContent = model?.label ?? ''
+    // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
+    const mark = pin.querySelector<HTMLElement>('.item-status-mark')
+    if (mark) {
+      mark.dataset.tone = model?.mark?.tone ?? 'neutral'
+      mark.dataset.fill = model?.mark?.fill ?? 'none'
+    }
   }
 
-  private menuChip(id: string, menu: HeaderMenu): HTMLButtonElement {
-    const chip = element('button', 'item-chip item-menu-chip', this.chips)
-    chip.type = 'button'
-    chip.id = id
-    chip.setAttribute('aria-haspopup', 'menu')
-    element('span', `item-chip-icon item-icon-${menu}`, chip).setAttribute('aria-hidden', 'true')
-    element('span', 'item-chip-label', chip)
-    element('span', 'item-chip-icon item-icon-indicator', chip).setAttribute('aria-hidden', 'true')
+  private menuPin(id: string, menu: HeaderMenu): HTMLButtonElement {
+    const pin = element('button', 'item-pin item-menu-pin', this.pins)
+    pin.type = 'button'
+    pin.id = id
+    pin.setAttribute('aria-haspopup', 'menu')
+    // An empty pin shows a plus where a filled one shows its symbol.
+    const symbol =
+      menu === 'status'
+        ? element('span', 'item-pin-symbol item-status-mark', pin)
+        : element('span', 'item-pin-symbol item-pin-icon item-icon-parent', pin)
+    symbol.setAttribute('aria-hidden', 'true')
+    element('span', 'item-pin-icon item-icon-plus', pin).setAttribute('aria-hidden', 'true')
+    element('span', 'item-pin-label', pin)
+    element('span', 'item-pin-icon item-icon-indicator', pin).setAttribute('aria-hidden', 'true')
     // A native pop-up button opens as the mouse goes down, and from the keyboard on Space or Return.
-    chip.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0 || chip.disabled) return
+    pin.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || pin.disabled) return
       event.preventDefault()
-      this.openMenu(chip, menu)
+      this.openMenu(pin, menu)
     })
     // As with an AppKit button, a click leaves the keyboard where it was, in the title say.
-    chip.addEventListener('mousedown', (event) => event.preventDefault())
-    chip.addEventListener('click', (event) => {
-      if (event.detail === 0) this.openMenu(chip, menu)
+    pin.addEventListener('mousedown', (event) => event.preventDefault())
+    pin.addEventListener('click', (event) => {
+      if (event.detail === 0) this.openMenu(pin, menu)
     })
-    return chip
+    return pin
   }
 
-  private openMenu(chip: HTMLElement, menu: HeaderMenu) {
+  private openMenu(pin: HTMLElement, menu: HeaderMenu) {
     if (!this.model) return
-    const rect = chip.getBoundingClientRect()
+    const rect = pin.getBoundingClientRect()
     postToHost({
       type: 'headerMenu',
       item: this.model.item,

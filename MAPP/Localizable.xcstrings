@@ -82,6 +82,9 @@
     "Note reference: %@. Open to edit source." : {
 
     },
+    "Open %@" : {
+
+    },
     "Open to view this PDF" : {
 
     },
@@ -95,6 +98,9 @@
 
     },
     "Quote" : {
+
+    },
+    "Remove Parent" : {
 
     },
     "Rendering diagram…" : {
@@ -214,9 +220,6 @@
     "Add Connection" : {
 
     },
-    "Add Parent" : {
-
-    },
     "Add Relationship" : {
 
     },
@@ -224,9 +227,6 @@
 
     },
     "Change Relationship" : {
-
-    },
-    "Choose Parent…" : {
 
     },
     "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
@@ -253,16 +253,10 @@
     "Open Item" : {
 
     },
-    "Open Parent" : {
-
-    },
     "Remove Connection" : {
 
     },
     "Replace…" : {
-
-    },
-    "Set Status" : {
 
     },
     "Start Writing" : {

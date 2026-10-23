@@ -1005,7 +1005,7 @@ struct EditorTests {
         #expect(try await page.editor.webView.evaluateJavaScript("window.pastedScriptRan === undefined") as? Bool == true)
     }
 
-    @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
+    @Test func aPinAsksForItsMenuUnderItsFrameInTheEditor() async throws {
         let page = try await Harness()
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -1031,7 +1031,7 @@ struct EditorTests {
         let expected = page.editor.container.convert(CGRect(x: chip[0], y: chip[1] + covered, width: chip[2], height: chip[3]), from: page.editor.webView)
         #expect(abs(menus[0].2.minX - expected.minX) < 0.5 && abs(menus[0].2.minY - expected.minY) < 0.5)
         #expect(abs(menus[0].2.width - chip[2]) < 0.5 && abs(menus[0].2.height - chip[3]) < 0.5)
-        #expect(menus[0].2.minY > 52 - 30, "the chip lies below the covered top, less what has scrolled")
+        #expect(menus[0].2.minY > 52 - 30, "the pin lies below the covered top, less what has scrolled")
     }
 
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
@@ -1127,7 +1127,7 @@ struct EditorTests {
         let host = try await HostedPage()
         defer { host.close() }
         let library = host.library, ticket = host.ticket, page = host.page
-        let status = try await host.value("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
+        let status = try await host.value("document.querySelector('#ItemStatusChip .item-pin-label').textContent") as? String
         #expect(status == "In Progress")
 
         // Return saves the title as the item's, once, and the note's text takes the keyboard.
