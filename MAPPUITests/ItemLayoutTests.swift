@@ -84,7 +84,7 @@ final class ItemLayoutTests: XCTestCase {
         let before = header.frame.minY
         let otherColumnControls = [
             app.toolbars.buttons["Search"],
-            app.toolbars.menuButtons["Sort"],
+            app.toolbars.menuButtons["View Options"],
             app.toolbars.buttons["Hide Sidebar"],
         ]
         let controlFrames = otherColumnControls.map(\.frame)

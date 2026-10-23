@@ -162,7 +162,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
-    /// The list's search, a field only once its button beside Sort is clicked.
+    /// The list's search, a field only once its button beside View Options is clicked.
     private var listSearch: XCUIElement { window.searchFields["ColumnSearch"] }
 
     func testTheListsSearchFindsNotesAcrossFoldersAndEscapePutsItAway() {
@@ -279,10 +279,10 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(listSearch.value as? String, "tomatoes", "the field took the keyboard again")
     }
 
-    func testCommandPSearchesEveryNotesTextAndOpensTheOneChosen() {
+    func testShiftCommandPSearchesEveryNotesTextAndOpensTheOneChosen() {
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
         editor.click()
-        app.typeKey("p", modifierFlags: .command)
+        app.typeKey("p", modifierFlags: [.command, .shift])
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         app.typeText("ragu")
@@ -595,6 +595,27 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(typeRow("aic.ticket.task").exists)
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(waitForType("aic.ticket.task"), "Return chooses the first match")
+    }
+
+    func testBackAndForwardMoveThroughTheItemsOpened() {
+        let back = window.descendants(matching: .any).matching(identifier: "BackToolbar").element(boundBy: 0)
+        let forward = window.descendants(matching: .any).matching(identifier: "ForwardToolbar").element(boundBy: 0)
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertFalse(back.isEnabled, "nothing was opened before the first note")
+        row(titled: "Recipes to try").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(back.isEnabled)
+        XCTAssertFalse(forward.isEnabled, "nothing lies ahead")
+        app.typeKey("[", modifierFlags: .command)
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(forward.isEnabled)
+        XCTAssertFalse(back.isEnabled)
+        app.typeKey("]", modifierFlags: .command)
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        back.click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        forward.click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
     }
 
     func testBackAndForwardMoveThroughTheTypesShown() {

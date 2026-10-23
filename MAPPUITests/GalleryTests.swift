@@ -20,7 +20,7 @@ final class GalleryTests: XCTestCase {
     override func tearDown() async throws { app.terminate() }
 
     private func choose(_ mode: String) {
-        let more = window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0)
+        let more = window.descendants(matching: .any).matching(identifier: "ViewOptionsToolbar").element(boundBy: 0)
         XCTAssertTrue(more.waitForExistence(timeout: 3))
         more.click()
         let option = window.menuItems[mode].firstMatch
@@ -33,7 +33,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testGalleryReplacesTheListAndEditorWithAnAdaptiveGrid() throws {
-        choose("Gallery View")
+        choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists)
         XCTAssertFalse(window.webViews.firstMatch.exists)
@@ -70,7 +70,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testOpeningReturningAndListViewKeepTheNoteAndUndo() {
-        choose("Gallery View")
+        choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))
         target.click()
@@ -86,7 +86,7 @@ final class GalleryTests: XCTestCase {
         app.typeText("\nGallery edit retained")
         window.buttons["BackToGallery"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
-        choose("List View")
+        choose("List")
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         let text = expectation(for: NSPredicate(format: "value CONTAINS %@", "Gallery edit retained"), evaluatedWith: editor)
         wait(for: [text], timeout: 3)
@@ -97,7 +97,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testDeletingAnOpenedItemKeepsTheGallerySelectionCurrent() {
-        choose("Gallery View")
+        choose("Gallery")
         let first = card("Kitchen quotes")
         XCTAssertTrue(first.waitForExistence(timeout: 3))
         first.doubleClick()
@@ -118,7 +118,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testAnOpenedGalleryNoteKeepsItsCompactTitleAndTrailingActions() {
-        choose("Gallery View")
+        choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))
         target.doubleClick()
@@ -142,7 +142,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testGallerySearchAndEmptyResultsUseTheExistingSearch() {
-        choose("Gallery View")
+        choose("Gallery")
         XCTAssertTrue(card("Kitchen quotes").waitForExistence(timeout: 3))
         card("Kitchen quotes").doubleClick()
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
@@ -166,7 +166,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testKeyboardSelectionDeletionAndUndoWorkInGallery() {
-        choose("Gallery View")
+        choose("Gallery")
         let first = card("Kitchen quotes")
         let second = card("Reading list")
         XCTAssertTrue(first.waitForExistence(timeout: 3))
@@ -186,7 +186,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testSettingsTypesAndHiddenSidebarReturnToGallery() throws {
-        choose("Gallery View")
+        choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min { abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX) })
         let edge = splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -204,10 +204,10 @@ final class GalleryTests: XCTestCase {
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3))
         for _ in 0..<3 {
-            choose("List View")
+            choose("List")
             XCTAssertTrue(list.waitForExistence(timeout: 3))
             XCTAssertFalse(sidebar.exists)
-            choose("Gallery View")
+            choose("Gallery")
             XCTAssertTrue(gallery.waitForExistence(timeout: 3))
             XCTAssertFalse(sidebar.exists)
         }
@@ -217,7 +217,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testAHiddenDraftKeepsItsTextWhenReturningToGallery() {
-        choose("Gallery View")
+        choose("Gallery")
         window.buttons["NewItemToolbar"].click()
         let title = window.textFields["NewItemTitle"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
@@ -247,15 +247,15 @@ final class GalleryTests: XCTestCase {
         field.typeText("Print")
         XCTAssertTrue(window.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Print…")).firstMatch.waitForExistence(timeout: 3))
         field.typeKey(.escape, modifierFlags: [])
-        choose("Gallery View")
+        choose("Gallery")
         card("Reading list").click()
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.typeText("Print")
         XCTAssertFalse(window.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Print…")).firstMatch.exists)
         field.typeKey("a", modifierFlags: .command)
-        field.typeText("List View")
-        XCTAssertTrue(window.buttons["List View"].waitForExistence(timeout: 3))
+        field.typeText("View as List")
+        XCTAssertTrue(window.buttons["View as List"].waitForExistence(timeout: 3))
         field.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(list.waitForExistence(timeout: 3))
     }
