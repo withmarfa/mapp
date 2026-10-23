@@ -54,7 +54,7 @@ These hold across the app. The nested files say how each library keeps them.
 - Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. The nested `AGENTS.md` and `CLAUDE.md` files are listed there; list any new one too, or it is copied into the app, and two with one name fail the build as duplicate resources.
 - The bundle identifier, display name, and version are build settings. A Debug build has its own bundle identifier, `com.withmarfa.mapp.debug`, so it never shares the installed app's container, defaults, saved server, Marfa store or keychain items; Release is `com.withmarfa.mapp`. Key anything that must differ between them (the keychain service) on `Bundle.main.bundleIdentifier`, never a literal. `MAPP/Info.plist` holds only what build settings cannot express (the note drag type) and is excluded from the app's resources.
 - `MAPP/Model/`: the data model, free of SwiftUI. `Items/` holds the library protocol and item types; `Marfa/` holds the Marfa library.
-- `MAPP/Views/`: windows, panes, toolbars, commands, and Settings. `MAPP/Types/`: the Marfa Types browser.
+- `MAPP/Views/`: windows, panes, toolbars, commands, and Settings.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
 - `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` holds items in memory for testing view models without a folder or server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
