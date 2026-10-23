@@ -70,23 +70,7 @@ struct NoteList: View {
             browser.focusRequest = .page
             return .handled
         }
-        .toolbar {
-            ColumnSearch(
-                isExpanded: $browser.isSearchExpanded,
-                text: $browser.searchText,
-                prompt: String(localized: "Search"),
-                columnWidth: width,
-                focusRequests: browser.searchFocusRequests,
-                onDown: { browser.focusRequest = .list }
-            ) {
-                Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                    OrderOptions()
-                        .pickerStyle(.inline)
-                }
-                .menuIndicator(.hidden)
-                .help("Sort")
-            }
-        }
+        .toolbar { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1
@@ -97,7 +81,7 @@ struct NoteList: View {
         }
         .dragContainerSelection(Array(browser.selection))
         .onChange(of: ids) { old, new in
-            browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
+            browser.keepSelection(from: old, to: new)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             if ids.count == 1, let id = ids.first, library.canRenameFile(of: library.item(id)) {

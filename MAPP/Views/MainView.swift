@@ -16,6 +16,7 @@ struct MainView: View {
     @State private var listWidth: CGFloat = 340
     @State private var measuredWidths = ColumnWidths()
     @State private var typesListWidth: CGFloat = 340
+    @State private var galleryWidth: CGFloat = 900
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var importRequestID: UUID?
@@ -174,9 +175,12 @@ struct MainView: View {
                                 }
                         }
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0.isFinite, $0 > 0 { galleryWidth = $0 } }
                     .modifier(itemInspector)
                     .toolbar {
-                        GalleryToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                        GalleryToolbar(
+                            browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
+                            columnWidth: min(galleryWidth, 400))
                     }
                 }
             } else {
@@ -221,7 +225,7 @@ struct MainView: View {
         // The gallery disappears while an item is open; selection must still follow deletes and moves.
         .onChange(of: galleryItemIDs) { old, new in
             guard browser.usesGallery, !browser.isCreatingItem else { return }
-            browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
+            browser.keepSelection(from: old, to: new)
         }
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)

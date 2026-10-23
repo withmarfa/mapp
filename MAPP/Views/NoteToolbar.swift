@@ -1,6 +1,10 @@
 import SwiftUI
 
-/// The list workspace keeps its existing customizable toolbar and item identities.
+/// The page's toolbar: Back and Forward through the items shown, then Details and More. Format is out of the
+/// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
+///
+/// Back and Forward take the automatic placement, which sets them at the leading edge of this column's section.
+/// The navigation placement sets them at the window's leading edge, beside the list column's title.
 struct NoteToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
@@ -13,6 +17,10 @@ struct NoteToolbar: CustomizableToolbarContent {
     }
 
     var body: some CustomizableToolbarContent {
+        ToolbarItem(id: "back") { HistoryButton(browser: browser, direction: .back) }
+            .hidden(browser == nil || tools.showsTypes)
+        ToolbarItem(id: "forward") { HistoryButton(browser: browser, direction: .forward) }
+            .hidden(browser == nil || tools.showsTypes)
         ToolbarItem(id: "scrolledTitle") {
             Text(tools.notes.first?.title ?? "")
                 .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -23,10 +31,8 @@ struct NoteToolbar: CustomizableToolbarContent {
         .customizationBehavior(.disabled)
         .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsGallery == true || tools.showsTypes)
         ToolbarSpacer(.flexible)
-        ToolbarItem(id: "newNote") { NewNoteButton(browser: browser) }
-            .customizationBehavior(.disabled)
-            .hidden(browser == nil)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
+            .defaultCustomization(.hidden)
             .hidden(tools.showsTypes || browser?.showsGallery == true)
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(tools.showsTypes)
@@ -35,13 +41,17 @@ struct NoteToolbar: CustomizableToolbarContent {
     }
 }
 
-/// Gallery shares the item actions without a second customizable toolbar configuration.
+/// The gallery's toolbar, one for the grid and the page it opens, so the order across its single column is set here:
+/// View Options and Search together, then Details and More, then New Item, as the list and page toolbars have them
+/// across two columns. Opened on an item, View Options and Search give way; Details and More stay.
 struct GalleryToolbar: ToolbarContent {
     @CurrentLibrary private var library
-    let browser: Browser
+    @Bindable var browser: Browser
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
+    /// The width the search field spans when it is out.
+    let columnWidth: CGFloat
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
@@ -54,11 +64,30 @@ struct GalleryToolbar: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
-        ToolbarItemGroup(placement: .primaryAction) {
-            NewNoteButton(browser: browser)
-            if !browser.showsGallery { FormatMenu(editor: editor, note: tools.editableNote) }
-            tools.detailsButton
-            tools.moreMenu
+        if browser.showsGallery {
+            ColumnSearch(
+                isExpanded: $browser.isSearchExpanded,
+                text: $browser.searchText,
+                prompt: String(localized: "Search"),
+                columnWidth: columnWidth,
+                focusRequests: browser.searchFocusRequests,
+                onDown: { browser.focusRequest = .list }
+            ) {
+                ViewOptionsMenu(browser: browser)
+            }
+        }
+        // Over the grid, Details and More act on the cards selected, so they wait for one.
+        if !browser.showsGallery || !browser.selection.isEmpty {
+            if browser.showsGallery { ToolbarSpacer(.fixed) }
+            ToolbarItemGroup {
+                tools.detailsButton
+                tools.moreMenu
+            }
+        }
+        // The field spans the column, so there is no room beside it.
+        if !browser.isSearchExpanded || !browser.showsGallery {
+            ToolbarSpacer(.fixed)
+            ToolbarItem { NewItemButton(browser: browser) }
         }
     }
 }
@@ -90,29 +119,36 @@ private struct ItemToolbarActions {
     }
 
     var detailsButton: some View {
-        Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
+        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
             .help(details.isPresented ? "Hide Details" : "Show Details")
             .disabled((browser?.selection.count ?? notes.count) != 1 || browser?.isCreatingItem == true)
             .accessibilityIdentifier("DetailsToggle")
     }
 
     var moreMenu: some View {
-        MoreMenu(notes: browser?.isCreatingItem != true && (browser?.selection.count ?? notes.count) == notes.count ? notes : [],
-                 fileURL: selectedFileURL, browser: browser, editor: editor, editableNote: editableNote)
+        let isShowingSelection = browser?.isCreatingItem != true && (browser?.selection.count ?? notes.count) == notes.count
+        return MoreMenu(
+            ids: browser.map { $0.isCreatingItem ? [] : $0.selection } ?? Set(items.map(\.id)),
+            notes: isShowingSelection ? notes : [],
+            fileURL: selectedFileURL, browser: browser, editor: editor, visibleNote: visibleNote, editableNote: editableNote)
     }
 }
 
-private struct NewNoteButton: View {
+/// Back or Forward through the items this window has shown.
+private struct HistoryButton: View {
     @CurrentLibrary private var library
     let browser: Browser?
+    let direction: SelectionHistory.Direction
 
     var body: some View {
-        Button("New Item", systemImage: "plus") {
-            browser?.startItemDraft()
+        let isBack = direction == .back
+        let isEnabled = browser.map { isBack ? $0.canGoBack(in: library) : $0.canGoForward(in: library) } ?? false
+        Button(isBack ? "Back" : "Forward", systemImage: isBack ? "chevron.backward" : "chevron.forward") {
+            browser?.go(direction, in: library)
         }
-        .help("New Item")
-        .accessibilityIdentifier("NewItemToolbar")
-        .disabled(browser == nil || !library.isLoaded)
+        .help(isBack ? "Back" : "Forward")
+        .disabled(!isEnabled)
+        .accessibilityIdentifier(isBack ? "BackToolbar" : "ForwardToolbar")
     }
 }
 
@@ -145,57 +181,62 @@ private struct FormatMenu: View {
     }
 }
 
-/// What else can be done to the notes shown, as Notes keeps it under its More button.
+/// What else can be done to the item shown, as Notes keeps it under its More button.
 private struct MoreMenu: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    /// Everything selected, files too; the windows it opens and the share it makes take them all.
+    let ids: Set<ItemID>
     let notes: [Item]
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController
+    /// The note on the page, which Print, Export and the source view act on.
+    let visibleNote: Item?
     let editableNote: Item?
 
     var body: some View {
+        let noteIDs = Set(notes.map(\.id))
+        let note = notes.count == 1 ? notes.first : nil
         Menu("More", systemImage: "ellipsis") {
-            if let browser {
-                ItemViewOptions(browser: browser)
-                Divider()
+            if browser != nil {
+                Button("Open in New Window", systemImage: "macwindow") {
+                    for id in library.idsForWindows(ids) { openWindow(value: id) }
+                }
+                .keyboardShortcut("o")
+                .disabled(ids.isEmpty)
             }
-            let note = notes.count == 1 ? notes.first : nil
-            NoteShareLink(title: note?.title ?? "", text: note.flatMap { library.body(of: $0.id)?.text }, fileURL: fileURL)
-            Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
-                .disabled(editableNote == nil)
+            NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
+            NoteOrganizeActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
+            Divider()
+            Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(editableNote == nil)
             if let browser {
                 Button("Rename…", systemImage: "pencil") { browser.renamingNote = notes.first?.id }
                     .disabled(notes.count != 1 || !library.canRenameFile(of: notes.first))
-                Divider()
             }
-            if !notes.isEmpty {
-                NoteActions(ids: Set(notes.map(\.id)), undoManager: undoManager)
+            Divider()
+            Menu("Page Width", systemImage: "arrow.left.and.right") {
+                PageWidthOptions().pickerStyle(.inline).labelsHidden()
             }
+            Button(editor.caret.sourceMode ? "Show Formatted Text" : "Show Markdown Source", systemImage: "doc.plaintext") {
+                editor.setSourceMode(!editor.caret.sourceMode)
+            }
+            .disabled(visibleNote == nil)
+            Divider()
+            Button("Print…", systemImage: "printer") { editor.printNote() }
+                .keyboardShortcut("p")
+                .disabled(visibleNote == nil)
+            Button("Export as PDF…", systemImage: "doc.richtext") { editor.exportPDF() }
+                .disabled(visibleNote == nil)
+            Divider()
+            NoteRemoveActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
         }
         .menuIndicator(.hidden)
         .help("More")
         .accessibilityIdentifier("MoreToolbar")
-    }
-}
-
-/// Shares a note's markdown as text, the form every destination can take, or a file as itself.
-struct NoteShareLink: View {
-    var title = ""
-    /// Nil when there is no one note to share.
-    let text: String?
-    var fileURL: URL? = nil
-
-    var body: some View {
-        if let fileURL {
-            ShareLink(item: fileURL)
-        } else if let text {
-            ShareLink(item: text, subject: Text(title), preview: SharePreview(title))
-        } else {
-            ShareLink(item: "")
-                .disabled(true)
-        }
     }
 }

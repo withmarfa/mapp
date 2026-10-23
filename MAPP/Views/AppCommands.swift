@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The menu bar. File makes and opens notes and acts on the selected ones; View orders the list and moves back
-/// and forward through the types Marfa Types has shown.
+/// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the list shows and
+/// orders items and moves back and forward through the items the window has shown.
 struct AppCommands: Commands {
     /// Nil while no library is open: before a folder is chosen, or while a server's copy opens.
     let library: (any ItemLibrary)?
@@ -45,9 +45,9 @@ struct AppCommands: Commands {
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)
             Divider()
-            NoteShareLink(
-                title: one?.title ?? "", text: one.flatMap { library?.body(of: $0.id)?.text },
-                fileURL: ids.count == 1 ? ids.first.flatMap { id in library.flatMap { browser?.fileURL(of: id, in: $0) ?? $0.fileURL(for: id) } } : nil)
+            NoteShareLink(share: library.map { library in
+                NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0, in: library) } : nil, in: library)
+            } ?? NoteShare())
             Button("Rename Note…", systemImage: "pencil") {
                 browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
             }
@@ -67,18 +67,18 @@ struct AppCommands: Commands {
             .disabled(browser?.selectedFolder == nil || !editsFolders)
         }
 
-        // ⌘P is Search Notes, so Print takes ⇧⌘P, which Page Setup would have had; the print panel sets the paper.
+        // Print has ⌘P, as everywhere; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
                 .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .keyboardShortcut("p")
                 .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
             palette("Search Notes…", systemImage: "magnifyingglass", .search)
-                .keyboardShortcut("p")
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             palette("Command Palette", systemImage: "command", .commands)
                 .keyboardShortcut("k")
         }
@@ -89,9 +89,9 @@ struct AppCommands: Commands {
             }
             .disabled(editor?.hasNote != true)
             Divider()
-            if let browser { ItemViewOptions(browser: browser) }
+            ItemViewOptions(browser: browser, style: .menuBar)
             Divider()
-            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "info.circle") {
+            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
@@ -101,16 +101,22 @@ struct AppCommands: Commands {
             Divider()
             PageWidthOptions()
             Divider()
-            // ⌘[ and ⌘], as in Safari and the Finder.
+            // ⌘[ and ⌘], as in Safari and the Finder. Marfa Types keeps its own history of the types it has shown.
+            // The page uses the same keys to outdent and indent a list item and to move between table cells, so
+            // while it has the keyboard the menu items give the keys up (the items still work from the menu).
             Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
                 if browser?.usesGallery == true { browser?.returnToGallery() }
-                else { marfaTypes?.goBack() }
+                else if let marfaTypes { marfaTypes.goBack() }
+                else if let browser, let library { browser.go(.back, in: library) }
             }
-                .keyboardShortcut("[")
-                .disabled(browser?.usesGallery == true ? browser?.showsGallery != false : marfaTypes?.canGoBack != true)
-            Button("Forward", systemImage: "chevron.forward") { marfaTypes?.goForward() }
-                .keyboardShortcut("]")
-                .disabled(marfaTypes?.canGoForward != true)
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
+                .disabled(!canGoBack)
+            Button("Forward", systemImage: "chevron.forward") {
+                if let marfaTypes { marfaTypes.goForward() }
+                else if let browser, let library { browser.go(.forward, in: library) }
+            }
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("]", modifiers: .command))
+                .disabled(!canGoForward)
             Divider()
         }
 
@@ -125,6 +131,21 @@ extension AppCommands {
     /// Marfa Types, while the window in front shows it, for Back and Forward.
     private var marfaTypes: TypesBrowser? { browser?.showsTypes == true ? browser?.types : nil }
 
+    private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
+
+    private var canGoBack: Bool {
+        guard let browser else { return false }
+        if browser.usesGallery { return browser.showsGallery == false }
+        if let marfaTypes { return marfaTypes.canGoBack }
+        return library.map { browser.canGoBack(in: $0) } ?? false
+    }
+
+    private var canGoForward: Bool {
+        guard let browser, !browser.usesGallery else { return false }
+        if let marfaTypes { return marfaTypes.canGoForward }
+        return library.map { browser.canGoForward(in: $0) } ?? false
+    }
+
     /// Opens a palette over the window in front, or puts it away if that palette is already out.
     private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {
         Button(title, systemImage: systemImage) {
@@ -134,7 +155,7 @@ extension AppCommands {
     }
 }
 
-/// The list's own search, beside Sort, from ⌥⌘F under Find, as Notes has it.
+/// The list's own search, beside View Options, from ⌥⌘F under Find, as Notes has it.
 struct SearchListButton: View {
     @FocusedValue(\.browser) private var browser
 

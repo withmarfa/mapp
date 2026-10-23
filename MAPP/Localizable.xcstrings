@@ -46,6 +46,9 @@
     "Footnote" : {
 
     },
+    "Gallery" : {
+
+    },
     "Heading 1" : {
 
     },
@@ -62,6 +65,9 @@
 
     },
     "Link unavailable" : {
+
+    },
+    "List" : {
 
     },
     "Loading file…" : {
@@ -94,10 +100,16 @@
     "Rendering diagram…" : {
 
     },
+    "Share…" : {
+
+    },
     "Show Formatted Text" : {
 
     },
     "Show Markdown Source" : {
+
+    },
+    "Sort by %@" : {
 
     },
     "Start typing…" : {
@@ -115,22 +127,28 @@
     "Tip" : {
 
     },
+    "Ungroup by Date" : {
+
+    },
+    "View As" : {
+
+    },
+    "View as Gallery" : {
+
+    },
+    "View as List" : {
+
+    },
+    "View Options" : {
+
+    },
     "Warning" : {
 
     },
     "The printable note could not finish loading." : {
 
     },
-    "List View" : {
-
-    },
-    "Gallery View" : {
-
-    },
     "Back to Gallery" : {
-
-    },
-    "View" : {
 
     },
     "Base Text Size" : {
@@ -317,9 +335,6 @@
 
     },
     "Archive" : {
-
-    },
-    "Archive Note" : {
 
     },
     "Back" : {
@@ -654,9 +669,6 @@
 
     },
     "Some notes have tags that can’t be read or changed safely, so their files were left unchanged." : {
-
-    },
-    "Sort" : {
 
     },
     "Sort By" : {

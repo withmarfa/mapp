@@ -63,7 +63,7 @@ struct NoteWindow: View {
                             }
                         }
                         ToolbarItem {
-                            Button("Details", systemImage: "info.circle") { details.isPresented.toggle() }
+                            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
                                 .accessibilityIdentifier("DetailsToggle")
                         }
                     }

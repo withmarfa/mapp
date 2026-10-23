@@ -57,8 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder"),
            !ProcessInfo.processInfo.arguments.contains("-MAPPKeepSampleSettings") {
             let defaults = UserDefaults.standard
-            let columns = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("NSSplitView Subview Frames") }
-            for key in OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all + columns { defaults.removeObject(forKey: key) }
+            let kept = defaults.dictionaryRepresentation().keys.filter {
+                $0.hasPrefix("NSSplitView Subview Frames") || $0.hasPrefix("NSToolbar Configuration")
+            }
+            for key in OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all + kept { defaults.removeObject(forKey: key) }
         }
         #endif
         super.init()

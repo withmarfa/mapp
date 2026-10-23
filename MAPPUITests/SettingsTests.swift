@@ -69,7 +69,7 @@ final class SettingsTests: XCTestCase {
         let sidebarToggle = window.toolbars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Sidebar")).firstMatch
         XCTAssertTrue(sidebarToggle.exists)
         XCTAssertLessThan(sidebarToggle.frame.maxX, sidebar.frame.maxX, "the sidebar toggle stays with its column")
-        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
+        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0).exists)
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3), "the native sidebar toggle targets Settings")
         XCTAssertTrue(back.exists)
@@ -87,7 +87,7 @@ final class SettingsTests: XCTestCase {
         back.click()
         XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
         XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "FormatToolbar").element(boundBy: 0).exists)
+        XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0).exists)
     }
 
     func testSettingsReturnsToTheTypesBrowser() {

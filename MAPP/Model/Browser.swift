@@ -6,7 +6,19 @@ import Observation
 @Observable
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
-    var selection: Set<ItemID> = []
+    var selection: Set<ItemID> = [] {
+        didSet {
+            guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
+            history.record(selection, in: item)
+        }
+    }
+    /// The items the person chose in this window, for Back and Forward: a click, a key in the list, a link or a
+    /// palette jump's destination. The app's own moves (the first note of a place, the next note after a delete
+    /// or a search) are left out, except the note the window opens on, so Back can return to it. Kept for the
+    /// life of the window, not across launches.
+    private(set) var history = SelectionHistory()
+    @ObservationIgnored private var isMovingThroughHistory = false
+    @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
             isGalleryItemPresented = false
@@ -27,9 +39,9 @@ final class Browser {
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
-    /// The palette that is out, if any: ⌘K's commands, or ⌘P's search of every note.
+    /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note.
     var palette: Palette?
-    /// Whether the list's search is out as a field, rather than a button beside Sort.
+    /// Whether the list's search is out as a field, rather than a button beside View Options.
     var isSearchExpanded = false
     /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
     let types = TypesBrowser()
@@ -104,6 +116,34 @@ final class Browser {
         if !usesGallery { focusRequest = .page }
     }
 
+    /// Whether an earlier item the window showed can still be shown again.
+    func canGoBack(in library: any ItemLibrary) -> Bool {
+        history.target(.back, in: library, shown: selection) != nil
+    }
+
+    func canGoForward(in library: any ItemLibrary) -> Bool {
+        history.target(.forward, in: library, shown: selection) != nil
+    }
+
+    /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
+    /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
+    func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
+        guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
+        isMovingThroughHistory = true
+        defer { isMovingThroughHistory = false }
+        isCreatingItem = false
+        isGalleryItemPresented = false
+        if isSearching || sidebarItem != entry.place {
+            searchText = ""
+            isSearchExpanded = false
+            sidebarItem = entry.place
+        }
+        if !items(in: library).contains(where: { $0.id == entry.id }) { sidebarItem = .allNotes }
+        selection = [entry.id]
+        history.move(to: index)
+        focusRequest = .list
+    }
+
     func returnToGallery() {
         isCreatingItem = false
         isGalleryItemPresented = false
@@ -155,7 +195,20 @@ final class Browser {
 
     func selectFirstNote(in library: any ItemLibrary, order: NoteOrder) {
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
-        selection = first.map { [$0.id] } ?? []
+        selectAutomatically(first.map { [$0.id] } ?? [])
+    }
+
+    /// Moves the selection as the app does, not as the person chose, so Back does not stop there.
+    private func selectAutomatically(_ ids: Set<ItemID>) {
+        isSelectingAutomatically = true
+        defer { isSelectingAutomatically = false }
+        selection = ids
+    }
+
+    /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
+    func keepSelection(from old: [ItemID], to new: [ItemID]) {
+        let kept = Self.selection(selection, keptFrom: old, in: new)
+        if kept != selection { selectAutomatically(kept) }
     }
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
@@ -246,6 +299,7 @@ final class Browser {
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         selection = []
+        history = SelectionHistory()
         isGalleryItemPresented = false
         sidebarItem = .allNotes
         searchText = ""
@@ -376,8 +430,49 @@ final class Browser {
         case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
         }
         let ids = Set(snapshot.selection)
-        selection = Set(items(in: library).map(\.id).filter(ids.contains))
+        selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
+    }
+}
+
+/// The single items a window has shown, oldest first, and which of them it shows now.
+struct SelectionHistory {
+    struct Entry: Equatable {
+        let place: SidebarItem
+        let id: ItemID
+    }
+
+    nonisolated enum Direction { case back, forward }
+
+    private static let limit = 100
+    private(set) var entries: [Entry] = []
+    private var position = -1
+
+    /// Notes the selection after a change. Only one item shown is an entry; showing it again leaves the history as
+    /// it is, and showing another drops whatever lay ahead.
+    mutating func record(_ selection: Set<ItemID>, in place: SidebarItem) {
+        guard selection.count == 1, let id = selection.first else { return }
+        if entries.indices.contains(position), entries[position].id == id { return }
+        entries.removeSubrange((position + 1)...)
+        entries.append(Entry(place: place, id: id))
+        if entries.count > Self.limit { entries.removeFirst(entries.count - Self.limit) }
+        position = entries.count - 1
+    }
+
+    mutating func move(to index: Int) {
+        guard entries.indices.contains(index) else { return }
+        position = index
+    }
+
+    /// The nearest entry in a direction whose item still exists and is not the one shown now (the app can move the
+    /// selection off the entry the history is at). A deleted item is shown only where it was left, in Recently
+    /// Deleted, since no other place lists it.
+    func target(_ direction: Direction, in library: any ItemLibrary, shown: Set<ItemID>) -> (index: Int, entry: Entry)? {
+        let candidates = direction == .back ? Array(entries.indices.prefix(max(position, 0)).reversed()) : Array(entries.indices.dropFirst(position + 1))
+        return candidates.lazy.map { ($0, entries[$0]) }.first { _, entry in
+            guard shown != [entry.id], let item = library.item(entry.id) else { return false }
+            return item.state != .trashed || entry.place == .recentlyDeleted
+        }
     }
 }
 

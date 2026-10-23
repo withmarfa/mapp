@@ -43,13 +43,6 @@ struct ItemGallery: View {
         }
         .navigationTitle(title)
         .navigationSubtitle(browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
-        .toolbar {
-            ColumnSearch(isExpanded: $browser.isSearchExpanded, text: $browser.searchText, prompt: String(localized: "Search"), columnWidth: min(width, 400), focusRequests: browser.searchFocusRequests, onDown: { browser.focusRequest = .list }) {
-                Menu("Sort", systemImage: "arrow.up.arrow.down") { OrderOptions().pickerStyle(.inline) }
-                    .menuIndicator(.hidden)
-                    .help("Sort")
-            }
-        }
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
