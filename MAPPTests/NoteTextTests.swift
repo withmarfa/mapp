@@ -43,7 +43,7 @@ struct NoteTextTests {
         - [ ] Adapter
         - [x] Walking shoes
         """
-        #expect(preview(body) == "Three days in October. Adapter Walking shoes")
+        #expect(preview(body) == "Three days in October. Adapter. Walking shoes")
     }
 
     @Test func previewReadsTablesWithoutPipesOrDelimiterRows() {
@@ -53,7 +53,7 @@ struct NoteTextTests {
         | --- | ---: |
         | Oak & Iron | £11,850 |
         """
-        #expect(preview(body) == "Supplier Quote Oak & Iron £11,850")
+        #expect(preview(body) == "Supplier Quote. Oak & Iron £11,850")
     }
 
     @Test func previewKeepsCodeInsideFencesAsWritten() {

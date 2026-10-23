@@ -619,7 +619,26 @@
 
     },
     "Deleted items stay here for %lld days, then they’re deleted for good." : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted items stay here for %lld day, then they’re deleted for good."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted items stay here for %lld days, then they’re deleted for good."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Derived From" : {
       "extractionState" : "manual"

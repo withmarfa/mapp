@@ -13,7 +13,13 @@ struct ItemPreviewTests {
         - a list item
         1. a numbered item
         """
-        #expect(text(body) == "This has strong and light words, code, a link, and gone. A quoted line a list item a numbered item")
+        #expect(text(body) == "This has strong and light words, code, a link, and gone. A quoted line. A list item. A numbered item")
+    }
+
+    @Test func eachLineEndsAsASentenceSoItemsReadApart() {
+        #expect(text("- own type\n- Share the log\n- Done!\n- see notes:\n- (aside)") == "own type. Share the log. Done! See notes: (aside)")
+        #expect(text("One line with no stop") == "One line with no stop")
+        #expect(text("Steps\n- iPhone first\n- macOS next", title: "none") == "Steps. iPhone first. macOS next")
     }
 
     @Test func headingLinesAreSkipped() {
@@ -39,7 +45,7 @@ struct ItemPreviewTests {
     }
 
     @Test func whitespaceCollapsesToSingleSpaces() {
-        #expect(text("First   line\n\n\n\tsecond\t\tline\r\nthird") == "First line second line third")
+        #expect(text("First   line\n\n\n\tsecond\t\tline\r\nthird") == "First line. Second line. Third")
     }
 
     @Test func aFirstLineThatRepeatsTheTitleIsDropped() {
@@ -61,9 +67,11 @@ struct ItemPreviewTests {
         #expect(ItemPreview.text(of: "Body", title: "Task", fallback: "Description") == "Body")
     }
 
-    @Test func aFileReadsAsItsKindAndSize() {
+    @Test func aFileReadsAsItsKindAndSize() throws {
         let described = ItemPreview.file(.plainText, byteCount: 76)
-        #expect(described == (UTType.plainText.localizedDescription ?? "") + ", " + ByteCountFormatter.string(fromByteCount: 76, countStyle: .file))
+        let kind = try #require(UTType.plainText.localizedDescription)
+        #expect(described == kind.prefix(1).uppercased() + kind.dropFirst() + ", " + ByteCountFormatter.string(fromByteCount: 76, countStyle: .file))
+        #expect(described.first?.isUppercase == true)
         #expect(described.hasSuffix("76 bytes"))
     }
 

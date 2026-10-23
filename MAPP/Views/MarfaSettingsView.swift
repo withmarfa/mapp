@@ -57,12 +57,6 @@ struct MarfaSettingsView: View {
                 if let waiting = host.waitingChanges, waiting > 0 {
                     LabeledContent("Waiting to Send") { Text(Words.changes(waiting)).foregroundStyle(.secondary) }
                 }
-                HStack {
-                    Button("Disconnect") { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier("MarfaDisconnect")
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                }
             } header: {
                 Text("Marfa Server")
             }

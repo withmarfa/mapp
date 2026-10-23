@@ -38,7 +38,8 @@ struct ItemInspectorHost: View {
                 )
                 .id(id)
             } else {
-                ContentUnavailableView("No Item Selected", systemImage: "sidebar.right")
+                // The page beside it already says that nothing is selected.
+                Color.clear
             }
         }
         .sheet(item: $editing) { relationship in
