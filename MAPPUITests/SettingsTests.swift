@@ -1,12 +1,17 @@
 import AppKit
 import XCTest
 
+/// Settings is a place in the main window: the sidebar stays, its pages take the list's column and the page the
+/// detail column, and choosing a place in the sidebar leaves it.
 @MainActor
 final class SettingsTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var settings: XCUIElement { window.descendants(matching: .any)["SettingsWorkspace"].firstMatch }
+    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    /// Settings' pages, which take the list's column while Settings is the place.
+    private var settings: XCUIElement { element("SettingsPageList") }
+    private var settingsRow: XCUIElement { element("SidebarSettingsRow") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -41,64 +46,55 @@ final class SettingsTests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         XCTAssertEqual(app.windows.count, 1, "settings uses the same window")
-        XCTAssertFalse(list.exists, "there is no item-list column in settings")
-        XCTAssertFalse(window.buttons["Share"].exists, "note commands are hidden in settings")
+        XCTAssertFalse(list.exists, "the pages take the item list's column")
+        XCTAssertTrue(sidebar.exists, "the sidebar stays")
+        XCTAssertFalse(element("MoreToolbar").exists, "item commands are hidden in settings")
         attachScreenshot("SettingsAppearance")
-        XCTAssertTrue(window.staticTexts["Appearance"].exists)
+        XCTAssertTrue(element("SettingsDetail").exists)
         XCTAssertTrue(window.popUpButtons["NoteSort"].exists, "the real list preferences are available")
         XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort By")
 
-        window.buttons["SettingsBack"].click()
-        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+        leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertEqual(title.value as? String, "Trip to Lisbon")
         XCTAssertEqual(list.frame.width, listFrame.width, accuracy: 2, "the note-list width is preserved")
     }
 
-    func testSettingsUsesNativeSidebarAndToolbarAcrossCategories() {
-        let workspaceTitle = window.children(matching: .staticText).matching(NSPredicate(format: "value == %@", "All Notes")).firstMatch
-        XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
+    func testEachSettingsPageShowsInTheDetailColumnWithItsTitle() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        XCTAssertTrue(workspaceTitle.waitForNonExistence(timeout: 3), "the hidden workspace does not contribute a title")
-        let back = window.toolbars.buttons["SettingsBack"]
-        XCTAssertTrue(back.waitForExistence(timeout: 3), "Back belongs to the system toolbar")
-        let sidebar = window.outlines["SettingsSidebar"]
-        XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        XCTAssertLessThan(back.frame.maxX, sidebar.frame.maxX, "Back stays in the sidebar toolbar")
-        let sidebarToggle = window.toolbars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Sidebar")).firstMatch
-        XCTAssertTrue(sidebarToggle.exists)
-        XCTAssertLessThan(sidebarToggle.frame.maxX, sidebar.frame.maxX, "the sidebar toggle stays with its column")
-        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0).exists)
+        XCTAssertFalse(element("MoreToolbar").exists)
         app.typeKey("s", modifierFlags: [.command, .control])
-        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3), "the native sidebar toggle targets Settings")
-        XCTAssertTrue(back.exists)
+        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 3), "the native sidebar toggle works in Settings")
+        XCTAssertTrue(settings.exists, "the pages stay")
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("marfa", "Marfa"), ("sidebar", "Sidebar"), ("about", "About"), ("appearance", "Appearance")] {
-            let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
-            XCTAssertTrue(category.exists)
-            category.click()
-            XCTAssertFalse(workspaceTitle.exists)
-            XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0).exists)
-            attachScreenshot("NativeSettings-\(pane)")
-            XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the active pane has a native toolbar title")
+        let pages = [("editor", "Editor"), ("sidebar", "Sidebar"), ("library", "Library"), ("recentlyDeleted", "Recently Deleted"),
+                     ("about", "About"), ("appearance", "Appearance")]
+        for (page, title) in pages {
+            let row = element("SettingsPage-\(page)")
+            XCTAssertTrue(row.exists, "\(title) is a page")
+            XCTAssertGreaterThan(row.frame.minX, sidebar.frame.maxX, "the pages are in the content column, not the sidebar")
+            row.click()
+            XCTAssertTrue(element("SettingsDetail").exists)
+            attachScreenshot("Settings-\(page)")
+            XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the page has a native toolbar title")
         }
-        back.click()
-        XCTAssertTrue(workspaceTitle.waitForExistence(timeout: 3))
+        leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0).exists)
+        XCTAssertTrue(element("MoreToolbar").exists)
     }
 
     func testSettingsReturnsToTheChosenPlace() {
-        window.outlines["Sidebar"].staticTexts["Recently Deleted"].click()
-        let deleted = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Old packing list")).firstMatch
-        XCTAssertTrue(deleted.waitForExistence(timeout: 5))
+        sidebar.staticTexts["Personal"].click()
+        let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Bike service")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
         for _ in 0..<2 {
             app.typeKey(",", modifierFlags: .command)
             XCTAssertTrue(settings.waitForExistence(timeout: 3))
-            window.buttons["SettingsBack"].click()
-            XCTAssertTrue(deleted.waitForExistence(timeout: 5))
+            sidebar.staticTexts["Personal"].click()
+            XCTAssertTrue(note.waitForExistence(timeout: 5))
+            XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch.exists)
         }
     }
 
@@ -116,7 +112,7 @@ final class SettingsTests: XCTestCase {
         wait(for: [inserted], timeout: 3)
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        window.buttons["SettingsBack"].click()
+        leaveSettings()
         XCTAssertTrue(body.waitForExistence(timeout: 3))
         XCTAssertTrue((body.value as? String)?.contains("Retained editor check") == true)
         body.click()
@@ -125,7 +121,7 @@ final class SettingsTests: XCTestCase {
         wait(for: [undone], timeout: 3)
     }
 
-    func testSettingsFromAnUnselectedItemKeepsNativeChrome() {
+    func testSettingsFromAnUnselectedItemReturnsToNoSelection() {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
@@ -135,10 +131,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        XCTAssertTrue(window.toolbars.buttons["SettingsBack"].exists)
-        XCTAssertTrue(window.outlines["SettingsSidebar"].exists)
-        attachScreenshot("NativeSettings-no-item-selected")
-        window.buttons["SettingsBack"].click()
+        XCTAssertTrue(element("SettingsDetail").exists)
+        attachScreenshot("Settings-no-item-selected")
+        leaveSettings()
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
     }
 
@@ -151,42 +146,28 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         XCTAssertFalse(search.exists)
         XCTAssertTrue(window.toolbars.staticTexts["Appearance"].waitForExistence(timeout: 3))
-        attachScreenshot("NativeSettings-from-column-search")
-        window.buttons["SettingsBack"].click()
+        attachScreenshot("Settings-from-column-search")
+        leaveSettings()
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         XCTAssertEqual(search.value as? String, "Lisbon")
         window.buttons["CloseColumnSearch"].click()
     }
 
-    func testSettingsSearchFindsControlsAndHandlesNoMatches() {
+    func testAPreferenceChangedInSettingsOutlivesLeavingIt() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        let search = window.searchFields.element(boundBy: 0)
-        XCTAssertTrue(search.waitForExistence(timeout: 3))
-        search.click()
-        search.typeText("spelling")
-        attachScreenshot("SettingsSearchSpelling")
-        XCTAssertEqual(search.value as? String, "spelling")
+        element("SettingsPage-editor").click()
         let spelling = window.switches["CheckSpelling"]
         XCTAssertTrue(spelling.waitForExistence(timeout: 3))
         XCTAssertEqual(spelling.label, "Check Spelling While Typing")
         XCTAssertEqual(spelling.value.map { String(describing: $0) }, "1")
         spelling.click()
         XCTAssertEqual(spelling.value.map { String(describing: $0) }, "0")
-        window.buttons["SettingsBack"].click()
+        leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
-        XCTAssertTrue(spelling.waitForExistence(timeout: 3))
+        XCTAssertTrue(spelling.waitForExistence(timeout: 3), "Settings opens at the page shown last")
         XCTAssertEqual(spelling.value.map { String(describing: $0) }, "0", "the preference survives returning to the notes")
-        XCTAssertFalse(window.staticTexts["Appearance"].exists)
-        search.click()
-        search.typeKey("a", modifierFlags: .command)
-        search.typeText("no matching preference")
-        XCTAssertFalse(spelling.exists)
-        XCTAssertTrue(window.buttons["SettingsBack"].exists, "return remains available with no results")
-        search.typeKey("a", modifierFlags: .command)
-        search.typeKey(.delete, modifierFlags: [])
-        XCTAssertTrue(window.staticTexts["Appearance"].firstMatch.waitForExistence(timeout: 3))
     }
 
     func testSettingsPreservesAnUnsubmittedDraftWithTheSidebarHidden() {
@@ -198,10 +179,13 @@ final class SettingsTests: XCTestCase {
         title.typeText("Unsubmitted field notes")
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        window.buttons["SettingsBack"].click()
+        XCTAssertFalse(title.exists)
+        // With the sidebar hidden there is no place to choose; New Item leaves Settings and resumes the draft.
+        app.typeKey("n", modifierFlags: .command)
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         XCTAssertEqual(title.value as? String, "Unsubmitted field notes")
-        XCTAssertFalse(window.outlines["Sidebar"].exists, "the sidebar stays hidden after returning")
+        XCTAssertFalse(settings.exists)
+        XCTAssertFalse(sidebar.exists, "the sidebar stays hidden after returning")
     }
 
     func testSettingsCanOpenAfterTheLastWindowCloses() {
@@ -213,7 +197,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(app.windows.count, 1)
     }
 
-    func testCommandPaletteOpensTheSameSettingsWorkspace() {
+    func testCommandPaletteOpensSettingsInTheSameWindow() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 3))
@@ -228,22 +212,21 @@ final class SettingsTests: XCTestCase {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         let originalHeight = row.frame.height
-        let sidebarText = window.outlines["Sidebar"].staticTexts["All Notes"]
+        let sidebarText = sidebar.staticTexts["All Notes"]
         let originalSidebarHeight = sidebarText.frame.height
-        let favoriteText = window.outlines["Sidebar"].staticTexts["Kitchen quotes"]
-        let folderText = window.outlines["Sidebar"].staticTexts["Home"]
+        let favoriteText = sidebar.staticTexts["Kitchen quotes"]
+        let folderText = sidebar.staticTexts["Home"]
         let originalFavoriteHeight = favoriteText.frame.height
         let originalFolderHeight = folderText.frame.height
         XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
-        let settingsButton = window.toolbars.buttons["SettingsToolbar"]
-        XCTAssertTrue(settingsButton.exists)
-        XCTAssertLessThan(settingsButton.frame.maxX, list.frame.minX, "Settings belongs to the sidebar")
-        settingsButton.click()
+        XCTAssertTrue(settingsRow.exists)
+        XCTAssertLessThan(settingsRow.frame.maxX, list.frame.minX, "Settings belongs to the sidebar")
+        settingsRow.click()
         let size = window.popUpButtons["InterfaceTextSize"]
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         size.click()
         app.menuItems["18 pt"].click()
-        window.buttons["SettingsBack"].click()
+        leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertGreaterThan(row.frame.height, originalHeight + 8, "list text and row height scale together")
         XCTAssertGreaterThan(favoriteText.frame.height, originalFavoriteHeight + 3, "favorite text scales with the interface")
@@ -253,7 +236,7 @@ final class SettingsTests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         XCTAssertEqual(size.value as? String, "18 pt", "the setting is retained on returning")
-        window.outlines["SettingsSidebar"].staticTexts["Editor"].click()
+        element("SettingsPage-editor").click()
         let noteSize = window.popUpButtons["TextSize"]
         XCTAssertTrue(noteSize.waitForExistence(timeout: 3))
         XCTAssertEqual(noteSize.value as? String, "13 pt", "the note's own text setting stays independent")
@@ -263,23 +246,26 @@ final class SettingsTests: XCTestCase {
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         app.typeKey(",", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        element("SettingsPage-appearance").click()
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         XCTAssertEqual(size.value as? String, "18 pt", "the preference survives restarting the app")
     }
 
-    func testBaseTextSizeKeepsSidebarPlacesAndSearchUsableAtLimits() {
+    func testBaseTextSizeKeepsTheSidebarFootAndSearchUsableAtLimits() {
         for points in [24, 11] {
             app.typeKey(",", modifierFlags: .command)
             let size = window.popUpButtons["InterfaceTextSize"]
             XCTAssertTrue(size.waitForExistence(timeout: 3))
             size.click()
             app.menuItems["\(points) pt"].click()
-            window.buttons["SettingsBack"].click()
-            let sidebar = window.outlines["Sidebar"]
+            leaveSettings()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-            let deleted = sidebar.staticTexts["Recently Deleted"]
-            XCTAssertTrue(deleted.waitForExistence(timeout: 3))
-            XCTAssertTrue(sidebar.frame.contains(deleted.frame), "a sidebar place is clipped at \(points) points")
+            let foot = element("SidebarFoot")
+            let label = foot.staticTexts["Settings"].firstMatch
+            XCTAssertTrue(label.waitForExistence(timeout: 3))
+            XCTAssertTrue(foot.frame.contains(label.frame), "the Settings row is clipped at \(points) points")
+            XCTAssertTrue(window.frame.contains(label.frame))
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.searchFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))
@@ -289,6 +275,18 @@ final class SettingsTests: XCTestCase {
             XCTAssertTrue(search.waitForNonExistence(timeout: 3))
             attachScreenshot("InterfaceText-\(points)")
         }
+    }
+
+    /// Chooses the place the window showed, which leaves Settings with the window as it was.
+    private func leaveSettings() {
+        let allNotes = sidebar.staticTexts["All Notes"]
+        XCTAssertTrue(allNotes.waitForExistence(timeout: 3))
+        allNotes.click()
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
     private func attachScreenshot(_ name: String) {

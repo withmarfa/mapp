@@ -18,14 +18,15 @@ final class ItemToolbarTests: XCTestCase {
 
     override func tearDown() { app.terminate() }
 
-    func testTheListToolbarHoldsViewOptionsSearchAndNewItemAndThePageToolbarHoldsHistoryDetailsAndMore() {
+    func testTheListToolbarHoldsViewOptionsSearchAndNewItemAndThePageToolbarHoldsHistoryViewAsMoreAndDetails() {
+        let viewMode = control("ViewModeMenu")
         let viewOptions = control("ViewOptionsToolbar")
         let newItem = control("NewItemToolbar")
         let back = control("BackToolbar")
         let forward = control("ForwardToolbar")
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
-        for element in [viewOptions, newItem, back, forward, details, more] { XCTAssertTrue(element.exists) }
+        for element in [viewMode, viewOptions, newItem, back, forward, details, more] { XCTAssertTrue(element.exists) }
         XCTAssertEqual(count("DetailsToggle"), 1, "The closed inspector adds no second Details")
         XCTAssertEqual(count("MoreToolbar"), 1, "The closed inspector adds no second More")
         XCTAssertFalse(control("FormatToolbar").exists, "Format is out of the default toolbar")
@@ -34,9 +35,10 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertLessThan(viewOptions.frame.maxX, newItem.frame.minX)
         XCTAssertGreaterThan(back.frame.minX, newItem.frame.maxX, "Back and Forward lead the page column, not the list column")
         XCTAssertLessThan(back.frame.maxX, forward.frame.minX)
-        XCTAssertLessThan(forward.frame.maxX, details.frame.minX)
-        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
-        XCTAssertGreaterThan(details.frame.minX, window.frame.midX)
+        XCTAssertLessThan(forward.frame.maxX, viewMode.frame.minX, "View As is on the page's trailing side, as in the gallery")
+        XCTAssertLessThan(viewMode.frame.maxX, more.frame.minX)
+        XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
+        XCTAssertGreaterThan(more.frame.minX, window.frame.midX)
         XCTAssertEqual(details.frame.midY, more.frame.midY, accuracy: 3)
         capture("List and page toolbars")
     }
@@ -51,8 +53,8 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(more.exists)
         XCTAssertEqual(count("DetailsToggle"), 1)
         XCTAssertEqual(count("MoreToolbar"), 1)
-        XCTAssertGreaterThanOrEqual(details.frame.minX, inspector.frame.minX, "Details sits above the inspector column")
-        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
+        XCTAssertGreaterThanOrEqual(more.frame.minX, inspector.frame.minX, "More and Details sit above the inspector column")
+        XCTAssertLessThan(more.frame.maxX, details.frame.minX)
         XCTAssertTrue(control("BackToolbar").exists, "Back and Forward stay with the page")
         XCTAssertTrue(control("ForwardToolbar").exists)
         capture("Details and More above the inspector")
@@ -63,15 +65,15 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("MoreToolbar"), 1)
     }
 
-    func testViewOptionsOffersViewAsAndSortBy() {
+    func testViewOptionsOffersSortByAndGroupByDate() {
         control("ViewOptionsToolbar").click()
-        for title in ["List", "Gallery", "Date Edited", "Date Created", "Title", "Group by Date"] {
+        for title in ["Date Edited", "Date Created", "Title", "Group by Date"] {
             XCTAssertTrue(window.menuItems[title].waitForExistence(timeout: 3), title)
         }
-        XCTAssertTrue(window.menuItems["List"].isEnabled)
-        XCTAssertTrue(window.menuItems["Gallery"].isEnabled)
+        XCTAssertFalse(window.menuItems["Gallery"].exists, "View As has the views now")
+        XCTAssertFalse(window.menuItems["View As"].exists)
         var previous = -CGFloat.infinity
-        for title in ["View As", "List", "Gallery", "Sort By", "Date Edited", "Date Created", "Title", "Group by Date"] {
+        for title in ["Sort By", "Date Edited", "Date Created", "Title", "Group by Date"] {
             let item = window.menuItems[title].firstMatch
             XCTAssertGreaterThan(item.frame.minY, previous, "\(title) follows the item before it")
             previous = item.frame.minY
@@ -124,10 +126,11 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(cancel.waitForNonExistence(timeout: 3))
     }
 
-    func testViewMenuOffersTheListAndGalleryAndHistoryShortcuts() {
+    func testViewMenuOffersTheThreeViewsAndHistoryShortcuts() {
         app.menuBars.menuBarItems["View"].click()
         XCTAssertTrue(app.menuBars.menuItems["View as List"].exists)
         XCTAssertTrue(app.menuBars.menuItems["View as Gallery"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as Table"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Back"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Forward"].exists)
         app.typeKey(.escape, modifierFlags: [])
@@ -144,12 +147,15 @@ final class ItemToolbarTests: XCTestCase {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let newItem = control("NewItemToolbar")
+        let viewMode = control("ViewModeMenu")
+        XCTAssertTrue(viewMode.exists, "View As stays reachable in the gallery")
         XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
         XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so Details and More have something to act on")
-        XCTAssertLessThan(viewOptions.frame.maxX, details.frame.minX)
-        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
-        XCTAssertLessThan(more.frame.maxX, newItem.frame.minX)
+        XCTAssertLessThan(viewMode.frame.maxX, viewOptions.frame.minX)
+        XCTAssertLessThan(viewOptions.frame.maxX, newItem.frame.minX)
+        XCTAssertLessThan(newItem.frame.maxX, more.frame.minX)
+        XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
         // ⌘2 leaves the keyboard where it was, so the grid is given it before Escape clears the selection.
         window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "GalleryItem-", "Selected")).firstMatch.click()
         app.typeKey(.escape, modifierFlags: [])
@@ -157,6 +163,40 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertFalse(more.exists)
         app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
+    }
+
+    func testViewAsShowsTheTableWithItsOwnFilterAndViewOptions() {
+        show("Table")
+        let table = control("ItemTable")
+        XCTAssertTrue(table.waitForExistence(timeout: 3))
+        XCTAssertFalse(window.outlines["NoteList"].exists, "the table spans the window")
+        XCTAssertFalse(window.webViews.firstMatch.exists)
+        XCTAssertTrue(control("ItemTableFilter").exists, "Filter is on the toolbar")
+        control("ViewOptionsToolbar").click()
+        for title in ["Sort By", "Group By", "Columns"] {
+            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), title)
+        }
+        XCTAssertFalse(window.menuItems["Group by Date"].exists, "the table groups by its columns")
+        capture("Table View Options menu")
+        app.typeKey(.escape, modifierFlags: [])
+        show("Gallery")
+        XCTAssertTrue(control("ItemGallery").waitForExistence(timeout: 3))
+        XCTAssertTrue(table.waitForNonExistence(timeout: 3))
+        app.typeKey("3", modifierFlags: .command)
+        XCTAssertTrue(table.waitForExistence(timeout: 3))
+        show("List")
+        XCTAssertTrue(window.outlines["NoteList"].waitForExistence(timeout: 3))
+        XCTAssertTrue(table.waitForNonExistence(timeout: 3))
+    }
+
+    /// Chooses a view from the toolbar's View As pop-up.
+    private func show(_ title: String) {
+        let menu = control("ViewModeMenu")
+        XCTAssertTrue(menu.waitForExistence(timeout: 3))
+        menu.click()
+        let item = window.menuItems[title].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 3), title)
+        item.click()
     }
 
     private func control(_ identifier: String) -> XCUIElement {

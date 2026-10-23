@@ -41,7 +41,6 @@ final class WindowTests: XCTestCase {
     private func groupIdentifier(for name: String) -> String? {
         switch name {
         case "Favorites": "SidebarFavoritesSection"
-        case "Library": "SidebarLibrarySection"
         case "Folders": "SidebarFolders"
         default: nil
         }
@@ -56,7 +55,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "All Notes", "Favorites", "Library", "Folders", "Work", "Home", "Personal", "Reading", "Recently Deleted"] {
+        for name in ["Inbox", "Recents", "All Notes", "Favorites", "Folders", "Work", "Home", "Personal", "Reading"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "All Notes"), 0)
@@ -113,28 +112,32 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "All Notes"), before + 1)
     }
 
-    func testDeletingFromTheContextMenuMovesToRecentlyDeletedAndUndoes() {
-        let deletedBefore = count(of: "Recently Deleted")
+    func testDeletingFromTheContextMenuRemovesTheNoteAndUndoes() {
+        let before = count(of: "All Notes")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(count(of: "Recently Deleted"), deletedBefore + 1)
+        XCTAssertEqual(count(of: "All Notes"), before - 1)
         app.typeKey("z", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
-        XCTAssertEqual(count(of: "Recently Deleted"), deletedBefore)
+        XCTAssertEqual(count(of: "All Notes"), before)
     }
 
-    func testRecentlyDeletedNotesCanBeRecoveredButNotEdited() {
-        sidebarItem("Recently Deleted").click()
-        row(titled: "Old packing list").click()
-        // A read-only page is text to read, not a text view.
-        XCTAssertTrue(page.staticTexts["Old packing list"].waitForExistence(timeout: 3))
-        page.staticTexts["Old packing list"].click()
-        app.typeText("zzz")
-        let typed = page.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "zzz"))
-        XCTAssertEqual(typed.count, 0, "a deleted note takes no typing")
-        window.buttons["Recover"].click()
-        XCTAssertTrue(row(titled: "Old packing list").waitForNonExistence(timeout: 2))
+    func testRecentlyDeletedInSettingsRestoresANote() {
+        app.typeKey(",", modifierFlags: .command)
+        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").element(boundBy: 0)
+        XCTAssertTrue(page.waitForExistence(timeout: 3))
+        page.click()
+        let detail = window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0)
+        let deleted = detail.staticTexts["Old packing list"]
+        XCTAssertTrue(deleted.waitForExistence(timeout: 3))
+        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists)
+        let restores = detail.buttons.matching(identifier: "RecentlyDeletedRestore").allElementsBoundByIndex
+        let restore = restores.min { abs($0.frame.midY - deleted.frame.midY) < abs($1.frame.midY - deleted.frame.midY) }
+        XCTAssertNotNil(restore, "each deleted item has its own Restore")
+        restore?.click()
+        XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists, "only the one restored leaves")
         sidebarItem("Personal").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
@@ -306,17 +309,16 @@ final class WindowTests: XCTestCase {
         wait(for: [twoWindows], timeout: 3)
     }
 
-    func testGroupingByDateFromTheViewMenuAddsSectionsThatTitleOrderDrops() {
-        XCTAssertFalse(list.staticTexts["Today"].exists)
-        toggleGroupByDate()
-        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
+    func testTheListIsGroupedByDateUntilTheViewMenuOrTitleOrderDropsIt() {
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2), "lists group by date from the start")
         sortBy("Title")
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
         sortBy("Date Edited")
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
-        // The setting outlives the app, so the next test starts from the default again.
         toggleGroupByDate()
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
+        toggleGroupByDate()
+        XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
     }
 
     func testUndoInTheEditMenuUndoesTypingInThePage() {
@@ -373,14 +375,6 @@ final class WindowTests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
 
-    func testRecentlyDeletedIsTheLastRowOfTheLibrarySection() {
-        let lastFolder = sidebarItem("Reading").frame
-        let deleted = sidebarItem("Recently Deleted").frame
-        XCTAssertGreaterThan(deleted.minY, lastFolder.maxY - 1, "Recently Deleted comes after the folders")
-        sidebarItem("Recently Deleted").click()
-        XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
-    }
-
     func testTheFoldersHeadingCreatesANewFolderFromItsContextMenu() {
         let heading = sidebarItem("Folders")
         heading.rightClick()
@@ -434,10 +428,13 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
     }
 
-    func testShareAndMoreSitAtTheToolbarsEnd() {
+    func testMoreAndDetailsSitAtTheToolbarsEnd() {
         let more = window.menuButtons["More"]
+        let details = window.descendants(matching: .any).matching(identifier: "DetailsToggle").element(boundBy: 0)
         XCTAssertTrue(more.waitForExistence(timeout: 2))
-        XCTAssertLessThan(window.frame.maxX - more.frame.maxX, 30, "More is at the end, not mid-toolbar")
+        XCTAssertTrue(details.exists)
+        XCTAssertLessThan(window.frame.maxX - details.frame.maxX, 30, "Details is at the end, not mid-toolbar")
+        XCTAssertLessThan(more.frame.maxX, details.frame.minX, "More comes just before it")
     }
 
     // MARK: Back and forward

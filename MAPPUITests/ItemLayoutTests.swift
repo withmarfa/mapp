@@ -110,9 +110,11 @@ final class ItemLayoutTests: XCTestCase {
         }
         capture("Compact title in toolbar after scrolling")
         app.typeKey(",", modifierFlags: .command)
-        let back = app.buttons["SettingsBack"]
-        XCTAssertTrue(back.waitForExistence(timeout: 3))
-        back.click()
+        let settings = app.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        // Choosing the place shown before leaves Settings with the window as it was.
+        app.outlines["Sidebar"].staticTexts["Reading"].click()
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
         XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the note's scroll position")
         XCTAssertFalse(header.isHittable)
         app.typeKey("f", modifierFlags: .command)

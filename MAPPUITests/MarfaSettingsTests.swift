@@ -1,13 +1,13 @@
 import XCTest
 
-/// The Marfa pane of Settings. The sample folder's app has a host of its own, on a Keychain held in memory, so
+/// The Marfa server section of Settings > Library. The sample folder's app has a host of its own, on a Keychain held in memory, so
 /// nothing here reaches the person's saved server or keys; the steps used need no server, since an address that
 /// is no server is refused before anything is asked of the network.
 @MainActor
 final class MarfaSettingsTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
-    private var settings: XCUIElement { window.descendants(matching: .any)["SettingsWorkspace"].firstMatch }
+    private var settings: XCUIElement { window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0) }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -21,32 +21,30 @@ final class MarfaSettingsTests: XCTestCase {
         app.terminate()
     }
 
-    private func openMarfaPane() {
+    private func openLibraryPage() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        let sidebar = window.outlines["SettingsSidebar"]
-        XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        let pane = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-marfa").element(boundBy: 0)
-        XCTAssertTrue(pane.waitForExistence(timeout: 3))
-        pane.click()
+        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-library").element(boundBy: 0)
+        XCTAssertTrue(page.waitForExistence(timeout: 3))
+        page.click()
     }
 
     private var address: XCUIElement { window.textFields["MarfaAddress"] }
     private var key: XCUIElement { window.secureTextFields["MarfaKey"] }
     private var connect: XCUIElement { window.buttons["MarfaConnect"] }
 
-    func testThePaneAsksForAnAddressAndAKeyThePersonPastes() {
-        openMarfaPane()
+    func testTheLibraryPageAsksForAnAddressAndAKeyThePersonPastes() {
+        openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         XCTAssertTrue(key.exists, "the key is typed into a secure field, so it is never shown")
         XCTAssertTrue(connect.exists)
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
-        XCTAssertTrue(window.toolbars.staticTexts["Marfa"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.toolbars.staticTexts["Library"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsMarfaDisconnected")
     }
 
     func testConnectWaitsForBothAnAddressAndAKey() {
-        openMarfaPane()
+        openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         XCTAssertFalse(connect.isEnabled)
         address.click()
@@ -58,7 +56,7 @@ final class MarfaSettingsTests: XCTestCase {
     }
 
     func testAnAddressThatIsNoServerIsToldInPlainWords() {
-        openMarfaPane()
+        openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
         address.click()
         address.typeText("marfa.example")
