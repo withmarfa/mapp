@@ -39,6 +39,24 @@ final class ItemToolbarTests: XCTestCase {
         capture("List and page toolbars")
     }
 
+    func testDetailsAndMoreMoveAboveTheInspectorWhileItIsOpen() {
+        let details = control("DetailsToggle")
+        let more = control("MoreToolbar")
+        details.click()
+        let inspector = window.descendants(matching: .any)["ItemInspectorDetails"]
+        XCTAssertTrue(inspector.waitForExistence(timeout: 3))
+        XCTAssertTrue(details.exists)
+        XCTAssertTrue(more.exists)
+        XCTAssertGreaterThanOrEqual(details.frame.minX, inspector.frame.minX, "Details sits above the inspector column")
+        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
+        XCTAssertTrue(control("BackToolbar").exists, "Back and Forward stay with the page")
+        XCTAssertTrue(control("ForwardToolbar").exists)
+        capture("Details and More above the inspector")
+        details.click()
+        XCTAssertTrue(inspector.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(control("DetailsToggle").exists, "Details returns to the page toolbar")
+    }
+
     func testViewOptionsOffersViewAsAndSortBy() {
         control("ViewOptionsToolbar").click()
         for title in ["List", "Gallery", "Date Edited", "Date Created", "Title", "Group by Date"] {

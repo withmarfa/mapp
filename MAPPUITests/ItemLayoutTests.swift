@@ -32,8 +32,8 @@ final class ItemLayoutTests: XCTestCase {
         let bodyHeading = page.textViews.firstMatch.staticTexts["Kitchen quotes"].firstMatch
         XCTAssertTrue(bodyHeading.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20,
-                                    "Body content must start below the title and property chips.")
-        app.buttons["DetailsToggle"].click()
+                                    "Body content must start below the title and pinned properties.")
+        app.descendants(matching: .any)["DetailsToggle"].click()
         capture("Document with inspector and narrower content")
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20)
         XCTAssertLessThan(page.frame.width, normalWidth)

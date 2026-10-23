@@ -18,10 +18,13 @@ final class ItemJourneyTests: XCTestCase {
     func testCreateRelateEditAndReopen() {
         create(type: "Project", title: "Interface Test Project")
         create(type: "Task", title: "Interface Test Task")
-        let details = app.buttons["DetailsToggle"]
+        let details = app.descendants(matching: .any)["DetailsToggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
         details.click()
-        let parentEdit = app.buttons["RelationshipAdd.child-of"]
+        let addRelationship = app.descendants(matching: .any)["RelationshipAddMenu"]
+        XCTAssertTrue(addRelationship.waitForExistence(timeout: 3))
+        addRelationship.click()
+        let parentEdit = app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "RelationshipAdd.child-of", "Parent")).firstMatch
         XCTAssertTrue(parentEdit.waitForExistence(timeout: 3))
         parentEdit.click()
         let search = app.textFields["RelationshipSearch"]
@@ -53,7 +56,7 @@ final class ItemJourneyTests: XCTestCase {
         let reopened = app.webViews.firstMatch.textViews.firstMatch
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
-        app.buttons["DetailsToggle"].click()
+        app.descendants(matching: .any)["DetailsToggle"].click()
         let savedDescription = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 3))
         XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
@@ -91,12 +94,12 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         status.click()
         app.menuItems["Completed"].click()
-        app.buttons["DetailsToggle"].click()
-        let inspectorStatus = app.popUpButtons["ItemProperty.status"]
+        app.descendants(matching: .any)["DetailsToggle"].click()
+        let inspectorStatus = app.descendants(matching: .any)["ItemProperty.status"]
         XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
-        XCTAssertEqual(inspectorStatus.value as? String, "Completed")
+        XCTAssertTrue(inspectorStatus.label.contains("Completed") || inspectorStatus.value as? String == "Completed")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        attachment.name = "Item page with shared chips and details"
+        attachment.name = "Item page with pins and details"
         attachment.lifetime = .keepAlways
         add(attachment)
         app.terminate()
@@ -108,9 +111,9 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
-        if !inspectorStatus.exists { app.buttons["DetailsToggle"].click() }
+        if !inspectorStatus.exists { app.descendants(matching: .any)["DetailsToggle"].click() }
         XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
-        XCTAssertEqual(inspectorStatus.value as? String, "Completed")
+        XCTAssertTrue(inspectorStatus.label.contains("Completed") || inspectorStatus.value as? String == "Completed")
     }
 
     func testImportPhotoAndShowNativeViewer() {
