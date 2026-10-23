@@ -220,7 +220,7 @@ final class EditorController: NSObject {
         call("setHeader", header.map(json) ?? "null")
     }
 
-    /// Shows a chip's menu under it, as a pop-up button shows its own.
+    /// Shows a pin's menu under it, as a pop-up button shows its own.
     func popUpMenu(_ menu: NSMenu, under rect: CGRect) {
         // Tracking a menu runs its own event loop, which waits until the page's message has been handled.
         Task { menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: container) }
@@ -786,6 +786,7 @@ final class EditorController: NSObject {
             "status": String(localized: "Status"),
             "discardChanges": String(localized: "Discard Changes"),
             "propertyRejected": String(localized: "The value could not be saved. Please try again."),
+            "parentRejected": String(localized: "The connection could not be removed."),
         ]
     }
 

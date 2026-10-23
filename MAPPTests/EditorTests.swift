@@ -845,7 +845,7 @@ struct EditorTests {
         PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
                    type: "Task", status: .init(label: "In Progress", enabled: true),
-                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, interfaceTextSize: 13)
+                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
     }
 
     static func json(_ value: some Encodable) -> String {
@@ -870,7 +870,7 @@ struct EditorTests {
         page.editor.setHeader(Self.header("Review the findings"))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         let shown = try await page.editor.webView.evaluateJavaScript(
-            "[...document.querySelectorAll('#ItemPageTitle, #ItemTypeChip, #ItemStatusChip, #ItemParentChip')].map(e => e.textContent)"
+            "[...document.querySelectorAll('#ItemPageTitle, #ItemTypePin, #ItemStatusPin, #ItemParentPin')].map(e => e.textContent)"
         ) as? [String]
         #expect(shown == ["Review the findings", "Task", "In Progress", "Field Research"])
 
@@ -1005,7 +1005,7 @@ struct EditorTests {
         #expect(try await page.editor.webView.evaluateJavaScript("window.pastedScriptRan === undefined") as? Bool == true)
     }
 
-    @Test func aChipAsksForItsMenuUnderItsFrameInTheEditor() async throws {
+    @Test func aPinAsksForItsMenuUnderItsFrameInTheEditor() async throws {
         let page = try await Harness()
         let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -1019,19 +1019,19 @@ struct EditorTests {
         var menus: [(PageHeaderMenu, ItemID, CGRect)] = []
         page.editor.onHeaderEvent = { if case .menu(let menu, let item, let rect) = $0 { menus.append((menu, item, rect)) } }
         try await page.run("window.scrollTo(0, 30)")
-        let chip = try await Self.rect("#ItemStatusChip", in: page)
+        let pin = try await Self.rect("#ItemStatusPin", in: page)
         let viewport = try #require(try await page.editor.webView.evaluateJavaScript("window.innerHeight") as? Double)
-        try await page.run("document.getElementById('ItemStatusChip').dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, cancelable: true }))")
-        try await page.run("document.getElementById('ItemParentChip').click()")
+        try await page.run("document.getElementById('ItemStatusPin').dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, cancelable: true }))")
+        try await page.run("document.getElementById('ItemParentPin').click()")
         try await page.wait { menus.count == 2 }
         #expect(menus.map(\.0) == [.status, .parent])
         #expect(menus.allSatisfy { $0.1 == id })
         // The page's window starts below what covers the web view's top; the frame is in the container's terms.
         let covered = page.editor.webView.bounds.height - viewport
-        let expected = page.editor.container.convert(CGRect(x: chip[0], y: chip[1] + covered, width: chip[2], height: chip[3]), from: page.editor.webView)
+        let expected = page.editor.container.convert(CGRect(x: pin[0], y: pin[1] + covered, width: pin[2], height: pin[3]), from: page.editor.webView)
         #expect(abs(menus[0].2.minX - expected.minX) < 0.5 && abs(menus[0].2.minY - expected.minY) < 0.5)
-        #expect(abs(menus[0].2.width - chip[2]) < 0.5 && abs(menus[0].2.height - chip[3]) < 0.5)
-        #expect(menus[0].2.minY > 52 - 30, "the chip lies below the covered top, less what has scrolled")
+        #expect(abs(menus[0].2.width - pin[2]) < 0.5 && abs(menus[0].2.height - pin[3]) < 0.5)
+        #expect(menus[0].2.minY > 52 - 30, "the pin lies below the covered top, less what has scrolled")
     }
 
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
@@ -1127,7 +1127,7 @@ struct EditorTests {
         let host = try await HostedPage()
         defer { host.close() }
         let library = host.library, ticket = host.ticket, page = host.page
-        let status = try await host.value("document.querySelector('#ItemStatusChip .item-chip-label').textContent") as? String
+        let status = try await host.value("document.querySelector('#ItemStatusPin .item-pin-label').textContent") as? String
         #expect(status == "In Progress")
 
         // Return saves the title as the item's, once, and the note's text takes the keyboard.

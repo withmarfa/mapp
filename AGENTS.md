@@ -71,6 +71,7 @@ These hold across the app. The nested files say how each library keeps them.
   The UI tests take control of the keyboard and mouse. Add `-only-testing:MAPPTests` to run the unit tests alone.
 - Replace `test` with `build` to build only. The built app is `build/Build/Products/Debug/MAPP.app`.
 - A Debug build launched with `-MAPPSampleFolder` opens a fresh folder of sample notes in the app's temporary directory and an isolated Marfa host. The UI tests use it.
+- To point that Debug build at a test server, run its binary with `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` in the environment: the isolated host connects to that server, keeping the key in memory only.
 - The editor page has its own commands; see `editor/AGENTS.md`.
 
 ## Signing

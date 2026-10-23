@@ -75,6 +75,9 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     /// note, more than one, or none yet. A library that binds each spelling on its own, as Marfa does, answers a
     /// link by its own binding. Empty where links are read afresh.
     var boundLinks: [BoundLink] = []
+    /// What made the item, as the library names it: for a Marfa item, the source of the key that wrote it. Nil
+    /// where the library does not know, as a folder does not.
+    var source: String?
 
     /// The items the links in this item's text were already bound to, by the name each link is spelled with (read
     /// as `NoteLinks.nameKey`). A library that keeps a name's first target, as Marfa does, answers a new link with

@@ -44,6 +44,7 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'status',
   'discardChanges',
   'propertyRejected',
+  'parentRejected',
 ]
 export function splitLabels(all: AppLabels): {
   editor: Partial<EditorLabels>

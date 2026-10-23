@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 /// Uses system renderers without loading binary content into the Markdown editor.
 struct FileItemContent: View {
     let url: URL
+    /// The item's title. A Marfa file is kept under its hash, so the file's own name says nothing to the person.
+    let title: String
     @State private var zoom = 1.0
 
     private var type: UTType { UTType(filenameExtension: url.pathExtension) ?? .data }
@@ -15,7 +17,7 @@ struct FileItemContent: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(url.lastPathComponent).interfaceFont(.headline).lineLimit(1)
+                Text(title).interfaceFont(.headline).lineLimit(1)
                 Spacer()
                 if type.conforms(to: .image) {
                     Button("Zoom Out", systemImage: "minus.magnifyingglass") { zoom = max(0.25, zoom - 0.25) }
@@ -32,7 +34,7 @@ struct FileItemContent: View {
                     ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
                 }
             } else if type.conforms(to: .image) {
-                FileImageView(url: url, zoom: zoom)
+                FileImageView(url: url, title: title, zoom: zoom)
             } else {
                 FileQuickLookView(url: url)
             }
@@ -57,6 +59,7 @@ private struct FilePDFView: NSViewRepresentable {
 
 private struct FileImageView: View {
     let url: URL
+    let title: String
     let zoom: Double
     private var previewImage: NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -73,7 +76,7 @@ private struct FileImageView: View {
                 ScrollView([.horizontal, .vertical]) {
                     Image(nsImage: image).resizable().scaledToFit()
                         .frame(width: max(1, geometry.size.width) * zoom, height: max(1, geometry.size.height) * zoom)
-                        .accessibilityLabel(url.lastPathComponent)
+                        .accessibilityLabel(title)
                 }
             } else {
                 ContentUnavailableView("Can’t Preview This Image", systemImage: "photo", description: Text("Open the file in another app to view it."))
@@ -103,18 +106,18 @@ private enum FilePreviewFixtures {
 
 #Preview("Photo item") {
     if let url = FilePreviewFixtures.url("item-preview-photo", extension: "png") {
-        FileItemContent(url: url).frame(width: 700, height: 600)
+        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
     }
 }
 
 #Preview("PDF item") {
     if let url = FilePreviewFixtures.url("item-preview-brief", extension: "pdf") {
-        FileItemContent(url: url).frame(width: 700, height: 600)
+        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
     }
 }
 
 #Preview("Other file item") {
     if let url = FilePreviewFixtures.url("item-preview-file", extension: "txt") {
-        FileItemContent(url: url).frame(width: 700, height: 600)
+        FileItemContent(url: url, title: url.lastPathComponent).frame(width: 700, height: 600)
     }
 }

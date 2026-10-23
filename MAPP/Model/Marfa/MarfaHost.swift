@@ -329,6 +329,13 @@ extension MarfaSource: MarfaHostedSource {}
         return (connection, key)
     }
 
+    #if DEBUG
+    /// Sets the server a launch opens, for a debug build run against a test server. The key is the key store's.
+    func presetTestServer(_ connection: MarfaConnection) {
+        defaults.set(connection.address.absoluteString, forKey: Self.addressKey)
+    }
+    #endif
+
     private func remember(_ connection: MarfaConnection) {
         self.connection = connection
         defaults.set(connection.address.absoluteString, forKey: Self.addressKey)

@@ -28,7 +28,7 @@ struct NewItemPage: View {
                 .onSubmit { startWriting() }
                 .accessibilityLabel("Title")
                 .accessibilityIdentifier("NewItemTitle")
-            ItemChipLayout {
+            ItemPinLayout {
                 Menu {
                     ForEach(WorkbenchSchema.types) { type in
                         Button { draft.typeID = type.id } label: {
@@ -40,9 +40,10 @@ struct NewItemPage: View {
                         }
                     }
                 } label: {
-                    ItemChipLabel(title: Text(LocalizedStringKey(WorkbenchSchema.definition(draft.typeID)?.label ?? "Type")))
+                    ItemPinLabel(title: Text(LocalizedStringKey(WorkbenchSchema.definition(draft.typeID)?.label ?? "Type")),
+                                 systemImage: "doc.text")
                 }
-                .itemChipMenuStyle()
+                .itemPinMenuStyle()
                 .accessibilityLabel("Type")
                 .accessibilityIdentifier("NewItemType")
                 Menu {
@@ -54,10 +55,10 @@ struct NewItemPage: View {
                         }
                     }
                 } label: {
-                    ItemChipLabel(title: Text(parents.first { $0.id == draft.parentID }?.title ?? String(localized: "Add Parent")),
-                                  systemImage: "square.stack")
+                    ItemPinLabel(title: Text(parents.first { $0.id == draft.parentID }?.title ?? String(localized: "Parent")),
+                                 systemImage: "square.stack", isEmpty: draft.parentID == nil)
                 }
-                .itemChipMenuStyle()
+                .itemPinMenuStyle(isEmpty: draft.parentID == nil)
                 .accessibilityLabel("Parent")
                 .accessibilityIdentifier("NewItemParent")
             }

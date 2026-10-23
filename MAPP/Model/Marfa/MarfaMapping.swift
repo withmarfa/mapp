@@ -15,6 +15,8 @@ nonisolated enum MarfaMapping {
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
     static let sizeField = "size_bytes"
+    /// The keys a file item keeps its bytes' facts under, shown as the file's kind and size instead.
+    static let fileFacts: Set<String> = [blobField, mimeTypeField, sizeField]
     /// Marfa's folder device writes a body link as this edge, so it reads as the body's, not a property's.
     static let bodyLinkEdge = "references"
     /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.
@@ -144,7 +146,8 @@ nonisolated enum MarfaMapping {
             preview: damaged ? MarfaProblems.unreadableMessage : preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound)
+            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
+            source: row.source.isEmpty ? nil : row.source)
     }
 
     /// The text between the brackets of a link as the package renders it, `[[text]]`.
@@ -170,14 +173,14 @@ nonisolated enum MarfaMapping {
     /// property the type lacks. A type the catalogue lacks is read as Marfa reads one with no hints.
     static func titleField(of type: ItemTypeInfo?) -> String? {
         guard let type else { return "title" }
-        return type.titleField ?? (type.declares("title") ? "title" : nil)
+        return type.titleKey
     }
 
     /// Where an item's text is read and written: the field the type's hints name, else `body` where the type
     /// declares it. Marfa reads `body` even where it is not declared; the app refuses text for such a type rather
     /// than write a property the type lacks.
     static func bodyField(of type: ItemTypeInfo?) -> String? {
-        type.flatMap { $0.bodyField ?? ($0.declares("body") ? "body" : nil) }
+        type?.bodyKey
     }
 
     static func body(of row: Marfa.Item, catalogue: Catalogue) -> String? {

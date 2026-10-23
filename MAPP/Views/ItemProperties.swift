@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Each row keeps unfinished input until it is committed; unrelated inspector updates do not replace it.
+/// One property of an item as a row of the inspector's property sheet. Each row keeps unfinished input until it
+/// is committed; unrelated inspector updates do not replace it.
 struct ItemPropertyRow: View {
     let definition: ItemTypeInfo.Field
     let value: PropertyValue?
@@ -8,108 +9,207 @@ struct ItemPropertyRow: View {
     let onChange: (PropertyValue?) -> Bool
     var retainedDraft: ItemPropertyDraft? = nil
     @State private var localDraft = ItemPropertyDraft()
+    @State private var rowHovering = false
+    @State private var choosingDate = false
+    /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
+    /// person's own, until the person is done typing it.
+    @State private var typingOwnValue = false
+    @FocusState private var dateButtonFocused: Bool
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            control
-                .disabled(!isEditable)
-            if let invalidValue {
-                Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
-            }
-            if input.rejected {
-                Text("The value could not be saved. Your input has been kept.")
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.red)
-                Button("Discard Changes") {
-                    input.isDirty = false
-                    seed(value)
+        InspectorRow(name: LocalizedStringKey(definition.label)) {
+            VStack(alignment: .leading, spacing: 4) {
+                if isEditable {
+                    control
+                } else if let readOnlyText {
+                    // A value that cannot be changed reads as a Details row does, not as a dimmed control.
+                    readOnlyText
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("ItemProperty.\(definition.key)")
                 }
-                .interfaceFont(.caption)
+                if let invalidValue {
+                    Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
+                }
+                if input.rejected {
+                    Text("The value could not be saved. Your input has been kept.")
+                        .interfaceFont(.caption)
+                        .foregroundStyle(.red)
+                    Button("Discard Changes") {
+                        input.isDirty = false
+                        seed(value)
+                    }
+                    .interfaceFont(.caption)
+                }
             }
         }
+        .onHover { rowHovering = $0 }
         .onAppear { if !input.isDirty { seed(value) } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
         .onChange(of: value) { _, value in if !input.isDirty { seed(value) } }
-        .onChange(of: isFocused) { if !isFocused { commit() } }
+        .onChange(of: isFocused) { if !isFocused { commit(); typingOwnValue = false } }
         .onDisappear { commit() }
     }
 
     @ViewBuilder private var control: some View {
         switch definition.kind {
-        case .choice(let choices):
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
-                value?.string ?? ""
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
-            }) {
-                Text("Not Set").tag("")
-                if let current = value?.string, !choices.contains(current) {
-                    Text(current).tag(current)
-                }
-                ForEach(choices, id: \.self) { Text(LocalizedStringKey(Self.choiceLabel($0))).tag($0) }
-            }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
+        case .choice:
+            choiceMenu()
         case .boolean:
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
-                if case .bool(let selected) = value { selected ? "true" : "false" } else { "" }
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
-            }) {
-                Text("Not Set").tag("")
-                Text("Yes").tag("true")
-                Text("No").tag("false")
-            }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
-        case .date:
-            VStack(alignment: .leading, spacing: 6) {
-                textField
-                if let date = Self.date(value?.string) {
-                    DatePicker("Choose Date", selection: Binding {
-                        date
-                    } set: { selected in
-                        let dateOnly = value?.string?.count == 10
-                        let text = dateOnly
-                            ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                            : selected.ISO8601Format()
-                        input.rejected = !onChange(.string(text))
-                        if !input.rejected { input.text = text; input.isDirty = false }
-                    }, displayedComponents: value?.string?.count == 10 ? [.date] : [.date, .hourAndMinute])
-                    .labelsHidden()
-                } else if value == nil || value?.string == "" {
-                    Button("Set Date") {
-                        let text = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                        input.rejected = !onChange(.string(text))
-                    }
+            let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
+            menu(current: current.map { Text($0 ? "Yes" : "No") }) {
+                Picker(LocalizedStringKey(definition.label), selection: Binding {
+                    current.map { $0 ? "true" : "false" } ?? ""
+                } set: { selected in
+                    input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
+                }) {
+                    Text("Not Set").tag("")
+                    Text("Yes").tag("true")
+                    Text("No").tag("false")
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+        case .date:
+            HStack(spacing: 4) {
+                textField
+                // Always there, so the keyboard and VoiceOver reach it; it is drawn only where a pointer or the
+                // keyboard is, so the row at rest shows nothing but its value.
+                Button { choosingDate = true } label: { Image(systemName: "calendar") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .focused($dateButtonFocused)
+                    .opacity(rowHovering || isFocused || dateButtonFocused || choosingDate ? 1 : 0)
+                    .accessibilityLabel("Choose Date")
+                    .accessibilityIdentifier("ItemPropertyDate.\(definition.key)")
+                    .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
+            }
+            .accessibilityAction(named: "Choose Date") { choosingDate = true }
+        // Marfa only recommends these values, so any other text is as valid: the menu offers them, and Other… types one.
+        case .text where definition.isPicked:
+            if typingOwnValue {
+                textField
+                    .task { isFocused = true }
+            } else {
+                choiceMenu(allowsOther: true)
             }
         case .text, .number:
             textField
         // A list or an object is shown as written, since a text field would replace it with a string.
         case .other:
-            textField
-                .disabled(true)
+            if let value {
+                Text(ItemValueText.string(value))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    private var textField: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(LocalizedStringKey(definition.label))
-                .interfaceFont(.subheadline).foregroundStyle(.secondary)
-            TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
-                input.text = $0
-                input.isDirty = true
-                input.rejected = false
-            }, axis: definition.key == "description" ? .vertical : .horizontal)
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .lineLimit(definition.key == "description" ? 2...5 : 1...1)
-            .focused($isFocused)
-            .onSubmit { commit() }
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    /// The value as the control would show it: a choice by its label, a Boolean as Yes or No, anything else as written.
+    private var readOnlyText: Text? {
+        guard let value else { return nil }
+        if definition.kind == .boolean, case .bool(let flag) = value { return Text(flag ? "Yes" : "No") }
+        if definition.isPicked, let option = value.string {
+            return Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: option)))
         }
+        return Text(ItemValueText.string(value))
+    }
+
+    private func choiceMenu(allowsOther: Bool = false) -> some View {
+        let current = value?.string
+        return menu(current: current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }) {
+            Picker(LocalizedStringKey(definition.label), selection: Binding {
+                current ?? ""
+            } set: { selected in
+                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
+            }) {
+                Text("Not Set").tag("")
+                ForEach(definition.options(including: current), id: \.self) {
+                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            if allowsOther {
+                Divider()
+                Button("Other…") { typingOwnValue = true }
+                    .accessibilityIdentifier("ItemPropertyOther.\(definition.key)")
+            }
+        }
+    }
+
+    /// A choice as plain text that opens a menu: no chevron and no fill until hovered. The button style with a plain
+    /// label, unlike the borderless one, adds no inset of its own, so the text starts where a text value does.
+    private func menu<Content: View>(current: Text?, @ViewBuilder content: () -> Content) -> some View {
+        Menu {
+            content()
+        } label: {
+            Group {
+                if let current { current } else { InspectorPlaceholder() }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .inspectorValue()
+        .accessibilityLabel(LocalizedStringKey(definition.label))
+        .accessibilityValue(current == nil ? Text("Not Set") : current!)
+        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    }
+
+    private var datePicker: some View {
+        let dateOnly = isDateOnly
+        return VStack(spacing: 8) {
+            DatePicker("Choose Date", selection: Binding {
+                Self.date(value?.string) ?? Date()
+            } set: { setDate($0) }, displayedComponents: dateOnly ? [.date] : [.date, .hourAndMinute])
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            // The picker already shows today for an empty date, and picking the day it shows may change nothing.
+            Button("Today") { setDate(Date()) }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("ItemPropertyToday.\(definition.key)")
+        }
+        .padding(12)
+    }
+
+    /// A date of ten characters is a day, as an empty one is until the person picks a time.
+    private var isDateOnly: Bool { (value?.string ?? "").isEmpty || value?.string?.count == 10 }
+
+    private func setDate(_ selected: Date) {
+        let text = isDateOnly
+            ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+            : selected.ISO8601Format()
+        input.rejected = !onChange(.string(text))
+        if !input.rejected { input.text = text; input.isDirty = false }
+    }
+
+    private var textField: some View {
+        TextField(LocalizedStringKey(definition.label), text: Binding { input.text } set: {
+            input.text = $0
+            input.isDirty = true
+            input.rejected = false
+        }, prompt: Text(""), axis: definition.kind == .number ? .horizontal : .vertical)
+        .labelsHidden()
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .multilineTextAlignment(.leading)
+        .lineLimit(definition.kind == .number ? 1...1 : 1...12)
+        .focused($isFocused)
+        .onSubmit { commit(); typingOwnValue = false }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
+        .overlay(alignment: .topLeading) {
+            if input.text.isEmpty { InspectorPlaceholder().allowsHitTesting(false).accessibilityHidden(true) }
+        }
+        .inspectorValue(isFocused: isFocused)
+        .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
     private var invalidValue: String? {
@@ -151,10 +251,6 @@ struct ItemPropertyRow: View {
         if !input.rejected { input.isDirty = false }
     }
 
-    static func choiceLabel(_ value: String) -> String {
-        value.replacingOccurrences(of: "_", with: " ").capitalized
-    }
-
     private static func date(_ value: String?) -> Date? {
         guard let value else { return nil }
         if let date = try? Date(value, strategy: .iso8601) { return date }
@@ -183,7 +279,7 @@ nonisolated enum ItemValueText {
 
 #Preview("Property Controls") {
     ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")]?.fields ?? []) { definition in
                 ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
@@ -193,5 +289,6 @@ nonisolated enum ItemValueText {
         }
         .padding(16)
     }
-    .frame(width: 320, height: 440)
+    .interfaceTextStyle()
+    .frame(width: 300, height: 440)
 }

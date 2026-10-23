@@ -41,7 +41,7 @@ nonisolated enum EditorMessage: Sendable {
     case titleInput(ItemID, String)
     case titleCommit(ItemID, String, startWriting: Bool)
     case titleDiscard(ItemID)
-    /// A chip asks for its menu, with the chip's frame in the page's window and the height of that window.
+    /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
     case openLink(String)
     case copy(String)

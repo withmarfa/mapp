@@ -26,6 +26,8 @@ final class ItemToolbarTests: XCTestCase {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         for element in [viewOptions, newItem, back, forward, details, more] { XCTAssertTrue(element.exists) }
+        XCTAssertEqual(count("DetailsToggle"), 1, "The closed inspector adds no second Details")
+        XCTAssertEqual(count("MoreToolbar"), 1, "The closed inspector adds no second More")
         XCTAssertFalse(control("FormatToolbar").exists, "Format is out of the default toolbar")
         let page = window.itemPageTitle.frame
         XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the list column")
@@ -37,6 +39,28 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertGreaterThan(details.frame.minX, window.frame.midX)
         XCTAssertEqual(details.frame.midY, more.frame.midY, accuracy: 3)
         capture("List and page toolbars")
+    }
+
+    func testDetailsAndMoreMoveAboveTheInspectorWhileItIsOpen() {
+        let details = control("DetailsToggle")
+        let more = control("MoreToolbar")
+        details.click()
+        let inspector = window.descendants(matching: .any)["ItemInspectorDetails"]
+        XCTAssertTrue(inspector.waitForExistence(timeout: 3))
+        XCTAssertTrue(details.exists)
+        XCTAssertTrue(more.exists)
+        XCTAssertEqual(count("DetailsToggle"), 1)
+        XCTAssertEqual(count("MoreToolbar"), 1)
+        XCTAssertGreaterThanOrEqual(details.frame.minX, inspector.frame.minX, "Details sits above the inspector column")
+        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
+        XCTAssertTrue(control("BackToolbar").exists, "Back and Forward stay with the page")
+        XCTAssertTrue(control("ForwardToolbar").exists)
+        capture("Details and More above the inspector")
+        details.click()
+        XCTAssertTrue(inspector.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(control("DetailsToggle").exists, "Details returns to the page toolbar")
+        XCTAssertEqual(count("DetailsToggle"), 1)
+        XCTAssertEqual(count("MoreToolbar"), 1)
     }
 
     func testViewOptionsOffersViewAsAndSortBy() {
@@ -137,6 +161,10 @@ final class ItemToolbarTests: XCTestCase {
 
     private func control(_ identifier: String) -> XCUIElement {
         window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
+    }
+
+    private func count(_ identifier: String) -> Int {
+        window.descendants(matching: .any).matching(identifier: identifier).count
     }
 
     private func capture(_ name: String) {

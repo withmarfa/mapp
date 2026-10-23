@@ -54,6 +54,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// notes folder by its connection index, a Marfa library by what the copy bound that very link to. A link names a
     /// note only when the answer is `resolved`; `missing` is the one that names none at all.
     func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution
+    /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
+    /// and any a library keeps for its own use.
+    func hiddenPropertyKeys(of item: Item) -> Set<String>
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
@@ -127,6 +130,8 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
+
     /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
     /// written in has not already bound that name to another. Otherwise the item's identity with its title as the label
     /// (`[[identity|Title]]`), which Marfa reads as naming the identity.

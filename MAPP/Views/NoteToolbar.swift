@@ -2,6 +2,7 @@ import SwiftUI
 
 /// The page's toolbar: Back and Forward through the items shown, then Details and More. Format is out of the
 /// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
+/// While the inspector is open, Details and More sit above it instead (`InspectorToolbar`).
 ///
 /// Back and Forward take the automatic placement, which sets them at the leading edge of this column's section.
 /// The navigation placement sets them at the window's leading edge, beside the list column's title.
@@ -35,9 +36,42 @@ struct NoteToolbar: CustomizableToolbarContent {
             .defaultCustomization(.hidden)
             .hidden(tools.showsTypes || browser?.showsGallery == true)
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsTypes)
+            .hidden(tools.showsTypes || tools.showsInspector)
         ToolbarItem(id: "more") { tools.moreMenu }
-            .hidden(tools.showsTypes)
+            .hidden(tools.showsTypes || tools.showsInspector)
+    }
+}
+
+/// Details and More above the inspector column, where the system sets a toolbar declared inside the inspector's
+/// content. Details is on while the inspector is open and is never dimmed, so the inspector can always be closed.
+/// It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
+/// and would show Details and More a second time beside the page's own.
+struct InspectorToolbar: ToolbarContent {
+    @CurrentLibrary private var library
+    let browser: Browser?
+    let items: [Item]
+    let editor: EditorController
+    let details: DetailsPresentation
+
+    var body: some ToolbarContent {
+        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+        if tools.showsInspector {
+            ToolbarItemGroup {
+                DetailsToggle(details: details)
+                tools.moreMenu
+            }
+        }
+    }
+}
+
+/// The Details button of a toolbar above the inspector: on, because the inspector is open.
+struct DetailsToggle: View {
+    let details: DetailsPresentation
+
+    var body: some View {
+        Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+            .help("Hide Details")
+            .accessibilityIdentifier("DetailsToggle")
     }
 }
 
@@ -76,8 +110,9 @@ struct GalleryToolbar: ToolbarContent {
                 ViewOptionsMenu(browser: browser)
             }
         }
-        // Over the grid, Details and More act on the cards selected, so they wait for one.
-        if !browser.showsGallery || !browser.selection.isEmpty {
+        // Over the grid, Details and More act on the cards selected, so they wait for one. They move above the
+        // inspector while it is open.
+        if !details.showsInspector(in: browser), !browser.showsGallery || !browser.selection.isEmpty {
             if browser.showsGallery { ToolbarSpacer(.fixed) }
             ToolbarItemGroup {
                 tools.detailsButton
@@ -101,6 +136,7 @@ private struct ItemToolbarActions {
 
     var notes: [Item] { items.filter { !$0.isFile } }
     var showsTypes: Bool { browser?.showsTypes == true }
+    var showsInspector: Bool { details.showsInspector(in: browser) }
 
     var visibleNote: Item? {
         guard browser?.isCreatingItem != true, browser?.showsGallery != true,

@@ -499,6 +499,18 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(bench.hasCopy(first))
     }
 
+    @Test func aDebugTestServerIsOpenedByTheNextLaunchWithItsKeyHeldInMemory() async throws {
+        let bench = try HostBench()
+        bench.keys.save("test-key", for: first)
+        let host = bench.host()
+        host.presetTestServer(first)
+        #expect(host.configuredConnection == first)
+
+        await host.launch()
+        #expect(host.connection == first)
+        #expect(host.source === bench.servers.last)
+    }
+
     @Test func aLaunchReconnectsFromTheCopyWithoutWaitingOnTheServer() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")

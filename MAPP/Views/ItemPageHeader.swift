@@ -2,13 +2,13 @@ import AppKit
 import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
-/// title and chips above the note, so they scroll with it as one surface, and this carries out what the person
-/// does there: the title is saved as the item's property, and each chip opens a native menu. Applied to the
-/// editor's view, whose container the chips' frames arrive in.
+/// title and pinned properties above the note, so they scroll with it as one surface, and this carries out what
+/// the person does there: the title is saved as the item's property, and each pin opens a native menu (the parent
+/// pin opens the chooser directly while the item has no parent). Applied to the editor's view, whose container
+/// the pins' frames arrive in.
 struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.openWindow) private var openWindow
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     let item: Item
     let editor: EditorController
@@ -16,7 +16,7 @@ struct ItemPageHeader: ViewModifier {
     /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
     /// the safe area leaves, while the container runs up under the toolbar.
     let containerTop: CGFloat
-    /// The parent chip's frame while its chooser is open.
+    /// The parent pin's frame while its chooser is open.
     @State private var choosingParent: CGRect?
 
     func body(content: Content) -> some View {
@@ -35,6 +35,7 @@ struct ItemPageHeader: ViewModifier {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     // A refused status belongs to the visit, as the page showed it before.
                     drafts.draft(for: old, key: "status").rejected = false
+                    if let parent = Self.parent(of: old, in: library) { drafts.draft(for: old, key: parent.field).rejected = false }
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
@@ -49,7 +50,7 @@ struct ItemPageHeader: ViewModifier {
     static func header(of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
-        let status = Self.status(of: item, in: library)
+        let status = library.catalogue.itemTypes[item.type]?.statusField
         let parent = Self.parent(of: item.id, in: library)
         return PageHeader(
             item: item.id.rawValue,
@@ -60,19 +61,27 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
-            status: status.map { _ in
-                PageHeader.Chip(label: (item.value(of: "status")?.string).map(ItemPropertyRow.choiceLabel) ?? String(localized: "Set Status"),
-                                enabled: item.isEditable)
+            status: status.map { field in
+                let value = Self.statusValue(of: item, in: field)
+                // With nothing to pick from, the pin only shows the status the item has.
+                return PageHeader.Pin(label: value.map { Self.localized(ItemTypeInfo.Field.label(ofOption: $0)) } ?? String(localized: "Status"),
+                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(status: value))
             },
-            parent: parent.map { PageHeader.Chip(label: $0.targets.first?.title ?? String(localized: "Add Parent"), enabled: true) },
+            parent: parent.map {
+                // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
+                let title = $0.targets.first?.title
+                return PageHeader.Pin(label: title ?? String(localized: "Parent"), enabled: title != nil || $0.isEditable,
+                                      empty: title == nil, opensMenu: title != nil)
+            },
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
+            parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
         )
     }
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left.
     private var handler: (PageHeaderEvent) -> Void {
-        let library = library, drafts = drafts, undoManager = undoManager, openWindow = openWindow
+        let library = library, drafts = drafts, undoManager = undoManager
         let choosingParent = $choosingParent
         // The editor keeps this, so it holds the editor weakly; otherwise neither would ever be released.
         return { [weak editor] event in
@@ -98,38 +107,60 @@ struct ItemPageHeader: ViewModifier {
                 draft.isDirty = false
                 draft.rejected = false
             case .menu(.status, let id, let rect):
-                guard let item = library.item(id), let status = Self.status(of: item, in: library),
-                      case .choice(let choices) = status.kind else { return }
+                guard let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 let menu = NSMenu()
-                for choice in choices {
-                    let entry = actionItem(Self.localized(ItemPropertyRow.choiceLabel(choice))) {
+                for choice in Self.statusChoices(of: item, in: status) {
+                    let entry = actionItem(Self.localized(ItemTypeInfo.Field.label(ofOption: choice))) {
                         drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
                     }
-                    entry.state = item.value(of: status.key)?.string == choice ? .on : .off
+                    entry.state = Self.statusValue(of: item, in: status) == choice ? .on : .off
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
             case .menu(.parent, let id, let rect):
                 guard let parent = Self.parent(of: id, in: library) else { return }
+                guard let target = parent.targets.first else {
+                    if parent.isEditable { choosingParent.wrappedValue = rect }
+                    return
+                }
                 let menu = NSMenu()
                 menu.autoenablesItems = false
-                if let target = parent.targets.first?.itemID, library.item(target) != nil {
-                    menu.addItem(actionItem(String(localized: "Open Parent")) { openWindow(value: target) })
+                let open = actionItem(String(localized: "Open \(target.title)")) { [weak editor] in
+                    if let id = target.itemID { editor?.onOpenNote(id) }
                 }
-                let choose = actionItem(parent.targets.isEmpty ? String(localized: "Choose Parent…") : String(localized: "Change Parent…")) {
-                    choosingParent.wrappedValue = rect
+                open.isEnabled = target.itemID.map { library.item($0) != nil } ?? false
+                menu.addItem(open)
+                let change = actionItem(String(localized: "Change Parent…")) { choosingParent.wrappedValue = rect }
+                change.isEnabled = parent.isEditable
+                menu.addItem(change)
+                menu.addItem(.separator())
+                let remove = actionItem(String(localized: "Remove Parent")) {
+                    Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager)
                 }
-                choose.isEnabled = parent.isEditable
-                menu.addItem(choose)
+                remove.isEnabled = parent.isEditable
+                menu.addItem(remove)
                 editor.popUpMenu(menu, under: rect)
             }
         }
     }
 
-    private static func status(of item: Item, in library: any ItemLibrary) -> ItemTypeInfo.Field? {
-        guard let field = library.catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == "status" }),
-              case .choice = field.kind else { return nil }
-        return field
+    /// Takes the item out of its parent. A library that refuses leaves the parent as it was, and the page says so
+    /// until the next try or the next item.
+    static func removeParent(
+        _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
+    ) {
+        drafts.draft(for: id, key: parent.field).rejected = !library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
+    }
+
+    /// The status the item holds, if it holds one.
+    static func statusValue(of item: Item, in field: ItemTypeInfo.Field) -> String? {
+        item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
+    /// not list, so the menu always shows what is set.
+    static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
+        field.options(including: statusValue(of: item, in: field))
     }
 
     private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {
