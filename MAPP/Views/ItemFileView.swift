@@ -59,14 +59,18 @@ struct ItemFileView: View {
 
     @State private var loader = ItemFileLoader()
 
+    private var item: Item? { library.item(id) }
+
     var body: some View {
-        Group {
+        // The task sits on one container. On the switch itself (`Group` hands a modifier to each branch) it would
+        // start again with every branch, and a load changes the branch: the file would be fetched over and over.
+        ZStack {
             switch loader.resolution(of: id) {
             case nil:
                 ProgressView("Getting File…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready(let url):
-                FileItemContent(url: url, title: library.item(id)?.title ?? url.lastPathComponent)
+                FileItemContent(url: url, title: item?.title ?? url.lastPathComponent, contentType: item?.fileType)
             case .unavailable:
                 ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
             case .failed:
