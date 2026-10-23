@@ -618,6 +618,18 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
     }
 
+    func testBackAndForwardKeysBelongToThePageWhileItHasTheKeyboard() {
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        row(titled: "Recipes to try").click()
+        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        app.typeKey(.return, modifierFlags: [])
+        app.typeKey("[", modifierFlags: .command)
+        XCTAssertFalse(waitForText("BEGINSWITH", "Kitchen quotes"), "the page keeps ⌘[ while it has the keyboard")
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey("[", modifierFlags: .command)
+        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"), "the list has the keyboard again, so ⌘[ goes back")
+    }
+
     func testBackAndForwardMoveThroughTheTypesShown() {
         sidebarItem("Marfa Types").click()
         XCTAssertTrue(typeRow("core.note").waitForExistence(timeout: 5))
