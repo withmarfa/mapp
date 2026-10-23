@@ -77,7 +77,26 @@
       }
     },
     "%lld changes need attention" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change needs attention"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes need attention"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%lld changes need your attention." : {
       "localizations" : {
@@ -901,7 +920,26 @@
       "extractionState" : "manual"
     },
     "Key refused, %lld changes waiting" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Key refused, %lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Key refused, %lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Kind" : {
       "extractionState" : "manual"
@@ -1158,7 +1196,26 @@
       "extractionState" : "manual"
     },
     "Offline, %lld changes waiting" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Only one item can be chosen here." : {
       "extractionState" : "manual"
