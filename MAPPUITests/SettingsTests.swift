@@ -75,7 +75,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(back.exists)
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("marfa", "Marfa"), ("about", "About"), ("appearance", "Appearance")] {
+        for (pane, title) in [("editor", "Editor"), ("library", "Library"), ("marfa", "Marfa"), ("sidebar", "Sidebar"), ("about", "About"), ("appearance", "Appearance")] {
             let category = sidebar.descendants(matching: .any).matching(identifier: "SettingsPane-\(pane)").element(boundBy: 0)
             XCTAssertTrue(category.exists)
             category.click()
@@ -90,16 +90,15 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "MoreToolbar").element(boundBy: 0).exists)
     }
 
-    func testSettingsReturnsToTheTypesBrowser() {
-        window.outlines["SidebarPlaces"].staticTexts["Marfa Types"].click()
-        let types = window.descendants(matching: .any)["MarfaTypesList"]
-        XCTAssertTrue(types.waitForExistence(timeout: 5))
+    func testSettingsReturnsToTheChosenPlace() {
+        window.outlines["Sidebar"].staticTexts["Recently Deleted"].click()
+        let deleted = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Old packing list")).firstMatch
+        XCTAssertTrue(deleted.waitForExistence(timeout: 5))
         for _ in 0..<2 {
             app.typeKey(",", modifierFlags: .command)
             XCTAssertTrue(settings.waitForExistence(timeout: 3))
             window.buttons["SettingsBack"].click()
-            XCTAssertTrue(types.waitForExistence(timeout: 5))
-            XCTAssertFalse(list.exists)
+            XCTAssertTrue(deleted.waitForExistence(timeout: 5))
         }
     }
 
@@ -276,12 +275,11 @@ final class SettingsTests: XCTestCase {
             size.click()
             app.menuItems["\(points) pt"].click()
             window.buttons["SettingsBack"].click()
-            let places = window.outlines["SidebarPlaces"]
-            XCTAssertTrue(places.waitForExistence(timeout: 3))
-            XCTAssertEqual(places.outlineRows.count, 2)
-            for row in places.outlineRows.allElementsBoundByIndex {
-                XCTAssertTrue(places.frame.contains(row.frame), "a sidebar place is clipped at \(points) points")
-            }
+            let sidebar = window.outlines["Sidebar"]
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
+            let deleted = sidebar.staticTexts["Recently Deleted"]
+            XCTAssertTrue(deleted.waitForExistence(timeout: 3))
+            XCTAssertTrue(sidebar.frame.contains(deleted.frame), "a sidebar place is clipped at \(points) points")
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.searchFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))

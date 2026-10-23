@@ -21,16 +21,14 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     func testSidebarKeepsTopPlacesAndFavoritesAboveTheNativeGroups() {
-        for title in ["Inbox", "All Notes", "Favorites", "Kitchen quotes", "Reading list", "Library", "Projects", "Items", "Folders"] {
+        for title in ["Inbox", "All Notes", "Favorites", "Kitchen quotes", "Reading list", "Library", "Projects", "Folders", "Recently Deleted"] {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
         XCTAssertFalse(sidebarText("All Favorites").exists)
         XCTAssertLessThan(sidebarText("All Notes").frame.maxY, sidebarText("Favorites").frame.minY)
         XCTAssertLessThan(sidebarText("Reading list").frame.maxY, sidebarText("Library").frame.minY)
         XCTAssertLessThan(sidebarText("Library").frame.maxY, sidebarText("Projects").frame.minY)
-        let places = window.outlines["SidebarPlaces"]
-        XCTAssertTrue(places.staticTexts["Marfa Types"].exists)
-        XCTAssertTrue(places.staticTexts["Recently Deleted"].exists)
+        XCTAssertLessThan(sidebarText("Folders").frame.maxY, sidebarText("Recently Deleted").frame.minY, "Recently Deleted comes last")
         attachScreenshot("SidebarGroupedNavigation")
     }
 
@@ -59,21 +57,14 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
     }
 
-    func testFooterHoverAndSelectionKeepTheNativeAppearance() {
-        let places = window.outlines["SidebarPlaces"]
-        let types = places.staticTexts["Marfa Types"]
-        XCTAssertTrue(types.waitForExistence(timeout: 3))
-        types.hover()
-        attachScreenshot("FooterMarfaTypesHover")
-        types.click()
-        XCTAssertTrue(window.descendants(matching: .any)["MarfaTypesList"].waitForExistence(timeout: 5))
-        types.hover()
-        attachScreenshot("FooterMarfaTypesSelected")
-
-        let deleted = places.staticTexts["Recently Deleted"]
+    func testRecentlyDeletedHoverAndSelectionKeepTheNativeAppearance() {
+        let deleted = sidebarText("Recently Deleted")
+        XCTAssertTrue(deleted.waitForExistence(timeout: 3))
+        deleted.hover()
+        attachScreenshot("RecentlyDeletedHover")
         deleted.click()
         XCTAssertTrue(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Old packing list")).firstMatch.waitForExistence(timeout: 3))
-        attachScreenshot("FooterRecentlyDeletedSelected")
+        attachScreenshot("RecentlyDeletedSelected")
     }
 
     func testFavoritesSectionDisappearsAfterTheLastItemIsRemoved() {
@@ -93,19 +84,22 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
     }
 
-    func testItemsDisclosureRemembersItsStateWhenSettingsCloses() {
-        XCTAssertFalse(sidebarText("Note").exists)
-        disclosure(for: "Items").click()
-        XCTAssertTrue(sidebarText("Note").waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Files").exists)
-        XCTAssertFalse(sidebarText("Project").exists, "Projects is the only project collection row")
+    func testAPlaceHiddenFromItsMenuIsOfferedBackInSettings() {
+        sidebarText("Projects").rightClick()
+        window.menuItems["Hide from Sidebar"].click()
+        XCTAssertTrue(sidebarText("Projects").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sidebarText("Folders").exists, "the other places stay")
+
         app.typeKey(",", modifierFlags: .command)
-        XCTAssertTrue(window.buttons["SettingsBack"].waitForExistence(timeout: 3))
+        let pane = window.descendants(matching: .any).matching(identifier: "SettingsPane-sidebar").element(boundBy: 0)
+        XCTAssertTrue(pane.waitForExistence(timeout: 3))
+        pane.click()
+        let toggle = window.descendants(matching: .any).matching(identifier: "SidebarSetting-projects").element(boundBy: 0)
+        XCTAssertTrue(toggle.waitForExistence(timeout: 3))
+        XCTAssertEqual(toggle.value as? Int, 0, "Settings lists the place unchecked")
+        toggle.click()
         window.buttons["SettingsBack"].click()
-        XCTAssertTrue(sidebarText("Note").waitForExistence(timeout: 3))
-        disclosure(for: "Items").click()
-        XCTAssertTrue(sidebarText("Note").waitForNonExistence(timeout: 3))
-        XCTAssertTrue(window.outlines["SidebarPlaces"].staticTexts["Recently Deleted"].exists)
+        XCTAssertTrue(sidebarText("Projects").waitForExistence(timeout: 3))
     }
 
     func testCollapsedFoldersExpandForCreationAndKeepRenameAndDelete() {
@@ -186,7 +180,6 @@ final class SidebarNavigationTests: XCTestCase {
         case "Favorites": "SidebarFavoritesSection"
         case "Library": "SidebarLibrarySection"
         case "Projects": "SidebarProjects"
-        case "Items": "SidebarItems"
         case "Folders": "SidebarFolders"
         default: nil
         }

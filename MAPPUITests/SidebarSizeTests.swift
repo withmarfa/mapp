@@ -1,21 +1,19 @@
 import XCTest
 
-/// The places fixed at the sidebar's foot are a list sized to its rows, whose height follows the sidebar size
-/// chosen in System Settings, so each size is checked.
+/// The last row of the Library section follows the sidebar size chosen in System Settings, so each size is checked.
 @MainActor
 final class SidebarSizeTests: XCTestCase {
-    func testThePlacesAtTheFootFitAtEverySidebarSize() {
+    func testTheLastLibraryRowFitsAtEverySidebarSize() {
         for size in ["1", "2", "3"] {
             let app = XCUIApplication()
             // Before the sample folder's flag, which takes no value.
             app.launchArguments += ["-NSTableViewDefaultSizeMode", size, "-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
             app.launch()
-            let places = app.windows.firstMatch.outlines["SidebarPlaces"]
-            XCTAssertTrue(places.waitForExistence(timeout: 10))
-            for row in places.outlineRows.allElementsBoundByIndex {
-                XCTAssertTrue(places.frame.contains(row.frame), "a row is cut off at sidebar size \(size)")
-            }
-            XCTAssertEqual(places.outlineRows.count, 2)
+            let sidebar = app.windows.firstMatch.outlines["Sidebar"]
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 10))
+            let deleted = sidebar.staticTexts["Recently Deleted"]
+            XCTAssertTrue(deleted.waitForExistence(timeout: 3))
+            XCTAssertTrue(sidebar.frame.contains(deleted.frame), "the row is cut off at sidebar size \(size)")
             app.terminate()
         }
     }

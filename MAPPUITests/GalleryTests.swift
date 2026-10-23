@@ -185,7 +185,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
     }
 
-    func testSettingsTypesAndHiddenSidebarReturnToGallery() throws {
+    func testSettingsAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
         choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min { abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX) })
@@ -197,8 +197,8 @@ final class GalleryTests: XCTestCase {
         window.buttons["SettingsBack"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         XCTAssertEqual(sidebar.frame.width, width, accuracy: 3)
-        window.outlines["SidebarPlaces"].staticTexts["Marfa Types"].click()
-        XCTAssertTrue(window.outlines["MarfaTypesList"].waitForExistence(timeout: 3))
+        sidebar.staticTexts["Recently Deleted"].click()
+        XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         sidebar.staticTexts["All Notes"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         app.typeKey("s", modifierFlags: [.command, .control])

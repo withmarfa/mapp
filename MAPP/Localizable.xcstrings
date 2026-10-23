@@ -154,9 +154,6 @@
     "^[%lld result](inflect: true)" : {
 
     },
-    "^[%lld subtype](inflect: true)" : {
-      "extractionState" : "manual"
-    },
     "^[Delete %lld note](inflect: true) immediately?" : {
 
     },
@@ -208,8 +205,8 @@
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
     },
-    "A type that is compatible with another claims to have at least the other’s fields." : {
-      "extractionState" : "manual"
+    "A type appears here once the library holds an item of it. Drag to change the order." : {
+
     },
     "About" : {
       "extractionState" : "manual"
@@ -262,9 +259,6 @@
     "All Notes" : {
 
     },
-    "An edge points from one item to another." : {
-      "extractionState" : "manual"
-    },
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
@@ -291,9 +285,6 @@
       }
     },
     "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
-      "extractionState" : "manual"
-    },
-    "Any type" : {
       "extractionState" : "manual"
     },
     "Appearance" : {
@@ -458,9 +449,6 @@
     "Choose a kind of item and give it a title." : {
       "extractionState" : "manual"
     },
-    "Choose a type to see its fields and connections." : {
-      "extractionState" : "manual"
-    },
     "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
 
     },
@@ -499,15 +487,6 @@
     },
     "Command Palette" : {
 
-    },
-    "Compatibility" : {
-      "extractionState" : "manual"
-    },
-    "Compatible from" : {
-      "extractionState" : "manual"
-    },
-    "Compatible with" : {
-      "extractionState" : "manual"
     },
     "Completed" : {
       "extractionState" : "manual"
@@ -557,6 +536,9 @@
     "Created" : {
       "extractionState" : "manual"
     },
+    "Customize Sidebar…" : {
+
+    },
     "Date" : {
       "extractionState" : "manual"
     },
@@ -605,15 +587,6 @@
     "Deleted notes stay in Recently Deleted for %lld days, then they’re deleted for good." : {
 
     },
-    "Deleting either item is refused while the connection exists" : {
-      "extractionState" : "manual"
-    },
-    "Deleting either item keeps the other" : {
-      "extractionState" : "manual"
-    },
-    "Deleting the item it points from also deletes the item it points to" : {
-      "extractionState" : "manual"
-    },
     "Derived From" : {
       "extractionState" : "manual"
     },
@@ -659,25 +632,7 @@
     "Divider" : {
 
     },
-    "Each can be pointed to by many items." : {
-      "extractionState" : "manual"
-    },
-    "Each can be pointed to by one item at most." : {
-      "extractionState" : "manual"
-    },
-    "Each can point to many items." : {
-      "extractionState" : "manual"
-    },
-    "Each can point to one item at most." : {
-      "extractionState" : "manual"
-    },
     "Each server has its own copy on this Mac." : {
-      "extractionState" : "manual"
-    },
-    "Edge types" : {
-      "extractionState" : "manual"
-    },
-    "Edge types that do not limit their types connect every type, so they are not listed here." : {
       "extractionState" : "manual"
     },
     "Edit Property" : {
@@ -720,6 +675,9 @@
 
     },
     "Favorites" : {
+
+    },
+    "Favorites lists the items you’ve marked as favorites." : {
 
     },
     "Feature" : {
@@ -785,9 +743,6 @@
     "From" : {
       "extractionState" : "manual"
     },
-    "From or to" : {
-      "extractionState" : "manual"
-    },
     "Full Width" : {
 
     },
@@ -817,6 +772,9 @@
     },
     "Hide Details" : {
       "extractionState" : "manual"
+    },
+    "Hide from Sidebar" : {
+
     },
     "High" : {
       "extractionState" : "manual"
@@ -849,9 +807,6 @@
     "Inbox" : {
 
     },
-    "Inherited from" : {
-      "extractionState" : "manual"
-    },
     "Insert Table" : {
 
     },
@@ -881,9 +836,6 @@
     },
     "Item Type" : {
 
-    },
-    "Item types" : {
-      "extractionState" : "manual"
     },
     "Item unavailable" : {
       "extractionState" : "manual"
@@ -1041,9 +993,6 @@
     "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting" : {
       "extractionState" : "manual"
     },
-    "Marfa Types" : {
-
-    },
     "Markdown Source" : {
 
     },
@@ -1127,20 +1076,14 @@
     "No Items" : {
       "extractionState" : "manual"
     },
+    "No Library Is Open" : {
+
+    },
     "No Results" : {
 
     },
-    "No Type Selected" : {
-      "extractionState" : "manual"
-    },
-    "No Types" : {
-      "extractionState" : "manual"
-    },
     "None" : {
 
-    },
-    "Not a field of this type" : {
-      "extractionState" : "manual"
     },
     "Not connected" : {
       "extractionState" : "manual"
@@ -1190,6 +1133,9 @@
     "Open %@" : {
 
     },
+    "Open a library to choose what its sidebar shows." : {
+
+    },
     "Open Copy" : {
       "extractionState" : "manual"
     },
@@ -1230,9 +1176,6 @@
 
     },
     "Parent" : {
-      "extractionState" : "manual"
-    },
-    "Parent types" : {
       "extractionState" : "manual"
     },
     "Paste a new key" : {
@@ -1349,16 +1292,7 @@
     "Replace…" : {
 
     },
-    "Required" : {
-      "extractionState" : "manual"
-    },
     "Resolve the existing target before replacing this relationship." : {
-      "extractionState" : "manual"
-    },
-    "Reverse name" : {
-      "extractionState" : "manual"
-    },
-    "Reverse name: %@" : {
       "extractionState" : "manual"
     },
     "Roles" : {
@@ -1443,6 +1377,9 @@
     "Show Formatted Text" : {
 
     },
+    "Show Hide Reorder Places Inbox All Items Favorites Projects Types Folders Files Recently Deleted Customize" : {
+
+    },
     "Show in Finder" : {
 
     },
@@ -1452,8 +1389,8 @@
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
-    "Shown because a type below it matches the search." : {
-      "extractionState" : "manual"
+    "Sidebar" : {
+
     },
     "Size" : {
       "extractionState" : "manual"
@@ -1567,12 +1504,6 @@
       "extractionState" : "manual"
     },
     "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again." : {
-      "extractionState" : "manual"
-    },
-    "The item it points from" : {
-      "extractionState" : "manual"
-    },
-    "The item it points to" : {
       "extractionState" : "manual"
     },
     "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy." : {
@@ -1719,9 +1650,6 @@
     "This kind of item has no text to edit." : {
       "extractionState" : "manual"
     },
-    "This library has no types to show." : {
-      "extractionState" : "manual"
-    },
     "This library is being brought up to date. Try again in a moment." : {
       "extractionState" : "manual"
     },
@@ -1741,9 +1669,6 @@
       "extractionState" : "manual"
     },
     "This needs the server. Try again when you’re back online." : {
-      "extractionState" : "manual"
-    },
-    "This type has no fields." : {
       "extractionState" : "manual"
     },
     "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it." : {
@@ -1777,8 +1702,8 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "Types with the role %@" : {
-      "extractionState" : "manual"
+    "Types" : {
+
     },
     "Undo" : {
 
@@ -1837,19 +1762,10 @@
     "What you wrote is lost unless you copy it first." : {
       "extractionState" : "manual"
     },
-    "When an item is deleted" : {
-      "extractionState" : "manual"
-    },
     "Wide" : {
 
     },
-    "Written at" : {
-      "extractionState" : "manual"
-    },
     "Yes" : {
-      "extractionState" : "manual"
-    },
-    "Yes or no" : {
       "extractionState" : "manual"
     },
     "Yesterday" : {
