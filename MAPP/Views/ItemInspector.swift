@@ -99,7 +99,7 @@ struct ItemInspector: View {
     let onProperty: (String, PropertyValue?) -> Bool
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
-    var onRemove: ((ItemRelationship, ItemID) -> Bool)? = nil
+    let onRemove: (ItemRelationship, ItemID) -> Bool
     var drafts: DetailsPresentation? = nil
     @State private var detailsOpen = false
 
@@ -122,7 +122,7 @@ struct ItemInspector: View {
                     InspectorHeading(title: "Relationships", topPadding: fields.isEmpty ? 2 : 18)
                     ForEach(shownRelationships) { relationship in
                         ItemRelationshipRow(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
-                                            onRemove: onRemove.map { remove in { target in remove(relationship, target) } })
+                                            onRemove: { onRemove(relationship, $0) })
                     }
                     if !mentions.isEmpty {
                         InspectorRow(name: "Links in Content") {

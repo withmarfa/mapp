@@ -6,7 +6,7 @@ struct ItemRelationshipRow: View {
     let relationship: ItemRelationship
     let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
-    var onRemove: ((ItemID) -> Bool)? = nil
+    let onRemove: (ItemID) -> Bool
     @State private var rejected = false
 
     var body: some View {
@@ -14,7 +14,7 @@ struct ItemRelationshipRow: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(relationship.targets) { target in
                     ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
-                        rejected = !(onRemove?(id) ?? false)
+                        rejected = !onRemove(id)
                     }
                     .inspectorMinimumHeight()
                 }
