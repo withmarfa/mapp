@@ -25,6 +25,7 @@ const ticket: HeaderModel = {
   },
   parent: { label: 'Field Research', enabled: true, empty: false, opensMenu: true },
   propertyRejected: false,
+  parentRejected: false,
   interfaceTextSize: 13,
 }
 
@@ -119,13 +120,28 @@ test('every pin is one height and the icons the app draws reach the page as mask
 })
 
 test('a refused title shows why and offers to discard the draft', () => {
-  header.set({ ...ticket, draft: 'A/B', titleRejected: true, propertyRejected: true })
+  header.set({
+    ...ticket,
+    draft: 'A/B',
+    titleRejected: true,
+    propertyRejected: true,
+    parentRejected: true,
+  })
   const error = root.querySelector<HTMLElement>('.item-title-error')!
   expect(error.hidden).toBe(false)
   expect(error.textContent).toContain('The title could not be saved.')
   expect([...root.querySelectorAll<HTMLElement>('.item-error')].every((e) => !e.hidden)).toBe(true)
   error.querySelector('button')!.click()
   expect(posted).toEqual([{ type: 'titleDiscard', item: 'ticket' }])
+})
+
+test('a parent that could not be removed says so, apart from a refused status', () => {
+  const errors = () => [...root.querySelectorAll<HTMLElement>(':scope > .item-error')]
+  header.set({ ...ticket, parentRejected: true })
+  expect(errors().map((e) => e.hidden)).toEqual([true, false])
+  expect(errors()[1]!.textContent).toBe('The connection could not be removed.')
+  header.set(ticket)
+  expect(errors().every((e) => e.hidden)).toBe(true)
 })
 
 test('typing and Return reach the app for the item the title belongs to', () => {

@@ -284,7 +284,15 @@ test("the words the app sends mount InkKit, with the app's own kept out of its l
   expect(Object.keys(sent).length).toBeGreaterThan(30)
   const labels = splitLabels(sent)
   expect(Object.keys(labels.header).sort()).toEqual(
-    ['discardChanges', 'itemType', 'propertyRejected', 'status', 'title', 'untitled'].sort(),
+    [
+      'discardChanges',
+      'itemType',
+      'parentRejected',
+      'propertyRejected',
+      'status',
+      'title',
+      'untitled',
+    ].sort(),
   )
   expect(labels.words.noteReference).toContain('%@')
   expect(labels.words.linkToNote).toBeTruthy()

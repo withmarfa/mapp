@@ -50,6 +50,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var status: Pin?
     var parent: Pin?
     var propertyRejected: Bool
+    var parentRejected: Bool
     var interfaceTextSize: Int
 }
 

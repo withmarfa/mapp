@@ -30,6 +30,8 @@ export interface HeaderModel {
   status: HeaderPin | null
   parent: HeaderPin | null
   propertyRejected: boolean
+  /** The app could not remove the parent. */
+  parentRejected: boolean
   /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
 }
@@ -55,6 +57,7 @@ export interface HeaderLabels {
   status: string
   discardChanges: string
   propertyRejected: string
+  parentRejected: string
 }
 
 export type HeaderMenu = 'status' | 'parent'
@@ -69,6 +72,7 @@ const englishLabels: HeaderLabels = {
   status: 'Status',
   discardChanges: 'Discard Changes',
   propertyRejected: 'The value could not be saved. Please try again.',
+  parentRejected: 'The connection could not be removed.',
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -96,6 +100,7 @@ export class ItemHeader {
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
   private readonly propertyError: HTMLParagraphElement
+  private readonly parentError: HTMLParagraphElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
 
@@ -138,6 +143,10 @@ export class ItemHeader {
     this.propertyError.setAttribute('role', 'alert')
     this.propertyError.textContent = this.labels.propertyRejected
     this.propertyError.hidden = true
+    this.parentError = element('p', 'item-error', root)
+    this.parentError.setAttribute('role', 'alert')
+    this.parentError.textContent = this.labels.parentRejected
+    this.parentError.hidden = true
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -249,6 +258,7 @@ export class ItemHeader {
     this.titleError.hidden = !model.titleRejected
     this.titleRefusal.textContent = model.titleRefusal
     this.propertyError.hidden = !model.propertyRejected
+    this.parentError.hidden = !model.parentRejected
     this.typePin.hidden = model.type == null
     this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
     this.showPin(this.statusPin, model.status)

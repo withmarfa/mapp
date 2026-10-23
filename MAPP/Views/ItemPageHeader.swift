@@ -35,6 +35,7 @@ struct ItemPageHeader: ViewModifier {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     // A refused status belongs to the visit, as the page showed it before.
                     drafts.draft(for: old, key: "status").rejected = false
+                    if let parent = Self.parent(of: old, in: library) { drafts.draft(for: old, key: parent.field).rejected = false }
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
@@ -73,6 +74,7 @@ struct ItemPageHeader: ViewModifier {
                                       empty: title == nil, opensMenu: title != nil)
             },
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
+            parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
         )
     }
@@ -133,13 +135,21 @@ struct ItemPageHeader: ViewModifier {
                 menu.addItem(change)
                 menu.addItem(.separator())
                 let remove = actionItem(String(localized: "Remove Parent")) {
-                    library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
+                    Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager)
                 }
                 remove.isEnabled = parent.isEditable
                 menu.addItem(remove)
                 editor.popUpMenu(menu, under: rect)
             }
         }
+    }
+
+    /// Takes the item out of its parent. A library that refuses leaves the parent as it was, and the page says so
+    /// until the next try or the next item.
+    static func removeParent(
+        _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
+    ) {
+        drafts.draft(for: id, key: parent.field).rejected = !library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
     }
 
     /// The status the item holds, if it holds one.

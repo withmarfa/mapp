@@ -119,6 +119,24 @@ struct InspectorFieldsTests {
         #expect(String(decoding: menu, as: UTF8.self).contains("\"opensMenu\":true"))
     }
 
+    @MainActor @Test func aRefusedRemoveParentIsToldAndAnAcceptedOneClearsTheTelling() throws {
+        let child = Self.item("aic.ticket.task")
+        let target = ItemRelationshipTarget(title: "Field Research", itemID: ItemID("10000000-0000-0000-0000-000000000009"), resolution: .resolved(ItemID("10000000-0000-0000-0000-000000000009")))
+        let parent = ItemRelationship(field: "child-of", label: "Parent", targets: [target], isEditable: true, allowsMultiple: false)
+        let library = FakeItemLibrary(items: [child])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        library.relationshipsByItem[child.id] = [parent]
+        let drafts = DetailsPresentation()
+
+        ItemPageHeader.removeParent(parent, of: child.id, in: library, drafts: drafts, undoManager: nil)
+        #expect(library.relationshipWrites.map(\.targets) == [[]])
+        #expect(ItemPageHeader.header(of: child.id, in: library, drafts: drafts)?.parentRejected == true)
+
+        library.acceptsRelationships = true
+        ItemPageHeader.removeParent(parent, of: child.id, in: library, drafts: drafts, undoManager: nil)
+        #expect(ItemPageHeader.header(of: child.id, in: library, drafts: drafts)?.parentRejected == false)
+    }
+
     // MARK: The inspector's fields
 
     @Test func theTitleAndTheBodyAreNotProperties() {

@@ -845,7 +845,7 @@ struct EditorTests {
         PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
                    type: "Task", status: .init(label: "In Progress", enabled: true),
-                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, interfaceTextSize: 13)
+                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
     }
 
     static func json(_ value: some Encodable) -> String {

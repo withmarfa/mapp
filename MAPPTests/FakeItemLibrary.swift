@@ -15,6 +15,11 @@ final class FakeItemLibrary: ItemLibrary {
     var catalogue = WorkbenchSchema.catalogue
     var capabilities: SourceCapabilities = []
     var trashDays: Int?
+    /// What `relationships(for:)` answers, by item.
+    var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
+    /// Whether `setItemRelationship` takes a write, and the writes it was asked for.
+    var acceptsRelationships = false
+    var relationshipWrites: [(item: ItemID, field: String, targets: [ItemID])] = []
     var completedImports: [UUID: ItemID] = [:]
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
@@ -90,7 +95,7 @@ final class FakeItemLibrary: ItemLibrary {
         default: return .ambiguous(named.map(\.id))
         }
     }
-    func relationships(for id: ItemID) -> [ItemRelationship] { [] }
+    func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     func creationParentCandidates(typeID: String) -> [Item] { [] }
@@ -162,7 +167,10 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool { false }
+    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
+        relationshipWrites.append((id, field, targetIDs))
+        return acceptsRelationships
+    }
 
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?) {
         change(ids) { item in
