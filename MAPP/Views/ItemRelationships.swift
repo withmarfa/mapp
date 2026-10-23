@@ -10,7 +10,7 @@ struct ItemRelationshipRow: View {
     @State private var rejected = false
 
     var body: some View {
-        InspectorRow(name: LocalizedStringKey(relationship.label)) {
+        InspectorRow(name: LocalizedStringKey(ItemTypeInfo.Field.displayLabel(relationship.label))) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(relationship.targets) { target in
                     ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
@@ -83,22 +83,11 @@ struct ItemAddRelationshipRow: View {
     let onEdit: (ItemRelationship) -> Void
 
     var body: some View {
-        InspectorRow(name: nil) {
-            Menu {
-                ForEach(options) { option in
-                    Button(LocalizedStringKey(option.label)) { onEdit(option) }
-                        .accessibilityIdentifier("RelationshipAdd.\(option.field)")
-                }
-            } label: {
-                InspectorPlaceholder(text: "Add Relationship…")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
+        InspectorAddMenu(title: "Add Relationship…", identifier: "RelationshipAddMenu") {
+            ForEach(options) { option in
+                Button(ItemTypeInfo.Field.displayLabel(option.label)) { onEdit(option) }
+                    .accessibilityIdentifier("RelationshipAdd.\(option.field)")
             }
-            .menuStyle(.button)
-            .menuIndicator(.hidden)
-            .buttonStyle(.plain)
-            .inspectorValue()
-            .accessibilityIdentifier("RelationshipAddMenu")
         }
     }
 }
@@ -160,7 +149,7 @@ struct ItemRelationshipPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(LocalizedStringKey(relationship.label)).interfaceFont(.title2.bold())
+            Text(LocalizedStringKey(ItemTypeInfo.Field.displayLabel(relationship.label))).interfaceFont(.title2.bold())
             TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("RelationshipSearch")

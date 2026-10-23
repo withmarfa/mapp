@@ -123,14 +123,46 @@ extension View {
     }
 }
 
-/// The text an empty value shows. Text fields, menus and the add-relationship row share one colour, because a
+/// The text an empty value shows. Text fields and menus share one colour, because a
 /// hierarchical style dims twice inside a menu label and a text field's own prompt colour differs from it.
 struct InspectorPlaceholder: View {
     static let color = Color(nsColor: .placeholderTextColor)
 
-    var text: LocalizedStringKey = "Add"
+    let text: LocalizedStringKey
 
     var body: some View {
         Text(text).foregroundStyle(Self.color)
+    }
+}
+
+/// The button that ends a section and adds to it: secondary text with a plus, on the same leading edge as the
+/// section's names, and a menu of what can be added.
+struct InspectorAddMenu<Content: View>: View {
+    let title: LocalizedStringKey
+    let identifier: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            Label(title, systemImage: "plus")
+                .interfaceFont(.callout)
+                .inspectorMinimumHeight()
+                .contentShape(.rect)
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .fixedSize()
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// A hairline between two sections, in place of a box around either.
+struct InspectorSectionDivider: View {
+    var body: some View {
+        Divider().padding(.top, 14)
     }
 }

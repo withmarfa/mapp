@@ -167,7 +167,65 @@ struct InspectorFieldsTests {
         library.catalogue = Catalogue(itemTypes: [Self.task])
         let hidden = library.hiddenPropertyKeys(of: item)
         #expect(hidden == ["title", "body"])
-        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden).map(\.key) == ["description", "status", "priority"])
+        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden).map(\.key) == ["description"])
+        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden).map(\.key) == ["status", "priority"])
+    }
+
+    // MARK: Only what has a value
+
+    @Test func propertiesListOnlyWhatHasAValueInTheCataloguesOrder() {
+        let item = Self.item("aic.ticket.task", properties: [
+            Property(key: "priority", value: .string("high")), Property(key: "description", value: .string("About")),
+            Property(key: "status", value: .string(""))
+        ])
+        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["description", "priority"])
+        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["status"])
+    }
+
+    @Test func anItemWithNoValuesListsNothingAndOffersEveryProperty() {
+        let item = Self.item("aic.ticket.task")
+        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: ["title", "body"]).isEmpty)
+        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: ["title", "body"]).map(\.key) == ["description", "status", "priority"])
+    }
+
+    @Test func aPropertyTheItemCannotTakeIsNeverOffered() {
+        var item = Self.item("aic.ticket.task")
+        item.state = .trashed
+        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: []).isEmpty)
+        let list = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array"), Self.field("note")]))
+        #expect(InspectorFields.addable(of: Self.item("aic.x"), type: list, hidden: []).map(\.key) == ["note"])
+    }
+
+    @Test func anAddedOrClearedPropertyStaysListedAndLeavesTheMenu() {
+        let item = Self.item("aic.ticket.task")
+        let hidden: Set<String> = ["title", "body"]
+        let revealed: Set<String> = ["priority"]
+        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden, revealed: revealed).map(\.key) == ["priority"])
+        #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden, revealed: revealed).map(\.key) == ["description", "status"])
+    }
+
+    @Test func emptyValuesAreNotValues() {
+        #expect(!InspectorFields.hasValue(nil))
+        #expect(!InspectorFields.hasValue(.null))
+        #expect(!InspectorFields.hasValue(.string("")))
+        #expect(!InspectorFields.hasValue(.array([])))
+        #expect(InspectorFields.hasValue(.string("a")))
+        #expect(InspectorFields.hasValue(.bool(false)))
+        #expect(InspectorFields.hasValue(.number(0)))
+    }
+
+    // MARK: Display labels
+
+    @Test func aCatalogueLabelReadsInTitleCase() {
+        #expect(ItemTypeInfo.Field.displayLabel("Completed at") == "Completed At")
+        #expect(ItemTypeInfo.Field.displayLabel("Starts at") == "Starts At")
+        #expect(ItemTypeInfo.Field.displayLabel("Linked from") == "Linked From")
+        #expect(ItemTypeInfo.Field.displayLabel("URL") == "URL")
+        #expect(ItemTypeInfo.Field.displayLabel("Due") == "Due")
+        #expect(ItemTypeInfo.Field.displayLabel("") == "")
+        let field = ItemTypeInfo.Field(key: "completed_at", label: "Completed at", kind: .date, declaredBy: TypeID("aic.x"))
+        #expect(field.displayLabel == "Completed At")
+        #expect(field.label == "Completed at")
     }
 
     @MainActor @Test func aTitleFromTheFirstLineHidesNothingElse() {

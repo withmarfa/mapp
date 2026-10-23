@@ -33,9 +33,12 @@ final class ItemJourneyTests: XCTestCase {
         search.typeText("Interface Test Project")
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipCandidate.'")).firstMatch.click()
         app.buttons["RelationshipSave"].click()
+        let addProperty = app.descendants(matching: .any)["ItemInspectorAddProperty"]
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 3))
+        addProperty.click()
+        app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch.click()
         let description = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(description.waitForExistence(timeout: 3))
-        description.click()
         description.typeText("Saved through the native inspector")
         app.typeKey(.tab, modifierFlags: [])
         details.click()
