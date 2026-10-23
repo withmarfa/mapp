@@ -23,6 +23,41 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
+    @Test func settingsIsAPlaceThatKeepsTheListAndSelectionBehindIt() {
+        let (library, _, newer, _) = makeLibrary()
+        let browser = Browser()
+        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.selection = [newer.id]
+        browser.showSettings(.library)
+        #expect(browser.showsSettings)
+        #expect(browser.settingsPage == .library)
+        #expect(browser.sidebarItem == .inbox)
+        #expect(browser.selection == [newer.id])
+        browser.showSettings()
+        #expect(browser.settingsPage == .library, "opening Settings again keeps the page it was on")
+    }
+
+    @Test func choosingAPlaceOrAnItemLeavesSettings() throws {
+        let (library, older, _, _) = makeLibrary()
+        let item = try #require(library.item(older.id))
+        let browser = Browser()
+        browser.showSettings()
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        #expect(!browser.showsSettings)
+        browser.showSettings()
+        browser.reveal(item, in: library, order: NoteOrder())
+        #expect(!browser.showsSettings)
+        browser.showSettings()
+        browser.startItemDraft()
+        #expect(!browser.showsSettings)
+    }
+
+    @Test func everySettingsPageIsListedOnceAndNamed() {
+        #expect(SettingsPage.groups.flatMap { $0 } == SettingsPage.allCases)
+        #expect(Set(SettingsPage.allCases.map(\.title)).count == SettingsPage.allCases.count)
+        #expect(SettingsPage.allCases.allSatisfy { !$0.summary.isEmpty && !$0.symbol.isEmpty })
+    }
+
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {
         let (library, older, _, _) = makeLibrary()
         let item = try #require(library.item(older.id))
@@ -191,7 +226,7 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
-    @Test(arguments: [SidebarItem.recentlyDeleted])
+    @Test(arguments: [SidebarItem.files])
     func aNewItemFromAPlaceWithoutNotesOpensADraftThenRevealsTheCreatedItem(from item: SidebarItem) {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
@@ -302,7 +337,7 @@ struct BrowserTests {
         library.capabilities = []
         #expect(!Browser.canDrop(on: .inbox, in: library))
         #expect(!Browser.canDrop(on: .folder(work.id), in: library))
-        #expect(Browser.canDrop(on: .recentlyDeleted, in: library), "deleting needs no capability")
+        #expect(!Browser.canDrop(on: .recentlyDeleted, in: library), "Recently Deleted is no longer a place to drop on")
         library.capabilities = .move
         #expect(Browser.canDrop(on: .inbox, in: library))
         #expect(Browser.canDrop(on: .folder(work.id), in: library))

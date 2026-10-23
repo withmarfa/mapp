@@ -9,7 +9,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case types
     /// The group that holds a notes folder's folders.
     case folders
-    case files, recentlyDeleted
+    case files
     case type(TypeID)
 
     var key: String {
@@ -21,7 +21,6 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .types: "types"
         case .folders: "folders"
         case .files: "files"
-        case .recentlyDeleted: "recentlyDeleted"
         case .type(let id): "type:" + id.rawValue
         }
     }
@@ -92,7 +91,6 @@ struct SidebarPlan {
             types = layout.ordered(library.itemTypeCounts.filter { $0.id != .project }, by: { SidebarPlace.type($0.id).key })
             if !types.isEmpty { rows.append(.types) }
         }
-        rows.append(.recentlyDeleted)
         self.library = layout.ordered(rows)
     }
 

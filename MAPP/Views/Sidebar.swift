@@ -13,13 +13,18 @@ struct Sidebar: View {
     @SceneStorage("sidebarFoldersExpanded") private var foldersExpanded = true
 
     /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
-    /// cannot show, so that is ignored.
+    /// cannot show, so that is ignored. While Settings shows, the row of Settings is the one selected, so
+    /// choosing the place that was open before returns to it as it was.
     private var selection: Binding<SidebarItem?> {
         Binding {
-            browser.sidebarItem
+            browser.showsSettings ? nil : browser.sidebarItem
         } set: { item in
-            guard let item, item != browser.sidebarItem else { return }
-            browser.show(item, in: library, order: order)
+            guard let item else { return }
+            if item == browser.sidebarItem {
+                browser.leaveSettings()
+            } else {
+                browser.show(item, in: library, order: order)
+            }
         }
     }
 
@@ -143,8 +148,6 @@ struct Sidebar: View {
             .accessibilityIdentifier("SidebarFolders")
         case .files:
             row(.files, systemImage: "doc", hiding: .files)
-        case .recentlyDeleted:
-            row(.recentlyDeleted, systemImage: "trash", hiding: .recentlyDeleted)
         case .inbox, .all, .favorites, .type:
             EmptyView()
         }
@@ -230,8 +233,7 @@ struct Sidebar: View {
         switch item {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
-        case .recentlyDeleted: library.deleteAfterSaving(ids, undoManager: undoManager)
-        case .allNotes, .favorites, .itemType, .project, .favoriteItem, .files: break
+        case .allNotes, .favorites, .itemType, .project, .favoriteItem, .files, .recentlyDeleted: break
         }
     }
 

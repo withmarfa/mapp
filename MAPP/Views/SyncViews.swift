@@ -1,102 +1,33 @@
 import AppKit
 import SwiftUI
 
-/// How the library stands with its server, at the foot of the sidebar as Mail and Notes keep theirs. It says
-/// nothing while everything is in step, and nothing at all while the app reads a folder; otherwise it is one
-/// quiet line that opens the details and what can be done about them.
-struct SyncStatusBar: View {
-    @Environment(MarfaHost.self) private var host: MarfaHost?
-    @State private var isPresented = false
-    let openSettings: () -> Void
+/// Reads how the library stands with its server, again as the clock passes: a change made online goes within
+/// moments and is not worth a line, so a line about sending waits for the clock.
+struct SyncStatusReading<Content: View>: View {
+    let host: MarfaHost
+    @ViewBuilder let content: (SyncStatus) -> Content
 
     var body: some View {
-        if let host, host.source != nil {
-            // A change made online goes within moments and is not worth a line, so the line waits for the clock.
-            TimelineView(.periodic(from: .now, by: host.report.waiting > 0 ? 1 : 60)) { context in
-                let status = SyncStatus(state: host.state, report: host.report, now: context.date)
-                if let note = status.primary {
-                    line(note, status: status, host: host)
-                }
-            }
-        }
-    }
-
-    private func line(_ note: SyncStatus.Note, status: SyncStatus, host: MarfaHost) -> some View {
-        Button {
-            isPresented.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                if note.kind == .catchingUp || note.kind == .sending {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: note.symbol)
-                }
-                Text(note.title)
-                Spacer(minLength: 0)
-            }
-            .interfaceFont(.callout)
-            .foregroundStyle(note.isWarning ? Color.orange : Color.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .help(note.detail)
-        .accessibilityLabel(note.title)
-        .accessibilityHint(note.detail)
-        .accessibilityIdentifier("SyncStatus")
-        // A popover left presented would open again by itself the next time the line returns.
-        .onDisappear { isPresented = false }
-        .popover(isPresented: $isPresented, arrowEdge: .trailing) {
-            SyncDetails(status: status, problems: host.report.problems, isOnline: host.state == .online) {
-                isPresented = false
-                openSettings()
-            }
+        TimelineView(.periodic(from: .now, by: host.report.waiting > 0 ? 1 : 60)) { context in
+            content(SyncStatus(state: host.state, report: host.report, now: context.date))
         }
     }
 }
 
-/// What the status line stands for: how the connection is, and each change that needs the person.
-private struct SyncDetails: View {
-    let status: SyncStatus
-    let problems: [SyncProblemEntry]
-    let isOnline: Bool
-    let openSettings: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // The list below speaks for the changes that need attention.
-                ForEach(status.notes.filter { $0.kind != .needsAttention }) { note in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label(note.title, systemImage: note.symbol)
-                            .interfaceFont(.headline)
-                            .foregroundStyle(note.isWarning ? Color.orange : Color.primary)
-                        Text(note.detail)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                if status.pointsToSettings {
-                    Button("Open Settings…", action: openSettings)
-                        .accessibilityIdentifier("SyncOpenSettings")
-                }
-                ForEach(problems) { problem in
-                    Divider()
-                    SyncProblemRow(problem: problem, isOnline: isOnline)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+extension SyncStatus.Note {
+    /// The colour of the dot beside the note: red where the person has to act, orange where something waits,
+    /// and quiet while the app is only catching up.
+    var dotColor: Color {
+        switch kind {
+        case .keyRefused, .unavailable: .red
+        case .needsAttention, .offline: .orange
+        case .catchingUp, .sending: .secondary
         }
-        .frame(width: 380)
-        .frame(maxHeight: 480)
-        .accessibilityIdentifier("SyncDetails")
     }
 }
 
 /// One change that needs the person: what happened, what they wrote, and what they can do about it.
-private struct SyncProblemRow: View {
+struct SyncProblemRow: View {
     @CurrentLibrary private var library
     @Environment(\.openWindow) private var openWindow
     let problem: SyncProblemEntry

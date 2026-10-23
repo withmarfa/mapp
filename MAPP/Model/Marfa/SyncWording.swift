@@ -12,6 +12,8 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
         let kind: Kind
         var title: String
+        /// The short line the sidebar and the Library page show, with the count that makes the title useful.
+        var line: String
         var detail: String
         var symbol: String
         /// Whether it asks something of the person, as against telling them how things stand.
@@ -29,8 +31,6 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
     var isQuiet: Bool { notes.isEmpty }
     var primary: Note? { notes.first }
-    /// Whether what the person has to do is in Settings: a key to replace, a library to open.
-    var pointsToSettings: Bool { notes.contains { $0.kind == .keyRefused || $0.kind == .unavailable } }
 
     init(state: MarfaHost.State, report: SyncReport, now: Date) {
         guard state != .disconnected else { return }
@@ -58,19 +58,21 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     private static func keyRefused(waiting: Int) -> Note {
         var detail = String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
         if waiting > 0 { detail += " " + Words.waiting(waiting) }
-        return Note(kind: .keyRefused, title: String(localized: "Key refused"), detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
+        let line = waiting > 0 ? Words.keyRefusedLine(waiting) : String(localized: "Key refused")
+        return Note(kind: .keyRefused, title: String(localized: "Key refused"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
     }
 
     private static var unavailable: Note {
         Note(
-            kind: .unavailable, title: String(localized: "Library unavailable"),
+            kind: .unavailable, title: String(localized: "Library unavailable"), line: String(localized: "Library unavailable"),
             detail: String(localized: "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do."),
             symbol: "exclamationmark.triangle", isWarning: true)
     }
 
     private static func needsAttention(_ count: Int) -> Note {
         Note(
-            kind: .needsAttention, title: String(localized: "Needs attention"), detail: Words.needAttention(count),
+            kind: .needsAttention, title: String(localized: "Needs attention"), line: Words.needAttentionLine(count),
+            detail: Words.needAttention(count),
             symbol: "exclamationmark.triangle", isWarning: true)
     }
 
@@ -78,19 +80,20 @@ nonisolated struct SyncStatus: Hashable, Sendable {
         let detail = waiting == 0
             ? String(localized: "Your changes are kept on this Mac and sent when you’re back online.")
             : Words.sentWhenOnline(waiting)
-        return Note(kind: .offline, title: String(localized: "Offline"), detail: detail, symbol: "wifi.slash", isWarning: false)
+        let line = waiting == 0 ? String(localized: "Offline") : Words.offlineLine(waiting)
+        return Note(kind: .offline, title: String(localized: "Offline"), line: line, detail: detail, symbol: "wifi.slash", isWarning: false)
     }
 
     private static var catchingUp: Note {
         Note(
-            kind: .catchingUp, title: String(localized: "Catching up"),
+            kind: .catchingUp, title: String(localized: "Catching up"), line: String(localized: "Catching up"),
             detail: String(localized: "Getting the latest changes from the server."),
             symbol: "arrow.triangle.2.circlepath", isWarning: false)
     }
 
     private static func sending(waiting: Int) -> Note {
         Note(
-            kind: .sending, title: Words.sending(waiting), detail: Words.waiting(waiting),
+            kind: .sending, title: Words.sending(waiting), line: Words.sending(waiting), detail: Words.waiting(waiting),
             symbol: "arrow.up.circle", isWarning: false)
     }
 }
@@ -111,6 +114,18 @@ nonisolated enum Words {
 
     static func sending(_ count: Int) -> String {
         String(localized: "Sending \(count) changes")
+    }
+
+    static func needAttentionLine(_ count: Int) -> String {
+        String(localized: "\(count) changes need attention")
+    }
+
+    static func offlineLine(_ count: Int) -> String {
+        String(localized: "Offline, \(count) changes waiting")
+    }
+
+    static func keyRefusedLine(_ count: Int) -> String {
+        String(localized: "Key refused, \(count) changes waiting")
     }
 
     static func needAttention(_ count: Int) -> String {

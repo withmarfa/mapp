@@ -16,7 +16,6 @@ struct CommandPalette: View {
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
     let browser: Browser
     let editor: EditorController
-    let settings: SettingsPresentation
     let mode: Browser.Palette
     @State private var query = ""
     @State private var highlighted = 0
@@ -301,14 +300,16 @@ struct CommandPalette: View {
             add(String(localized: "Print…"), "printer", "⌘P") { editor.printNote() }
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
-        let sidebarTitle = String(localized: "Customize Sidebar…")
-        entries.append(Entry(id: "command:" + sidebarTitle, title: sidebarTitle, systemImage: "sidebar.left", takesFocus: true) {
-            settings.show(.sidebar)
-        })
         let settingsTitle = String(localized: "Settings…")
-        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gear", shortcut: "⌘,", takesFocus: true) {
-            settings.show()
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gearshape", shortcut: "⌘,", takesFocus: true) {
+            browser.showSettings()
         })
+        for page in SettingsPage.allCases {
+            let title = String(localized: "Settings: \(page.title)")
+            entries.append(Entry(id: "command:" + title, title: title, systemImage: page.symbol, takesFocus: true) {
+                browser.showSettings(page)
+            })
+        }
         return entries
     }
 
@@ -319,7 +320,6 @@ struct CommandPalette: View {
         items += library.itemTypeCounts.filter { $0.id != .project }.map { (.itemType($0.id.rawValue), "doc.text") }
         if library.capabilities.contains(.folders) { items += [(.files, "doc")] }
         items += library.folders.map { (.folder($0.id), "folder") }
-        items += [(.recentlyDeleted, "trash")]
         return items.map { item, systemImage in
             Entry(id: "place:\(item)", title: library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)

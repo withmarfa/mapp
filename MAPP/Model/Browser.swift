@@ -29,6 +29,11 @@ final class Browser {
         }
     }
     var isGalleryItemPresented = false
+    /// Whether the window shows Settings in place of the list and the item page. The place the window was
+    /// showing, its selection and its draft are kept, so choosing that place again returns to them.
+    private(set) var showsSettings = false
+    /// The page of Settings shown, and the one shown next time Settings is.
+    var settingsPage = SettingsPage.appearance
     var searchText = ""
     /// The note whose file name is being asked for.
     var renamingNote: ItemID?
@@ -76,6 +81,15 @@ final class Browser {
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
 
+    /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
+    func showSettings(_ page: SettingsPage? = nil) {
+        if let page { settingsPage = page }
+        showsSettings = true
+    }
+
+    /// Settings gives way to whatever the window showed, or to a place chosen in the sidebar.
+    func leaveSettings() { showsSettings = false }
+
     /// The folder the sidebar has selected, which the folder commands act on.
     var selectedFolder: ItemID? {
         if case .folder(let id) = item { id } else { nil }
@@ -87,12 +101,14 @@ final class Browser {
     var showsGallery: Bool { usesGallery && !isGalleryItemPresented && !isCreatingItem }
 
     func openGallerySelection() {
+        leaveSettings()
         guard usesGallery, selection.count == 1 else { return }
         isGalleryItemPresented = true
         focusRequest = nil
     }
 
     func reveal(_ item: Item, in library: any ItemLibrary, order: NoteOrder) {
+        leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
             show(.allNotes, in: library, order: order)
         }
@@ -122,6 +138,7 @@ final class Browser {
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
+        leaveSettings()
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCreatingItem = false
@@ -154,12 +171,12 @@ final class Browser {
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// note is one, nor in Recently Deleted or search results.
+    /// note is one, nor in search results.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         NoteGroup.sections(
             of: items(in: library),
             sort: order.sort,
-            favoritesFirst: !isSearching && !showsOnlyFavorites && item != .recentlyDeleted,
+            favoritesFirst: !isSearching && !showsOnlyFavorites,
             groupsByDate: order.groupsByDate,
             now: now
         )
@@ -167,7 +184,7 @@ final class Browser {
 
     /// Whether the list mixes notes from several places, so each row says where its note lives.
     var showsFolders: Bool {
-        isSearching || item == .allNotes || showsOnlyFavorites || item == .recentlyDeleted
+        isSearching || item == .allNotes || showsOnlyFavorites
     }
 
     /// What the rows of the list say about themselves: the type where the list holds several, the place where it
@@ -190,6 +207,7 @@ final class Browser {
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
+        leaveSettings()
         isCreatingItem = false
         isGalleryItemPresented = false
         searchText = ""
@@ -218,6 +236,7 @@ final class Browser {
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
     func startItemDraft() {
+        leaveSettings()
         if itemDraft == nil { itemDraft = NewItemDraft(place: item) }
         isCreatingItem = true
         focusRequest = .page
@@ -355,12 +374,11 @@ final class Browser {
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 
-    /// Dropped items move into a folder or the Inbox, where the library moves items, or go to Recently Deleted.
+    /// Dropped items move into a folder or the Inbox, where the library moves items.
     static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
         switch place {
         case .inbox, .folder: library.capabilities.contains(.move)
-        case .recentlyDeleted: true
-        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files: false
+        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .recentlyDeleted: false
         }
     }
 
@@ -433,7 +451,9 @@ final class Browser {
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } || (TypeID(type) == .project && library.hasProjectType)
                 ? snapshot.place : .allNotes
-        case .inbox, .allNotes, .favorites, .recentlyDeleted, .files: snapshot.place
+        case .inbox, .allNotes, .favorites, .files: snapshot.place
+        // Recently Deleted is a page of Settings now, so a window kept from before it moved opens on All Items.
+        case .recentlyDeleted: .allNotes
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
@@ -471,13 +491,12 @@ struct SelectionHistory {
     }
 
     /// The nearest entry in a direction whose item still exists and is not the one shown now (the app can move the
-    /// selection off the entry the history is at). A deleted item is shown only where it was left, in Recently
-    /// Deleted, since no other place lists it.
+    /// selection off the entry the history is at). A deleted item is not shown, since no place lists it.
     func target(_ direction: Direction, in library: any ItemLibrary, shown: Set<ItemID>) -> (index: Int, entry: Entry)? {
         let candidates = direction == .back ? Array(entries.indices.prefix(max(position, 0)).reversed()) : Array(entries.indices.dropFirst(position + 1))
         return candidates.lazy.map { ($0, entries[$0]) }.first { _, entry in
             guard shown != [entry.id], let item = library.item(entry.id) else { return false }
-            return item.state != .trashed || entry.place == .recentlyDeleted
+            return item.state != .trashed
         }
     }
 }
