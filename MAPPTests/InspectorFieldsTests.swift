@@ -139,37 +139,64 @@ struct InspectorFieldsTests {
 
     // MARK: The inspector's fields
 
-    @Test func theTitleAndTheBodyAreNotProperties() {
+    @MainActor private static func marfa(_ items: [MAPP.Item], types: [ItemTypeInfo]) async throws -> MarfaLibrary {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: Catalogue(itemTypes: types), places: [])))
+        try #require(await eventually { library.isLoaded })
+        return library
+    }
+
+    @MainActor @Test func theTitleAndTheBodyAreNotProperties() {
         let item = Self.item("aic.ticket.task", properties: [
             Property(key: "title", value: .string("Title")), Property(key: "body", value: .string("Text")),
             Property(key: "description", value: .string("About"))
         ])
-        #expect(InspectorFields.properties(of: item, type: Self.task).map(\.key) == ["description", "status", "priority"])
+        let library = FakeItemLibrary(items: [item])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        let hidden = library.hiddenPropertyKeys(of: item)
+        #expect(hidden == ["title", "body"])
+        #expect(InspectorFields.properties(of: item, type: Self.task, hidden: hidden).map(\.key) == ["description", "status", "priority"])
     }
 
-    @Test func aTitleFromTheFirstLineHidesNothingElse() {
+    @MainActor @Test func aTitleFromTheFirstLineHidesNothingElse() {
         let note = Self.item("core.note", rule: .firstLine)
-        #expect(InspectorFields.hiddenKeys(of: note, type: nil).isEmpty)
+        let library = FakeItemLibrary(items: [note])
+        library.catalogue = Catalogue()
+        #expect(library.hiddenPropertyKeys(of: note).isEmpty)
     }
 
-    @Test func aFileHidesItsBlobAndItsFacts() {
+    @MainActor @Test func aTitleKeptInAnotherPropertyHidesThatProperty() {
+        let entity = Self.item("core.entity", rule: .property("name"))
+        #expect(FakeItemLibrary(items: [entity]).hiddenPropertyKeys(of: entity) == ["name"])
+    }
+
+    @MainActor @Test func aMarfaFileHidesItsBlobAndItsFacts() async throws {
         let item = Self.item("core.file", properties: [
             Property(key: "blob_ref", value: .string("sha256:abc")), Property(key: "mime_type", value: .string("text/plain")),
             Property(key: "title", value: .string("notes.txt")), Property(key: "size_bytes", value: .number(76)),
             Property(key: "description", value: .string("Meeting notes"))
         ], content: .file(.plainText, byteCount: 76))
-        #expect(InspectorFields.hiddenKeys(of: item, type: Self.file) == ["blob_ref", "mime_type", "size_bytes", "title"])
-        #expect(InspectorFields.properties(of: item, type: Self.file).map(\.key) == ["description"])
+        let library = try await Self.marfa([item], types: [Self.file])
+        let hidden = library.hiddenPropertyKeys(of: item)
+        #expect(hidden == ["blob_ref", "mime_type", "size_bytes", "title"])
+        #expect(InspectorFields.properties(of: item, type: Self.file, hidden: hidden).map(\.key) == ["description"])
         // None of them turns up under the other properties either.
-        #expect(InspectorFields.accountedFor(item: item, type: Self.file).isSuperset(of: ["blob_ref", "mime_type", "size_bytes"]))
+        #expect(InspectorFields.accountedFor(type: Self.file, hidden: hidden).isSuperset(of: ["blob_ref", "mime_type", "size_bytes"]))
+    }
+
+    @MainActor @Test func aMarfaNoteKeepsItsPropertiesNamedLikeAFilesFacts() async throws {
+        let note = Self.item("core.note", properties: [Property(key: "size_bytes", value: .number(1))])
+        let library = try await Self.marfa([note], types: [MarfaMapping.itemType(ItemType(id: "core.note", label: "Note", titleField: "title"))])
+        #expect(library.hiddenPropertyKeys(of: note) == ["title"])
     }
 
     @Test func aFieldWithNothingInItAndNoWayToAddToItHasNoRow() {
         let list = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("tags", "array")]))
         let empty = Self.item("aic.x")
-        #expect(InspectorFields.properties(of: empty, type: list).isEmpty)
+        #expect(InspectorFields.properties(of: empty, type: list, hidden: []).isEmpty)
         let full = Self.item("aic.x", properties: [Property(key: "tags", value: .array([.string("a")]))])
-        #expect(InspectorFields.properties(of: full, type: list).map(\.key) == ["tags"])
+        #expect(InspectorFields.properties(of: full, type: list, hidden: []).map(\.key) == ["tags"])
     }
 
     // MARK: Labels for other properties

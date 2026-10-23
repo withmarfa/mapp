@@ -54,6 +54,7 @@ enum ItemPreviewFixtures {
     ItemInspector(item: ItemPreviewFixtures.unresolved,
                   type: WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")],
                   place: "Tickets", catalogue: WorkbenchSchema.catalogue,
+                  hiddenKeys: ItemPreviewFixtures.library.hiddenPropertyKeys(of: ItemPreviewFixtures.unresolved),
                   relationships: [.init(field: "child-of", label: "Parent", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
                   mentions: [], onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in }, onRemove: { _, _ in true })
         .interfaceTextStyle()

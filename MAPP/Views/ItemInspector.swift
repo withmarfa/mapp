@@ -24,6 +24,7 @@ struct ItemInspectorHost: View {
                     path: library.path(of: id),
                     place: Self.place(of: item, in: library),
                     catalogue: library.catalogue,
+                    hiddenKeys: library.hiddenPropertyKeys(of: item),
                     relationships: library.relationships(for: id),
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
@@ -85,6 +86,8 @@ struct ItemInspector: View {
     var place: String? = nil
     /// Calls a property the item's type does not define by the label another type gives it.
     var catalogue = Catalogue()
+    /// The item's property keys that are not listed: the title, the text, and any the library keeps for itself.
+    var hiddenKeys: Set<String> = []
     let relationships: [ItemRelationship]
     let mentions: [ItemRelationshipTarget]
     let onProperty: (String, PropertyValue?) -> Bool
@@ -140,7 +143,7 @@ struct ItemInspector: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
-    private var fields: [ItemTypeInfo.Field] { InspectorFields.properties(of: item, type: type) }
+    private var fields: [ItemTypeInfo.Field] { InspectorFields.properties(of: item, type: type, hidden: hiddenKeys) }
 
     private var shownRelationships: [ItemRelationship] {
         relationships.filter { !$0.targets.isEmpty }
@@ -215,7 +218,7 @@ struct ItemInspector: View {
     /// Every property the type does not name or show elsewhere, in the order the item holds them. A source that
     /// keeps no tags field still shows the item's tags among them.
     private var otherProperties: [Property] {
-        var shown = InspectorFields.accountedFor(item: item, type: type)
+        var shown = InspectorFields.accountedFor(type: type, hidden: hiddenKeys)
         shown.formUnion(relationships.map(\.field))
         var properties = item.properties.filter { !shown.contains($0.key) }
         if !item.tags.isEmpty && item.value(of: "tags") == nil {

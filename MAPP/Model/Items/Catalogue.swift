@@ -160,6 +160,16 @@ nonisolated struct Catalogue: Hashable, Sendable {
         type.flatMap { itemTypes[$0]?.fields.first { $0.key == key }?.label } ?? fieldLabels[key]
     }
 
+    /// The keys that hold what the page shows itself, the item's title and text, so Properties does not list them.
+    func pageKeys(of item: Item) -> Set<String> {
+        var keys: Set<String> = []
+        if case .property(let key) = item.titleRule { keys.insert(key) }
+        let type = itemTypes[item.type]
+        if let key = type?.titleKey { keys.insert(key) }
+        if let key = type?.bodyKey { keys.insert(key) }
+        return keys
+    }
+
     /// Every type below `type` through `parent`, not including `type` itself.
     func descendants(of type: TypeID) -> Set<TypeID> {
         var children: [TypeID: [TypeID]] = [:]

@@ -394,6 +394,12 @@ import Observation
         return record.isHeld ? record.item : nil
     }
 
+    /// A file's bytes are named by facts the server sets, which the inspector shows as its kind and size.
+    func hiddenPropertyKeys(of item: Item) -> Set<String> {
+        let keys = catalogue.pageKeys(of: item)
+        return item.isFile ? keys.union(MarfaMapping.fileFacts) : keys
+    }
+
     /// The items held among `ids`, observed as the lists are, for reads that gather many items at once.
     func heldItems(_ ids: some Sequence<ItemID>) -> [Item] {
         _ = contentRevision
