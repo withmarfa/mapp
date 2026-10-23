@@ -114,11 +114,14 @@ final class FakeItemLibrary: ItemLibrary {
     var files: [ItemID: URL] = [:]
     var fetchable: [ItemID: URL] = [:]
     var fetchFails = false
+    /// How many times a file was asked for.
+    @ObservationIgnored var fetches = 0
     /// How long fetching each file takes, as a server's can.
     var fetchDelay: [ItemID: Duration] = [:]
 
     func fileURL(for id: ItemID) -> URL? { files[id] }
     func fileURL(of id: ItemID) async throws -> URL? {
+        fetches += 1
         if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }
         if let delay = fetchDelay[id] { try await Task.sleep(for: delay) }
         return files[id] ?? fetchable[id]
