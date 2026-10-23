@@ -168,6 +168,7 @@ struct ItemInspector: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9 * InterfaceStyle.scale(for: textSize), weight: .bold))
                     .rotationEffect(.degrees(detailsOpen ? 90 : 0))
+                    .accessibilityHidden(true)
             }
             .interfaceFont(.subheadline.bold())
             .foregroundStyle(.secondary)
