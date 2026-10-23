@@ -52,7 +52,7 @@ struct NoteList: View {
             }
         }
         .listStyle(.inset)
-        .softSelection(rows: ids)
+        .softSelection(rows: ids, selection: browser.selection)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .accessibilityIdentifier("NoteList")
         .accessibilityLabel(title)

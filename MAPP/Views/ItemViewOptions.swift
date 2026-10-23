@@ -8,9 +8,9 @@ struct ItemViewOptions: View {
 
     var body: some View {
         Group {
-            choice("View as List", systemImage: "list.bullet", .list, key: "1")
-            choice("View as Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
-            choice("View as Table", systemImage: "tablecells", .table, key: "3")
+            choice("View as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
+            choice("View as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
+            choice("View as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
         }
         .disabled(browser == nil)
     }
@@ -30,20 +30,22 @@ struct ItemViewOptions: View {
     }
 }
 
-/// List, Gallery or Table, as a control of its own at the start of the items' toolbar.
-struct ViewModePicker: View {
+/// List, Gallery or Table, as one pop-up button that shows the view in use, as Finder's View button does. It
+/// stays at the window's trailing side whichever view is shown.
+struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
         Picker("View As", selection: $browser.viewMode) {
-            Label("List", systemImage: "list.bullet").tag(ItemViewMode.list)
-            Label("Gallery", systemImage: "square.grid.2x2").tag(ItemViewMode.gallery)
-            Label("Table", systemImage: "tablecells").tag(ItemViewMode.table)
+            Label("List", systemImage: ItemViewMode.list.symbol).tag(ItemViewMode.list)
+            Label("Gallery", systemImage: ItemViewMode.gallery.symbol).tag(ItemViewMode.gallery)
+            Label("Table", systemImage: ItemViewMode.table.symbol).tag(ItemViewMode.table)
         }
-        .pickerStyle(.segmented)
+        .pickerStyle(.menu)
         .labelStyle(.iconOnly)
         .help("View As")
-        .accessibilityIdentifier("ViewModePicker")
+        .accessibilityLabel("View As")
+        .accessibilityIdentifier("ViewModeMenu")
     }
 }
 

@@ -87,11 +87,7 @@ struct GalleryCard: View {
                 .foregroundStyle(.secondary)
             }
             .foregroundStyle(.primary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            // The same soft mark as a list's selection (`softSelection`).
-            .background(selected ? Color.primary.opacity(0.06) : .clear, in: .rect(cornerRadius: 7, style: .continuous))
-            .padding(.horizontal, -2)
+            .padding(.horizontal, 4)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }

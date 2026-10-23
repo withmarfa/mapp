@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The page's toolbar: Back and Forward through the items shown, then More and, at the far right, Details, which
-/// opens the panel at the window's right edge. Format is out of the
+/// The page's toolbar: Back and Forward through the items shown, then View As, More and, at the far right, Details,
+/// which opens the panel at the window's right edge. Format is out of the
 /// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
 /// While the inspector is open, Details and More sit above it instead (`InspectorToolbar`).
 ///
@@ -36,6 +36,10 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true)
+        ToolbarItem(id: "viewMode") {
+            if let browser { ViewModeMenu(browser: browser) }
+        }
+        .hidden(browser == nil)
         ToolbarItem(id: "more") { tools.moreMenu }
             .hidden(tools.showsInspector)
         ToolbarItem(id: "details") { tools.detailsButton }
@@ -77,9 +81,9 @@ struct DetailsToggle: View {
 }
 
 /// The gallery's and the table's toolbar, one for the collection and the page it opens, so the order across its
-/// single column is set here: the view switch, then View Options and Search together, then New Item, then More and
-/// Details at the far right, as the list and page toolbars have them across two columns. The table brings its own
-/// View Options (`ItemTableControls`). Opened on an item, the switch, View Options and Search give way.
+/// single column is set here: View As, View Options and Search together, then New Item, then More and Details at the
+/// far right, as the list and page toolbars have them across two columns. The table brings its own View Options
+/// (`ItemTableControls`). Opened on an item, View As, View Options and Search give way.
 struct GalleryToolbar<Options: View>: ToolbarContent {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -102,11 +106,6 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
             .sharedBackgroundVisibility(.hidden)
         }
         if browser.showsCollection {
-            // The field spans the column, so the switch gives way to it.
-            if !browser.isSearchExpanded {
-                ToolbarItem { ViewModePicker(browser: browser) }
-                ToolbarSpacer(.fixed)
-            }
             ColumnSearch(
                 isExpanded: $browser.isSearchExpanded,
                 text: $browser.searchText,
@@ -115,6 +114,7 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }
             ) {
+                ViewModeMenu(browser: browser)
                 options()
             }
         }

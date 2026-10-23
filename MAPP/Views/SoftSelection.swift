@@ -4,9 +4,10 @@ import SwiftUI
 extension View {
     /// Selects in a soft grey mark, inset and rounded, the same whether or not the window is active, in place of
     /// the system's accent fill, which reads as too loud across a whole list. Apply it to a `List` or `Table`,
-    /// with `rows`, the identifiers it shows, so the marks follow rows that move.
-    func softSelection(rows: some Hashable) -> some View {
-        background(SoftSelection(rows: rows.hashValue))
+    /// with `rows`, the identifiers it shows, and `selection`, so the marks follow rows that move and every change
+    /// of selection, however it is made.
+    func softSelection(rows: some Hashable, selection: some Hashable) -> some View {
+        background(SoftSelection(rows: rows.hashValue, selection: selection.hashValue))
     }
 }
 
@@ -14,6 +15,7 @@ extension View {
 /// its highlight off, so rows keep their own text colors, and draws the selected rows' marks beneath them.
 private struct SoftSelection: NSViewRepresentable {
     let rows: Int
+    let selection: Int
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) { probe.refresh() }
@@ -35,6 +37,8 @@ private struct SoftSelection: NSViewRepresentable {
             // SwiftUI may set the highlight again as it updates the table.
             if let table, table.selectionHighlightStyle != .none { table.selectionHighlightStyle = .none }
             marks?.update()
+            // SwiftUI hands the table its new selection after this update, so the marks look again once it has.
+            DispatchQueue.main.async { [weak self] in self?.marks?.update() }
         }
 
         private func attach() {
@@ -86,6 +90,13 @@ private struct SoftSelection: NSViewRepresentable {
                 })
             }
             table.postsFrameChangedNotifications = true
+            // Rows scrolled into view get row views of their own, which the marks are placed by.
+            if let clip = table.enclosingScrollView?.contentView {
+                clip.postsBoundsChangedNotifications = true
+                observers.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.update() }
+                })
+            }
         }
 
         required init?(coder: NSCoder) { nil }
@@ -106,9 +117,13 @@ private struct SoftSelection: NSViewRepresentable {
             guard let table, let layer else { return }
             var color = CGColor.clear
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                color = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+                color = NSColor.labelColor.withAlphaComponent(0.08).cgColor
             }
-            let rows = table.selectedRowIndexes
+            // The table's selection, and any row view it marks as selected, since SwiftUI can set either first.
+            var rows = table.selectedRowIndexes
+            table.enumerateAvailableRowViews { view, row in
+                if view.isSelected { rows.insert(row) }
+            }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             layer.sublayers?.forEach { $0.removeFromSuperlayer() }

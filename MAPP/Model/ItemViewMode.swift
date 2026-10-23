@@ -5,6 +5,15 @@ import Foundation
 nonisolated enum ItemViewMode: String, Codable, CaseIterable {
     case list, gallery, table
 
+    /// The SF Symbol for the view, in its menu and on the button that opens it.
+    var symbol: String {
+        switch self {
+        case .list: "list.bullet"
+        case .gallery: "square.grid.2x2"
+        case .table: "tablecells"
+        }
+    }
+
     /// Whether the items fill the window in place of the list and the page.
     var spansWindow: Bool { self != .list }
 

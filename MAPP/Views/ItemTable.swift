@@ -89,7 +89,7 @@ struct ItemTable: View {
             }
         }
         .tableStyle(.inset)
-        .softSelection(rows: rows.map(\.id.rawValue) + collapsed.sorted())
+        .softSelection(rows: rows.map(\.id.rawValue) + collapsed.sorted(), selection: browser.selection)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .background(.windowBackground)
