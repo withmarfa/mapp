@@ -20,6 +20,7 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - No CI runs on pull requests: Xcode Cloud only archives tagged releases, and GitHub runs only Dependabot. Run the tests locally before you merge.
+- While working, run only the tests a change touches (`-only-testing:MAPPTests/<Suite>`), and every test once before merging.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
 - Keep no legacy: no compatibility shims, deprecation aliases, or migration paths. Removed means gone.

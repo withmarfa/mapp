@@ -1,28 +1,16 @@
 import SwiftUI
 
-/// List, Gallery or Table, each with its shortcut: under a View As header in the list's View Options menu, or as
-/// View as List, Gallery and Table in the View menu, which keeps them whatever the window in front is.
+/// List, Gallery or Table, each with its shortcut, as View as List, Gallery and Table in the View menu, which keeps
+/// them whatever the window in front is.
 struct ItemViewOptions: View {
-    enum Style { case sections, menuBar }
-
     /// Nil while no window is in front, which leaves the choices in the menu, dimmed.
     let browser: Browser?
-    var style = Style.sections
 
     var body: some View {
         Group {
-            switch style {
-            case .sections:
-                Section("View As") {
-                    choice("List", systemImage: "list.bullet", .list, key: "1")
-                    choice("Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
-                    choice("Table", systemImage: "tablecells", .table, key: "3")
-                }
-            case .menuBar:
-                choice("View as List", systemImage: "list.bullet", .list, key: "1")
-                choice("View as Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
-                choice("View as Table", systemImage: "tablecells", .table, key: "3")
-            }
+            choice("View as List", systemImage: "list.bullet", .list, key: "1")
+            choice("View as Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
+            choice("View as Table", systemImage: "tablecells", .table, key: "3")
         }
         .disabled(browser == nil)
     }
@@ -42,18 +30,29 @@ struct ItemViewOptions: View {
     }
 }
 
-/// How the list looks: its view, its order and its grouping, in one menu on the list's toolbar.
-struct ViewOptionsMenu: View {
+/// List, Gallery or Table, as a control of its own at the start of the items' toolbar.
+struct ViewModePicker: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        Menu("View Options", systemImage: "line.3.horizontal.decrease") {
-            ItemViewOptions(browser: browser)
-            // The table sorts and groups from its own bar and headers.
-            if browser.viewMode != .table {
-                Divider()
-                OrderOptions(style: .sections)
-            }
+        Picker("View As", selection: $browser.viewMode) {
+            Label("List", systemImage: "list.bullet").tag(ItemViewMode.list)
+            Label("Gallery", systemImage: "square.grid.2x2").tag(ItemViewMode.gallery)
+            Label("Table", systemImage: "tablecells").tag(ItemViewMode.table)
+        }
+        .pickerStyle(.segmented)
+        .labelStyle(.iconOnly)
+        .help("View As")
+        .accessibilityIdentifier("ViewModePicker")
+    }
+}
+
+/// How the list and the gallery are ordered and grouped, in one menu on their toolbar. The table has its own
+/// (`ItemTableControls`), which adds its columns.
+struct ViewOptionsMenu: View {
+    var body: some View {
+        Menu("View Options", systemImage: "slider.horizontal.3") {
+            OrderOptions(style: .sections)
         }
         .menuIndicator(.hidden)
         .help("View Options")

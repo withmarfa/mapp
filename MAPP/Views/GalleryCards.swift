@@ -75,7 +75,8 @@ struct GalleryCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .interfaceFont(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                    // Two lines held for every title, so the cards of a row are the same height.
+                    .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
                     Image(systemName: symbol)
@@ -83,12 +84,13 @@ struct GalleryCard: View {
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }
                 .interfaceFont(.caption)
-                .foregroundStyle(selected ? AnyShapeStyle(.white.opacity(0.85)) : AnyShapeStyle(.secondary))
+                .foregroundStyle(.secondary)
             }
-            .foregroundStyle(selected ? Color.white : Color.primary)
+            .foregroundStyle(.primary)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(selected ? Color.accentColor : .clear, in: .rect(cornerRadius: 7, style: .continuous))
+            // The same soft mark as a list's selection (`softSelection`).
+            .background(selected ? Color.primary.opacity(0.06) : .clear, in: .rect(cornerRadius: 7, style: .continuous))
             .padding(.horizontal, -2)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -120,7 +122,7 @@ private struct GalleryThumbnail: View {
             .overlay {
                 if selected {
                     RoundedRectangle(cornerRadius: Self.radius + 3, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: 3)
+                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 3)
                         .padding(-3)
                 }
             }

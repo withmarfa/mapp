@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The page's toolbar: Back and Forward through the items shown, then Details and More. Format is out of the
+/// The page's toolbar: Back and Forward through the items shown, then More and, at the far right, Details, which
+/// opens the panel at the window's right edge. Format is out of the
 /// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
 /// While the inspector is open, Details and More sit above it instead (`InspectorToolbar`).
 ///
@@ -35,14 +36,14 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true)
-        ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsInspector)
         ToolbarItem(id: "more") { tools.moreMenu }
+            .hidden(tools.showsInspector)
+        ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(tools.showsInspector)
     }
 }
 
-/// Details and More above the inspector column, where the system sets a toolbar declared inside the inspector's
+/// More and Details above the inspector column, where the system sets a toolbar declared inside the inspector's
 /// content. Details is on while the inspector is open and is never dimmed, so the inspector can always be closed.
 /// It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
 /// and would show Details and More a second time beside the page's own.
@@ -57,8 +58,8 @@ struct InspectorToolbar: ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
         if tools.showsInspector {
             ToolbarItemGroup {
-                DetailsToggle(details: details)
                 tools.moreMenu
+                DetailsToggle(details: details)
             }
         }
     }
@@ -75,10 +76,11 @@ struct DetailsToggle: View {
     }
 }
 
-/// The gallery's toolbar, one for the grid and the page it opens, so the order across its single column is set here:
-/// View Options and Search together, then Details and More, then New Item, as the list and page toolbars have them
-/// across two columns. Opened on an item, View Options and Search give way; Details and More stay.
-struct GalleryToolbar: ToolbarContent {
+/// The gallery's and the table's toolbar, one for the collection and the page it opens, so the order across its
+/// single column is set here: the view switch, then View Options and Search together, then New Item, then More and
+/// Details at the far right, as the list and page toolbars have them across two columns. The table brings its own
+/// View Options (`ItemTableControls`). Opened on an item, the switch, View Options and Search give way.
+struct GalleryToolbar<Options: View>: ToolbarContent {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     let items: [Item]
@@ -86,6 +88,7 @@ struct GalleryToolbar: ToolbarContent {
     let details: DetailsPresentation
     /// The width the search field spans when it is out.
     let columnWidth: CGFloat
+    @ViewBuilder let options: () -> Options
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
@@ -99,6 +102,11 @@ struct GalleryToolbar: ToolbarContent {
             .sharedBackgroundVisibility(.hidden)
         }
         if browser.showsCollection {
+            // The field spans the column, so the switch gives way to it.
+            if !browser.isSearchExpanded {
+                ToolbarItem { ViewModePicker(browser: browser) }
+                ToolbarSpacer(.fixed)
+            }
             ColumnSearch(
                 isExpanded: $browser.isSearchExpanded,
                 text: $browser.searchText,
@@ -107,22 +115,22 @@ struct GalleryToolbar: ToolbarContent {
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }
             ) {
-                ViewOptionsMenu(browser: browser)
-            }
-        }
-        // Over the grid, Details and More act on the cards selected, so they wait for one. They move above the
-        // inspector while it is open.
-        if !details.showsInspector(in: browser), !browser.showsCollection || !browser.selection.isEmpty {
-            if browser.showsCollection { ToolbarSpacer(.fixed) }
-            ToolbarItemGroup {
-                tools.detailsButton
-                tools.moreMenu
+                options()
             }
         }
         // The field spans the column, so there is no room beside it.
         if !browser.isSearchExpanded || !browser.showsCollection {
             ToolbarSpacer(.fixed)
             ToolbarItem { NewItemButton(browser: browser) }
+        }
+        // Over the collection, More and Details act on what is selected, so they wait for it. They move above the
+        // inspector while it is open.
+        if !details.showsInspector(in: browser), !browser.showsCollection || !browser.selection.isEmpty {
+            ToolbarSpacer(.fixed)
+            ToolbarItemGroup {
+                tools.moreMenu
+                tools.detailsButton
+            }
         }
     }
 }

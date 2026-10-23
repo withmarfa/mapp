@@ -10,6 +10,7 @@ struct ItemGallery: View {
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var width: CGFloat = 900
+    @State private var height: CGFloat = 600
     @State private var anchor: ItemID?
     @State private var cursor: ItemID?
     @State private var daysSeen = 0
@@ -71,6 +72,17 @@ struct ItemGallery: View {
                 .padding(Self.inset)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Items")
+                // Space between and below the cards clears the selection, as a click on a Finder window's does.
+                .frame(maxWidth: .infinity, minHeight: height, alignment: .topLeading)
+                .background {
+                    Color.clear
+                        .contentShape(.rect)
+                        .onTapGesture {
+                            browser.selection = []
+                            anchor = nil
+                            pane.wrappedValue = .list
+                        }
+                }
             }
             .focusable()
             .focusEffectDisabled()
@@ -83,7 +95,10 @@ struct ItemGallery: View {
             .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
         .background(.windowBackground)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0.isFinite, $0 > 0 { width = $0 } }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            if size.width.isFinite, size.width > 0 { width = size.width }
+            if size.height.isFinite, size.height > 0 { height = size.height }
+        }
     }
 
     private func sectionGrid(_ section: NoteSection, ids: [ItemID]) -> some View {

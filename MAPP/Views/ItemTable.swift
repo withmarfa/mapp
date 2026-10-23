@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// A place's items as a table, in the manner of a database view: a row for each item, a column for each field its
-/// type has, and the place's own grouping, sort and filters above it. Selecting a row shows it in Details, and
+/// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableControls`). Selecting a row shows it in Details, and
 /// opening one shows its page in the table's place, as the gallery does.
 struct ItemTable: View {
     @CurrentLibrary private var library
@@ -12,29 +12,17 @@ struct ItemTable: View {
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
-    @AppStorage("itemTableColumns") private var storedColumns = Data()
+    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @State private var columnCustomization = TableColumnCustomization<ItemTableRow>()
     @State private var daysSeen = 0
 
     var body: some View {
         let _ = daysSeen
-        let allRows = ItemTableRow.rows(of: browser.items(in: library), in: library)
-        let columns = ItemTableLayout.columns(
-            for: allRows, catalogue: library.catalogue, place: browser.item, hidden: hiddenKeys(allRows))
-        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
-        let sort = ItemTableLayout.sort(options, columns: columns)
-        let rows = ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
-        let grouping = ItemTableLayout.grouping(options, columns: columns)
-        let groups = grouping.map { ItemTableLayout.groups(of: rows, by: $0) } ?? []
-        let collapsed = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0) } ?? []
+        let content = ItemTableContent(browser: browser, library: library)
+        let (allRows, rows) = (content.allRows, content.rows)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        table(columns: columns, rows: rows, groups: groups, grouping: grouping, collapsed: collapsed)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                ItemTableBar(
-                    options: optionsBinding, columns: columns, rows: allRows, shownCount: rows.count,
-                    sort: sort, grouping: grouping, customization: $columnCustomization)
-            }
+        table(columns: content.columns, rows: rows, groups: content.groups, grouping: content.grouping, collapsed: content.collapsed)
             .overlay {
                 if allRows.isEmpty {
                     if browser.isSearching {
@@ -53,13 +41,17 @@ struct ItemTable: View {
                 }
             }
             .navigationTitle(title)
-            .navigationSubtitle(browser.isSearching ? Text("^[\(allRows.count) result](inflect: true)") : Text("^[\(allRows.count) item](inflect: true)"))
+            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count))
             .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
-            .onChange(of: placeKey, initial: true) { columnCustomization = storedLayouts[placeKey] ?? .init() }
-            .onChange(of: columnCustomization) { storeColumns() }
+            .onChange(of: placeKey, initial: true) { loadColumns() }
+            // The toolbar's Columns menu changes the stored layout.
+            .onChange(of: storedColumns) { loadColumns() }
+            .onChange(of: columnCustomization) {
+                storedColumns = ItemTableColumnLayouts.storing(columnCustomization, for: browser.item, in: storedColumns)
+            }
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
             }
@@ -97,6 +89,7 @@ struct ItemTable: View {
             }
         }
         .tableStyle(.inset)
+        .softSelection(rows: rows.map(\.id.rawValue) + collapsed.sorted())
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .background(.windowBackground)
@@ -145,12 +138,10 @@ struct ItemTable: View {
         browser.tableOptions[browser.item, default: .init()].collapsed = next
     }
 
-    private func hiddenKeys(_ rows: [ItemTableRow]) -> Set<String> {
-        rows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
-    }
-
-    private var optionsBinding: Binding<ItemTableOptions> {
-        Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
+    /// How many items show, and of how many once a filter hides some.
+    private func subtitle(shown: Int, of count: Int) -> Text {
+        if browser.isSearching { return Text("^[\(count) result](inflect: true)") }
+        return shown == count ? Text("^[\(count) item](inflect: true)") : Text("\(shown) of \(count) items")
     }
 
     /// The header's sort: a click puts its column first, and only the last few columns clicked are kept.
@@ -164,18 +155,60 @@ struct ItemTable: View {
 
     // MARK: Column layouts
 
-    private var placeKey: String {
-        (try? JSONEncoder().encode(browser.item)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    private var placeKey: String { ItemTableColumnLayouts.key(for: browser.item) }
+
+    private func loadColumns() {
+        let stored = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
+        if stored != columnCustomization { columnCustomization = stored }
+    }
+}
+
+/// What a place's table shows, worked out alike by the table and its toolbar's controls.
+struct ItemTableContent {
+    /// Every row before the filters.
+    let allRows: [ItemTableRow]
+    let columns: [ItemTableColumn]
+    let sort: [ItemTableComparator]
+    /// The rows the filters keep, in order.
+    let rows: [ItemTableRow]
+    let grouping: ItemTableColumn?
+    let groups: [ItemTableGroup]
+    let collapsed: Set<String>
+
+    init(browser: Browser, library: any ItemLibrary) {
+        allRows = ItemTableRow.rows(of: browser.items(in: library), in: library)
+        let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
+        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, place: browser.item, hidden: hidden)
+        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        sort = ItemTableLayout.sort(options, columns: columns)
+        rows = ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
+        grouping = ItemTableLayout.grouping(options, columns: columns)
+        groups = grouping.map { [rows] grouping in ItemTableLayout.groups(of: rows, by: grouping) } ?? []
+        collapsed = grouping.map { [groups] grouping in ItemTableLayout.collapsed(options, groups: groups, by: grouping) } ?? []
+    }
+}
+
+/// Each place's columns as the person arranged them (shown or hidden, in their order, at their widths), kept
+/// together in the defaults under one key.
+enum ItemTableColumnLayouts {
+    static let key = "itemTableColumns"
+
+    static func key(for place: SidebarItem) -> String {
+        (try? JSONEncoder().encode(place)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
     }
 
-    private var storedLayouts: [String: TableColumnCustomization<ItemTableRow>] {
-        (try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: storedColumns)) ?? [:]
+    static func layout(for place: SidebarItem, in stored: Data) -> TableColumnCustomization<ItemTableRow> {
+        layouts(in: stored)[key(for: place)] ?? .init()
     }
 
-    private func storeColumns() {
-        var layouts = storedLayouts
-        layouts[placeKey] = columnCustomization
-        if let data = try? JSONEncoder().encode(layouts) { storedColumns = data }
+    static func storing(_ layout: TableColumnCustomization<ItemTableRow>, for place: SidebarItem, in stored: Data) -> Data {
+        var layouts = layouts(in: stored)
+        layouts[key(for: place)] = layout
+        return (try? JSONEncoder().encode(layouts)) ?? stored
+    }
+
+    private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>] {
+        (try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)) ?? [:]
     }
 }
 

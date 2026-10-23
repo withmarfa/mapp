@@ -155,7 +155,14 @@ struct MainView: View {
                     .toolbar {
                         GalleryToolbar(
                             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            columnWidth: min(galleryWidth, 400))
+                            columnWidth: min(galleryWidth, 400)
+                        ) {
+                            if browser.viewMode == .table {
+                                ItemTableControls(browser: browser)
+                            } else {
+                                ViewOptionsMenu()
+                            }
+                        }
                     }
                 }
             } else {

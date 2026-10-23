@@ -19,6 +19,7 @@ struct SidebarFoot: View {
             }
             settingsRow
         }
+        .padding(.top, 6)
     }
 
     private func syncLine(_ note: SyncStatus.Note) -> some View {
@@ -56,7 +57,8 @@ struct SidebarFoot: View {
             Label {
                 Text("Settings").interfaceFont(.body)
             } icon: {
-                Image(systemName: "gearshape").interfaceFont(.body)
+                // Grey, as a place of its own rather than one of the library's.
+                Image(systemName: "gearshape").interfaceFont(.body).foregroundStyle(.secondary)
             }
             .tag(Row.settings)
             .accessibilityIdentifier("SidebarSettingsRow")

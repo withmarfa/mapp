@@ -260,7 +260,7 @@ struct EditorTests {
 
     @Test func nativeFindReplacementBatchUsesScopedReadableTextAndEmojiGeometry() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.webView
         defer { window.close() }
@@ -285,7 +285,7 @@ struct EditorTests {
 
     @Test func nativeFindGeometryFollowsViewportAndAppearanceChanges() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.orderFrontRegardless()
@@ -344,7 +344,7 @@ struct EditorTests {
         }
         let page = try await Harness()
         try await page.load("Draft\n")
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let host = HostDelegate()
         window.delegate = host
@@ -379,7 +379,7 @@ struct EditorTests {
 
     @Test func aHeadingHasNativeFormatStateAndItsAuthoredSource() async throws {
         let page = try await Harness()
-        let window = NSWindow(
+        let window = TestWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
             styleMask: [.titled], backing: .buffered, defer: false
         )
@@ -647,7 +647,7 @@ struct EditorTests {
         let note = Note(path: "Projects/Embeds.md", text: body, created: .now)
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
         let page = try await Harness(library: library)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         defer {
@@ -696,7 +696,7 @@ struct EditorTests {
         let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
         let page = try await Harness(library: library)
         // WebKit loads no media for a page outside a window.
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         defer {
@@ -806,7 +806,7 @@ struct EditorTests {
 
     @Test func aNoteExportsAsAPDFOfItsTextAndPageStyle() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         defer { window.close() }
@@ -861,7 +861,7 @@ struct EditorTests {
 
     @Test func theItemHeaderScrollsWithTheTextInsideThePageAndKeepsItsMargins() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.orderFrontRegardless()
@@ -923,7 +923,7 @@ struct EditorTests {
 
     @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.makeKeyAndOrderFront(nil)
@@ -968,7 +968,7 @@ struct EditorTests {
     /// The paste itself is InkKit's; this holds that it works through the pasteboard, the web view and the bridge.
     @Test func htmlCopiedFromAWebPageIsPastedIntoTheNoteAsReadableText() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.makeKeyAndOrderFront(nil)
@@ -1007,7 +1007,7 @@ struct EditorTests {
 
     @Test func aPinAsksForItsMenuUnderItsFrameInTheEditor() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         page.editor.container.topInset = 52
@@ -1067,7 +1067,7 @@ struct EditorTests {
             page = try await Harness(library: library)
             page.editor.titleDrafts = drafts
             shown = Shown(id)
-            window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: PageHost(library: library, editor: page.editor, drafts: drafts, shown: shown)
                 .environment(\.library, library))
@@ -1213,7 +1213,7 @@ struct EditorTests {
         // The app's run loop empties its autorelease pool after every event; a test's await does not, so the
         // window's own steps are made in pools of their own.
         let window = autoreleasepool {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: NoteWindow(id: .constant(item)).environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
@@ -1245,7 +1245,7 @@ struct EditorTests {
         let drafts = DetailsPresentation()
         editor.titleDrafts = drafts
         let window = autoreleasepool {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: Shown(item))
                 .environment(\.library, library))
@@ -1300,7 +1300,7 @@ struct EditorTests {
         }
         let ticks = Ticks()
         let window = autoreleasepool {
-            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1100, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1100, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: Remaking(ticks: ticks, content: content))
             window.makeKeyAndOrderFront(nil)
@@ -1499,7 +1499,7 @@ struct EditorTests {
         let drafts = DetailsPresentation()
         editor.titleDrafts = drafts
         let shown = Shown(firstLine.id)
-        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: PageHost(library: library, editor: editor, drafts: drafts, shown: shown)
             .environment(\.library, library))
@@ -1615,7 +1615,7 @@ struct EditorTests {
 
     @Test func quotesAndDashesStayAsTypedBecauseSmartPunctuationIsOff() async throws {
         let page = try await Harness()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.makeKeyAndOrderFront(nil)

@@ -174,12 +174,12 @@
         }
       }
     },
-    "%lld of %lld" : {
+    "%lld of %lld items" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld of %2$lld"
+            "value" : "%1$lld of %2$lld items"
           }
         }
       }
@@ -521,12 +521,6 @@
     "Choose one item here, or remove the link first." : {
       "extractionState" : "manual"
     },
-    "Choose the order of the rows" : {
-
-    },
-    "Choose which properties show as columns" : {
-
-    },
     "Clear Filters" : {
 
     },
@@ -555,6 +549,9 @@
 
     },
     "Column" : {
+
+    },
+    "Columns" : {
 
     },
     "Command Palette" : {
@@ -873,16 +870,10 @@
     "Getting the latest changes from the server." : {
       "extractionState" : "manual"
     },
-    "Group" : {
-
-    },
     "Group By" : {
 
     },
     "Group by Date" : {
-
-    },
-    "Group: %@" : {
 
     },
     "Heading" : {
@@ -1451,9 +1442,6 @@
     "Properties" : {
       "extractionState" : "manual"
     },
-    "Put the rows into groups" : {
-
-    },
     "Question" : {
       "extractionState" : "manual"
     },
@@ -1484,16 +1472,10 @@
     "Remove Connection" : {
 
     },
-    "Remove filter %@" : {
-
-    },
     "Remove from Favorites" : {
 
     },
     "Remove Parent" : {
-
-    },
-    "Remove this filter" : {
 
     },
     "Rename" : {
@@ -1632,9 +1614,6 @@
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
-    "Shown in Table" : {
-
-    },
     "Shows the group’s items" : {
 
     },
@@ -1653,16 +1632,10 @@
     "Someday" : {
       "extractionState" : "manual"
     },
-    "Sort" : {
-
-    },
     "Sort By" : {
 
     },
     "Sort by %@" : {
-
-    },
-    "Sort: %@" : {
 
     },
     "Standard" : {
