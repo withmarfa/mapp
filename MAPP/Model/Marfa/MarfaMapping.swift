@@ -10,7 +10,6 @@ import UniformTypeIdentifiers
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.
 nonisolated enum MarfaMapping {
     static let fileType = TypeID("core.file")
-    static let projectType = TypeID("aic.project")
     /// The core.file fields naming the bytes, their kind and their length, which the server sets.
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
@@ -408,12 +407,12 @@ nonisolated enum MarfaMapping {
                 query: ItemQuery(states: [.archived]), drop: .transition(.archived))
         ]
         let active = items.filter { $0.state == .active }
-        if catalogue.itemTypes[projectType] != nil {
+        if catalogue.itemTypes[TypeID.project] != nil {
             places.append(
                 Place(
-                    id: .type(projectType), title: String(localized: "Projects"), symbol: "square.stack",
-                    section: .projects, query: ItemQuery(types: [projectType])))
-            let projects = active.filter { $0.type == projectType }
+                    id: .type(TypeID.project), title: String(localized: "Projects"), symbol: "square.stack",
+                    section: .projects, query: ItemQuery(types: [TypeID.project])))
+            let projects = active.filter { $0.type == TypeID.project }
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
             places += projects.map { project in
                 Place(
@@ -421,7 +420,7 @@ nonisolated enum MarfaMapping {
                     query: ItemQuery(beneath: project.id))
             }
         }
-        let held = Set(active.map(\.type)).subtracting([projectType])
+        let held = Set(active.map(\.type)).subtracting([TypeID.project])
         places += held.compactMap { catalogue.itemTypes[$0] }
             .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
             .map { type in
@@ -429,12 +428,10 @@ nonisolated enum MarfaMapping {
                     id: .type(type.id), title: type.label, symbol: type.id == fileType ? "doc" : "doc.text",
                     section: .types, query: ItemQuery(types: [type.id]))
             }
-        places += [
+        places.append(
             Place(
                 id: .recentlyDeleted, title: String(localized: "Recently Deleted"), symbol: "trash", section: .footer,
-                query: ItemQuery(states: [.trashed]), drop: .transition(.trashed)),
-            Place(id: .marfaTypes, title: String(localized: "Marfa Types"), symbol: "cube", section: .footer, query: nil)
-        ]
+                query: ItemQuery(states: [.trashed]), drop: .transition(.trashed)))
         return places
     }
 }

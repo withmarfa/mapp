@@ -12,7 +12,7 @@ nonisolated enum LibraryFixture {
     static let ticket = TypeID("aic.ticket")
     static let task = TypeID("aic.ticket.task")
     static let bug = TypeID("aic.ticket.bug")
-    static let project = MarfaMapping.projectType
+    static let project = TypeID.project
     static let entity = TypeID("core.entity")
     static let image = TypeID("core.image")
     static let album = TypeID("core.album")
@@ -163,7 +163,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.items(in: .files)) == [F.f1])
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
         #expect(library.items(in: .folder(F.p1)).isEmpty)
-        #expect(library.items(in: .marfaTypes).isEmpty)
         #expect(library.folders.isEmpty)
         for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .project(F.p1), .files, .recentlyDeleted] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")

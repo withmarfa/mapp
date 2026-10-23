@@ -56,8 +56,6 @@ struct GalleryTests {
         browser.openGallerySelection()
         browser.show(.inbox, in: library, order: NoteOrder())
         #expect(browser.showsGallery)
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        #expect(!browser.usesGallery)
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.showsGallery)
     }

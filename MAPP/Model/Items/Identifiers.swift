@@ -27,6 +27,9 @@ nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
     let rawValue: String
     init(rawValue: String) { self.rawValue = rawValue }
     init(_ rawValue: String) { self.rawValue = rawValue }
+
+    /// The type whose items the sidebar lists as Projects, with the items beneath each.
+    static let project = TypeID("aic.project")
 }
 
 nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {

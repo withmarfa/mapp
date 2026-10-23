@@ -22,7 +22,7 @@ struct ItemViewOptions: View {
                 choice("View as Gallery", systemImage: "square.grid.2x2", .gallery, key: "2")
             }
         }
-        .disabled(browser?.showsTypes != false)
+        .disabled(browser == nil)
     }
 
     private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, key: KeyEquivalent) -> some View {

@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum PlaceID: Hashable, Codable, Sendable {
-    case inbox, all, favorites, archive, recentlyDeleted, marfaTypes
+    case inbox, all, favorites, archive, recentlyDeleted
     case type(TypeID)
     case beneath(ItemID)
     case folder(ItemID)
@@ -46,8 +46,7 @@ nonisolated struct Place: Identifiable, Hashable, Sendable {
     var title: String
     var symbol: String
     var section: Section
-    /// Nil for a place that shows something other than items, such as Marfa Types.
-    var query: ItemQuery?
+    var query: ItemQuery
     var drop: DropAction?
     var editing: PlaceEditing = []
 }

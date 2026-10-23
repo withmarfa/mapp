@@ -95,25 +95,23 @@ struct AppCommands: Commands {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1 || browser?.showsTypes == true)
+            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1)
             Divider()
             OrderOptions()
             Divider()
             PageWidthOptions()
             Divider()
-            // ⌘[ and ⌘], as in Safari and the Finder. Marfa Types keeps its own history of the types it has shown.
+            // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
             // while it has the keyboard the menu items give the keys up (the items still work from the menu).
             Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
                 if browser?.usesGallery == true { browser?.returnToGallery() }
-                else if let marfaTypes { marfaTypes.goBack() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
-                if let marfaTypes { marfaTypes.goForward() }
-                else if let browser, let library { browser.go(.forward, in: library) }
+                if let browser, let library { browser.go(.forward, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("]", modifiers: .command))
                 .disabled(!canGoForward)
@@ -128,21 +126,16 @@ struct AppCommands: Commands {
 extension AppCommands {
     private var editsFolders: Bool { library?.capabilities.contains(.folders) == true }
 
-    /// Marfa Types, while the window in front shows it, for Back and Forward.
-    private var marfaTypes: TypesBrowser? { browser?.showsTypes == true ? browser?.types : nil }
-
     private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
 
     private var canGoBack: Bool {
         guard let browser else { return false }
         if browser.usesGallery { return browser.showsGallery == false }
-        if let marfaTypes { return marfaTypes.canGoBack }
         return library.map { browser.canGoBack(in: $0) } ?? false
     }
 
     private var canGoForward: Bool {
         guard let browser, !browser.usesGallery else { return false }
-        if let marfaTypes { return marfaTypes.canGoForward }
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
 

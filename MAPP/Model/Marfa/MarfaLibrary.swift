@@ -445,7 +445,7 @@ import Observation
             let active = index.ids(in: .active)
             return index.reachable(from: id, type: MarfaMapping.parentEdge).union([id]).intersection(active)
         case .recentlyDeleted: return index.ids(in: .trashed)
-        case .folder, .marfaTypes: return []
+        case .folder: return []
         }
     }
 
@@ -462,11 +462,10 @@ import Observation
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id), .project(let id): item(id)?.title ?? ""
         case .folder: ""
-        case .itemType(let type) where TypeID(type) == MarfaMapping.projectType: String(localized: "Projects")
+        case .itemType(let type) where TypeID(type) == .project: String(localized: "Projects")
         case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
         case .files: String(localized: "Files")
         case .recentlyDeleted: String(localized: "Recently Deleted")
-        case .marfaTypes: String(localized: "Marfa Types")
         }
     }
 

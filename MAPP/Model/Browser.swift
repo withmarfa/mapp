@@ -43,8 +43,6 @@ final class Browser {
     var palette: Palette?
     /// Whether the list's search is out as a field, rather than a button beside View Options.
     var isSearchExpanded = false
-    /// Marfa Types as this window shows it, kept while other places are shown so it is where it was left.
-    let types = TypesBrowser()
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
     var isCreatingItem = false
@@ -74,8 +72,6 @@ final class Browser {
 
     nonisolated enum Pane: Hashable {
         case sidebar, list, page, search
-        /// The search of Marfa Types, which searches the types rather than the notes.
-        case typesSearch
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
@@ -87,10 +83,7 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// Whether the window shows Marfa's types in place of the list and the note.
-    var showsTypes: Bool { item == .marfaTypes }
-
-    var usesGallery: Bool { viewMode == .gallery && !showsTypes }
+    var usesGallery: Bool { viewMode == .gallery }
     var showsGallery: Bool { usesGallery && !isGalleryItemPresented && !isCreatingItem }
 
     func openGallerySelection() {
@@ -187,7 +180,6 @@ final class Browser {
         isCreatingItem = false
         isGalleryItemPresented = false
         searchText = ""
-        types.searchText = ""
         isSearchExpanded = false
         sidebarItem = item
         selectFirstNote(in: library, order: order)
@@ -309,7 +301,6 @@ final class Browser {
         folderToDelete = nil
         palette = nil
         fetchedFile = nil
-        types.searchText = ""
         if let creation, left?.item(creation.id) != nil {
             self.creation = nil
             itemDraft = nil
@@ -356,7 +347,7 @@ final class Browser {
         switch place {
         case .inbox, .folder: library.capabilities.contains(.move)
         case .recentlyDeleted: true
-        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .marfaTypes: false
+        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files: false
         }
     }
 
@@ -426,8 +417,10 @@ final class Browser {
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
         case .project(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
         case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
-        case .itemType(let type): WorkbenchSchema.definition(type).map { _ in snapshot.place } ?? .allNotes
-        case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
+        case .itemType(let type):
+            library.itemTypeCounts.contains { $0.id.rawValue == type } || (TypeID(type) == .project && library.hasProjectType)
+                ? snapshot.place : .allNotes
+        case .inbox, .allNotes, .favorites, .recentlyDeleted, .files: snapshot.place
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))

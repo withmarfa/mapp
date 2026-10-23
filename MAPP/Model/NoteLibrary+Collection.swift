@@ -91,7 +91,6 @@ extension NoteLibrary {
         case .recentlyDeleted: return counts.trashed
         case .folder(let id): return counts.containers[ContainerID(id), default: 0]
         case .itemType(let type): return counts.types[TypeID(type), default: 0]
-        case .marfaTypes: return 0
         case .favoriteItem, .project:
             guard let belongs = predicate(for: place) else { return 0 }
             return items.reduce(0) { belongs($1) ? $0 + 1 : $0 }
@@ -160,7 +159,6 @@ extension NoteLibrary {
             let container = ContainerID(id)
             return { $0.state == .active && $0.container == container }
         case .recentlyDeleted: return { $0.state == .trashed }
-        case .marfaTypes: return nil
         case .files: return { $0.state == .active && $0.isFile }
         case .itemType(let type):
             let type = TypeID(type)

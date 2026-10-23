@@ -1095,12 +1095,12 @@ extension LiveMarfaTests {
             let log = ChangeLog(source)
             source.refresh()
             let hydrated = try #require(await log.wait { state in
-                (state.snapshot?.items.count ?? 0) > 100 && state.snapshot?.catalogue.itemTypes[MarfaMapping.projectType] != nil
+                (state.snapshot?.items.count ?? 0) > 100 && state.snapshot?.catalogue.itemTypes[TypeID.project] != nil
             })
             #expect(await waitForConnection(source) { $0 == .online })
             let snapshot = try #require(hydrated.snapshot)
             let catalogue = snapshot.catalogue
-            #expect(catalogue.itemTypes[MarfaMapping.projectType]?.titleField == "title")
+            #expect(catalogue.itemTypes[TypeID.project]?.titleField == "title")
             #expect(catalogue.edgeTypes["parent-of"]?.reverseName == "child-of")
             #expect(snapshot.items.allSatisfy { !$0.title.isEmpty })
 
@@ -1124,9 +1124,9 @@ extension LiveMarfaTests {
             #expect(projectItem.properties.allSatisfy { $0.key != "body" })
 
             let word = try #require(projectItem.title.split(separator: " ").first { $0.count > 3 }.map(String.init))
-            let found = try await source.search(word, in: ItemQuery(types: [MarfaMapping.projectType]))
+            let found = try await source.search(word, in: ItemQuery(types: [TypeID.project]))
             #expect(found.contains(project))
-            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == MarfaMapping.projectType })
+            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == TypeID.project })
             let count = snapshot.items.count
             await source.close()
 

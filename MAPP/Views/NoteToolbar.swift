@@ -19,9 +19,9 @@ struct NoteToolbar: CustomizableToolbarContent {
 
     var body: some CustomizableToolbarContent {
         ToolbarItem(id: "back") { HistoryButton(browser: browser, direction: .back) }
-            .hidden(browser == nil || tools.showsTypes)
+            .hidden(browser == nil)
         ToolbarItem(id: "forward") { HistoryButton(browser: browser, direction: .forward) }
-            .hidden(browser == nil || tools.showsTypes)
+            .hidden(browser == nil)
         ToolbarItem(id: "scrolledTitle") {
             Text(tools.notes.first?.title ?? "")
                 .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -30,15 +30,15 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsGallery == true || tools.showsTypes)
+        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsGallery == true)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
-            .hidden(tools.showsTypes || browser?.showsGallery == true)
+            .hidden(browser?.showsGallery == true)
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsTypes || tools.showsInspector)
+            .hidden(tools.showsInspector)
         ToolbarItem(id: "more") { tools.moreMenu }
-            .hidden(tools.showsTypes || tools.showsInspector)
+            .hidden(tools.showsInspector)
     }
 }
 
@@ -135,7 +135,6 @@ private struct ItemToolbarActions {
     let details: DetailsPresentation
 
     var notes: [Item] { items.filter { !$0.isFile } }
-    var showsTypes: Bool { browser?.showsTypes == true }
     var showsInspector: Bool { details.showsInspector(in: browser) }
 
     var visibleNote: Item? {

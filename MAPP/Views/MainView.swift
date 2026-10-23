@@ -15,7 +15,6 @@ struct MainView: View {
     @State private var sidebarWidth: CGFloat = 220
     @State private var listWidth: CGFloat = 340
     @State private var measuredWidths = ColumnWidths()
-    @State private var typesListWidth: CGFloat = 340
     @State private var galleryWidth: CGFloat = 900
     @State private var noteName = ""
     @State private var takenNoteName: String?
@@ -81,32 +80,11 @@ struct MainView: View {
     }
 
     private var splitView: some View {
-        // The list workspace keeps three columns even when Marfa Types replaces its content.
         // Gallery replaces this entire split view rather than changing the columns inside it.
         NavigationSplitView(columnVisibility: listColumnVisibility) {
             sidebarColumn
         } content: {
-            Group {
-                if browser.showsTypes {
-                    TypesListView(browser: browser.types, pane: $pane)
-                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { typesListWidth = $0 }
-                        .navigationTitle(library.name(of: .marfaTypes))
-                        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
-                        .toolbar {
-                            ColumnSearch(
-                                isExpanded: $browser.isSearchExpanded,
-                                text: Bindable(browser.types).searchText,
-                                prompt: String(localized: "Search"),
-                                columnWidth: typesListWidth,
-                                focusRequests: browser.searchFocusRequests,
-                                onSubmit: browser.types.selectFirstMatch,
-                                onDown: { browser.focusRequest = .list }
-                            ) {}
-                        }
-                } else {
-                    NoteList(browser: browser, order: order, pane: $pane)
-                }
-            }
+            NoteList(browser: browser, order: order, pane: $pane)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                 if $0.isFinite, $0 >= 280 { measuredWidths.list = $0 }
             }
@@ -145,10 +123,6 @@ struct MainView: View {
             if browser.isCreatingItem, let draft = browser.itemDraft {
                 NewItemPage(browser: browser, draft: draft)
                     .disabled(browser.isAwaitingCreation)
-                    .onAppear { editor.close() }
-            } else if browser.showsTypes {
-                TypeDetailView(browser: browser.types)
-                    // The note that was on the page is out of sight, so it is left.
                     .onAppear { editor.close() }
             } else {
                 NoteDetail(browser: browser, editor: editor, details: details)
@@ -197,7 +171,6 @@ struct MainView: View {
         workspace
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
-        .onChange(of: library.catalogue, initial: true) { browser.types.catalogue = library.catalogue }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 ZStack(alignment: .top) {
@@ -340,19 +313,14 @@ struct MainView: View {
         importRequestID = nil
     }
 
-    /// The list's search comes out as a field, which takes the keyboard. Search List over Marfa Types searches
-    /// All Notes, since Find there searches the types.
+    /// The list's search comes out as a field, which takes the keyboard.
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.showsTypes { browser.show(.allNotes, in: library, order: order) }
             if browser.usesGallery {
                 browser.isCreatingItem = false
                 browser.isGalleryItemPresented = false
             }
-            browser.isSearchExpanded = true
-            browser.searchFocusRequests += 1
-        case .typesSearch:
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .sidebar, .list:

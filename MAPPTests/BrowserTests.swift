@@ -191,7 +191,7 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
-    @Test(arguments: [SidebarItem.recentlyDeleted, .marfaTypes])
+    @Test(arguments: [SidebarItem.recentlyDeleted])
     func aNewItemFromAPlaceWithoutNotesOpensADraftThenRevealsTheCreatedItem(from item: SidebarItem) {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()
@@ -306,7 +306,7 @@ struct BrowserTests {
         library.capabilities = .move
         #expect(Browser.canDrop(on: .inbox, in: library))
         #expect(Browser.canDrop(on: .folder(work.id), in: library))
-        for place: SidebarItem in [.allNotes, .favorites, .files, .marfaTypes, .itemType("core.note")] {
+        for place: SidebarItem in [.allNotes, .favorites, .files, .itemType("core.note")] {
             #expect(!Browser.canDrop(on: place, in: library))
         }
     }
@@ -354,38 +354,15 @@ struct BrowserTests {
         #expect(restored.selection == [older.id])
     }
 
-    @Test func marfaTypesKeepsItsChoiceButNotItsSearchWhenAnotherPlaceIsShown() {
-        let (library, _, _, _) = makeFakeLibrary()
-        let browser = Browser()
-        browser.types.catalogue = library.catalogue
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        browser.types.searchText = "task"
-        browser.types.selectFirstMatch()
-        let chosen = browser.types.selection
-        #expect(chosen == .item(TypeID("aic.ticket.task")))
-        browser.show(.inbox, in: library, order: NoteOrder())
-        #expect(browser.types.searchText.isEmpty)
-        browser.show(.marfaTypes, in: library, order: NoteOrder())
-        #expect(browser.types.selection == chosen)
-        #expect(!browser.types.isSearching)
-    }
-
-    @Test func marfaTypesListsTheFilesLibrarysTypes() {
+    @Test func aRestoredWindowShowsATypeTheLibraryHoldsAndLeavesOneItDoesNot() {
         let (library, _, _, _) = makeLibrary()
+        let held = library.itemTypeCounts.first.map(\.id.rawValue) ?? ""
+        #expect(!held.isEmpty)
         let browser = Browser()
-        browser.types.catalogue = library.catalogue
-        let labels = browser.types.itemRows.map(\.type.label)
-        #expect(labels.contains("Task") && labels.contains("Note") && labels.contains("Image"))
-        #expect(browser.types.edgeTypes.map(\.id).contains("parent-of"))
-    }
-
-    @Test func aRestoredWindowShowsMarfaTypesAgain() {
-        let (library, _, _, _) = makeLibrary()
-        let saved = Browser()
-        saved.show(.marfaTypes, in: library, order: NoteOrder())
-        let restored = Browser()
-        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
-        #expect(restored.showsTypes)
+        browser.restore(Browser.Snapshot(place: .itemType(held), selection: []), in: library, order: NoteOrder())
+        #expect(browser.item == .itemType(held))
+        browser.restore(Browser.Snapshot(place: .itemType("aic.nothing"), selection: []), in: library, order: NoteOrder())
+        #expect(browser.item == .allNotes)
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {

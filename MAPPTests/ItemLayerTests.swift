@@ -138,7 +138,7 @@ struct ItemLayerTests {
     }
 
     @Test(arguments: [
-        PlaceID.inbox, .all, .favorites, .archive, .recentlyDeleted, .marfaTypes,
+        PlaceID.inbox, .all, .favorites, .archive, .recentlyDeleted,
         .type(TypeID("core.note")), .beneath(ItemID("project")), .folder(ItemID("folder"))
     ])
     func aPlaceSurvivesEncoding(place: PlaceID) throws {

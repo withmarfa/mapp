@@ -4,7 +4,6 @@ import SwiftUI
 /// Edit > Find, as TextEdit and Notes lay it out, acting on the note whose page the window shows through the
 /// system find bar. Search List leads it with ⌥⌘F, as Search Notes does in Notes, so Find and Replace has no
 /// shortcut of its own.
-/// Over Marfa Types, Find goes to the list column's search, which searches the types.
 struct FindCommands: Commands {
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.browser) private var browser
@@ -15,13 +14,8 @@ struct FindCommands: Commands {
                 SearchListButton()
                     .keyboardShortcut("f", modifiers: [.command, .option])
                 Divider()
-                if browser?.showsTypes == true {
-                    Button("Find…", systemImage: "magnifyingglass") { browser?.focusRequest = .typesSearch }
-                        .keyboardShortcut("f")
-                } else {
-                    item("Find…", systemImage: "magnifyingglass", .showFindInterface)
-                        .keyboardShortcut("f")
-                }
+                item("Find…", systemImage: "magnifyingglass", .showFindInterface)
+                    .keyboardShortcut("f")
                 item("Find and Replace…", systemImage: "arrow.left.arrow.right", .showReplaceInterface)
                     .disabled(editor?.isEditable != true)
                 item("Find Next", systemImage: "chevron.down", .nextMatch)

@@ -65,7 +65,7 @@ extension LiveMarfaTests {
                 #expect(tickets.contains { $0.type != TypeID("aic.ticket") })
 
                 // A project lists itself and everything below it; each child holds it as `child-of`.
-                let projects = library.items(in: .itemType(MarfaMapping.projectType.rawValue))
+                let projects = library.items(in: .itemType(TypeID.project.rawValue))
                 let project = try #require(projects.first { project in
                     library.relationships(for: project.id).contains { $0.field == "inverse:parent-of" && !$0.targets.isEmpty }
                 })
