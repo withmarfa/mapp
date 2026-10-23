@@ -17,8 +17,16 @@ struct ItemPropertyRow: View {
     var body: some View {
         InspectorRow(name: LocalizedStringKey(definition.label)) {
             VStack(alignment: .leading, spacing: 4) {
-                control
-                    .disabled(!isEditable)
+                if isEditable {
+                    control
+                } else if let readOnlyText {
+                    // A value that cannot be changed reads as a Details row does, not as a dimmed control.
+                    readOnlyText
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+                }
                 if let invalidValue {
                     Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
@@ -64,7 +72,7 @@ struct ItemPropertyRow: View {
         case .date:
             HStack(spacing: 4) {
                 textField
-                if isEditable && (rowHovering || isFocused || choosingDate) {
+                if rowHovering || isFocused || choosingDate {
                     Button { choosingDate = true } label: { Image(systemName: "calendar") }
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
@@ -85,6 +93,16 @@ struct ItemPropertyRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The value as the control would show it: a choice by its label, a Boolean as Yes or No, anything else as written.
+    private var readOnlyText: Text? {
+        guard let value else { return nil }
+        if definition.kind == .boolean, case .bool(let flag) = value { return Text(flag ? "Yes" : "No") }
+        if definition.isPicked, let option = value.string {
+            return Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: option)))
+        }
+        return Text(ItemValueText.string(value))
     }
 
     private func choiceMenu(_ choices: [String]) -> some View {
