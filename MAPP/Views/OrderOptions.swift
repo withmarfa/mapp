@@ -21,7 +21,12 @@ struct OrderOptions: View {
         case .submenu:
             picker
         case .sections:
-            Section("Sort By") { picker.pickerStyle(.inline).labelsHidden() }
+            // An inline picker brings a separator of its own above its choices, under the header.
+            Section("Sort By") {
+                ForEach(NoteSort.allCases, id: \.self) { choice in
+                    Toggle(isOn: Binding { sort == choice } set: { _ in sort = choice }) { Text(choice.title) }
+                }
+            }
             Divider()
         }
         group

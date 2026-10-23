@@ -89,7 +89,7 @@ struct AppCommands: Commands {
             }
             .disabled(editor?.hasNote != true)
             Divider()
-            if let browser { ItemViewOptions(browser: browser) }
+            ItemViewOptions(browser: browser, style: .menuBar)
             Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
