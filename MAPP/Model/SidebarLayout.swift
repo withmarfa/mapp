@@ -5,9 +5,9 @@ import Observation
 /// or move is found again.
 nonisolated enum SidebarPlace: Hashable, Sendable {
     case inbox, all, favorites, projects
-    /// The group that holds a Marfa library's types.
+    /// The section that holds a Marfa library's types.
     case types
-    /// The group that holds a notes folder's folders.
+    /// The section that holds a notes folder's folders.
     case folders
     case files
     case type(TypeID)
@@ -26,7 +26,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     }
 }
 
-/// What one library's person chose for the sidebar: the places hidden, and the order of the rest. A place the layout
+/// What one library's person chose for the sidebar: the places hidden, the sections collapsed, and the order of the rest. A place the layout
 /// does not mention, such as a type the catalogue has just gained, is shown, after the ones that have a position.
 nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     private(set) var hidden: Set<String> = []
@@ -34,7 +34,25 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     /// group only ever reads the keys of its own.
     private(set) var order: [String] = []
 
+    /// The keys of the sections the person has collapsed, which the sidebar shows with only their headers.
+    private(set) var collapsed: Set<String> = []
+
+    init() {}
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        hidden = try values.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? []
+        order = try values.decodeIfPresent([String].self, forKey: .order) ?? []
+        collapsed = try values.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
+    }
+
     func isHidden(_ place: SidebarPlace) -> Bool { hidden.contains(place.key) }
+
+    func isCollapsed(_ section: SidebarPlace) -> Bool { collapsed.contains(section.key) }
+
+    mutating func setCollapsed(_ section: SidebarPlace, _ isCollapsed: Bool) {
+        if isCollapsed { collapsed.insert(section.key) } else { collapsed.remove(section.key) }
+    }
 
     mutating func setHidden(_ place: SidebarPlace, _ isHidden: Bool) {
         if isHidden { hidden.insert(place.key) } else { hidden.remove(place.key) }
@@ -71,9 +89,9 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 struct SidebarPlan {
     /// Above Favorites: Inbox and All Items.
     let top: [SidebarPlace]
-    /// The Library section's rows.
+    /// What follows Favorites: the Projects section, then the Types or Folders section.
     let library: [SidebarPlace]
-    /// The types the Types group lists, which only a library without folders has.
+    /// The types the Types section lists, which only a library without folders has.
     let types: [ItemTypeCount]
     let layout: SidebarLayout
 
@@ -87,8 +105,8 @@ struct SidebarPlan {
             if library.count(in: .files) > 0 { rows.append(.files) }
             types = []
         } else {
-            // Projects have their own group, so the Types group lists the rest.
-            types = layout.ordered(library.itemTypeCounts.filter { $0.id != .project }, by: { SidebarPlace.type($0.id).key })
+            // Projects have their own section; `itemTypeCounts` leaves out the project type and the file types.
+            types = layout.ordered(library.itemTypeCounts, by: { SidebarPlace.type($0.id).key })
             if !types.isEmpty { rows.append(.types) }
         }
         self.library = layout.ordered(rows)

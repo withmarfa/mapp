@@ -298,7 +298,7 @@ final class Browser {
         searchText = ""
         isSearchExpanded = false
         if !library.items(in: item).contains(where: { $0.id == creation.id }) {
-            sidebarItem = .itemType(creation.typeID)
+            sidebarItem = TypeID(creation.typeID) == .project ? .project(creation.id) : .itemType(creation.typeID)
         }
         selection = [creation.id]
         focusRequest = .page
@@ -382,12 +382,16 @@ final class Browser {
         }
     }
 
-    /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is.
+    /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is. So is a type that no longer holds an item.
     func folderRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
         if case .project(let id) = sidebarItem, library.item(id)?.state != .active {
+            show(.allNotes, in: library, order: order)
+        }
+        // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
+        if case .itemType(let type) = sidebarItem, TypeID(type) != .project, library.isLoaded, library.count(in: .itemType(type)) == 0 {
             show(.allNotes, in: library, order: order)
         }
         if case .favoriteItem(let id) = sidebarItem,

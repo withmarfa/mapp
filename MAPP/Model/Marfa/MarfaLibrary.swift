@@ -432,15 +432,15 @@ import Observation
     }
 
     /// The Inbox is the feed tier. All Items is every active item in either tier, files among them, as All Notes
-    /// is in a folder. A type's place holds its subtypes too.
+    /// is in a folder. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
         case .inbox: return index.feed
         case .allNotes: return index.ids(in: .active)
         case .favorites: return index.favorites
         case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
-        case .itemType(let type): return active(ofType: TypeID(type))
-        case .files: return active(ofType: MarfaMapping.fileType)
+        case .itemType(let type): return index.activeByType[TypeID(type)] ?? []
+        case .files: return active(withSubtypesOf: MarfaMapping.fileType)
         case .project(let id):
             let active = index.ids(in: .active)
             return index.reachable(from: id, type: MarfaMapping.parentEdge).union([id]).intersection(active)
@@ -449,7 +449,7 @@ import Observation
         }
     }
 
-    private func active(ofType type: TypeID) -> Set<ItemID> {
+    private func active(withSubtypesOf type: TypeID) -> Set<ItemID> {
         catalogue.descendants(of: type).union([type]).reduce(into: Set<ItemID>()) { found, type in
             found.formUnion(index.activeByType[type] ?? [])
         }

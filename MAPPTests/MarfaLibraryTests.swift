@@ -156,7 +156,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.items(in: .favorites)) == [F.t1, F.n1])
         #expect(ids(library.items(in: .favoriteItem(F.n1))) == [F.n1])
         #expect(library.items(in: .favoriteItem(F.n2)).isEmpty)
-        #expect(ids(library.items(in: .itemType("aic.ticket"))) == [F.e1, F.t1])
+        // A type's place lists that type's own items and none of its subtypes'.
+        #expect(library.items(in: .itemType("aic.ticket")).isEmpty)
+        #expect(ids(library.items(in: .itemType("aic.ticket.task"))) == [F.e1])
         #expect(ids(library.items(in: .itemType("aic.ticket.bug"))) == [F.t1])
         #expect(ids(library.items(in: .project(F.p1))) == [F.p1, F.e1, F.t1])
         #expect(ids(library.items(in: .project(F.p2))) == [F.p2])
@@ -164,7 +166,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
         #expect(library.items(in: .folder(F.p1)).isEmpty)
         #expect(library.folders.isEmpty)
-        for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .project(F.p1), .files, .recentlyDeleted] {
+        for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .project(F.p1), .files, .recentlyDeleted] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
         // Newest first, as the source paints them.
@@ -196,7 +198,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.item(added.id) != nil })
         #expect(library.body(of: added.id)?.text == "Fresh")
         #expect(ids(library.items(in: .project(F.p2))) == [F.p2, added.id])
-        #expect(library.count(in: .itemType("aic.ticket")) == 3)
+        #expect(library.count(in: .itemType("aic.ticket.task")) == 2)
 
         source.send(.removed([F.n1]))
         #expect(await eventually { library.isGone(F.n1) })

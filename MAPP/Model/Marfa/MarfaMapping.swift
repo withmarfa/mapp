@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.
 nonisolated enum MarfaMapping {
-    static let fileType = TypeID("core.file")
+    static let fileType = TypeID.file
     /// The core.file fields naming the bytes, their kind and their length, which the server sets.
     static let blobField = "blob_ref"
     static let mimeTypeField = "mime_type"
@@ -413,23 +413,29 @@ nonisolated enum MarfaMapping {
         if catalogue.itemTypes[TypeID.project] != nil {
             places.append(
                 Place(
-                    id: .type(TypeID.project), title: String(localized: "Projects"), symbol: "square.stack",
-                    section: .projects, query: ItemQuery(types: [TypeID.project])))
+                    id: .type(TypeID.project), title: String(localized: "Projects"), symbol: "folder",
+                    section: .projects, query: ItemQuery(types: [TypeID.project], includesSubtypes: false)))
             let projects = active.filter { $0.type == TypeID.project }
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
             places += projects.map { project in
                 Place(
-                    id: .beneath(project.id), title: project.title, symbol: "square.stack", section: .projects,
+                    id: .beneath(project.id), title: project.title, symbol: "folder", section: .projects,
                     query: ItemQuery(beneath: project.id))
             }
         }
-        let held = Set(active.map(\.type)).subtracting([TypeID.project])
+        // Each type's place lists that type's own items, most first, so a count and its list agree.
+        let counts = Dictionary(grouping: active, by: \.type).mapValues(\.count)
+        let held = counts.keys.filter { $0 != TypeID.project && !catalogue.isFileType($0) }
+        let labels = catalogue.displayLabels(for: held)
         places += held.compactMap { catalogue.itemTypes[$0] }
-            .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+            .sorted {
+                let (a, b) = (counts[$0.id] ?? 0, counts[$1.id] ?? 0)
+                return a != b ? a > b : $0.label.localizedStandardCompare($1.label) == .orderedAscending
+            }
             .map { type in
                 Place(
-                    id: .type(type.id), title: type.label, symbol: type.id == fileType ? "doc" : "doc.text",
-                    section: .types, query: ItemQuery(types: [type.id]))
+                    id: .type(type.id), title: labels[type.id] ?? type.label, symbol: TypeSymbol.name(for: type.id, in: catalogue),
+                    section: .types, query: ItemQuery(types: [type.id], includesSubtypes: false))
             }
         places.append(
             Place(

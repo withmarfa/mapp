@@ -49,7 +49,7 @@ nonisolated enum WorkbenchSchema {
     }
 
     /// Files are items too, typed as Marfa's core types name them; an image or a PDF is a kind of file.
-    static let fileType = TypeID("core.file")
+    static let fileType = TypeID.file
     static let imageType = TypeID("core.image")
     static let pdfType = TypeID("core.pdf")
 
