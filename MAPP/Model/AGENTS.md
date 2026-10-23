@@ -1,6 +1,6 @@
 # Model
 
-The data model, free of SwiftUI: the `ItemLibrary` protocol and its two libraries, `NoteLibrary` over a notes folder and `MarfaLibrary` over a Marfa server, and `Libraries`, which chooses between them. Before changing `Marfa/`, also read `MAPP/Model/Marfa/AGENTS.md`.
+The data model, free of SwiftUI: the `ItemLibrary` protocol and its two libraries, `NoteLibrary` over a notes folder and `MarfaLibrary` over a Marfa server, and `Libraries`, which chooses between them. Views reach a library only through `ItemLibrary`: what a view needs to know about an item comes from the protocol, such as `hiddenPropertyKeys(of:)` (the keys an item's page already shows elsewhere, so Properties leaves them out) and `Item.source` (what made the item; nil where the library does not know, as a folder does not). Before changing `Marfa/`, also read `MAPP/Model/Marfa/AGENTS.md`.
 
 ## The notes folder
 
