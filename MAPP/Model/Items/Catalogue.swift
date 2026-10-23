@@ -99,6 +99,18 @@ nonisolated extension ItemTypeInfo.Field {
     static func label(ofOption option: String) -> String {
         option.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
+
+    /// A label the catalogue wrote for people, set in title case for the interface: "Completed at" reads as
+    /// "Completed At". Only each word's first letter changes, so an acronym or a name keeps its capitals. This is
+    /// the one place a catalogue label becomes a display label, for properties and relationships alike.
+    static func displayLabel(_ label: String) -> String {
+        label.split(separator: " ", omittingEmptySubsequences: false)
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+    }
+
+    /// The field's label as the interface shows it.
+    var displayLabel: String { Self.displayLabel(label) }
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
