@@ -144,7 +144,8 @@ nonisolated enum MarfaMapping {
             preview: damaged ? MarfaProblems.unreadableMessage : preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
-            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound)
+            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
+            source: row.source.isEmpty ? nil : row.source)
     }
 
     /// The text between the brackets of a link as the package renders it, `[[text]]`.

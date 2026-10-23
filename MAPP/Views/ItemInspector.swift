@@ -185,6 +185,7 @@ struct ItemInspector: View {
     @ViewBuilder private var details: some View {
         detail("Created", item.created.formatted(date: .abbreviated, time: .shortened))
         detail("Edited", item.modified.formatted(date: .abbreviated, time: .shortened))
+        if let source = item.source { detail("Made by", source) }
         if let place { detail("Place", place) }
         // Only a server counts an item's versions; a file has no such number.
         if path == nil { detail("Version", item.version.rawValue.formatted()) }

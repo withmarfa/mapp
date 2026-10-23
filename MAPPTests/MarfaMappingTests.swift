@@ -69,6 +69,15 @@ struct MarfaMappingTests {
         MarfaMapping.item(row, edges: edges, catalogue: catalogue, isHeld: { held.contains($0) })
     }
 
+    // MARK: Who made an item
+
+    @Test func anItemKeepsTheSourceMarfaNamesAsWhatMadeIt() {
+        #expect(Self.item(Self.row("a")).source == "test")
+        var unnamed = Self.row("b")
+        unnamed.source = ""
+        #expect(Self.item(unnamed).source == nil)
+    }
+
     // MARK: Rows the copy could not read
 
     @Test func aRowTheCopyCouldNotReadIsShownAsDamagedNotAsEmpty() {
