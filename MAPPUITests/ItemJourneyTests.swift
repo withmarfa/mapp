@@ -90,7 +90,7 @@ final class ItemJourneyTests: XCTestCase {
         title.typeKey(.return, modifierFlags: [])
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
-        let status = app.itemStatusChip
+        let status = app.itemStatusPin
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         status.click()
         app.menuItems["Completed"].click()

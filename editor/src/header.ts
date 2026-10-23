@@ -124,16 +124,16 @@ export class ItemHeader {
     })
     this.pins = element('div', 'item-pins', root)
     this.typePin = element('span', 'item-pin', this.pins)
-    this.typePin.id = 'ItemTypeChip'
+    this.typePin.id = 'ItemTypePin'
     this.typePin.title = this.labels.itemType
     element('span', 'item-pin-icon item-icon-type', this.typePin).setAttribute(
       'aria-hidden',
       'true',
     )
     element('span', 'item-pin-label', this.typePin)
-    this.statusPin = this.menuPin('ItemStatusChip', 'status')
+    this.statusPin = this.menuPin('ItemStatusPin', 'status')
     this.statusPin.setAttribute('aria-label', this.labels.status)
-    this.parentPin = this.menuPin('ItemParentChip', 'parent')
+    this.parentPin = this.menuPin('ItemParentPin', 'parent')
     this.propertyError = element('p', 'item-error', root)
     this.propertyError.setAttribute('role', 'alert')
     this.propertyError.textContent = this.labels.propertyRejected
