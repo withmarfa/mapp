@@ -170,6 +170,19 @@ final class Browser {
         isSearching || item == .allNotes || showsOnlyFavorites || item == .recentlyDeleted
     }
 
+    /// What the rows of the list say about themselves: the type where the list holds several, the place where it
+    /// mixes places, and nothing that the list itself already says.
+    func metaContext(for items: [Item]) -> ItemMeta.Context {
+        var context = ItemMeta.Context()
+        context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
+        context.showsPlaces = showsFolders
+        if !isSearching {
+            if case .project(let id) = item { context.project = id }
+            context.isInbox = item == .inbox
+        }
+        return context
+    }
+
     private var showsOnlyFavorites: Bool {
         if case .favoriteItem = item { return true }
         return item == .favorites

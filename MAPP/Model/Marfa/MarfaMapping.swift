@@ -140,9 +140,16 @@ nonisolated enum MarfaMapping {
         let bound = (bodyLinks?.links ?? []).map { name in
             BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
+        let content = content(of: row, catalogue: catalogue)
+        let preview: String
+        if case .file(let fileType, let byteCount) = content {
+            preview = ItemPreview.file(fileType, byteCount: byteCount)
+        } else {
+            preview = ItemPreview.text(of: body, title: title, fallback: row.properties["description"]?.string)
+        }
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
-            preview: damaged ? MarfaProblems.unreadableMessage : preview(of: body), content: content(of: row, catalogue: catalogue), state: state,
+            preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
@@ -302,10 +309,6 @@ nonisolated enum MarfaMapping {
 
     private static func firstLine(of body: String) -> String {
         body.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
-    }
-
-    private static func preview(of body: String) -> String {
-        String(body.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(240))
     }
 
     private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
