@@ -70,10 +70,10 @@ struct AppCommands: Commands {
         // Print has ⌘P, as everywhere; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
-                .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || browser?.showsCollection == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
                 .keyboardShortcut("p")
-                .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
+                .disabled(browser?.isCreatingItem == true || browser?.showsCollection == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
@@ -104,8 +104,8 @@ struct AppCommands: Commands {
             // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
             // while it has the keyboard the menu items give the keys up (the items still work from the menu).
-            Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
-                if browser?.usesGallery == true { browser?.returnToGallery() }
+            Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
+                if browser?.usesCollection == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
@@ -130,12 +130,12 @@ extension AppCommands {
 
     private var canGoBack: Bool {
         guard let browser else { return false }
-        if browser.usesGallery { return browser.showsGallery == false }
+        if browser.usesCollection { return browser.showsCollection == false }
         return library.map { browser.canGoBack(in: $0) } ?? false
     }
 
     private var canGoForward: Bool {
-        guard let browser, !browser.usesGallery else { return false }
+        guard let browser, !browser.usesCollection else { return false }
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
 

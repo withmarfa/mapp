@@ -191,7 +191,7 @@ struct CommandPalette: View {
         let selected = browser.selectedItems(in: library).filter { !$0.isFile }
         let ids = Set(selected.map(\.id))
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
-        let hasVisibleEditor = !browser.showsGallery && one?.id == editor.noteID && editor.hasNote
+        let hasVisibleEditor = !browser.showsCollection && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
@@ -203,6 +203,7 @@ struct CommandPalette: View {
         if library.isLoaded {
             add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
             add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
+            add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
             for choice in NoteSort.allCases where choice != sort {
                 add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
             }
@@ -211,9 +212,9 @@ struct CommandPalette: View {
                     groupsByDate.toggle()
                 }
             }
-            if browser.usesGallery {
-                if !browser.showsGallery {
-                    add(String(localized: "Back to Gallery"), "chevron.backward", historyKey("⌘[")) { browser.returnToGallery() }
+            if browser.usesCollection {
+                if !browser.showsCollection {
+                    add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘[")) { browser.returnToCollection() }
                 }
             } else {
                 if browser.canGoBack(in: library) {

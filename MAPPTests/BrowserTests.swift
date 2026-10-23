@@ -69,7 +69,7 @@ struct BrowserTests {
         browser.viewMode = .gallery
         browser.focusRequest = .page
         browser.reveal(item, in: library, order: NoteOrder())
-        #expect(browser.isGalleryItemPresented)
+        #expect(browser.isCollectionItemPresented)
         #expect(browser.focusRequest == nil)
     }
 

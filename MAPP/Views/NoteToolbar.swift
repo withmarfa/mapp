@@ -30,11 +30,11 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsGallery == true)
+        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsCollection == true)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
-            .hidden(browser?.showsGallery == true)
+            .hidden(browser?.showsCollection == true)
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(tools.showsInspector)
         ToolbarItem(id: "more") { tools.moreMenu }
@@ -89,7 +89,7 @@ struct GalleryToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
-        if !browser.showsGallery, !browser.isCreatingItem, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+        if !browser.showsCollection, !browser.isCreatingItem, editor.isHeaderScrolledAway, tools.notes.count == 1 {
             ToolbarItem(placement: .navigation) {
                 Text(tools.notes.first?.title ?? "")
                     .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -98,7 +98,7 @@ struct GalleryToolbar: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
-        if browser.showsGallery {
+        if browser.showsCollection {
             ColumnSearch(
                 isExpanded: $browser.isSearchExpanded,
                 text: $browser.searchText,
@@ -112,15 +112,15 @@ struct GalleryToolbar: ToolbarContent {
         }
         // Over the grid, Details and More act on the cards selected, so they wait for one. They move above the
         // inspector while it is open.
-        if !details.showsInspector(in: browser), !browser.showsGallery || !browser.selection.isEmpty {
-            if browser.showsGallery { ToolbarSpacer(.fixed) }
+        if !details.showsInspector(in: browser), !browser.showsCollection || !browser.selection.isEmpty {
+            if browser.showsCollection { ToolbarSpacer(.fixed) }
             ToolbarItemGroup {
                 tools.detailsButton
                 tools.moreMenu
             }
         }
         // The field spans the column, so there is no room beside it.
-        if !browser.isSearchExpanded || !browser.showsGallery {
+        if !browser.isSearchExpanded || !browser.showsCollection {
             ToolbarSpacer(.fixed)
             ToolbarItem { NewItemButton(browser: browser) }
         }
@@ -138,7 +138,7 @@ private struct ItemToolbarActions {
     var showsInspector: Bool { details.showsInspector(in: browser) }
 
     var visibleNote: Item? {
-        guard browser?.isCreatingItem != true, browser?.showsGallery != true,
+        guard browser?.isCreatingItem != true, browser?.showsCollection != true,
               (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
               let note = notes.first, editor.hasNote, editor.noteID == note.id else { return nil }
         return note

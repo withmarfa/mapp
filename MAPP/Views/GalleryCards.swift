@@ -223,7 +223,7 @@ private struct GalleryAccessory: View {
 }
 
 /// The status ring the page header draws, in its color, with half or all of it filled.
-private struct StatusMark: View {
+struct StatusMark: View {
     let mark: PageHeader.Mark
     let size: CGFloat
 

@@ -4,7 +4,7 @@ import AppKit
 /// properties. The page draws it above the note so the two scroll as one surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// A status's ring: its color and how much of it is filled. The catalogue holds neither, so they follow the
-    /// status's name, and a status the app does not know gets the plain ring.
+    /// status's tone (`StatusTone`), and a status the app does not know gets the plain ring.
     struct Mark: Encodable, Equatable, Sendable {
         enum Tone: String, Encodable, Sendable { case neutral, orange, red, green, grey }
         enum Fill: String, Encodable, Sendable { case none, half, full }
@@ -17,12 +17,12 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         }
 
         init(status: String?) {
-            switch status {
-            case "in_progress": self.init(tone: .orange, fill: .half)
-            case "blocked": self.init(tone: .red, fill: .half)
-            case "completed": self.init(tone: .green, fill: .full)
-            case "canceled": self.init(tone: .grey, fill: .full)
-            default: self.init(tone: .neutral, fill: .none)
+            switch status.map(StatusTone.init) {
+            case .active: self.init(tone: .orange, fill: .half)
+            case .waiting: self.init(tone: .red, fill: .half)
+            case .done: self.init(tone: .green, fill: .full)
+            case .canceled: self.init(tone: .grey, fill: .full)
+            case .planned, .later, .other, nil: self.init(tone: .neutral, fill: .none)
             }
         }
     }

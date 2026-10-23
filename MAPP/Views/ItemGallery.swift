@@ -120,7 +120,7 @@ struct ItemGallery: View {
         }
         .onKeyPress(.return) {
             guard browser.selection.count == 1 else { return .ignored }
-            browser.openGallerySelection()
+            browser.openCollectionSelection()
             return .handled
         }
         .onKeyPress(.escape) {
@@ -158,7 +158,7 @@ struct ItemGallery: View {
         .contentShape([.interaction, .accessibility], .rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             browser.selection = [item.id]
-            browser.openGallerySelection()
+            browser.openCollectionSelection()
         })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title)
@@ -172,11 +172,11 @@ struct ItemGallery: View {
         }
         .accessibilityAction(named: Text("Open")) {
             browser.selection = [item.id]
-            browser.openGallerySelection()
+            browser.openCollectionSelection()
         }
         .contextMenu {
             let selected = browser.selection.contains(item.id) ? browser.selection : [item.id]
-            Button("Open") { browser.selection = [item.id]; browser.openGallerySelection() }
+            Button("Open") { browser.selection = [item.id]; browser.openCollectionSelection() }
             Button("Open in New Window", systemImage: "macwindow") {
                 for id in library.idsForWindows(selected) { openWindow(value: id) }
             }

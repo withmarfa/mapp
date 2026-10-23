@@ -38,21 +38,21 @@ struct MainView: View {
 
     var body: some View { lifecycleWindow }
 
-    /// The gallery has no list column, so it is the one place that mounts the two-column split view. Settings
+    /// The gallery and the table have no list column, so they mount the two-column split view. Settings
     /// shows in the three-column one, in place of the list and the page, whatever the window is set to show.
-    private var usesGalleryLayout: Bool { browser.usesGallery && !browser.showsSettings }
+    private var usesCollectionLayout: Bool { browser.usesCollection && !browser.showsSettings }
 
     private var activeWindow: some View {
         // Release the split view's toolbar provider before changing its native column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
-        renamingWindow.id(usesGalleryLayout)
-        .onChange(of: usesGalleryLayout) {
+        renamingWindow.id(usesCollectionLayout)
+        .onChange(of: usesCollectionLayout) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
             editor.flush()
         }
-        .onChange(of: browser.showsGallery) {
-            if browser.showsGallery { editor.releaseFocus(); editor.flush() }
+        .onChange(of: browser.showsCollection) {
+            if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }
         .onChange(of: browser.showsSettings) {
             if browser.showsSettings {
@@ -73,7 +73,7 @@ struct MainView: View {
     }
 
     private var splitView: some View {
-        // Gallery replaces this entire split view rather than changing the columns inside it.
+        // The gallery and the table replace this entire split view rather than changing the columns inside it.
         NavigationSplitView(columnVisibility: listColumnVisibility) {
             sidebarColumn
         } content: {
@@ -128,18 +128,22 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if usesGalleryLayout {
+            if usesCollectionLayout {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
                     Group {
-                        if browser.showsGallery {
-                            ItemGallery(browser: browser, order: order, pane: $pane)
+                        if browser.showsCollection {
+                            if browser.viewMode == .table {
+                                ItemTable(browser: browser, order: order, pane: $pane)
+                            } else {
+                                ItemGallery(browser: browser, order: order, pane: $pane)
+                            }
                         } else {
                             itemPage
                                 .toolbar {
                                     ToolbarItem(placement: .navigation) {
-                                        Button("Back to Gallery", systemImage: "chevron.backward") { browser.returnToGallery() }
+                                        Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
                                             .accessibilityIdentifier("BackToGallery")
                                     }
                                 }
@@ -185,15 +189,15 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, browser.showsGallery ? nil : editor)
+        .focusedSceneValue(\.editor, browser.showsCollection ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
         activeWindow
-        // The gallery disappears while an item is open; selection must still follow deletes and moves.
+        // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
         .onChange(of: galleryItemIDs) { old, new in
-            guard browser.usesGallery, !browser.isCreatingItem else { return }
+            guard browser.usesCollection, !browser.isCreatingItem else { return }
             browser.keepSelection(from: old, to: new)
         }
         .onChange(of: library.folders) {
@@ -246,7 +250,7 @@ struct MainView: View {
     }
 
     private var galleryItemIDs: [ItemID] {
-        guard browser.usesGallery else { return [] }
+        guard browser.usesCollection else { return [] }
         return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 
@@ -305,7 +309,7 @@ struct MainView: View {
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]
-        browser.openGallerySelection()
+        browser.openCollectionSelection()
         library.consumeImportCompletion(requestID)
         importRequestID = nil
     }
@@ -314,9 +318,9 @@ struct MainView: View {
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.usesGallery {
+            if browser.usesCollection {
                 browser.isCreatingItem = false
-                browser.isGalleryItemPresented = false
+                browser.isCollectionItemPresented = false
             }
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
@@ -326,7 +330,7 @@ struct MainView: View {
             let request = browser.focusRequest
             Task { pane = request }
         case .page:
-            if browser.showsGallery { browser.isGalleryItemPresented = true }
+            if browser.showsCollection { browser.isCollectionItemPresented = true }
             return
         case nil: return
         }

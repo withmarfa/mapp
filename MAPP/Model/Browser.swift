@@ -21,14 +21,16 @@ final class Browser {
     @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
-            isGalleryItemPresented = false
-            if viewMode == .gallery {
+            isCollectionItemPresented = false
+            if viewMode.spansWindow {
                 isCreatingItem = false
                 focusRequest = .list
             }
         }
     }
-    var isGalleryItemPresented = false
+    var isCollectionItemPresented = false
+    /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
+    var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     /// Whether the window shows Settings in place of the list and the item page. The place the window was
     /// showing, its selection and its draft are kept, so choosing that place again returns to them.
     private(set) var showsSettings = false
@@ -97,13 +99,14 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    var usesGallery: Bool { viewMode == .gallery }
-    var showsGallery: Bool { usesGallery && !isGalleryItemPresented && !isCreatingItem }
+    /// Whether the window shows the gallery or the table, which span it, rather than the list beside the page.
+    var usesCollection: Bool { viewMode.spansWindow }
+    var showsCollection: Bool { usesCollection && !isCollectionItemPresented && !isCreatingItem }
 
-    func openGallerySelection() {
+    func openCollectionSelection() {
         leaveSettings()
-        guard usesGallery, selection.count == 1 else { return }
-        isGalleryItemPresented = true
+        guard usesCollection, selection.count == 1 else { return }
+        isCollectionItemPresented = true
         focusRequest = nil
     }
 
@@ -113,7 +116,7 @@ final class Browser {
             show(.allNotes, in: library, order: order)
         }
         selection = [item.id]
-        if usesGallery { openGallerySelection() }
+        if usesCollection { openCollectionSelection() }
         else { focusRequest = .list }
     }
 
@@ -122,7 +125,7 @@ final class Browser {
     /// The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: NoteOrder) {
         reveal(item, in: library, order: order)
-        if !usesGallery { focusRequest = .page }
+        if !usesCollection { focusRequest = .page }
     }
 
     /// Whether an earlier item the window showed can still be shown again.
@@ -142,7 +145,7 @@ final class Browser {
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         if isSearching || sidebarItem != entry.place {
             searchText = ""
             isSearchExpanded = false
@@ -154,9 +157,9 @@ final class Browser {
         focusRequest = .list
     }
 
-    func returnToGallery() {
+    func returnToCollection() {
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         focusRequest = .list
     }
 
@@ -209,7 +212,7 @@ final class Browser {
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         leaveSettings()
         isCreatingItem = false
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         searchText = ""
         isSearchExpanded = false
         sidebarItem = item
@@ -294,7 +297,7 @@ final class Browser {
         self.creation = nil
         isCreatingItem = false
         itemDraft = nil
-        isGalleryItemPresented = usesGallery
+        isCollectionItemPresented = usesCollection
         searchText = ""
         isSearchExpanded = false
         if !library.items(in: item).contains(where: { $0.id == creation.id }) {
@@ -324,7 +327,7 @@ final class Browser {
         undoManager?.removeAllActions()
         selection = []
         history = SelectionHistory()
-        isGalleryItemPresented = false
+        isCollectionItemPresented = false
         sidebarItem = .allNotes
         searchText = ""
         isSearchExpanded = false
