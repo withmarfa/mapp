@@ -70,23 +70,7 @@ struct NoteList: View {
             browser.focusRequest = .page
             return .handled
         }
-        .toolbar {
-            ColumnSearch(
-                isExpanded: $browser.isSearchExpanded,
-                text: $browser.searchText,
-                prompt: String(localized: "Search"),
-                columnWidth: width,
-                focusRequests: browser.searchFocusRequests,
-                onDown: { browser.focusRequest = .list }
-            ) {
-                Menu("Sort", systemImage: "arrow.up.arrow.down") {
-                    OrderOptions()
-                        .pickerStyle(.inline)
-                }
-                .menuIndicator(.hidden)
-                .help("Sort")
-            }
-        }
+        .toolbar { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1

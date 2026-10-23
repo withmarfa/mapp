@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⌘P: the
+/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⇧⌘P: the
 /// same field searching the text of every note, each found note shown with the words around what was found.
 /// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
 /// be done now, so what it lists is what the menus have enabled.
@@ -9,8 +9,11 @@ struct CommandPalette: View {
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
+    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
     let browser: Browser
     let editor: EditorController
     let settings: SettingsPresentation
@@ -197,10 +200,30 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             if !browser.showsTypes {
-                add(String(localized: "List View"), "list.bullet") { browser.viewMode = .list }
-                add(String(localized: "Gallery View"), "square.grid.2x2") { browser.viewMode = .gallery }
-                if browser.usesGallery && !browser.showsGallery {
+                add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
+                add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
+                for order in NoteSort.allCases where order != sort {
+                    add(String(localized: "Sort by \(String(localized: order.title))"), "arrow.up.arrow.down") { sort = order }
+                }
+                if sort != .title {
+                    add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
+                        groupsByDate.toggle()
+                    }
+                }
+            }
+            if browser.usesGallery {
+                if !browser.showsGallery {
                     add(String(localized: "Back to Gallery"), "chevron.backward", "⌘[") { browser.returnToGallery() }
+                }
+            } else if browser.showsTypes {
+                if browser.types.canGoBack { add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.types.goBack() } }
+                if browser.types.canGoForward { add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.types.goForward() } }
+            } else {
+                if browser.canGoBack(in: library) {
+                    add(String(localized: "Back"), "chevron.backward", "⌘[") { browser.go(.back, in: library, order: order) }
+                }
+                if browser.canGoForward(in: library) {
+                    add(String(localized: "Forward"), "chevron.forward", "⌘]") { browser.go(.forward, in: library, order: order) }
                 }
             }
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
@@ -208,7 +231,7 @@ struct CommandPalette: View {
                 add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
             }
             if !browser.isCreatingItem, browser.selection.count == 1, let details {
-                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "info.circle", "⌥⌘I") { details.isPresented.toggle() }
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
             }
             if library.capabilities.contains(.folders) {
                 add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
@@ -217,7 +240,7 @@ struct CommandPalette: View {
             }
         }
         let search = String(localized: "Search Notes")
-        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⌘P", takesFocus: true) {
+        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⇧⌘P", takesFocus: true) {
             browser.palette = .search
         })
 
@@ -233,8 +256,23 @@ struct CommandPalette: View {
                     add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
                 }
             }
+            if hasVisibleEditor {
+                add(String(localized: "Add Attachment…"), "paperclip", "⇧⌘A") { editor.isChoosingImages = true }
+            }
             if library.canRenameFile(of: one) {
                 add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
+            }
+        }
+        if !browser.selection.isEmpty, !browser.isCreatingItem {
+            add(String(localized: "Open in New Window"), "macwindow", "⌘O") {
+                for id in library.idsForWindows(browser.selection) { openWindow(value: id) }
+            }
+        }
+        if let one {
+            add(String(localized: "Share…"), "square.and.arrow.up") {
+                let text = library.body(of: one.id)?.text ?? ""
+                guard let view = NSApp.keyWindow?.contentView else { return }
+                NSSharingServicePicker(items: [text]).show(relativeTo: .zero, of: view, preferredEdge: .minY)
             }
         }
 
@@ -264,7 +302,7 @@ struct CommandPalette: View {
             add(String(localized: "Full Width"), "arrow.left.and.right") { fullWidth = true }
         }
         if hasVisibleEditor {
-            add(String(localized: "Print…"), "printer", "⇧⌘P") { editor.printNote() }
+            add(String(localized: "Print…"), "printer", "⌘P") { editor.printNote() }
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
         let settingsTitle = String(localized: "Settings…")

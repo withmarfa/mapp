@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The menu bar. File makes and opens notes and acts on the selected ones; View orders the list and moves back
-/// and forward through the types Marfa Types has shown.
+/// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the list shows and
+/// orders items and moves back and forward through the items the window has shown.
 struct AppCommands: Commands {
     /// Nil while no library is open: before a folder is chosen, or while a server's copy opens.
     let library: (any ItemLibrary)?
@@ -67,18 +67,18 @@ struct AppCommands: Commands {
             .disabled(browser?.selectedFolder == nil || !editsFolders)
         }
 
-        // ⌘P is Search Notes, so Print takes ⇧⌘P, which Page Setup would have had; the print panel sets the paper.
+        // Print has ⌘P, as everywhere; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
                 .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .keyboardShortcut("p")
                 .disabled(browser?.isCreatingItem == true || browser?.showsGallery == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
             palette("Search Notes…", systemImage: "magnifyingglass", .search)
-                .keyboardShortcut("p")
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             palette("Command Palette", systemImage: "command", .commands)
                 .keyboardShortcut("k")
         }
@@ -91,7 +91,7 @@ struct AppCommands: Commands {
             Divider()
             if let browser { ItemViewOptions(browser: browser) }
             Divider()
-            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "info.circle") {
+            Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
@@ -101,16 +101,20 @@ struct AppCommands: Commands {
             Divider()
             PageWidthOptions()
             Divider()
-            // ⌘[ and ⌘], as in Safari and the Finder.
+            // ⌘[ and ⌘], as in Safari and the Finder. Marfa Types keeps its own history of the types it has shown.
             Button(browser?.usesGallery == true ? "Back to Gallery" : "Back", systemImage: "chevron.backward") {
                 if browser?.usesGallery == true { browser?.returnToGallery() }
-                else { marfaTypes?.goBack() }
+                else if let marfaTypes { marfaTypes.goBack() }
+                else if let browser, let library { browser.go(.back, in: library, order: order) }
             }
                 .keyboardShortcut("[")
-                .disabled(browser?.usesGallery == true ? browser?.showsGallery != false : marfaTypes?.canGoBack != true)
-            Button("Forward", systemImage: "chevron.forward") { marfaTypes?.goForward() }
+                .disabled(!canGoBack)
+            Button("Forward", systemImage: "chevron.forward") {
+                if let marfaTypes { marfaTypes.goForward() }
+                else if let browser, let library { browser.go(.forward, in: library, order: order) }
+            }
                 .keyboardShortcut("]")
-                .disabled(marfaTypes?.canGoForward != true)
+                .disabled(!canGoForward)
             Divider()
         }
 
@@ -124,6 +128,19 @@ extension AppCommands {
 
     /// Marfa Types, while the window in front shows it, for Back and Forward.
     private var marfaTypes: TypesBrowser? { browser?.showsTypes == true ? browser?.types : nil }
+
+    private var canGoBack: Bool {
+        guard let browser else { return false }
+        if browser.usesGallery { return browser.showsGallery == false }
+        if let marfaTypes { return marfaTypes.canGoBack }
+        return library.map { browser.canGoBack(in: $0) } ?? false
+    }
+
+    private var canGoForward: Bool {
+        guard let browser, !browser.usesGallery else { return false }
+        if let marfaTypes { return marfaTypes.canGoForward }
+        return library.map { browser.canGoForward(in: $0) } ?? false
+    }
 
     /// Opens a palette over the window in front, or puts it away if that palette is already out.
     private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {
