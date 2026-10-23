@@ -88,6 +88,48 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
+    @Test func jumpingToANoteInAnotherPlaceLeavesNothingBetweenItAndTheNoteLeft() {
+        let (library, older, newer, _) = makeFakeLibrary()
+        let planning = FakeItemLibrary.note("Planning", modified: start - 7200, in: work)
+        library.items.append(planning)
+        let browser = Browser()
+        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.selection = [older.id]
+        browser.reveal(planning, in: library, order: NoteOrder())
+        #expect(browser.selection == [planning.id])
+        #expect(browser.history.entries.map(\.id) == [newer.id, older.id, planning.id], "the first note All Items showed on the way was not recorded")
+        browser.go(.back, in: library)
+        #expect(browser.selection == [older.id])
+        #expect(browser.sidebarItem == .inbox)
+    }
+
+    @Test func theNoteAWindowOpensOnIsWhereBackCanReturnTo() {
+        let (library, older, newer, _) = makeFakeLibrary()
+        let browser = Browser()
+        browser.show(.inbox, in: library, order: NoteOrder())
+        #expect(browser.selection == [newer.id])
+        browser.selection = [older.id]
+        #expect(browser.history.entries.map(\.id) == [newer.id, older.id])
+        browser.go(.back, in: library)
+        #expect(browser.selection == [newer.id])
+    }
+
+    @Test func showingAPlaceOrSearchingMovesTheSelectionWithoutMakingHistory() {
+        let (library, older, newer, favorite) = makeFakeLibrary()
+        let browser = Browser()
+        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.selection = [older.id]
+        browser.show(.folder(work.id), in: library, order: NoteOrder())
+        #expect(browser.selection == [favorite.id])
+        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.selection = [older.id]
+        browser.searchText = "Newer"
+        browser.keepSelection(from: [newer.id, older.id], to: browser.items(in: library).map(\.id))
+        #expect(browser.selection == [newer.id], "the search moved the selection to a result")
+        #expect(browser.history.entries.map(\.id) == [newer.id, older.id])
+        #expect(!browser.canGoBack(in: library), "the only earlier note is the one the search moved to")
+    }
+
     @Test func draftDoesNotExposePreviouslySelectedNoteToCommands() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()

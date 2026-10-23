@@ -225,7 +225,7 @@ struct MainView: View {
         // The gallery disappears while an item is open; selection must still follow deletes and moves.
         .onChange(of: galleryItemIDs) { old, new in
             guard browser.usesGallery, !browser.isCreatingItem else { return }
-            browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
+            browser.keepSelection(from: old, to: new)
         }
         .onChange(of: library.folders) {
             browser.folderRemoved(in: library, order: order)

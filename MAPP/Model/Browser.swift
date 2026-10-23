@@ -7,11 +7,18 @@ import Observation
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
     var selection: Set<ItemID> = [] {
-        didSet { if !isMovingThroughHistory { history.record(selection, in: item) } }
+        didSet {
+            guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
+            history.record(selection, in: item)
+        }
     }
-    /// The items this window has shown, for Back and Forward. Kept for the life of the window, not across launches.
+    /// The items the person chose in this window, for Back and Forward: a click, a key in the list, a link or a
+    /// palette jump's destination. The app's own moves (the first note of a place, the next note after a delete
+    /// or a search) are left out, except the note the window opens on, so Back can return to it. Kept for the
+    /// life of the window, not across launches.
     private(set) var history = SelectionHistory()
     @ObservationIgnored private var isMovingThroughHistory = false
+    @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
             isGalleryItemPresented = false
@@ -111,17 +118,17 @@ final class Browser {
 
     /// Whether an earlier item the window showed can still be shown again.
     func canGoBack(in library: any ItemLibrary) -> Bool {
-        history.target(.back, in: library) != nil
+        history.target(.back, in: library, shown: selection) != nil
     }
 
     func canGoForward(in library: any ItemLibrary) -> Bool {
-        history.target(.forward, in: library) != nil
+        history.target(.forward, in: library, shown: selection) != nil
     }
 
     /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
-        guard let (index, entry) = history.target(direction, in: library) else { return }
+        guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCreatingItem = false
@@ -188,7 +195,20 @@ final class Browser {
 
     func selectFirstNote(in library: any ItemLibrary, order: NoteOrder) {
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
-        selection = first.map { [$0.id] } ?? []
+        selectAutomatically(first.map { [$0.id] } ?? [])
+    }
+
+    /// Moves the selection as the app does, not as the person chose, so Back does not stop there.
+    private func selectAutomatically(_ ids: Set<ItemID>) {
+        isSelectingAutomatically = true
+        defer { isSelectingAutomatically = false }
+        selection = ids
+    }
+
+    /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
+    func keepSelection(from old: [ItemID], to new: [ItemID]) {
+        let kept = Self.selection(selection, keptFrom: old, in: new)
+        if kept != selection { selectAutomatically(kept) }
     }
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
@@ -410,7 +430,7 @@ final class Browser {
         case .inbox, .allNotes, .favorites, .recentlyDeleted, .marfaTypes, .files: snapshot.place
         }
         let ids = Set(snapshot.selection)
-        selection = Set(items(in: library).map(\.id).filter(ids.contains))
+        selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
     }
 }
@@ -444,12 +464,13 @@ struct SelectionHistory {
         position = index
     }
 
-    /// The nearest entry in a direction whose item still exists. A deleted item is shown only where it was left, in
-    /// Recently Deleted, since no other place lists it.
-    func target(_ direction: Direction, in library: any ItemLibrary) -> (index: Int, entry: Entry)? {
+    /// The nearest entry in a direction whose item still exists and is not the one shown now (the app can move the
+    /// selection off the entry the history is at). A deleted item is shown only where it was left, in Recently
+    /// Deleted, since no other place lists it.
+    func target(_ direction: Direction, in library: any ItemLibrary, shown: Set<ItemID>) -> (index: Int, entry: Entry)? {
         let candidates = direction == .back ? Array(entries.indices.prefix(max(position, 0)).reversed()) : Array(entries.indices.dropFirst(position + 1))
         return candidates.lazy.map { ($0, entries[$0]) }.first { _, entry in
-            guard let item = library.item(entry.id) else { return false }
+            guard shown != [entry.id], let item = library.item(entry.id) else { return false }
             return item.state != .trashed || entry.place == .recentlyDeleted
         }
     }

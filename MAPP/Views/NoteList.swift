@@ -81,7 +81,7 @@ struct NoteList: View {
         }
         .dragContainerSelection(Array(browser.selection))
         .onChange(of: ids) { old, new in
-            browser.selection = Browser.selection(browser.selection, keptFrom: old, in: new)
+            browser.keepSelection(from: old, to: new)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             if ids.count == 1, let id = ids.first, library.canRenameFile(of: library.item(id)) {
