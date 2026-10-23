@@ -66,7 +66,7 @@ struct ItemFileView: View {
                 ProgressView("Getting File…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready(let url):
-                FileItemContent(url: url)
+                FileItemContent(url: url, title: library.item(id)?.title ?? url.lastPathComponent)
             case .unavailable:
                 ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
             case .failed:
