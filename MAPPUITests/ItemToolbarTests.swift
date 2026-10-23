@@ -30,7 +30,9 @@ final class ItemToolbarTests: XCTestCase {
         let page = window.itemPageTitle.frame
         XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the list column")
         XCTAssertLessThan(viewOptions.frame.maxX, newItem.frame.minX)
+        XCTAssertGreaterThan(back.frame.minX, newItem.frame.maxX, "Back and Forward lead the page column, not the list column")
         XCTAssertLessThan(back.frame.maxX, forward.frame.minX)
+        XCTAssertLessThan(forward.frame.maxX, details.frame.minX)
         XCTAssertLessThan(details.frame.maxX, more.frame.minX)
         XCTAssertGreaterThan(details.frame.minX, window.frame.midX)
         XCTAssertEqual(details.frame.midY, more.frame.midY, accuracy: 3)
@@ -43,6 +45,12 @@ final class ItemToolbarTests: XCTestCase {
             XCTAssertTrue(window.menuItems[title].waitForExistence(timeout: 3), title)
         }
         XCTAssertEqual(window.menuItems["List"].value as? Int, 1, "the list is the view shown")
+        var previous = -CGFloat.infinity
+        for title in ["View As", "List", "Gallery", "Sort By", "Date Edited", "Date Created", "Title", "Group by Date"] {
+            let item = window.menuItems[title].firstMatch
+            XCTAssertGreaterThan(item.frame.minY, previous, "\(title) follows the item before it")
+            previous = item.frame.minY
+        }
         capture("View Options menu")
         app.typeKey(.escape, modifierFlags: [])
     }
@@ -93,8 +101,8 @@ final class ItemToolbarTests: XCTestCase {
 
     func testViewMenuOffersTheListAndGalleryAndHistoryShortcuts() {
         app.menuBars.menuBarItems["View"].click()
-        XCTAssertTrue(app.menuBars.menuItems["List"].exists)
-        XCTAssertTrue(app.menuBars.menuItems["Gallery"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as List"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["View as Gallery"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Back"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Forward"].exists)
         app.typeKey(.escape, modifierFlags: [])
@@ -107,8 +115,19 @@ final class ItemToolbarTests: XCTestCase {
     func testCommandOneAndTwoSwitchBetweenTheListAndTheGallery() {
         app.typeKey("2", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
-        XCTAssertTrue(control("ViewOptionsToolbar").exists, "View Options stays reachable in the gallery")
-        XCTAssertTrue(control("NewItemToolbar").exists, "New Item stays reachable in the gallery")
+        let viewOptions = control("ViewOptionsToolbar")
+        let details = control("DetailsToggle")
+        let more = control("MoreToolbar")
+        let newItem = control("NewItemToolbar")
+        XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
+        XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
+        XCTAssertTrue(details.exists, "the card selected in the list is still selected, so Details and More have something to act on")
+        XCTAssertLessThan(viewOptions.frame.maxX, details.frame.minX)
+        XCTAssertLessThan(details.frame.maxX, more.frame.minX)
+        XCTAssertLessThan(more.frame.maxX, newItem.frame.minX)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(details.waitForNonExistence(timeout: 3), "Details and More leave the grid when no card is selected")
+        XCTAssertFalse(more.exists)
         app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }
