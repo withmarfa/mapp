@@ -179,9 +179,20 @@ import Observation
             defaults.removePersistentDomain(forName: suite)
             let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
             try? FileManager.default.removeItem(at: root)
-            return Libraries(
-                folder: NotesFolder(defaults: defaults),
-                host: MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root)))
+            // A debug build can be pointed at a test server by hand. The key stays in memory and the address goes
+            // only to the sample defaults cleared above, so nothing reaches the Keychain or the saved server.
+            var presets: [MarfaConnection: String] = [:]
+            var server: MarfaConnection?
+            if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder"),
+                let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
+                let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
+            {
+                presets[connection] = key
+                server = connection
+            }
+            let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore(presets), location: location(root: root))
+            if let server { host.presetTestServer(server) }
+            return Libraries(folder: NotesFolder(defaults: defaults), host: host)
         }
         #endif
         let host = MarfaHost(defaults: .standard, keys: KeychainKeyStore(), location: location())
