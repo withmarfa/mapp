@@ -248,6 +248,10 @@ body {
   mask-image: var(--icon-indicator);
 }
 
+.item-menu-pin.direct .item-icon-indicator {
+  display: none;
+}
+
 /* The status mark: a ring in the status's color, with half or all of it filled. */
 .item-status-mark {
   --mark: var(--label-secondary);

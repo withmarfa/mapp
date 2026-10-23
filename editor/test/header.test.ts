@@ -20,9 +20,10 @@ const ticket: HeaderModel = {
     label: 'In Progress',
     enabled: true,
     empty: false,
+    opensMenu: true,
     mark: { tone: 'orange', fill: 'half' },
   },
-  parent: { label: 'Field Research', enabled: true, empty: false },
+  parent: { label: 'Field Research', enabled: true, empty: false, opensMenu: true },
   propertyRejected: false,
   interfaceTextSize: 13,
 }
@@ -84,18 +85,26 @@ test('a pin without a value is drawn empty, and a status pin carries its mark', 
       label: 'Completed',
       enabled: true,
       empty: false,
+      opensMenu: true,
       mark: { tone: 'green', fill: 'full' },
     },
-    parent: { label: 'Parent', enabled: true, empty: true },
+    parent: { label: 'Parent', enabled: true, empty: true, opensMenu: false },
   })
   expect(mark().dataset.tone).toBe('green')
   expect(mark().dataset.fill).toBe('full')
   expect(chip('ItemParentChip').classList.contains('empty')).toBe(true)
   expect(label('ItemParentChip')).toBe('Parent')
-  // An empty pin still opens its menu; the app decides whether that is a menu or the picker.
+  // The empty parent pin opens the app's chooser directly, so it has no chevron and is not announced as a menu.
+  expect(chip('ItemParentChip').classList.contains('direct')).toBe(true)
+  expect(chip('ItemParentChip').getAttribute('aria-haspopup')).toBe('dialog')
+  expect(chip('ItemStatusChip').classList.contains('direct')).toBe(false)
+  expect(chip('ItemStatusChip').getAttribute('aria-haspopup')).toBe('menu')
   chip('ItemParentChip').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
   expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
-  header.set({ ...ticket, status: { label: 'Status', enabled: true, empty: true } })
+  header.set({
+    ...ticket,
+    status: { label: 'Status', enabled: true, empty: true, opensMenu: true },
+  })
   expect(chip('ItemStatusChip').classList.contains('empty')).toBe(true)
   expect(chip('ItemStatusChip').getAttribute('aria-description')).toBe('')
 })
@@ -182,7 +191,10 @@ test('a chip asks for its menu with its frame, from the mouse or the keyboard', 
       viewportHeight: window.innerHeight,
     },
   ])
-  header.set({ ...ticket, status: { label: 'Status', enabled: false, empty: true } })
+  header.set({
+    ...ticket,
+    status: { label: 'Status', enabled: false, empty: true, opensMenu: true },
+  })
   posted = []
   chip('ItemStatusChip').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
   expect(posted).toEqual([])

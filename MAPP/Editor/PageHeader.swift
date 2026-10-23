@@ -27,11 +27,13 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         }
     }
 
-    /// A pin that opens a menu. An empty one has no value yet: the page shows a plus and a quieter edge.
+    /// A pin that opens a menu. An empty one has no value yet: the page shows a plus and a quieter edge. A pin
+    /// that opens the app's chooser directly, as an empty parent does, is not a menu and has no chevron.
     struct Pin: Encodable, Equatable, Sendable {
         var label: String
         var enabled: Bool
         var empty = false
+        var opensMenu = true
         var mark: Mark?
     }
 

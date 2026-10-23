@@ -49,7 +49,7 @@ struct ItemPageHeader: ViewModifier {
     static func header(of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
-        let status = Self.status(of: item, in: library)
+        let status = library.catalogue.itemTypes[item.type]?.statusField
         let parent = Self.parent(of: item.id, in: library)
         return PageHeader(
             item: item.id.rawValue,
@@ -60,16 +60,17 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
-            status: status.map { _ in
-                let value = item.value(of: "status")?.string
-                return PageHeader.Pin(label: value.map(ItemPropertyRow.choiceLabel) ?? String(localized: "Status"),
-                                      enabled: item.isEditable, empty: value == nil, mark: .init(status: value))
+            status: status.map { field in
+                let value = Self.statusValue(of: item, in: field)
+                // With nothing to pick from, the pin only shows the status the item has.
+                return PageHeader.Pin(label: value.map { Self.localized(ItemTypeInfo.Field.label(ofOption: $0)) } ?? String(localized: "Status"),
+                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(status: value))
             },
             parent: parent.map {
                 // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
                 let title = $0.targets.first?.title
                 return PageHeader.Pin(label: title ?? String(localized: "Parent"), enabled: title != nil || $0.isEditable,
-                                      empty: title == nil)
+                                      empty: title == nil, opensMenu: title != nil)
             },
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
@@ -104,14 +105,13 @@ struct ItemPageHeader: ViewModifier {
                 draft.isDirty = false
                 draft.rejected = false
             case .menu(.status, let id, let rect):
-                guard let item = library.item(id), let status = Self.status(of: item, in: library),
-                      case .choice(let choices) = status.kind else { return }
+                guard let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 let menu = NSMenu()
-                for choice in choices {
-                    let entry = actionItem(Self.localized(ItemPropertyRow.choiceLabel(choice))) {
+                for choice in Self.statusChoices(of: item, in: status) {
+                    let entry = actionItem(Self.localized(ItemTypeInfo.Field.label(ofOption: choice))) {
                         drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
                     }
-                    entry.state = item.value(of: status.key)?.string == choice ? .on : .off
+                    entry.state = Self.statusValue(of: item, in: status) == choice ? .on : .off
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
@@ -142,10 +142,17 @@ struct ItemPageHeader: ViewModifier {
         }
     }
 
-    private static func status(of item: Item, in library: any ItemLibrary) -> ItemTypeInfo.Field? {
-        guard let field = library.catalogue.itemTypes[item.type]?.fields.first(where: { $0.key == "status" }),
-              case .choice = field.kind else { return nil }
-        return field
+    /// The status the item holds, if it holds one.
+    static func statusValue(of item: Item, in field: ItemTypeInfo.Field) -> String? {
+        item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
+    /// not list, so the menu always shows what is set.
+    static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
+        let options = field.options
+        guard let value = statusValue(of: item, in: field), !options.contains(value) else { return options }
+        return options + [value]
     }
 
     private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {

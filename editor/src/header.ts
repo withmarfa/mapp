@@ -9,6 +9,8 @@ export interface HeaderPin {
   label: string
   enabled: boolean
   empty: boolean
+  /** False for a pin that opens the app's chooser directly: it has no chevron, as a pop-up button does. */
+  opensMenu: boolean
   /** Only the status pin has a mark. */
   mark?: { tone: HeaderTone; fill: HeaderFill }
 }
@@ -279,6 +281,9 @@ export class ItemHeader {
     pin.hidden = model == null
     pin.disabled = !(model?.enabled ?? false)
     pin.classList.toggle('empty', model?.empty ?? false)
+    const opensMenu = model?.opensMenu ?? true
+    pin.classList.toggle('direct', !opensMenu)
+    pin.setAttribute('aria-haspopup', opensMenu ? 'menu' : 'dialog')
     pin.querySelector('.item-pin-label')!.textContent = model?.label ?? ''
     // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
     const mark = pin.querySelector<HTMLElement>('.item-status-mark')
@@ -292,7 +297,6 @@ export class ItemHeader {
     const pin = element('button', 'item-pin item-menu-pin', this.pins)
     pin.type = 'button'
     pin.id = id
-    pin.setAttribute('aria-haspopup', 'menu')
     // An empty pin shows a plus where a filled one shows its symbol.
     const symbol =
       menu === 'status'

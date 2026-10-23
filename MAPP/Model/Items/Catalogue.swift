@@ -37,6 +37,60 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     var compatibleWith: [TypeID] = []
 
     func declares(_ key: String) -> Bool { fields.contains { $0.key == key } }
+
+    /// The property the item's title is kept in: the field the hints name, else `title` where the type declares
+    /// it.
+    var titleKey: String? { titleField ?? (declares("title") ? "title" : nil) }
+
+    /// The property the item's text is kept in: the field the hints name, else `body` where the type declares it.
+    var bodyKey: String? { bodyField ?? (declares("body") ? "body" : nil) }
+
+    /// The field an item's status is kept in, for any type that defines one a person can pick from: a choice, or
+    /// a text field that recommends values (Marfa's `core.task` does). A status the type gives some other shape
+    /// (a number, a date) is not a status the page can offer a menu for.
+    var statusField: Field? {
+        fields.first { field in
+            guard field.key == "status" else { return false }
+            switch field.kind {
+            case .choice, .text: return true
+            case .number, .boolean, .date, .other: return false
+            }
+        }
+    }
+}
+
+nonisolated extension ItemTypeInfo.Field {
+    /// The values the catalogue offers for the field, in its order: a choice's own, or the ones a text field's
+    /// description recommends, as `Recommended values: pending, in_progress`. Empty when it names none.
+    var options: [String] {
+        switch kind {
+        case .choice(let choices): return choices
+        case .text: return Self.recommendedValues(in: description)
+        case .number, .boolean, .date, .other: return []
+        }
+    }
+
+    /// Whether the field is picked from a list of values rather than typed.
+    var isPicked: Bool { !options.isEmpty }
+
+    private static let recommendation = "recommended values:"
+
+    private static func recommendedValues(in description: String?) -> [String] {
+        guard let description, let range = description.range(of: recommendation, options: [.caseInsensitive, .anchored]) else { return [] }
+        let values = description[range.upperBound...]
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "."))) }
+        // Prose that merely follows the phrase is no list: every value has to look like one.
+        guard !values.isEmpty, values.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" } })
+        else { return [] }
+        return values
+    }
+
+    /// An option written for reading: the catalogue holds no labels for them, so `in_progress` reads as "In
+    /// Progress".
+    static func label(ofOption option: String) -> String {
+        option.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
