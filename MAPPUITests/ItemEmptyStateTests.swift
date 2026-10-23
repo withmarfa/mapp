@@ -27,7 +27,7 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
-        XCTAssertEqual(prompt.value as? String, "Select an item")
+        XCTAssertEqual(prompt.value as? String, "No Item Selected")
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         XCTAssertFalse(window.itemPageTitle.exists)
         capture("Items without selection and matching toolbar background")

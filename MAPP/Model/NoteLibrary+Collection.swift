@@ -265,6 +265,7 @@ extension NoteLibrary {
         let type = file.isImage ? WorkbenchSchema.imageType : file.isPDF ? WorkbenchSchema.pdfType : WorkbenchSchema.fileType
         return Item(
             id: file.id, type: type, title: file.title, titleRule: .firstLine,
+            preview: ItemPreview.file(file.contentType, byteCount: file.stored.byteCount),
             content: .file(file.contentType, byteCount: file.stored.byteCount), container: file.folderID.map(ContainerID.init),
             version: ItemVersion(file.revision), created: file.stored.created, modified: file.stored.modified)
     }

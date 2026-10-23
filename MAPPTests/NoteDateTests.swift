@@ -29,8 +29,24 @@ struct NoteDateTests {
         #expect(label(19) == "Saturday")
     }
 
-    @Test func olderDatesShowTheDate() {
+    @Test func olderDatesShowTheShortDate() {
         #expect(label(18) == "18/09/2026")
         #expect(label(2, 9) == "02/09/2026")
+    }
+
+    @Test func aWeekAgoIsAlreadyADate() {
+        #expect(label(19) == "Saturday")
+        #expect(label(18) == "18/09/2026")
+    }
+
+    @Test func theShortDateFollowsTheLocale() {
+        let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 18))!
+        let date = calendar.date(from: DateComponents(year: 2025, month: 12, day: 31, hour: 9))!
+        #expect(NoteDate.listLabel(for: date, now: now, calendar: calendar, locale: Locale(identifier: "en_GB")) == "31/12/2025")
+        #expect(NoteDate.listLabel(for: date, now: now, calendar: calendar, locale: Locale(identifier: "en_US")) == "12/31/2025")
+    }
+
+    @Test func aTimeLaterTodayStillShowsTheTime() {
+        #expect(label(25, hour: 23, minute: 59) == "23:59")
     }
 }

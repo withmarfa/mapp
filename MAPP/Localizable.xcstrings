@@ -452,11 +452,17 @@
     "Choose a kind of item and give it a title." : {
       "extractionState" : "manual"
     },
+    "Choose a single item to read or edit it." : {
+
+    },
     "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
 
     },
     "Choose a unique title without characters that cannot be used in a file name." : {
       "extractionState" : "manual"
+    },
+    "Choose an item from the list to read or edit it." : {
+
     },
     "Choose Date" : {
       "extractionState" : "manual"
@@ -1067,9 +1073,6 @@
     "No" : {
       "extractionState" : "manual"
     },
-    "No additional text" : {
-
-    },
     "No Files" : {
       "extractionState" : "manual"
     },
@@ -1329,9 +1332,6 @@
 
     },
     "Search Settings" : {
-
-    },
-    "Select an item" : {
 
     },
     "Selected" : {

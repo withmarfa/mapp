@@ -53,7 +53,7 @@ struct NoteTextTests {
         | --- | ---: |
         | Oak & Iron | £11,850 |
         """
-        #expect(preview(body) == "Supplier  Quote Oak & Iron  £11,850")
+        #expect(preview(body) == "Supplier Quote Oak & Iron £11,850")
     }
 
     @Test func previewKeepsCodeInsideFencesAsWritten() {
@@ -70,13 +70,13 @@ struct NoteTextTests {
         #expect(preview("Title\n\n![Dusk|320](Attachments/Dusk.png) and ![Photo\\|400](a.png)") == "Dusk and Photo")
     }
 
-    @Test func previewOfATitleOnlyNoteSaysSo() {
-        #expect(preview("# Just a title") == "No additional text")
+    @Test func previewOfATitleOnlyNoteIsEmpty() {
+        #expect(preview("# Just a title") == "")
     }
 
     @Test func previewIsCappedAtTheLimit() {
         let body = "Title\n" + String(repeating: "word ", count: 200)
-        #expect(preview(body).count == NoteText.previewLimit)
+        #expect(preview(body).count == ItemPreview.limit)
     }
 
     @Test(arguments: [

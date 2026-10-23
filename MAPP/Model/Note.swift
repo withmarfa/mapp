@@ -100,7 +100,7 @@ nonisolated struct Note: Identifiable, Hashable {
     private mutating func refreshText() {
         let line = NoteText.firstLine(of: file.body)
         title = (followsFirstLine ? line : nil) ?? file.title ?? fileTitle
-        preview = NoteText.preview(of: file.body, title: title)
+        preview = ItemPreview.text(of: file.body, title: title)
         revise()
     }
 

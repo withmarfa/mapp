@@ -18,6 +18,7 @@ struct NoteList: View {
         let now = library.now()
         let sections = browser.sections(in: library, order: order, now: now)
         let ids = sections.flatMap { $0.items.map(\.id) }
+        let context = browser.metaContext(for: sections.flatMap(\.items))
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
@@ -37,7 +38,7 @@ struct NoteList: View {
                     let row = ItemRow(
                         item: item,
                         dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
-                        folderName: browser.showsFolders ? folderName(for: item) : nil,
+                        meta: ItemMeta.make(for: item, in: library, context: context),
                         previewLines: previewLines
                     )
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
@@ -117,26 +118,22 @@ struct NoteList: View {
             Browser.delete(ids, in: library, undoManager: undoManager)
         }
     }
-
-    private func folderName(for item: Item) -> String {
-        library.folder(of: item)?.name ?? String(localized: "Inbox")
-    }
 }
 
-/// Laid out as Mail lays out a message, so the date lines up at the trailing edge, and the preview's lines are
-/// reserved whether the item fills them or not, keeping every row the same height. A file's kind stands in for
-/// the preview a note has.
+/// Laid out as Mail lays out a message: the title and, at the trailing edge, the date; under them the text, in as
+/// many lines as the list is set to show; then what the item is and where it sits. A row has only the lines it
+/// has something to put in, so one without text leaves no gap.
 struct ItemRow: View {
     let item: Item
     let dateLabel: String
-    let folderName: String?
+    let meta: ItemMeta
     let previewLines: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(item.title)
-                    .interfaceFont(.headline)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(item.title.isEmpty ? String(localized: "Untitled") : item.title)
+                    .interfaceFont(.body.weight(.semibold))
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(dateLabel)
@@ -145,27 +142,36 @@ struct ItemRow: View {
                     .lineLimit(1)
                     .layoutPriority(1)
             }
-            if previewLines > 0 {
-                Group {
-                    if case .file(let type, _) = item.content {
-                        Label(type.localizedDescription ?? String(localized: "File"), systemImage: type.conforms(to: .image) ? "photo" : "doc")
-                    } else {
-                        Text(item.preview)
-                    }
-                }
-                .interfaceFont(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(previewLines, reservesSpace: true)
-            }
-            if let folderName {
-                Label(folderName, systemImage: "folder")
-                    .interfaceFont(.caption)
+            if previewLines > 0, !item.preview.isEmpty {
+                Text(item.preview)
+                    .interfaceFont(.subheadline)
                     .foregroundStyle(.secondary)
-                    .labelStyle(.titleAndIcon)
+                    .lineLimit(previewLines)
+            }
+            if !meta.isEmpty {
+                ItemMetaLine(meta: meta)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 1)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The pieces that say what an item is and where it sits, side by side with room between them.
+struct ItemMetaLine: View {
+    let meta: ItemMeta
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(meta.pieces) { piece in
+                Label(piece.label, systemImage: piece.symbol)
+                    .labelStyle(.titleAndIcon)
+                    .lineLimit(1)
+            }
+        }
+        .interfaceFont(.caption)
     }
 }
 
@@ -193,4 +199,27 @@ private enum ListLine: Identifiable {
         }
         return lines
     }
+}
+
+#Preview("Rows") {
+    let now = Date.now
+    let rows: [(String, String, String, [ItemMeta.Piece], String)] = [
+        ("Review the findings", "Compare the field notes and photographs, then write up what the interviews changed about the plan.", "9:41 AM", [.init(symbol: "checkmark.circle", label: "Task"), .init(symbol: "folder", label: "Field Research")], ""),
+        ("Field notes", "Start with what we observed in the kitchen: three quotes, two photos and the measurements.", "Yesterday", [.init(symbol: "doc.text", label: "Note")], ""),
+        ("Decide on the sync wording", "Two names are in use. Pick one and update the docs and the app together.", "Wednesday", [.init(symbol: "signpost.right", label: "Decision"), .init(symbol: "folder", label: "Marfa")], ""),
+        ("Contract.pdf", "PDF Document, 1.2 MB", "23/09/2026", [.init(symbol: "doc", label: "File")], ""),
+        ("Untitled", "", "04/09/2026", [], ""),
+    ]
+    List {
+        ForEach(rows, id: \.0) { row in
+            ItemRow(
+                item: Item(
+                    id: ItemID(row.0), type: TypeID("core.note"), title: row.0, titleRule: .firstLine, preview: row.1,
+                    version: ItemVersion(1), created: now, modified: now),
+                dateLabel: row.2, meta: ItemMeta(pieces: row.3), previewLines: 2)
+        }
+    }
+    .listStyle(.inset)
+    .interfaceTextStyle()
+    .frame(width: 340, height: 460)
 }
