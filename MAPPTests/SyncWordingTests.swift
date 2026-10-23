@@ -54,6 +54,8 @@ struct SyncStatusTests {
 
         let some = try #require(SyncStatus(state: .offline(reason: nil), report: report(waiting: 1, oldest: 2), now: now).primary)
         #expect(some.detail == "1 change will be sent when you’re back online.")
+        #expect(some.line == "Offline, 1 change waiting")
+        #expect(none.line == "Offline")
     }
 
     @Test func catchingUpAfterReconnectingIsSaid() throws {
@@ -69,14 +71,13 @@ struct SyncStatusTests {
         #expect(note.title == "Key refused")
         #expect(note.detail == "The server doesn’t accept your key. Enter a new one in Settings. 2 changes are waiting to be sent.")
         #expect(note.isWarning)
-        #expect(status.pointsToSettings)
+        #expect(note.line == "Key refused, 2 changes waiting")
         #expect(!status.notes.contains { $0.kind == .sending }, "the server is not being asked, so nothing is being sent")
     }
 
     @Test func aLibraryThatCannotBeOpenedPointsToSettings() throws {
         let status = SyncStatus(state: .unavailable(message: "The store is damaged."), report: report(), now: now)
         #expect(status.primary?.kind == .unavailable)
-        #expect(status.pointsToSettings)
     }
 
     @Test func changesThatNeedThePersonCountedWithAnyOtherNote() throws {
@@ -85,7 +86,7 @@ struct SyncStatusTests {
         #expect(status.notes.map(\.kind) == [.needsAttention, .offline])
         #expect(status.primary?.title == "Needs attention")
         #expect(status.primary?.detail == "2 changes need your attention.")
-        #expect(!status.pointsToSettings)
+        #expect(status.primary?.line == "2 changes need attention")
     }
 
     @Test func aKeyThatIsRefusedComesBeforeAnythingElse() {
@@ -277,11 +278,10 @@ struct ConnectionStatusTests {
     }
 
     @Test(arguments: [MarfaHost.State.otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse])
-    func theWindowPointsToSettingsForACopyThisVersionCantOpen(state: MarfaHost.State) {
+    func theWindowSaysACopyThisVersionCantOpenIsUnavailable(state: MarfaHost.State) {
         let status = SyncStatus(state: state, report: SyncReport(), now: Date())
         #expect(status.primary?.kind == .unavailable)
         #expect(status.primary?.detail == "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do.")
-        #expect(status.pointsToSettings)
     }
 
     @Test func theReasonOfBeingOfflineIsNotShown() {

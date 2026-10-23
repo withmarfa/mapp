@@ -19,13 +19,11 @@ struct MainView: View {
     @State private var noteName = ""
     @State private var takenNoteName: String?
     @State private var importRequestID: UUID?
-    private let settings: SettingsPresentation
     private let restoresWindow: Bool
 
-    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), settings: SettingsPresentation = SettingsPresentation(), restoresWindow: Bool = true) {
+    init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
         _browser = State(initialValue: browser)
         _details = State(initialValue: details)
-        self.settings = settings
         self.restoresWindow = restoresWindow
     }
 
@@ -40,17 +38,15 @@ struct MainView: View {
 
     var body: some View { lifecycleWindow }
 
+    /// The gallery has no list column, so it is the one place that mounts the two-column split view. Settings
+    /// shows in the three-column one, in place of the list and the page, whatever the window is set to show.
+    private var usesGalleryLayout: Bool { browser.usesGallery && !browser.showsSettings }
+
     private var activeWindow: some View {
-        Group {
-            if settings.isPresented {
-                SettingsView(presentation: settings)
-            } else {
-                // Release the split view's toolbar provider before changing its native column count.
-                // Browser, editor, drafts, and column preferences remain above this presentation identity.
-                renamingWindow.id(browser.usesGallery)
-            }
-        }
-        .onChange(of: browser.usesGallery) {
+        // Release the split view's toolbar provider before changing its native column count.
+        // Browser, editor, drafts, and column preferences remain above this presentation identity.
+        renamingWindow.id(usesGalleryLayout)
+        .onChange(of: usesGalleryLayout) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
             editor.flush()
@@ -58,11 +54,8 @@ struct MainView: View {
         .onChange(of: browser.showsGallery) {
             if browser.showsGallery { editor.releaseFocus(); editor.flush() }
         }
-        .onChange(of: settings.isPresented) {
-            if settings.isPresented {
-                // Changing the ideal during a resize feeds transient layout sizes back into the split view.
-                sidebarWidth = measuredWidths.sidebar
-                listWidth = measuredWidths.list
+        .onChange(of: browser.showsSettings) {
+            if browser.showsSettings {
                 editor.flush()
                 browser.palette = nil
                 pane = nil
@@ -84,17 +77,27 @@ struct MainView: View {
         NavigationSplitView(columnVisibility: listColumnVisibility) {
             sidebarColumn
         } content: {
-            NoteList(browser: browser, order: order, pane: $pane)
+            Group {
+                if browser.showsSettings {
+                    SettingsPageList(browser: browser)
+                } else {
+                    NoteList(browser: browser, order: order, pane: $pane)
+                }
+            }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                 if $0.isFinite, $0 >= 280 { measuredWidths.list = $0 }
             }
             .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
         } detail: {
-            itemPage
-                .modifier(itemInspector)
-                .toolbar(id: "main") {
-                    NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
-                }
+            if browser.showsSettings {
+                SettingsPageView(page: browser.settingsPage)
+            } else {
+                itemPage
+                    .modifier(itemInspector)
+                    .toolbar(id: "main") {
+                        NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                    }
+            }
         }
     }
 
@@ -103,19 +106,12 @@ struct MainView: View {
             // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
             .focused($pane, equals: .sidebar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                SyncStatusBar { settings.show(.marfa) }
+                SidebarFoot(browser: browser)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
                 if $0.isFinite, $0 >= 180 { measuredWidths.sidebar = $0 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: sidebarWidth, max: 320)
-            .toolbar {
-                ToolbarItem {
-                    Button("Settings…", systemImage: "gearshape") { settings.show() }
-                        .help("Settings")
-                        .accessibilityIdentifier("SettingsToolbar")
-                }
-            }
     }
 
     private var itemPage: some View {
@@ -132,7 +128,7 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if browser.usesGallery {
+            if usesGalleryLayout {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
@@ -181,7 +177,7 @@ struct MainView: View {
                             browser.palette = nil
                             browser.focusRequest = .list
                         }
-                    CommandPalette(browser: browser, editor: editor, settings: settings, mode: palette)
+                    CommandPalette(browser: browser, editor: editor, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
                         .id(palette)
                         .padding(.top, 72)
@@ -305,6 +301,7 @@ struct MainView: View {
         guard let requestID = importRequestID, let id = completedImportID,
               library.item(id) != nil else { return }
         browser.isCreatingItem = false
+        browser.leaveSettings()
         browser.sidebarItem = .allNotes
         browser.searchText = ""
         browser.selection = [id]

@@ -37,7 +37,7 @@ struct SidebarTests {
         let library = folderLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.types.isEmpty)
-        #expect(plan.library == [.projects, .folders, .recentlyDeleted])
+        #expect(plan.library == [.projects, .folders])
     }
 
     @Test func recentlyDeletedCountsWhatTheBinHolds() {
@@ -76,14 +76,14 @@ struct SidebarTests {
     @Test func aMarfaLibraryShowsTypesNotFolders() async throws {
         let library = try await marfaLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())
-        #expect(plan.library == [.projects, .types, .recentlyDeleted])
+        #expect(plan.library == [.projects, .types])
         #expect(!plan.types.contains { $0.id == .project })
         #expect(library.count(in: .recentlyDeleted) == 1)
     }
 
-    @Test func anEmptyLibraryStillOffersProjectsAndRecentlyDeleted() async throws {
+    @Test func anEmptyLibraryStillOffersProjects() async throws {
         let library = try await marfaLibrary([])
-        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.projects, .recentlyDeleted])
+        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.projects])
     }
 
     @Test func aCatalogueWithoutTheProjectTypeHasNoProjectsRow() async throws {
@@ -92,7 +92,7 @@ struct SidebarTests {
             edgeTypes: Array(LibraryFixture.catalogue.edgeTypes.values))
         let library = try await marfaLibrary(
             [LibraryFixture.item(LibraryFixture.n1, LibraryFixture.note, "Plain note", age: 1)], catalogue: notesOnly)
-        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types, .recentlyDeleted])
+        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types])
     }
 
     @Test func aTypeTheCatalogueGainsAppearsAfterTheOnesAlreadyPlaced() async throws {
@@ -113,13 +113,13 @@ struct SidebarTests {
         let library = try await marfaLibrary()
         var layout = SidebarLayout()
         layout.setHidden(.type(LibraryFixture.entity), true)
-        layout.setHidden(.recentlyDeleted, true)
+        layout.setHidden(.projects, true)
         let plan = SidebarPlan(library, layout: layout)
         #expect(plan.types.contains { $0.id == LibraryFixture.entity })
         #expect(!plan.shownTypes.contains { $0.id == LibraryFixture.entity })
-        #expect(plan.shownLibrary == [.projects, .types])
-        layout.setHidden(.recentlyDeleted, false)
-        #expect(SidebarPlan(library, layout: layout).shownLibrary.last == .recentlyDeleted)
+        #expect(plan.shownLibrary == [.types])
+        layout.setHidden(.projects, false)
+        #expect(SidebarPlan(library, layout: layout).shownLibrary == [.projects, .types])
     }
 
     @Test func movingPlacesReordersThemWithinTheirGroup() {
