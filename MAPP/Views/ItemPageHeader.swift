@@ -160,9 +160,7 @@ struct ItemPageHeader: ViewModifier {
     /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
     /// not list, so the menu always shows what is set.
     static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
-        let options = field.options
-        guard let value = statusValue(of: item, in: field), !options.contains(value) else { return options }
-        return options + [value]
+        field.options(including: statusValue(of: item, in: field))
     }
 
     private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {

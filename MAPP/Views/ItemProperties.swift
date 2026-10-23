@@ -11,6 +11,9 @@ struct ItemPropertyRow: View {
     @State private var localDraft = ItemPropertyDraft()
     @State private var rowHovering = false
     @State private var choosingDate = false
+    /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
+    /// person's own, until the person is done typing it.
+    @State private var typingOwnValue = false
     @FocusState private var dateButtonFocused: Bool
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
     @FocusState private var isFocused: Bool
@@ -47,14 +50,14 @@ struct ItemPropertyRow: View {
         .onAppear { if !input.isDirty { seed(value) } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
         .onChange(of: value) { _, value in if !input.isDirty { seed(value) } }
-        .onChange(of: isFocused) { if !isFocused { commit() } }
+        .onChange(of: isFocused) { if !isFocused { commit(); typingOwnValue = false } }
         .onDisappear { commit() }
     }
 
     @ViewBuilder private var control: some View {
         switch definition.kind {
-        case .choice(let choices):
-            choiceMenu(choices)
+        case .choice:
+            choiceMenu()
         case .boolean:
             let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
             menu(current: current.map { Text($0 ? "Yes" : "No") }) {
@@ -85,9 +88,14 @@ struct ItemPropertyRow: View {
                     .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
             }
             .accessibilityAction(named: "Choose Date") { choosingDate = true }
-        // A text field that recommends values is picked from them, as a status is, and keeps a value of its own.
+        // Marfa only recommends these values, so any other text is as valid: the menu offers them, and Other… types one.
         case .text where definition.isPicked:
-            choiceMenu(definition.options)
+            if typingOwnValue {
+                textField
+                    .task { isFocused = true }
+            } else {
+                choiceMenu(allowsOther: true)
+            }
         case .text, .number:
             textField
         // A list or an object is shown as written, since a text field would replace it with a string.
@@ -110,7 +118,7 @@ struct ItemPropertyRow: View {
         return Text(ItemValueText.string(value))
     }
 
-    private func choiceMenu(_ choices: [String]) -> some View {
+    private func choiceMenu(allowsOther: Bool = false) -> some View {
         let current = value?.string
         return menu(current: current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }) {
             Picker(LocalizedStringKey(definition.label), selection: Binding {
@@ -119,13 +127,17 @@ struct ItemPropertyRow: View {
                 input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
             }) {
                 Text("Not Set").tag("")
-                if let current, !choices.contains(current) {
-                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: current))).tag(current)
+                ForEach(definition.options(including: current), id: \.self) {
+                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0)
                 }
-                ForEach(choices, id: \.self) { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0) }
             }
             .pickerStyle(.inline)
             .labelsHidden()
+            if allowsOther {
+                Divider()
+                Button("Other…") { typingOwnValue = true }
+                    .accessibilityIdentifier("ItemPropertyOther.\(definition.key)")
+            }
         }
     }
 
@@ -190,7 +202,7 @@ struct ItemPropertyRow: View {
         .multilineTextAlignment(.leading)
         .lineLimit(definition.kind == .number ? 1...1 : 1...12)
         .focused($isFocused)
-        .onSubmit { commit() }
+        .onSubmit { commit(); typingOwnValue = false }
         .frame(maxWidth: .infinity, alignment: .leading)
         // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
         .overlay(alignment: .topLeading) {

@@ -102,6 +102,17 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.header(of: library.items[1].id, in: library, drafts: DetailsPresentation())?.status == nil)
     }
 
+    @Test func aFieldThatOnlyRecommendsValuesKeepsAnyTypedValueInItsMenu() throws {
+        let status = try #require(Self.task.statusField)
+        #expect(status.options(including: nil) == status.options)
+        #expect(status.options(including: "") == status.options)
+        #expect(status.options(including: "completed") == status.options)
+        #expect(status.options(including: "waiting on Sam") == status.options + ["waiting on Sam"])
+        #expect(ItemTypeInfo.Field.label(ofOption: "in_progress") == "In Progress")
+        let plain = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("note")])).fields[0]
+        #expect(plain.options(including: "anything").isEmpty)
+    }
+
     @Test func theStatusMenuKeepsAValueTheCatalogueDoesNotList() throws {
         let status = try #require(Self.task.statusField)
         let blocked = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("blocked"))])

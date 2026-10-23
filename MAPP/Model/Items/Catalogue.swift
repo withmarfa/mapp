@@ -73,6 +73,14 @@ nonisolated extension ItemTypeInfo.Field {
     /// Whether the field is picked from a list of values rather than typed.
     var isPicked: Bool { !options.isEmpty }
 
+    /// The values to offer for an item that holds `current`: `options`, and `current` last where they do not list
+    /// it, since a menu always shows what is set. A text field only recommends its values, so it can hold any.
+    func options(including current: String?) -> [String] {
+        let options = options
+        guard !options.isEmpty, let current, !current.isEmpty, !options.contains(current) else { return options }
+        return options + [current]
+    }
+
     private static let recommendation = "recommended values:"
 
     private static func recommendedValues(in description: String?) -> [String] {
