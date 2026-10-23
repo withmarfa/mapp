@@ -2,6 +2,9 @@ import SwiftUI
 
 /// The page's toolbar: Back and Forward through the items shown, then Details and More. Format is out of the
 /// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
+///
+/// Back and Forward take the automatic placement, which sets them at the leading edge of this column's section.
+/// The navigation placement sets them at the window's leading edge, beside the list column's title.
 struct NoteToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
@@ -14,9 +17,9 @@ struct NoteToolbar: CustomizableToolbarContent {
     }
 
     var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "back", placement: .navigation) { HistoryButton(browser: browser, direction: .back) }
+        ToolbarItem(id: "back") { HistoryButton(browser: browser, direction: .back) }
             .hidden(browser == nil || tools.showsTypes)
-        ToolbarItem(id: "forward", placement: .navigation) { HistoryButton(browser: browser, direction: .forward) }
+        ToolbarItem(id: "forward") { HistoryButton(browser: browser, direction: .forward) }
             .hidden(browser == nil || tools.showsTypes)
         ToolbarItem(id: "scrolledTitle") {
             Text(tools.notes.first?.title ?? "")
