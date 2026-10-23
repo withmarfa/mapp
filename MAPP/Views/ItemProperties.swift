@@ -11,6 +11,7 @@ struct ItemPropertyRow: View {
     @State private var localDraft = ItemPropertyDraft()
     @State private var rowHovering = false
     @State private var choosingDate = false
+    @FocusState private var dateButtonFocused: Bool
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
     @FocusState private var isFocused: Bool
 
@@ -72,14 +73,18 @@ struct ItemPropertyRow: View {
         case .date:
             HStack(spacing: 4) {
                 textField
-                if rowHovering || isFocused || choosingDate {
-                    Button { choosingDate = true } label: { Image(systemName: "calendar") }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Choose Date")
-                        .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
-                }
+                // Always there, so the keyboard and VoiceOver reach it; it is drawn only where a pointer or the
+                // keyboard is, so the row at rest shows nothing but its value.
+                Button { choosingDate = true } label: { Image(systemName: "calendar") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .focused($dateButtonFocused)
+                    .opacity(rowHovering || isFocused || dateButtonFocused || choosingDate ? 1 : 0)
+                    .accessibilityLabel("Choose Date")
+                    .accessibilityIdentifier("ItemPropertyDate.\(definition.key)")
+                    .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
             }
+            .accessibilityAction(named: "Choose Date") { choosingDate = true }
         // A text field that recommends values is picked from them, as a status is, and keeps a value of its own.
         case .text where definition.isPicked:
             choiceMenu(definition.options)
@@ -147,19 +152,30 @@ struct ItemPropertyRow: View {
     }
 
     private var datePicker: some View {
-        let dateOnly = value?.string == nil || value?.string?.count == 10
-        return DatePicker("Choose Date", selection: Binding {
-            Self.date(value?.string) ?? Date()
-        } set: { selected in
-            let text = dateOnly
-                ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-                : selected.ISO8601Format()
-            input.rejected = !onChange(.string(text))
-            if !input.rejected { input.text = text; input.isDirty = false }
-        }, displayedComponents: dateOnly ? [.date] : [.date, .hourAndMinute])
-        .datePickerStyle(.graphical)
-        .labelsHidden()
+        let dateOnly = isDateOnly
+        return VStack(spacing: 8) {
+            DatePicker("Choose Date", selection: Binding {
+                Self.date(value?.string) ?? Date()
+            } set: { setDate($0) }, displayedComponents: dateOnly ? [.date] : [.date, .hourAndMinute])
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            // The picker already shows today for an empty date, and picking the day it shows may change nothing.
+            Button("Today") { setDate(Date()) }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("ItemPropertyToday.\(definition.key)")
+        }
         .padding(12)
+    }
+
+    /// A date of ten characters is a day, as an empty one is until the person picks a time.
+    private var isDateOnly: Bool { (value?.string ?? "").isEmpty || value?.string?.count == 10 }
+
+    private func setDate(_ selected: Date) {
+        let text = isDateOnly
+            ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+            : selected.ISO8601Format()
+        input.rejected = !onChange(.string(text))
+        if !input.rejected { input.text = text; input.isDirty = false }
     }
 
     private var textField: some View {
