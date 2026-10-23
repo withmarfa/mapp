@@ -14,8 +14,15 @@ struct ItemGallery: View {
     @State private var cursor: ItemID?
     @State private var daysSeen = 0
 
+    private static let spacing: CGFloat = 20
+    private static let inset: CGFloat = 24
+
     private var columnCount: Int {
-        max(1, Int((width - 48 + 20) / (220 * InterfaceStyle.scale(for: textSize) + 20)))
+        max(1, Int((width - 2 * Self.inset + Self.spacing) / (190 * InterfaceStyle.scale(for: textSize) + Self.spacing)))
+    }
+
+    private var thumbnailWidth: CGFloat {
+        (width - 2 * Self.inset - CGFloat(columnCount - 1) * Self.spacing) / CGFloat(columnCount)
     }
 
     var body: some View {
@@ -23,8 +30,7 @@ struct ItemGallery: View {
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = sections.flatMap { $0.items.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        let context = browser.metaContext(for: sections.flatMap(\.items))
-        keyboardCollection(sections, ids: ids, context: context)
+        keyboardCollection(sections, ids: ids)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -54,15 +60,15 @@ struct ItemGallery: View {
         .dragContainerSelection(Array(browser.selection))
     }
 
-    private func collection(_ sections: [NoteSection], ids: [ItemID], context: ItemMeta.Context) -> some View {
+    private func collection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
+                LazyVStack(alignment: .leading, spacing: 28) {
                     ForEach(sections) { section in
-                        sectionGrid(section, ids: ids, context: context)
+                        sectionGrid(section, ids: ids)
                     }
                 }
-                .padding(24)
+                .padding(Self.inset)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Items")
             }
@@ -80,7 +86,7 @@ struct ItemGallery: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0.isFinite, $0 > 0 { width = $0 } }
     }
 
-    private func sectionGrid(_ section: NoteSection, ids: [ItemID], context: ItemMeta.Context) -> some View {
+    private func sectionGrid(_ section: NoteSection, ids: [ItemID]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
@@ -88,9 +94,9 @@ struct ItemGallery: View {
                     .foregroundStyle(.secondary)
                     .accessibilityAddTraits(.isHeader)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: columnCount), spacing: 20) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: columnCount), spacing: Self.spacing + 4) {
                 ForEach(section.items) { item in
-                    card(item, ids: ids, context: context).id(item.id)
+                    card(item, ids: ids).id(item.id)
                 }
             }
             .accessibilityElement(children: .contain)
@@ -98,8 +104,8 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID], context: ItemMeta.Context) -> some View {
-        collection(sections, ids: ids, context: context)
+    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
+        collection(sections, ids: ids)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
             let destination: ItemID?
@@ -136,7 +142,7 @@ struct ItemGallery: View {
         .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:)), perform: deleteSelection)
     }
 
-    private func card(_ item: Item, ids: [ItemID], context: ItemMeta.Context) -> some View {
+    private func card(_ item: Item, ids: [ItemID]) -> some View {
         Button {
             // SwiftUI Button actions do not expose the click's modifiers; AppKit supplies just that event.
             let modifiers = NSApp.currentEvent?.modifierFlags ?? []
@@ -144,12 +150,12 @@ struct ItemGallery: View {
             pane.wrappedValue = .list
         } label: {
             GalleryCard(
-                item: item, selected: browser.selection.contains(item.id), context: context,
-                date: NoteDate.listLabel(for: order.sort.date(of: item), now: library.now()))
+                item: item, selected: browser.selection.contains(item.id),
+                date: NoteDate.listLabel(for: order.sort.date(of: item), now: library.now()), width: thumbnailWidth)
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .contentShape([.interaction, .accessibility], .rect(cornerRadius: 16))
+        .contentShape([.interaction, .accessibility], .rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             browser.selection = [item.id]
             browser.openGallerySelection()
@@ -196,70 +202,5 @@ struct ItemGallery: View {
             guard kept else { return }
             Browser.delete(ids, in: library, undoManager: undoManager)
         }
-    }
-}
-
-private struct GalleryCard: View {
-    @CurrentLibrary private var library
-    let item: Item
-    let selected: Bool
-    let context: ItemMeta.Context
-    let date: String
-    @State private var image: CGImage?
-
-    var body: some View {
-        let body = library.body(of: item.id)
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if let image {
-                    GeometryReader { geometry in
-                        Image(decorative: image, scale: 1).resizable().scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    }
-                } else {
-                    Rectangle().fill(.background)
-                    VStack(alignment: .leading, spacing: 12) {
-                        if item.isFile {
-                            Image(systemName: TypeSymbol.name(for: item.type, in: library.catalogue))
-                                .interfaceFont(.largeTitle).foregroundStyle(.secondary)
-                            Text(item.preview).interfaceFont(.subheadline).lineLimit(2).foregroundStyle(.secondary)
-                        } else {
-                            Text(item.preview).interfaceFont(.body).lineLimit(6).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(18)
-                    .padding(.bottom, 72)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
-            }
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title).interfaceFont(.headline).lineLimit(2)
-                    HStack(spacing: 12) {
-                        if item.isFavorite { Image(systemName: "star.fill") }
-                        ItemMetaLine(meta: ItemMeta.make(for: item, in: library, context: context))
-                        Spacer(minLength: 4)
-                        Text(date).lineLimit(1)
-                    }
-                    .interfaceFont(.caption)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(image == nil ? Color.primary : .white)
-                .background {
-                    if image != nil { LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom).padding(.top, -32) }
-                    else { Rectangle().fill(.background) }
-                }
-            }
-            .clipShape(.rect(cornerRadius: 16))
-            .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: selected ? 3 : 1) }
-            .task(id: GalleryPreviewRequest(id: item.id, version: item.version, body: body?.text)) {
-                image = nil
-                let preview = await GalleryPreview.image(for: item, body: body?.text, in: library)
-                if !Task.isCancelled { image = preview }
-            }
     }
 }

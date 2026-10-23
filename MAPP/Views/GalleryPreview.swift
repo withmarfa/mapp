@@ -2,16 +2,10 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-nonisolated struct GalleryPreviewRequest: Hashable {
-    let id: ItemID
-    let version: ItemVersion
-    let body: String?
-}
-
 enum GalleryPreview {
     static func image(for item: Item, body: String?, in library: any ItemLibrary) async -> CGImage? {
         if case .file(let type, _) = item.content {
-            guard type.conforms(to: .image), let url = try? await library.fileURL(of: item.id), !Task.isCancelled else { return nil }
+            guard type.conforms(to: .image), let url = await fileURL(of: item, in: library), !Task.isCancelled else { return nil }
             return await thumbnail(at: url)
         }
         guard let body else { return nil }
@@ -26,6 +20,16 @@ enum GalleryPreview {
         }
         return nil
     }
+
+    /// The file where it is at hand, else fetched when it is small enough that a grid of cards can afford it. A
+    /// larger file shows its type's icon until the person opens it.
+    static func fileURL(of item: Item, in library: any ItemLibrary) async -> URL? {
+        if let url = library.fileURL(for: item.id) { return url }
+        guard case .file(_, let byteCount) = item.content, byteCount <= fetchLimit else { return nil }
+        return try? await library.fileURL(of: item.id)
+    }
+
+    private static let fetchLimit: Int64 = 8 << 20
 
     @concurrent private static func thumbnail(at url: URL) async -> CGImage? {
         guard !Task.isCancelled, let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
