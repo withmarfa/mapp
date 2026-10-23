@@ -29,14 +29,45 @@ nonisolated enum ItemPreview {
         if let first = lines.first, first.localizedCaseInsensitiveCompare(title) == .orderedSame {
             lines.removeFirst()
         }
-        let words = lines.joined(separator: " ").split(whereSeparator: \.isWhitespace)
+        let words = sentences(lines).split(whereSeparator: \.isWhitespace)
         return String(words.joined(separator: " ").prefix(limit))
     }
 
-    /// What a file's row says in place of text: its kind and size, as `Plain Text, 76 bytes`. A size the library
+    /// The lines run together, each ending as a sentence and starting as one, so the items of a list read apart,
+    /// not as one phrase.
+    private static func sentences(_ lines: [String]) -> String {
+        var joined: [String] = []
+        for (index, line) in lines.enumerated() {
+            var line = line
+            if let previous = joined.last, previous.last.map({ ".!?…".contains($0) }) == true {
+                line = capitalized(line)
+            }
+            let isLast = index == lines.count - 1
+            joined.append(isLast || endsSentence(line) ? line : line + ".")
+        }
+        return joined.joined(separator: " ")
+    }
+
+    private static func endsSentence(_ line: String) -> Bool {
+        let closers: Set<Character> = [")", "]", "\"", "'", "”", "’", "»", "*", "_", "`"]
+        guard let last = line.last(where: { !closers.contains($0) }) else { return true }
+        return ".!?…:;".contains(last)
+    }
+
+    /// A line that begins with a lowercase word, as a list item does, begins a sentence. A word with a capital
+    /// inside it, such as `iPhone`, is a name and stays as written.
+    private static func capitalized(_ line: String) -> String {
+        guard let first = line.first, first.isLowercase else { return line }
+        let word = line.prefix { $0.isLetter }
+        guard word.allSatisfy(\.isLowercase) else { return line }
+        return first.uppercased() + line.dropFirst()
+    }
+
+    /// What a file's row says in place of text: its kind and size, as `Plain text, 76 bytes`. A size the library
     /// does not know is left out.
     static func file(_ type: UTType, byteCount: Int64) -> String {
-        let kind = type.localizedDescription ?? String(localized: "File")
+        let described = type.localizedDescription ?? String(localized: "File")
+        let kind = described.prefix(1).localizedUppercase + described.dropFirst()
         guard byteCount > 0 else { return kind }
         return kind + ", " + ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file)
     }
