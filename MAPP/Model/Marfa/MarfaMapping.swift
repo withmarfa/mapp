@@ -410,22 +410,9 @@ nonisolated enum MarfaMapping {
                 query: ItemQuery(states: [.archived]), drop: .transition(.archived))
         ]
         let active = items.filter { $0.state == .active }
-        if catalogue.itemTypes[TypeID.project] != nil {
-            places.append(
-                Place(
-                    id: .type(TypeID.project), title: String(localized: "Projects"), symbol: "folder",
-                    section: .projects, query: ItemQuery(types: [TypeID.project], includesSubtypes: false)))
-            let projects = active.filter { $0.type == TypeID.project }
-                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-            places += projects.map { project in
-                Place(
-                    id: .beneath(project.id), title: project.title, symbol: "folder", section: .projects,
-                    query: ItemQuery(beneath: project.id))
-            }
-        }
         // Each type's place lists that type's own items, most first, so a count and its list agree.
         let counts = Dictionary(grouping: active, by: \.type).mapValues(\.count)
-        let held = counts.keys.filter { $0 != TypeID.project && !catalogue.isFileType($0) }
+        let held = counts.keys.filter { !catalogue.isFileType($0) }
         let labels = catalogue.displayLabels(for: held)
         places += held.compactMap { catalogue.itemTypes[$0] }
             .sorted {

@@ -30,7 +30,7 @@ struct ItemTableCell: View {
             .labelStyle(ItemTableLabelStyle())
             .foregroundStyle(.secondary)
         case .parent: link(row.parent)
-        case .project: link(row.project)
+        case .collection: link(row.collection)
         case .created: date(row.item.created, isDue: false)
         case .edited: date(row.item.modified, isDue: false)
         case .duration(let start, let end):
@@ -217,7 +217,7 @@ struct ItemTableCategory: View {
                 if let value { Avatar(name: value) } else { Image(systemName: "person.crop.circle.dashed").foregroundStyle(.tertiary) }
             }
             .labelStyle(ItemTableLabelStyle())
-        case .link where column.content == .project:
+        case .link where column.content == .collection:
             Label { Text(title) } icon: { Image(systemName: value == nil ? "folder.badge.questionmark" : "folder").foregroundStyle(.secondary) }
                 .labelStyle(ItemTableLabelStyle())
         default:

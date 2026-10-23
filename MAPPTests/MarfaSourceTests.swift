@@ -1095,19 +1095,17 @@ extension LiveMarfaTests {
             let log = ChangeLog(source)
             source.refresh()
             let hydrated = try #require(await log.wait { state in
-                (state.snapshot?.items.count ?? 0) > 100 && state.snapshot?.catalogue.itemTypes[TypeID.project] != nil
+                (state.snapshot?.items.count ?? 0) > 100 && state.snapshot?.catalogue.itemTypes[TypeID("aic.project")] != nil
             })
             #expect(await waitForConnection(source) { $0 == .online })
             let snapshot = try #require(hydrated.snapshot)
             let catalogue = snapshot.catalogue
-            #expect(catalogue.itemTypes[TypeID.project]?.titleField == "title")
+            #expect(catalogue.itemTypes[TypeID("aic.project")]?.titleField == "title")
             #expect(catalogue.edgeTypes["parent-of"]?.reverseName == "child-of")
             #expect(snapshot.items.allSatisfy { !$0.title.isEmpty })
 
-            // A project lists itself and its children, which hold it as `child-of`.
-            let projects = snapshot.places.compactMap { place -> ItemID? in
-                if case .beneath(let id) = place.id { id } else { nil }
-            }
+            // A project's children hold it as `child-of`, and the copy lists them beneath it.
+            let projects = snapshot.items.filter { $0.type == TypeID("aic.project") }.map(\.id)
             let project = try #require(projects.first { id in
                 snapshot.items.contains { $0.edgesOut.contains { $0.type == "child-of" && $0.target == .item(id) } }
             })
@@ -1124,9 +1122,9 @@ extension LiveMarfaTests {
             #expect(projectItem.properties.allSatisfy { $0.key != "body" })
 
             let word = try #require(projectItem.title.split(separator: " ").first { $0.count > 3 }.map(String.init))
-            let found = try await source.search(word, in: ItemQuery(types: [TypeID.project]))
+            let found = try await source.search(word, in: ItemQuery(types: [TypeID("aic.project")]))
             #expect(found.contains(project))
-            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == TypeID.project })
+            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == TypeID("aic.project") })
             let count = snapshot.items.count
             await source.close()
 

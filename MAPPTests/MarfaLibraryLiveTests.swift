@@ -64,15 +64,15 @@ extension LiveMarfaTests {
                 let tickets = library.items(in: .itemType("aic.ticket"))
                 #expect(tickets.contains { $0.type != TypeID("aic.ticket") })
 
-                // A project lists itself and everything below it; each child holds it as `child-of`.
-                let projects = library.items(in: .itemType(TypeID.project.rawValue))
+                // A project lists everything below it, not itself; each child holds it as `child-of`.
+                let projects = library.items(in: .itemType("aic.project"))
                 let project = try #require(projects.first { project in
                     library.relationships(for: project.id).contains { $0.field == "inverse:parent-of" && !$0.targets.isEmpty }
                 })
                 let children = try #require(library.relationships(for: project.id).first { $0.field == "inverse:parent-of" })
                 #expect(children.label == "Children")
-                let beneath = Set(library.items(in: .project(project.id)).map(\.id))
-                #expect(beneath.contains(project.id))
+                let beneath = Set(library.items(in: .collection(project.id)).map(\.id))
+                #expect(!beneath.contains(project.id))
                 for child in children.targets {
                     let id = try #require(child.itemID)
                     let parent = library.relationships(for: id).first { $0.field == "child-of" }
@@ -116,7 +116,7 @@ extension LiveMarfaTests {
                 })
                 #expect(library.relationships(for: parent).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child])
                 #expect(library.body(of: child)?.text == "Made by the MAPP tests.")
-                #expect(Set(library.items(in: .project(parent)).map(\.id)) == [parent, child])
+                #expect(Set(library.items(in: .collection(parent)).map(\.id)) == [child])
 
                 // Text: held at once, and the copy's own once the server has answered.
                 library.updateBody(of: child, to: "Edited \(token) text.")

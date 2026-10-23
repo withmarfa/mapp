@@ -28,7 +28,7 @@ struct ItemTableLayoutTests {
 
     private static func row(
         _ title: String, type: String = "aic.ticket.task", status: String? = nil, priority: String? = nil,
-        notes: String? = nil, parent: String? = nil, project: String? = nil, modified: Date = .now
+        notes: String? = nil, parent: String? = nil, collection: String? = nil, modified: Date = .now
     ) -> ItemTableRow {
         var properties: [Property] = [Property(key: "title", value: .string(title))]
         if let status { properties.append(Property(key: "status", value: .string(status))) }
@@ -38,7 +38,7 @@ struct ItemTableLayoutTests {
             id: ItemID(title), type: TypeID(type), title: title, titleRule: .property("title"), properties: properties,
             version: ItemVersion(1), created: modified, modified: modified)
         func link(_ title: String?) -> ItemTableRow.Link? { title.map { .init(id: ItemID($0), title: $0, symbol: "folder") } }
-        return ItemTableRow(item: item, typeLabel: type, typeSymbol: "doc", parent: link(parent), project: link(project))
+        return ItemTableRow(item: item, typeLabel: type, typeSymbol: "doc", parent: link(parent), collection: link(collection))
     }
 
     private static func columns(_ rows: [ItemTableRow], place: SidebarItem = .allNotes) -> [ItemTableColumn] {
@@ -64,9 +64,9 @@ struct ItemTableLayoutTests {
     // MARK: Columns
 
     @Test func aTypesFieldsFollowTheNameLeadingWithStatusAndPriority() {
-        let rows = [Self.row("A", status: "pending", priority: "low", project: "P")]
+        let rows = [Self.row("A", status: "pending", priority: "low", collection: "P")]
         let ids = Self.columns(rows).map(\.id)
-        #expect(ids == ["title", "field.status", "field.priority", "parent", "project", "field.notes", "field.description", "edited", "created"])
+        #expect(ids == ["title", "field.status", "field.priority", "parent", "collection", "field.notes", "field.description", "edited", "created"])
     }
 
     @Test func theTitleAndTextAreNotColumns() {
@@ -89,16 +89,16 @@ struct ItemTableLayoutTests {
         #expect(shown["created"] == false)
     }
 
-    @Test func aParentThatIsTheProjectStartsHidden() {
-        let filed = Self.columns([Self.row("A", parent: "P", project: "P")])
+    @Test func aParentThatIsTheCollectionStartsHidden() {
+        let filed = Self.columns([Self.row("A", parent: "P", collection: "P")])
         #expect(filed.first { $0.id == "parent" }?.isShownByDefault == false)
-        let underEpic = Self.columns([Self.row("A", parent: "Epic", project: "P")])
+        let underEpic = Self.columns([Self.row("A", parent: "Epic", collection: "P")])
         #expect(underEpic.first { $0.id == "parent" }?.isShownByDefault == true)
     }
 
-    @Test func aProjectsTableHasNoProjectColumn() {
-        let ids = Self.columns([Self.row("A", project: "P")], place: .project(ItemID("P"))).map(\.id)
-        #expect(!ids.contains("project"))
+    @Test func aCollectionsTableHasNoCollectionColumn() {
+        let ids = Self.columns([Self.row("A", collection: "P")], place: .collection(ItemID("P"))).map(\.id)
+        #expect(!ids.contains("collection"))
     }
 
     // MARK: Sorting

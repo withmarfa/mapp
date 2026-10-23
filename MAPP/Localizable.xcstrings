@@ -332,6 +332,9 @@
     "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
       "extractionState" : "manual"
     },
+    "Anything other items are filed under is a collection." : {
+
+    },
     "Appearance" : {
 
     },
@@ -543,6 +546,12 @@
 
     },
     "Collapsed" : {
+
+    },
+    "Collection" : {
+
+    },
+    "Collections" : {
 
     },
     "Column" : {
@@ -1439,9 +1448,6 @@
     "Project" : {
       "extractionState" : "manual"
     },
-    "Projects" : {
-      "extractionState" : "manual"
-    },
     "Properties" : {
       "extractionState" : "manual"
     },
@@ -1461,6 +1467,9 @@
 
     },
     "Recently deleted notes can’t be edited." : {
+
+    },
+    "Recents" : {
 
     },
     "Recover" : {
@@ -1599,6 +1608,9 @@
     "Show %@" : {
 
     },
+    "Show Collections" : {
+
+    },
     "Show Details" : {
       "extractionState" : "manual"
     },
@@ -1612,9 +1624,6 @@
 
     },
     "Show only some items" : {
-
-    },
-    "Show Projects" : {
 
     },
     "Show Types" : {

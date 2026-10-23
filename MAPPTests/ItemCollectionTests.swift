@@ -204,7 +204,7 @@ struct ItemCollectionTests {
         let project = try #require(library.items(in: .itemType("aic.project")).first)
         let places: [SidebarItem] = [
             .inbox, .allNotes, .favorites, .files, .recentlyDeleted, .folder(work.id),
-            .project(project.id), .favoriteItem(project.id)
+            .collection(project.id), .favoriteItem(project.id)
         ] + WorkbenchSchema.types.map { .itemType($0.id) } + [.itemType("core.image")]
         for place in places {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")

@@ -180,7 +180,7 @@ struct BrowserTests {
         let library = NoteLibrary(notes: [])
         let project = try #require(library.createItem(typeID: "aic.project", title: "Project", in: .allNotes).flatMap { library.note($0) })
         let browser = Browser()
-        browser.sidebarItem = .project(project.id)
+        browser.sidebarItem = .collection(project.id)
         browser.startItemDraft()
         browser.itemDraft?.typeID = "aic.ticket.task"
         browser.itemDraft?.title = "Unparented task"
@@ -283,7 +283,7 @@ struct BrowserTests {
         let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\n", created: start)
         let library = NoteLibrary(notes: [existing, project])
         let browser = Browser()
-        browser.sidebarItem = .project(project.id)
+        browser.sidebarItem = .collection(project.id)
         browser.startItemDraft()
         #expect(browser.itemDraft?.parentID == project.id)
         let created = browser.createDraft(in: library, undoManager: nil).flatMap { library.note($0) }

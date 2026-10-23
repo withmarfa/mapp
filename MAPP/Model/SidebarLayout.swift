@@ -4,24 +4,30 @@ import Observation
 /// A place the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
 /// or move is found again.
 nonisolated enum SidebarPlace: Hashable, Sendable {
-    case inbox, all, favorites, projects
+    case inbox, recents, all, favorites
+    /// The section that holds the items other items are filed under.
+    case collections
     /// The section that holds a Marfa library's types.
     case types
     /// The section that holds a notes folder's folders.
     case folders
     case files
-    case type(TypeID)
+    /// A type's row, or a group of types by its stem (`TypeNode.id`).
+    case type(String)
+    case collection(ItemID)
 
     var key: String {
         switch self {
         case .inbox: "inbox"
+        case .recents: "recents"
         case .all: "all"
         case .favorites: "favorites"
-        case .projects: "projects"
+        case .collections: "collections"
         case .types: "types"
         case .folders: "folders"
         case .files: "files"
-        case .type(let id): "type:" + id.rawValue
+        case .type(let id): "type:" + id
+        case .collection(let id): "collection:" + id.rawValue
         }
     }
 }
@@ -87,28 +93,30 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// Above Favorites: Inbox and All Items.
+    /// Inbox, Recents and All Items, then Files where the library holds any.
     let top: [SidebarPlace]
-    /// What follows Favorites: the Projects section, then the Types or Folders section.
+    /// What follows them, before Favorites: the Types or Folders section, then Collections.
     let library: [SidebarPlace]
-    /// The types the Types section lists, which only a library without folders has.
-    let types: [ItemTypeCount]
+    /// The collections the Collections section lists, two levels of them.
+    let collections: [CollectionNode]
+    /// The types the Types section lists, nested, which only a library without folders has. The person orders the
+    /// top rows; the rows under one keep the order of their items.
+    let types: [TypeNode]
     let layout: SidebarLayout
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
-        top = layout.ordered([.inbox, .all])
+        top = layout.ordered([.inbox, .recents, .all] + (library.count(in: .files) > 0 ? [.files] : []))
+        collections = library.collectionTree
         var rows: [SidebarPlace] = []
-        if library.hasProjectType { rows.append(.projects) }
         if library.capabilities.contains(.folders) {
             rows.append(.folders)
-            if library.count(in: .files) > 0 { rows.append(.files) }
             types = []
         } else {
-            // Projects have their own section; `itemTypeCounts` leaves out the project type and the file types.
-            types = layout.ordered(library.itemTypeCounts, by: { SidebarPlace.type($0.id).key })
+            types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
             if !types.isEmpty { rows.append(.types) }
         }
+        if !collections.isEmpty { rows.append(.collections) }
         self.library = layout.ordered(rows)
     }
 
@@ -116,7 +124,23 @@ struct SidebarPlan {
 
     var shownTop: [SidebarPlace] { top.filter(isShown) }
     var shownLibrary: [SidebarPlace] { library.filter(isShown) }
-    var shownTypes: [ItemTypeCount] { types.filter { isShown(.type($0.id)) } }
+
+    /// The collections not hidden, and under each the ones not hidden.
+    var shownCollections: [CollectionNode] {
+        collections.filter { isShown(.collection($0.id)) }.map { node in
+            CollectionNode(id: node.id, title: node.title, symbol: node.symbol, children: node.children.filter { isShown(.collection($0.id)) })
+        }
+    }
+
+    /// The type rows not hidden, at every level; hiding a row hides what is under it.
+    var shownTypes: [TypeNode] { Self.shown(types, by: self) }
+
+    private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {
+        nodes.filter { plan.isShown(.type($0.id)) }.map { node in
+            TypeNode(id: node.id, type: node.type, label: node.label, symbol: node.symbol, count: node.count, total: node.total,
+                     children: shown(node.children, by: plan))
+        }
+    }
 }
 
 /// The layouts a person has made, one for each library, kept in the defaults. A library is named by its server's

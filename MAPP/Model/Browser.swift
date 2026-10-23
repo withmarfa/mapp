@@ -197,7 +197,7 @@ final class Browser {
         context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
         context.showsPlaces = showsFolders
         if !isSearching {
-            if case .project(let id) = item { context.project = id }
+            if case .collection(let id) = item { context.collection = id }
             context.isInbox = item == .inbox
         }
         return context
@@ -301,7 +301,7 @@ final class Browser {
         searchText = ""
         isSearchExpanded = false
         if !library.items(in: item).contains(where: { $0.id == creation.id }) {
-            sidebarItem = TypeID(creation.typeID) == .project ? .project(creation.id) : .itemType(creation.typeID)
+            sidebarItem = .itemType(creation.typeID)
         }
         selection = [creation.id]
         focusRequest = .page
@@ -381,7 +381,7 @@ final class Browser {
     static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
         switch place {
         case .inbox, .folder: library.capabilities.contains(.move)
-        case .allNotes, .favorites, .favoriteItem, .itemType, .project, .files, .recentlyDeleted: false
+        case .recents, .allNotes, .favorites, .favoriteItem, .itemType, .collection, .files, .recentlyDeleted: false
         }
     }
 
@@ -390,11 +390,11 @@ final class Browser {
         if case .folder(let id) = sidebarItem, library.folder(id) == nil {
             show(.allNotes, in: library, order: order)
         }
-        if case .project(let id) = sidebarItem, library.item(id)?.state != .active {
+        if case .collection(let id) = sidebarItem, library.item(id)?.state != .active {
             show(.allNotes, in: library, order: order)
         }
         // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
-        if case .itemType(let type) = sidebarItem, TypeID(type) != .project, library.isLoaded, library.count(in: .itemType(type)) == 0 {
+        if case .itemType(let type) = sidebarItem, library.isLoaded, library.count(in: .itemType(type)) == 0 {
             show(.allNotes, in: library, order: order)
         }
         if case .favoriteItem(let id) = sidebarItem,
@@ -453,12 +453,11 @@ final class Browser {
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
-        case .project(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
+        case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
         case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
         case .itemType(let type):
-            library.itemTypeCounts.contains { $0.id.rawValue == type } || (TypeID(type) == .project && library.hasProjectType)
-                ? snapshot.place : .allNotes
-        case .inbox, .allNotes, .favorites, .files: snapshot.place
+            library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
+        case .inbox, .recents, .allNotes, .favorites, .files: snapshot.place
         // Recently Deleted is a page of Settings now, so a window kept from before it moved opens on All Items.
         case .recentlyDeleted: .allNotes
         }
@@ -519,7 +518,7 @@ final class NewItemDraft {
     init(place: SidebarItem) {
         self.place = place
         if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
-        if case .project(let id) = place { parentID = id }
+        if case .collection(let id) = place { parentID = id }
     }
 
     /// A draft carried to another library keeps its text and what the loaded library can still hold: a parent it

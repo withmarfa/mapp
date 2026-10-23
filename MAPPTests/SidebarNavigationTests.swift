@@ -80,11 +80,11 @@ struct SidebarNavigationTests {
         let project = try #require(library.createItem(typeID: "aic.project", title: "Field research").flatMap { library.note($0) })
         let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id).flatMap { library.note($0) })
         library.setFavorite([project.id], true)
-        #expect(SidebarItem.project(project.id) != .favoriteItem(project.id))
-        #expect(Set(library.items(in: .project(project.id)).map(\.id)) == [project.id, child.id])
+        #expect(SidebarItem.collection(project.id) != .favoriteItem(project.id))
+        #expect(library.items(in: .collection(project.id)).map(\.id) == [child.id])
         #expect(library.items(in: .favoriteItem(project.id)).map(\.id) == [project.id])
         #expect(library.items(in: .itemType("aic.project")).map(\.id) == [project.id])
-        #expect(library.name(of: .itemType("aic.project")) == "Projects")
+        #expect(library.name(of: .itemType("aic.project")) == "Project")
     }
 
     @Test func shortcutAndProjectTitlesUseTheSharedItemProjection() {
@@ -92,6 +92,6 @@ struct SidebarNavigationTests {
         let library = NoteLibrary(notes: [project], now: { date })
         #expect(library.item(project.id)?.title == "Folded project")
         #expect(library.name(of: .favoriteItem(project.id)) == "Folded project")
-        #expect(library.name(of: .project(project.id)) == "Folded project")
+        #expect(library.name(of: .collection(project.id)) == "Folded project")
     }
 }

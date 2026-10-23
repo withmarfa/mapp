@@ -11,9 +11,9 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     let item: Item
     let typeLabel: String
     let typeSymbol: String
-    /// The item the row's item is filed under, which may be its project.
+    /// The item the row's item is filed under, which may be its collection.
     let parent: Link?
-    let project: Link?
+    let collection: Link?
     var id: ItemID { item.id }
 }
 
@@ -22,17 +22,14 @@ extension ItemTableRow {
     static func rows(of items: [Item], in library: any ItemLibrary) -> [ItemTableRow] {
         let catalogue = library.catalogue
         return items.map { item in
-            let parent = item.edgesOut.lazy.compactMap { edge -> Item? in
-                guard edge.type == "child-of", case .item(let id) = edge.target else { return nil }
-                return library.item(id)
-            }.first
-            let project = library.project(of: item)
+            let parent = item.parentID.flatMap { library.item($0) }
+            let collection = library.collection(of: item)
             return ItemTableRow(
                 item: item,
                 typeLabel: TypeSymbol.label(for: item.type, in: catalogue),
                 typeSymbol: TypeSymbol.name(for: item.type, in: catalogue),
                 parent: parent.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) },
-                project: project.map { Link(id: $0.id, title: $0.title, symbol: "folder") })
+                collection: collection.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) })
         }
     }
 }
@@ -63,7 +60,7 @@ nonisolated enum StatusTone: Int, Hashable, Sendable, CaseIterable, Comparable {
 /// A column of the table: which part of an item it shows, and how.
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
-        case title, type, parent, project, created, edited
+        case title, type, parent, collection, created, edited
         /// The time between two date fields, as a session's start and end.
         case duration(start: String, end: String)
         case field(ItemTypeInfo.Field)
@@ -95,7 +92,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     static let title = ItemTableColumn(id: "title", label: String(localized: "Name"), content: .title, style: .title)
     static let type = ItemTableColumn(id: "type", label: String(localized: "Type"), content: .type, style: .text)
     static let parent = ItemTableColumn(id: "parent", label: String(localized: "Parent"), content: .parent, style: .link)
-    static let project = ItemTableColumn(id: "project", label: String(localized: "Project"), content: .project, style: .link)
+    static let collection = ItemTableColumn(id: "collection", label: String(localized: "Collection"), content: .collection, style: .link)
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
     static let created = ItemTableColumn(
         id: "created", label: String(localized: "Created"), content: .created, style: .date, isShownByDefault: false)
@@ -161,7 +158,7 @@ nonisolated extension ItemTableColumn {
         switch content {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
-        case .project: return row.project?.id.rawValue
+        case .collection: return row.collection?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
         case .title, .created, .edited, .duration: return nil
         }
@@ -172,7 +169,7 @@ nonisolated extension ItemTableColumn {
         switch content {
         case .type: return rows.first { $0.item.type.rawValue == value }?.typeLabel ?? value
         case .parent: return rows.lazy.compactMap(\.parent).first { $0.id.rawValue == value }?.title ?? value
-        case .project: return rows.lazy.compactMap(\.project).first { $0.id.rawValue == value }?.title ?? value
+        case .collection: return rows.lazy.compactMap(\.collection).first { $0.id.rawValue == value }?.title ?? value
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
@@ -185,7 +182,7 @@ nonisolated extension ItemTableColumn {
         case .title: return .text(row.item.title)
         case .type: return .text(row.typeLabel)
         case .parent: return row.parent.map { .text($0.title) }
-        case .project: return row.project.map { .text($0.title) }
+        case .collection: return row.collection.map { .text($0.title) }
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
         case .duration(let start, let end): return ItemTableValue.duration(row, start: start, end: end).map { .number(Decimal($0)) }
@@ -307,12 +304,12 @@ nonisolated enum ItemTableLayout {
         let (people, rest) = (sorted.filter(Self.firstFields.contains), sorted.filter { !Self.firstFields.contains($0) })
         for key in people { columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold)) }
 
-        // The parent is worth a column where it is something other than the project, such as a ticket's epic.
-        let isProject: Bool = if case .project = place { true } else { false }
+        // The parent is worth a column where it is something other than the collection, such as a ticket's epic.
+        let isCollection: Bool = if case .collection = place { true } else { false }
         var parent = ItemTableColumn.parent
-        parent.isShownByDefault = rows.count(where: { $0.parent != nil && $0.parent?.id != $0.project?.id }) >= threshold
+        parent.isShownByDefault = rows.count(where: { $0.parent != nil && $0.parent?.id != $0.collection?.id }) >= threshold
         columns.append(parent)
-        if !isProject, rows.contains(where: { $0.project != nil }) { columns.append(.project) }
+        if !isCollection, rows.contains(where: { $0.collection != nil }) { columns.append(.collection) }
 
         for key in rest {
             columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold))

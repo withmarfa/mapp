@@ -86,7 +86,7 @@ struct TypeSymbolTests {
         ("aic.decision", "signpost.right"), ("aic.agent.log", "list.bullet.rectangle"), ("aic.agent.session", "clock"),
         ("aic.epic", "flag"), ("aic.ticket", "ticket"), ("aic.ticket.feature", "sparkles"), ("aic.ticket.spike", "bolt"),
         ("core.bookmark", "bookmark"), ("core.person", "person"), ("core.file", "doc"), ("core.image", "photo"),
-        ("aic.project", "folder"),
+        ("aic.project", "square.stack"),
     ])
     func eachKnownTypeHasItsSymbol(id: String, symbol: String) {
         #expect(TypeSymbol.name(for: TypeID(id)) == symbol)
@@ -142,8 +142,9 @@ struct ItemMetaTests {
         let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
         let library = FakeItemLibrary(items: [project, epic, task])
         let meta = ItemMeta.make(for: task, in: library, context: .init(mixesTypes: true))
-        #expect(meta.pieces.map(\.label) == ["Task", "Field Research"])
-        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle", "folder"])
+        // The project is the top of the chain, so the task is in the collection just below it: its epic.
+        #expect(meta.pieces.map(\.label) == ["Task", "Interviews"])
+        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle", "flag"])
     }
 
     @Test func aListOfOneTypeLeavesTheTypeOut() {
@@ -153,11 +154,11 @@ struct ItemMetaTests {
         #expect(ItemMeta.make(for: task, in: library, context: .init()).pieces.map(\.label) == ["Field Research"])
     }
 
-    @Test func aProjectsOwnListDoesNotNameTheProject() {
+    @Test func aCollectionsOwnListDoesNotNameTheCollection() {
         let project = item("Field Research", type: "aic.project")
         let task = item("Book rooms", type: "aic.ticket.task", parent: project)
         let library = FakeItemLibrary(items: [project, task])
-        #expect(ItemMeta.make(for: task, in: library, context: .init(project: project.id)).isEmpty)
+        #expect(ItemMeta.make(for: task, in: library, context: .init(collection: project.id)).isEmpty)
     }
 
     @Test func anItemWithNoProjectAndNothingToSayHasNoLine() {
@@ -166,11 +167,22 @@ struct ItemMetaTests {
         #expect(ItemMeta.make(for: note, in: library, context: .init(showsPlaces: true, isInbox: false)).isEmpty)
     }
 
-    @Test func aParentThatIsNoProjectIsPassedOver() {
+    @Test func anyTypeCanBeACollection() {
         let epic = item("Interviews", type: "aic.epic")
         let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
         let library = FakeItemLibrary(items: [epic, task])
-        #expect(library.project(of: task) == nil)
+        #expect(library.collection(of: task)?.id == epic.id)
+    }
+
+    @Test func theCollectionIsJustBelowTheTop() {
+        let root = item("WithMarfa", type: "aic.project")
+        let project = item("Marfa", type: "aic.project", parent: root)
+        let epic = item("Interviews", type: "aic.epic", parent: project)
+        let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
+        let library = FakeItemLibrary(items: [root, project, epic, task])
+        #expect(library.collection(of: task)?.id == project.id)
+        #expect(library.collection(of: project)?.id == root.id)
+        #expect(library.collection(of: root) == nil)
     }
 
     @Test func aParentCycleEnds() {
@@ -179,7 +191,7 @@ struct ItemMetaTests {
         one.edgesOut = [Edge(id: EdgeID("loop"), type: "child-of", source: one.id, target: .item(two.id), origin: .property("child-of"))]
         two.edgesOut = [Edge(id: EdgeID("loop2"), type: "child-of", source: two.id, target: .item(one.id), origin: .property("child-of"))]
         let library = FakeItemLibrary(items: [one, two])
-        #expect(library.project(of: one) == nil)
+        #expect(library.collection(of: one)?.id == two.id)
     }
 
     @Test func aFeedItemNamesTheInboxAnywhereButTheInbox() {

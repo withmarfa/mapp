@@ -1,19 +1,19 @@
 import Foundation
 
 extension ItemLibrary {
-    /// The nearest project above the item, following the parent each item holds (`child-of`). Nil for an item
-    /// outside every project.
-    func project(of item: Item) -> Item? {
+    /// The collection a list names an item by: the ancestor just below the top of its chain of parents
+    /// (`child-of`), as the sidebar's Collections section shows them, so a ticket under an epic under Marfa under
+    /// WithMarfa is in Marfa. An item whose only ancestor is the top is in the top; one with no parent is in none.
+    /// No type is special, so it reads the same on any Marfa.
+    func collection(of item: Item) -> Item? {
+        var chain: [Item] = []
         var current = item
         var visited: Set<ItemID> = [item.id]
-        while let parent = current.edgesOut.lazy.compactMap({ edge -> ItemID? in
-            guard edge.type == "child-of", case .item(let id) = edge.target else { return nil }
-            return id
-        }).first, visited.insert(parent).inserted, let next = self.item(parent) {
-            if next.type == .project || catalogue.isSubtype(next.type, ofAnyOf: [.project]) { return next }
+        while let parent = current.parentID, visited.insert(parent).inserted, let next = self.item(parent), next.state == .active {
+            chain.append(next)
             current = next
         }
-        return nil
+        return chain.count >= 2 ? chain.dropLast().last : chain.last
     }
 }
 
@@ -30,11 +30,11 @@ nonisolated struct ItemMeta: Hashable, Sendable {
 
     var isEmpty: Bool { pieces.isEmpty }
 
-    /// What a list tells about itself: whether it holds several types, the project it lists (which its rows need
+    /// What a list tells about itself: whether it holds several types, the collection it lists (which its rows need
     /// not name again), and whether it mixes places.
     struct Context: Hashable, Sendable {
         var mixesTypes = false
-        var project: ItemID?
+        var collection: ItemID?
         var showsPlaces = false
         var isInbox = false
     }
@@ -47,8 +47,8 @@ nonisolated struct ItemMeta: Hashable, Sendable {
                 symbol: TypeSymbol.name(for: item.type, in: library.catalogue),
                 label: TypeSymbol.label(for: item.type, in: library.catalogue)))
         }
-        if let project = library.project(of: item), project.id != context.project {
-            pieces.append(Piece(symbol: "folder", label: project.title))
+        if let collection = library.collection(of: item), collection.id != context.collection {
+            pieces.append(Piece(symbol: TypeSymbol.name(for: collection.type, in: library.catalogue), label: collection.title))
         }
         if context.showsPlaces, let folder = library.folder(of: item), !pieces.contains(where: { $0.label == folder.name }) {
             pieces.append(Piece(symbol: "folder", label: folder.name))

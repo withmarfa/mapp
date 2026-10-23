@@ -47,9 +47,11 @@ private enum PlaceSymbol {
     static func name(of place: SidebarItem, in catalogue: Catalogue) -> String {
         switch place {
         case .inbox: "tray"
+        case .recents: "clock"
         case .allNotes: "note.text"
         case .favorites, .favoriteItem: "star"
-        case .folder, .project: "folder"
+        case .folder: "folder"
+        case .collection: "square.stack"
         case .itemType(let id): TypeSymbol.name(for: TypeID(id), in: catalogue)
         case .files: "doc"
         case .recentlyDeleted: "trash"

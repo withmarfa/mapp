@@ -32,16 +32,28 @@ struct Sidebar: View {
                     ForEach(plan.shownTop, id: \.key) { place in
                         switch place {
                         case .inbox: row(.inbox, symbol: "tray", hiding: .inbox)
+                        // Always the same number, so it says nothing.
+                        case .recents: row(.recents, symbol: "clock", hiding: .recents, counted: false)
+                        case .files: row(.files, symbol: "doc", hiding: .files)
                         default: row(.allNotes, symbol: "note.text", hiding: .all)
                         }
                     }
                 }
             }
 
+            ForEach(plan.shownLibrary, id: \.key) { section in
+                switch section {
+                case .collections: collectionsSection(plan)
+                case .types: typesSection(plan)
+                case .folders: foldersSection(plan)
+                default: EmptyView()
+                }
+            }
+
             if plan.isShown(.favorites), !favorites.isEmpty {
                 Section(isExpanded: expansion(.favorites)) {
                     ForEach(favorites) { item in
-                        sidebarLabel(item.title, symbol: item.type == .project ? "folder" : TypeSymbol.name(for: item.type, in: library.catalogue))
+                        sidebarLabel(item.title, symbol: TypeSymbol.name(for: item.type, in: library.catalogue))
                             .tag(SidebarItem.favoriteItem(item.id))
                             .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
                     }
@@ -49,57 +61,6 @@ struct Sidebar: View {
                     Text("Favorites")
                         .contextMenu { hideButton(.favorites) }
                         .accessibilityIdentifier("SidebarFavoritesSection")
-                }
-            }
-
-            if plan.library.contains(.projects), plan.isShown(.projects), !projects.isEmpty {
-                Section(isExpanded: expansion(.projects)) {
-                    ForEach(projects) { project in
-                        row(.project(project.id), symbol: "folder", title: project.title)
-                    }
-                } header: {
-                    Text("Projects")
-                        .contextMenu { hideButton(.projects) }
-                        .accessibilityIdentifier("SidebarProjects")
-                }
-            }
-
-            if plan.library.contains(.types), plan.isShown(.types) {
-                Section(isExpanded: expansion(.types)) {
-                    ForEach(plan.shownTypes) { type in
-                        row(.itemType(type.id.rawValue), symbol: type.symbol, title: type.label, hiding: .type(type.id))
-                    }
-                } header: {
-                    Text("Types")
-                        .contextMenu { hideButton(.types) }
-                        .accessibilityIdentifier("SidebarTypes")
-                }
-            }
-
-            if plan.library.contains(.folders), plan.isShown(.folders) {
-                Section(isExpanded: expansion(.folders)) {
-                    ForEach(library.folders) { folder in
-                        folderRow(folder)
-                    }
-                    .onMove(perform: editsFolders ? { source, destination in
-                        let ids = source.map { library.folders[$0].id }
-                        let target = destination < library.folders.count ? library.folders[destination].id : nil
-                        library.moveFolders(ids, before: target, undoManager: undoManager)
-                    } : nil)
-                    if plan.library.contains(.files), plan.isShown(.files) {
-                        row(.files, symbol: "doc", hiding: .files)
-                    }
-                } header: {
-                    Text("Folders")
-                        .contextMenu {
-                            Button("New Folder") {
-                                browser.newFolder(in: library, order: order, undoManager: undoManager)
-                            }
-                            .disabled(!library.isLoaded || !editsFolders)
-                            Divider()
-                            hideButton(.folders)
-                        }
-                        .accessibilityIdentifier("SidebarFolders")
                 }
             }
         }
@@ -134,18 +95,98 @@ struct Sidebar: View {
         }
     }
 
-    /// A section's disclosure, kept in the library's sidebar layout so it is remembered for each library.
+    /// What other items are filed under, two levels of it: a collection that has collections under it folds them
+    /// open and shut, and opening any row lists everything filed under it.
+    private func collectionsSection(_ plan: SidebarPlan) -> some View {
+        Section(isExpanded: expansion(.collections)) {
+            ForEach(plan.shownCollections) { node in
+                if node.children.isEmpty {
+                    collectionRow(node)
+                } else {
+                    DisclosureGroup(isExpanded: expansion(.collection(node.id))) {
+                        ForEach(node.children) { collectionRow($0) }
+                    } label: {
+                        collectionRow(node)
+                    }
+                }
+            }
+        } header: {
+            Text("Collections")
+                .contextMenu { hideButton(.collections) }
+                .accessibilityIdentifier("SidebarCollections")
+        }
+    }
+
+    private func collectionRow(_ node: CollectionNode) -> some View {
+        row(.collection(node.id), symbol: node.symbol, title: node.title, hiding: .collection(node.id))
+            .accessibilityIdentifier("SidebarCollection-\(node.id.rawValue)")
+    }
+
+    private func typesSection(_ plan: SidebarPlan) -> some View {
+        Section(isExpanded: expansion(.types)) {
+            ForEach(plan.shownTypes) { typeRow($0) }
+        } header: {
+            Text("Types")
+                .contextMenu { hideButton(.types) }
+                .accessibilityIdentifier("SidebarTypes")
+        }
+    }
+
+    /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. Erased, since
+    /// a row holds rows of its own kind.
+    private func typeRow(_ node: TypeNode) -> AnyView {
+        guard !node.children.isEmpty else { return AnyView(typeLabel(node)) }
+        return AnyView(DisclosureGroup(isExpanded: expansion(.type(node.id))) {
+            ForEach(node.children) { typeRow($0) }
+        } label: {
+            typeLabel(node)
+        })
+    }
+
+    @ViewBuilder private func typeLabel(_ node: TypeNode) -> some View {
+        if node.opens, let type = node.type {
+            row(.itemType(type.rawValue), symbol: node.symbol, title: node.label, hiding: .type(node.id))
+                .accessibilityIdentifier("SidebarType-\(node.id)")
+        } else {
+            sidebarLabel(node.label, symbol: node.symbol)
+                .selectionDisabled()
+                .contextMenu { hideButton(.type(node.id)) }
+                .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
+        }
+    }
+
+    private func foldersSection(_ plan: SidebarPlan) -> some View {
+        Section(isExpanded: expansion(.folders)) {
+            ForEach(library.folders) { folder in
+                folderRow(folder)
+            }
+            .onMove(perform: editsFolders ? { source, destination in
+                let ids = source.map { library.folders[$0].id }
+                let target = destination < library.folders.count ? library.folders[destination].id : nil
+                library.moveFolders(ids, before: target, undoManager: undoManager)
+            } : nil)
+        } header: {
+            Text("Folders")
+                .contextMenu {
+                    Button("New Folder") {
+                        browser.newFolder(in: library, order: order, undoManager: undoManager)
+                    }
+                    .disabled(!library.isLoaded || !editsFolders)
+                    Divider()
+                    hideButton(.folders)
+                }
+                .accessibilityIdentifier("SidebarFolders")
+        }
+    }
+
+    /// A section's or a row's disclosure, kept in the library's sidebar layout so it is remembered for each library.
+    /// Everything starts open.
     private func expansion(_ section: SidebarPlace) -> Binding<Bool> {
         Binding {
             !libraries.sidebarLayout.isCollapsed(section)
         } set: { isExpanded in
             libraries.updateSidebarLayout { $0.setCollapsed(section, !isExpanded) }
         }
-    }
-
-    private var projects: [Item] {
-        library.items(in: .itemType(TypeID.project.rawValue))
-            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     private var favorites: [Item] {
@@ -159,9 +200,11 @@ struct Sidebar: View {
         }
     }
 
-    private func row(_ item: SidebarItem, symbol: String, title: String? = nil, hiding place: SidebarPlace? = nil) -> some View {
+    private func row(
+        _ item: SidebarItem, symbol: String, title: String? = nil, hiding place: SidebarPlace? = nil, counted: Bool = true
+    ) -> some View {
         sidebarLabel(title ?? library.name(of: item), symbol: symbol)
-            .badge(count(in: item))
+            .badge(counted ? count(in: item) : nil)
             .tag(item)
             .dropDestination(for: NoteReference.self, isEnabled: Browser.canDrop(on: item, in: library)) { notes, _ in
                 drop(notes, on: item)
@@ -223,7 +266,7 @@ struct Sidebar: View {
         switch item {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
-        case .allNotes, .favorites, .itemType, .project, .favoriteItem, .files, .recentlyDeleted: break
+        case .recents, .allNotes, .favorites, .itemType, .collection, .favoriteItem, .files, .recentlyDeleted: break
         }
     }
 

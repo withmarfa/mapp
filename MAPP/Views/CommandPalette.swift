@@ -315,12 +315,14 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, String, String?)] = [(.inbox, "tray", nil), (.allNotes, "note.text", nil), (.favorites, "star", nil)]
-        if library.hasProjectType { items.append((.itemType(TypeID.project.rawValue), "folder", nil)) }
-        items += library.items(in: .itemType(TypeID.project.rawValue)).map { (.project($0.id), "folder", nil) }
+        var items: [(SidebarItem, String, String?)] = [
+            (.inbox, "tray", nil), (.recents, "clock", nil), (.allNotes, "note.text", nil), (.favorites, "star", nil),
+        ]
+        if library.count(in: .files) > 0 { items += [(.files, "doc", nil)] }
+        // The collections the sidebar shows, its two levels of them.
+        items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
         // The types the sidebar shows, under the names it gives them.
         items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
-        if library.capabilities.contains(.folders) { items += [(.files, "doc", nil)] }
         items += library.folders.map { (.folder($0.id), "folder", nil) }
         return items.map { item, systemImage, title in
             Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {

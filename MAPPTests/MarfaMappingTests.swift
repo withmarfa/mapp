@@ -432,16 +432,12 @@ struct MarfaMappingTests {
         ]
         let places = MarfaMapping.places(items: items, catalogue: Self.catalogue)
         #expect(places.map(\.id) == [
-            .inbox, .all, .favorites, .archive, .type(TypeID("aic.project")), .beneath(ItemID("p1")),
-            .beneath(ItemID("p2")), .type(TypeID("core.entity")), .type(TypeID("aic.ticket")), .recentlyDeleted
+            .inbox, .all, .favorites, .archive, .type(TypeID("aic.project")),
+            .type(TypeID("core.entity")), .type(TypeID("aic.ticket")), .recentlyDeleted
         ])
         #expect(places.first { $0.id == .inbox }?.query == ItemQuery(tier: .feed))
         #expect(places.first { $0.id == .favorites }?.drop == .tag(ItemTag.favorite))
         #expect(places.first { $0.id == .recentlyDeleted }?.query == ItemQuery(states: [.trashed]))
-        #expect(places.first { $0.id == .beneath(ItemID("p1")) }?.title == "Alpha")
-
-        let noProjects = Catalogue(itemTypes: Self.catalogue.itemTypes.values.filter { $0.id != TypeID("aic.project") })
-        #expect(!MarfaMapping.places(items: [], catalogue: noProjects).contains { $0.section == .projects })
     }
 
     @Test func aSnapshotTakesEachChangeInTurn() {

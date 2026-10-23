@@ -41,6 +41,6 @@ nonisolated enum TypeSymbol {
         "person": "person",
         "file": "doc",
         "image": "photo",
-        "project": "folder",
+        "project": "square.stack",
     ]
 }

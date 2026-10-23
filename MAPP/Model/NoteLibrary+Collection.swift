@@ -75,6 +75,7 @@ extension NoteLibrary {
     }
 
     func items(in place: SidebarItem) -> [Item] {
+        if place == .recents { return Self.recent(allItems) }
         guard let belongs = predicate(for: place) else { return [] }
         return allItems.filter(belongs)
     }
@@ -91,7 +92,8 @@ extension NoteLibrary {
         case .recentlyDeleted: return counts.trashed
         case .folder(let id): return counts.containers[ContainerID(id), default: 0]
         case .itemType(let type): return counts.types[TypeID(type), default: 0]
-        case .favoriteItem, .project:
+        case .recents: return min(counts.active, Self.recentLimit)
+        case .favoriteItem, .collection:
             guard let belongs = predicate(for: place) else { return 0 }
             return items.reduce(0) { belongs($1) ? $0 + 1 : $0 }
         }
@@ -159,17 +161,19 @@ extension NoteLibrary {
             let container = ContainerID(id)
             return { $0.state == .active && $0.container == container }
         case .recentlyDeleted: return { $0.state == .trashed }
+        case .recents: return nil
         case .files: return { $0.state == .active && $0.isFile }
         case .itemType(let type):
             let type = TypeID(type)
             return { $0.state == .active && $0.type == type }
-        case .project(let id):
-            let members = projectDescendants(id).union([id])
+        // What is filed under the item, at any depth; the item itself is the place, not one of its members.
+        case .collection(let id):
+            let members = descendants(of: id)
             return { $0.state == .active && members.contains($0.id) }
         }
     }
 
-    private func projectDescendants(_ id: ItemID) -> Set<ItemID> {
+    private func descendants(of id: ItemID) -> Set<ItemID> {
         let edges = connectionIndex.edges.filter { $0.name == "parent-of" }
         var result: Set<ItemID> = []
         var pending = [id]
