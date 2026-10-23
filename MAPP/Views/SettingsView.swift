@@ -209,7 +209,8 @@ private enum SettingsPreview {
             folder: NotesFolder(defaults: SettingsPreview.defaults),
             host: MarfaHost(
                 defaults: SettingsPreview.defaults, keys: MemoryKeyStore(),
-                location: try! MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "SettingsPreview")))))
+                location: try! MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "SettingsPreview"))),
+            defaults: SettingsPreview.defaults))
         .defaultAppStorage(SettingsPreview.defaults)
         .frame(width: 1100, height: 720)
 }

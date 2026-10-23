@@ -1045,7 +1045,7 @@ extension LiveMarfaTests {
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "MarfaHostConnectReviewTests-\(UUID().uuidString)"))
-        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host())
+        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host(), defaults: defaults)
     }
 
     /// A quit while the key and the copy are removed must not leave the address behind, or the next launch opens
