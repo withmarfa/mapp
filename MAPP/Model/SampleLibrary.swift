@@ -81,8 +81,8 @@ nonisolated enum SampleLibrary {
         }
         store.drain()
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-MAPPViewStudies") {
-            try ViewStudiesSample.write(to: root, now: now)
+        if ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") {
+            try CollectionSample.write(to: root, now: now)
         }
         #endif
     }

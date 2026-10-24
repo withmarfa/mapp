@@ -1,7 +1,7 @@
 import Foundation
 
 #if DEBUG
-nonisolated enum ViewStudiesSample {
+nonisolated enum CollectionSample {
     static func write(to root: URL, now: Date) throws {
         let tasks = [
             ("Find a quieter reading layout", "pending", "high", "Compare a narrow reading column with properties beside it."),

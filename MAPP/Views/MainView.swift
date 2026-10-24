@@ -278,7 +278,7 @@ struct MainView: View {
             browser.fitDraft(to: library)
             if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-MAPPViewStudies"),
+            if ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample"),
                ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
                 browser.sidebarItem = .itemType("aic.ticket.task")
                 browser.viewMode = .board

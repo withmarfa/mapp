@@ -22,9 +22,6 @@ struct MAPPApp: App {
             FormatCommands()
             ToolbarCommands()
             SettingsCommands(request: settingsRequest)
-            #if DEBUG
-            InterfaceStudiesCommands()
-            #endif
         }
 
         WindowGroup("Item", for: ItemID.self) { $id in
@@ -48,27 +45,8 @@ struct MAPPApp: App {
         }
         .defaultSize(width: 640, height: 720)
 
-        #if DEBUG
-        Window("Interface Studies", id: "interface-studies") {
-            InterfaceStudiesView()
-                .interfaceTextStyle()
-        }
-        .defaultSize(width: 1200, height: 820)
-        #endif
     }
 }
-
-#if DEBUG
-private struct InterfaceStudiesCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some Commands {
-        CommandGroup(after: .windowArrangement) {
-            Button("Interface Studies") { openWindow(id: "interface-studies") }
-        }
-    }
-}
-#endif
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()

@@ -35,9 +35,9 @@ Print and Export as PDF render a complete snapshot of the note, including local 
 
 ## Reviewing components in Xcode
 
-The native view preview adds **Board** (⌘4) and **Agenda** (⌘5) to View As. Board groups by a choice or recommended-text field from the items' catalogue, supports validated moves and undo, and offers comfortable and compact cards. Agenda groups a selected date field into days and keeps undated or invalid values visible; rescheduling is not implemented. Both open an item in place and return to the same collection. They use temporary per-window layout choices, not shared saved Views.
+**Board** (⌘4) and **Agenda** (⌘5) are available in View As. Board groups by a choice or recommended-text field from the items' catalogue, supports validated moves and undo, and offers comfortable and compact cards. Agenda groups a selected date field into days and keeps undated or invalid values visible; rescheduling is not implemented. Both open an item in place and return to the same collection. They use temporary per-window layout choices, not shared saved Views.
 
-Debug builds include **Window > Interface Studies**, with fictional reading, highlight, search and collection pages. See [Native view studies](Design/Native%20view%20studies.md) for controls, limitations and the disposable sample tour.
+For a disposable sample tour, launch a Debug build with `-MAPPSampleFolder -MAPPCollectionSample`. It starts on eight sample tasks in Board. Select the Agenda folder and choose View as Agenda to see dated and undated sessions. These are temporary local files; the sample does not connect to Marfa.
 
 Open `MAPP.xcodeproj`, choose the `MAPP` scheme, and open `MAPP/Views/ItemPreviewFixtures.swift`. Enable Editor > Canvas and resume a named preview. These previews use fixed sample items and an in-memory library; they do not read or write a person's working folder.
 

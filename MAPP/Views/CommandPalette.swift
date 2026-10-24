@@ -6,7 +6,6 @@ import UniformTypeIdentifiers
 /// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
 /// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
-    @Environment(\.openWindow) private var openStudyWindow
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
@@ -243,9 +242,6 @@ struct CommandPalette: View {
                 }
             }
         }
-        #if DEBUG
-        add(String(localized: "Interface Studies"), "rectangle.3.group") { openStudyWindow(id: "interface-studies") }
-        #endif
         let search = String(localized: "Search Notes")
         entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⇧⌘P", takesFocus: true) {
             browser.palette = .search
