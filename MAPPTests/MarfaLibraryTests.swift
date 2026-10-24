@@ -1026,6 +1026,49 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(again != id, "a second New makes another item rather than naming the refused one")
     }
 
+    /// Only a body typed on the held version is shown at once; a title, a favorite or text typed on an older read
+    /// reaches the library's copy later, through the source's report. Leaving the item in between must not take
+    /// it for empty and bin what the person just changed.
+    @Test(arguments: ["a title", "a favorite", "text typed on an older read"])
+    func anItemChangedBeforeTheSourceReportsItIsKeptWhenLeft(_ change: String) async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let id = try #require(browser.startNewItem(typeID: LibraryFixture.note.rawValue, in: library, undoManager: nil))
+        source.send(.upserted([LibraryFixture.item(id, LibraryFixture.note, String(localized: "Untitled"), age: 0)]))
+        try #require(await eventually { library.item(id) != nil })
+        browser.finishNewItem(in: library)
+        try #require(!browser.isAwaitingNewItem)
+
+        switch change {
+        case "a title": library.setItemProperty(id, key: "title", value: .string("Trip"), undoManager: nil)
+        case "a favorite": library.setFavorite([id], true, undoManager: nil)
+        default: library.updateBody(of: id, to: "Packing list", readAt: ItemVersion(0))
+        }
+        browser.selection = [LibraryFixture.n1]
+        #expect(!browser.leaveNewItem(id, closing: false, undoManager: nil))
+        #expect(!source.writes.contains { if case .transition(id, _) = $0 { true } else { false } })
+    }
+
+    /// Another item pointed at the new one, such as a link or a collection membership, is something in it.
+    @Test func anItemAnotherItemPointsAtIsKeptWhenLeft() async throws {
+        let (library, source) = try await loaded()
+        let browser = Browser()
+        browser.adopt(library)
+        let id = try #require(browser.startNewItem(typeID: LibraryFixture.note.rawValue, in: library, undoManager: nil))
+        source.send(.upserted([LibraryFixture.item(id, LibraryFixture.note, String(localized: "Untitled"), age: 0)]))
+        try #require(await eventually { library.item(id) != nil })
+        browser.finishNewItem(in: library)
+
+        var pointing = try #require(library.item(LibraryFixture.n2))
+        pointing.edgesOut = [Edge(id: EdgeID("m1"), type: "about", source: pointing.id, target: .item(id), origin: .property("about"))]
+        source.send(.upserted([pointing]))
+        try #require(await eventually { library.item(LibraryFixture.n2)?.edgesOut.isEmpty == false })
+
+        browser.selection = [LibraryFixture.n1]
+        #expect(!browser.leaveNewItem(id, closing: false, undoManager: nil))
+    }
+
     /// A create still awaited when another library opens is not followed there, since that library will never hold it.
     @Test func aCreateAwaitedWhenTheLibraryChangesIsNotCarriedToTheNextLibrary() async throws {
         let (library, _) = try await loaded()

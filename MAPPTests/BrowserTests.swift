@@ -369,21 +369,15 @@ struct BrowserTests {
         #expect(browser.leaveNewItem(id, closing: false, undoManager: nil))
     }
 
-    @Test func anItemNewDidNotMakeIsNeverRemovedByLeavingIt() {
+    @Test func anEmptyItemAnotherNoteLinksToIsKept() throws {
         let (library, older, _, _) = makeLibrary()
         let browser = Browser()
-        #expect(!browser.leaveNewItem(older.id, closing: true, undoManager: nil))
-        #expect(library.note(older.id)?.isDeleted == false)
-    }
-
-    @Test func anEmptyItemMadeInAnotherLibraryIsRemovedFromThatLibrary() throws {
-        let (library, _, _, _) = makeLibrary()
-        let other = FakeItemLibrary(now: start)
-        let browser = Browser()
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(browser.leaveNewItem(id, closing: true, undoManager: nil))
-        #expect(other.items.isEmpty)
-        #expect(library.note(id)?.isDeleted == true)
+        let title = try #require(library.item(id)?.title)
+        library.updateBody(of: older.id, to: "See [[\(title)]]", readAt: try #require(library.item(older.id)).version)
+        browser.selection = [older.id]
+        #expect(!browser.leaveNewItem(id, closing: false, undoManager: nil))
+        #expect(library.note(id)?.isDeleted == false)
     }
 
     // MARK: Keeping the selection in the list

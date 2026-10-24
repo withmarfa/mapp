@@ -11,17 +11,20 @@ struct NewItem {
     let parentID: ItemID?
     /// The library the create was sent to; another one that has loaded without the item never will hold it.
     let library: any ItemLibrary
-    /// What the library held of the item when it first showed it, to tell later whether anything was set. Nil
-    /// while the create is awaited: a Marfa library shows the item when its source says so.
+    /// What the library held of the item when it first showed it, to tell later whether anything else changed it.
+    /// Nil while the create is awaited: a Marfa library shows the item when its source says so.
     var baseline: Item?
 
     var isAwaited: Bool { baseline == nil }
 
-    /// Whether the item still holds nothing the person put there: the title it was made with, no text, no tags, no
-    /// other property or connection than it began with, and the parent it was made under or none. An item the
-    /// library no longer shows, or shows as deleted, holds nothing to remove.
+    /// Whether the item still holds nothing the person put there. Nothing counts as put there only if the library
+    /// has made no write to it since it was made and nothing is connected to it, and what the library shows is still
+    /// the title it was made with, no text, no tags, no other property or connection than it began with, and the
+    /// parent it was made under or none. The writes are asked first because a library may show a write only later;
+    /// what it shows catches a change made by anything else. An item the library no longer shows, or shows as
+    /// deleted, holds nothing to remove.
     func isUntouched(in library: any ItemLibrary) -> Bool {
-        guard let baseline, let item = library.item(id), item.state == .active else { return false }
+        guard let baseline, !library.wasTouched(id), let item = library.item(id), item.state == .active else { return false }
         guard item.title == baseline.title, item.tags == baseline.tags, item.properties == baseline.properties,
               item.tier == baseline.tier, item.container == baseline.container,
               item.parentID == nil || item.parentID == parentID,
