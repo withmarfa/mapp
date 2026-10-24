@@ -103,10 +103,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
     /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
     func wasRefused(creating id: ItemID) -> Bool
-    /// Whether the library has written to the item since it began, other than by making it, or another item is
-    /// connected to it. A library that waits for its source to report a write answers from the writes it made too,
-    /// since the copy it shows may not hold them yet; one that takes each write into its copy at once answers from
-    /// the copy's connections alone.
+    /// Whether the library has written to the item since making it, or another item is connected to it. A library
+    /// that waits for its source to report a write answers from the writes it made too, since the copy it shows may
+    /// not hold them yet; one that takes each write into its copy at once answers from the copy's connections alone.
     func wasTouched(_ id: ItemID) -> Bool
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool

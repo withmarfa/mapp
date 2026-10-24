@@ -17,12 +17,11 @@ struct NewItem {
 
     var isAwaited: Bool { baseline == nil }
 
-    /// Whether the item still holds nothing the person put there. Nothing counts as put there only if the library
-    /// has made no write to it since it was made and nothing is connected to it, and what the library shows is still
-    /// the title it was made with, no text, no tags, no other property or connection than it began with, and the
-    /// parent it was made under or none. The writes are asked first because a library may show a write only later;
-    /// what it shows catches a change made by anything else. An item the library no longer shows, or shows as
-    /// deleted, holds nothing to remove.
+    /// Whether the item still holds nothing the person put there: the library has made no write to it since it was
+    /// made, no other item is connected to it, and what the library shows is still the title it was made with, no
+    /// text, no tags, no other property or connection than it began with, and the parent it was made under or none.
+    /// The writes are asked first because a library may show a write only later; what it shows catches a change
+    /// made by anything else. An item the library no longer shows, or shows as deleted, holds nothing to remove.
     func isUntouched(in library: any ItemLibrary) -> Bool {
         guard let baseline, !library.wasTouched(id), let item = library.item(id), item.state == .active else { return false }
         guard item.title == baseline.title, item.tags == baseline.tags, item.properties == baseline.properties,
