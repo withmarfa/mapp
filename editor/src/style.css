@@ -287,7 +287,7 @@ body {
   background: var(--mark);
 }
 
-/* InkKit 0.1.4 draws a wiki link as plain text, and one that names no note only with a tooltip
+/* InkKit draws a wiki link as plain text, and one that names no note only with a tooltip
    (aicayzer/inkkit#159). A link takes the link color; one that names no note is muted and underlined with
    dashes, so the cue is not color alone. Drop this when InkKit styles wiki links itself. */
 .inkkit-wiki-link {
