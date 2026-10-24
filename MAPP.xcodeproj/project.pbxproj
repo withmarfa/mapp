@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		331000013066ED47005D07A2 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 331000023066ED47005D07A2 /* Yams */; };
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
+		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +84,7 @@
 		3303FE043066ED47005D07A2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
 			);
 		};
 		3303FE343066ED47005D07A2 /* Frameworks */ = {
@@ -164,6 +166,9 @@
 				3303FE013066ED47005D07A2 /* MAPPTests */,
 			);
 			name = MAPPTests;
+			packageProductDependencies = (
+				331000083066ED47005D07A2 /* MarfaTesting */,
+			);
 			productName = MAPPTests;
 			productReference = 3303FE003066ED47005D07A2 /* MAPPTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -595,12 +600,17 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.29;
+				minimumVersion = 0.0.31;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		331000083066ED47005D07A2 /* MarfaTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaTesting;
+		};
 		331000023066ED47005D07A2 /* Yams */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 331000033066ED47005D07A2 /* XCRemoteSwiftPackageReference "Yams" */;

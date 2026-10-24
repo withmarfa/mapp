@@ -56,20 +56,22 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let connection: MarfaConnection
     /// Purge needs the server, which the library offers only while it can be reached; moving, renaming files,
     /// folders and importing are a files library's.
-    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier]
+    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier, .downloadedFiles]
     let embeds: any EmbedResolver
     let copy: WorkingCopy
+    let downloadedFiles: (any DownloadedFiles)?
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    private init(copy: WorkingCopy, connection: MarfaConnection) {
+    init(copy: WorkingCopy, connection: MarfaConnection, reading: (any MarfaReading)? = nil) {
         self.copy = copy
+        downloadedFiles = MarfaDownloads(copy: copy)
         self.connection = connection
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
         embeds = MarfaEmbeds(events: events)
-        engine = MarfaEngine(copy: copy, hub: hub, tell: { event in
+        engine = MarfaEngine(copy: copy, hub: hub, reading: reading, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
         Task { [engine] in await engine.run(stream) }
@@ -301,7 +303,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
         let hits: [SearchHit]
         do {
-            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500) }
+            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500).rows }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }

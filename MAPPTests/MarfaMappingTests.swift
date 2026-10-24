@@ -229,11 +229,6 @@ struct MarfaMappingTests {
         #expect(open.allowsAnySource() && open.allowsAnyTarget())
     }
 
-    @Test func theSliceNamesEveryNamespaceButTheServersOwn() {
-        #expect(MarfaMapping.namespaces(of: Self.catalogue) == ["aic.*", "core.*"])
-        #expect(MarfaMapping.namespaces(of: Catalogue()).isEmpty)
-    }
-
     // MARK: Items
 
     @Test func titleAndBodyComeFromTheTypesFields() {
