@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "MAPP can’t fill these required fields: %@. Your draft is kept here." : {
+      "extractionState" : "manual"
+    },
     "Console" : {
       "extractionState" : "manual"
     },

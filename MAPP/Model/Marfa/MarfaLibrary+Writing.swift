@@ -26,6 +26,12 @@ extension MarfaLibrary {
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
         // The Inbox is the feed tier, so an item made there stays where it was made.
         let draft = ItemDraft(type: type, title: title, body: text, tier: place == .inbox ? .feed : nil, parent: parentID)
+        do {
+            _ = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
+        } catch {
+            failure = (cantCreate, error.problem.message ?? cantCreate)
+            return nil
+        }
         submitCreate(id, draft, failing: cantCreate)
         let name = String(localized: "New Item")
         registerUndo(undoManager, name: name) { [weak undoManager] library in

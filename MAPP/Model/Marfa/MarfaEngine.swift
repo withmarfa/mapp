@@ -859,6 +859,15 @@ actor MarfaEngine {
     /// The item keeps the id the app minted, a lowercase UUIDv7 as the server requires. A body for a type with
     /// no body field is refused rather than dropped.
     private func create(_ id: ItemID, _ draft: ItemDraft) async throws -> Marfa.QueuedWrite {
+        let properties = try Self.creationProperties(draft, catalogue: catalogue)
+        return try await copy.items.create(
+            Draft(
+                type: draft.type.rawValue, properties: properties, tags: draft.tags.sorted(),
+                tier: draft.tier.map(MarfaMapping.marfaTier), id: id.rawValue))
+    }
+
+    /// The library checks the same properties before submitting, so a draft missing required values stays editable.
+    nonisolated static func creationProperties(_ draft: ItemDraft, catalogue: Catalogue) throws(Refused) -> JSONObject {
         let info = catalogue.itemTypes[draft.type]
         var properties = JSONObject(draft.properties.sorted { $0.key < $1.key }.map { ($0.key, MarfaMapping.json($0.value)) })
         var body = draft.body
@@ -868,13 +877,31 @@ actor MarfaEngine {
             body = body.isEmpty ? draft.title : draft.title + "\n\n" + body
         }
         if !body.isEmpty {
-            guard let bodyField = MarfaMapping.bodyField(of: info) else { throw Unsupported(message: Self.noText) }
+            guard let bodyField = MarfaMapping.bodyField(of: info) else {
+                throw Refused(problem: SyncProblem(code: "unsupported", message: Self.noText))
+            }
             properties[bodyField] = .string(body)
         }
-        return try await copy.items.create(
-            Draft(
-                type: draft.type.rawValue, properties: properties, tags: draft.tags.sorted(),
-                tier: draft.tier.map(MarfaMapping.marfaTier), id: id.rawValue))
+        if let bodyField = MarfaMapping.bodyField(of: info), properties[bodyField] == nil,
+           info?.fields.contains(where: { $0.key == bodyField && $0.required && $0.kind == .text }) == true {
+            properties[bodyField] = .string("")
+        }
+        let missing = info?.fields.filter { field in
+            guard field.required else { return false }
+            guard let value = properties[field.key], value != .null else { return true }
+            // A title or body supplied as text cannot satisfy a required field of another shape.
+            if field.key == MarfaMapping.titleField(of: info) || field.key == MarfaMapping.bodyField(of: info) {
+                return !field.kind.accepts(MarfaMapping.value(value))
+            }
+            return false
+        } ?? []
+        if !missing.isEmpty {
+            let fields = missing.map(\.label).joined(separator: ", ")
+            throw Refused(problem: SyncProblem(
+                code: "invalid_properties",
+                message: String(localized: "MAPP can’t fill these required fields: \(fields). Your draft is kept here.")))
+        }
+        return properties
     }
 
     /// The create is already queued and answered on its own, so a parent that cannot be linked is told apart and

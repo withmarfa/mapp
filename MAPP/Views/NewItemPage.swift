@@ -7,7 +7,7 @@ struct NewItemPage: View {
     let browser: Browser
     @Bindable var draft: NewItemDraft
     @StoredPageStyle private var style
-    @State private var rejected = false
+    @State private var rejection: String?
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -64,8 +64,8 @@ struct NewItemPage: View {
                 .accessibilityLabel("Parent")
                 .accessibilityIdentifier("NewItemParent")
             }
-            if rejected {
-                Text("Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here.")
+            if let rejection {
+                Text(rejection)
                     .interfaceFont(.callout).foregroundStyle(.red)
                 Button("Start Writing") { startWriting() }
             }
@@ -89,9 +89,9 @@ struct NewItemPage: View {
         }
         .onChange(of: draft.typeID, initial: true) {
             draft.validateParent(in: library)
-            rejected = false
+            rejection = nil
         }
-        .onChange(of: draft.title) { rejected = false }
+        .onChange(of: draft.title) { rejection = nil }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NewItemPage")
     }
@@ -106,7 +106,8 @@ struct NewItemPage: View {
     private func startWriting() {
         guard browser.isCreatingItem else { return }
         guard browser.createDraft(in: library, undoManager: undoManager) != nil else {
-            rejected = true
+            rejection = library.failure?.message ?? String(localized:
+                "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here.")
             return
         }
     }

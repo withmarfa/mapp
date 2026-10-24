@@ -346,6 +346,22 @@ struct BrowserTests {
         #expect(!browser.isCreatingItem)
     }
 
+    @Test func aTitleOnlyDraftStillCreatesAnEmptyFileNote() throws {
+        let (library, _, _, _) = makeLibrary()
+        let browser = Browser()
+        browser.startItemDraft()
+        browser.itemDraft?.title = "A title without text"
+
+        let id = try #require(browser.createDraft(in: library, undoManager: nil))
+        let note = try #require(library.note(id))
+        #expect(note.title == "A title without text")
+        #expect(note.body.isEmpty)
+        #expect(library.failure == nil)
+        #expect(browser.itemDraft == nil)
+        #expect(!browser.isCreatingItem)
+        #expect(browser.selection == [id])
+    }
+
     @Test func untitledDraftNamesAreUniqueAndProjectsSupplyParents() {
         let existing = Note(path: "Notes/Untitled.md", text: "---\ntype: core.note\ntitle: Untitled\n---\n", created: start)
         let project = Note(path: "Projects/Area.md", text: "---\ntype: aic.project\ntitle: Area\n---\n", created: start)
