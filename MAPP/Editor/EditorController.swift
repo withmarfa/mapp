@@ -165,6 +165,16 @@ final class EditorController: NSObject {
 
     // MARK: Driving the page
 
+    /// A selection is navigation intent, including returning to a note whose outgoing capture failed.
+    func select(_ item: Item) {
+        requestedNoteID = item.id
+        if wantsFocus != item.id { wantsFocus = nil }
+        if pendingHeading?.note != item.id { pendingHeading = nil }
+        loadRequest += 1
+        if noteID == item.id, isPresented { noteChanged(item) }
+        else { load(item) }
+    }
+
     /// Shows a note for reading. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
@@ -244,7 +254,7 @@ final class EditorController: NSObject {
     /// text where the caret is.
     func noteChanged(_ item: Item) {
         // SwiftUI can deliver a change from the page just left after another item has loaded.
-        // Only an explicit load may navigate; an old item's update must not take the page back.
+        // Only an explicit selection or load may navigate; an old update must not take the page back.
         guard item.id == requestedNoteID else { return }
         guard item.id == noteID, isPresented else { return load(item) }
         guard let body = library?.body(of: item.id) else { return }

@@ -230,6 +230,34 @@ struct EditorTests {
         #expect(try await page.markdown() == nil)
     }
 
+    @Test func reselectingTheNoteAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        let originalID = try #require(page.editor.noteID)
+        let original = try #require(page.library.item(originalID))
+        let generation = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
+        let replacement = Note(body: "Replacement\n", created: .now)
+        page.library.notes.append(replacement)
+        let replacementItem = try #require(page.library.item(replacement.id))
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        page.editor.select(replacementItem)
+        try await page.wait { page.library.failure != nil }
+        #expect(page.editor.noteID == originalID)
+
+        page.editor.select(original)
+        try await page.run("window.editor.flush = window.savedFlush")
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int == generation)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Original\n")
+        page.editor.noteChanged(replacementItem)
+        #expect(page.editor.noteID == originalID)
+
+        page.library.updateBody(of: originalID, to: "Outside\n")
+        page.editor.noteChanged(try #require(page.library.item(originalID)))
+        #expect(try await page.shownText(until: "Outside") == "Outside")
+        #expect(page.editor.noteID == originalID)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
         let page = try await Harness()
         try await page.load("Original\n")
@@ -1018,7 +1046,7 @@ struct EditorTests {
         if close {
             editor.close()
         } else {
-            let other = try #require(library.items.first { $0.id != item.id && !$0.isFile })
+            let other = try #require(library.items(in: .allNotes).first { $0.id != item.id && !$0.isFile })
             source.setBody("Other body\n", of: other.id)
             source.send(.bodyChanged(other.id, other.version))
             try #require(await eventually { library.body(of: other.id) != nil })
