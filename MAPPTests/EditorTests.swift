@@ -921,6 +921,60 @@ struct EditorTests {
         #expect(page.library.failure == nil)
     }
 
+    @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
+        let page = try await Harness()
+        let container = page.editor.container
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        container.topInset = 52
+        container.layoutSubtreeIfNeeded()
+        let paragraphs = Array(repeating: "A paragraph for the scrolling check.", count: 60).joined(separator: "\n\n") + "\n"
+        try await page.load(paragraphs)
+        page.editor.setHeader(Self.header("First item"))
+        try await page.frames()
+        try await page.run("window.scrollTo(0, 240)")
+        try await page.frames()
+        let scrolled = try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double
+        #expect(scrolled == 240)
+
+        for index in 0..<3 {
+            page.editor.setHeader(Self.header(String(repeating: "A longer title ", count: index + 1)))
+            try await page.load("Item \(index)\n\n" + paragraphs)
+            try await page.frames()
+            #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
+            #expect(!page.editor.isHeaderScrolledAway)
+            window.setContentSize(NSSize(width: index.isMultiple(of: 2) ? 600 : 700, height: 500))
+            container.layoutSubtreeIfNeeded()
+            try await page.frames()
+            #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
+            try await page.run("window.scrollTo(0, 240)")
+            try await page.frames()
+        }
+        #expect(page.changes.isEmpty)
+        #expect(page.library.failure == nil)
+    }
+
+    @Test func anUpdateForTheItemJustLeftCannotReloadIt() async throws {
+        let first = Note(body: "First item\n", created: .now)
+        let second = Note(body: "Second item\n", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(first.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        page.editor.load(try #require(library.item(second.id)))
+        try await page.wait { page.editor.noteID == second.id }
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        page.editor.noteChanged(try #require(library.item(first.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.noteID == second.id)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == second.body)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {
         let page = try await Harness()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)

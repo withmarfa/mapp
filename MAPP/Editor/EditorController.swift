@@ -240,7 +240,9 @@ final class EditorController: NSObject {
     /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
     /// text where the caret is.
     func noteChanged(_ item: Item) {
-        guard item.id == noteID else { return load(item) }
+        // SwiftUI can deliver a change from the page just left after another item has loaded.
+        // Only an explicit load may navigate; an old item's update must not take the page back.
+        guard item.id == noteID else { return }
         guard let body = library?.body(of: item.id) else { return }
         guard body.text != markdown || item.isWritable != isEditable else {
             // The page already holds this text, so what is typed next is typed on this version of it.
