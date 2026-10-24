@@ -1,25 +1,20 @@
 import SwiftUI
 
-/// The foot of the sidebar, pinned below its list: a line about the server when there is something to say, and
-/// the row that opens Settings. The row is a one-row sidebar list, so it looks, hovers and selects as the rows
-/// above it do.
+/// The offline indicator stays below the scrolling navigation; other status belongs in Library settings.
 struct SidebarFoot: View {
     @Environment(MarfaHost.self) private var host: MarfaHost?
-    @Environment(\.interfaceTextSize) private var textSize
     let browser: Browser
-
-    private enum Row: Hashable { case settings }
 
     var body: some View {
         VStack(spacing: 0) {
             if let host, host.source != nil {
                 SyncStatusReading(host: host) { status in
-                    if let note = status.primary { syncLine(note) }
+                    if let note = status.notes.first(where: { $0.kind == .offline }) {
+                        syncLine(note)
+                    }
                 }
             }
-            settingsRow
         }
-        .padding(.top, 6)
     }
 
     private func syncLine(_ note: SyncStatus.Note) -> some View {
@@ -38,7 +33,7 @@ struct SidebarFoot: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -48,25 +43,4 @@ struct SidebarFoot: View {
         .accessibilityIdentifier("SyncStatus")
     }
 
-    private var settingsRow: some View {
-        List(selection: Binding<Row?> {
-            browser.showsSettings ? .settings : nil
-        } set: { row in
-            if row == .settings { browser.showSettings() }
-        }) {
-            Label {
-                Text("Settings").interfaceFont(.body)
-            } icon: {
-                // Grey, as a place of its own rather than one of the library's.
-                Image(systemName: "gearshape").interfaceFont(.body).foregroundStyle(.secondary)
-            }
-            .tag(Row.settings)
-            .accessibilityIdentifier("SidebarSettingsRow")
-        }
-        .listStyle(.sidebar)
-        .scrollDisabled(true)
-        .scrollContentBackground(.hidden)
-        .frame(height: 20 * InterfaceStyle.scale(for: textSize) + 24)
-        .accessibilityIdentifier("SidebarFoot")
-    }
 }

@@ -1,9 +1,9 @@
 import XCTest
 
-/// The Settings row at the sidebar's foot is sized for the sidebar size chosen in System Settings, so each size is checked.
+/// The sidebar's instance menu stays reachable at every sidebar size chosen in System Settings.
 @MainActor
 final class SidebarSizeTests: XCTestCase {
-    func testTheSettingsRowFitsTheSidebarFootAtEverySidebarSize() {
+    func testTheInstanceMenuOpensSettingsAtEverySidebarSize() {
         for size in ["1", "2", "3"] {
             let app = XCUIApplication()
             // Before the sample folder's flag, which takes no value.
@@ -11,10 +11,15 @@ final class SidebarSizeTests: XCTestCase {
             app.launch()
             let window = app.windows.firstMatch
             XCTAssertTrue(window.outlines["Sidebar"].waitForExistence(timeout: 10))
-            let foot = window.descendants(matching: .any).matching(identifier: "SidebarFoot").element(boundBy: 0)
-            let settings = foot.staticTexts["Settings"].firstMatch
+            let instance = window.descendants(matching: .any).matching(identifier: "SidebarLibrary").element(boundBy: 0)
+            XCTAssertTrue(instance.waitForExistence(timeout: 3))
+            XCTAssertTrue(instance.isHittable, "the instance menu is reachable at sidebar size \(size)")
+            instance.click()
+            let settings = app.menuItems["Settings"]
             XCTAssertTrue(settings.waitForExistence(timeout: 3))
-            XCTAssertTrue(foot.frame.contains(settings.frame), "the row is cut off at sidebar size \(size)")
+            settings.click()
+            XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
+                .waitForExistence(timeout: 3))
             app.terminate()
         }
     }

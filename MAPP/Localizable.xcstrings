@@ -1,6 +1,44 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Console" : {
+      "extractionState" : "manual"
+    },
+    "Instance" : {
+      "extractionState" : "manual"
+    },
+    "Sources" : {
+      "extractionState" : "manual"
+    },
+    "Not connected yet" : {
+      "extractionState" : "manual"
+    },
+    "No Sources" : {
+      "extractionState" : "manual"
+    },
+    "No Collections" : {
+      "extractionState" : "manual"
+    },
+    "Sources appear here when items identify where they came from." : {
+      "extractionState" : "manual"
+    },
+    "Items with other items filed under them appear here." : {
+      "extractionState" : "manual"
+    },
+    "Views" : {
+      "extractionState" : "manual"
+    },
+    "Edit" : {
+      "extractionState" : "manual",
+      "generatesSymbol" : false
+    },
+    "Delete Permanently…" : {
+      "extractionState" : "manual",
+      "generatesSymbol" : false
+    },
+    "Deleted items are kept for %lld days." : {
+      "extractionState" : "manual"
+    },
     "" : {
 
     },
@@ -332,9 +370,6 @@
     "Another copy of MAPP on this Mac is using your library. Quit the other copy, then quit and reopen this one." : {
       "extractionState" : "manual"
     },
-    "Anything other items are filed under is a collection." : {
-
-    },
     "Appearance" : {
 
     },
@@ -585,6 +620,9 @@
       "extractionState" : "manual"
     },
     "Connection Actions" : {
+
+    },
+    "Continue Draft" : {
 
     },
     "Copy" : {
@@ -1041,6 +1079,9 @@
       "extractionState" : "manual"
     },
     "Library" : {
+
+    },
+    "Library Settings" : {
 
     },
     "Library unavailable" : {
@@ -1591,9 +1632,6 @@
 
     },
     "Show %@" : {
-
-    },
-    "Show Collections" : {
 
     },
     "Show Details" : {

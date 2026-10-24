@@ -54,7 +54,6 @@ struct SettingsPageView: View {
         case .editor: EditorSettings()
         case .sidebar: SidebarSettings()
         case .library: LibrarySettings()
-        case .recentlyDeleted: RecentlyDeletedSettings()
         case .about: AboutSettings()
         }
     }

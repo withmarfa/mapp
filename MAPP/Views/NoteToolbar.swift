@@ -1,28 +1,22 @@
 import SwiftUI
 
-/// The page's toolbar: Back and Forward through the items shown, then View As, More and, at the far right, Details,
+/// The page's toolbar: View As, Share and More, and, at the far right, Details,
 /// which opens the panel at the window's right edge. Format is out of the
 /// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
-/// While the inspector is open, Details and More sit above it instead (`InspectorToolbar`).
-///
-/// Back and Forward take the automatic placement, which sets them at the leading edge of this column's section.
-/// The navigation placement sets them at the window's leading edge, beside the list column's title.
+/// While the inspector is open, Share, More and Details sit above it instead (`InspectorToolbar`).
 struct NoteToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
+    var fileURL: URL?
 
     private var tools: ItemToolbarActions {
-        ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+        ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
     }
 
     var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "back") { HistoryButton(browser: browser, direction: .back) }
-            .hidden(browser == nil)
-        ToolbarItem(id: "forward") { HistoryButton(browser: browser, direction: .forward) }
-            .hidden(browser == nil)
         ToolbarItem(id: "scrolledTitle") {
             Text(tools.notes.first?.title ?? "")
                 .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -40,29 +34,43 @@ struct NoteToolbar: CustomizableToolbarContent {
             if let browser { ViewModeMenu(browser: browser) }
         }
         .hidden(browser == nil)
-        ToolbarItem(id: "more") { tools.moreMenu }
+        ToolbarSpacer(.fixed)
+            .hidden(browser == nil || tools.showsInspector)
+        ToolbarItem(id: "share") { tools.shareLink }
+            .hidden(tools.showsInspector)
+        ToolbarItem(id: "more") {
+            tools.moreMenu.disabled(items.isEmpty || browser?.isCreatingItem == true)
+        }
+        .hidden(tools.showsInspector)
+        ToolbarSpacer(.fixed)
             .hidden(tools.showsInspector)
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(tools.showsInspector)
     }
 }
 
-/// More and Details above the inspector column, where the system sets a toolbar declared inside the inspector's
+/// Share, More and Details above the inspector column, where the system sets a toolbar declared inside the inspector's
 /// content. Details is on while the inspector is open and is never dimmed, so the inspector can always be closed.
 /// It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
-/// and would show Details and More a second time beside the page's own.
+/// and would show the actions a second time beside the page's own.
 struct InspectorToolbar: ToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
+    var fileURL: URL?
 
     var body: some ToolbarContent {
-        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         if tools.showsInspector {
             ToolbarItemGroup {
+                tools.shareLink
                 tools.moreMenu
+                    .disabled(items.isEmpty || browser?.isCreatingItem == true)
+            }
+            ToolbarSpacer(.fixed)
+            ToolbarItem {
                 DetailsToggle(details: details)
             }
         }
@@ -81,8 +89,8 @@ struct DetailsToggle: View {
 }
 
 /// The gallery's and the table's toolbar, one for the collection and the page it opens, so the order across its
-/// single column is set here: View As, View Options and Search together, then New Item, then More and Details at the
-/// far right, as the list and page toolbars have them across two columns. The table brings its own View Options
+/// single column is set here: Search, View As and View Options together, New Item when the sidebar is hidden, then
+/// Share and More together, with Details separate at the far right. The table brings its own View Options
 /// (`ItemTableControls`). Opened on an item, View As, View Options and Search give way.
 struct GalleryToolbar<Options: View>: ToolbarContent {
     @CurrentLibrary private var library
@@ -92,6 +100,7 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
     let details: DetailsPresentation
     /// The width the search field spans when it is out.
     let columnWidth: CGFloat
+    var showsCreation = true
     @ViewBuilder let options: () -> Options
 
     var body: some ToolbarContent {
@@ -119,16 +128,20 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
             }
         }
         // The field spans the column, so there is no room beside it.
-        if !browser.isSearchExpanded || !browser.showsCollection {
+        if showsCreation && (!browser.isSearchExpanded || !browser.showsCollection) {
             ToolbarSpacer(.fixed)
             ToolbarItem { NewItemButton(browser: browser) }
         }
-        // Over the collection, More and Details act on what is selected, so they wait for it. They move above the
-        // inspector while it is open.
-        if !details.showsInspector(in: browser), !browser.showsCollection || !browser.selection.isEmpty {
+        // Keep the controls in place when selection clears. They move above an open inspector.
+        if !details.showsInspector(in: browser) {
             ToolbarSpacer(.fixed)
             ToolbarItemGroup {
+                tools.shareLink
                 tools.moreMenu
+                    .disabled(browser.selection.isEmpty || browser.isCreatingItem)
+            }
+            ToolbarSpacer(.fixed)
+            ToolbarItem {
                 tools.detailsButton
             }
         }
@@ -141,6 +154,7 @@ private struct ItemToolbarActions {
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
+    var fileURL: URL?
 
     var notes: [Item] { items.filter { !$0.isFile } }
     var showsInspector: Bool { details.showsInspector(in: browser) }
@@ -156,15 +170,23 @@ private struct ItemToolbarActions {
     var editableNote: Item? { visibleNote.flatMap { $0.isWritable ? $0 : nil } }
 
     private var selectedFileURL: URL? {
-        guard browser?.isCreatingItem != true, browser?.selection.count == 1,
-              let id = browser?.selection.first else { return nil }
-        return browser?.fileURL(of: id, in: library)
+        guard browser?.isCreatingItem != true, (browser?.selection.count ?? items.count) == 1,
+              let id = browser?.selection.first ?? items.first?.id else { return nil }
+        return browser?.fileURL(of: id, in: library) ?? fileURL ?? library.fileURL(for: id)
+    }
+
+    var shareLink: some View {
+        let hasSingleSelection = browser?.isCreatingItem != true && (browser?.selection.count ?? items.count) == 1
+        let note = hasSingleSelection && notes.count == 1 ? notes.first : nil
+        return NoteShareLink(share: NoteShare(note: note, fileURL: selectedFileURL, in: library))
+            .help("Share…")
+            .accessibilityIdentifier("ShareToolbar")
     }
 
     var detailsButton: some View {
         Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
             .help(details.isPresented ? "Hide Details" : "Show Details")
-            .disabled((browser?.selection.count ?? notes.count) != 1 || browser?.isCreatingItem == true)
+            .disabled((browser?.selection.count ?? items.count) != 1 || browser?.isCreatingItem == true)
             .accessibilityIdentifier("DetailsToggle")
     }
 
@@ -174,24 +196,6 @@ private struct ItemToolbarActions {
             ids: browser.map { $0.isCreatingItem ? [] : $0.selection } ?? Set(items.map(\.id)),
             notes: isShowingSelection ? notes : [],
             fileURL: selectedFileURL, browser: browser, editor: editor, visibleNote: visibleNote, editableNote: editableNote)
-    }
-}
-
-/// Back or Forward through the items this window has shown.
-private struct HistoryButton: View {
-    @CurrentLibrary private var library
-    let browser: Browser?
-    let direction: SelectionHistory.Direction
-
-    var body: some View {
-        let isBack = direction == .back
-        let isEnabled = browser.map { isBack ? $0.canGoBack(in: library) : $0.canGoForward(in: library) } ?? false
-        Button(isBack ? "Back" : "Forward", systemImage: isBack ? "chevron.backward" : "chevron.forward") {
-            browser?.go(direction, in: library)
-        }
-        .help(isBack ? "Back" : "Forward")
-        .disabled(!isEnabled)
-        .accessibilityIdentifier(isBack ? "BackToolbar" : "ForwardToolbar")
     }
 }
 

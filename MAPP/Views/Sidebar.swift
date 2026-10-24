@@ -7,10 +7,10 @@ struct Sidebar: View {
     let browser: Browser
     let order: NoteOrder
     @State private var takenName: String?
+    @State private var editsTypes = false
 
-    /// Picking an item shows it afresh. Clicking empty space would clear the selection, which the list
-    /// cannot show, so that is ignored. While Settings shows, the row of Settings is the one selected, so
-    /// choosing the place that was open before returns to it as it was.
+    /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the
+    /// previous destination returns to its existing state.
     private var selection: Binding<SidebarItem?> {
         Binding {
             browser.showsSettings ? nil : browser.sidebarItem
@@ -34,7 +34,15 @@ struct Sidebar: View {
                         case .inbox: row(.inbox, symbol: "tray", hiding: .inbox)
                         // Always the same number, so it says nothing.
                         case .recents: row(.recents, symbol: "clock", hiding: .recents, counted: false)
-                        case .files: row(.files, symbol: "doc", hiding: .files)
+                        case .sources:
+                            row(.sources, symbol: "antenna.radiowaves.left.and.right", hiding: .sources, counted: false)
+                                .accessibilityIdentifier("SidebarSources")
+                        case .collections:
+                            row(.collections, symbol: "square.stack", hiding: .collections, counted: false)
+                                .accessibilityIdentifier("SidebarCollections")
+                        case .favorites:
+                            row(.favorites, symbol: "heart", hiding: .favorites)
+                                .accessibilityIdentifier("SidebarFavorites")
                         default: row(.allNotes, symbol: "note.text", hiding: .all)
                         }
                     }
@@ -43,28 +51,20 @@ struct Sidebar: View {
 
             ForEach(plan.shownLibrary, id: \.key) { section in
                 switch section {
-                case .collections: collectionsSection(plan)
                 case .types: typesSection(plan)
                 case .folders: foldersSection(plan)
                 default: EmptyView()
                 }
             }
 
-            if plan.isShown(.favorites), !favorites.isEmpty {
-                Section(isExpanded: expansion(.favorites)) {
-                    ForEach(favorites) { item in
-                        sidebarLabel(item.title, symbol: TypeSymbol.name(for: item.type, in: library.catalogue))
-                            .tag(SidebarItem.favoriteItem(item.id))
-                            .accessibilityIdentifier("SidebarFavoriteItem-\(item.id.rawValue)")
-                    }
-                } header: {
-                    Text("Favorites")
-                        .contextMenu { hideButton(.favorites) }
-                        .accessibilityIdentifier("SidebarFavoritesSection")
-                }
+            Section("Views") {
+                Text("Not connected yet")
+                    .foregroundStyle(.secondary)
+                    .selectionDisabled()
             }
         }
         .listStyle(.sidebar)
+        .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         .onDeleteCommand {
             if editsFolders { browser.folderToDelete = browser.selectedFolder }
@@ -95,40 +95,27 @@ struct Sidebar: View {
         }
     }
 
-    /// What other items are filed under, two levels of it: a collection that has collections under it folds them
-    /// open and shut, and opening any row lists everything filed under it.
-    private func collectionsSection(_ plan: SidebarPlan) -> some View {
-        Section(isExpanded: expansion(.collections)) {
-            ForEach(plan.shownCollections) { node in
-                if node.children.isEmpty {
-                    collectionRow(node)
-                } else {
-                    DisclosureGroup(isExpanded: expansion(.collection(node.id))) {
-                        ForEach(node.children) { collectionRow($0) }
-                    } label: {
-                        collectionRow(node)
-                    }
-                }
-            }
-        } header: {
-            Text("Collections")
-                .contextMenu { hideButton(.collections) }
-                .accessibilityIdentifier("SidebarCollections")
-        }
-    }
-
-    private func collectionRow(_ node: CollectionNode) -> some View {
-        row(.collection(node.id), symbol: node.symbol, title: node.title, hiding: .collection(node.id))
-            .accessibilityIdentifier("SidebarCollection-\(node.id.rawValue)")
+    private func selectionRows(_ plan: SidebarPlan) -> [String] {
+        plan.shownTop.map(\.key) + plan.shownLibrary.map(\.key)
+            + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
+            + library.itemTypeCounts.map { $0.id.rawValue }
     }
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
         Section(isExpanded: expansion(.types)) {
             ForEach(plan.shownTypes) { typeRow($0) }
         } header: {
-            Text("Types")
-                .contextMenu { hideButton(.types) }
-                .accessibilityIdentifier("SidebarTypes")
+            HStack {
+                Text("Types")
+                Spacer()
+                Button("Edit") { editsTypes = true }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $editsTypes) {
+                        SidebarTypePicker()
+                    }
+                    .accessibilityIdentifier("EditSidebarTypes")
+            }
+            .accessibilityIdentifier("SidebarTypes")
         }
     }
 
@@ -248,9 +235,9 @@ struct Sidebar: View {
 
     private func sidebarLabel(_ title: String, symbol: String) -> some View {
         Label {
-            Text(title).interfaceFont(.body)
+            Text(title).interfaceFont(.body).lineLimit(1).truncationMode(.tail)
         } icon: {
-            Image(systemName: symbol).interfaceFont(.body)
+            Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
         }
     }
 
@@ -266,7 +253,7 @@ struct Sidebar: View {
         switch item {
         case .inbox: library.move(ids, to: nil, undoManager: undoManager)
         case .folder(let id): library.move(ids, to: id, undoManager: undoManager)
-        case .recents, .allNotes, .favorites, .itemType, .collection, .favoriteItem, .files, .recentlyDeleted: break
+        case .recents, .allNotes, .favorites, .itemType, .collection, .collections, .sources, .source, .favoriteItem, .files, .recentlyDeleted: break
         }
     }
 
@@ -338,5 +325,34 @@ private struct FolderNameField: View {
         .environment(\.library, ItemPreviewFixtures.library)
         .environment(ItemPreviewFixtures.libraries(named: "MAPP.SidebarPreview"))
         .frame(width: 260, height: 740)
+}
+
+#Preview("Sidebar: 100 Collections") {
+    let notes = (1...100).flatMap { index in
+        [
+            Note(id: ItemID("collection-\(index)"), path: "Collection \(index).md",
+                 text: "---\ntype: aic.project\ntitle: Research collection \(index) with a longer title\n---\n", created: ItemPreviewFixtures.date),
+            Note(id: ItemID("child-\(index)"), path: "Child \(index).md",
+                 text: "---\ntype: core.note\ntitle: Field note \(index)\nchild-of: \"[[Research collection \(index) with a longer title]]\"\n---\n", created: ItemPreviewFixtures.date)
+        ]
+    }
+    let library = NoteLibrary(notes: notes, now: { ItemPreviewFixtures.date })
+    let browser = Browser()
+    NavigationSplitView {
+        VStack(spacing: 0) {
+            SidebarHeader(browser: browser)
+            Sidebar(browser: browser, order: NoteOrder())
+            SidebarFoot(browser: browser)
+        }
+        .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 340)
+        .toolbar {
+            ToolbarItem { NewItemButton(browser: browser) }
+        }
+    } detail: {
+        Color.clear
+    }
+    .environment(\.library, library)
+    .environment(ItemPreviewFixtures.libraries(named: "MAPP.LargeSidebarPreview"))
+    .frame(width: 700, height: 740)
 }
 #endif

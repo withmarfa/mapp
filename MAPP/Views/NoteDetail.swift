@@ -49,7 +49,9 @@ private enum PlaceSymbol {
         case .inbox: "tray"
         case .recents: "clock"
         case .allNotes: "note.text"
-        case .favorites, .favoriteItem: "star"
+        case .favorites, .favoriteItem: "heart"
+        case .sources, .source: "antenna.radiowaves.left.and.right"
+        case .collections: "square.stack"
         case .folder: "folder"
         case .collection: "square.stack"
         case .itemType(let id): TypeSymbol.name(for: TypeID(id), in: catalogue)

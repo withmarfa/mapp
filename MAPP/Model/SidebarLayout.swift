@@ -4,8 +4,8 @@ import Observation
 /// A place the sidebar can show, named by a key that stays the same across launches, so what the person chose to hide
 /// or move is found again.
 nonisolated enum SidebarPlace: Hashable, Sendable {
-    case inbox, recents, all, favorites
-    /// The section that holds the items other items are filed under.
+    case inbox, recents, all, favorites, sources
+    /// The index of items other items are filed under.
     case collections
     /// The section that holds a Marfa library's types.
     case types
@@ -14,7 +14,6 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
-    case collection(ItemID)
 
     var key: String {
         switch self {
@@ -22,12 +21,12 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .recents: "recents"
         case .all: "all"
         case .favorites: "favorites"
+        case .sources: "sources"
         case .collections: "collections"
         case .types: "types"
         case .folders: "folders"
         case .files: "files"
         case .type(let id): "type:" + id
-        case .collection(let id): "collection:" + id.rawValue
         }
     }
 }
@@ -93,12 +92,10 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// Inbox, Recents and All Items, then Files where the library holds any.
+    /// Main destinations; Files are included in Items.
     let top: [SidebarPlace]
-    /// What follows them, before Favorites: the Types or Folders section, then Collections.
+    /// The Types section, or Folders for a folder-backed library.
     let library: [SidebarPlace]
-    /// The collections the Collections section lists, two levels of them.
-    let collections: [CollectionNode]
     /// The types the Types section lists, nested, which only a library without folders has. The person orders the
     /// top rows; the rows under one keep the order of their items.
     let types: [TypeNode]
@@ -106,8 +103,7 @@ struct SidebarPlan {
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
-        top = layout.ordered([.inbox, .recents, .all] + (library.count(in: .files) > 0 ? [.files] : []))
-        collections = library.collectionTree
+        top = layout.ordered([.inbox, .recents, .all, .sources, .collections, .favorites])
         var rows: [SidebarPlace] = []
         if library.capabilities.contains(.folders) {
             rows.append(.folders)
@@ -116,7 +112,6 @@ struct SidebarPlan {
             types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
             if !types.isEmpty { rows.append(.types) }
         }
-        if !collections.isEmpty { rows.append(.collections) }
         self.library = layout.ordered(rows)
     }
 
@@ -124,13 +119,6 @@ struct SidebarPlan {
 
     var shownTop: [SidebarPlace] { top.filter(isShown) }
     var shownLibrary: [SidebarPlace] { library.filter(isShown) }
-
-    /// The collections not hidden, and under each the ones not hidden.
-    var shownCollections: [CollectionNode] {
-        collections.filter { isShown(.collection($0.id)) }.map { node in
-            CollectionNode(id: node.id, title: node.title, symbol: node.symbol, children: node.children.filter { isShown(.collection($0.id)) })
-        }
-    }
 
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }

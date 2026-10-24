@@ -245,6 +245,74 @@ struct BrowserTests {
         #expect(browser.selection == Set(created.map { [$0] } ?? []))
     }
 
+    @Test func requestedDraftTypeOnlyAppliesToANewDraft() {
+        let browser = Browser()
+        browser.startItemDraft(typeID: "aic.ticket.task")
+        #expect(browser.itemDraft?.typeID == "aic.ticket.task")
+        browser.itemDraft?.title = "Keep my title"
+        browser.itemDraft?.body = "Keep my text"
+        browser.isCreatingItem = false
+        browser.startItemDraft(typeID: "core.note")
+        #expect(browser.itemDraft?.typeID == "aic.ticket.task")
+        #expect(browser.itemDraft?.title == "Keep my title")
+        #expect(browser.itemDraft?.body == "Keep my text")
+        #expect(browser.isCreatingItem)
+    }
+
+    @Test(arguments: ["aic.project", "aic.ticket.task"])
+    func preselectedDraftTypeValidatesItsInheritedParent(typeID: String) throws {
+        let epic = Note(path: "Epics/Launch.md", text: "---\ntype: aic.epic\ntitle: Launch\n---\n", created: start)
+        let library = NoteLibrary(notes: [epic])
+        let browser = Browser()
+        browser.sidebarItem = .collection(epic.id)
+        browser.startItemDraft(typeID: typeID)
+        let draft = try #require(browser.itemDraft)
+        draft.title = "New work"
+        draft.body = "Keep this text."
+        draft.validateParent(in: library)
+        let expectedParent = typeID == "aic.project" ? nil : epic.id
+        #expect(draft.parentID == expectedParent)
+        let createdID = try #require(browser.createDraft(in: library, undoManager: nil))
+        let created = try #require(library.item(createdID))
+        #expect(created.type.rawValue == typeID)
+        #expect(created.parentID == expectedParent)
+        #expect(library.body(of: createdID)?.text == "Keep this text.")
+    }
+
+    @Test func parentValidationWaitsForTheLibraryBeforeFittingARetainedDraft() throws {
+        let parentID = ItemID.mint()
+        let library = FakeItemLibrary(now: start)
+        library.isLoaded = false
+        let draft = NewItemDraft(place: .collection(parentID))
+        draft.title = "Keep the title"
+        draft.body = "Keep the text"
+
+        draft.validateParent(in: library)
+        #expect(draft.parentID == parentID)
+        #expect(draft.fit(to: library) == nil)
+
+        library.isLoaded = true
+        let change = try #require(draft.fit(to: library))
+        #expect(change.message.contains("parent"))
+        #expect(draft.parentID == nil)
+        #expect(draft.title == "Keep the title")
+        #expect(draft.body == "Keep the text")
+    }
+
+    @Test(arguments: [SidebarItem.sources, .collections, .inbox, .source("test"), .collection(ItemID("parent"))])
+    func listSearchIsAvailableOnlyWhereAnItemListExists(place: SidebarItem) {
+        let browser = Browser()
+        browser.sidebarItem = place
+        let hasList = place != .sources && place != .collections
+        #expect(browser.canSearchList == hasList)
+        browser.startItemDraft()
+        #expect(browser.canSearchList == hasList)
+        browser.showSettings()
+        #expect(!browser.canSearchList)
+        browser.leaveSettings()
+        #expect(browser.canSearchList == hasList)
+    }
+
     @Test func newItemDraftRespectsTypeAndSurvivesNavigation() {
         let (library, _, _, _) = makeLibrary()
         let browser = Browser()

@@ -39,14 +39,11 @@ struct NoteWindow: View {
 
     private var item: Item? { id.flatMap { library.item($0) } }
 
-    /// A note's More menu acts on its page; a file has none, so only Details sits above its inspector. Nothing
-    /// while the inspector is closed, as the window's own Details button is then the only one.
+    /// Nothing while the inspector is closed, as the window's own actions are then the only ones.
     @ToolbarContentBuilder private var inspectorToolbar: some ToolbarContent {
         if details.isPresented {
-            if let item, !item.isFile {
-                InspectorToolbar(browser: nil, items: [item], editor: editor, details: details)
-            } else {
-                ToolbarItem { DetailsToggle(details: details) }
+            if let item {
+                InspectorToolbar(browser: nil, items: [item], editor: editor, details: details, fileURL: fileURL)
             }
         }
     }
@@ -66,21 +63,8 @@ struct NoteWindow: View {
                 ItemFileView(id: item.id) { fileURL = $0 }
                     .navigationTitle(item.title)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
-                    .toolbar {
-                        ToolbarItem {
-                            if let fileURL {
-                                ShareLink(item: fileURL)
-                            } else {
-                                ShareLink(item: "").disabled(true)
-                            }
-                        }
-                        // Above the inspector while it is open.
-                        if !details.isPresented {
-                            ToolbarItem {
-                                Button("Details", systemImage: "sidebar.right") { details.isPresented = true }
-                                    .accessibilityIdentifier("DetailsToggle")
-                            }
-                        }
+                    .toolbar(id: "note") {
+                        NoteToolbar(browser: nil, items: [item], editor: editor, details: details, fileURL: fileURL)
                     }
             }
         }

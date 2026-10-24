@@ -5,6 +5,38 @@ import Testing
 struct SidebarNavigationTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
+    @Test func recentlyDeletedRestoresAsAnOrdinaryWorkspace() {
+        let note = Note(body: "Deleted text", created: date, deleted: date)
+        let library = NoteLibrary(notes: [note], now: { date })
+        let browser = Browser()
+        browser.restore(.init(place: .recentlyDeleted, selection: [note.id], viewMode: .gallery), in: library, order: NoteOrder())
+        #expect(browser.item == .recentlyDeleted)
+        #expect(browser.viewMode == .gallery)
+        #expect(browser.selection == [note.id])
+        #expect(!browser.showsSettings)
+    }
+
+    @Test func sourceIndexesPreserveExactNamesAndExcludeDeletedItems() async throws {
+        var first = FakeItemLibrary.note("First", modified: date)
+        first.source = "reader"
+        var second = FakeItemLibrary.note("Second", modified: date)
+        second.source = "Reader"
+        var deleted = FakeItemLibrary.note("Deleted", modified: date, state: .trashed)
+        deleted.source = "reader"
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(SourceSnapshot(items: [first, second, deleted], catalogue: LibraryFixture.catalogue, places: [])))
+        try #require(await eventually { library.isLoaded })
+        #expect(Set(library.sourceCounts.map(\.name)) == ["reader", "Reader"])
+        #expect(library.sourceCounts.allSatisfy { $0.count == 1 })
+        #expect(library.items(in: .source("reader")).map(\.id) == [first.id])
+        #expect(library.count(in: .source("reader")) == 1)
+        let browser = Browser()
+        browser.show(.sources, in: library, order: NoteOrder())
+        #expect(browser.showsSidebarIndex)
+        #expect(browser.selection.isEmpty)
+    }
+
     @Test func aFavoriteShortcutSelectsTheActualItemInsteadOfTheFirstFavorite() {
         let first = Note(body: "# First favorite", created: date, isFavorite: true)
         let second = Note(body: "# Second favorite", created: date - 100, isFavorite: true)

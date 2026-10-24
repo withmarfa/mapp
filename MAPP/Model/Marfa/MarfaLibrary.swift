@@ -441,6 +441,9 @@ import Observation
         switch place {
         case .inbox: return index.feed
         case .allNotes: return index.ids(in: .active)
+        case .sources, .collections: return []
+        case .source(let name):
+            return Set(index.ids(in: .active).filter { records[$0]?.item.source == name })
         // Listed in its own order by `items(in:)` and counted by its limit, so never read here.
         case .recents: return []
         case .favorites: return index.favorites
@@ -466,7 +469,10 @@ import Observation
         switch place {
         case .inbox: String(localized: "Inbox")
         case .recents: String(localized: "Recents")
-        case .allNotes: String(localized: "All Items")
+        case .allNotes: String(localized: "Items")
+        case .sources: String(localized: "Sources")
+        case .collections: String(localized: "Collections")
+        case .source(let name): name
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
         case .folder: ""

@@ -7,6 +7,7 @@ struct NoteList: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
     let order: NoteOrder
+    var showsCreation = true
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
     @State private var width: CGFloat = 340
@@ -72,7 +73,7 @@ struct NoteList: View {
             browser.focusRequest = .page
             return .handled
         }
-        .toolbar { ListToolbar(browser: browser, columnWidth: width) }
+        .toolbar { ListToolbar(browser: browser, columnWidth: width, showsCreation: showsCreation) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1

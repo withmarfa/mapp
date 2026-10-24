@@ -16,7 +16,7 @@ final class ItemLayoutTests: XCTestCase {
     override func tearDown() async throws { app.terminate() }
 
     func testHeaderAndBodyOccupySeparateRegions() {
-        app.outlines["Sidebar"].staticTexts["All Notes"].click()
+        app.outlines["Sidebar"].staticTexts["Items"].click()
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
@@ -45,7 +45,7 @@ final class ItemLayoutTests: XCTestCase {
     }
 
     func testSearchFillsItsColumnAndHasATrailingCloseButton() {
-        app.outlines["Sidebar"].staticTexts["All Notes"].click()
+        app.outlines["Sidebar"].staticTexts["Items"].click()
         let list = app.outlines["NoteList"]
         app.typeKey("f", modifierFlags: [.command, .option])
         let search = app.searchFields["ColumnSearch"]

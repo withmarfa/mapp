@@ -64,6 +64,8 @@ final class FakeItemLibrary: ItemLibrary {
             switch place {
             case .inbox: item.state == .active && item.container == nil
             case .allNotes: item.state == .active
+            case .sources, .collections: false
+            case .source(let name): item.state == .active && item.source == name
             case .recents: false
             case .favorites: item.state == .active && item.isFavorite
             case .favoriteItem(let id): item.id == id && item.state == .active && item.isFavorite

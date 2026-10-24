@@ -36,13 +36,17 @@ struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        Picker("View As", selection: $browser.viewMode) {
-            Label("List", systemImage: ItemViewMode.list.symbol).tag(ItemViewMode.list)
-            Label("Gallery", systemImage: ItemViewMode.gallery.symbol).tag(ItemViewMode.gallery)
-            Label("Table", systemImage: ItemViewMode.table.symbol).tag(ItemViewMode.table)
+        Menu {
+            Picker("View As", selection: $browser.viewMode) {
+                Text("List").tag(ItemViewMode.list)
+                Text("Gallery").tag(ItemViewMode.gallery)
+                Text("Table").tag(ItemViewMode.table)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label("View As", systemImage: browser.viewMode.symbol)
+                .labelStyle(.iconOnly)
         }
-        .pickerStyle(.menu)
-        .labelStyle(.iconOnly)
         .help("View As")
         .accessibilityLabel("View As")
         .accessibilityIdentifier("ViewModeMenu")

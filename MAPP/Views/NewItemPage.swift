@@ -14,12 +14,14 @@ struct NewItemPage: View {
         GeometryReader { geometry in
             content
                 .padding(.horizontal, style.horizontalInset(for: geometry.size.width))
-                .padding(.top, CGFloat(style.textSize) * 2)
+                .padding(.top, 16)
         }
+        // Match the editor's opaque backing instead of the window's tinted surface.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 10) {
             TextField("Untitled", text: $draft.title)
                 .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
                 .textFieldStyle(.plain)
@@ -85,8 +87,8 @@ struct NewItemPage: View {
                 browser.focusRequest = nil
             }
         }
-        .onChange(of: draft.typeID) {
-            if !parents.contains(where: { $0.id == draft.parentID }) { draft.parentID = nil }
+        .onChange(of: draft.typeID, initial: true) {
+            draft.validateParent(in: library)
             rejected = false
         }
         .onChange(of: draft.title) { rejected = false }

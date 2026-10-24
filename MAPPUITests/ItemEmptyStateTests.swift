@@ -20,7 +20,7 @@ final class ItemEmptyStateTests: XCTestCase {
     override func tearDown() { app.terminate() }
 
     func testItemsWithoutSelectionShowAQuietPrompt() {
-        sidebar.staticTexts["All Notes"].click()
+        sidebar.staticTexts["Items"].click()
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
@@ -50,7 +50,7 @@ final class ItemEmptyStateTests: XCTestCase {
     }
 
     func testAnEmptySearchLeavesTheContentPaneBlank() {
-        sidebar.staticTexts["All Notes"].click()
+        sidebar.staticTexts["Items"].click()
         app.typeKey("f", modifierFlags: [.command, .option])
         let search = window.searchFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))

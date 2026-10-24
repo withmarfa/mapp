@@ -6,7 +6,7 @@ final class SidebarNavigationTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var settingsRow: XCUIElement { element("SidebarSettingsRow") }
+    private var instanceMenu: XCUIElement { element("SidebarLibrary") }
     private var settingsPages: XCUIElement { element("SettingsPageList") }
 
     override func setUp() async throws {
@@ -22,78 +22,86 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarListsTopPlacesThenFoldersThenFavoritesWithSettingsAtTheFoot() {
-        for title in ["Inbox", "Recents", "All Notes", "Folders", "Favorites", "Kitchen quotes", "Reading list"] {
+    func testSidebarListsTopPlacesThenFoldersAndViews() {
+        let destinations = ["Inbox", "Recents", "Items", "Sources", "Collections", "Favorites", "Folders", "Views"]
+        for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
-        for title in ["Library", "Projects", "Recently Deleted", "All Favorites"] {
+        for title in ["Browse", "Files", "Recently Deleted", "Kitchen quotes", "Reading list"] {
             XCTAssertFalse(sidebarText(title).exists, "\(title) is not in the sidebar")
         }
-        XCTAssertFalse(sidebarText("Collections").exists, "nothing in the sample is filed under anything")
-        XCTAssertTrue(settingsRow.exists)
-        XCTAssertLessThan(sidebarText("Inbox").frame.maxY, sidebarText("Recents").frame.minY)
-        XCTAssertLessThan(sidebarText("Recents").frame.maxY, sidebarText("All Notes").frame.minY)
-        XCTAssertLessThan(sidebarText("All Notes").frame.maxY, sidebarText("Folders").frame.minY)
-        XCTAssertLessThan(sidebarText("Folders").frame.maxY, sidebarText("Favorites").frame.minY)
-        XCTAssertLessThan(sidebarText("Reading list").frame.maxY, settingsRow.frame.minY, "Settings sits below the places")
+        XCTAssertTrue(instanceMenu.exists)
+        for identifier in ["SidebarSources", "SidebarCollections"] {
+            let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
+            XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
+        }
+        for (before, after) in zip(destinations, destinations.dropFirst()) {
+            XCTAssertLessThan(sidebarText(before).frame.maxY, sidebarText(after).frame.minY)
+        }
         attachScreenshot("SidebarGroupedNavigation")
     }
 
-    func testEachFavoriteShortcutSelectsItsActualItem() {
+    func testFavoritesListsItsItemsForSelection() {
+        sidebarText("Favorites").click()
         let title = window.itemPageTitle
         for favorite in ["Kitchen quotes", "Reading list"] {
-            sidebarText(favorite).click()
+            let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
+            XCTAssertTrue(note.waitForExistence(timeout: 3))
+            note.click()
             let selected = expectation(for: NSPredicate(format: "value == %@", favorite), evaluatedWith: title)
             wait(for: [selected], timeout: 3)
-            let other = favorite == "Kitchen quotes" ? "Reading list" : "Kitchen quotes"
-            XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", other)).firstMatch.exists)
         }
+        XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testFavoritesSectionCollapsesAndRemembersItsStateWhenSettingsCloses() {
-        disclosure(for: "Favorites").click()
-        XCTAssertTrue(sidebarText("Kitchen quotes").waitForNonExistence(timeout: 3))
-        XCTAssertFalse(sidebarText("Reading list").exists)
-        XCTAssertTrue(sidebarText("Folders").exists)
+    func testFoldersRememberTheirCollapsedStateWhenSettingsCloses() {
+        disclosure(for: "Folders").click()
+        XCTAssertTrue(sidebarText("Home").waitForNonExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
-        sidebarText("All Notes").click()
+        sidebarText("Items").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Favorites").exists)
-        XCTAssertFalse(sidebarText("Reading list").exists)
-        disclosure(for: "Favorites").click()
-        XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
+        XCTAssertTrue(sidebarText("Folders").exists)
+        XCTAssertFalse(sidebarText("Home").exists)
+        disclosure(for: "Folders").click()
+        XCTAssertTrue(sidebarText("Home").waitForExistence(timeout: 3))
     }
 
-    func testTheSettingsRowAtTheFootOpensSettingsInTheWindowAndAPlaceLeavesIt() {
-        settingsRow.hover()
-        attachScreenshot("SettingsRowHover")
-        settingsRow.click()
+    func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
+        instanceMenu.click()
+        let settings = app.menuItems["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.menuItems["Recently Deleted"].exists)
+        settings.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists, "the pages take the list's column")
         XCTAssertTrue(sidebar.exists, "the sidebar stays")
         XCTAssertEqual(app.windows.count, 1)
-        attachScreenshot("SettingsRowSelected")
+        attachScreenshot("SettingsFromInstanceMenu")
         sidebarText("Inbox").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertFalse(settingsPages.exists)
     }
 
-    func testFavoritesSectionDisappearsAfterTheLastItemIsRemoved() {
+    func testFavoritesRemainsAvailableAfterTheLastItemIsRemoved() {
+        sidebarText("Favorites").click()
         for favorite in ["Kitchen quotes", "Reading list"] {
             let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", favorite)).firstMatch
             XCTAssertTrue(note.waitForExistence(timeout: 3))
             note.rightClick()
             window.menuItems["Remove from Favorites"].click()
-            XCTAssertTrue(sidebarText(favorite).waitForNonExistence(timeout: 3))
+            XCTAssertTrue(note.waitForNonExistence(timeout: 3))
         }
-        XCTAssertTrue(sidebarText("Favorites").waitForNonExistence(timeout: 3))
+        XCTAssertTrue(sidebarText("Favorites").exists)
         XCTAssertTrue(sidebarText("Folders").exists)
+        sidebarText("Items").click()
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.rightClick()
         window.menuItems["Add to Favorites"].click()
         XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Reading list").waitForExistence(timeout: 3))
+        sidebarText("Favorites").click()
+        XCTAssertTrue(note.waitForExistence(timeout: 3))
     }
 
     func testAPlaceHiddenFromItsMenuIsOfferedBackInSettings() {
@@ -112,7 +120,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertEqual(toggle.value as? Int, 0, "Settings lists the place switched off")
         toggle.click()
         XCTAssertTrue(sidebarText("Folders").waitForExistence(timeout: 3), "the sidebar beside Settings follows at once")
-        sidebarText("All Notes").click()
+        sidebarText("Items").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertTrue(sidebarText("Home").exists)
     }
@@ -148,25 +156,23 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(sidebarText("Archive").waitForNonExistence(timeout: 3))
     }
 
-    func testAnItemFiledUnderAnotherMakesItACollection() {
+    func testAnItemFiledUnderAnotherAppearsInTheCollectionsIndex() {
         create(type: "Project", title: "Field research")
-        XCTAssertFalse(sidebarText("Collections").exists, "a project with nothing under it is no collection")
+        XCTAssertTrue(sidebarText("Collections").exists, "the collections index stays available when empty")
+        XCTAssertFalse(sidebarText("Field research").exists, "a project with nothing under it is no collection")
         create(type: "Task", title: "Survey the site", parent: "Field research")
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
-        XCTAssertLessThan(sidebarText("Folders").frame.maxY, sidebarText("Collections").frame.minY)
+        XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
         XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY)
-        let collection = sidebar.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND (label == %@ OR value == %@)", "SidebarCollection-", "Field research", "Field research"))
-            .element(boundBy: 0)
+        XCTAssertFalse(sidebarText("Field research").exists, "Collection entries belong in the index")
+        sidebarText("Collections").click()
+        let index = element("SidebarIndex")
+        XCTAssertTrue(index.waitForExistence(timeout: 3))
+        let collection = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Field research")).firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 3))
         collection.click()
         XCTAssertTrue(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Survey the site")).firstMatch.waitForExistence(timeout: 3))
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch.exists)
-        disclosure(for: "Collections").click()
-        XCTAssertTrue(collection.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Collections").exists)
-        disclosure(for: "Collections").click()
-        XCTAssertTrue(collection.waitForExistence(timeout: 3))
     }
 
     private func create(type: String, title: String, parent: String? = nil) {
@@ -199,9 +205,7 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func disclosure(for title: String) -> XCUIElement {
-        if title == "Favorites" {
-            sidebarText(title).hover()
-        }
+        sidebarText(title).hover()
         let row: XCUIElement
         if let identifier = groupIdentifier(for: title) {
             row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
@@ -216,7 +220,8 @@ final class SidebarNavigationTests: XCTestCase {
 
     private func groupIdentifier(for title: String) -> String? {
         switch title {
-        case "Favorites": "SidebarFavoritesSection"
+        case "Favorites": "SidebarFavorites"
+        case "Sources": "SidebarSources"
         case "Collections": "SidebarCollections"
         case "Folders": "SidebarFolders"
         default: nil

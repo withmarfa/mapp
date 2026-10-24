@@ -11,6 +11,9 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case folder(ItemID)
     case itemType(String)
     case collection(ItemID)
+    case collections
+    case sources
+    case source(String)
     case files
     case recentlyDeleted
 }
