@@ -88,7 +88,7 @@ struct MainView: View {
                 if browser.showsSettings {
                     SettingsPageList(browser: browser)
                 } else {
-                    NoteList(browser: browser, order: order, showsCreation: !isSidebarVisible, pane: $pane)
+                    NoteList(browser: browser, order: order, pane: $pane)
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
@@ -102,7 +102,8 @@ struct MainView: View {
                 itemPage
                     .modifier(itemInspector)
                     .toolbar(id: "main") {
-                        NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
+                        NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
+                            showsCreation: !isSidebarVisible)
                     }
             }
         }
@@ -122,7 +123,7 @@ struct MainView: View {
         .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
         .toolbar {
             if isSidebarVisible {
-                ToolbarItem {
+                ToolbarItem(id: "sidebarNewItem") {
                     NewItemButton(browser: browser)
                 }
             }

@@ -38,9 +38,10 @@ struct SidebarIndex: View {
         .navigationTitle(library.name(of: browser.item))
         .toolbar {
             if showsCreation {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(id: "indexNewItem") {
                     NewItemButton(browser: browser)
                 }
+                ToolbarSpacer(.flexible)
             }
         }
         .accessibilityIdentifier("SidebarIndex")

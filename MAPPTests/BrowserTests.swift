@@ -245,7 +245,7 @@ struct BrowserTests {
         #expect(browser.selection == Set(created.map { [$0] } ?? []))
     }
 
-    @Test func requestedDraftTypeOnlyAppliesToANewDraft() {
+    @Test func choosingAnotherTypeDoesNotSilentlyDiscardDraftText() {
         let browser = Browser()
         browser.startItemDraft(typeID: "aic.ticket.task")
         #expect(browser.itemDraft?.typeID == "aic.ticket.task")
@@ -257,6 +257,85 @@ struct BrowserTests {
         #expect(browser.itemDraft?.title == "Keep my title")
         #expect(browser.itemDraft?.body == "Keep my text")
         #expect(browser.isCreatingItem)
+    }
+
+    @Test func choosingATypeReplacesAnUntouchedDraftInTheCurrentPlace() throws {
+        let browser = Browser()
+        browser.startItemDraft(typeID: "aic.ticket.task")
+        let previous = try #require(browser.itemDraft)
+        browser.sidebarItem = .collection(ItemID("parent"))
+        browser.isCreatingItem = false
+
+        browser.startItemDraft(typeID: "core.note")
+
+        let current = try #require(browser.itemDraft)
+        #expect(current !== previous)
+        #expect(current.typeID == "core.note")
+        #expect(current.parentID == ItemID("parent"))
+        #expect(browser.isCreatingItem)
+    }
+
+    @Test(arguments: ["A title", " ", "\n"])
+    func titleContentRequiresExplicitDiscard(text: String) throws {
+        let browser = Browser()
+        browser.startItemDraft(typeID: "aic.ticket.task")
+        let previous = try #require(browser.itemDraft)
+        previous.title = text
+
+        browser.startItemDraft(typeID: "core.note")
+
+        #expect(browser.itemDraft === previous)
+        #expect(previous.title == text)
+        #expect(previous.typeID == "aic.ticket.task")
+        #expect(previous.hasText)
+        #expect(browser.replaceItemDraft(previous, typeID: "core.note"))
+        #expect(browser.itemDraft !== previous)
+        #expect(browser.itemDraft?.typeID == "core.note")
+        #expect(browser.itemDraft?.hasText == false)
+    }
+
+    @Test(arguments: ["Body text", " ", "\r\n"])
+    func bodyContentRequiresExplicitDiscard(text: String) throws {
+        let browser = Browser()
+        browser.startItemDraft(typeID: "aic.ticket.task")
+        let previous = try #require(browser.itemDraft)
+        previous.body = text
+
+        browser.startItemDraft(typeID: "core.note")
+
+        #expect(browser.itemDraft === previous)
+        #expect(previous.body == text)
+        #expect(previous.typeID == "aic.ticket.task")
+        #expect(previous.hasText)
+    }
+
+    @Test func anOldDiscardConfirmationCannotReplaceANewerDraft() throws {
+        let browser = Browser()
+        browser.startItemDraft(typeID: "aic.ticket.task")
+        let previous = try #require(browser.itemDraft)
+        #expect(browser.replaceItemDraft(previous, typeID: "core.note"))
+        browser.itemDraft?.title = "Newer text"
+
+        #expect(!browser.replaceItemDraft(previous, typeID: "aic.project"))
+        #expect(browser.itemDraft?.title == "Newer text")
+        #expect(browser.itemDraft?.typeID == "core.note")
+    }
+
+    @Test func submittedDraftCannotBeReplacedEvenWhenItHasNoText() throws {
+        let (library, _, _, _) = makeFakeLibrary()
+        library.holdsCreations = true
+        let browser = Browser()
+        browser.startItemDraft(typeID: "core.note")
+        let previous = try #require(browser.itemDraft)
+        let created = try #require(browser.createDraft(in: library, undoManager: nil))
+        #expect(browser.isAwaitingCreation)
+
+        browser.startItemDraft(typeID: "aic.ticket.task")
+
+        #expect(browser.itemDraft === previous)
+        #expect(previous.typeID == "core.note")
+        #expect(!browser.replaceItemDraft(previous, typeID: "aic.ticket.task"))
+        #expect(browser.creation?.id == created)
     }
 
     @Test(arguments: ["aic.project", "aic.ticket.task"])

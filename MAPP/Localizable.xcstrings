@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Continue Editing" : {
+      "extractionState" : "manual"
+    },
+    "Discard Draft" : {
+      "extractionState" : "manual"
+    },
+    "Discard the unfinished item?" : {
+      "extractionState" : "manual"
+    },
+    "The unfinished item contains unsaved text. Discard it to start a new item, or continue editing it." : {
+      "extractionState" : "manual"
+    },
     "MAPP can’t fill these required fields: %@. Your draft is kept here." : {
       "extractionState" : "manual"
     },

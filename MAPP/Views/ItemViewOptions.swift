@@ -36,17 +36,17 @@ struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        Menu {
-            Picker("View As", selection: $browser.viewMode) {
-                Text("List").tag(ItemViewMode.list)
-                Text("Gallery").tag(ItemViewMode.gallery)
-                Text("Table").tag(ItemViewMode.table)
-            }
-            .pickerStyle(.inline)
-        } label: {
-            Label("View As", systemImage: browser.viewMode.symbol)
-                .labelStyle(.iconOnly)
+        Picker("View As", selection: $browser.viewMode) {
+            Text("List").tag(ItemViewMode.list)
+            Text("Gallery").tag(ItemViewMode.gallery)
+            Text("Table").tag(ItemViewMode.table)
+        } currentValueLabel: {
+            Image(systemName: browser.viewMode.symbol)
         }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        // The menu's text choices otherwise set the width of the icon-only control.
+        .frame(width: 48)
         .help("View As")
         .accessibilityLabel("View As")
         .accessibilityIdentifier("ViewModeMenu")
