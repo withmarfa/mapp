@@ -11,12 +11,18 @@ struct NoteToolbar: CustomizableToolbarContent {
     let editor: EditorController
     let details: DetailsPresentation
     var fileURL: URL?
+    var showsCreation = false
 
     private var tools: ItemToolbarActions {
         ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
     }
 
     var body: some CustomizableToolbarContent {
+        ToolbarItem(id: "detailNewItem") {
+            NewItemButton(browser: browser)
+        }
+        .customizationBehavior(.disabled)
+        .hidden(!showsCreation)
         ToolbarItem(id: "scrolledTitle") {
             Text(tools.notes.first?.title ?? "")
                 .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -89,9 +95,9 @@ struct DetailsToggle: View {
 }
 
 /// The gallery's and the table's toolbar, one for the collection and the page it opens, so the order across its
-/// single column is set here: Search, View As and View Options together, New Item when the sidebar is hidden, then
-/// Share and More together, with Details separate at the far right. The table brings its own View Options
-/// (`ItemTableControls`). Opened on an item, View As, View Options and Search give way.
+/// single column keeps New Item at the leading side when the sidebar is hidden. At the trailing side, Search and
+/// View Options precede View As, Share and More, and Details. The table brings its own View Options
+/// (`ItemTableControls`). Opened on an item, View Options and Search give way.
 struct GalleryToolbar<Options: View>: ToolbarContent {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -105,6 +111,9 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
+        if showsCreation {
+            ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
+        }
         if !browser.showsCollection, !browser.isCreatingItem, editor.isHeaderScrolledAway, tools.notes.count == 1 {
             ToolbarItem(placement: .navigation) {
                 Text(tools.notes.first?.title ?? "")
@@ -114,6 +123,7 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         }
+        ToolbarSpacer(.flexible)
         if browser.showsCollection {
             ColumnSearch(
                 isExpanded: $browser.isSearchExpanded,
@@ -123,15 +133,11 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }
             ) {
-                ViewModeMenu(browser: browser)
                 options()
             }
-        }
-        // The field spans the column, so there is no room beside it.
-        if showsCreation && (!browser.isSearchExpanded || !browser.showsCollection) {
             ToolbarSpacer(.fixed)
-            ToolbarItem { NewItemButton(browser: browser) }
         }
+        ToolbarItem(id: "collectionViewMode") { ViewModeMenu(browser: browser) }
         // Keep the controls in place when selection clears. They move above an open inspector.
         if !details.showsInspector(in: browser) {
             ToolbarSpacer(.fixed)

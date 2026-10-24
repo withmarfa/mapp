@@ -102,7 +102,7 @@ struct Sidebar: View {
     }
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
-        Section(isExpanded: expansion(.types)) {
+        Section {
             ForEach(plan.shownTypes) { typeRow($0) }
         } header: {
             HStack {
@@ -115,6 +115,7 @@ struct Sidebar: View {
                     }
                     .accessibilityIdentifier("EditSidebarTypes")
             }
+            .padding(.trailing, 12)
             .accessibilityIdentifier("SidebarTypes")
         }
     }
