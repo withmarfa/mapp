@@ -120,7 +120,7 @@ extension Browser {
     /// The page has let go of an item, once its last edit was handed over. An item New made that holds nothing is
     /// moved to Recently Deleted, never erased; one with anything in it, or a title typed and not yet saved, stays
     /// as any item does. Where the page still shows the item, as when Settings or the table covers it for a
-    /// moment, nothing is decided, unless the window or the app is going. Whether the item was removed.
+    /// moment, nothing is decided, unless the window or the app is going. Answers whether the item was removed.
     @discardableResult
     func leaveNewItem(_ id: ItemID, closing: Bool, hasUnsavedTitle: Bool = false, undoManager: UndoManager?) -> Bool {
         guard let entry = newItems[id], !entry.isAwaited else { return false }
