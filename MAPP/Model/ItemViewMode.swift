@@ -1,9 +1,8 @@
 import Foundation
 
-/// How a place shows its items. The list keeps the page beside it; the gallery and the table span the window and
-/// open an item in their place.
+/// The list keeps the page beside it; collection layouts span the window and open an item in their place.
 nonisolated enum ItemViewMode: String, Codable, CaseIterable {
-    case list, gallery, table
+    case list, gallery, table, board, agenda
 
     /// The SF Symbol for the view, in its menu and on the button that opens it.
     var symbol: String {
@@ -11,6 +10,8 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .list: "list.bullet"
         case .gallery: "square.grid.2x2"
         case .table: "tablecells"
+        case .board: "rectangle.split.3x1"
+        case .agenda: "calendar"
         }
     }
 
@@ -23,6 +24,8 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .list: "Back"
         case .gallery: "Back to Gallery"
         case .table: "Back to Table"
+        case .board: "Back to Board"
+        case .agenda: "Back to Agenda"
         }
     }
 }

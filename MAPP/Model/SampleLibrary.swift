@@ -80,6 +80,11 @@ nonisolated enum SampleLibrary {
             store.perform(.trash(path: path, id: UUID(), date: date(daysAgo: 2, hour: 10)))
         }
         store.drain()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") {
+            try CollectionSample.write(to: root, now: now)
+        }
+        #endif
     }
 }
 

@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"A change couldn’t be saved. The board shows the values currently held by the library." : { "extractionState" : "manual" },
+"Agenda" : { "extractionState" : "manual" },
+"Back to Agenda" : { "extractionState" : "manual" },
+"Back to Board" : { "extractionState" : "manual" },
+"Board" : { "extractionState" : "manual" },
+"Can’t Move Items" : { "extractionState" : "manual" },
+"Card Density" : { "extractionState" : "manual" },
+"Comfortable" : { "extractionState" : "manual" },
+"Compact" : { "extractionState" : "manual" },
+"Date Field" : { "extractionState" : "manual" },
+"Invalid Date" : { "extractionState" : "manual" },
+"Invalid Value" : { "extractionState" : "manual" },
+"No Board Fields" : { "extractionState" : "manual" },
+"No Date" : { "extractionState" : "manual" },
+"No Date Fields" : { "extractionState" : "manual" },
+"No Value" : { "extractionState" : "manual" },
+"Not Applicable" : { "extractionState" : "manual" },
+"Read Only" : { "extractionState" : "manual" },
+"These items have no choice fields or text fields with recommended values. Choose another place or use List, Gallery, or Table." : { "extractionState" : "manual" },
+"This lane isn’t available for every selected item. Check each item’s type and required fields." : { "extractionState" : "manual" },
+"View as Agenda" : { "extractionState" : "manual" },
+"View as Board" : { "extractionState" : "manual" },
     "%llu couldn’t be downloaded" : {
       "extractionState" : "manual"
     },

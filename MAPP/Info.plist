@@ -6,6 +6,14 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
+			<string>com.withmarfa.mapp.board-item</string>
+			<key>UTTypeDescription</key>
+			<string>MAPP Board Item</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
 			<string>com.withmarfa.mapp.note</string>
 			<key>UTTypeDescription</key>
 			<string>MAPP Note</string>

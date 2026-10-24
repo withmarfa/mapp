@@ -3,6 +3,35 @@ import Testing
 @testable import MAPP
 
 struct BrowserTests {
+    @Test(arguments: [ItemViewMode.board, .agenda])
+    func collectionStudiesOpenAndReturnWithoutLosingSelection(_ mode: ItemViewMode) {
+        let (library, _, newer, _) = makeFakeLibrary()
+        let browser = Browser()
+        browser.adopt(library)
+        browser.selection = [newer.id]
+        browser.viewMode = mode
+        browser.openCollectionSelection()
+        #expect(browser.isCollectionItemPresented)
+        browser.returnToCollection()
+        #expect(browser.showsCollection)
+        #expect(browser.selection == [newer.id])
+        #expect(browser.viewMode == mode)
+    }
+
+    @Test func collectionOptionsAreClearedWhenTheLibraryChanges() {
+        let (first, _, _, _) = makeFakeLibrary()
+        let (second, _, _, _) = makeFakeLibrary()
+        let browser = Browser()
+        browser.adopt(first)
+        browser.boardFields[.allNotes] = "status"
+        browser.agendaFields[.allNotes] = "starts_at"
+        browser.compactBoards[.allNotes] = true
+        browser.adopt(second)
+        #expect(browser.boardFields.isEmpty)
+        #expect(browser.agendaFields.isEmpty)
+        #expect(browser.compactBoards.isEmpty)
+    }
+
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     let work = Folder(name: "Work")
 

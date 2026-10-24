@@ -31,6 +31,9 @@ final class Browser {
     var isCollectionItemPresented = false
     /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
+    var boardFields: [SidebarItem: String] = [:]
+    var compactBoards: [SidebarItem: Bool] = [:]
+    var agendaFields: [SidebarItem: String] = [:]
     /// Whether the window shows Settings in place of the list and the item page. The place the window was
     /// showing, its selection and its draft are kept, so choosing that place again returns to them.
     private(set) var showsSettings = false
@@ -340,6 +343,10 @@ final class Browser {
         shownLibrary = library
         guard !isFirst else { return }
         undoManager?.removeAllActions()
+        tableOptions = [:]
+        boardFields = [:]
+        compactBoards = [:]
+        agendaFields = [:]
         selection = []
         history = SelectionHistory()
         isCollectionItemPresented = false

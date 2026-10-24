@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// List, Gallery or Table, each with its shortcut, as View as List, Gallery and Table in the View menu, which keeps
-/// them whatever the window in front is.
+/// View choices remain in the menu when no document window is in front.
 struct ItemViewOptions: View {
     /// Nil while no window is in front, which leaves the choices in the menu, dimmed.
     let browser: Browser?
@@ -11,6 +10,8 @@ struct ItemViewOptions: View {
             choice("View as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
             choice("View as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
             choice("View as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
+            choice("View as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
+            choice("View as Agenda", systemImage: ItemViewMode.agenda.symbol, .agenda, key: "5")
         }
         .disabled(browser == nil)
     }
@@ -20,6 +21,8 @@ struct ItemViewOptions: View {
         case .list: "ViewAsList"
         case .gallery: "ViewAsGallery"
         case .table: "ViewAsTable"
+        case .board: "ViewAsBoard"
+        case .agenda: "ViewAsAgenda"
         }
     }
 
@@ -30,8 +33,7 @@ struct ItemViewOptions: View {
     }
 }
 
-/// List, Gallery or Table, as one pop-up button that shows the view in use, as Finder's View button does. It
-/// stays at the window's trailing side whichever view is shown.
+/// One pop-up button stays at the window's trailing side whichever view is shown.
 struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
@@ -40,6 +42,8 @@ struct ViewModeMenu: View {
             Text("List").tag(ItemViewMode.list)
             Text("Gallery").tag(ItemViewMode.gallery)
             Text("Table").tag(ItemViewMode.table)
+            Text("Board").tag(ItemViewMode.board)
+            Text("Agenda").tag(ItemViewMode.agenda)
         } currentValueLabel: {
             Image(systemName: browser.viewMode.symbol)
         }

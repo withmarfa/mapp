@@ -207,10 +207,12 @@ struct CommandPalette: View {
             add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
             add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
             add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
-            for choice in NoteSort.allCases where choice != sort {
+            add(String(localized: "View as Board"), "rectangle.split.3x1", "⌘4") { browser.viewMode = .board }
+            add(String(localized: "View as Agenda"), "calendar", "⌘5") { browser.viewMode = .agenda }
+            for choice in NoteSort.allCases where choice != sort && (browser.viewMode == .list || browser.viewMode == .gallery) {
                 add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
             }
-            if sort != .title {
+            if sort != .title && (browser.viewMode == .list || browser.viewMode == .gallery) {
                 add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
                     groupsByDate.toggle()
                 }
