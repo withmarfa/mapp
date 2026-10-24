@@ -44,7 +44,6 @@ struct MAPPApp: App {
             .unkeptChanges(libraries)
         }
         .defaultSize(width: 640, height: 720)
-
     }
 }
 
