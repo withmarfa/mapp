@@ -176,7 +176,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func placesAreNamedForThePerson() async throws {
         let (library, _) = try await loaded()
         #expect(library.name(of: .inbox) == String(localized: "Inbox"))
-        #expect(library.name(of: .allNotes) == String(localized: "All Items"))
+        #expect(library.name(of: .allNotes) == String(localized: "Items"))
         #expect(library.name(of: .itemType("aic.project")) == "Project")
         #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bug")
         #expect(library.name(of: .collection(F.p1)) == "Alpha")

@@ -82,6 +82,8 @@ final class Browser {
     }
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
+    var showsSidebarIndex: Bool { !showsSettings && !isCreatingItem && (item == .sources || item == .collections) }
+    var canSearchList: Bool { !showsSettings && item != .sources && item != .collections }
 
     /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
     func showSettings(_ page: SettingsPage? = nil) {
@@ -238,9 +240,12 @@ final class Browser {
     }
 
     /// A draft belongs to the window, so leaving its page never discards what was typed.
-    func startItemDraft() {
+    func startItemDraft(typeID: String? = nil) {
         leaveSettings()
-        if itemDraft == nil { itemDraft = NewItemDraft(place: item) }
+        if itemDraft == nil {
+            itemDraft = NewItemDraft(place: item)
+            if let typeID { itemDraft?.typeID = typeID }
+        }
         isCreatingItem = true
         focusRequest = .page
     }
@@ -381,7 +386,7 @@ final class Browser {
     static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
         switch place {
         case .inbox, .folder: library.capabilities.contains(.move)
-        case .recents, .allNotes, .favorites, .favoriteItem, .itemType, .collection, .files, .recentlyDeleted: false
+        case .recents, .allNotes, .favorites, .favoriteItem, .itemType, .collection, .collections, .sources, .source, .files, .recentlyDeleted: false
         }
     }
 
@@ -457,9 +462,7 @@ final class Browser {
         case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
-        case .inbox, .recents, .allNotes, .favorites, .files: snapshot.place
-        // Recently Deleted is a page of Settings now, so a window kept from before it moved opens on All Items.
-        case .recentlyDeleted: .allNotes
+        case .inbox, .recents, .allNotes, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
@@ -519,6 +522,14 @@ final class NewItemDraft {
         self.place = place
         if case .itemType(let id) = place { typeID = id } else { typeID = "core.note" }
         if case .collection(let id) = place { parentID = id }
+    }
+
+    /// A type picked before the page opens must validate its inherited parent just like a later type change.
+    func validateParent(in library: any ItemLibrary) {
+        guard library.isLoaded, let parentID else { return }
+        if !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parentID }) {
+            self.parentID = nil
+        }
     }
 
     /// A draft carried to another library keeps its text and what the loaded library can still hold: a parent it

@@ -19,7 +19,6 @@ struct RootView: View {
         }
         // Settings reads the library too, so it is given to both.
         .environment(\.library, libraries.current)
-        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .focusedSceneValue(\.browser, browser)
         .onAppear {
             if settingsRequest.isPending {

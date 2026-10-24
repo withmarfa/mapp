@@ -19,10 +19,13 @@ private struct SoftSelection: NSViewRepresentable {
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) { probe.refresh() }
+    static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.dismantle() }
 
     final class Probe: NSView {
         private weak var table: NSTableView?
         private weak var marks: Marks?
+        private var originalHighlightStyle: NSTableView.SelectionHighlightStyle?
+        private var isDismantled = false
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -33,6 +36,7 @@ private struct SoftSelection: NSViewRepresentable {
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
         func refresh() {
+            guard !isDismantled, window != nil else { return }
             if table == nil || table?.window !== window { attach() }
             // SwiftUI may set the highlight again as it updates the table.
             if let table, table.selectionHighlightStyle != .none { table.selectionHighlightStyle = .none }
@@ -43,11 +47,30 @@ private struct SoftSelection: NSViewRepresentable {
 
         private func attach() {
             guard window != nil, let table = nearestTable() else { return }
+            detach(restoringHighlight: true)
             self.table = table
+            originalHighlightStyle = table.selectionHighlightStyle
             table.selectionHighlightStyle = .none
             let marks = Marks(table: table)
             table.addSubview(marks, positioned: .below, relativeTo: nil)
             self.marks = marks
+        }
+
+        func dismantle() {
+            isDismantled = true
+            // Restoring an outline's highlight reloads its rows. SwiftUI's row tree is already being removed.
+            detach(restoringHighlight: false)
+        }
+
+        private func detach(restoringHighlight: Bool) {
+            marks?.detach()
+            marks?.removeFromSuperview()
+            if restoringHighlight, let table, table.window != nil, let originalHighlightStyle {
+                table.selectionHighlightStyle = originalHighlightStyle
+            }
+            table = nil
+            marks = nil
+            originalHighlightStyle = nil
         }
 
         /// The table this probe sits behind: the first, going outwards, whose scroll view covers the probe's centre.
@@ -84,9 +107,18 @@ private struct SoftSelection: NSViewRepresentable {
             autoresizingMask = [.width, .height]
             wantsLayer = true
             let center = NotificationCenter.default
-            for name in [NSTableView.selectionDidChangeNotification, NSView.frameDidChangeNotification] {
+            var changes = [NSTableView.selectionDidChangeNotification, NSView.frameDidChangeNotification]
+            if table is NSOutlineView {
+                changes += [NSOutlineView.selectionDidChangeNotification,
+                            NSOutlineView.itemDidExpandNotification, NSOutlineView.itemDidCollapseNotification]
+            }
+            for name in Set(changes) {
                 observers.append(center.addObserver(forName: name, object: table, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.update() }
+                    MainActor.assumeIsolated {
+                        self?.update()
+                        // Outline disclosure can finish moving its row views after the notification.
+                        DispatchQueue.main.async { [weak self] in self?.update() }
+                    }
                 })
             }
             table.postsFrameChangedNotifications = true
@@ -103,6 +135,12 @@ private struct SoftSelection: NSViewRepresentable {
 
         isolated deinit {
             observers.forEach(NotificationCenter.default.removeObserver)
+        }
+
+        func detach() {
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers.removeAll()
+            table = nil
         }
 
         override var isFlipped: Bool { true }

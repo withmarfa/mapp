@@ -6,7 +6,7 @@ final class ItemToolbarTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
 
-    override func setUp() {
+    override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
@@ -16,53 +16,59 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.webViews.firstMatch.textViews.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() { app.terminate() }
+    override func tearDown() async throws { app.terminate() }
 
-    func testTheListToolbarHoldsViewOptionsSearchAndNewItemAndThePageToolbarHoldsHistoryViewAsMoreAndDetails() {
+    func testTheSidebarOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
         let viewMode = control("ViewModeMenu")
         let viewOptions = control("ViewOptionsToolbar")
         let newItem = control("NewItemToolbar")
-        let back = control("BackToolbar")
-        let forward = control("ForwardToolbar")
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
-        for element in [viewMode, viewOptions, newItem, back, forward, details, more] { XCTAssertTrue(element.exists) }
+        let share = control("ShareToolbar")
+        for element in [viewMode, viewOptions, newItem, details, share, more] { XCTAssertTrue(element.exists) }
+        XCTAssertFalse(control("BackToolbar").exists)
+        XCTAssertFalse(control("ForwardToolbar").exists)
         XCTAssertEqual(count("DetailsToggle"), 1, "The closed inspector adds no second Details")
         XCTAssertEqual(count("MoreToolbar"), 1, "The closed inspector adds no second More")
+        XCTAssertEqual(count("ShareToolbar"), 1, "The closed inspector adds no second Share")
         XCTAssertFalse(control("FormatToolbar").exists, "Format is out of the default toolbar")
         let page = window.itemPageTitle.frame
-        XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the list column")
-        XCTAssertLessThan(viewOptions.frame.maxX, newItem.frame.minX)
-        XCTAssertGreaterThan(back.frame.minX, newItem.frame.maxX, "Back and Forward lead the page column, not the list column")
-        XCTAssertLessThan(back.frame.maxX, forward.frame.minX)
-        XCTAssertLessThan(forward.frame.maxX, viewMode.frame.minX, "View As is on the page's trailing side, as in the gallery")
-        XCTAssertLessThan(viewMode.frame.maxX, more.frame.minX)
+        XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar")
+        XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX)
+        XCTAssertEqual(newItem.frame.midY, details.frame.midY, accuracy: 3, "New Item shares the native toolbar row")
+        XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
+        XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
         XCTAssertGreaterThan(more.frame.minX, window.frame.midX)
         XCTAssertEqual(details.frame.midY, more.frame.midY, accuracy: 3)
         capture("List and page toolbars")
     }
 
-    func testDetailsAndMoreMoveAboveTheInspectorWhileItIsOpen() {
+    func testShareMoreAndDetailsMoveAboveTheInspectorWhileItIsOpen() {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
+        let share = control("ShareToolbar")
         details.click()
         let inspector = window.descendants(matching: .any)["ItemInspectorDetails"]
         XCTAssertTrue(inspector.waitForExistence(timeout: 3))
         XCTAssertTrue(details.exists)
         XCTAssertTrue(more.exists)
+        XCTAssertTrue(share.exists)
         XCTAssertEqual(count("DetailsToggle"), 1)
         XCTAssertEqual(count("MoreToolbar"), 1)
-        XCTAssertGreaterThanOrEqual(more.frame.minX, inspector.frame.minX, "More and Details sit above the inspector column")
+        XCTAssertEqual(count("ShareToolbar"), 1)
+        XCTAssertGreaterThanOrEqual(share.frame.minX, inspector.frame.minX, "Share, More and Details sit above the inspector column")
+        XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX)
-        XCTAssertTrue(control("BackToolbar").exists, "Back and Forward stay with the page")
-        XCTAssertTrue(control("ForwardToolbar").exists)
-        capture("Details and More above the inspector")
+        XCTAssertFalse(control("BackToolbar").exists)
+        XCTAssertFalse(control("ForwardToolbar").exists)
+        capture("Share More and Details above the inspector")
         details.click()
         XCTAssertTrue(inspector.waitForNonExistence(timeout: 3))
         XCTAssertTrue(control("DetailsToggle").exists, "Details returns to the page toolbar")
         XCTAssertEqual(count("DetailsToggle"), 1)
         XCTAssertEqual(count("MoreToolbar"), 1)
+        XCTAssertEqual(count("ShareToolbar"), 1)
     }
 
     func testViewOptionsOffersSortByAndGroupByDate() {
@@ -101,12 +107,13 @@ final class ItemToolbarTests: XCTestCase {
 
     func testANewItemDraftDisablesTheItemActions() {
         control("NewItemToolbar").click()
+        let noteType = app.menuItems["Note"]
+        XCTAssertTrue(noteType.waitForExistence(timeout: 3))
+        noteType.click()
         XCTAssertTrue(window.textFields["NewItemTitle"].waitForExistence(timeout: 3))
         XCTAssertFalse(control("DetailsToggle").isEnabled)
-        control("MoreToolbar").click()
-        XCTAssertFalse(window.menuItems["Share…"].isEnabled)
-        XCTAssertFalse(window.menuItems["Add Attachment…"].isEnabled)
-        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(control("ShareToolbar").isEnabled)
+        XCTAssertFalse(control("MoreToolbar").isEnabled)
     }
 
     func testMovedAttachmentAndFormattingActionsStillWork() {
@@ -146,21 +153,28 @@ final class ItemToolbarTests: XCTestCase {
         let viewOptions = control("ViewOptionsToolbar")
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
+        let share = control("ShareToolbar")
         let newItem = control("NewItemToolbar")
         let viewMode = control("ViewModeMenu")
         XCTAssertTrue(viewMode.exists, "View As stays reachable in the gallery")
         XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
         XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
-        XCTAssertTrue(details.exists, "the card selected in the list is still selected, so Details and More have something to act on")
+        XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
+        XCTAssertTrue(share.exists)
+        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays in the sidebar")
         XCTAssertLessThan(viewMode.frame.maxX, viewOptions.frame.minX)
-        XCTAssertLessThan(viewOptions.frame.maxX, newItem.frame.minX)
-        XCTAssertLessThan(newItem.frame.maxX, more.frame.minX)
+        XCTAssertLessThan(viewOptions.frame.maxX, share.frame.minX)
+        XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
         // ⌘2 leaves the keyboard where it was, so the grid is given it before Escape clears the selection.
         window.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "GalleryItem-", "Selected")).firstMatch.click()
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(details.waitForNonExistence(timeout: 3), "Details and More leave the grid when no card is selected")
-        XCTAssertFalse(more.exists)
+        let cleared = expectation(for: NSPredicate(format: "enabled == false"), evaluatedWith: details)
+        wait(for: [cleared], timeout: 3)
+        for action in [details, share, more] {
+            XCTAssertTrue(action.exists, "item actions stay in place when selection clears")
+            XCTAssertFalse(action.isEnabled)
+        }
         app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }

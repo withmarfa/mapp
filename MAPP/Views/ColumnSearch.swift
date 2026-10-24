@@ -28,12 +28,10 @@ struct ColumnSearch<Leading: View>: ToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
         } else {
-            ToolbarItemGroup { leading() }
-            // A button of its own, apart from the controls beside it.
-            ToolbarSpacer(.fixed)
-            ToolbarItem {
+            ToolbarItemGroup {
                 Button("Search", systemImage: "magnifyingglass") { isExpanded = true }
                     .help("Search")
+                leading()
             }
         }
     }

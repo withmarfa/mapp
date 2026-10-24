@@ -40,7 +40,7 @@ final class WindowTests: XCTestCase {
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
-        case "Favorites": "SidebarFavoritesSection"
+        case "Favorites": "SidebarFavorites"
         case "Folders": "SidebarFolders"
         default: nil
         }
@@ -55,10 +55,10 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "Recents", "All Notes", "Favorites", "Folders", "Work", "Home", "Personal", "Reading"] {
+        for name in ["Inbox", "Recents", "Items", "Favorites", "Folders", "Work", "Home", "Personal", "Reading"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
-        XCTAssertGreaterThan(count(of: "All Notes"), 0)
+        XCTAssertGreaterThan(count(of: "Items"), 0)
     }
 
     func testTheFirstNoteIsSelectedAndShownInThePage() {
@@ -102,42 +102,44 @@ final class WindowTests: XCTestCase {
     }
 
     func testNewNoteIsCreatedSelectedAndEmpty() {
-        let before = count(of: "All Notes")
+        let before = count(of: "Items")
         sidebarItem("Inbox").click()
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         // An empty page holds nothing but the line the caret sits on.
         let empty = expectation(for: NSPredicate(format: "value == nil OR value MATCHES %@", "\\s*"), evaluatedWith: editor)
         wait(for: [empty], timeout: 3)
-        XCTAssertEqual(count(of: "All Notes"), before + 1)
+        XCTAssertEqual(count(of: "Items"), before + 1)
     }
 
     func testDeletingFromTheContextMenuRemovesTheNoteAndUndoes() {
-        let before = count(of: "All Notes")
+        let before = count(of: "Items")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(count(of: "All Notes"), before - 1)
+        XCTAssertEqual(count(of: "Items"), before - 1)
         app.typeKey("z", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
-        XCTAssertEqual(count(of: "All Notes"), before)
+        XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testRecentlyDeletedInSettingsRestoresANote() {
-        app.typeKey(",", modifierFlags: .command)
-        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").element(boundBy: 0)
-        XCTAssertTrue(page.waitForExistence(timeout: 3))
-        page.click()
-        let detail = window.descendants(matching: .any).matching(identifier: "SettingsDetail").element(boundBy: 0)
-        let deleted = detail.staticTexts["Old packing list"]
+    func testRecentlyDeletedFromTheInstanceMenuRestoresANote() {
+        window.descendants(matching: .any).matching(identifier: "SidebarLibrary").element(boundBy: 0).click()
+        let recentlyDeleted = app.menuItems["Recently Deleted"]
+        XCTAssertTrue(recentlyDeleted.waitForExistence(timeout: 3))
+        recentlyDeleted.click()
+        let deleted = row(titled: "Old packing list")
         XCTAssertTrue(deleted.waitForExistence(timeout: 3))
-        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists)
-        let restores = detail.buttons.matching(identifier: "RecentlyDeletedRestore").allElementsBoundByIndex
-        let restore = restores.min { abs($0.frame.midY - deleted.frame.midY) < abs($1.frame.midY - deleted.frame.midY) }
-        XCTAssertNotNil(restore, "each deleted item has its own Restore")
-        restore?.click()
+        XCTAssertTrue(row(titled: "Draft agenda").exists)
+        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0).exists)
+        deleted.click()
+        let actions = window.descendants(matching: .any).matching(identifier: "RecentlyDeletedActions").element(boundBy: 0)
+        let restore = actions.buttons["Restore"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 3))
+        XCTAssertTrue(restore.isEnabled)
+        restore.click()
         XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(detail.staticTexts["Draft agenda"].exists, "only the one restored leaves")
+        XCTAssertTrue(row(titled: "Draft agenda").exists, "only the one restored leaves")
         sidebarItem("Personal").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
@@ -158,7 +160,7 @@ final class WindowTests: XCTestCase {
 
     func testTheListsSearchFindsNotesAcrossFoldersAndEscapePutsItAway() {
         XCTAssertFalse(listSearch.exists, "a button until it is clicked")
-        window.buttons["Search"].firstMatch.click()
+        window.toolbars.buttons["Search"].firstMatch.click()
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
@@ -169,11 +171,12 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
     }
 
-    func testAddingToFavoritesFromTheContextMenuAddsAShortcut() {
-        XCTAssertFalse(sidebarItem("Garden ideas").exists)
+    func testAddingToFavoritesFromTheContextMenuIncludesTheItem() {
         row(titled: "Garden ideas").rightClick()
         window.menuItems["Add to Favorites"].click()
-        XCTAssertTrue(sidebarItem("Garden ideas").waitForExistence(timeout: 2))
+        sidebarItem("Favorites").click()
+        XCTAssertTrue(row(titled: "Garden ideas").waitForExistence(timeout: 2))
+        XCTAssertFalse(sidebarItem("Garden ideas").exists, "favorites are listed in the workspace")
     }
 
     func testMovingTheSelectedNoteAwaySelectsTheNextOne() {
@@ -332,12 +335,12 @@ final class WindowTests: XCTestCase {
     }
 
     func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
-        let before = count(of: "All Notes")
+        let before = count(of: "Items")
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeKey("z", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Untitled").waitForNonExistence(timeout: 2))
-        XCTAssertEqual(count(of: "All Notes"), before)
+        XCTAssertEqual(count(of: "Items"), before)
     }
 
     func testATableIsInsertedFromTheFormatMenu() {
@@ -439,24 +442,19 @@ final class WindowTests: XCTestCase {
 
     // MARK: Back and forward
 
-    func testBackAndForwardMoveThroughTheItemsOpened() {
-        let back = window.descendants(matching: .any).matching(identifier: "BackToolbar").element(boundBy: 0)
-        let forward = window.descendants(matching: .any).matching(identifier: "ForwardToolbar").element(boundBy: 0)
+    func testBackAndForwardShortcutsMoveThroughTheItemsOpened() {
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
-        XCTAssertFalse(back.isEnabled, "nothing was opened before the first note")
         row(titled: "Recipes to try").click()
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
-        XCTAssertTrue(back.isEnabled)
-        XCTAssertFalse(forward.isEnabled, "nothing lies ahead")
         app.typeKey("[", modifierFlags: .command)
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
-        XCTAssertTrue(forward.isEnabled)
-        XCTAssertFalse(back.isEnabled)
         app.typeKey("]", modifierFlags: .command)
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
-        back.click()
+        app.menuBars.menuBarItems["View"].click()
+        app.menuItems["Back"].click()
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
-        forward.click()
+        app.menuBars.menuBarItems["View"].click()
+        app.menuItems["Forward"].click()
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
     }
 

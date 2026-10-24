@@ -84,6 +84,11 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            Button("Recently Deleted", systemImage: "trash") {
+                if let library { browser?.show(.recentlyDeleted, in: library, order: order) }
+            }
+            .disabled(browser == nil || library == nil)
+            Divider()
             Button(editor?.caret.sourceMode == true ? "Show Formatted Text" : "Show Markdown Source") {
                 if let editor { editor.setSourceMode(!editor.caret.sourceMode) }
             }
@@ -156,6 +161,6 @@ struct SearchListButton: View {
         Button("Search List", systemImage: "magnifyingglass") {
             browser?.focusRequest = .search
         }
-        .disabled(browser == nil)
+        .disabled(browser?.canSearchList != true)
     }
 }

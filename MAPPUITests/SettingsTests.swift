@@ -11,7 +11,7 @@ final class SettingsTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     /// Settings' pages, which take the list's column while Settings is the place.
     private var settings: XCUIElement { element("SettingsPageList") }
-    private var settingsRow: XCUIElement { element("SidebarSettingsRow") }
+    private var instanceMenu: XCUIElement { element("SidebarLibrary") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -69,8 +69,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(settings.exists, "the pages stay")
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-        let pages = [("editor", "Editor"), ("sidebar", "Sidebar"), ("library", "Library"), ("recentlyDeleted", "Recently Deleted"),
+        let pages = [("editor", "Editor"), ("sidebar", "Sidebar"), ("library", "Library"),
                      ("about", "About"), ("appearance", "Appearance")]
+        XCTAssertFalse(element("SettingsPage-recentlyDeleted").exists, "Recently Deleted is a workspace destination")
         for (page, title) in pages {
             let row = element("SettingsPage-\(page)")
             XCTAssertTrue(row.exists, "\(title) is a page")
@@ -212,16 +213,15 @@ final class SettingsTests: XCTestCase {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         let originalHeight = row.frame.height
-        let sidebarText = sidebar.staticTexts["All Notes"]
+        let sidebarText = sidebar.staticTexts["Items"]
         let originalSidebarHeight = sidebarText.frame.height
-        let favoriteText = sidebar.staticTexts["Kitchen quotes"]
         let folderText = sidebar.staticTexts["Home"]
-        let originalFavoriteHeight = favoriteText.frame.height
         let originalFolderHeight = folderText.frame.height
-        XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
-        XCTAssertTrue(settingsRow.exists)
-        XCTAssertLessThan(settingsRow.frame.maxX, list.frame.minX, "Settings belongs to the sidebar")
-        settingsRow.click()
+        XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
+        XCTAssertTrue(instanceMenu.exists)
+        XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the instance menu belongs to the sidebar")
+        instanceMenu.click()
+        app.menuItems["Settings"].click()
         let size = window.popUpButtons["InterfaceTextSize"]
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         size.click()
@@ -229,7 +229,6 @@ final class SettingsTests: XCTestCase {
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertGreaterThan(row.frame.height, originalHeight + 8, "list text and row height scale together")
-        XCTAssertGreaterThan(favoriteText.frame.height, originalFavoriteHeight + 3, "favorite text scales with the interface")
         XCTAssertGreaterThan(folderText.frame.height, originalFolderHeight + 3, "nested folder text scales with the interface")
         XCTAssertGreaterThan(sidebarText.frame.height, originalSidebarHeight + 3, "sidebar text scales too")
         attachScreenshot("LargerInterfaceText")
@@ -252,7 +251,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(size.value as? String, "18 pt", "the preference survives restarting the app")
     }
 
-    func testBaseTextSizeKeepsTheSidebarFootAndSearchUsableAtLimits() {
+    func testBaseTextSizeKeepsTheInstanceMenuAndSearchUsableAtLimits() {
         for points in [24, 11] {
             app.typeKey(",", modifierFlags: .command)
             let size = window.popUpButtons["InterfaceTextSize"]
@@ -261,11 +260,13 @@ final class SettingsTests: XCTestCase {
             app.menuItems["\(points) pt"].click()
             leaveSettings()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-            let foot = element("SidebarFoot")
-            let label = foot.staticTexts["Settings"].firstMatch
-            XCTAssertTrue(label.waitForExistence(timeout: 3))
-            XCTAssertTrue(foot.frame.contains(label.frame), "the Settings row is clipped at \(points) points")
-            XCTAssertTrue(window.frame.contains(label.frame))
+            XCTAssertTrue(instanceMenu.waitForExistence(timeout: 3))
+            XCTAssertTrue(instanceMenu.isHittable, "the instance menu is reachable at \(points) points")
+            instanceMenu.click()
+            let settingsItem = app.menuItems["Settings"]
+            XCTAssertTrue(settingsItem.waitForExistence(timeout: 3))
+            XCTAssertTrue(settingsItem.isEnabled)
+            app.typeKey(.escape, modifierFlags: [])
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.searchFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))
@@ -279,9 +280,9 @@ final class SettingsTests: XCTestCase {
 
     /// Chooses the place the window showed, which leaves Settings with the window as it was.
     private func leaveSettings() {
-        let allNotes = sidebar.staticTexts["All Notes"]
-        XCTAssertTrue(allNotes.waitForExistence(timeout: 3))
-        allNotes.click()
+        let items = sidebar.staticTexts["Items"]
+        XCTAssertTrue(items.waitForExistence(timeout: 3))
+        items.click()
         XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
     }
 

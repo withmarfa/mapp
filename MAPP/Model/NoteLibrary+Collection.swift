@@ -87,6 +87,8 @@ extension NoteLibrary {
         switch place {
         case .inbox: return counts.inbox
         case .allNotes: return counts.active
+        case .sources, .collections: return 0
+        case .source(let name): return items.filter { $0.state == .active && $0.source == name }.count
         case .favorites: return counts.favorites
         case .files: return counts.files
         case .recentlyDeleted: return counts.trashed
@@ -155,6 +157,8 @@ extension NoteLibrary {
         switch place {
         case .inbox: return { $0.state == .active && $0.container == nil }
         case .allNotes: return { $0.state == .active }
+        case .sources, .collections: return { _ in false }
+        case .source(let name): return { $0.state == .active && $0.source == name }
         case .favorites: return { $0.state == .active && $0.isFavorite }
         case .favoriteItem(let id): return { $0.id == id && $0.state == .active && $0.isFavorite }
         case .folder(let id):

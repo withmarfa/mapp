@@ -13,7 +13,7 @@ struct MainView: View {
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
     @State private var sidebarWidth: CGFloat = 230
-    @State private var listWidth: CGFloat = 330
+    @State private var listWidth: CGFloat = 350
     @State private var measuredWidths = ColumnWidths()
     @State private var galleryWidth: CGFloat = 900
     @State private var noteName = ""
@@ -42,11 +42,18 @@ struct MainView: View {
     /// shows in the three-column one, in place of the list and the page, whatever the window is set to show.
     private var usesCollectionLayout: Bool { browser.usesCollection && !browser.showsSettings }
 
+    private var workspacePresentation: WorkspacePresentation {
+        if browser.showsSettings { return .settings }
+        if browser.showsSidebarIndex { return .index }
+        return usesCollectionLayout ? .collection : .list
+    }
+
     private var activeWindow: some View {
-        // Release the split view's toolbar provider before changing its native column count.
+        // Settings replaces both column toolbar providers even when the split keeps three columns.
+        // Release the outgoing providers before mounting that workspace or changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
-        renamingWindow.id(usesCollectionLayout)
-        .onChange(of: usesCollectionLayout) {
+        renamingWindow.id(workspacePresentation)
+        .onChange(of: workspacePresentation) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
             editor.flush()
@@ -81,7 +88,7 @@ struct MainView: View {
                 if browser.showsSettings {
                     SettingsPageList(browser: browser)
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane)
+                    NoteList(browser: browser, order: order, showsCreation: !isSidebarVisible, pane: $pane)
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
@@ -102,17 +109,24 @@ struct MainView: View {
     }
 
     private var sidebarColumn: some View {
-        Sidebar(browser: browser, order: order)
-            // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
-            .focused($pane, equals: .sidebar)
-            // A bar, not an inset, so the list's rows soften under it as they scroll past.
-            .safeAreaBar(edge: .bottom, spacing: 0) {
-                SidebarFoot(browser: browser)
+        VStack(spacing: 0) {
+            SidebarHeader(browser: browser)
+            Sidebar(browser: browser, order: order)
+                // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
+                .focused($pane, equals: .sidebar)
+            SidebarFoot(browser: browser)
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+            if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
+        }
+        .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
+        .toolbar {
+            if isSidebarVisible {
+                ToolbarItem {
+                    NewItemButton(browser: browser)
+                }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
-            }
-            .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
+        }
     }
 
     private var itemPage: some View {
@@ -129,7 +143,13 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if usesCollectionLayout {
+            if browser.showsSidebarIndex {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    SidebarIndex(browser: browser, order: order, showsCreation: !isSidebarVisible)
+                }
+            } else if usesCollectionLayout {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
@@ -155,7 +175,7 @@ struct MainView: View {
                     .toolbar {
                         GalleryToolbar(
                             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            columnWidth: min(galleryWidth, 400)
+                            columnWidth: min(galleryWidth, 400), showsCreation: !isSidebarVisible
                         ) {
                             if browser.viewMode == .table {
                                 ItemTableControls(browser: browser)
@@ -177,6 +197,11 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         workspace
+        .safeAreaBar(edge: .bottom, spacing: 0) {
+            if !browser.showsSettings, browser.item == .recentlyDeleted {
+                RecentlyDeletedActions(browser: browser)
+            }
+        }
         .focusedSceneValue(\.detailsPresentation, details)
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .overlay(alignment: .top) {
@@ -197,7 +222,7 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, browser.showsCollection ? nil : editor)
+        .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
     }
 
@@ -357,10 +382,14 @@ struct MainView: View {
     }
 }
 
+private enum WorkspacePresentation: Hashable {
+    case list, collection, settings, index
+}
+
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.
 private final class ColumnWidths {
     var sidebar: CGFloat = 230
-    var list: CGFloat = 330
+    var list: CGFloat = 350
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

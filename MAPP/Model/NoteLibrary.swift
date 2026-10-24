@@ -350,7 +350,10 @@ final class NoteLibrary: ItemLibrary {
         switch item {
         case .inbox: String(localized: "Inbox")
         case .recents: String(localized: "Recents")
-        case .allNotes: String(localized: "All Notes")
+        case .allNotes: String(localized: "Items")
+        case .sources: String(localized: "Sources")
+        case .collections: String(localized: "Collections")
+        case .source(let name): name
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id): self.item(id)?.title ?? ""
         case .folder(let id): folder(id)?.name ?? ""

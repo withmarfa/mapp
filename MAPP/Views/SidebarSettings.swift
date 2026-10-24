@@ -24,7 +24,6 @@ struct SidebarSettings: View {
         return Form {
             Section("Places") {
                 group(plan.top, in: library, plan: plan)
-                row(.favorites, in: library, plan: plan, among: [])
             }
             if plan.library.contains(.types) {
                 Section {
@@ -46,23 +45,6 @@ struct SidebarSettings: View {
             if !folderRows.isEmpty {
                 Section("Folders") {
                     group(folderRows, in: library, plan: plan)
-                }
-            }
-            if plan.library.contains(.collections) {
-                Section {
-                    row(.collections, title: String(localized: "Show Collections"), in: library, plan: plan, among: [])
-                    ForEach(plan.collections) { node in
-                        row(.collection(node.id), in: library, plan: plan, among: [])
-                            .disabled(plan.layout.isHidden(.collections))
-                        ForEach(node.children) { child in
-                            row(.collection(child.id), in: library, plan: plan, among: [], depth: 1)
-                                .disabled(plan.layout.isHidden(.collections) || plan.layout.isHidden(.collection(node.id)))
-                        }
-                    }
-                } header: {
-                    Text("Collections")
-                } footer: {
-                    Text("Anything other items are filed under is a collection.")
                 }
             }
         }
@@ -132,12 +114,12 @@ struct SidebarSettings: View {
         case .recents: library.name(of: .recents)
         case .all: library.name(of: .allNotes)
         case .favorites: library.name(of: .favorites)
+        case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
         case .types: String(localized: "Types")
         case .folders: String(localized: "Folders")
         case .files: library.name(of: .files)
         case .type(let id): Self.typeNode(id, in: plan.types)?.label ?? id
-        case .collection(let id): library.item(id)?.title ?? ""
         }
     }
 
@@ -146,13 +128,13 @@ struct SidebarSettings: View {
         case .inbox: "tray"
         case .recents: "clock"
         case .all: "note.text"
-        case .favorites: "star"
+        case .favorites: "heart"
+        case .sources: "antenna.radiowaves.left.and.right"
         case .collections: "square.stack"
         case .types: "square.grid.2x2"
         case .folders: "folder"
         case .files: "doc"
         case .type(let id): Self.typeNode(id, in: plan.types)?.symbol ?? TypeSymbol.fallback
-        case .collection(let id): Self.collectionNode(id, in: plan.collections)?.symbol ?? "square.stack"
         }
     }
 
@@ -162,9 +144,5 @@ struct SidebarSettings: View {
             if let found = typeNode(id, in: node.children) { return found }
         }
         return nil
-    }
-
-    private static func collectionNode(_ id: ItemID, in nodes: [CollectionNode]) -> CollectionNode? {
-        nodes.lazy.compactMap { $0.id == id ? $0 : $0.children.first { $0.id == id } }.first
     }
 }

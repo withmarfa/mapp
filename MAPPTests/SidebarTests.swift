@@ -40,8 +40,7 @@ struct SidebarTests {
         let library = folderLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.types.isEmpty)
-        // Nothing is filed under anything, so there is no Collections section.
-        #expect(plan.collections.isEmpty)
+        #expect(plan.shownTop.contains(.collections), "The index remains available when empty")
         #expect(plan.library == [.folders])
     }
 
@@ -186,10 +185,10 @@ struct SidebarTests {
         #expect(tree.first?.symbol == "square.stack")
         #expect(tree.first?.children.map(\.title) == ["Epic task"])
         #expect(tree.first?.children.first?.symbol == "checkmark.circle")
-        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types, .collections])
+        #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types])
     }
 
-    @Test func theSidebarShowsTwoLevelsOfCollectionsByTitle() {
+    @Test func theCollectionsIndexShowsTwoLevelsByTitle() {
         let root = filed("Root")
         let b = filed("B", under: root), a = filed("A", under: root)
         let deep = filed("Deep", under: a)
@@ -244,7 +243,7 @@ struct SidebarTests {
     @Test func aMarfaLibraryShowsTypesNotFolders() async throws {
         let library = try await marfaLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())
-        #expect(plan.library == [.types, .collections])
+        #expect(plan.library == [.types])
         #expect(!plan.types.contains { $0.type.map(library.catalogue.isFileType) == true })
         #expect(library.count(in: .recentlyDeleted) == 1)
     }
@@ -253,13 +252,13 @@ struct SidebarTests {
         let library = try await marfaLibrary([])
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.library.isEmpty)
-        #expect(plan.top == [.inbox, .recents, .all])
+        #expect(plan.top == [.inbox, .recents, .all, .sources, .collections, .favorites])
     }
 
-    @Test func filesJoinTheTopWhereTheLibraryHoldsAny() async throws {
+    @Test func filesStayUnderItemsWithoutAddingAnotherSidebarDestination() async throws {
         let library = try await marfaLibrary()
-        #expect(SidebarPlan(library, layout: SidebarLayout()).top == [.inbox, .recents, .all, .files])
-        #expect(SidebarPlan(folderLibrary(), layout: SidebarLayout()).top == [.inbox, .recents, .all])
+        #expect(SidebarPlan(library, layout: SidebarLayout()).top == [.inbox, .recents, .all, .sources, .collections, .favorites])
+        #expect(SidebarPlan(folderLibrary(), layout: SidebarLayout()).top == [.inbox, .recents, .all, .sources, .collections, .favorites])
     }
 
     @Test func recentsListsTheItemsEditedMostRecentlyUpToTheLimit() {
@@ -306,7 +305,7 @@ struct SidebarTests {
         let layouts = SidebarLayouts(defaults: defaults)
         layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.types))
-        #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.collections))
+        #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.folders))
         #expect(!layouts.layout(for: "marfa:two").isCollapsed(.types))
     }
 
@@ -327,7 +326,7 @@ struct SidebarTests {
         #expect(!plan.shownTypes.contains { $0.type == LibraryFixture.entity })
         #expect(plan.shownLibrary == [.types])
         layout.setHidden(.collections, false)
-        #expect(SidebarPlan(library, layout: layout).shownLibrary == [.types, .collections])
+        #expect(SidebarPlan(library, layout: layout).shownTop.contains(.collections))
     }
 
     @Test func hidingARowHidesWhatIsUnderIt() async throws {
@@ -338,10 +337,6 @@ struct SidebarTests {
         #expect(ticket?.children.map(\.id) == ["aic.ticket.task"])
         layout.setHidden(.type(LibraryFixture.ticket.rawValue), true)
         #expect(!SidebarPlan(library, layout: layout).shownTypes.contains { $0.id == "aic.ticket" })
-
-        let alpha = try #require(library.collectionTree.first)
-        layout.setHidden(.collection(try #require(alpha.children.first).id), true)
-        #expect(SidebarPlan(library, layout: layout).shownCollections.first?.children.isEmpty == true)
     }
 
     @Test func movingPlacesReordersThemWithinTheirGroup() {

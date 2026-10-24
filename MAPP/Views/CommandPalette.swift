@@ -191,7 +191,7 @@ struct CommandPalette: View {
         let selected = browser.selectedItems(in: library).filter { !$0.isFile }
         let ids = Set(selected.map(\.id))
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
-        let hasVisibleEditor = !browser.showsCollection && one?.id == editor.noteID && editor.hasNote
+        let hasVisibleEditor = !browser.showsCollection && !browser.showsSidebarIndex && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
@@ -201,6 +201,9 @@ struct CommandPalette: View {
         func historyKey(_ key: String) -> String? { returnFocus == .page ? nil : key }
 
         if library.isLoaded {
+            if browser.canSearchList {
+                add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F") { browser.focusRequest = .search }
+            }
             add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
             add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
             add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
@@ -316,10 +319,12 @@ struct CommandPalette: View {
 
     private var places: [Entry] {
         var items: [(SidebarItem, String, String?)] = [
-            (.inbox, "tray", nil), (.recents, "clock", nil), (.allNotes, "note.text", nil), (.favorites, "star", nil),
+            (.inbox, "tray", nil), (.recents, "clock", nil), (.allNotes, "note.text", nil),
+            (.sources, "antenna.radiowaves.left.and.right", nil), (.collections, "square.stack", nil),
+            (.favorites, "heart", nil), (.recentlyDeleted, "trash", nil),
         ]
-        if library.count(in: .files) > 0 { items += [(.files, "doc", nil)] }
-        // The collections the sidebar shows, its two levels of them.
+        items += library.sourceCounts.map { (.source($0.name), "antenna.radiowaves.left.and.right", $0.name) }
+        // Match the two levels in the collection index.
         items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
         // The types the sidebar shows, under the names it gives them.
         items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
