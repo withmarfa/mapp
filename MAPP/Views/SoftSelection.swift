@@ -13,7 +13,7 @@ extension View {
 
 /// SwiftUI cannot style a list's selection, which the `NSTableView` behind it draws. This finds that table, turns
 /// its highlight off, so rows keep their own text colors, and draws the selected rows' marks beneath them.
-private struct SoftSelection: NSViewRepresentable {
+struct SoftSelection: NSViewRepresentable {
     let rows: Int
     let selection: Int
 
@@ -122,6 +122,15 @@ private struct SoftSelection: NSViewRepresentable {
                 })
             }
             table.postsFrameChangedNotifications = true
+            // A selected row that grows or shrinks, or moves under one that does, changes no frame but its own row
+            // view's: the table's frame stays put while it has room, and no selection or row identifier changes.
+            observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: nil, queue: .main) { [weak self] note in
+                let view = note.object as? NSTableRowView
+                MainActor.assumeIsolated {
+                    guard let self, let view, view.superview === self.table else { return }
+                    self.update()
+                }
+            })
             // Rows scrolled into view get row views of their own, which the marks are placed by.
             if let clip = table.enclosingScrollView?.contentView {
                 clip.postsBoundsChangedNotifications = true
@@ -166,6 +175,7 @@ private struct SoftSelection: NSViewRepresentable {
             CATransaction.setDisableActions(true)
             layer.sublayers?.forEach { $0.removeFromSuperlayer() }
             for row in rows where row < table.numberOfRows {
+                table.rowView(atRow: row, makeIfNecessary: false)?.postsFrameChangedNotifications = true
                 let mark = CALayer()
                 mark.frame = Self.rect(ofRow: row, in: table)
                 mark.backgroundColor = color
