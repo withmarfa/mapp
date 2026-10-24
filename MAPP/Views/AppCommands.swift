@@ -16,7 +16,9 @@ struct AppCommands: Commands {
         SidebarCommands()
 
         CommandGroup(replacing: .newItem) {
-            Button("New Item", systemImage: "plus") { browser?.startItemDraft() }
+            Button("New Item", systemImage: "plus") {
+                if let library { browser?.startNewItem(in: library, undoManager: notes?.undoManager) }
+            }
                 .keyboardShortcut("n")
                 .disabled(browser == nil || library?.isLoaded != true)
             Button("Import Files…") { browser?.isImportingFiles = true }
@@ -35,7 +37,7 @@ struct AppCommands: Commands {
 
         // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
-            let ids: Set<ItemID> = browser?.isCreatingItem == true ? [] : (notes?.ids ?? [])
+            let ids: Set<ItemID> = notes?.ids ?? []
             // The note commands act on notes; a file selected has only its share and its window.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
@@ -70,10 +72,10 @@ struct AppCommands: Commands {
         // Print has ⌘P, as everywhere; the print panel sets the paper.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
-                .disabled(browser?.isCreatingItem == true || browser?.showsCollection == true || editor?.hasNote != true)
+                .disabled(browser?.showsCollection == true || editor?.hasNote != true)
             Button("Print…", systemImage: "printer") { editor?.printNote() }
                 .keyboardShortcut("p")
-                .disabled(browser?.isCreatingItem == true || browser?.showsCollection == true || editor?.hasNote != true)
+                .disabled(browser?.showsCollection == true || editor?.hasNote != true)
         }
 
         CommandGroup(after: .textEditing) {
@@ -100,7 +102,7 @@ struct AppCommands: Commands {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(browser?.isCreatingItem == true || details == nil || notes?.ids.count != 1)
+            .disabled(details == nil || notes?.ids.count != 1)
             Divider()
             OrderOptions()
             Divider()

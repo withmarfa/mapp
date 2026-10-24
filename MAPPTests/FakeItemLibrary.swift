@@ -183,6 +183,7 @@ final class FakeItemLibrary: ItemLibrary {
     var refusedCreations: Set<ItemID> = []
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
+    func wasTouched(_ id: ItemID) -> Bool { false }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         relationshipWrites.append((id, field, targetIDs))

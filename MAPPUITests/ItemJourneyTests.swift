@@ -66,19 +66,13 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.exists)
     }
 
-    func testBodyFocusCreatesItemAndHeaderEditsSurviveReopening() {
-        app.typeKey("n", modifierFlags: .command)
-        let type = app.descendants(matching: .any)["NewItemType"]
-        XCTAssertTrue(type.waitForExistence(timeout: 3))
-        type.click()
+    func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
+        app.buttons["NewItemToolbar"].click()
         app.menuItems["Task"].click()
-        let draftTitle = app.textFields["NewItemTitle"]
-        draftTitle.click()
-        draftTitle.typeText("Body Focus Draft")
-        let body = app.buttons["NewItemBody"]
-        XCTAssertTrue(body.waitForExistence(timeout: 3))
-        body.click()
-        XCTAssertTrue(draftTitle.waitForNonExistence(timeout: 3))
+        let pageTitle = app.itemPageTitle
+        XCTAssertTrue(pageTitle.waitForExistence(timeout: 3))
+        app.typeText("Body Focus Draft")
+        app.typeKey(.return, modifierFlags: [])
         let editor = app.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.typeText("Created by starting the document body.")
@@ -137,15 +131,10 @@ final class ItemJourneyTests: XCTestCase {
     }
 
     private func create(type: String, title: String) {
-        app.typeKey("n", modifierFlags: .command)
-        let typePicker = app.descendants(matching: .any)["NewItemType"]
-        XCTAssertTrue(typePicker.waitForExistence(timeout: 3))
-        typePicker.click()
+        app.buttons["NewItemToolbar"].click()
         app.menuItems[type].click()
-        let field = app.textFields["NewItemTitle"]
-        field.click()
-        field.typeText(title)
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
+        app.typeText(title)
+        app.typeKey(.return, modifierFlags: [])
     }
 }

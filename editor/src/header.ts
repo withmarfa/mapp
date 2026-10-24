@@ -103,6 +103,9 @@ export class ItemHeader {
   private readonly parentError: HTMLParagraphElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
+  /** The item whose title is to take the keyboard as soon as the header shows it, since the app may ask before
+   *  it has sent that item's header. */
+  private wantedTitle?: string
 
   constructor(
     readonly root: HTMLElement,
@@ -255,6 +258,7 @@ export class ItemHeader {
       this.title.setAttribute('aria-readonly', String(!model.editable))
     }
     if (!this.isEditingTitle) this.showTitle()
+    this.takeWantedTitle()
     this.titleError.hidden = !model.titleRejected
     this.titleRefusal.textContent = model.titleRefusal
     this.propertyError.hidden = !model.propertyRejected
@@ -268,6 +272,32 @@ export class ItemHeader {
       'aria-description',
       model.status && !model.status.empty ? model.status.label : '',
     )
+  }
+
+  /** Gives the title of `item` the keyboard with its text selected, so typing replaces it. Held until the header
+   *  shows that item and can be edited. */
+  focusTitle(item: string) {
+    this.wantedTitle = item
+    this.takeWantedTitle()
+  }
+
+  /** The keyboard goes elsewhere, so a title still waiting for it does not take it later. */
+  cancelTitleFocus() {
+    this.wantedTitle = undefined
+  }
+
+  private takeWantedTitle() {
+    const model = this.model
+    if (!model || this.wantedTitle !== model.item || this.root.hidden) return
+    if (this.title.getAttribute('contenteditable') !== 'plaintext-only') return
+    this.wantedTitle = undefined
+    this.title.focus()
+    const selection = document.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(this.title)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
 
   setIcons(icons: HeaderIcons) {

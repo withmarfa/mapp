@@ -409,6 +409,11 @@ final class NoteLibrary: ItemLibrary {
         store?.drain()
     }
 
+    /// Every write is in the copy `item(_:)` shows as it is made, so only a note pointing at this one is left to ask.
+    func wasTouched(_ id: ItemID) -> Bool {
+        connectionIndex.references.contains { $0.sourceID != id && $0.resolution == .resolved(id) }
+    }
+
     /// The store writes a create before `createItem` answers, so none is refused later.
     func wasRefused(creating id: ItemID) -> Bool { false }
 

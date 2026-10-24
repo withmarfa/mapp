@@ -21,6 +21,7 @@ declare global {
       flush(expected?: number): string | null
       format(command: FormatCommand, arg?: string | number, expected?: number): void
       focus(): void
+      focusTitle(item: string): void
       blurText(expected: number): void
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
@@ -164,6 +165,7 @@ function setPageProperty(name: string, value: string): void {
 window.editor = {
   load: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
+    header.cancelTitleFocus()
     editor.load(markdown, nextGeneration, editable)
     headerScrolledAway = false
     checkHeaderScrolledAway()
@@ -176,7 +178,11 @@ window.editor = {
   flush: (expected) => editor.flush(expected),
   format: (command, arg, expected) =>
     guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
-  focus: () => editor.focus(),
+  focus: () => {
+    header.cancelTitleFocus()
+    editor.focus()
+  },
+  focusTitle: (item) => header.focusTitle(item),
   blurText: (expected: number) => {
     if (expected !== generation) return
     guardedCommand(() => editor.blur(expected))

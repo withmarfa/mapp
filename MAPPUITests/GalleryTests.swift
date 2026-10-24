@@ -222,24 +222,20 @@ final class GalleryTests: XCTestCase {
         XCTAssertEqual(sidebar.frame.width, width, accuracy: 3)
     }
 
-    func testAHiddenDraftKeepsItsTextWhenReturningToGallery() {
+    func testANewItemMadeInTheGalleryOpensInThePageAndAppearsAsACardOnReturning() {
         choose("Gallery")
         window.buttons["NewItemToolbar"].click()
-        let title = window.textFields["NewItemTitle"]
+        window.menuItems["Note"].click()
+        let title = window.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        title.typeText("Gallery draft")
-        window.buttons["BackToGallery"].click()
-        XCTAssertTrue(gallery.waitForExistence(timeout: 3))
-        window.buttons["NewItemToolbar"].click()
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        XCTAssertEqual(title.value as? String, "Gallery draft")
-        title.typeKey(.return, modifierFlags: [])
+        app.typeText("Gallery item")
+        app.typeKey(.return, modifierFlags: [])
         let editor = window.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.typeText("Created from the gallery")
         window.buttons["BackToGallery"].click()
-        XCTAssertTrue(card("Gallery draft").waitForExistence(timeout: 3))
-        card("Gallery draft").doubleClick()
+        XCTAssertTrue(card("Gallery item").waitForExistence(timeout: 3))
+        card("Gallery item").doubleClick()
         let content = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created from the gallery"), evaluatedWith: editor)
         wait(for: [content], timeout: 3)
     }

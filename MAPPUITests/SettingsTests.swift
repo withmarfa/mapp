@@ -171,20 +171,13 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(spelling.value.map { String(describing: $0) }, "0", "the preference survives returning to the notes")
     }
 
-    func testSettingsPreservesAnUnsubmittedDraftWithTheSidebarHidden() {
+    func testNewItemLeavesSettingsAndOpensThePageWithTheSidebarHidden() {
         app.typeKey("s", modifierFlags: [.command, .control])
-        app.typeKey("n", modifierFlags: .command)
-        let title = window.textFields["NewItemTitle"]
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        title.click()
-        title.typeText("Unsubmitted field notes")
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        XCTAssertFalse(title.exists)
-        // With the sidebar hidden there is no place to choose; New Item leaves Settings and resumes the draft.
+        // With the sidebar hidden there is no place to choose; New leaves Settings and opens the new item.
         app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        XCTAssertEqual(title.value as? String, "Unsubmitted field notes")
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCTAssertFalse(settings.exists)
         XCTAssertFalse(sidebar.exists, "the sidebar stays hidden after returning")
     }

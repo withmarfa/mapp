@@ -59,8 +59,11 @@ import Observation
     @ObservationIgnored private var following: [Task<Void, Never>] = []
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
+    /// Items this library has written to, or connected another item to, other than by creating them. The copy shows
+    /// a title, tags or a link only when the source reports them, so what it shows may not yet hold a write.
+    @ObservationIgnored var written: Set<ItemID> = []
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
-    /// so the draft it came from is the person's to send again.
+    /// so the window has no item to open and gives the New up.
     private(set) var refusedCreations: Set<ItemID> = []
     /// The text of each item's last save until the source answers it, so text a closing source refuses can be
     /// given back to the person. Only the last is kept, since it holds everything typed before it.
@@ -333,12 +336,38 @@ import Observation
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
+        recordWritten(write)
         refusals[id] = Refusal(title: title, text: Self.createdText(write))
         if !source.submit(write, as: id) {
             refusals[id] = nil
             notKept(title, text: Self.typedText(write))
         }
         return id
+    }
+
+    /// The items a write is made to or connects, so `wasTouched` knows them before the source reports the write. A
+    /// create touches only the item it files under; the item it makes is not yet written to.
+    private func recordWritten(_ write: ItemWrite) {
+        switch write {
+        case .create(_, let draft):
+            if let parent = draft.parent { written.insert(parent) }
+        case .editProperties(let id, _, _, _), .editBody(let id, _, _, _), .retype(let id, _, _), .retier(let id, _, _),
+            .move(let id, _), .transition(let id, _), .purge(let id, _), .tag(let id, _, _):
+            written.insert(id)
+        case .link(let draft, _):
+            written.formUnion([draft.source, draft.target])
+        case .unlink(let edge):
+            if let link = index.links[edge] { written.formUnion([link.source, link.target]) }
+        case .moveEdge(let edge, _, let target):
+            written.insert(target)
+            if let link = index.links[edge] { written.formUnion([link.source, link.target]) }
+        case .place:
+            break
+        }
+    }
+
+    func wasTouched(_ id: ItemID) -> Bool {
+        written.contains(id) || index.links(touching: id).contains { $0.holder != id }
     }
 
     /// Told where the person sees it, with the text they typed, since nothing else holds that text.
@@ -355,13 +384,13 @@ import Observation
         return createdText(write)
     }
 
-    /// A draft refused while it waits is given back by the window that made it, unless that window has moved on.
+    /// The text a create holds, which a source that closes before it answers gives back to the person.
     private static func createdText(_ write: ItemWrite) -> String? {
         guard case .create(_, let draft) = write else { return nil }
         return draft.body.isEmpty ? draft.title : draft.title + "\n\n" + draft.body
     }
 
-    /// A create is followed to its answer, so one refused before the source holds the item gives its draft back.
+    /// A create is followed to its answer, so one refused before the source holds the item is told to the window that made it.
     func submitCreate(_ id: ItemID, _ draft: ItemDraft, failing title: String) {
         let write = submit(.create(id: id, draft), failing: title)
         if refusals[write] != nil { creating[write] = id } else { refusedCreations.insert(id) }

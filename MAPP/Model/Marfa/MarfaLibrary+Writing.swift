@@ -214,6 +214,7 @@ extension MarfaLibrary {
             try file.data.write(to: url)
             urls.append(url)
         }
+        written.insert(id)
         return try await source.embeds.attach(urls, to: id)
     }
 

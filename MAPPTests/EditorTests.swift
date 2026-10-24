@@ -208,7 +208,7 @@ struct EditorTests {
         let page = try await Harness()
         try await page.load("Original\n")
         var left = false
-        page.editor.onLeave = { _ in left = true }
+        page.editor.onLeave = { _, _ in left = true }
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         let originalID = page.editor.noteID
         let replacement = Note(body: "Replacement\n", created: .now)
@@ -378,7 +378,7 @@ struct EditorTests {
         window.delegate = host
         let proxy = EditorCloseDelegate(editor: page.editor, window: window)
         var left = false
-        page.editor.onLeave = { _ in left = true }
+        page.editor.onLeave = { _, _ in left = true }
         let rejected = proxy.windowShouldClose(window)
         #expect(!rejected)
         host.permitsClose = false
@@ -502,7 +502,7 @@ struct EditorTests {
         let library = NoteLibrary(notes: [note], store: store)
         let page = try await Harness(library: library)
         page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-        page.editor.onLeave = { library.leave($0) }
+        page.editor.onLeave = { id, _ in library.leave(id) }
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, 'R&D plan ')")
@@ -885,6 +885,31 @@ struct EditorTests {
         try #require(try await page.editor.webView.evaluateJavaScript(
             "(() => { const r = document.querySelector(\(json(selector))).getBoundingClientRect(); return [r.left, r.top, r.width, r.height] })()"
         ) as? [Double])
+    }
+
+    @Test func aNewItemsTitleTakesTheKeyboardWhenThePageShowsThatItem() async throws {
+        let page = try await Harness()
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        let note = Note(body: "", created: .now)
+        page.library.notes.append(note)
+        page.editor.load(try #require(page.library.item(note.id)))
+        try await page.wait { page.editor.noteID == note.id }
+        page.editor.focus(note.id, onTitle: true)
+        page.editor.setHeader(Self.header("Untitled", id: note.id))
+        var focused = ""
+        var selected = ""
+        for _ in 0..<40 {
+            focused = try await page.editor.webView.evaluateJavaScript("document.activeElement?.id ?? ''") as? String ?? ""
+            selected = try await page.editor.webView.evaluateJavaScript("String(getSelection())") as? String ?? ""
+            if focused == "ItemPageTitle", selected == "Untitled" { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(focused == "ItemPageTitle")
+        #expect(selected == "Untitled", "the title is selected, so typing names the item")
     }
 
     @Test func theItemHeaderScrollsWithTheTextInsideThePageAndKeepsItsMargins() async throws {

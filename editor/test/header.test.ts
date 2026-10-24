@@ -308,3 +308,27 @@ test('text dropped on the title while it is not being edited is saved when the t
     },
   ])
 })
+
+test('a title asked for before its header arrives takes the keyboard with its text selected', () => {
+  header.focusTitle('ticket')
+  expect(header.isEditingTitle).toBe(false)
+  // The header of the item shown before is not the title asked for.
+  header.set({ ...ticket, item: 'other', title: 'Other' })
+  expect(header.isEditingTitle).toBe(false)
+  header.set(ticket)
+  expect(header.isEditingTitle).toBe(true)
+  expect(document.getSelection()?.toString()).toBe('Review the findings')
+  // The request is used once.
+  title().blur()
+  header.set(ticket)
+  expect(header.isEditingTitle).toBe(false)
+})
+
+test('a title that cannot be edited, or a request the keyboard has since left, takes nothing', () => {
+  header.focusTitle('ticket')
+  header.set({ ...ticket, editable: false })
+  expect(header.isEditingTitle).toBe(false)
+  header.cancelTitleFocus()
+  header.set(ticket)
+  expect(header.isEditingTitle).toBe(false)
+})

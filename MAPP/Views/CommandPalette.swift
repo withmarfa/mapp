@@ -229,11 +229,11 @@ struct CommandPalette: View {
                     add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
                 }
             }
-            add(String(localized: "New Item"), "plus", "⌘N") { browser.startItemDraft() }
+            add(String(localized: "New Item"), "plus", "⌘N") { browser.startNewItem(in: library, undoManager: undoManager) }
             if library.capabilities.contains(.importFiles) {
                 add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
             }
-            if !browser.isCreatingItem, browser.selection.count == 1, let details {
+            if browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
             }
             if library.capabilities.contains(.folders) {
@@ -264,7 +264,7 @@ struct CommandPalette: View {
                 add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
             }
         }
-        if !browser.selection.isEmpty, !browser.isCreatingItem {
+        if !browser.selection.isEmpty {
             add(String(localized: "Open in New Window"), "macwindow", "⌘O") {
                 for id in library.idsForWindows(browser.selection) { openWindow(value: id) }
             }

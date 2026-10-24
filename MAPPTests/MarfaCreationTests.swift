@@ -22,25 +22,23 @@ struct MarfaCreationTests {
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
         browser.adopt(library)
-        browser.startItemDraft(typeID: typeID)
-        browser.itemDraft?.title = "A title"
-        let id = try #require(browser.createDraft(in: library, undoManager: nil))
+        let id = try #require(browser.startNewItem(typeID: typeID, in: library, undoManager: nil))
         guard case .create(let submittedID, let draft) = try #require(source.writes.last) else {
             Issue.record("Expected a create")
             return
         }
         #expect(submittedID == id)
-        #expect(browser.isAwaitingCreation)
+        #expect(browser.isAwaitingNewItem)
         #expect(library.failure == nil)
 
         let properties = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
 
-        #expect(properties[titleKey] == .string("A title"))
+        #expect(properties[titleKey] == .string(String(localized: "Untitled")))
         #expect(properties[bodyKey] == .string(""))
     }
 
     @Test(arguments: [ItemTypeInfo.Field.Kind.text, .number, .boolean, .date, .choice(["open"]), .other])
-    func anUnfilledRequiredFieldKeepsTheDraftAndSendsNothing(_ kind: ItemTypeInfo.Field.Kind) async throws {
+    func anUnfilledRequiredFieldMakesNothingAndSaysWhich(_ kind: ItemTypeInfo.Field.Kind) async throws {
         let type = ItemTypeInfo(
             id: TypeID("test.record"), label: "Record",
             fields: [
@@ -54,26 +52,21 @@ struct MarfaCreationTests {
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
         browser.adopt(library)
-        browser.startItemDraft(typeID: type.id.rawValue)
-        browser.itemDraft?.title = "Keep this title"
-        browser.itemDraft?.body = "Keep this text.\n"
         let undo = UndoManager()
 
-        #expect(browser.createDraft(in: library, undoManager: undo) == nil)
+        #expect(browser.startNewItem(typeID: type.id.rawValue, in: library, undoManager: undo) == nil)
         #expect(source.writes.isEmpty)
         #expect(!undo.canUndo)
-        #expect(browser.isCreatingItem)
-        #expect(!browser.isAwaitingCreation)
-        #expect(browser.itemDraft?.title == "Keep this title")
-        #expect(browser.itemDraft?.body == "Keep this text.\n")
+        #expect(!browser.isAwaitingNewItem)
+        #expect(browser.newItems.isEmpty)
         #expect(library.failure?.title == String(localized: "Can’t Create Item"))
         #expect(library.failure?.message.contains("Needed") == true)
+        #expect(library.failure?.message.contains("draft") == false)
 
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })
-        browser.itemDraft?.typeID = Self.type.rawValue
-        let id = try #require(browser.createDraft(in: library, undoManager: undo))
-        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Keep this title", body: "Keep this text.\n"))])
+        let id = try #require(browser.startNewItem(typeID: Self.type.rawValue, in: library, undoManager: undo))
+        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: String(localized: "Untitled"), body: ""))])
     }
 
     @Test(arguments: [ItemTypeInfo.Field.Kind.number, .boolean, .date, .choice(["open"]), .other])

@@ -176,20 +176,15 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func create(type: String, title: String, parent: String? = nil) {
-        app.typeKey("n", modifierFlags: .command)
-        let typePicker = window.descendants(matching: .any)["NewItemType"]
-        XCTAssertTrue(typePicker.waitForExistence(timeout: 3))
-        typePicker.click()
+        window.buttons["NewItemToolbar"].click()
         window.menuItems[type].click()
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
+        app.typeText(title)
+        app.typeKey(.return, modifierFlags: [])
         if let parent {
-            window.descendants(matching: .any)["NewItemParent"].click()
+            window.itemParentPin.click()
             window.menuItems[parent].click()
         }
-        let field = window.textFields["NewItemTitle"]
-        field.click()
-        field.typeText(title)
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
     }
 
     private func element(_ identifier: String) -> XCUIElement {

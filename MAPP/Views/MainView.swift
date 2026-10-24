@@ -131,15 +131,7 @@ struct MainView: View {
     }
 
     private var itemPage: some View {
-        Group {
-            if browser.isCreatingItem, let draft = browser.itemDraft {
-                NewItemPage(browser: browser, draft: draft)
-                    .disabled(browser.isAwaitingCreation)
-                    .onAppear { editor.close() }
-            } else {
-                NoteDetail(browser: browser, editor: editor, details: details)
-            }
-        }
+        NoteDetail(browser: browser, editor: editor, details: details)
     }
 
     private var workspace: some View {
@@ -231,14 +223,14 @@ struct MainView: View {
         }
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
-        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.isCreatingItem ? [] : browser.selection, undoManager: undoManager))
+        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
     }
 
     private var lifecycleWindow: some View {
         activeWindow
         // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
         .onChange(of: galleryItemIDs) { old, new in
-            guard browser.usesCollection, !browser.isCreatingItem else { return }
+            guard browser.usesCollection else { return }
             browser.keepSelection(from: old, to: new)
         }
         .onChange(of: library.folders) {
@@ -255,13 +247,17 @@ struct MainView: View {
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do.
         .onDisappear {
-            editorSlot.made?.flush()
+            editorSlot.made?.flush(closing: true)
             editorSlot.made?.windowWent()
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onLeave = { [library] id in library.leave(id) }
+            editor.onLeave = { [library, browser, details, weak editor] id, closing in
+                library.leave(id)
+                browser.leaveNewItem(id, closing: closing, hasUnsavedTitle: details.unsavedTitles.contains(id),
+                                     undoManager: editor?.webView.window?.undoManager)
+            }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
             editor.onOpenNote = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
@@ -271,12 +267,11 @@ struct MainView: View {
             }
         }
         // A window restores what it showed once the folder has been read, since before then nothing is there. A
-        // window carried to another library starts afresh with it, keeping only a draft the person was writing.
+        // window carried to another library starts afresh with it.
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
-            browser.fitDraft(to: library)
-            if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
+            if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample"),
                ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
@@ -285,10 +280,13 @@ struct MainView: View {
             }
             #endif
         }
-        // A new item reaches a server's library when its source says so, which the draft page waits for.
-        .onChange(of: creationIsSettled) {
-            if creationIsSettled { browser.finishCreation(in: library) }
+        // A new item reaches a server's library when its source says so, which the window waits for to open it.
+        .onChange(of: newItemIsSettled) {
+            if newItemIsSettled { browser.finishNewItem(in: library) }
         }
+        // An item New made that the page never held, as when the selection moved on at once, has no editor to say
+        // it was left.
+        .onChange(of: browser.selection) { leaveNewItemsNeverShown() }
         #if DEBUG
         // A sample launch can open an item without a click, as `-MAPPSelectItem <id>`, once the library holds it.
         .onChange(of: launchSelection.map { library.item($0) != nil }, initial: true) {
@@ -304,8 +302,6 @@ struct MainView: View {
 
     private var importingWindow: some View {
         presentedWindow
-        .onChange(of: browser.sidebarItem) { browser.isCreatingItem = false }
-        .onChange(of: browser.selection) { browser.isCreatingItem = false }
         .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
                 let requestID = UUID()
@@ -334,7 +330,13 @@ struct MainView: View {
         }
     }
 
-    private var creationIsSettled: Bool { browser.isCreationSettled(in: library) }
+    private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
+
+    private func leaveNewItemsNeverShown() {
+        for id in browser.newItems.keys where editor.noteID != id {
+            browser.leaveNewItem(id, closing: false, hasUnsavedTitle: details.unsavedTitles.contains(id), undoManager: undoManager)
+        }
+    }
 
     #if DEBUG
     private var launchSelection: ItemID? {
@@ -352,7 +354,6 @@ struct MainView: View {
     private func revealImportedItem() {
         guard let requestID = importRequestID, let id = completedImportID,
               library.item(id) != nil else { return }
-        browser.isCreatingItem = false
         browser.leaveSettings()
         browser.sidebarItem = .allNotes
         browser.searchText = ""
@@ -366,10 +367,7 @@ struct MainView: View {
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.usesCollection {
-                browser.isCreatingItem = false
-                browser.isCollectionItemPresented = false
-            }
+            if browser.usesCollection { browser.isCollectionItemPresented = false }
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .sidebar, .list:
@@ -377,7 +375,7 @@ struct MainView: View {
             // Asked for as the place changes, the list that takes the keyboard is not yet in the window.
             let request = browser.focusRequest
             Task { pane = request }
-        case .page:
+        case .page, .title:
             if browser.showsCollection { browser.isCollectionItemPresented = true }
             return
         case nil: return
@@ -417,7 +415,7 @@ private struct ItemInspectorColumn: ViewModifier {
     let editor: EditorController
 
     func body(content: Content) -> some View {
-        content.inspector(isPresented: Binding { details.showsInspector(in: browser) } set: { details.isPresented = $0 }) {
+        content.inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
                 .toolbar {
