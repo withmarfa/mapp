@@ -24,6 +24,7 @@ import Observation
     var notesToPurge: Set<ItemID> = []
     private(set) var catalogue = Catalogue()
     private(set) var syncReport: SyncReport
+    var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
     /// How the server stands, for the app to show beside the library.
     private(set) var connection: MarfaHost.State
     let now: () -> Date

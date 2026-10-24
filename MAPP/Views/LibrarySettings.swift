@@ -17,6 +17,10 @@ struct LibrarySettings: View {
             Section { LibrarySummary() }
             if libraries.mode == .files { folderSection }
             MarfaSettingsView(model: libraries.marfaSettings)
+            if let library, library.capabilities.contains(.downloadedFiles), let files = library.downloadedFiles {
+                LibraryDownloads(files: files)
+                    .id(ObjectIdentifier(library))
+            }
             if library != nil, !host.report.problems.isEmpty {
                 Section {
                     ForEach(host.report.problems) { problem in
@@ -170,6 +174,14 @@ private struct LibrarySummary: View {
                 Text(detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if let fill = library?.syncReport.fill, fill.state != .complete {
+                Text(fill.state == .updating ? "Updating library…" : "Downloading library…")
+                    .foregroundStyle(.secondary)
+                Text(FillWording.line(fill))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .accessibilityIdentifier("LibraryFillProgress")
             }
         }
     }

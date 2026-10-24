@@ -40,6 +40,7 @@ nonisolated struct SourceCapabilities: OptionSet, Hashable, Sendable {
     /// Folders can be made, renamed, deleted and reordered.
     static let folders = SourceCapabilities(rawValue: 1 << 6)
     static let importFiles = SourceCapabilities(rawValue: 1 << 7)
+    static let downloadedFiles = SourceCapabilities(rawValue: 1 << 8)
 }
 
 nonisolated enum SourceChange: Hashable, Sendable {

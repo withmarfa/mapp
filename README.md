@@ -23,6 +23,12 @@ The item list defaults to 350 points and can be resized. Settings (⌘, or the i
 
 File-backed items use the workbench definitions as interim input. Files without a Markdown envelope expose their file information, but do not claim editable properties that the folder cannot persist.
 
+## Offline library and downloads
+
+A Marfa library fills automatically with every non-system type in both tiers. Items appear as they arrive, and Settings > Library shows the number listed and the expected total, when known. Interrupted fills resume automatically. An out-of-date copy remains readable and editable while it refills; edits wait in its queue.
+
+Settings > Library > Downloaded Files shows the space used, the current limit, and attachment availability. Choose Automatic, a size, or Keep All Downloads. Remove Downloaded Files clears expendable downloads, preserving attachments, pending uploads, and files currently being read. Closing the library waits for removal to restore the chosen limit. Attachments are fetched separately after every fill and catch-up, retried when the server reconnects and when replay brings an attachment, and stay outside the limit. Downloads do not hold up queued edits or a flush. Missing attachments are counted with their reasons. A file larger than the limit can still open while disk space allows.
+
 ## Editing and export
 
 Plain-text file items open as selectable, read-only pages using the note text-size and reading-width settings. Their content stays literal, including Markdown punctuation and line breaks, and opening them never rewrites their bytes. UTF-8 and BOM-marked UTF-16/32 are supported. Files larger than 4 MiB, unknown encodings, and binary content use the system preview with Open instead of showing a truncated document. Editing a file's stored bytes is not yet supported.
