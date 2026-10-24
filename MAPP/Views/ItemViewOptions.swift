@@ -45,6 +45,8 @@ struct ViewModeMenu: View {
         }
         .pickerStyle(.menu)
         .labelsHidden()
+        // The menu's text choices otherwise set the width of the icon-only control.
+        .frame(width: 48)
         .help("View As")
         .accessibilityLabel("View As")
         .accessibilityIdentifier("ViewModeMenu")

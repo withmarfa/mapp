@@ -36,18 +36,13 @@ struct SidebarHeader: View {
                     }
                 }
             } label: {
-                HStack(spacing: 7) {
-                    Text(instanceName)
-                        .interfaceFont(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
+                Text(instanceName)
+                    .interfaceFont(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+            .menuIndicator(.visible)
             .help("Instance")
             .accessibilityValue(instanceName)
             .accessibilityIdentifier("SidebarLibrary")
