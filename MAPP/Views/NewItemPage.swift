@@ -16,7 +16,8 @@ struct NewItemPage: View {
                 .padding(.horizontal, style.horizontalInset(for: geometry.size.width))
                 .padding(.top, 16)
         }
-        .background(.windowBackground)
+        // Match the editor's opaque backing instead of the window's tinted surface.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var content: some View {
