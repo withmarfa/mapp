@@ -1,9 +1,10 @@
 import Foundation
 import Marfa
 import struct MarfaCore.BinPage
+import struct MarfaCore.KeptFetch
 
-/// Everything the source asks of the server: hydrating, catching up and draining, one at a time, apart from the
-/// engine, so a write reaches the copy's queue at once however long the network takes.
+/// Hydrating, catching up and draining run in order apart from the engine, so writes reach the queue at once.
+/// Attachment downloads run separately so they cannot hold up a drain or flush.
 actor MarfaSync {
     private nonisolated enum Retry {
         case refresh, drain
@@ -36,6 +37,9 @@ actor MarfaSync {
     /// hydrated again, since the engine reads again the items they changed, which an expired copy refuses.
     private var answersWaiting = false
     private var working: Task<Void, Never>?
+    private var fetching: Task<Void, Never>?
+    private var wantsFetch = false
+    private(set) var lastKeptFetch: KeptFetch?
     private var retry: Task<Void, Never>?
     private var failures = 0
     private var flushers: [CheckedContinuation<Void, Never>] = []
@@ -137,10 +141,11 @@ actor MarfaSync {
         }
     }
 
-    /// The copy's held stream drains what waited, so a refreshed copy asks for nothing else but the bin.
+    /// The copy's held stream drains what waited; attachment retries and the bin are this lane's own work.
     func reachable() {
         hub.set(.online)
         if !refreshed { wantsRefresh = true }
+        else { fetchAttachments() }
         wantsBin = true
         work()
     }
@@ -177,6 +182,7 @@ actor MarfaSync {
         stopped = true
         retry?.cancel()
         working?.cancel()
+        fetching?.cancel()
         for flusher in flushers + draining { flusher.resume() }
         flushers = []
         draining = []
@@ -211,6 +217,7 @@ actor MarfaSync {
         retry?.cancel()
         retry = nil
         working?.cancel()
+        fetching?.cancel()
         defer {
             paused = false
             work()
@@ -250,6 +257,7 @@ actor MarfaSync {
     }
 
     private func work() {
+        startFetch()
         guard started, !stopped, !paused, working == nil else { return }
         working = Task { await self.loop() }
     }
@@ -298,19 +306,42 @@ actor MarfaSync {
         } else {
             try await hydrate()
         }
-        // Missing attachments have their own counts and reasons; a failed fetch must not stop queued edits.
-        do { try await refreshing.fetchKept() }
-        catch is CancellationError { throw CancellationError() }
-        catch let MarfaError.canceled(message) { throw MarfaError.canceled(message: message) }
-        catch { }
+        try Task.checkCancellation()
+        fetchAttachments()
         // Kept until the queue has been read, so a read that fails is tried again by the next refresh.
         if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
+    }
+
+    private func fetchAttachments() {
+        wantsFetch = true
+        startFetch()
+    }
+
+    private func startFetch() {
+        guard wantsFetch, fetching == nil, !stopped, !paused else { return }
+        fetching = Task { await self.fetchLoop() }
+    }
+
+    private func fetchLoop() async {
+        while wantsFetch, !stopped, !paused, !Task.isCancelled {
+            wantsFetch = false
+            do {
+                let report = try await refreshing.fetchKept()
+                try Task.checkCancellation()
+                // A successful call can still leave missing bytes. Keep its counts and reasons until the next fetch.
+                lastKeptFetch = report
+            } catch {
+                // Refresh and reconnection retry downloads without changing the queue's retry or connection state.
+            }
+        }
+        fetching = nil
+        startFetch()
     }
 
     /// A drain on a copy never hydrated sends one write and then throws, losing that write's verdict, so it waits
     /// for the first hydration.
     private func runDrain() async {
-        guard (try? await copy.status())?.hydration == .complete else { return }
+        guard (try? await refreshing.readStatus())?.hydration == .complete else { return }
         drains += 1
         do {
             let report = try await copy.queue.drain()

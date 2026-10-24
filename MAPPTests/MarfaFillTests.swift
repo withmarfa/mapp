@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import MarfaTesting
 import Synchronization
 import struct MarfaCore.Draft
 import struct MarfaCore.Edit
@@ -12,14 +11,16 @@ import Testing
 @Suite struct MarfaFillTests {
     @Test(arguments: [Completeness.partial, .stale])
     func incompleteRowsPaintAndSavesWorkWithoutEdgeReads(_ completeness: Completeness) async throws {
-        let fake = WorkingCopy.fake()
-        try await fake.copy.declareTypes([[
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        try await copy.declareTypes([[
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
-        let write = try await fake.copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
-        let reads = FillingReads(copy: fake.copy, completeness: completeness)
-        let source = MarfaSource(copy: fake.copy, connection: try MarfaConnection(address: "https://example.test"), reading: reads)
+        let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
+        let reads = FillingReads(copy: copy, completeness: completeness)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"), reading: reads)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Arriving") != nil })
@@ -28,7 +29,7 @@ import Testing
         #expect(source.syncReport.fill?.listed == 1)
         source.submit(.editBody(item.id, "Saved during fill", base: item.version, merge: .asRead), as: WriteID())
         await source.queueSubmitted()
-        #expect(try await fake.copy.items.get(try #require(write.itemId))?.body == "Saved during fill")
+        #expect(try await copy.items.get(try #require(write.itemId))?.body == "Saved during fill")
         #expect(reads.edgeReads.withLock { $0 } > 0)
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })
         await source.close()
@@ -55,24 +56,26 @@ import Testing
     }
 
     @Test func unfinishedRefreshReadsRowsWithoutClearingTheFollowFailure() async throws {
-        let fake = WorkingCopy.fake()
-        let source = MarfaSource(copy: fake.copy, connection: try MarfaConnection(address: "https://example.test"))
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        try await fake.copy.declareTypes([[
+        try await copy.declareTypes([[
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
-        let created = try await fake.copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        fake.send(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
-        fake.send(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
+        let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
+        source.events.yield(.change(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil)))
+        source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         let item = try #require(painted.item(titled: "Arrived"))
         #expect(source.connectionState == .offline(reason: "offline"))
         source.submit(.editBody(item.id, "Kept", base: item.version, merge: .asRead), as: WriteID())
         await source.queueSubmitted()
-        #expect(try await fake.copy.items.get(try #require(created.itemId))?.body == "Kept")
+        #expect(try await copy.items.get(try #require(created.itemId))?.body == "Kept")
         await source.close()
     }
 

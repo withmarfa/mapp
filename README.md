@@ -27,7 +27,7 @@ File-backed items use the workbench definitions as interim input. Files without 
 
 A Marfa library fills automatically with every non-system type in both tiers. Items appear as they arrive, and Settings > Library shows the number listed and the expected total, when known. Interrupted fills resume automatically. An out-of-date copy remains readable and editable while it refills; edits wait in its queue.
 
-Settings > Library > Downloaded Files shows the space used, the current limit, and attachment availability. Choose Automatic, a size, or Keep All Downloads. Remove Downloaded Files clears expendable downloads, preserving attachments, pending uploads, and files currently being read. Attachments are fetched after every fill and catch-up and stay outside the limit. Missing attachments are counted with their reasons. A file larger than the limit can still open while disk space allows.
+Settings > Library > Downloaded Files shows the space used, the current limit, and attachment availability. Choose Automatic, a size, or Keep All Downloads. Remove Downloaded Files clears expendable downloads, preserving attachments, pending uploads, and files currently being read. Attachments are fetched separately after every fill and catch-up, retried when the server reconnects, and stay outside the limit. Downloads do not hold up queued edits or a flush. Missing attachments are counted with their reasons. A file larger than the limit can still open while disk space allows.
 
 ## Editing and export
 
