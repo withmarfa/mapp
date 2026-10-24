@@ -41,18 +41,18 @@ struct GalleryTests {
         #expect(restored.selection == [newer.id])
     }
 
-    @Test func returningToGalleryRetainsTheDraftAndChangingPlaceReturnsToTheGrid() {
+    @Test func aNewItemOpensInThePageAndReturningToGalleryOrChangingPlaceReturnsToTheGrid() {
         let (library, _, _, _) = BrowserTests().makeLibrary()
         let browser = Browser()
         browser.viewMode = .gallery
         browser.show(.allNotes, in: library, order: NoteOrder())
         browser.openCollectionSelection()
         #expect(!browser.showsCollection)
-        browser.startItemDraft()
-        browser.itemDraft?.body = "Keep this text"
+        let id = browser.startNewItem(in: library, undoManager: nil)
+        #expect(!browser.showsCollection, "the new item opens in the page, not behind the grid")
+        #expect(browser.selection == id.map { [$0] })
         browser.returnToCollection()
         #expect(browser.showsCollection)
-        #expect(browser.itemDraft?.body == "Keep this text")
         browser.openCollectionSelection()
         browser.show(.inbox, in: library, order: NoteOrder())
         #expect(browser.showsCollection)

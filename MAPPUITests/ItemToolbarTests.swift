@@ -105,15 +105,15 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testANewItemDraftDisablesTheItemActions() {
+    func testANewItemHasTheItemActionsOfAnyOther() {
         control("NewItemToolbar").click()
         let noteType = app.menuItems["Note"]
         XCTAssertTrue(noteType.waitForExistence(timeout: 3))
         noteType.click()
-        XCTAssertTrue(window.textFields["NewItemTitle"].waitForExistence(timeout: 3))
-        XCTAssertFalse(control("DetailsToggle").isEnabled)
-        XCTAssertFalse(control("ShareToolbar").isEnabled)
-        XCTAssertFalse(control("MoreToolbar").isEnabled)
+        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
+        XCTAssertTrue(control("DetailsToggle").isEnabled)
+        XCTAssertTrue(control("ShareToolbar").isEnabled)
+        XCTAssertTrue(control("MoreToolbar").isEnabled)
     }
 
     func testMovedAttachmentAndFormattingActionsStillWork() {

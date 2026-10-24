@@ -23,14 +23,15 @@ final class EditorTypingTests: XCTestCase {
         app.terminate()
     }
 
+    /// New makes the item at once and opens its page with the title selected, so typing names it.
     private func beginNewItem(title: String) {
         app.typeKey("n", modifierFlags: .command)
-        let field = window.textFields["NewItemTitle"]
+        let field = window.itemPageTitle
         XCTAssertTrue(field.waitForExistence(timeout: 3))
-        field.click()
-        field.typeText(title)
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
+        if !title.isEmpty {
+            app.typeText(title)
+            app.typeKey(.return, modifierFlags: [])
+        }
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
     }
 

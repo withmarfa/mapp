@@ -77,14 +77,15 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
+    /// New makes the item at once and opens its page with the title selected, so typing names it.
     private func beginNewItem(title: String = "") {
         app.typeKey("n", modifierFlags: .command)
-        let field = window.textFields["NewItemTitle"]
+        let field = window.itemPageTitle
         XCTAssertTrue(field.waitForExistence(timeout: 3))
-        field.click()
-        if !title.isEmpty { field.typeText(title) }
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
+        if !title.isEmpty {
+            app.typeText(title)
+            app.typeKey(.return, modifierFlags: [])
+        }
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
     }
 
@@ -203,11 +204,14 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("NOT CONTAINS", "Draft"), "Escape handed the arrows back to the list")
     }
 
-    func testCommandNMakesANoteReadyForTyping() {
+    func testCommandNMakesANoteReadyForTitling() {
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeText("Shopping")
-        XCTAssertTrue(waitForText("CONTAINS", "Shopping"))
+        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 3), "the title is selected, so typing replaces it")
+        app.typeKey(.return, modifierFlags: [])
+        app.typeText("Milk")
+        XCTAssertTrue(waitForText("CONTAINS", "Milk"), "Return moves from the title into the page")
     }
 
     func testTheDeleteKeyDeletesTheSelectedNote() {
@@ -327,6 +331,7 @@ final class WindowTests: XCTestCase {
     func testUndoInTheEditMenuUndoesTypingInThePage() {
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
+        app.typeKey(.return, modifierFlags: [])
         app.typeText("Groceries")
         XCTAssertTrue(waitForText("==", "Groceries"))
         app.menuBars.menuBarItems["Edit"].click()
@@ -346,6 +351,7 @@ final class WindowTests: XCTestCase {
     func testATableIsInsertedFromTheFormatMenu() {
         beginNewItem()
         XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
+        app.typeKey(.return, modifierFlags: [])
         app.typeText("Quotes")
         app.typeKey("t", modifierFlags: [.command, .option])
         let table = page.tables.firstMatch

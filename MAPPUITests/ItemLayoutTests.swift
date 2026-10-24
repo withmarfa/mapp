@@ -38,7 +38,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20)
         XCTAssertLessThan(page.frame.width, normalWidth)
         app.typeKey("n", modifierFlags: .command)
-        XCTAssertTrue(app.textFields["NewItemTitle"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         capture("New item narrow width")
         XCTAssertFalse(app.buttons["Import File…"].exists)
         XCTAssertFalse(app.buttons["Back"].exists)
