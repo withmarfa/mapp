@@ -88,6 +88,7 @@ actor MarfaEngine {
 
     let sync: MarfaSync
     private let copy: WorkingCopy
+    private let downloads: MarfaDownloads
     private let reading: any MarfaReading
     private let hub: MarfaHub
     private let tell: @Sendable (Event) -> Bool
@@ -169,13 +170,15 @@ actor MarfaEngine {
     }
     #endif
 
-    init(copy: WorkingCopy, hub: MarfaHub, reading: (any MarfaReading)? = nil,
+    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads, reading: (any MarfaReading)? = nil,
+         refreshing: (any MarfaRefreshing)? = nil,
          tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
+        self.downloads = downloads
         self.reading = reading ?? MarfaRead(copy: copy)
         self.hub = hub
         self.tell = tell
-        sync = MarfaSync(copy: copy, hub: hub, tell: tell)
+        sync = MarfaSync(copy: copy, hub: hub, downloads: downloads, refreshing: refreshing, tell: tell)
     }
 
     func run(_ events: AsyncStream<Event>) async {
@@ -267,6 +270,7 @@ actor MarfaEngine {
         closed = true
         following?.cancel()
         await sync.stop()
+        await downloads.stop()
         await copy.close()
     }
 
@@ -685,6 +689,12 @@ actor MarfaEngine {
         case .server:
             await sync.heard()
             await reread(change)
+            // Reachability precedes replay. Fetch again once the copy holds the arriving attachment or its item.
+            let changedEdges = change.itemId.map { edges.edges(touching: $0) } ?? []
+            let namedEdge = change.edgeId.flatMap { edges[$0] }
+            if (changedEdges + [namedEdge].compactMap { $0 }).contains(where: { $0.edgeType == MarfaMapping.attachmentEdge }) {
+                await sync.fetchAttachments()
+            }
         case .refreshed(.purged): await purged(change.itemId)
         case .saved, .refreshed: await reload()
         case .stopped(let error): await sync.stopped(error)

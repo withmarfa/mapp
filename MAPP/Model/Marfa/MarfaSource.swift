@@ -64,14 +64,16 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    init(copy: WorkingCopy, connection: MarfaConnection, reading: (any MarfaReading)? = nil) {
+    init(copy: WorkingCopy, connection: MarfaConnection, reading: (any MarfaReading)? = nil,
+         refreshing: (any MarfaRefreshing)? = nil) {
         self.copy = copy
-        downloadedFiles = MarfaDownloads(copy: copy)
+        let downloads = MarfaDownloads(copy: copy)
+        downloadedFiles = downloads
         self.connection = connection
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
         self.events = events
         embeds = MarfaEmbeds(events: events)
-        engine = MarfaEngine(copy: copy, hub: hub, reading: reading, tell: { event in
+        engine = MarfaEngine(copy: copy, hub: hub, downloads: downloads, reading: reading, refreshing: refreshing, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
         Task { [engine] in await engine.run(stream) }

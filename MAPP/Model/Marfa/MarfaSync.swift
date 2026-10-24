@@ -19,6 +19,7 @@ actor MarfaSync {
     }
 
     private let copy: WorkingCopy
+    private let downloads: MarfaDownloads
     private let refreshing: any MarfaRefreshing
     private let hub: MarfaHub
     /// False once the engine has stopped taking events.
@@ -94,9 +95,10 @@ actor MarfaSync {
         return .idle
     }
 
-    init(copy: WorkingCopy, hub: MarfaHub, refreshing: (any MarfaRefreshing)? = nil,
+    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads? = nil, refreshing: (any MarfaRefreshing)? = nil,
          tell: @escaping @Sendable (MarfaEngine.Event) -> Bool) {
         self.copy = copy
+        self.downloads = downloads ?? MarfaDownloads(copy: copy)
         self.refreshing = refreshing ?? MarfaRefresh(copy: copy)
         self.hub = hub
         self.tell = tell
@@ -224,7 +226,7 @@ actor MarfaSync {
         }
         hub.changingKey(true)
         do {
-            try await copy.useKey(key)
+            try await downloads.useKey(key)
         } catch {
             hub.changingKey(false)
             throw error
@@ -312,7 +314,7 @@ actor MarfaSync {
         if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
     }
 
-    private func fetchAttachments() {
+    func fetchAttachments() {
         wantsFetch = true
         startFetch()
     }

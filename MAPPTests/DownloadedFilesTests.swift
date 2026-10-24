@@ -67,4 +67,44 @@ import Testing
         #expect(try await again.read().budget == .automatic)
         await reopened.close()
     }
+
+    @Test(arguments: [DownloadBudget.automatic, .bytes(12345), .keepAll], [false, true])
+    func closingDuringRemovalKeepsTheSavedBudget(_ budget: DownloadBudget, agreeing: Bool) async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let store = directory.appending(path: "copy.sqlite")
+        let copy = try await WorkingCopy.open(store: store, fileBudget: budget.marfa)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"))
+        let files = try #require(source.downloadedFiles as? MarfaDownloads)
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        defer { releaseContinuation.finish() }
+        await files.whenRemoving {
+            enteredContinuation.finish()
+            for await _ in release { }
+        }
+        let removal = Task { try await files.removeDownloadedFiles() }
+        for await _ in entered { }
+        #expect(try await copy.blobs.cache().setting == .bytes(bytes: 0))
+        await #expect(throws: SourceFailure.self) { try await source.tryKey("unused") }
+        let closing = Task {
+            if agreeing { #expect(await source.close(agreeing: nil) == .closed) }
+            else { await source.close() }
+        }
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(5)
+        while !(await files.stopped), clock.now < deadline { await Task.yield() }
+        #expect(await files.stopped)
+        // Close has reached the download barrier, but the copy must still accept the restore.
+        #expect(try await copy.blobs.cache().setting == .bytes(bytes: 0))
+        await #expect(throws: MarfaError.self) { try await files.setBudget(.keepAll) }
+        removal.cancel()
+        releaseContinuation.finish()
+        try await removal.value
+        await closing.value
+        let reopened = try await WorkingCopy.open(store: store)
+        #expect(try await reopened.blobs.cache().setting == budget.marfa)
+        await reopened.close()
+    }
 }

@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import struct MarfaCore.Attachments
 import struct MarfaCore.KeptFetch
+import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -13,6 +14,8 @@ private actor FillServer: MarfaRefreshing {
     var expire = false
     var resumed = false
     var restarted: String?
+    var attachmentCopy: WorkingCopy?
+    private(set) var fetchedAttachments: [String] = []
 
     init(_ hydration: Hydration) {
         status = Status(sliceTypes: ["*"], sliceTier: .all, hydration: hydration)
@@ -25,6 +28,7 @@ private actor FillServer: MarfaRefreshing {
     }
 
     func readStatus() -> Status { status }
+    func observeAttachments(in copy: WorkingCopy) { attachmentCopy = copy }
     func hydrate(types: [String], tier: SliceTier) throws -> HydrateReport {
         #expect(types == ["*"])
         #expect(tier == .all)
@@ -72,6 +76,9 @@ private actor FillServer: MarfaRefreshing {
 
     func fetchKept() async throws -> KeptFetch {
         calls.append("attachments")
+        if let attachmentCopy {
+            fetchedAttachments = try await attachmentCopy.edges.ofType(MarfaMapping.attachmentEdge).map(\.sourceId)
+        }
         if let heldFetch {
             for await _ in heldFetch { }
         }
@@ -253,5 +260,45 @@ private actor FillServer: MarfaRefreshing {
             try await wait { await server.calls.count == 3 }
             #expect(await server.calls == ["fill", "attachments", "attachments"])
         }
+    }
+
+    @Test func anAttachmentArrivingThroughReplayIsFetchedWithoutAnotherDrain() async throws {
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        let note = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Held", "body": "Text"]))
+        let noteID = try #require(note.itemId)
+        let server = FillServer(.complete)
+        await server.observeAttachments(in: copy)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"), refreshing: server)
+        source.events.yield(.paint)
+        await source.queueSubmitted()
+        await source.engine.sync.refresh()
+        await source.engine.sync.flush()
+        try await wait { await server.calls.count == 2 }
+        let drains = await source.engine.sync.drains
+
+        let earlyFetch = KeptFetch(fetched: 0, fetchedBytes: 0, attachments: Attachments(
+            held: 0, heldBytes: 0, partialBytes: 0, notHeld: 0, notHeldBytes: 0, notHeldByReason: []))
+        await server.report(earlyFetch)
+        source.events.yield(.change(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil)))
+        source.events.yield(.change(Change(origin: .serverReachable, itemId: nil, edgeId: nil)))
+        await source.queueSubmitted()
+        try await wait { await source.engine.sync.lastKeptFetch == earlyFetch }
+        #expect(await server.fetchedAttachments.isEmpty)
+
+        // The early retry has finished. Replay now adds a file and its relationship to the held note.
+        let file = store.root.appending(path: "replayed.txt")
+        try Data("From another device".utf8).write(to: file)
+        let attached = try await copy.items.attach(to: noteID, file: file)
+        let fileID = try #require(attached.item.itemId)
+        let edgeID = try #require(attached.edge.edgeId)
+        source.events.yield(.change(Change(origin: .server(event: "edge.created", cursor: "replayed"),
+                                          itemId: nil, edgeId: edgeID)))
+        await source.queueSubmitted()
+        try await wait { await server.fetchedAttachments == [fileID] }
+        #expect(await source.engine.sync.drains == drains)
+        #expect(await server.calls == ["catchUp", "attachments", "attachments", "attachments"])
+        await source.close()
     }
 }
