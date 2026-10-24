@@ -73,6 +73,8 @@ final class EditorController: NSObject {
     /// The note on the page, and the markdown the page holds for it as far as the app knows, read from the
     /// library at `read`.
     private(set) var noteID: ItemID?
+    /// An explicit selection can outlive a missing body, so its next update can retry the load.
+    @ObservationIgnored private var requestedNoteID: ItemID?
     @ObservationIgnored private var markdown = ""
     @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
@@ -166,6 +168,7 @@ final class EditorController: NSObject {
     /// Shows a note for reading. A deleted note is shown read-only. The note shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
+        requestedNoteID = item.id
         if wantsFocus != item.id { wantsFocus = nil }
         if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
@@ -242,7 +245,8 @@ final class EditorController: NSObject {
     func noteChanged(_ item: Item) {
         // SwiftUI can deliver a change from the page just left after another item has loaded.
         // Only an explicit load may navigate; an old item's update must not take the page back.
-        guard item.id == noteID else { return }
+        guard item.id == requestedNoteID else { return }
+        guard item.id == noteID, isPresented else { return load(item) }
         guard let body = library?.body(of: item.id) else { return }
         guard body.text != markdown || item.isWritable != isEditable else {
             // The page already holds this text, so what is typed next is typed on this version of it.
@@ -258,7 +262,7 @@ final class EditorController: NSObject {
     private func show(_ item: Item, as function: String) {
         // The request was typed into the text now being replaced, which the page would refuse an answer for.
         cancelLinkRequest()
-        guard let body = library?.body(of: item.id) else { return close() }
+        guard let body = library?.body(of: item.id) else { return hide() }
         if function == "load" { isPresented = true }
         noteID = item.id
         markdown = body.text
@@ -279,6 +283,11 @@ final class EditorController: NSObject {
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
     /// commands for the note on the page (Print, Find) stop acting on one out of sight.
     func close() {
+        requestedNoteID = nil
+        hide()
+    }
+
+    private func hide() {
         cancelLinkRequest()
         wantsFocus = nil
         pendingHeading = nil
@@ -365,6 +374,7 @@ final class EditorController: NSObject {
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
         windowIsGone = true
+        requestedNoteID = nil
         cancelLinkRequest()
         titleDrafts = nil
         Self.open.remove(self)
