@@ -21,6 +21,8 @@ File-backed items use the workbench definitions as interim input. Files without 
 
 ## Editing and export
 
+Plain-text file items open as selectable, read-only pages using the note text-size and reading-width settings. Their content stays literal, including Markdown punctuation and line breaks, and opening them never rewrites their bytes. UTF-8 and BOM-marked UTF-16/32 are supported. Files larger than 4 MiB, unknown encodings, and binary content use the system preview with Open instead of showing a truncated document. Editing a file's stored bytes is not yet supported.
+
 View and the command palette switch between formatted and source editing. Native Find and Replace work with the active editor. Local images, audio, and video preview inline with the existing file-access protections. PDFs show a card with Open to view the document in its native app, because WebKit cannot display them in the protected editor frame. Note references open source editing; they do not embed the referenced note.
 
 Typing `/` on an empty line opens a menu of blocks, such as headings, lists, a table, a quote and a code block, and Link to Note, which asks which note to link to and writes a link that names that note and no other. Typing `[[` offers the titles of the library's notes, leaving out a title that more than one note goes by. Typing a row such as `| Name | Date |` and pressing Return or Tab makes a table, and Option-Up and Option-Down move the block at the caret. The page makes no smart quotes or dashes of its own; the system's Substitutions setting applies as it does in any Mac text field.

@@ -14,6 +14,8 @@ struct FileItemContent: View {
     /// name says nothing there; a type the library does not know leaves it to the name.
     var contentType: UTType?
     @State private var zoom = 1.0
+    @State private var textPreview: PlainTextFile.Preview?
+    @State private var previewURL: URL?
 
     /// What a file is shown with: the library's type where it gives one, and the file's name where it does not.
     nonisolated static func type(of url: URL, contentType: UTType?) -> UTType {
@@ -24,6 +26,33 @@ struct FileItemContent: View {
     private var type: UTType { Self.type(of: url, contentType: contentType) }
 
     var body: some View {
+        ZStack {
+            if type.conforms(to: .plainText) {
+                switch previewURL == url ? textPreview : nil {
+                case .text(let text):
+                    PlainTextFilePage(text: text, title: title) { NSWorkspace.shared.open(url) }
+                case .unsupported:
+                    systemPreview
+                case .unavailable:
+                    ContentUnavailableView("Can’t Read This Text File", systemImage: "doc.text", description: Text("The file may have moved or become unavailable. Select it again to retry."))
+                case nil:
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                systemPreview
+            }
+        }
+        .task(id: [url.absoluteString, type.identifier]) {
+            textPreview = nil
+            guard type.conforms(to: .plainText) else { return }
+            let preview = await Task.detached(priority: .userInitiated) { PlainTextFile.read(url) }.value
+            guard !Task.isCancelled else { return }
+            previewURL = url
+            textPreview = preview
+        }
+    }
+
+    private var systemPreview: some View {
         VStack(spacing: 0) {
             HStack {
                 Text(title).interfaceFont(.headline).lineLimit(1)

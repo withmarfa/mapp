@@ -21,6 +21,14 @@ struct FilePreviewTypeTests {
     @Test func theTypeTheLibrarySaysWinsOverTheName() {
         #expect(FileItemContent.type(of: URL(filePath: "/folder/scan.bin"), contentType: .pdf) == .pdf)
     }
+
+    @Test func onlyPlainTextTypesUseTheTextPage() {
+        #expect(FileItemContent.type(of: hashed, contentType: UTType(mimeType: "text/plain")).conforms(to: .plainText))
+        #expect(FileItemContent.type(of: URL(filePath: "/folder/note.txt"), contentType: nil).conforms(to: .plainText))
+        for type in [UTType.data, .png, .pdf, .rtf, .html] {
+            #expect(!FileItemContent.type(of: hashed, contentType: type).conforms(to: .plainText))
+        }
+    }
 }
 
 struct QuickLookFileTests {
