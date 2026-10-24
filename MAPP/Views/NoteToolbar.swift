@@ -31,7 +31,7 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.isCreatingItem == true || browser?.showsCollection == true)
+        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.showsCollection == true)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
@@ -45,7 +45,7 @@ struct NoteToolbar: CustomizableToolbarContent {
         ToolbarItem(id: "share") { tools.shareLink }
             .hidden(tools.showsInspector)
         ToolbarItem(id: "more") {
-            tools.moreMenu.disabled(items.isEmpty || browser?.isCreatingItem == true)
+            tools.moreMenu.disabled(items.isEmpty)
         }
         .hidden(tools.showsInspector)
         ToolbarSpacer(.fixed)
@@ -73,7 +73,7 @@ struct InspectorToolbar: ToolbarContent {
             ToolbarItemGroup {
                 tools.shareLink
                 tools.moreMenu
-                    .disabled(items.isEmpty || browser?.isCreatingItem == true)
+                    .disabled(items.isEmpty)
             }
             ToolbarSpacer(.fixed)
             ToolbarItem {
@@ -114,7 +114,7 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
         if showsCreation {
             ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
         }
-        if !browser.showsCollection, !browser.isCreatingItem, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+        if !browser.showsCollection, editor.isHeaderScrolledAway, tools.notes.count == 1 {
             ToolbarItem(placement: .navigation) {
                 Text(tools.notes.first?.title ?? "")
                     .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
@@ -139,12 +139,12 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
         }
         ToolbarItem(id: "collectionViewMode") { ViewModeMenu(browser: browser) }
         // Keep the controls in place when selection clears. They move above an open inspector.
-        if !details.showsInspector(in: browser) {
+        if !details.isPresented {
             ToolbarSpacer(.fixed)
             ToolbarItemGroup {
                 tools.shareLink
                 tools.moreMenu
-                    .disabled(browser.selection.isEmpty || browser.isCreatingItem)
+                    .disabled(browser.selection.isEmpty)
             }
             ToolbarSpacer(.fixed)
             ToolbarItem {
@@ -163,10 +163,10 @@ private struct ItemToolbarActions {
     var fileURL: URL?
 
     var notes: [Item] { items.filter { !$0.isFile } }
-    var showsInspector: Bool { details.showsInspector(in: browser) }
+    var showsInspector: Bool { details.isPresented }
 
     var visibleNote: Item? {
-        guard browser?.isCreatingItem != true, browser?.showsCollection != true,
+        guard browser?.showsCollection != true,
               (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
               let note = notes.first, editor.hasNote, editor.noteID == note.id else { return nil }
         return note
@@ -176,13 +176,13 @@ private struct ItemToolbarActions {
     var editableNote: Item? { visibleNote.flatMap { $0.isWritable ? $0 : nil } }
 
     private var selectedFileURL: URL? {
-        guard browser?.isCreatingItem != true, (browser?.selection.count ?? items.count) == 1,
+        guard (browser?.selection.count ?? items.count) == 1,
               let id = browser?.selection.first ?? items.first?.id else { return nil }
         return browser?.fileURL(of: id, in: library) ?? fileURL ?? library.fileURL(for: id)
     }
 
     var shareLink: some View {
-        let hasSingleSelection = browser?.isCreatingItem != true && (browser?.selection.count ?? items.count) == 1
+        let hasSingleSelection = (browser?.selection.count ?? items.count) == 1
         let note = hasSingleSelection && notes.count == 1 ? notes.first : nil
         return NoteShareLink(share: NoteShare(note: note, fileURL: selectedFileURL, in: library))
             .help("Share…")
@@ -192,14 +192,14 @@ private struct ItemToolbarActions {
     var detailsButton: some View {
         Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
             .help(details.isPresented ? "Hide Details" : "Show Details")
-            .disabled((browser?.selection.count ?? items.count) != 1 || browser?.isCreatingItem == true)
+            .disabled((browser?.selection.count ?? items.count) != 1)
             .accessibilityIdentifier("DetailsToggle")
     }
 
     var moreMenu: some View {
-        let isShowingSelection = browser?.isCreatingItem != true && (browser?.selection.count ?? notes.count) == notes.count
+        let isShowingSelection = (browser?.selection.count ?? notes.count) == notes.count
         return MoreMenu(
-            ids: browser.map { $0.isCreatingItem ? [] : $0.selection } ?? Set(items.map(\.id)),
+            ids: browser.map(\.selection) ?? Set(items.map(\.id)),
             notes: isShowingSelection ? notes : [],
             fileURL: selectedFileURL, browser: browser, editor: editor, visibleNote: visibleNote, editableNote: editableNote)
     }

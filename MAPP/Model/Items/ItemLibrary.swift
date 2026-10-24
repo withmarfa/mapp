@@ -100,8 +100,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Every note being written is left and every change handed over, as the app quits or the library changes:
     /// returns once each is kept on this Mac, never waiting on a server.
     func finish() async
-    /// Whether the create of `id` was refused before the library held the item, so the draft it came from is the
-    /// person's to send again. A library that refuses a create at once answers nil from `createItem` instead.
+    /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
+    /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
     func wasRefused(creating id: ItemID) -> Bool
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool

@@ -80,16 +80,6 @@ enum ItemPreviewFixtures {
         .environment(\.library, library)
 }
 
-#Preview("New Item") {
-    let browser = Browser()
-    let _ = browser.startItemDraft()
-    let library = ItemPreviewFixtures.library
-    MainView(browser: browser, restoresWindow: false)
-        .environment(\.library, library)
-        .environment(ItemPreviewFixtures.libraries())
-        .frame(width: 1180, height: 760)
-}
-
 #Preview("Complete Item Window") {
     let library = ItemPreviewFixtures.library
     MainView(browser: ItemPreviewFixtures.browser, details: ItemPreviewFixtures.details, restoresWindow: false)

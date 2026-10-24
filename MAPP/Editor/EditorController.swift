@@ -35,8 +35,9 @@ final class EditorController: NSObject {
 
     /// An edit to a note, with the markdown the note now holds and the version of the text it was typed on.
     @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }
-    /// A note the page has moved on from, once any edit to it has been handed over.
-    @ObservationIgnored var onLeave: (ItemID) -> Void = { _ in }
+    /// A note the page has moved on from, once any edit to it has been handed over. `closing` is true where the
+    /// window or the app is going, so the note will not be shown again by this window.
+    @ObservationIgnored var onLeave: (_ id: ItemID, _ closing: Bool) -> Void = { _, _ in }
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
@@ -90,7 +91,12 @@ final class EditorController: NSObject {
     }
     @ObservationIgnored private var loadRequest = 0
     @ObservationIgnored private var closeDelegate: EditorCloseDelegate?
-    @ObservationIgnored private var wantsFocus: ItemID?
+    /// Where the keyboard goes once the page shows the item: its text, or its title.
+    private struct FocusWish: Equatable {
+        let id: ItemID
+        let onTitle: Bool
+    }
+    @ObservationIgnored private var wantsFocus: FocusWish?
     @ObservationIgnored private var style = PageStyle()
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
@@ -168,7 +174,7 @@ final class EditorController: NSObject {
     /// A selection is navigation intent, including returning to a note whose outgoing capture failed.
     func select(_ item: Item) {
         requestedNoteID = item.id
-        if wantsFocus != item.id { wantsFocus = nil }
+        if wantsFocus?.id != item.id { wantsFocus = nil }
         if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
         if noteID == item.id, isPresented { noteChanged(item) }
@@ -179,7 +185,7 @@ final class EditorController: NSObject {
     /// left once its last edit is in.
     func load(_ item: Item) {
         requestedNoteID = item.id
-        if wantsFocus != item.id { wantsFocus = nil }
+        if wantsFocus?.id != item.id { wantsFocus = nil }
         if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
         let request = loadRequest
@@ -287,7 +293,7 @@ final class EditorController: NSObject {
         shown[generation] = Shown(id: item.id, read: body.version)
         call(function, json(body.text), String(generation), String(isEditable))
         revealPendingHeading(in: item.id)
-        if let requested = wantsFocus { focus(requested) }
+        if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -315,7 +321,7 @@ final class EditorController: NSObject {
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
     /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
-    func flush(leaving: Bool = true, then done: @escaping (Bool) -> Void = { _ in }) {
+    func flush(leaving: Bool = true, closing: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         guard let noteID else { return done(true) }
         guard isReady else { return done(!hasLoadedPage) }
         let generation = generation
@@ -334,7 +340,7 @@ final class EditorController: NSObject {
                 }
                 if let markdown = result as? String { report(markdown, of: generation) }
                 guard self.noteID == noteID, self.generation == generation else { return done(false) }
-                if leaving { onLeave(noteID) }
+                if leaving { onLeave(noteID, closing) }
                 done(true)
             }
         }
@@ -355,7 +361,7 @@ final class EditorController: NSObject {
                 gate.arrive(false)
                 continue
             }
-            editor.flush(leaving: leaving, then: gate.arrive)
+            editor.flush(leaving: leaving, closing: leaving, then: gate.arrive)
         }
         Task { try? await Task.sleep(for: .seconds(3)); gate.open(false) }
     }
@@ -414,17 +420,18 @@ final class EditorController: NSObject {
         return false
     }
 
-    /// Gives the page the keyboard: now if it is ready and in a window, otherwise once it is, as when the page
-    /// comes back after the gallery. One request, never repeated.
-    func focus(_ itemID: ItemID? = nil) {
+    /// Gives the page the keyboard, in the item's text or, with `onTitle`, in its title with the title selected:
+    /// now if the page is ready and in a window, otherwise once it is, as when the page comes back after the
+    /// gallery. One request, never repeated.
+    func focus(_ itemID: ItemID? = nil, onTitle: Bool = false) {
         guard let requested = itemID ?? noteID else { return }
         guard requested == noteID, isReady, let window = webView.window else {
-            wantsFocus = requested
+            wantsFocus = FocusWish(id: requested, onTitle: onTitle)
             return
         }
         wantsFocus = nil
         window.makeFirstResponder(webView)
-        call("focus")
+        if onTitle { call("focusTitle", json(requested.rawValue)) } else { call("focus") }
     }
 
     func releaseFocus() {
@@ -442,7 +449,7 @@ final class EditorController: NSObject {
                 closeDelegate?.detach()
                 closeDelegate = EditorCloseDelegate(editor: self, window: window)
             }
-            if let requested = wantsFocus { focus(requested) }
+            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
         }
     }
 
@@ -862,7 +869,7 @@ final class EditorController: NSObject {
                 shown[generation] = Shown(id: noteID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
-            if let requested = wantsFocus { focus(requested) }
+            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
         case .changed(let markdown, let generation):
             report(markdown, of: generation)
         case .state(let state):

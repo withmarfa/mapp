@@ -904,7 +904,7 @@ actor MarfaEngine {
                 tier: draft.tier.map(MarfaMapping.marfaTier), id: id.rawValue))
     }
 
-    /// The library checks the same properties before submitting, so a draft missing required values stays editable.
+    /// The library checks the same properties before submitting, so a create missing required values is refused before it is queued.
     nonisolated static func creationProperties(_ draft: ItemDraft, catalogue: Catalogue) throws(Refused) -> JSONObject {
         let info = catalogue.itemTypes[draft.type]
         var properties = JSONObject(draft.properties.sorted { $0.key < $1.key }.map { ($0.key, MarfaMapping.json($0.value)) })
@@ -937,7 +937,7 @@ actor MarfaEngine {
             let fields = missing.map(\.label).joined(separator: ", ")
             throw Refused(problem: SyncProblem(
                 code: "invalid_properties",
-                message: String(localized: "MAPP can’t fill these required fields: \(fields). Your draft is kept here.")))
+                message: String(localized: "MAPP can’t fill these required fields: \(fields).")))
         }
         return properties
     }

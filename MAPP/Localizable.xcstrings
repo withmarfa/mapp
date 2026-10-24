@@ -107,19 +107,7 @@
     "Items listed: %llu" : {
       "extractionState" : "manual"
     },
-    "Continue Editing" : {
-      "extractionState" : "manual"
-    },
-    "Discard Draft" : {
-      "extractionState" : "manual"
-    },
-    "Discard the unfinished item?" : {
-      "extractionState" : "manual"
-    },
-    "The unfinished item contains unsaved text. Discard it to start a new item, or continue editing it." : {
-      "extractionState" : "manual"
-    },
-    "MAPP can’t fill these required fields: %@. Your draft is kept here." : {
+    "MAPP can’t fill these required fields: %@." : {
       "extractionState" : "manual"
     },
     "Console" : {
@@ -659,9 +647,6 @@
     "Choose a single item to read or edit it." : {
 
     },
-    "Choose a unique title without characters that cannot be used in a file name, and a valid parent. Your draft is kept here." : {
-
-    },
     "Choose a unique title without characters that cannot be used in a file name." : {
       "extractionState" : "manual"
     },
@@ -741,9 +726,6 @@
       "extractionState" : "manual"
     },
     "Connection Actions" : {
-
-    },
-    "Continue Draft" : {
 
     },
     "Copy" : {
@@ -1374,9 +1356,6 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "New Item Changed" : {
-      "extractionState" : "manual"
-    },
     "New Item…" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
@@ -1809,12 +1788,6 @@
     "Start typing…" : {
 
     },
-    "Start writing" : {
-
-    },
-    "Start Writing" : {
-
-    },
     "Starts" : {
       "extractionState" : "manual"
     },
@@ -1896,9 +1869,6 @@
     "The images weren’t added to the note. %@" : {
 
     },
-    "The item could not be created. Check its title and parent, then try again." : {
-      "extractionState" : "manual"
-    },
     "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again." : {
       "extractionState" : "manual"
     },
@@ -1918,15 +1888,6 @@
       "extractionState" : "manual"
     },
     "The Keychain wouldn’t take the key. Check that MAPP can use the Keychain, then try again." : {
-      "extractionState" : "manual"
-    },
-    "The library now open doesn’t have the item you chose as its parent, so your new item has no parent. Check it before you create it." : {
-      "extractionState" : "manual"
-    },
-    "The library now open doesn’t have the kind of item you chose or the item you chose as its parent, so your new item is a note with no parent. Check it before you create it." : {
-      "extractionState" : "manual"
-    },
-    "The library now open doesn’t have the kind of item you chose, so your new item is a note. Check it before you create it." : {
       "extractionState" : "manual"
     },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
@@ -2187,9 +2148,6 @@
     },
     "Yesterday" : {
 
-    },
-    "You can edit the item’s properties and relationships in Details after creating it." : {
-      "extractionState" : "manual"
     },
     "You can’t undo this action." : {
 

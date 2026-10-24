@@ -28,7 +28,7 @@ struct NoteWindow: View {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-        editor.onLeave = { [library] id in library.leave(id) }
+        editor.onLeave = { [library] id, _ in library.leave(id) }
         // The keyboard follows the link to the note it opened, as it does in a main window.
         editor.onOpenNote = { [weak editor] linked in
             id.wrappedValue = linked
@@ -88,7 +88,7 @@ struct NoteWindow: View {
         // the window's undo would act on the library left.
         .onDisappear {
             // A window that never showed a note made no editor.
-            editorSlot.made?.flush()
+            editorSlot.made?.flush(closing: true)
             editorSlot.made?.windowWent()
             undoManager?.removeAllActions()
         }

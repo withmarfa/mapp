@@ -35,9 +35,9 @@ struct NoteDetail: View {
 
     /// The page takes the keyboard when asked, once it shows; the editor holds the request until its page is ready.
     private func grantFocusRequest() {
-        guard browser.focusRequest == .page else { return }
+        guard let request = browser.focusRequest, request == .page || request == .title else { return }
         browser.focusRequest = nil
-        editor.focus(browser.selection.first)
+        editor.focus(browser.selection.first, onTitle: request == .title)
     }
 }
 
