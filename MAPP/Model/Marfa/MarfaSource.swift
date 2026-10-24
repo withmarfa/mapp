@@ -259,10 +259,34 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
         do {
-            return try await MarfaEngine.asking(hub) { try await copy.blobs.get(hash) }
+            return try await MarfaEngine.asking(hub) {
+                try await copy.blobs.withFile(hash) { try Self.keptCopy(of: $0, named: hash) }
+            }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
+        } catch {
+            throw SourceFailure(kind: .failed, message: error.localizedDescription)
         }
+    }
+
+    /// The package keeps a fetched file from cache trimming only while `withFile` runs, and the views read the file
+    /// long after, so its bytes are copied out under their hash, which names them whole.
+    static func keptCopy(of file: URL, named hash: String) throws -> URL {
+        let manager = FileManager.default
+        let directory = URL.temporaryDirectory.appending(path: "MAPP Files", directoryHint: .isDirectory)
+        let kept = directory.appending(path: hash, directoryHint: .notDirectory)
+        if manager.fileExists(atPath: kept.path) { return kept }
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Copied beside and moved in whole, so a copy cut short is never taken for the file.
+        let partial = directory.appending(path: "\(hash).\(UUID().uuidString).partial", directoryHint: .notDirectory)
+        try manager.copyItem(at: file, to: partial)
+        do {
+            try manager.moveItem(at: partial, to: kept)
+        } catch {
+            try? manager.removeItem(at: partial)
+            if !manager.fileExists(atPath: kept.path) { throw error }
+        }
+        return kept
     }
 
     /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
