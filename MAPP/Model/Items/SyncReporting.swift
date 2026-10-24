@@ -19,6 +19,7 @@ nonisolated struct SyncReport: Hashable, Sendable {
     }
 
     var phase = Phase.current
+    var fill: LibraryFill?
     /// Writes not answered yet, problems aside.
     var waiting = 0
     var oldestWaiting: Date?

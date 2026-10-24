@@ -1,9 +1,10 @@
 import Foundation
 import Marfa
 import struct MarfaCore.BinPage
+import struct MarfaCore.KeptFetch
 
-/// Everything the source asks of the server: hydrating, catching up and draining, one at a time, apart from the
-/// engine, so a write reaches the copy's queue at once however long the network takes.
+/// Hydrating, catching up and draining run in order apart from the engine, so writes reach the queue at once.
+/// Attachment downloads run separately so they cannot hold up a drain or flush.
 actor MarfaSync {
     private nonisolated enum Retry {
         case refresh, drain
@@ -11,8 +12,15 @@ actor MarfaSync {
 
     /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
     private static let tier = SliceTier.all
+    nonisolated static let slice = ["*"]
+
+    nonisolated static func needsFill(_ status: Status) -> Bool {
+        status.hydration != .complete || status.sliceTier != .all || status.sliceTypes != slice
+    }
 
     private let copy: WorkingCopy
+    private let downloads: MarfaDownloads
+    private let refreshing: any MarfaRefreshing
     private let hub: MarfaHub
     /// False once the engine has stopped taking events.
     private let tell: @Sendable (MarfaEngine.Event) -> Bool
@@ -30,6 +38,9 @@ actor MarfaSync {
     /// hydrated again, since the engine reads again the items they changed, which an expired copy refuses.
     private var answersWaiting = false
     private var working: Task<Void, Never>?
+    private var fetching: Task<Void, Never>?
+    private var wantsFetch = false
+    private(set) var lastKeptFetch: KeptFetch?
     private var retry: Task<Void, Never>?
     private var failures = 0
     private var flushers: [CheckedContinuation<Void, Never>] = []
@@ -38,6 +49,7 @@ actor MarfaSync {
     private(set) var drains = 0
     /// How many times it has hydrated, for the tests.
     private(set) var hydrations = 0
+    private(set) var lastHydration: HydrateReport?
     /// Rows the copy could not read, which only a hydration replaces.
     private var rehydration = Rehydration()
     /// Whether the person has been told of a stop since something last succeeded, so a fault the core ends a stream
@@ -83,8 +95,11 @@ actor MarfaSync {
         return .idle
     }
 
-    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (MarfaEngine.Event) -> Bool) {
+    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads? = nil, refreshing: (any MarfaRefreshing)? = nil,
+         tell: @escaping @Sendable (MarfaEngine.Event) -> Bool) {
         self.copy = copy
+        self.downloads = downloads ?? MarfaDownloads(copy: copy)
+        self.refreshing = refreshing ?? MarfaRefresh(copy: copy)
         self.hub = hub
         self.tell = tell
     }
@@ -128,10 +143,11 @@ actor MarfaSync {
         }
     }
 
-    /// The copy's held stream drains what waited, so a refreshed copy asks for nothing else but the bin.
+    /// The copy's held stream drains what waited; attachment retries and the bin are this lane's own work.
     func reachable() {
         hub.set(.online)
         if !refreshed { wantsRefresh = true }
+        else { fetchAttachments() }
         wantsBin = true
         work()
     }
@@ -168,6 +184,7 @@ actor MarfaSync {
         stopped = true
         retry?.cancel()
         working?.cancel()
+        fetching?.cancel()
         for flusher in flushers + draining { flusher.resume() }
         flushers = []
         draining = []
@@ -202,13 +219,14 @@ actor MarfaSync {
         retry?.cancel()
         retry = nil
         working?.cancel()
+        fetching?.cancel()
         defer {
             paused = false
             work()
         }
         hub.changingKey(true)
         do {
-            try await copy.useKey(key)
+            try await downloads.useKey(key)
         } catch {
             hub.changingKey(false)
             throw error
@@ -241,6 +259,7 @@ actor MarfaSync {
     }
 
     private func work() {
+        startFetch()
         guard started, !stopped, !paused, working == nil else { return }
         working = Task { await self.loop() }
     }
@@ -282,26 +301,49 @@ actor MarfaSync {
         }
     }
 
-    private func refreshNow() async throws {
-        let status = try await copy.status()
-        if status.hydration == .complete {
-            _ = try await copy.catchUp()
-            // A copy hydrated for one tier, as an earlier version of the app made them, takes the other too.
-            let namespaces = try await MarfaMapping.namespaces(of: catalogue())
-            if rehydration.wanted || status.sliceTier != Self.tier || Set(namespaces) != Set(status.sliceTypes) {
-                try await hydrate()
-            }
+    func refreshNow() async throws {
+        let status = try await refreshing.readStatus()
+        if !Self.needsFill(status), !rehydration.wanted {
+            try await refreshing.catchUp()
         } else {
             try await hydrate()
         }
+        try Task.checkCancellation()
+        fetchAttachments()
         // Kept until the queue has been read, so a read that fails is tried again by the next refresh.
         if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
+    }
+
+    func fetchAttachments() {
+        wantsFetch = true
+        startFetch()
+    }
+
+    private func startFetch() {
+        guard wantsFetch, fetching == nil, !stopped, !paused else { return }
+        fetching = Task { await self.fetchLoop() }
+    }
+
+    private func fetchLoop() async {
+        while wantsFetch, !stopped, !paused, !Task.isCancelled {
+            wantsFetch = false
+            do {
+                let report = try await refreshing.fetchKept()
+                try Task.checkCancellation()
+                // A successful call can still leave missing bytes. Keep its counts and reasons until the next fetch.
+                lastKeptFetch = report
+            } catch {
+                // Refresh and reconnection retry downloads without changing the queue's retry or connection state.
+            }
+        }
+        fetching = nil
+        startFetch()
     }
 
     /// A drain on a copy never hydrated sends one write and then throws, losing that write's verdict, so it waits
     /// for the first hydration.
     private func runDrain() async {
-        guard (try? await copy.status())?.hydration == .complete else { return }
+        guard (try? await refreshing.readStatus())?.hydration == .complete else { return }
         drains += 1
         do {
             let report = try await copy.queue.drain()
@@ -396,24 +438,24 @@ actor MarfaSync {
     /// Recently Deleted shows this many pages of the bin; the server keeps the rest.
     nonisolated static let binPages = 10
 
-    /// A new copy holds only Marfa's built-in types, so its first slice is theirs; the server's catalogue then
-    /// names every namespace, and the copy is hydrated again with them all.
+    /// The stable slice lets the core resume an interrupted fill and includes types registered later.
     private func hydrate() async throws {
         hub.report.update { $0.phase = .catchingUp }
         defer { hub.report.update { $0.phase = .current } }
         hydrations += 1
-        var slice = MarfaMapping.namespaces(of: try await catalogue())
-        for _ in 0..<2 {
-            _ = try await copy.hydrate(types: slice, tier: Self.tier)
-            let wanted = MarfaMapping.namespaces(of: try await catalogue())
-            if Set(wanted) == Set(slice) { break }
-            slice = wanted
+        // Hydration announces only its end. One acknowledged read at a time shows pages as they arrive,
+        // without letting a slow engine accumulate progress events ahead of a person's writes.
+        let progress = Task { [tell] in
+            while !Task.isCancelled {
+                await withCheckedContinuation { done in
+                    if !tell(.fillProgress(done)) { done.resume() }
+                }
+                do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+            }
         }
+        defer { progress.cancel() }
+        lastHydration = try await refreshing.hydrate(types: Self.slice, tier: Self.tier)
         rehydration.finished()
-    }
-
-    private func catalogue() async throws -> Catalogue {
-        try await MarfaMapping.catalogue(itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
     }
 
     private func succeeded() {

@@ -23,6 +23,90 @@
 "This lane isn’t available for every selected item. Check each item’s type and required fields." : { "extractionState" : "manual" },
 "View as Agenda" : { "extractionState" : "manual" },
 "View as Board" : { "extractionState" : "manual" },
+    "%llu couldn’t be downloaded" : {
+      "extractionState" : "manual"
+    },
+    "%llu need more disk space" : {
+      "extractionState" : "manual"
+    },
+    "%llu of %llu items listed" : {
+      "extractionState" : "manual"
+    },
+    "%llu unavailable on the server" : {
+      "extractionState" : "manual"
+    },
+    "%llu waiting for a connection" : {
+      "extractionState" : "manual"
+    },
+    "%llu waiting for file details" : {
+      "extractionState" : "manual"
+    },
+    "%llu waiting for the server" : {
+      "extractionState" : "manual"
+    },
+    "%llu waiting to download" : {
+      "extractionState" : "manual"
+    },
+    "Attachment counts are unavailable." : {
+      "extractionState" : "manual"
+    },
+    "Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files waiting to upload." : {
+      "extractionState" : "manual"
+    },
+    "Automatic" : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t change downloaded files. Check the current limit and try again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t read downloaded files. MAPP will try again." : {
+      "extractionState" : "manual"
+    },
+    "Current limit: %@" : {
+      "extractionState" : "manual"
+    },
+    "Download Limit" : {
+      "extractionState" : "manual"
+    },
+    "Downloaded Files" : {
+      "extractionState" : "manual"
+    },
+    "Downloading library…" : {
+      "extractionState" : "manual"
+    },
+    "Keep All Downloads" : {
+      "extractionState" : "manual"
+    },
+    "Listing items…" : {
+      "extractionState" : "manual"
+    },
+    "Reading downloaded files…" : {
+      "extractionState" : "manual"
+    },
+    "Remove Downloaded Files" : {
+      "extractionState" : "manual"
+    },
+    "Space Used" : {
+      "extractionState" : "manual"
+    },
+    "Unavailable" : {
+      "extractionState" : "manual"
+    },
+    "Updating library…" : {
+      "extractionState" : "manual"
+    },
+    "Wait for the current download change to finish." : {
+      "extractionState" : "manual"
+    },
+    "^[%llu attachment](inflect: true) kept offline" : {
+      "extractionState" : "manual"
+    },
+    "^[%llu attachment](inflect: true) not yet offline" : {
+      "extractionState" : "manual"
+    },
+    "Items listed: %llu" : {
+      "extractionState" : "manual"
+    },
     "Continue Editing" : {
       "extractionState" : "manual"
     },

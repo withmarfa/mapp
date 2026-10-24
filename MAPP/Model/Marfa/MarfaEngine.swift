@@ -14,6 +14,7 @@ import enum MarfaCore.JsonValue
 actor MarfaEngine {
     nonisolated enum Event: Sendable {
         case paint
+        case fillProgress(CheckedContinuation<Void, Never>)
         /// The copy's changes have a new stream after the last one ended, so what changed between them was not heard.
         case resumed
         case write(ItemWrite, WriteID)
@@ -87,6 +88,8 @@ actor MarfaEngine {
 
     let sync: MarfaSync
     private let copy: WorkingCopy
+    private let downloads: MarfaDownloads
+    private let reading: any MarfaReading
     private let hub: MarfaHub
     private let tell: @Sendable (Event) -> Bool
     private var catalogue = Catalogue()
@@ -167,11 +170,15 @@ actor MarfaEngine {
     }
     #endif
 
-    init(copy: WorkingCopy, hub: MarfaHub, tell: @escaping @Sendable (Event) -> Bool) {
+    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads, reading: (any MarfaReading)? = nil,
+         refreshing: (any MarfaRefreshing)? = nil,
+         tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
+        self.downloads = downloads
+        self.reading = reading ?? MarfaRead(copy: copy)
         self.hub = hub
         self.tell = tell
-        sync = MarfaSync(copy: copy, hub: hub, tell: tell)
+        sync = MarfaSync(copy: copy, hub: hub, downloads: downloads, refreshing: refreshing, tell: tell)
     }
 
     func run(_ events: AsyncStream<Event>) async {
@@ -182,6 +189,7 @@ actor MarfaEngine {
                 }
                 if case .flush(let done) = event { done.resume() }
                 if case .queued(let done) = event { done.resume() }
+                if case .fillProgress(let done) = event { done.resume() }
                 if case .close(let done) = event { done.resume() }
                 if case .drained(_, let taken) = event { taken.resume() }
                 if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
@@ -195,6 +203,15 @@ actor MarfaEngine {
             }
             switch event {
             case .paint: await paint()
+            case .fillProgress(let done):
+                if let status = try? await reading.status() {
+                    let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
+                                            status.hydration == .complete ? .complete : .partial)
+                    if hub.report.value.fill != fill {
+                        await reload()
+                    }
+                }
+                done.resume()
             case .resumed:
                 await reload()
                 // The follow of the server is new with the stream, so the copy is brought up to date, which also
@@ -253,6 +270,7 @@ actor MarfaEngine {
         closed = true
         following?.cancel()
         await sync.stop()
+        await downloads.stop()
         await copy.close()
     }
 
@@ -293,8 +311,16 @@ actor MarfaEngine {
                     itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
                 var rows: [String: Marfa.Item] = [:]
                 var edges: [Marfa.Edge] = []
-                for row in try await copy.items.list(ListFilters(allStates: true)) { rows[row.id] = row }
-                for type in catalogue.edgeTypes.keys { edges += try await copy.edges.ofType(type) }
+                let listed = try await reading.items()
+                for row in listed { rows[row.id] = row }
+                let status = try await reading.status()
+                hub.report.update { $0.fill = LibraryFill(status, completeness: listed.completeness) }
+                do {
+                    edges = try await reading.edges(ofTypes: Array(catalogue.edgeTypes.keys))
+                } catch MarfaError.hydrationIncomplete {
+                    // The rows can be read before their relationships. Keep known links through a refill.
+                    edges = self.edges.all
+                }
                 return (catalogue, rows, edges)
             }
         } catch {
@@ -375,7 +401,12 @@ actor MarfaEngine {
                     if row == nil {
                         row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
                     }
-                    return (row, row == nil ? [] : try await copy.edges.from(id) + copy.edges.to(id))
+                    let held: [Marfa.Edge]
+                    do { held = row == nil ? [] : try await reading.edges(touching: id) }
+                    catch MarfaError.hydrationIncomplete {
+                        held = edges.ids(touching: id).compactMap { edges[$0] }
+                    }
+                    return (row, held)
                 }
                 read.append((row, id, held))
             }
@@ -590,8 +621,10 @@ actor MarfaEngine {
             queue: queue, kept: Array(refusals.values), conflictedCopies: copies, catalogue: catalogue, types: types)
         hub.report.update { current in
             let phase = current.phase
+            let fill = current.fill
             current = report
             current.phase = phase
+            current.fill = fill
         }
     }
 
@@ -656,6 +689,12 @@ actor MarfaEngine {
         case .server:
             await sync.heard()
             await reread(change)
+            // Reachability precedes replay. Fetch again once the copy holds the arriving attachment or its item.
+            let changedEdges = change.itemId.map { edges.edges(touching: $0) } ?? []
+            let namedEdge = change.edgeId.flatMap { edges[$0] }
+            if (changedEdges + [namedEdge].compactMap { $0 }).contains(where: { $0.edgeType == MarfaMapping.attachmentEdge }) {
+                await sync.fetchAttachments()
+            }
         case .refreshed(.purged): await purged(change.itemId)
         case .saved, .refreshed: await reload()
         case .stopped(let error): await sync.stopped(error)
@@ -743,8 +782,7 @@ actor MarfaEngine {
         }
     }
 
-    /// A copy that expired, or whose hydration was cut short, takes no writes until it is hydrated again; the
-    /// package says so in its own words, which the person is spared. The app keeps the text it tried to save.
+    /// An unavailable row or an edge write can need a complete copy. The app keeps any text it tried to save.
     nonisolated static func problem(for error: MarfaError) -> SyncProblem {
         switch error {
         case .hydrationIncomplete, .copyExpired: SyncProblem(code: error.code(), message: notCurrent)

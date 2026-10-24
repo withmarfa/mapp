@@ -23,6 +23,7 @@ protocol ItemLibrary: AnyObject, Observable {
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
     var syncReport: SyncReport { get }
+    var downloadedFiles: (any DownloadedFiles)? { get }
     /// False where the action is not offered for the problem.
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
     var completedImports: [UUID: ItemID] { get }
@@ -134,6 +135,7 @@ protocol ItemLibrary: AnyObject, Observable {
 }
 
 extension ItemLibrary {
+    var downloadedFiles: (any DownloadedFiles)? { nil }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
     /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is

@@ -3,8 +3,13 @@ import Observation
 
 /// A source read from a server: its items, what it has yet to send, and how the server stands.
 nonisolated protocol ConnectedItemSource: ItemSource, SyncReporting {
+    var downloadedFiles: (any DownloadedFiles)? { get }
     var connectionState: MarfaConnectionState { get }
     func connectionStates() -> AsyncStream<MarfaConnectionState>
+}
+
+nonisolated extension ConnectedItemSource {
+    var downloadedFiles: (any DownloadedFiles)? { nil }
 }
 
 /// What the host needs of a Marfa library beside reading and writing it, so its lifecycle is tested without a
