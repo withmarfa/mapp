@@ -230,6 +230,34 @@ struct EditorTests {
         #expect(try await page.markdown() == nil)
     }
 
+    @Test func reselectingTheNoteAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
+        let page = try await Harness()
+        try await page.load("Original\n")
+        let originalID = try #require(page.editor.noteID)
+        let original = try #require(page.library.item(originalID))
+        let generation = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
+        let replacement = Note(body: "Replacement\n", created: .now)
+        page.library.notes.append(replacement)
+        let replacementItem = try #require(page.library.item(replacement.id))
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        page.editor.select(replacementItem)
+        try await page.wait { page.library.failure != nil }
+        #expect(page.editor.noteID == originalID)
+
+        page.editor.select(original)
+        try await page.run("window.editor.flush = window.savedFlush")
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int == generation)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Original\n")
+        page.editor.noteChanged(replacementItem)
+        #expect(page.editor.noteID == originalID)
+
+        page.library.updateBody(of: originalID, to: "Outside\n")
+        page.editor.noteChanged(try #require(page.library.item(originalID)))
+        #expect(try await page.shownText(until: "Outside") == "Outside")
+        #expect(page.editor.noteID == originalID)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
         let page = try await Harness()
         try await page.load("Original\n")
@@ -919,6 +947,124 @@ struct EditorTests {
         #expect(try await page.markdown() == nil)
         // Resizing the header and the window raises nothing in the page.
         #expect(page.library.failure == nil)
+    }
+
+    @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
+        let page = try await Harness()
+        let container = page.editor.container
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        container.topInset = 52
+        container.layoutSubtreeIfNeeded()
+        let paragraphs = Array(repeating: "A paragraph for the scrolling check.", count: 60).joined(separator: "\n\n") + "\n"
+        try await page.load(paragraphs)
+        page.editor.setHeader(Self.header("First item"))
+        try await page.frames()
+        try await page.run("window.scrollTo(0, 240)")
+        try await page.frames()
+        let scrolled = try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double
+        #expect(scrolled == 240)
+
+        for index in 0..<3 {
+            page.editor.setHeader(Self.header(String(repeating: "A longer title ", count: index + 1)))
+            try await page.load("Item \(index)\n\n" + paragraphs)
+            try await page.frames()
+            #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
+            #expect(!page.editor.isHeaderScrolledAway)
+            window.setContentSize(NSSize(width: index.isMultiple(of: 2) ? 600 : 700, height: 500))
+            container.layoutSubtreeIfNeeded()
+            try await page.frames()
+            #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
+            try await page.run("window.scrollTo(0, 240)")
+            try await page.frames()
+        }
+        #expect(page.changes.isEmpty)
+        #expect(page.library.failure == nil)
+    }
+
+    @Test func anUpdateForTheItemJustLeftCannotReloadIt() async throws {
+        let first = Note(body: "First item\n", created: .now)
+        let second = Note(body: "Second item\n", created: .now)
+        let library = NoteLibrary(notes: [first, second])
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(first.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        page.editor.load(try #require(library.item(second.id)))
+        try await page.wait { page.editor.noteID == second.id }
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        page.editor.noteChanged(try #require(library.item(first.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.noteID == second.id)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == second.body)
+        #expect(page.changes.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func aSelectedItemLoadsWhenItsMissingBodyArrives(versionChanged: Bool) async throws {
+        typealias F = LibraryFixture
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        var item = try #require(library.item(F.n1))
+        editor.load(item)
+        #expect(editor.noteID == nil)
+        #expect(!editor.hasNote)
+
+        source.setBody("Recovered body\n", of: item.id, version: 2)
+        if versionChanged {
+            item.version = ItemVersion(2)
+            source.send(.upserted([item]))
+        } else {
+            source.send(.bodyChanged(item.id, ItemVersion(2)))
+        }
+        try #require(await eventually { library.body(of: item.id)?.text == "Recovered body\n" })
+        editor.noteChanged(try #require(library.item(item.id)))
+        try #require(await eventually { editor.noteID == item.id })
+        #expect(editor.hasNote)
+        #expect(try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Recovered body\n")
+        #expect(source.writes.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func aMissingBodyCannotReopenAnItemAfterLeavingIt(close: Bool) async throws {
+        typealias F = LibraryFixture
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let item = try #require(library.item(F.n1))
+        editor.load(item)
+        if close {
+            editor.close()
+        } else {
+            let other = try #require(library.items(in: .allNotes).first { $0.id != item.id && !$0.isFile })
+            source.setBody("Other body\n", of: other.id)
+            source.send(.bodyChanged(other.id, other.version))
+            try #require(await eventually { library.body(of: other.id) != nil })
+            editor.load(other)
+            try #require(await eventually { editor.noteID == other.id })
+        }
+        let selected = editor.noteID
+        source.setBody("Recovered body\n", of: item.id)
+        source.send(.bodyChanged(item.id, item.version))
+        try #require(await eventually { library.body(of: item.id) != nil })
+        editor.noteChanged(item)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        #expect(editor.noteID == selected)
+        #expect(editor.hasNote == !close)
+        if !close {
+            #expect(try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Other body\n")
+        }
+        #expect(source.writes.isEmpty)
     }
 
     @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {

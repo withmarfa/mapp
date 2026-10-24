@@ -140,8 +140,7 @@ struct NotePage: View {
         .onChange(of: item.id, initial: true) { _, id in
             guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
-            if editor.noteID == item.id { editor.noteChanged(item) }
-            else { editor.load(item) }
+            editor.select(item)
         }
         // Every change to the note takes a new version; the editor takes in only one to its text or its state. A
         // Marfa server that keeps its own text over the person's changes the text without a new version. The
