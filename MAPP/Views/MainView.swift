@@ -156,9 +156,16 @@ struct MainView: View {
                 } detail: {
                     Group {
                         if browser.showsCollection {
-                            if browser.viewMode == .table {
+                            switch browser.viewMode {
+                            case .table:
                                 ItemTable(browser: browser, order: order, pane: $pane)
-                            } else {
+                            case .board:
+                                ItemBoard(browser: browser, selectedField: $browser.boardFields[browser.item], compact: Binding {
+                                    browser.compactBoards[browser.item, default: false]
+                                } set: { browser.compactBoards[browser.item] = $0 }, pane: $pane)
+                            case .agenda:
+                                ItemAgenda(browser: browser, selectedField: $browser.agendaFields[browser.item], pane: $pane)
+                            case .list, .gallery:
                                 ItemGallery(browser: browser, order: order, pane: $pane)
                             }
                         } else {
@@ -180,7 +187,7 @@ struct MainView: View {
                         ) {
                             if browser.viewMode == .table {
                                 ItemTableControls(browser: browser)
-                            } else {
+                            } else if browser.viewMode == .gallery {
                                 ViewOptionsMenu()
                             }
                         }
@@ -270,6 +277,13 @@ struct MainView: View {
             guard library.isLoaded else { return }
             browser.fitDraft(to: library)
             if restoresWindow && !browser.isCreatingItem { browser.restore(from: storedBrowser, in: library, order: order) }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-MAPPViewStudies"),
+               ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
+                browser.sidebarItem = .itemType("aic.ticket.task")
+                browser.viewMode = .board
+            }
+            #endif
         }
         // A new item reaches a server's library when its source says so, which the draft page waits for.
         .onChange(of: creationIsSettled) {

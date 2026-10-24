@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 /// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
 /// be done now, so what it lists is what the menus have enabled.
 struct CommandPalette: View {
+    @Environment(\.openWindow) private var openStudyWindow
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
@@ -207,10 +208,12 @@ struct CommandPalette: View {
             add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
             add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
             add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
-            for choice in NoteSort.allCases where choice != sort {
+            add(String(localized: "View as Board"), "rectangle.split.3x1", "⌘4") { browser.viewMode = .board }
+            add(String(localized: "View as Agenda"), "calendar", "⌘5") { browser.viewMode = .agenda }
+            for choice in NoteSort.allCases where choice != sort && (browser.viewMode == .list || browser.viewMode == .gallery) {
                 add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
             }
-            if sort != .title {
+            if sort != .title && (browser.viewMode == .list || browser.viewMode == .gallery) {
                 add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
                     groupsByDate.toggle()
                 }
@@ -240,6 +243,9 @@ struct CommandPalette: View {
                 }
             }
         }
+        #if DEBUG
+        add(String(localized: "Interface Studies"), "rectangle.3.group") { openStudyWindow(id: "interface-studies") }
+        #endif
         let search = String(localized: "Search Notes")
         entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⇧⌘P", takesFocus: true) {
             browser.palette = .search

@@ -35,6 +35,10 @@ Print and Export as PDF render a complete snapshot of the note, including local 
 
 ## Reviewing components in Xcode
 
+The native view preview adds **Board** (⌘4) and **Agenda** (⌘5) to View As. Board groups by a choice or recommended-text field from the items' catalogue, supports validated moves and undo, and offers comfortable and compact cards. Agenda groups a selected date field into days and keeps undated or invalid values visible; rescheduling is not implemented. Both open an item in place and return to the same collection. They use temporary per-window layout choices, not shared saved Views.
+
+Debug builds include **Window > Interface Studies**, with fictional reading, highlight, search and collection pages. See [Native view studies](Design/Native%20view%20studies.md) for controls, limitations and the disposable sample tour.
+
 Open `MAPP.xcodeproj`, choose the `MAPP` scheme, and open `MAPP/Views/ItemPreviewFixtures.swift`. Enable Editor > Canvas and resume a named preview. These previews use fixed sample items and an in-memory library; they do not read or write a person's working folder.
 
 - **Grouped Sidebar** in `Sidebar.swift` shows the native disclosure groups and the Favorites destination. **Sidebar: 100 Collections** exercises long labels, scrolling, the header, and footer in a native split view.
