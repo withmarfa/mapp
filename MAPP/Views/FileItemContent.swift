@@ -30,7 +30,7 @@ struct FileItemContent: View {
             if type.conforms(to: .plainText) {
                 switch previewURL == url ? textPreview : nil {
                 case .text(let text):
-                    PlainTextFilePage(text: text, title: title)
+                    PlainTextFilePage(text: text, title: title) { NSWorkspace.shared.open(url) }
                 case .unsupported:
                     systemPreview
                 case .unavailable:

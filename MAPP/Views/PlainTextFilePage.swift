@@ -4,15 +4,20 @@ import SwiftUI
 struct PlainTextFilePage: View {
     let text: String
     let title: String
+    let openFile: () -> Void
     @StoredPageStyle private var style
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
-                    Text(verbatim: title)
-                        .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
-                        .accessibilityAddTraits(.isHeader)
+                    HStack(alignment: .firstTextBaseline, spacing: 16) {
+                        Text(verbatim: title)
+                            .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .bold))
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer(minLength: 0)
+                        Button("Open", systemImage: "arrow.up.forward.app", action: openFile)
+                    }
                     Text(verbatim: text)
                         .font(.system(size: CGFloat(style.textSize)))
                         .lineSpacing(CGFloat(style.textSize) * 0.35)
