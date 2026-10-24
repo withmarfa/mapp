@@ -8,17 +8,7 @@ struct SidebarHeader: View {
     @StoredOrder private var order
     let browser: Browser
 
-    private var instanceName: String {
-        #if DEBUG
-        // Design builds can preview the name until marfa-swift#358/#362 supplies instance metadata.
-        let arguments = ProcessInfo.processInfo.arguments
-        if let flag = arguments.firstIndex(of: "-MAPPPreviewInstanceName"),
-           arguments.indices.contains(flag + 1), !arguments[flag + 1].isEmpty {
-            return arguments[flag + 1]
-        }
-        #endif
-        return LibraryDescription.name(libraries)
-    }
+    private var instanceName: String { LibraryDescription.name(libraries) }
 
     var body: some View {
         HStack(spacing: 10) {

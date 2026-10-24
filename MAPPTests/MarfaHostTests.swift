@@ -107,6 +107,19 @@ nonisolated final class FakeServers: Sendable {
     let slow = Mutex(false)
     let opening = Mutex(false)
     private let made = Mutex<[FakeMarfaSource]>([])
+    /// The name each address gives itself; an address with none cannot be read.
+    let names = Mutex<[MarfaConnection: String]>([:])
+    let reads = Mutex(0)
+
+    var describer: MarfaHost.Describer {
+        { connection in
+            self.reads.withLock { $0 += 1 }
+            guard let name = self.names.withLock({ $0[connection] }) else {
+                throw SourceFailure(kind: .missing, message: "The server did not answer.")
+            }
+            return name
+        }
+    }
 
     var opened: [FakeMarfaSource] { made.withLock { $0 } }
     var last: FakeMarfaSource? { opened.last }
@@ -170,7 +183,7 @@ nonisolated final class TestKeyStore: KeyStore {
     }
 
     func host(opener: MarfaHost.Opener? = nil) -> MarfaHost {
-        MarfaHost(defaults: defaults, keys: keys, location: location, opener: opener ?? servers.opener)
+        MarfaHost(defaults: defaults, keys: keys, location: location, opener: opener ?? servers.opener, describer: servers.describer)
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }

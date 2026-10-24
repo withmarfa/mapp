@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Observation
 
 /// A source read from a server: its items, what it has yet to send, and how the server stands.
@@ -34,6 +35,8 @@ extension MarfaSource: MarfaHostedSource {}
 /// paints from the copy before asking the server anything. The words for each state are the app's.
 @Observable @MainActor final class MarfaHost {
     typealias Opener = @Sendable (MarfaConnection, any KeyStore, MarfaStoreLocation) async throws -> any MarfaHostedSource
+    /// Reads the name the server at an address gives itself. It sends no key.
+    typealias Describer = @Sendable (MarfaConnection) async throws -> String
 
     nonisolated enum State: Hashable, Sendable {
         case disconnected
@@ -96,11 +99,14 @@ extension MarfaSource: MarfaHostedSource {}
     private static let addressKey = "MarfaAddress"
     /// Addresses whose copy the person discarded but which could not be removed.
     private static let discardedKey = "MarfaDiscardedCopies"
+    /// The last name each server gave itself, by address, so a launch and an offline window show it.
+    private static let namesKey = "MarfaInstanceNames"
 
     private let defaults: UserDefaults
     private let keys: any KeyStore
     private let location: MarfaStoreLocation
     private let opener: Opener
+    private let describer: Describer
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
@@ -110,6 +116,8 @@ extension MarfaSource: MarfaHostedSource {}
     private(set) var report = SyncReport()
     private(set) var isBusy = false
     private var watching: [Task<Void, Never>] = []
+    private var reading: Task<Void, Never>?
+    private var instanceNames: [String: String]
     /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
@@ -117,12 +125,20 @@ extension MarfaSource: MarfaHostedSource {}
 
     init(
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
-        opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) }
+        opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) },
+        describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name }
     ) {
         self.defaults = defaults
         self.keys = keys
         self.location = location
         self.opener = opener
+        self.describer = describer
+        instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
+    }
+
+    /// The name the server at `connection` last gave itself, nil until one has been read.
+    func instanceName(for connection: MarfaConnection) -> String? {
+        instanceNames[connection.address.absoluteString]
     }
 
     /// The server the app is set to read from: the one connected to, or the one saved by an earlier launch before
@@ -195,6 +211,7 @@ extension MarfaSource: MarfaHostedSource {}
             throw .changesWaiting(nil)
         }
         detach()
+        forgetName(of: connection)
         // The address goes first, so a quit while the key and the copy are removed never opens this server again
         // at the next launch, with a key already gone.
         defaults.removeObject(forKey: Self.addressKey)
@@ -311,7 +328,8 @@ extension MarfaSource: MarfaHostedSource {}
         // The new copy is shown before the old one's key and copy are removed, so the windows go from one library
         // to the other and never show the notes folder between them.
         remember(connection)
-        attach(opened)
+        attach(opened, for: connection)
+        forgetName(of: old)
         if let problem = await finishLeaving(old, discarding: choice != .keepCopy) { throw problem }
     }
 
@@ -379,7 +397,7 @@ extension MarfaSource: MarfaHostedSource {}
         state = .connecting
         do {
             try await clearDiscarded(connection)
-            attach(try await Self.open(connection, keys: keys, location: location, with: opener))
+            attach(try await Self.open(connection, keys: keys, location: location, with: opener), for: connection)
         } catch {
             switch error {
             case .noKey: state = .keyRefused
@@ -410,28 +428,53 @@ extension MarfaSource: MarfaHostedSource {}
         }
     }
 
-    private func attach(_ source: any MarfaHostedSource) {
+    private func attach(_ source: any MarfaHostedSource, for connection: MarfaConnection) {
         detach()
         self.source = source
         state = Self.state(source.connectionState)
         report = source.syncReport
         let states = source.connectionStates()
         let reports = source.syncReports()
+        var wasOnline = source.connectionState == .online
         // A value already on its way from a source that has since been left is dropped.
         watching = [
             Task { [weak self] in
-                for await state in states where self?.source === source { self?.state = Self.state(state) }
+                for await state in states where self?.source === source {
+                    self?.state = Self.state(state)
+                    // Each return to the server may find it renamed.
+                    if state == .online, !wasOnline { self?.readName(of: connection) }
+                    wasOnline = state == .online
+                }
             },
             Task { [weak self] in
                 for await report in reports where self?.source === source { self?.report = report }
             }
         ]
         source.refresh()
+        readName(of: connection)
+    }
+
+    /// Asks the server for its name and keeps it; a failed read changes nothing.
+    private func readName(of connection: MarfaConnection) {
+        reading?.cancel()
+        reading = Task { [weak self, describer] in
+            // Leaving the copy cancels the read, so a late answer never names another server's library.
+            guard let name = try? await describer(connection), !Task.isCancelled, let self else { return }
+            self.instanceNames[connection.address.absoluteString] = name
+            self.defaults.set(self.instanceNames, forKey: Self.namesKey)
+        }
+    }
+
+    private func forgetName(of connection: MarfaConnection) {
+        instanceNames.removeValue(forKey: connection.address.absoluteString)
+        defaults.set(instanceNames, forKey: Self.namesKey)
     }
 
     private func detach() {
         for task in watching { task.cancel() }
         watching = []
+        reading?.cancel()
+        reading = nil
         source = nil
     }
 
