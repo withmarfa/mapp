@@ -14,6 +14,7 @@
 - The package's `Item`, `Edge`, `Edit`, `Draft`, `ListFilters`, `SearchFilters`, `SearchHit`, `BinPage`, `ItemState`, `Tier` and `JSONValue` are the core's own types. `MemberImportVisibility` is on, so a file that reads their members imports each one by name (`import struct MarfaCore.Item`). Never `import MarfaCore` whole: it makes `QueuedWrite`, `MarfaError`, `DrainReport` and other names the package declares itself ambiguous.
 - Each server address has its own copy in the app's own storage (`MarfaStoreLocation`), never inside a notes folder.
 - `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`). The key is never shown again once entered. Tests use `MemoryKeyStore` and a temporary store location.
+- `MarfaHost` also reads the server's own name (`Server.instanceDescription()`, which sends no key) when a copy is attached and each time the connection returns online, off the main actor, and keeps the last name for each address in defaults. A failed read changes nothing. `LibraryDescription.name` shows the name, or the address's host until one has been read. Disconnecting or switching away forgets that address's name.
 
 ## Never lose a person's write
 
