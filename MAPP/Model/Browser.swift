@@ -242,12 +242,22 @@ final class Browser {
     /// A draft belongs to the window, so leaving its page never discards what was typed.
     func startItemDraft(typeID: String? = nil) {
         leaveSettings()
-        if itemDraft == nil {
+        if itemDraft == nil || (typeID != nil && itemDraft?.hasText == false && creation == nil) {
             itemDraft = NewItemDraft(place: item)
             if let typeID { itemDraft?.typeID = typeID }
         }
         isCreatingItem = true
         focusRequest = .page
+    }
+
+    /// Only an explicit discard confirmation may replace text. The identity check prevents an old dialog
+    /// from discarding a newer draft, and a submitted creation must settle before another starts.
+    @discardableResult
+    func replaceItemDraft(_ confirmedDraft: NewItemDraft, typeID: String) -> Bool {
+        guard itemDraft === confirmedDraft, creation == nil else { return false }
+        itemDraft = nil
+        startItemDraft(typeID: typeID)
+        return true
     }
 
     /// Blank titles receive a unique name without requiring a naming dialog before typing. A library that shows
@@ -517,6 +527,8 @@ final class NewItemDraft {
     var body = ""
     var parentID: ItemID?
     let place: SidebarItem
+
+    var hasText: Bool { !title.isEmpty || !body.isEmpty }
 
     init(place: SidebarItem) {
         self.place = place
