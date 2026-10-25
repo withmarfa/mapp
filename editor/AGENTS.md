@@ -40,7 +40,7 @@ Run these in `editor/`:
 - `pnpm format:check`: Prettier. `pnpm format` rewrites.
 - `pnpm build`: writes `MAPP/Editor/Page/editor.html`.
 
-`MAPPTests/EditorTests.swift` runs the built page in real WebKit through the app's bridge, so run the unit tests after `pnpm build`.
+The `EditorTests` suite (`MAPPTests/EditorTests*.swift`) runs the built page in real WebKit through the app's bridge, so run the unit tests after `pnpm build`.
 
 ## Code Review Rules
 

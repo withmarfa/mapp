@@ -296,7 +296,7 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
 
 test("the words the app sends mount InkKit, with the app's own kept out of its labels", async () => {
   const swift = readFileSync(
-    resolve(import.meta.dirname, '../../MAPP/Editor/EditorController.swift'),
+    resolve(import.meta.dirname, '../../MAPP/Editor/EditorController+PageSettings.swift'),
     'utf8',
   )
   const start = swift.indexOf('static var editorLabels')
