@@ -75,7 +75,7 @@ struct AppCommands: Commands {
             }
             .disabled(editor?.hasNote != true)
             Divider()
-            ItemViewOptions(browser: browser)
+            ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
             Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()

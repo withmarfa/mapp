@@ -15,6 +15,15 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         }
     }
 
+    /// The layouts that can show items of these types. Board needs a choice field and Agenda a date field to group
+    /// by; a place without one never offers that layout, instead of offering an empty one.
+    static func available(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemViewMode] {
+        var modes: [ItemViewMode] = [.list, .gallery, .table]
+        if types.contains(where: { !ItemBoardLayout.eligibleFields(of: $0, catalogue: catalogue).isEmpty }) { modes.append(.board) }
+        if !ItemAgendaLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes.append(.agenda) }
+        return modes
+    }
+
     /// Whether the items fill the window in place of the list and the page.
     var spansWindow: Bool { self != .list }
 

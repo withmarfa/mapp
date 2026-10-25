@@ -24,8 +24,12 @@ nonisolated struct ItemAgendaGroup: Identifiable, Hashable, Sendable {
 
 nonisolated enum ItemAgendaLayout {
     static func fields(for items: [Item], catalogue: Catalogue) -> [ItemTypeInfo.Field] {
+        fields(forTypes: Set(items.map(\.type)), catalogue: catalogue)
+    }
+
+    static func fields(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemTypeInfo.Field] {
         var fields: [String: ItemTypeInfo.Field] = [:]
-        for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
+        for type in types.sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in catalogue.itemTypes[type]?.fields ?? [] where field.kind == .date {
                 if fields[field.key] == nil { fields[field.key] = field }
             }

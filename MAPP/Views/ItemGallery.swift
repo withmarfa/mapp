@@ -43,10 +43,9 @@ struct ItemGallery: View {
         .overlay {
             if ids.isEmpty {
                 if browser.isSearching {
-                    ContentUnavailableView.search(text: browser.searchText)
-                        .accessibilityElement(children: .contain)
+                    EmptyState.search(browser.searchText)
                         .accessibilityIdentifier("GalleryEmptySearch")
-                } else { ContentUnavailableView(browser.item == .files ? "No Files" : "No Items", systemImage: browser.item == .files ? "doc" : "note.text") }
+                } else { EmptyState(browser.item == .files ? "No Files" : "No Items") }
             }
         }
         .navigationTitle(title)

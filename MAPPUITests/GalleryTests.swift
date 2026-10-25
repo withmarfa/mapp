@@ -20,7 +20,7 @@ final class GalleryTests: XCTestCase {
 
     private func choose(_ mode: String) {
         app.menuBars.menuBarItems["View"].click()
-        let option = app.menuBars.menuItems["View as \(mode)"]
+        let option = app.menuBars.menuItems["as \(mode)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))
         option.click()
     }
@@ -151,7 +151,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
         app.typeKey("f", modifierFlags: [.command, .option])
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
-        let search = window.searchFields["ColumnSearch"]
+        let search = window.textFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         search.typeText("Lisbon")
         XCTAssertTrue(card("Trip to Lisbon").waitForExistence(timeout: 3))
@@ -160,7 +160,7 @@ final class GalleryTests: XCTestCase {
         search.typeText("no-matching-gallery-item")
         XCTAssertTrue(card("Trip to Lisbon").waitForNonExistence(timeout: 3))
         XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "GalleryEmptySearch").firstMatch.waitForExistence(timeout: 3))
-        window.buttons["CloseColumnSearch"].click()
+        search.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(card("Kitchen quotes").waitForExistence(timeout: 3))
         app.typeKey(.rightArrow, modifierFlags: [])
         XCTAssertEqual(card("Kitchen quotes").value as? String, "Selected")

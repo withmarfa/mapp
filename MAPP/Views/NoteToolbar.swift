@@ -104,8 +104,6 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
-    /// The width the search field spans when it is out.
-    let columnWidth: CGFloat
     var showsCreation = true
     @ViewBuilder let options: () -> Options
 
@@ -129,7 +127,7 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
                 isExpanded: $browser.isSearchExpanded,
                 text: $browser.searchText,
                 prompt: String(localized: "Search"),
-                columnWidth: columnWidth,
+                layout: .item,
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }
             ) {

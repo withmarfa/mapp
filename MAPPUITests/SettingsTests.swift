@@ -139,7 +139,7 @@ final class SettingsTests: XCTestCase {
 
     func testSettingsKeepsExpandedColumnSearchForReturning() {
         app.typeKey("f", modifierFlags: [.command, .option])
-        let search = window.searchFields["ColumnSearch"]
+        let search = window.textFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         search.typeText("Lisbon")
         app.typeKey(",", modifierFlags: .command)
@@ -150,7 +150,7 @@ final class SettingsTests: XCTestCase {
         leaveSettings()
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         XCTAssertEqual(search.value as? String, "Lisbon")
-        window.buttons["CloseColumnSearch"].click()
+        search.typeKey(.escape, modifierFlags: [])
     }
 
     func testAPreferenceChangedInSettingsOutlivesLeavingIt() {
@@ -260,11 +260,11 @@ final class SettingsTests: XCTestCase {
             XCTAssertTrue(settingsItem.isEnabled)
             app.typeKey(.escape, modifierFlags: [])
             app.typeKey("f", modifierFlags: [.command, .option])
-            let search = window.searchFields["ColumnSearch"]
+            let search = window.textFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))
             search.typeText("Lisbon")
             XCTAssertEqual(search.value as? String, "Lisbon")
-            window.buttons["CloseColumnSearch"].click()
+            search.typeKey(.escape, modifierFlags: [])
             XCTAssertTrue(search.waitForNonExistence(timeout: 3))
             attachScreenshot("InterfaceText-\(points)")
         }

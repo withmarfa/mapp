@@ -14,7 +14,6 @@ struct MainView: View {
     @State private var sidebarWidth: CGFloat = 230
     @State private var listWidth: CGFloat = 350
     @State private var measuredWidths = ColumnWidths()
-    @State private var galleryWidth: CGFloat = 900
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -166,12 +165,11 @@ struct MainView: View {
                                 }
                         }
                     }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0.isFinite, $0 > 0 { galleryWidth = $0 } }
                     .modifier(itemInspector)
                     .toolbar {
                         GalleryToolbar(
                             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            columnWidth: min(galleryWidth, 400), showsCreation: !isSidebarVisible
+                            showsCreation: !isSidebarVisible
                         ) {
                             if browser.viewMode == .table {
                                 ItemTableControls(browser: browser)
@@ -259,6 +257,10 @@ struct MainView: View {
         }
         // A window restores what it showed once the library has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it.
+        // A layout the place cannot show (Board with no choice fields) is not offered, and a window left on one
+        // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
+        .onChange(of: browser.availableViewModes(in: library), initial: true) { browser.fallBackToListIfUnavailable(in: library) }
+        .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }

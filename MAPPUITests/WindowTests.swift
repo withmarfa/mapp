@@ -139,7 +139,7 @@ final class WindowTests: XCTestCase {
     }
 
     /// The list's search, a field only once its button beside View Options is clicked.
-    private var listSearch: XCUIElement { window.searchFields["ColumnSearch"] }
+    private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
 
     func testTheListsSearchFindsNotesAndEscapePutsItAway() {
         XCTAssertFalse(listSearch.exists, "a button until it is clicked")

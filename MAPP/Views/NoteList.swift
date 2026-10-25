@@ -53,7 +53,8 @@ struct NoteList: View {
         }
         .listStyle(.inset)
         .softSelection(rows: ids, selection: browser.selection)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 >= 280 { width = $0 } }
         .accessibilityIdentifier("NoteList")
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
@@ -93,9 +94,9 @@ struct NoteList: View {
         .overlay {
             if ids.isEmpty {
                 if browser.isSearching {
-                    ContentUnavailableView.search(text: browser.searchText)
+                    EmptyState.search(browser.searchText)
                 } else {
-                    ContentUnavailableView(browser.item == .files ? "No Files" : "No Items", systemImage: browser.item == .files ? "doc" : "note.text")
+                    EmptyState(browser.item == .files ? "No Files" : "No Items")
                 }
             }
         }

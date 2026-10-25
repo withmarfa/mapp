@@ -17,10 +17,7 @@ struct ItemAgenda: View {
 
         VStack(spacing: 0) {
             HStack {
-                if fields.isEmpty {
-                    Label("No Date Fields", systemImage: "calendar")
-                        .foregroundStyle(.secondary)
-                } else {
+                if !fields.isEmpty {
                     Picker("Date Field", selection: Binding(get: { field }, set: { selectedField = $0 })) {
                         ForEach(fields) { field in
                             Text(verbatim: field.displayLabel).tag(Optional(field.key))
@@ -41,9 +38,9 @@ struct ItemAgenda: View {
                 .overlay {
                     if items.isEmpty {
                         if browser.isSearching {
-                            ContentUnavailableView.search(text: browser.searchText)
+                            EmptyState.search(browser.searchText)
                         } else {
-                            ContentUnavailableView("No Items", systemImage: "calendar")
+                            EmptyState("No Items")
                         }
                     }
                 }
