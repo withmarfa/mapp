@@ -39,4 +39,12 @@ struct PaletteMatchTests {
         #expect(PaletteMatch.score("👩‍💻 project", "project") == 1)
         #expect(PaletteMatch.score("日本語のノート", "ノート") == 2)
     }
+
+    @Test func keptTitlesRankAsFreshOnesDo() {
+        let titles = ["किताब", "किTable", "Café plans", "Éclair", "👩‍💻 project", "日本語のノート", "New Note", "Move to Inbox", "Unpin Note", "Spinach", "Pin Note"]
+        let kept = PaletteMatch.Titles()
+        for typed in ["ताब", "ब", "Table", "CAFE", "plans", "ECL", "👩", "ノート", "nn", "inb", "pin", "", "zz"] {
+            #expect(kept.ranked(titles, typed) == PaletteMatch.ranked(titles, typed), "\(typed)")
+        }
+    }
 }

@@ -347,7 +347,8 @@ nonisolated final class OpenFile: Sendable {
     private static func path(of descriptor: Int32) -> URL? {
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         guard fcntl(descriptor, F_GETPATH, &buffer) == 0 else { return nil }
-        return URL(filePath: String(cString: buffer), directoryHint: .notDirectory)
+        let length = buffer.firstIndex(of: 0) ?? buffer.count
+        return URL(filePath: String(decoding: buffer[..<length].map { UInt8(bitPattern: $0) }, as: UTF8.self), directoryHint: .notDirectory)
     }
 
     /// The directory's path as the system writes a descriptor's, which keeps the case on disk and the firmlinked
