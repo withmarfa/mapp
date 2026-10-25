@@ -39,6 +39,7 @@ struct EmbeddedFilesSafetyTests {
         files.webView(webView, start: task)
         task.stopped = true
         files.webView(webView, stop: task)
+        // Time for a call made after the stop, which nothing signals when none is made.
         try await Task.sleep(for: .milliseconds(300))
         #expect(task.callsAfterStop.isEmpty, "\(task.callsAfterStop)")
     }
@@ -50,6 +51,7 @@ struct EmbeddedFilesSafetyTests {
         files.webView(webView, start: task)
         task.stopped = true
         files.webView(webView, stop: task)
+        // Time for a call made after the stop, which nothing signals when none is made.
         try await Task.sleep(for: .milliseconds(300))
         #expect(task.callsAfterStop.isEmpty, "WebKit raises on these: \(task.callsAfterStop)")
     }
@@ -71,7 +73,7 @@ struct EmbeddedFilesSafetyTests {
         }
         let task = StrictSchemeTask(EmbeddedFiles.url(for: .path("../Attachments/Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
-        for _ in 0..<200 where !task.finished && !task.failed { try await Task.sleep(for: .milliseconds(5)) }
+        _ = await eventually { task.finished || task.failed }
         #expect(task.status == 404)
         #expect(task.data != secret, "served \(task.status ?? 0): a file outside the folder through a folder swapped for a link")
     }
@@ -88,7 +90,7 @@ struct EmbeddedFilesSafetyTests {
         }
         let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
-        for _ in 0..<200 where !task.finished && !task.failed && task.status == nil { try await Task.sleep(for: .milliseconds(5)) }
+        _ = await eventually { task.finished || task.failed || task.status != nil }
         let answered = task.finished || task.failed || task.status != nil
         // Releases the reader so the rest of the suite keeps its thread.
         let writer = open(file.path, O_WRONLY | O_NONBLOCK)

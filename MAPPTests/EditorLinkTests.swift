@@ -16,10 +16,9 @@ extension EditorTests {
     /// The marks of the page's links, once they read `expected` or after a few seconds.
     private func marks(_ page: Page, until expected: String) async throws -> String {
         var shown = ""
-        for _ in 0..<100 {
+        _ = try await eventuallyAsking {
             shown = try await marks(page)
-            if shown == expected { break }
-            try await Task.sleep(for: .milliseconds(50))
+            return shown == expected
         }
         return shown
     }
@@ -133,10 +132,10 @@ extension EditorTests {
         try await commandClick(0, in: page)
         try await page.wait { editor.noteID == plan.id }
         var heading = ""
-        for _ in 0..<60 where heading.isEmpty {
-            try await Task.sleep(for: .milliseconds(50))
+        _ = try await eventuallyAsking {
             heading = try await editor.webView.evaluateJavaScript(
                 "(window.getSelection().anchorNode?.parentElement?.closest('h1,h2,h3')?.textContent) ?? ''") as? String ?? ""
+            return !heading.isEmpty
         }
         #expect(heading == "Light and Water", "the page moved to the heading, ignoring case")
     }
@@ -162,10 +161,10 @@ extension EditorTests {
         _ = try await marks(page, until: "live")
         try await commandClick(0, in: page)
         var heading = ""
-        for _ in 0..<60 where heading.isEmpty {
-            try await Task.sleep(for: .milliseconds(50))
+        _ = try await eventuallyAsking {
             heading = try await page.editor.webView.evaluateJavaScript(
                 "(window.getSelection().anchorNode?.parentElement?.closest('h1,h2,h3')?.textContent) ?? ''") as? String ?? ""
+            return !heading.isEmpty
         }
         #expect(heading == "Soil")
         #expect(opened == 0 && beeps == 0)
@@ -183,11 +182,9 @@ extension EditorTests {
         shown.id = reader.id
         let editor = NoteWindow.makeEditor(
             library: library, details: DetailsPresentation(), showing: Binding { shown.id } set: { shown.id = $0 })
-        var waited = 0
-        while !editor.isReady, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
+        try #require(await eventually { editor.isReady })
         editor.load(try #require(library.item(reader.id)))
-        waited = 0
-        while editor.noteID != reader.id, waited < 100 { try await Task.sleep(for: .milliseconds(50)); waited += 1 }
+        try #require(await eventually { editor.noteID == reader.id })
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = editor.container
@@ -206,11 +203,7 @@ extension EditorTests {
         func typing() async throws -> Bool {
             try await editor.webView.evaluateJavaScript("document.activeElement?.matches('.ProseMirror') === true") as? Bool ?? false
         }
-        var focused = false
-        for _ in 0..<60 where !focused {
-            try await Task.sleep(for: .milliseconds(50))
-            focused = try await typing()
-        }
+        let focused = try await eventuallyAsking(typing)
         #expect(focused && window.firstResponder === editor.webView, "the caret is in the linked note, so typing goes on there")
         editor.windowWent()
     }

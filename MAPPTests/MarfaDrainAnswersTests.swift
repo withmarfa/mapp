@@ -50,7 +50,7 @@ struct MarfaDrainAnswersTests {
         try Self.recordAccepted(accepted.id, at: location.store(for: connection))
         source.events.yield(.change(Change(origin: .queueNotDrained(.storageFull(message: "full")), itemId: nil, edgeId: nil)))
         await source.queueSubmitted()
-        _ = try #require(await log.wait(for: .seconds(10)) { $0.answer(to: first) == .accepted })
+        _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         #expect(log.current.answer(to: second) == nil)
 
         // A later drain reports only the write it answered.
@@ -86,6 +86,7 @@ struct MarfaDrainAnswersTests {
         let holding = LiveMarfa.Flag()
         await source.engine.whenAnswering {
             holding.set()
+            // Holds the engine while it takes the first report, as a slow one would be held.
             try? await Task.sleep(for: .milliseconds(500))
         }
         source.events.yield(.change(Change(origin: .queueDrained(firstReport), itemId: nil, edgeId: nil)))

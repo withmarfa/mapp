@@ -75,7 +75,7 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = directory.appending(path: "copy.sqlite")
         let copy = try await WorkingCopy.open(store: store, fileBudget: budget.marfa)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"))
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"))
         let files = try #require(source.downloadedFiles as? MarfaDownloads)
         let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
         let (release, releaseContinuation) = AsyncStream<Void>.makeStream()

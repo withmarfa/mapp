@@ -6,18 +6,17 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// The library over a real copy of the test instance, run only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY`
-    /// are in the environment. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
-    /// ends, passed or not.
+    /// The library over a real copy of the test instance, in the Live test plan. Every item it makes has a title
+    /// starting `MAPPTEST ` and is purged when the test ends, passed or not.
     @MainActor
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaLibraryLiveTests {
         private func withLibrary(_ body: @MainActor (MarfaLibrary, MarfaSource, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
@@ -28,7 +27,7 @@ extension LiveMarfaTests {
             }
             do {
                 source.refresh()
-                try #require(await eventually(.seconds(60)) {
+                try #require(await eventually {
                     library.isLoaded && library.connection == .online && library.count(in: .allNotes) > 100
                 })
                 try await body(library, source, made)
@@ -109,9 +108,9 @@ extension LiveMarfaTests {
                 let parent = try make("parent")
                 let other = try make("other")
                 // A parent is chosen from what the library holds, which a new item joins once the copy has it.
-                try #require(await eventually(.seconds(20)) { library.item(parent) != nil && library.item(other) != nil })
+                try #require(await eventually { library.item(parent) != nil && library.item(other) != nil })
                 let child = try make("child", under: parent)
-                try #require(await eventually(.seconds(20)) {
+                try #require(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
                 })
                 #expect(library.relationships(for: parent).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child])
@@ -123,63 +122,63 @@ extension LiveMarfaTests {
                 #expect(library.body(of: child)?.text == "Edited \(token) text.")
                 await source.flush()
                 #expect(try await source.body(of: child).text == "Edited \(token) text.")
-                #expect(await eventually(.seconds(20)) { library.body(of: child)?.text == "Edited \(token) text." })
-                #expect(await eventually(.seconds(20)) { library.items(matching: token).contains { $0.id == child } })
+                #expect(await eventually { library.body(of: child)?.text == "Edited \(token) text." })
+                #expect(await eventually { library.items(matching: token).contains { $0.id == child } })
 
                 // A title, and its undo.
                 let title = try #require(library.item(child)?.title)
                 step { #expect(library.setItemProperty(child, key: "title", value: .string("MAPPTEST renamed \(token)"), undoManager: undo)) }
-                #expect(await eventually(.seconds(20)) { library.item(child)?.title == "MAPPTEST renamed \(token)" })
+                #expect(await eventually { library.item(child)?.title == "MAPPTEST renamed \(token)" })
                 undo.undo()
-                #expect(await eventually(.seconds(20)) { library.item(child)?.title == title })
+                #expect(await eventually { library.item(child)?.title == title })
 
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
                 // holds none, and a refusal would leave it where it was.
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
                 })
                 #expect(library.failure == nil)
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
                 // The server took the move of a source, which expires the copy and hydrates it again; nothing queued
                 // is lost, and the child is still under its new parent.
                 await source.flush()
-                #expect(await eventually(.seconds(30)) {
+                #expect(await eventually {
                     library.relationships(for: parent).first { $0.field == "inverse:parent-of" } == nil
                         && library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
-                #expect(await eventually(.seconds(20)) { library.syncReport.waiting == 0 })
+                #expect(await eventually { library.syncReport.waiting == 0 })
                 undo.undo()
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
                 })
                 // Without a parent, then under another, each seen from both ends, and undone.
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [], undoManager: undo)) }
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.isEmpty == true
                 })
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
                 #expect(library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other])
                 undo.undo()
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.isEmpty == true
                 })
                 undo.undo()
-                #expect(await eventually(.seconds(20)) {
+                #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
                 })
                 #expect(library.relationships(for: other).first { $0.field == "inverse:parent-of" } == nil)
 
                 // A favorite, and its undo.
                 step { library.setFavorite([child], true, undoManager: undo) }
-                #expect(await eventually(.seconds(20)) { library.items(in: .favorites).contains { $0.id == child } })
+                #expect(await eventually { library.items(in: .favorites).contains { $0.id == child } })
                 undo.undo()
-                #expect(await eventually(.seconds(20)) { library.item(child)?.isFavorite == false })
+                #expect(await eventually { library.item(child)?.isFavorite == false })
 
                 await source.flush()
                 #expect(library.failure == nil, "\(String(describing: library.failure))")
@@ -187,11 +186,11 @@ extension LiveMarfaTests {
                 // The bin: a delete the server has taken leaves the copy, and the item is still in Recently Deleted,
                 // from where undoing the delete restores it.
                 step { library.delete([other], undoManager: undo) }
-                #expect(await eventually(.seconds(20)) { library.item(other)?.state == .trashed })
+                #expect(await eventually { library.item(other)?.state == .trashed })
                 await source.flush()
                 #expect(library.items(in: .recentlyDeleted).contains { $0.id == other })
                 undo.undo()
-                #expect(await eventually(.seconds(30)) { library.item(other)?.state == .active })
+                #expect(await eventually { library.item(other)?.state == .active })
                 #expect(!library.items(in: .recentlyDeleted).contains { $0.id == other })
                 #expect(library.failure == nil, "\(String(describing: library.failure))")
             }
@@ -211,24 +210,24 @@ extension LiveMarfaTests {
                     undoManager: nil))
                 made.add(kept)
                 made.add(purged)
-                try #require(await eventually(.seconds(20)) { library.item(kept) != nil && library.item(purged) != nil })
+                try #require(await eventually { library.item(kept) != nil && library.item(purged) != nil })
                 await source.flush()
                 library.delete([kept, purged], undoManager: nil)
                 await source.flush()
-                try #require(await eventually(.seconds(30)) {
+                try #require(await eventually {
                     Set(library.items(in: .recentlyDeleted).map(\.id)).isSuperset(of: [kept, purged])
                 })
 
                 // Restoring after the delete was sent: the item comes back to its places.
                 library.recover([kept], undoManager: nil)
-                try #require(await eventually(.seconds(30)) { library.item(kept)?.state == .active })
+                try #require(await eventually { library.item(kept)?.state == .active })
                 #expect(!library.items(in: .recentlyDeleted).contains { $0.id == kept })
                 #expect(library.items(in: .allNotes).contains { $0.id == kept })
 
                 // Delete Permanently needs the server and takes the item out of the bin and the copy.
                 try #require(library.canPurge)
                 library.deletePermanentlyOnConfirm([purged])
-                try #require(await eventually(.seconds(30)) { library.item(purged) == nil })
+                try #require(await eventually { library.item(purged) == nil })
                 #expect(library.failure == nil, "\(String(describing: library.failure))")
                 let bin = try await source.copy.items.bin()
                 #expect(!bin.items.contains { $0.id == purged.rawValue })
@@ -244,29 +243,29 @@ extension LiveMarfaTests {
                     typeID: "core.note", title: "MAPPTEST fresh bin \(UUID().uuidString.prefix(8))", body: "In the bin.",
                     parentID: nil, in: .allNotes, undoManager: nil))
                 made.add(note)
-                try #require(await eventually(.seconds(20)) { library.item(note) != nil })
+                try #require(await eventually { library.item(note) != nil })
                 await source.flush()
                 library.delete([note], undoManager: nil)
                 await source.flush()
-                try #require(await eventually(.seconds(30)) { library.item(note)?.state == .trashed })
+                try #require(await eventually { library.item(note)?.state == .trashed })
 
                 let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-fresh-\(UUID().uuidString)", directoryHint: .isDirectory)
                 defer { try? FileManager.default.removeItem(at: root) }
-                let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+                let connection = try MarfaConnection(address: try LiveMarfa.address())
                 let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                    connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                     location: MarfaStoreLocation(root: root))
                 let fresh = MarfaLibrary(source: second)
                 second.refresh()
-                try #require(await eventually(.seconds(60)) {
+                try #require(await eventually {
                     fresh.isLoaded && fresh.connection == .online && fresh.count(in: .allNotes) > 100
                 })
-                try #require(await eventually(.seconds(30)) { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
-                #expect(await eventually(.seconds(20)) { fresh.body(of: note)?.text == "In the bin." })
+                try #require(await eventually { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
+                #expect(await eventually { fresh.body(of: note)?.text == "In the bin." })
 
                 fresh.recover([note], undoManager: nil)
                 #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
-                try #require(await eventually(.seconds(30)) { fresh.item(note)?.state == .active })
+                try #require(await eventually { fresh.item(note)?.state == .active })
                 #expect(fresh.failure == nil, "\(String(describing: fresh.failure))")
                 await second.flush()
                 await second.close()
@@ -287,13 +286,13 @@ extension LiveMarfaTests {
                     in: .allNotes, undoManager: nil))
                 made.add(target)
                 made.add(host)
-                try #require(await eventually(.seconds(20)) { library.item(target) != nil && library.item(host) != nil })
+                try #require(await eventually { library.item(target) != nil && library.item(host) != nil })
                 await source.flush()
 
                 // A link to the target, and to a name nothing answers to.
                 library.updateBody(of: host, to: "See [[\(targetTitle)]] and [[MAPPTEST nowhere \(token)]].")
                 await source.flush()
-                try #require(await eventually(.seconds(30)) {
+                try #require(await eventually {
                     library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.map(\.itemID) == [host]
                 })
                 let mentions = library.bodyMentions(for: host)
@@ -303,7 +302,7 @@ extension LiveMarfaTests {
                 // Taking the link out of the text takes the edge out.
                 library.updateBody(of: host, to: "Nothing again.")
                 await source.flush()
-                try #require(await eventually(.seconds(30)) {
+                try #require(await eventually {
                     library.relationships(for: target).first { $0.field == "inverse:references" }?.targets.isEmpty ?? true
                 })
                 #expect(library.bodyMentions(for: host).isEmpty)
@@ -315,7 +314,7 @@ extension LiveMarfaTests {
                 #expect(embed.name == "MAPPTEST attachment \(token).png")
                 library.updateBody(of: host, to: "A picture: ![\(embed.name)](\(embed.link))")
                 await source.flush()
-                try #require(await eventually(.seconds(30)) {
+                try #require(await eventually {
                     library.relationships(for: host).first { $0.field == "inverse:attached-to" }?.targets.count == 1
                 })
                 let file = try #require(library.relationships(for: host).first { $0.field == "inverse:attached-to" }?.targets.first?.itemID)
@@ -323,7 +322,7 @@ extension LiveMarfaTests {
                 // The path-style embed the page writes reads back as the file the package attached.
                 let links = try await source.copy.items.links(in: host.rawValue)
                 #expect(links.embeds.map(\.target) == [.item(id: file.rawValue)])
-                try #require(await eventually(.seconds(30)) {
+                try #require(await eventually {
                     if case .file(_, let size)? = library.item(file)?.content { size == Int64(png.count) } else { false }
                 })
                 #expect(library.items(in: .files).contains { $0.id == file })

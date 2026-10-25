@@ -171,7 +171,7 @@ import Observation
         // app, never reach the person's saved server, Keychain or copies.
         let environment = ProcessInfo.processInfo.environment
         if SampleLibrary.isRequested
-            || environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
+            || TestHost.isRequested
             || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
             let suite = "MAPP.SampleMarfa"

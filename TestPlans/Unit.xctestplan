@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "3F145335-2F76-4748-A389-6C97FC3CE521",
+      "name" : "Unit",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:MAPP.xcodeproj",
+        "identifier" : "3303FE023066ED47005D07A2",
+        "name" : "MAPPTests"
+      },
+      "skippedTags" : {
+        "tags" : [
+          "live"
+        ]
+      }
+    }
+  ],
+  "version" : 1
+}

@@ -12,8 +12,7 @@ final class EditorTypingTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+        app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         beginNewItem(title: "Typing test")

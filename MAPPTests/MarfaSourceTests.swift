@@ -54,28 +54,21 @@ nonisolated final class ChangeLog: Sendable {
     var current: State { box.state.withLock { $0 } }
 
     /// Waits for `condition` to hold, and answers the state that met it, or nil when it never did.
-    func wait(for timeout: Duration = .seconds(30), until condition: (State) -> Bool) async -> State? {
-        let clock = ContinuousClock()
-        let end = clock.now + timeout
-        while clock.now < end {
+    func wait(for limit: Duration = waitLimit, until condition: (State) -> Bool) async -> State? {
+        var met: State?
+        _ = await eventually(within: limit) {
             let current = self.current
-            if condition(current) { return current }
-            try? await Task.sleep(for: .milliseconds(50))
+            if condition(current) { met = current }
+            return met != nil
         }
-        return nil
+        return met
     }
 }
 
 nonisolated func waitForConnection(
-    _ source: MarfaSource, for timeout: Duration = .seconds(30), until condition: (MarfaConnectionState) -> Bool
+    _ source: MarfaSource, until condition: (MarfaConnectionState) -> Bool
 ) async -> Bool {
-    let clock = ContinuousClock()
-    let end = clock.now + timeout
-    while clock.now < end {
-        if condition(source.connectionState) { return true }
-        try? await Task.sleep(for: .milliseconds(50))
-    }
-    return false
+    await eventually { condition(source.connectionState) }
 }
 
 private func scratch() -> URL {
@@ -314,6 +307,7 @@ struct MarfaSourceOfflineTests {
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
         source.refresh()
+        // Time for the refresh to reach the server that never answers, so the write meets it hanging.
         try await Task.sleep(for: .milliseconds(200))
         let clock = ContinuousClock()
         let start = clock.now
@@ -472,13 +466,12 @@ struct MarfaSourceOfflineTests {
         #expect(await sync.hydrations == 0)
 
         await sync.unreadable(["a"])
-        let clock = ContinuousClock()
-        let end = clock.now + .seconds(20)
-        while await sync.hydrations == 0, clock.now < end { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(try await eventuallyAsking { await sync.hydrations > 0 })
         #expect(await sync.hydrations == 1)
 
         // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
         await sync.unreadable(["a"])
+        // Time for a second hydration, which nothing signals when none is asked for.
         try await Task.sleep(for: .milliseconds(500))
         #expect(await sync.hydrations == 1)
         await source.close()
@@ -522,7 +515,7 @@ struct MarfaSourceOfflineTests {
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
         source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
         // Hydrating again against a closed port fails at once, which shows the hydration was tried.
-        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         await source.close()
     }
 
@@ -589,7 +582,7 @@ struct MarfaSourceOfflineTests {
         for step in 0..<16 {
             let parent = step.isMultiple(of: 2) ? second : first
             source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: WriteID())
-            let shown = await log.wait(for: .seconds(10)) { state in
+            let shown = await log.wait { state in
                 state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.target) == [.item(parent)]
             }
             #expect(shown != nil, "after move \(step) the child shows \(parent == second ? "parent two" : "parent one")")
@@ -733,7 +726,7 @@ struct MarfaSourceOfflineTests {
         // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
         source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
-        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         let after = try await source.copy.queue.all()
         #expect(Set(after.map(\.id)) == Set(queued.map(\.id)))
         let shown = try #require(log.current.snapshot?.items.first { $0.id == child })
@@ -829,18 +822,16 @@ struct MarfaSourceOfflineTests {
 }
 
 extension LiveMarfaTests {
-    /// Runs against the test instance only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY` are in the environment
-    /// (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and `TEST_RUNNER_MARFA_TEST_MAPP_KEY`). Every item it
-    /// makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
+    /// Against the test instance, in the Live test plan. Every item it makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
     /// `items.purge`, which reaches an item the copy never held or has let go of.
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaSourceLiveTests {
         private static let note = TypeID("core.note")
 
         private func open(_ root: URL) async throws -> MarfaSource {
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             return try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
         }
 
@@ -1032,8 +1023,8 @@ extension LiveMarfaTests {
                 let otherRoot = scratch()
                 defer { try? FileManager.default.removeItem(at: otherRoot) }
                 try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
-                let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
-                let key = try #require(LiveMarfa.key)
+                let address = try #require(URL(string: try LiveMarfa.address()))
+                let key = try LiveMarfa.key()
                 let other = try await WorkingCopy.open(
                     store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
@@ -1078,7 +1069,7 @@ extension LiveMarfaTests {
         }
 
         private func conflictFromAnEarlierLaunch(_ root: URL, _ made: LiveMarfa.Made) async throws {
-            let address = try #require(LiveMarfa.address), key = try #require(LiveMarfa.key)
+            let address = try LiveMarfa.address(), key = try LiveMarfa.key()
             let connection = try MarfaConnection(address: address)
             let location = MarfaStoreLocation(root: root)
             let keys = MemoryKeyStore([connection: key])
@@ -1174,6 +1165,7 @@ extension LiveMarfaTests {
                 let holding = LiveMarfa.Flag()
                 await source.engine.whenAnswering {
                     holding.set()
+                    // Holds the answers for longer than the check below waits, as a slow engine would.
                     try? await Task.sleep(for: .seconds(2))
                 }
                 let before = await source.engine.sync.drains
@@ -1181,6 +1173,8 @@ extension LiveMarfaTests {
                 source.submit(.tag(id, ItemTag.favorite, on: true), as: tagged)
                 #expect(await LiveMarfa.until { holding.isSet })
                 await source.engine.sync.drain()
+                // Time for a second drain, which nothing signals when none is sent. It is shorter than the hold above,
+                // so the answers are still held and the count must not have moved.
                 try await Task.sleep(for: .milliseconds(800))
                 #expect(await source.engine.sync.drains == before + 1)
                 await source.engine.whenAnswering(nil)
@@ -1216,7 +1210,7 @@ extension LiveMarfaTests {
                 let move = WriteID(), tagged = WriteID()
                 source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: move)
                 source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
-                let done = try #require(await log.wait(for: .seconds(60)) { state in
+                let done = try #require(await log.wait { state in
                     state.answer(to: move) != nil && state.answer(to: tagged) != nil
                         && state.snapshot?.items.first { $0.id == child }?.sync == .settled
                 })
@@ -1253,7 +1247,7 @@ extension LiveMarfaTests {
                 // `c` is below `b`, so it cannot become `b`'s parent.
                 let move = WriteID()
                 source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: c), as: move)
-                let refused = try #require(await log.wait(for: .seconds(60)) { $0.answer(to: move) != nil })
+                let refused = try #require(await log.wait { $0.answer(to: move) != nil })
                 guard case .refused(let problem)? = refused.answer(to: move) else {
                     Issue.record("the move was answered \(String(describing: refused.answer(to: move)))")
                     return
@@ -1290,14 +1284,27 @@ extension LiveMarfaTests {
 }
 
 /// Every suite that writes to the test instance, one after another, since each reads what the server holds and
-/// another's writes would arrive in the middle.
-@Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+/// another's writes would arrive in the middle. Only the Live test plan runs it, with the instance's address and key
+/// in `MARFA_API_URL` and `MARFA_API_KEY`; without them each test fails rather than skips.
+@Suite(.serialized, .tags(.live))
 struct LiveMarfaTests {}
 
+extension Tag {
+    /// Tests that need the test instance: the Live test plan runs them and the Unit plan leaves them out.
+    @Tag static var live: Self
+}
+
 nonisolated enum LiveMarfa {
-    static var address: String? { ProcessInfo.processInfo.environment["MARFA_TEST_URL"].flatMap { $0.isEmpty ? nil : $0 } }
-    static var key: String? { ProcessInfo.processInfo.environment["MARFA_TEST_MAPP_KEY"].flatMap { $0.isEmpty ? nil : $0 } }
-    static var isConfigured: Bool { address != nil && key != nil }
+    /// The test instance's address, from the Live test plan's environment.
+    static func address() throws -> String { try setting("MARFA_API_URL") }
+
+    /// A key for the test instance, from the Live test plan's environment.
+    static func key() throws -> String { try setting("MARFA_API_KEY") }
+
+    private static func setting(_ name: String) throws -> String {
+        let value = ProcessInfo.processInfo.environment[name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return try #require(value.isEmpty ? nil : value, "The Live test plan needs \(name) for the test instance in the environment")
+    }
 
     /// The ids a test minted, each of which is purged when it ends.
     final class Made: Sendable {
@@ -1322,19 +1329,13 @@ nonisolated enum LiveMarfa {
         func set() { value.withLock { $0 = true } }
     }
 
-    static func until(_ timeout: Duration = .seconds(20), _ condition: () async -> Bool) async -> Bool {
-        let clock = ContinuousClock()
-        let end = clock.now + timeout
-        while clock.now < end {
-            if await condition() { return true }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        return false
+    static func until(_ condition: () async -> Bool) async -> Bool {
+        (try? await eventuallyAsking(condition)) ?? false
     }
 
     /// Bins and then purges each item over HTTP. An item never made answers 404, which is fine.
     static func purge(_ ids: [ItemID]) async {
-        guard let address, let key, let base = URL(string: address) else { return }
+        guard let address = try? address(), let key = try? key(), let base = URL(string: address) else { return }
         for id in ids {
             for (method, path) in [("DELETE", "items/\(id.rawValue)"), ("POST", "items/\(id.rawValue)/purge")] {
                 var request = URLRequest(url: base.appending(path: path))
@@ -1395,7 +1396,7 @@ struct MarfaSourceClosingTests {
         await withCheckedContinuation { source.events.yield(.close($0)) }
         let late = WriteID()
         #expect(source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Late", body: "")), as: late))
-        let told = try #require(await log.wait(for: .seconds(5)) { $0.answer(to: late) != nil })
+        let told = try #require(await log.wait { $0.answer(to: late) != nil })
         guard case .refused(let problem) = told.answer(to: late) else {
             Issue.record("a late write was answered \(String(describing: told.answer(to: late)))")
             return

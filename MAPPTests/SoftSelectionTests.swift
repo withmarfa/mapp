@@ -41,10 +41,14 @@ struct SoftSelectionTests {
         return nil
     }
 
-    private func pump() async {
-        for _ in 0..<10 {
-            try? await Task.sleep(for: .milliseconds(50))
-        }
+    /// The window's table, once it shows a selected row and its mark.
+    private func shownTable(in window: NSWindow) async throws -> NSTableView {
+        try #require(await eventually {
+            guard let table = table(in: window.contentView!) else { return false }
+            let shown = marks(of: table)
+            return shown.row != nil && !shown.marks.isEmpty
+        })
+        return try #require(table(in: window.contentView!))
     }
 
     /// The marks' frames, and the frame the selected row's view has.
@@ -61,26 +65,25 @@ struct SoftSelectionTests {
         window.contentView = NSHostingView(rootView: Harness(model: model))
         window.makeKeyAndOrderFront(nil)
         defer { window.close() }
-        await pump()
 
-        let table = try #require(table(in: window.contentView!))
+        let table = try await shownTable(in: window)
         let before = marks(of: table)
         #expect(before.marks.count == 1)
         let short = try #require(before.row)
         #expect(before.marks.first?.height == short.height)
 
         model.tallRow = true
-        await pump()
-        let grown = marks(of: table)
-        let tall = try #require(grown.row)
-        #expect(tall.height > short.height)
-        #expect(grown.marks.first?.height == tall.height)
+        #expect(await eventually {
+            let grown = marks(of: table)
+            guard let tall = grown.row else { return false }
+            return tall.height > short.height && grown.marks.first?.height == tall.height
+        }, "the mark grows with its row")
 
         model.tallRow = false
-        await pump()
-        let shrunk = marks(of: table)
-        #expect(shrunk.marks.first?.height == shrunk.row?.height)
-        #expect(shrunk.row?.height == short.height)
+        #expect(await eventually {
+            let shrunk = marks(of: table)
+            return shrunk.row?.height == short.height && shrunk.marks.first?.height == short.height
+        }, "the mark shrinks with its row")
     }
 
     @Test func theMarkFollowsTheListWhenItsWidthChanges() async throws {
@@ -90,14 +93,14 @@ struct SoftSelectionTests {
         window.contentView = NSHostingView(rootView: Harness(model: model))
         window.makeKeyAndOrderFront(nil)
         defer { window.close() }
-        await pump()
 
-        let table = try #require(table(in: window.contentView!))
+        let table = try await shownTable(in: window)
+        let wide = try #require(marks(of: table).row?.width)
         model.width = 480
-        await pump()
-        let widened = marks(of: table)
-        let row = try #require(widened.row)
-        let expectedWidth = row.width - 20
-        #expect(abs((widened.marks.first?.width ?? 0) - expectedWidth) < 0.5)
+        #expect(await eventually {
+            let widened = marks(of: table)
+            guard let row = widened.row, row.width > wide, let mark = widened.marks.first else { return false }
+            return abs(mark.width - (row.width - 20)) < 0.5
+        }, "the mark is as wide as its row, less its insets")
     }
 }

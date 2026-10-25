@@ -161,7 +161,7 @@ struct LibraryChangeTests {
         let loader = ItemFileLoader()
 
         let late = Task { await loader.load(a, in: library) }
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually { library.fetches == 1 }, "the earlier load has asked for its file")
         #expect(await loader.load(b, in: library) == .ready(urlB))
         #expect(await late.value == nil, "the earlier load gave way to the later one")
         #expect(loader.resolution(of: b) == .ready(urlB))

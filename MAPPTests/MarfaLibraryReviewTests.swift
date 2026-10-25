@@ -90,6 +90,7 @@ import Testing
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
         #expect(await eventually { library.failure != nil })
+        // Time for an unlink the refusal should not set off.
         try await Task.sleep(for: .milliseconds(200))
         #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
     }
@@ -135,9 +136,8 @@ import Testing
         source.inner.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         _ = library.items(matching: "body")
-        try await Task.sleep(for: .milliseconds(300))
+        #expect(await eventually { library.failure != nil }, "a search that threw is shown as no results, and nothing says so")
         #expect(library.items(matching: "body").isEmpty)
-        #expect(library.failure != nil, "a search that threw is shown as no results, and nothing says so")
     }
 }
 
@@ -175,14 +175,14 @@ nonisolated final class FailingSearchSource: ItemSource {
 extension LiveMarfaTests {
     /// Against the test instance.
     @MainActor
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaLibraryReviewLiveTests {
         private func withLibrary(_ body: @MainActor (MarfaLibrary, MarfaSource, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryReview-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
@@ -198,7 +198,7 @@ extension LiveMarfaTests {
             }
             do {
                 source.refresh()
-                try #require(await eventually(.seconds(60)) {
+                try #require(await eventually {
                     library.isLoaded && library.connection == .online && library.count(in: .allNotes) > 100
                 })
                 try await body(library, source, made)
@@ -215,7 +215,7 @@ extension LiveMarfaTests {
                 undoManager: nil))
             made.add(id)
             await source.flush()
-            try #require(await eventually(.seconds(20)) {
+            try #require(await eventually {
                 guard let item = library.item(id), let body = library.body(of: id) else { return false }
                 return item.sync == .settled && item.version.rawValue > 0 && body.version == item.version
             })
@@ -237,9 +237,9 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryReview-other-\(UUID().uuidString)", directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: root) }
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
+            let address = try #require(URL(string: try LiveMarfa.address()))
             let other = try await WorkingCopy.open(
-                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try #require(LiveMarfa.key)))
+                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try LiveMarfa.key()))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(id.rawValue))
             _ = try await other.items.update(id.rawValue, Edit(properties: ["body": .string(text)], baseVersion: row.version))
@@ -263,7 +263,7 @@ extension LiveMarfaTests {
                 let id = try await make(library, source, made, token)
                 let read = try #require(library.body(of: id)?.version)
                 try await otherDevice(id, sets: "theirs")
-                try #require(await eventually(.seconds(30)) { library.body(of: id)?.text == "theirs" })
+                try #require(await eventually { library.body(of: id)?.text == "theirs" })
                 library.updateBody(of: id, to: "start, mine", readAt: read)
                 try await settle(library, source)
                 let held = try await source.body(of: id).text
@@ -288,9 +288,9 @@ extension LiveMarfaTests {
                 let read = try #require(library.body(of: id)?.version)
                 source.submit(.editBody(id, "start, one", base: read, merge: .asRead), as: WriteID())
                 await source.flush()
-                try #require(await eventually(.seconds(20)) { library.item(id)?.sync == .settled })
+                try #require(await eventually { library.item(id)?.sync == .settled })
                 try await otherDevice(id, sets: "theirs")
-                let caughtUp = await LiveMarfa.until(.seconds(30)) { (try? await source.body(of: id).text) == "theirs" }
+                let caughtUp = await LiveMarfa.until { (try? await source.body(of: id).text) == "theirs" }
                 try #require(caughtUp)
                 source.submit(.editBody(id, "start, one, two", base: read, merge: .following), as: WriteID())
                 try await settle(library, source)
@@ -358,7 +358,7 @@ extension LiveMarfaTests {
                     typeID: "core.note", title: "MAPPTEST review \(token)", body: "captured", parentID: nil, in: .inbox,
                     undoManager: nil))
                 made.add(id)
-                #expect(await eventually(.seconds(20)) { library.items(in: .inbox).contains { $0.id == id } })
+                #expect(await eventually { library.items(in: .inbox).contains { $0.id == id } })
                 await source.flush()
                 try await Task.sleep(for: .seconds(2))
                 source.refresh()

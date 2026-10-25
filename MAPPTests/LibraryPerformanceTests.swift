@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
@@ -13,7 +14,7 @@ struct LibraryPerformanceTests {
 
     /// Projects, tasks under them, and notes that reference one another, with a few in the Inbox, a few favorites,
     /// a few in the bin and some files beside them.
-    static func makeLibrary() async throws -> MarfaLibrary {
+    static func makeLibrary() async throws -> (MarfaLibrary, FakeItemSource) {
         typealias Fixture = LibraryFixture
         var items: [Item] = []
         for index in 0..<itemCount {
@@ -42,7 +43,7 @@ struct LibraryPerformanceTests {
         let library = MarfaLibrary(source: source)
         source.send(.loaded(SourceSnapshot(items: items, catalogue: Fixture.catalogue)))
         try #require(await eventually { library.isLoaded })
-        return library
+        return (library, source)
     }
 
     /// The median of several runs, in milliseconds, after one run to warm caches as a running app has.
@@ -58,7 +59,7 @@ struct LibraryPerformanceTests {
     }
 
     @Test func readingALargeLibraryStaysFast() async throws {
-        let library = try await Self.makeLibrary()
+        let (library, source) = try await Self.makeLibrary()
         let browser = Browser()
         let order = NoteOrder()
         let item = ItemID("item-1")
@@ -82,14 +83,27 @@ struct LibraryPerformanceTests {
         }
         let counts = Self.measure { #expect(places.reduce(0) { $0 + library.count(in: $1) } > 0) }
 
+        // A keystroke: one item changes, and the list and the counts are read again.
+        var typed = try #require(library.item(item))
+        typed.preview = "Typed"
+        source.send(.upserted([typed]))
+        try #require(await eventually { library.item(item)?.preview == "Typed" })
+        let keystroke = Self.measure {
+            #expect(!library.items(in: .allNotes).isEmpty)
+            #expect(places.reduce(0) { $0 + library.count(in: $1) } > 0)
+        }
+
+        source.hits.withLock { $0["item"] = library.items(in: .allNotes).prefix(500).map(\.id) }
+        try #require(await eventually { library.items(matching: "item").count == 500 })
+        let search = Self.measure { #expect(library.items(matching: "item").count == 500) }
+
         let timings = [
             ("items in All Items", all), ("All Items read directly", direct), ("All Items read through ItemLibrary", throughProtocol),
             ("items of a type", type), ("an item and its relationships", relationships), ("sidebar counts", counts),
+            ("a keystroke's list and counts", keystroke), ("search results", search),
         ]
         let report = timings.map { "\($0): \(String(format: "%.3f", $1)) ms\n" }.joined()
-        print(report, terminator: "")
-        // The test runner keeps no standard output, so the timings are also left where a person can read them.
-        try? Data(report.utf8).write(to: URL.temporaryDirectory.appending(path: "MAPP-performance.txt"))
+        Attachment.record(report, named: "MAPP performance.txt")
 
         #expect(all < 50)
         #expect(direct < 50)
@@ -97,5 +111,7 @@ struct LibraryPerformanceTests {
         #expect(type < 50)
         #expect(relationships < 50)
         #expect(counts < 50)
+        #expect(keystroke < 50)
+        #expect(search < 50)
     }
 }

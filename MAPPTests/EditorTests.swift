@@ -49,25 +49,19 @@ struct EditorTests {
             _ = try await editor.webView.evaluateJavaScript("1")
         }
 
-        /// The page's text, once it reads `expected` or after a couple of seconds.
+        /// The page's text, once it reads `expected` or when the wait for it gives up.
         func shownText(until expected: String) async throws -> String {
             var shown = ""
-            for _ in 0..<40 {
+            _ = try await eventuallyAsking {
                 shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
-                if shown == expected { break }
-                try await Task.sleep(for: .milliseconds(50))
+                return shown == expected
             }
             return shown
         }
 
-        /// Waits for something the page does in its own time, such as reporting an edit after a pause. It returns as
-        /// soon as the condition holds, so the limit costs nothing when all is well; it is long because the first page
-        /// of a test process starts WebKit cold, which takes 4 to 9 seconds on a hosted runner.
+        /// Waits for something the page does in its own time, such as reporting an edit after a pause.
         func wait(_ condition: () -> Bool) async throws {
-            for _ in 0..<600 where !condition() {
-                try await Task.sleep(for: .milliseconds(50))
-            }
-            try #require(condition())
+            try #require(await eventually(condition))
         }
     }
 
@@ -85,7 +79,13 @@ struct EditorTests {
 
     """
 
+    /// A panel that takes the keyboard without activating the app, transparent like `TestWindow`.
     private final class ReadingPanel: NSPanel {
+        override init(contentRect: NSRect, styleMask: NSWindow.StyleMask, backing: NSWindow.BackingStoreType, defer flag: Bool) {
+            super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
+            alphaValue = 0
+        }
+
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
     }
@@ -181,8 +181,7 @@ struct EditorTests {
         #expect(!editor.isReady)
         editor.load(try #require(library.item(second.id)))
         #expect(editor.noteID == second.id)
-        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
-        try #require(editor.isReady)
+        try #require(await eventually { editor.isReady })
         let source = try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String
         #expect(source == "Second\n")
     }
@@ -335,6 +334,7 @@ struct EditorTests {
     @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
         let page = try await Page()
         try await page.load("```mermaid\nnot a valid diagram [\n```\n")
+        // Time for the diagram's failure to reach the app, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(300))
         #expect(page.library.failure == nil)
         #expect(try await page.markdown() == nil)
@@ -442,8 +442,7 @@ struct EditorTests {
         try await page.run("window.editor.flush = () => { throw new Error('composition') }")
         let laterRejected = proxy.windowShouldClose(window)
         #expect(!laterRejected)
-        try await Task.sleep(for: .milliseconds(2200))
-        #expect(!page.library.unkept.isEmpty)
+        #expect(await eventually { !page.library.unkept.isEmpty })
         proxy.detach()
         #expect(window.delegate === host)
         window.delegate = nil
@@ -594,12 +593,9 @@ struct EditorTests {
         #expect(base == ItemVersion(1))
         #expect(merge == .asRead)
         #expect(library.body(of: F.n1)?.text == "Theirs")
-        var shown = ""
-        for _ in 0..<20 {
-            shown = try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String ?? ""
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        #expect(shown == "Theirs")
+        #expect(try await eventuallyAsking {
+            try await editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').textContent") as? String == "Theirs"
+        })
     }
 
     @Test func anImageInTheFilesShowsAndOneLinkedFromOutsideDoesNot() async throws {
@@ -620,14 +616,9 @@ struct EditorTests {
         serveEmbeds(page.editor, from: root.url)
         let note = library.add("![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n")
         page.editor.load(note)
-        var widths: [Int] = []
-        for _ in 0..<40 {
-            widths = try await page.editor.webView.evaluateJavaScript(
-                "[...document.querySelectorAll('.inkkit-image img')].map((image) => image.naturalWidth)"
-            ) as? [Int] ?? []
-            if widths == [4] { break }
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        let widths = try await settle(page.editor,
+            "[...document.querySelectorAll('.inkkit-image img')].map((image) => image.naturalWidth)",
+            as: [Int].self) { $0 == [4] }
         #expect(widths == [4])
         let expectedMissing = [["name": "b", "status": "File Not Found"]]
         let absent = try await settle(page.editor,
@@ -652,10 +643,9 @@ struct EditorTests {
     /// Evaluates a script until it answers what `done` accepts, as a page loading files takes its own time.
     func settle<T>(_ editor: EditorController, _ script: String, as: T.Type = T.self, until done: (T?) -> Bool) async throws -> T? {
         var value: T?
-        for _ in 0..<100 {
+        _ = try await eventuallyAsking {
             value = try await editor.webView.evaluateJavaScript(script) as? T
-            if done(value) { break }
-            try await Task.sleep(for: .milliseconds(50))
+            return done(value)
         }
         return value
     }
@@ -782,8 +772,7 @@ struct EditorTests {
     /// An editor over a library held in memory, showing `notes[0]` once its page has loaded.
     func attachingEditor(_ library: FakeItemLibrary) async throws -> EditorController {
         let editor = EditorController(library: library)
-        for _ in 0..<100 where !editor.isReady { try await Task.sleep(for: .milliseconds(50)) }
-        try #require(editor.isReady)
+        try #require(await eventually { editor.isReady })
         editor.load(library.items[0])
         _ = try await editor.webView.evaluateJavaScript("1")
         return editor
@@ -791,10 +780,9 @@ struct EditorTests {
 
     static let pasted = [PastedImages.Source.data(name: "Photo.png", Data("png".utf8))]
 
-    /// What the page would save once the images have had time to land, or nil while it is as loaded.
-    func settledMarkdown(_ editor: EditorController) async throws -> String? {
-        try await Task.sleep(for: .milliseconds(300))
-        return try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
+    /// What the page would save, or nil while it is as loaded.
+    func markdown(_ editor: EditorController) async throws -> String? {
+        try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
     }
 
     @Test func attachedImagesAreInsertedIntoTheNote() async throws {
@@ -802,7 +790,7 @@ struct EditorTests {
         library.attaching = { [Embed(link: "Attachments/Photo.png", name: "Photo")] }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
-        #expect(try await settledMarkdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true)
+        #expect(try await eventuallyAsking { try await markdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true })
         #expect(library.failure == nil)
     }
 
@@ -811,7 +799,8 @@ struct EditorTests {
         library.attaching = { throw SourceFailure(kind: .failed, message: "The server is out of space.") }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
-        #expect(try await settledMarkdown(editor) == nil, "nothing is inserted")
+        #expect(await eventually { library.failure != nil })
+        #expect(try await markdown(editor) == nil, "nothing is inserted")
         #expect(library.failure?.title == "Can’t Attach Images")
         #expect(library.failure?.message == "The images weren’t added to the note. The server is out of space.")
     }
@@ -822,20 +811,24 @@ struct EditorTests {
         let library = FakeItemLibrary(items: [first, second])
         let (gate, open) = AsyncStream<Void>.makeStream()
         var started = false
+        var answered = false
         library.attaching = {
             started = true
             for await _ in gate { break }
+            defer { answered = true }
             return [Embed(link: "Attachments/Photo.png", name: "Photo")]
         }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
-        for _ in 0..<100 where !started { try await Task.sleep(for: .milliseconds(10)) }
-        try #require(started)
+        try #require(await eventually { started })
         editor.load(second)
         _ = try await editor.webView.evaluateJavaScript("1")
         open.yield()
         open.finish()
-        #expect(try await settledMarkdown(editor) == nil, "the note now on the page takes nothing")
+        try #require(await eventually { answered })
+        // Time for an insertion made from the late answer to reach the page, which nothing signals when none is made.
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(try await markdown(editor) == nil, "the note now on the page takes nothing")
         #expect(editor.noteID == second.id)
         #expect(library.failure == nil)
     }
@@ -868,14 +861,17 @@ struct EditorTests {
         page.editor.exportPDF(to: url)
         // The size is watched rather than the file read, and a PDF far larger than one short note's fails at once,
         // so pagination that runs away cannot fill the disk before the test gives up.
-        var bytes = 0
-        for _ in 0..<50 {
-            try await Task.sleep(for: .milliseconds(100))
+        var bytes = 0, runaway = 0
+        _ = await eventually {
             let now = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-            try #require(now <= 5_000_000, "the PDF has grown to \(now) bytes")
-            if now > 0, now == bytes { break }
-            bytes = now
+            defer { bytes = now }
+            if now > 5_000_000 {
+                runaway = now
+                return true
+            }
+            return now > 0 && now == bytes
         }
+        try #require(runaway == 0, "the PDF has grown to \(runaway) bytes")
         try #require(bytes > 0, "no PDF was written")
         let document = try #require(PDFDocument(url: url))
         #expect((1...2).contains(document.pageCount), "a short note prints on a page or two")
@@ -918,11 +914,10 @@ struct EditorTests {
         page.editor.setHeader(Self.header("Untitled", id: note.id))
         var focused = ""
         var selected = ""
-        for _ in 0..<40 {
+        _ = try await eventuallyAsking {
             focused = try await page.editor.webView.evaluateJavaScript("document.activeElement?.id ?? ''") as? String ?? ""
             selected = try await page.editor.webView.evaluateJavaScript("String(getSelection())") as? String ?? ""
-            if focused == "ItemPageTitle", selected == "Untitled" { break }
-            try await Task.sleep(for: .milliseconds(50))
+            return focused == "ItemPageTitle" && selected == "Untitled"
         }
         #expect(focused == "ItemPageTitle")
         #expect(selected == "Untitled", "the title is selected, so typing names the item")
@@ -1143,11 +1138,11 @@ struct EditorTests {
                 NSPasteboard.general.setString(pasted, forType: .string)
             }
             NSApp.sendAction(#selector(NSText.paste(_:)), to: page.editor.webView, from: nil)
-            for _ in 0..<60 where try await title() == "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            _ = try await eventuallyAsking { try await title() != "Title" }
             let markup = try await page.editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle').innerHTML") as? String
             #expect(markup == expected, "pasting \(pasted.unicodeScalars.map { String($0.value, radix: 16) }) left \(markup ?? "")")
             page.editor.webView.undo(nil)
-            for _ in 0..<60 where try await title() != "Title" { try await Task.sleep(for: .milliseconds(50)) }
+            _ = try await eventuallyAsking { try await title() == "Title" }
             #expect(try await title() == "Title", "one Undo takes out what was pasted")
         }
     }
@@ -1301,10 +1296,9 @@ struct EditorTests {
             try await page.run("document.getElementById('ItemPageTitle').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))")
         }
 
-        /// Waits for something the page or the window does in its own time, for up to ten seconds.
+        /// Waits for something the page or the window does in its own time.
         func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
-            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
-            try #require(try await condition(), "waiting for \(what)")
+            try #require(try await eventuallyAsking(condition), "waiting for \(what)")
         }
 
         func waitForTitle(_ title: String) async throws {
@@ -1400,7 +1394,7 @@ struct EditorTests {
     /// Opens the item in a window of its own, as the app's item window shows it, sets its title as `edit` says,
     /// and closes the window the way ⌘W does.
     static func openAndClose(_ library: MarfaLibrary, item: ItemID, edit: (EditorController, EditorWebView) async throws -> Void = { _, _ in }) async throws -> Released {
-        for _ in 0..<200 where !library.isLoaded { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(await eventually { library.isLoaded })
         // The app's run loop empties its autorelease pool after every event; a test's await does not, so the
         // window's own steps are made in pools of their own.
         let window = autoreleasepool {
@@ -1410,18 +1404,13 @@ struct EditorTests {
             window.makeKeyAndOrderFront(nil)
             return window
         }
-        for _ in 0..<200 where editorWebView(in: window.contentView)?.controller?.isReady != true {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        try #require(await eventually { editorWebView(in: window.contentView)?.controller?.isReady == true })
         let web = try #require(editorWebView(in: window.contentView))
         let editor = try #require(web.controller)
-        for _ in 0..<200 where try await web.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        try #require(try await eventuallyAsking { try await web.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String == library.item(item)?.title })
         try await edit(editor, web)
         autoreleasepool { window.performClose(nil) }
-        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(!window.isVisible, "the window closes")
+        #expect(await eventually { !window.isVisible }, "the window closes")
         // What SwiftUI does with a window it closes.
         autoreleasepool {
             window.toolbar = nil
@@ -1432,7 +1421,7 @@ struct EditorTests {
 
     /// An item's page in a window of its own, with an editor and drafts of its own, through to its window closing.
     static func openAndCloseAPage(_ library: MarfaLibrary, item: ItemID) async throws -> Released {
-        for _ in 0..<200 where !library.isLoaded { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(await eventually { library.isLoaded })
         let editor = EditorController(library: library)
         let drafts = DetailsPresentation()
         editor.titleDrafts = drafts
@@ -1444,22 +1433,19 @@ struct EditorTests {
             window.makeKeyAndOrderFront(nil)
             return window
         }
-        for _ in 0..<200 where try await editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String != library.item(item)?.title {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        try #require(try await eventuallyAsking { try await editor.webView.evaluateJavaScript("document.getElementById('ItemPageTitle')?.textContent") as? String == library.item(item)?.title })
         // Typing in the title goes through the window's handler, as a person's does.
         editor.onHeaderEvent(.titleInput(item, "Review the findings"))
         drafts.draft(for: item, key: "title").isDirty = false
         autoreleasepool { window.performClose(nil) }
-        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(!window.isVisible, "the window closes")
+        #expect(await eventually { !window.isVisible }, "the window closes")
         autoreleasepool { window.contentView = nil }
         return Released(editor: editor, webView: editor.webView, library: library)
     }
 
     @Test func aClosedWindowLetsGoOfItsEditorPageAndLibrary() async throws {
         let released = try await Self.openAndCloseAPage(ItemPreviewFixtures.library, item: ItemPreviewFixtures.ticketID)
-        for _ in 0..<200 where !released.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        _ = await eventually { released.isEmpty }
         #expect(released.editor == nil, "a closed window's editor is released")
         #expect(released.webView == nil, "a closed window's web view is released")
         #expect(released.library == nil, "a library no window shows is released")
@@ -1498,19 +1484,18 @@ struct EditorTests {
             window.makeKeyAndOrderFront(nil)
             return window
         }
-        for _ in 0..<200 where editorWebView(in: window.contentView)?.controller?.isReady != true {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        try #require(await eventually { editorWebView(in: window.contentView)?.controller?.isReady == true })
         gather()
         for _ in 0..<times {
             ticks.count += 1
+            // Lets each change reach the page before the next, as a person's edits arrive spaced apart.
             try await Task.sleep(for: .milliseconds(100))
             gather()
         }
         let shown = try #require(editorWebView(in: window.contentView)?.controller)
         let drafts = shown.titleDrafts
         autoreleasepool { window.performClose(nil) }
-        for _ in 0..<200 where window.isVisible { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(await eventually { !window.isVisible })
         autoreleasepool {
             window.toolbar = nil
             window.contentView = nil
@@ -1559,13 +1544,10 @@ struct EditorTests {
                 document.execCommand('selectAll'); document.execCommand('delete')
                 title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
                 """)
-            for _ in 0..<200 where try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool != true {
-                try await Task.sleep(for: .milliseconds(50))
-            }
+            try #require(try await eventuallyAsking { try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool == true })
             // Deleted from another window, so closing this one is allowed: the draft cannot be saved anywhere.
             library.delete([ticket], undoManager: nil)
-            for _ in 0..<200 where editor.isEditable { try await Task.sleep(for: .milliseconds(50)) }
-            #expect(!editor.isEditable, "the page shows the note deleted")
+            #expect(await eventually { !editor.isEditable }, "the page shows the note deleted")
         }
         library.recover([ticket], undoManager: nil)
         let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
@@ -1683,8 +1665,7 @@ struct EditorTests {
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         func value(_ script: String) async throws -> Any? { try await editor.webView.evaluateJavaScript(script) }
         func waitFor(_ what: String, _ condition: () async throws -> Bool) async throws {
-            for _ in 0..<200 where try await !condition() { try await Task.sleep(for: .milliseconds(50)) }
-            try #require(try await condition(), "waiting for \(what)")
+            try #require(try await eventuallyAsking(condition), "waiting for \(what)")
         }
         let editable = "document.getElementById('ItemPageTitle').getAttribute('contenteditable')"
         try await waitFor("the first-line title") { try await value("document.getElementById('ItemPageTitle')?.textContent") as? String == "Shopping list" }

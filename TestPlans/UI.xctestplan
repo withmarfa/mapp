@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "AAA9C51F-B829-4D52-AB62-5DB02D383153",
+      "name" : "UI",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:MAPP.xcodeproj",
+        "identifier" : "3303FE323066ED47005D07A2",
+        "name" : "MAPPUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

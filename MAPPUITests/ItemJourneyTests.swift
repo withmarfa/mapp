@@ -4,15 +4,14 @@ import XCTest
 final class ItemJourneyTests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUp() {
+    override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+        app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
 
-    override func tearDown() { app.terminate() }
+    override func tearDown() async throws { app.terminate() }
 
     func testCreateRelateEditAndReopen() {
         create(type: "Project", title: "Interface Test Project")

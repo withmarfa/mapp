@@ -5,9 +5,7 @@ import XCTest
 final class SidebarSizeTests: XCTestCase {
     func testTheInstanceMenuOpensSettingsAtEverySidebarSize() {
         for size in ["1", "2", "3"] {
-            let app = XCUIApplication()
-            // Before the sample library's flag, which takes no value.
-            app.launchArguments += ["-NSTableViewDefaultSizeMode", size, "-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+            let app = XCUIApplication.sample(settings: ["NSTableViewDefaultSizeMode": size])
             app.launch()
             let window = app.windows.firstMatch
             XCTAssertTrue(window.outlines["Sidebar"].waitForExistence(timeout: 10))

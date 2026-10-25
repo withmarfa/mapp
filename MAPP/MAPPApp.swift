@@ -1,6 +1,37 @@
 import SwiftUI
 
 @main
+enum Launch {
+    static func main() {
+        #if DEBUG
+        if TestHost.isRequested {
+            TestHost.run()
+            return
+        }
+        #endif
+        MAPPApp.main()
+    }
+}
+
+#if DEBUG
+/// The app as the unit tests' host: a running `NSApplication` for the tests to use, with no scene, no library and
+/// no delegate. The scheme tests the Debug Tests configuration, whose app is background-only (`LSBackgroundOnly`),
+/// so a test run shows no Dock icon and never takes the keyboard from the person.
+enum TestHost {
+    /// Whether the unit test bundle has been loaded into this process, which is so only for the app that hosts the
+    /// unit tests. The UI tests' app never has one: its tests run in the separate runner process, which drives the app
+    /// from outside, so no test bundle loads into it. The environment cannot tell the two apart, since Xcode may pass
+    /// XCTest variables to either (`XCUIApplication.launchEnvironment`).
+    static var isRequested: Bool {
+        Bundle.allBundles.contains { $0.bundleURL.pathExtension == "xctest" }
+    }
+
+    static func run() {
+        NSApplication.shared.run()
+    }
+}
+#endif
+
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()

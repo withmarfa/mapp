@@ -4,11 +4,9 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// What Marfa answers for the links in a note's text, against a server. Run only when `MARFA_TEST_URL` and
-    /// `MARFA_TEST_MAPP_KEY` are in the environment (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and
-    /// `TEST_RUNNER_MARFA_TEST_MAPP_KEY`); a throwaway server and key come from `core/scripts/server-up.sh` in the
-    /// `marfa` repository. Every item has a title starting `MAPPTEST ` and is purged when the test ends.
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    /// What Marfa answers for the links in a note's text, against the test instance, in the Live test plan. Every
+    /// item has a title starting `MAPPTEST ` and is purged when the test ends.
+    @Suite(.serialized)
     struct MarfaBodyLinkLiveTests {
         private static let note = TypeID("core.note")
 
@@ -16,9 +14,9 @@ extension LiveMarfaTests {
         private func withSource(_ body: (MarfaSource, ChangeLog, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaBodyLinks-\(UUID())", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let log = ChangeLog(source)
             do {
@@ -40,7 +38,7 @@ extension LiveMarfaTests {
         /// Each link in the text, as typed, with the note it names once the server has answered for all of them.
         private func targets(of reader: ItemID, in source: MarfaSource, count: Int) async throws -> [String: BodyTarget] {
             var found: [String: BodyTarget] = [:]
-            _ = await LiveMarfa.until(.seconds(30)) {
+            _ = await LiveMarfa.until {
                 let links = (try? await source.copy.items.links(in: reader.rawValue))?.links ?? []
                 found = Dictionary(links.map { ($0.text, $0.target) }, uniquingKeysWith: { first, _ in first })
                 return links.count == count && !found.values.contains(.pending)

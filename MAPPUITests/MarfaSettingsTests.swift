@@ -11,8 +11,7 @@ final class MarfaSettingsTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary", "-MAPPSampleUnconfigured"]
+        app = XCUIApplication.sample(flags: ["-MAPPSampleUnconfigured"])
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }

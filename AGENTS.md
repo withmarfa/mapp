@@ -19,8 +19,9 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - Use scoped Conventional Commits in the present tense, lowercase and short: `feat(app):`, `fix(editor):`, `test(model):`.
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
-- GitHub-hosted checks (`.github/workflows/checks.yml`) run on pull requests, each only when its files changed: the editor's tests, typecheck, format check and a rebuild of the page that must match the committed `editor.html`, and the app's unit tests (`-only-testing:MAPPTests`, never UI tests), where a failed test is retried twice and passes the check if a retry passes, so a flaky test does not show as red. The final job, `Checks`, always runs and is the one to require. Xcode Cloud only archives tagged releases. Run every test locally, including the UI tests, before you merge.
+- GitHub-hosted checks (`.github/workflows/checks.yml`) run on pull requests, each only when its files changed: the editor's tests, typecheck, format check and a rebuild of the page that must match the committed `editor.html`; and the app's `Unit` test plan, then a build of the UI tests, which never run there. A failed test fails the check; nothing is retried. The final job, `Checks`, always runs and is the one to require. Xcode Cloud only archives tagged releases. Run the `Unit` and `UI` plans locally before you merge.
 - While working, run only the tests a change touches (`-only-testing:MAPPTests/<Suite>`), and every test once before merging.
+- A test waits for what it needs with `eventually` or `eventuallyAsking` (`MAPPTests/Waiting.swift`), never a loop of short sleeps or its own time limit: a wait returns as soon as its condition holds, and the shared limit allows for a slow hosted runner. A fixed sleep is only for checking that something did not happen, with a comment saying what it gives time for.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
 - Keep no legacy: no compatibility shims, deprecation aliases, or migration paths. Removed means gone.
@@ -47,7 +48,7 @@ These hold across the app. The nested files say how the library keeps them.
 - Notes are held byte for byte. A note opened and left alone is never rewritten. An edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary` (`MAPP/Model/Items/ItemLibrary.swift`), read from the environment's `library` value. Never test for a concrete library type in a view.
 - Windows, selections, restoration, and drags name items by `ItemID`, never by path.
-- Tests never touch the person's data. Under unit tests hosted in the app, previews and the sample library, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location and defaults of its own, never the Keychain or the saved server. UI tests open the sample library (`-MAPPSampleLibrary`), a library held in memory by `marfa-swift`'s fake working copy (`WorkingCopy.fake`). A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy, never a server.
+- Tests never touch the person's data. Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location and defaults of its own, never the Keychain or the saved server. UI tests open the sample library through `XCUIApplication.sample()` (`-MAPPSampleLibrary`), a library held in memory by `marfa-swift`'s fake working copy (`WorkingCopy.fake`). A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy, never a server. Only the `Live` test plan reaches a server, and only a test instance.
 
 ## Layout
 
@@ -57,19 +58,34 @@ These hold across the app. The nested files say how the library keeps them.
 - `MAPP/Model/`: the data model, free of SwiftUI. `Items/` holds the library protocol and item types; `Marfa/` holds the Marfa library.
 - `MAPP/Views/`: windows, panes, toolbars, commands, and Settings.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
-- `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` holds items in memory for testing view models and the editor without a server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
+- `MAPPTests/`: Swift Testing unit tests. They are hosted in the app built with the `Debug Tests` configuration, which marks it background-only (`LSBackgroundOnly`), so the host never shows in the Dock, never becomes the active app and puts no window in front of the person; under XCTest it starts a bare `NSApplication` with no scene (`TestHost` in `MAPP/MAPPApp.swift`). `FakeItemLibrary` holds items in memory for testing view models and the editor without a server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
+- `TestPlans/`: the test plans. `Unit`, the `MAPP` scheme's default, runs every unit test except those tagged `live`; `Live` runs only those; `UI`, the `MAPP UI Tests` scheme's, runs the UI tests.
 - `Design/`: artwork that is not built into the app.
 
 ## Commands
 
-- Build and run every test:
+- Build and run the unit tests:
 
   ```sh
   xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
   ```
 
-  The UI tests take control of the keyboard and mouse. Add `-only-testing:MAPPTests` to run the unit tests alone.
+  They show no window and no Dock icon, so they can run while the Mac is in use.
+- Run the UI tests, which take control of the keyboard and mouse:
+
+  ```sh
+  xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS' -derivedDataPath build test
+  ```
+
+- Before a release, run the `Live` plan against a Marfa test instance, never a server that holds a person's data. Its tests create, edit and delete items there. Pass the instance's address and a key for it through xcodebuild's `TEST_RUNNER_` prefix, which hands them to the tests without it:
+
+  ```sh
+  TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> \
+    xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
+  ```
+
+  Without them, each live test fails rather than skips.
 - Replace `test` with `build` to build only. The built app is `build/Build/Products/Debug/MAPP.app`.
 - A Debug build launched with `-MAPPSampleLibrary` connects an isolated Marfa host to a sample library held in memory for the length of the run. The UI tests use it. Add `-MAPPSampleUnconfigured` to start with no server set instead, as a first launch does, `-MAPPCollectionSample` for tasks and events, and `-MAPPSelectItem <item id>` to select that item once the library holds it, for a run nobody can click.
 - To point that Debug build at a test server, run its binary with `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` in the environment: the isolated host connects to that server, keeping the key in memory only.
