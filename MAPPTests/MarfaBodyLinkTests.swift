@@ -4,11 +4,9 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// What Marfa answers for the links in a note's text, against a server. Run only when `MARFA_TEST_URL` and
-    /// `MARFA_TEST_MAPP_KEY` are in the environment (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and
-    /// `TEST_RUNNER_MARFA_TEST_MAPP_KEY`); a throwaway server and key come from `core/scripts/server-up.sh` in the
-    /// `marfa` repository. Every item has a title starting `MAPPTEST ` and is purged when the test ends.
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    /// What Marfa answers for the links in a note's text, against the test instance, in the Live test plan. Every
+    /// item has a title starting `MAPPTEST ` and is purged when the test ends.
+    @Suite(.serialized)
     struct MarfaBodyLinkLiveTests {
         private static let note = TypeID("core.note")
 
@@ -16,9 +14,9 @@ extension LiveMarfaTests {
         private func withSource(_ body: (MarfaSource, ChangeLog, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaBodyLinks-\(UUID())", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let log = ChangeLog(source)
             do {

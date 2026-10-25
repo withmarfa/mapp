@@ -1026,9 +1026,8 @@ struct MarfaHostOfflineTests {
 }
 
 extension LiveMarfaTests {
-    /// Runs against the test instance only when it is configured, as `MarfaSourceLiveTests` does, each on a copy of
-    /// its own that it removes.
-    @MainActor @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    /// Against the test instance, in the Live test plan, each on a copy of its own that it removes.
+    @MainActor @Suite(.serialized)
     struct MarfaHostLiveTests {
         private func host(_ bench: HostBench) -> MarfaHost {
             bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -1050,7 +1049,7 @@ extension LiveMarfaTests {
         }
 
         private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
-            try await host.connect(address: try #require(LiveMarfa.address), key: try #require(LiveMarfa.key))
+            try await host.connect(address: try LiveMarfa.address(), key: try LiveMarfa.key())
             #expect(await eventually(.seconds(30)) { host.state == .online && host.report.queueRead })
 
             let title = "MAPPTEST refused \(UUID().uuidString.prefix(8))"
@@ -1081,8 +1080,8 @@ extension LiveMarfaTests {
         func aWrongKeyGivenForAWorkingCopyKeepsTheOldKey() async throws {
             let bench = try HostBench()
             let host = host(bench)
-            let address = try #require(LiveMarfa.address)
-            let key = try #require(LiveMarfa.key)
+            let address = try LiveMarfa.address()
+            let key = try LiveMarfa.key()
             try await host.connect(address: address, key: key)
             #expect(await eventually(.seconds(30)) { host.state == .online })
             do {
@@ -1100,9 +1099,9 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: root) }
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             do {
                 let log = ChangeLog(source)
@@ -1138,9 +1137,9 @@ extension LiveMarfaTests {
         func aWrongKeyIsRefusedUntilTheRightOneIsGiven() async throws {
             let bench = try HostBench()
             let host = host(bench)
-            try await host.connect(address: try #require(LiveMarfa.address), key: "mapptest-not-a-key-\(UUID().uuidString)")
+            try await host.connect(address: try LiveMarfa.address(), key: "mapptest-not-a-key-\(UUID().uuidString)")
             #expect(await eventually(.seconds(30)) { host.state == .keyRefused }, "\(host.state)")
-            try await host.replaceKey(try #require(LiveMarfa.key))
+            try await host.replaceKey(try LiveMarfa.key())
             #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
             try await host.disconnect(.discardCopy(nil))
         }

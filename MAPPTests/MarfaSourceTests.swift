@@ -829,18 +829,16 @@ struct MarfaSourceOfflineTests {
 }
 
 extension LiveMarfaTests {
-    /// Runs against the test instance only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY` are in the environment
-    /// (passed to xcodebuild as `TEST_RUNNER_MARFA_TEST_URL` and `TEST_RUNNER_MARFA_TEST_MAPP_KEY`). Every item it
-    /// makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
+    /// Against the test instance, in the Live test plan. Every item it makes has a title starting `MAPPTEST ` and is purged when the test ends, passed or not, over HTTP with the key's
     /// `items.purge`, which reaches an item the copy never held or has let go of.
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaSourceLiveTests {
         private static let note = TypeID("core.note")
 
         private func open(_ root: URL) async throws -> MarfaSource {
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             return try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
         }
 
@@ -1032,8 +1030,8 @@ extension LiveMarfaTests {
                 let otherRoot = scratch()
                 defer { try? FileManager.default.removeItem(at: otherRoot) }
                 try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
-                let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
-                let key = try #require(LiveMarfa.key)
+                let address = try #require(URL(string: try LiveMarfa.address()))
+                let key = try LiveMarfa.key()
                 let other = try await WorkingCopy.open(
                     store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
@@ -1078,7 +1076,7 @@ extension LiveMarfaTests {
         }
 
         private func conflictFromAnEarlierLaunch(_ root: URL, _ made: LiveMarfa.Made) async throws {
-            let address = try #require(LiveMarfa.address), key = try #require(LiveMarfa.key)
+            let address = try LiveMarfa.address(), key = try LiveMarfa.key()
             let connection = try MarfaConnection(address: address)
             let location = MarfaStoreLocation(root: root)
             let keys = MemoryKeyStore([connection: key])
@@ -1290,14 +1288,27 @@ extension LiveMarfaTests {
 }
 
 /// Every suite that writes to the test instance, one after another, since each reads what the server holds and
-/// another's writes would arrive in the middle.
-@Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+/// another's writes would arrive in the middle. Only the Live test plan runs it, with the instance's address and key
+/// in `MARFA_API_URL` and `MARFA_API_KEY`; without them each test fails rather than skips.
+@Suite(.serialized, .tags(.live))
 struct LiveMarfaTests {}
 
+extension Tag {
+    /// Tests that need the test instance: the Live test plan runs them and the Unit plan leaves them out.
+    @Tag static var live: Self
+}
+
 nonisolated enum LiveMarfa {
-    static var address: String? { ProcessInfo.processInfo.environment["MARFA_TEST_URL"].flatMap { $0.isEmpty ? nil : $0 } }
-    static var key: String? { ProcessInfo.processInfo.environment["MARFA_TEST_MAPP_KEY"].flatMap { $0.isEmpty ? nil : $0 } }
-    static var isConfigured: Bool { address != nil && key != nil }
+    /// The test instance's address, from the Live test plan's environment.
+    static func address() throws -> String { try setting("MARFA_API_URL") }
+
+    /// A key for the test instance, from the Live test plan's environment.
+    static func key() throws -> String { try setting("MARFA_API_KEY") }
+
+    private static func setting(_ name: String) throws -> String {
+        let value = ProcessInfo.processInfo.environment[name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return try #require(value.isEmpty ? nil : value, "The Live test plan needs \(name) for the test instance in the environment")
+    }
 
     /// The ids a test minted, each of which is purged when it ends.
     final class Made: Sendable {
@@ -1334,7 +1345,7 @@ nonisolated enum LiveMarfa {
 
     /// Bins and then purges each item over HTTP. An item never made answers 404, which is fine.
     static func purge(_ ids: [ItemID]) async {
-        guard let address, let key, let base = URL(string: address) else { return }
+        guard let address = try? address(), let key = try? key(), let base = URL(string: address) else { return }
         for id in ids {
             for (method, path) in [("DELETE", "items/\(id.rawValue)"), ("POST", "items/\(id.rawValue)/purge")] {
                 var request = URLRequest(url: base.appending(path: path))

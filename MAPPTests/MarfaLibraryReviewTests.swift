@@ -175,14 +175,14 @@ nonisolated final class FailingSearchSource: ItemSource {
 extension LiveMarfaTests {
     /// Against the test instance.
     @MainActor
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaLibraryReviewLiveTests {
         private func withLibrary(_ body: @MainActor (MarfaLibrary, MarfaSource, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryReview-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
@@ -237,9 +237,9 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryReview-other-\(UUID().uuidString)", directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: root) }
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            let address = try #require(LiveMarfa.address.flatMap { URL(string: $0) })
+            let address = try #require(URL(string: try LiveMarfa.address()))
             let other = try await WorkingCopy.open(
-                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try #require(LiveMarfa.key)))
+                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try LiveMarfa.key()))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(id.rawValue))
             _ = try await other.items.update(id.rawValue, Edit(properties: ["body": .string(text)], baseVersion: row.version))

@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "id": "6EBE6B57-8FEC-4AEA-B4EC-1567F095D7E4",
+      "name": "Live",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {},
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:MAPP.xcodeproj",
+        "identifier": "3303FE023066ED47005D07A2",
+        "name": "MAPPTests"
+      },
+      "selectedTags": {
+        "tags": [
+          "live"
+        ]
+      }
+    }
+  ],
+  "version": 1
+}

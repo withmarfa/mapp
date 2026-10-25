@@ -6,18 +6,17 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// The library over a real copy of the test instance, run only when `MARFA_TEST_URL` and `MARFA_TEST_MAPP_KEY`
-    /// are in the environment. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
+    /// The library over a real copy of the test instance, in the Live test plan. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
     /// ends, passed or not.
     @MainActor
-    @Suite(.serialized, .enabled(if: LiveMarfa.isConfigured))
+    @Suite(.serialized)
     struct MarfaLibraryLiveTests {
         private func withLibrary(_ body: @MainActor (MarfaLibrary, MarfaSource, LiveMarfa.Made) async throws -> Void) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
@@ -252,9 +251,9 @@ extension LiveMarfaTests {
 
                 let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-fresh-\(UUID().uuidString)", directoryHint: .isDirectory)
                 defer { try? FileManager.default.removeItem(at: root) }
-                let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
+                let connection = try MarfaConnection(address: try LiveMarfa.address())
                 let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
+                    connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                     location: MarfaStoreLocation(root: root))
                 let fresh = MarfaLibrary(source: second)
                 second.refresh()
