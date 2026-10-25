@@ -24,6 +24,9 @@ struct SidebarSettings: View {
             Section("Places") {
                 group(plan.top, in: library, plan: plan)
             }
+            Section("Browse") {
+                group(plan.browse, in: library, plan: plan)
+            }
             if plan.library.contains(.types) {
                 Section {
                     row(.types, title: String(localized: "Show Types"), in: library, plan: plan, among: [])

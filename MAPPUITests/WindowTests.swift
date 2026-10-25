@@ -117,9 +117,8 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testRecentlyDeletedFromTheInstanceMenuRestoresANote() {
-        window.descendants(matching: .any).matching(identifier: "SidebarLibrary").element(boundBy: 0).click()
-        let recentlyDeleted = app.menuItems["Recently Deleted"]
+    func testRecentlyDeletedFromTheSidebarFootRestoresANote() {
+        let recentlyDeleted = window.descendants(matching: .any).matching(identifier: "SidebarRecentlyDeleted").element(boundBy: 0)
         XCTAssertTrue(recentlyDeleted.waitForExistence(timeout: 3))
         recentlyDeleted.click()
         let deleted = row(titled: "Old packing list")

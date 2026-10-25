@@ -106,7 +106,6 @@ struct MainView: View {
 
     private var sidebarColumn: some View {
         VStack(spacing: 0) {
-            SidebarHeader(browser: browser)
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)

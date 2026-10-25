@@ -35,19 +35,29 @@ struct Sidebar: View {
                         case .inbox: row(.inbox, symbol: "tray", hiding: .inbox)
                         // Always the same number, so it says nothing.
                         case .recents: row(.recents, symbol: "clock", hiding: .recents, counted: false)
+                        default:
+                            row(.favorites, symbol: "heart", hiding: .favorites)
+                                .accessibilityIdentifier("SidebarFavorites")
+                        }
+                    }
+                }
+            }
+
+            if !plan.shownBrowse.isEmpty {
+                Section("Browse") {
+                    ForEach(plan.shownBrowse, id: \.key) { place in
+                        switch place {
                         case .sources:
                             row(.sources, symbol: "antenna.radiowaves.left.and.right", hiding: .sources, counted: false)
                                 .accessibilityIdentifier("SidebarSources")
                         case .collections:
                             row(.collections, symbol: "square.stack", hiding: .collections, counted: false)
                                 .accessibilityIdentifier("SidebarCollections")
-                        case .favorites:
-                            row(.favorites, symbol: "heart", hiding: .favorites)
-                                .accessibilityIdentifier("SidebarFavorites")
                         default: row(.allNotes, symbol: "note.text", hiding: .all)
                         }
                     }
                 }
+                .accessibilityIdentifier("SidebarBrowse")
             }
 
             ForEach(plan.shownLibrary, id: \.key) { section in
@@ -72,7 +82,7 @@ struct Sidebar: View {
     }
 
     private func selectionRows(_ plan: SidebarPlan) -> [String] {
-        plan.shownTop.map(\.key) + plan.shownLibrary.map(\.key)
+        plan.shownTop.map(\.key) + plan.shownBrowse.map(\.key) + plan.shownLibrary.map(\.key)
             + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
             + library.itemTypeCounts.map { $0.id.rawValue }
     }
@@ -81,18 +91,7 @@ struct Sidebar: View {
         Section {
             ForEach(plan.shownTypes) { typeRow($0) }
         } header: {
-            HStack {
-                Text("Types")
-                Spacer()
-                Button("Edit") { editsTypes = true }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $editsTypes) {
-                        SidebarTypePicker()
-                    }
-                    .accessibilityIdentifier("EditSidebarTypes")
-            }
-            .padding(.trailing, 12)
-            .accessibilityIdentifier("SidebarTypes")
+            TypesHeading(editsTypes: $editsTypes)
         }
     }
 
@@ -166,6 +165,31 @@ struct Sidebar: View {
     }
 }
 
+/// The Types heading. Edit shows only while the pointer is over the heading, or its picker is open, as the control
+/// of a sidebar's section heading does.
+private struct TypesHeading: View {
+    @Binding var editsTypes: Bool
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack {
+            Text("Types")
+            Spacer()
+            Button("Edit") { editsTypes = true }
+                .buttonStyle(.plain)
+                .opacity(isHovering || editsTypes ? 1 : 0)
+                .popover(isPresented: $editsTypes) {
+                    SidebarTypePicker()
+                }
+                .accessibilityIdentifier("EditSidebarTypes")
+        }
+        .padding(.trailing, 12)
+        .contentShape(.rect)
+        .onHover { isHovering = $0 }
+        .accessibilityIdentifier("SidebarTypes")
+    }
+}
+
 #if DEBUG
 #Preview("Sample Sidebar") {
     Sidebar(browser: Browser(), order: NoteOrder())
@@ -202,7 +226,6 @@ struct Sidebar: View {
     let browser = Browser()
     NavigationSplitView {
         VStack(spacing: 0) {
-            SidebarHeader(browser: browser)
             Sidebar(browser: browser, order: NoteOrder())
             SidebarFoot(browser: browser)
         }

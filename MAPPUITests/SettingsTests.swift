@@ -11,7 +11,7 @@ final class SettingsTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     /// Settings' pages, which take the list's column while Settings is the place.
     private var settings: XCUIElement { element("SettingsPageList") }
-    private var instanceMenu: XCUIElement { element("SidebarLibrary") }
+    private var settingsButton: XCUIElement { element("SidebarOpenSettings") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -210,10 +210,9 @@ final class SettingsTests: XCTestCase {
         let typeText = sidebar.staticTexts["Note"]
         let originalTypeHeight = typeText.frame.height
         XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
-        XCTAssertTrue(instanceMenu.exists)
-        XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the instance menu belongs to the sidebar")
-        instanceMenu.click()
-        app.menuItems["Settings"].click()
+        XCTAssertTrue(settingsButton.exists)
+        XCTAssertLessThan(settingsButton.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
+        settingsButton.click()
         let size = window.popUpButtons["InterfaceTextSize"]
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         size.click()
@@ -243,7 +242,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(size.value as? String, "18 pt", "the preference survives restarting the app")
     }
 
-    func testBaseTextSizeKeepsTheInstanceMenuAndSearchUsableAtLimits() {
+    func testBaseTextSizeKeepsTheSidebarFootAndSearchUsableAtLimits() {
         for points in [24, 11] {
             app.typeKey(",", modifierFlags: .command)
             let size = window.popUpButtons["InterfaceTextSize"]
@@ -252,13 +251,9 @@ final class SettingsTests: XCTestCase {
             app.menuItems["\(points) pt"].click()
             leaveSettings()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
-            XCTAssertTrue(instanceMenu.waitForExistence(timeout: 3))
-            XCTAssertTrue(instanceMenu.isHittable, "the instance menu is reachable at \(points) points")
-            instanceMenu.click()
-            let settingsItem = app.menuItems["Settings"]
-            XCTAssertTrue(settingsItem.waitForExistence(timeout: 3))
-            XCTAssertTrue(settingsItem.isEnabled)
-            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(settingsButton.waitForExistence(timeout: 3))
+            XCTAssertTrue(settingsButton.isHittable, "the sidebar's Settings button is reachable at \(points) points")
+            XCTAssertTrue(settingsButton.isEnabled)
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.textFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))

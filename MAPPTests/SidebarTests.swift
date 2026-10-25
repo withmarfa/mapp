@@ -212,12 +212,14 @@ struct SidebarTests {
         let library = try await marfaLibrary([])
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.library.isEmpty)
-        #expect(plan.top == [.inbox, .recents, .all, .sources, .collections, .favorites])
+        #expect(plan.top == [.inbox, .recents, .favorites])
+        #expect(plan.browse == [.all, .sources, .collections])
     }
 
     @Test func filesStayUnderItemsWithoutAddingAnotherSidebarDestination() async throws {
         let library = try await marfaLibrary()
-        #expect(SidebarPlan(library, layout: SidebarLayout()).top == [.inbox, .recents, .all, .sources, .collections, .favorites])
+        let plan = SidebarPlan(library, layout: SidebarLayout())
+        #expect(plan.top + plan.browse == [.inbox, .recents, .favorites, .all, .sources, .collections])
     }
 
     @Test func recentsListsTheItemsEditedMostRecentlyUpToTheLimit() {
@@ -282,7 +284,36 @@ struct SidebarTests {
         #expect(!plan.shownTypes.contains { $0.type == LibraryFixture.entity })
         #expect(plan.shownLibrary == [.types])
         layout.setHidden(.collections, false)
-        #expect(SidebarPlan(library, layout: layout).shownTop.contains(.collections))
+        #expect(SidebarPlan(library, layout: layout).shownBrowse.contains(.collections))
+    }
+
+    @Test func hidingAPlaceTakesItOutOfBrowseWhileTheRestKeepTheirOrder() async throws {
+        let library = try await marfaLibrary()
+        var layout = SidebarLayout()
+        layout.setHidden(.sources, true)
+        let plan = SidebarPlan(library, layout: layout)
+        #expect(plan.shownBrowse == [.all, .collections])
+        #expect(plan.browse == [.all, .sources, .collections])
+    }
+
+    @Test func theFootsDotIsOrangeWhileConnectingRedWhenTheServerIsOutOfReachAndAbsentOtherwise() {
+        #expect(SidebarStatusDot(.online) == nil)
+        #expect(SidebarStatusDot(.disconnected) == nil)
+        #expect(SidebarStatusDot(.connecting) == .connecting)
+        #expect(SidebarStatusDot(.offline(reason: nil)) == .trouble)
+        #expect(SidebarStatusDot(.keyRefused) == .trouble)
+        #expect(SidebarStatusDot(.inUse) == .trouble)
+    }
+
+    @Test func showAllTypesBringsBackTypesAndLeavesOtherPlacesHidden() {
+        var layout = SidebarLayout()
+        layout.setHidden(.type("aic.ticket"), true)
+        layout.setHidden(.type("core.note"), true)
+        layout.setHidden(.sources, true)
+        #expect(layout.hidesTypes)
+        layout.showAllTypes()
+        #expect(!layout.hidesTypes)
+        #expect(layout.isHidden(.sources))
     }
 
     @Test func hidingARowHidesWhatIsUnderIt() async throws {

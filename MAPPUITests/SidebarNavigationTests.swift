@@ -6,7 +6,8 @@ final class SidebarNavigationTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var instanceMenu: XCUIElement { element("SidebarLibrary") }
+    private var instanceName: XCUIElement { element("SidebarLibrary") }
+    private var settingsButton: XCUIElement { element("SidebarOpenSettings") }
     private var settingsPages: XCUIElement { element("SettingsPageList") }
 
     override func setUp() async throws {
@@ -22,14 +23,16 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     func testSidebarListsTopPlacesThenTypesAndViews() {
-        let destinations = ["Inbox", "Recents", "Items", "Sources", "Collections", "Favorites", "Types", "Views"]
+        let destinations = ["Inbox", "Recents", "Favorites", "Browse", "Items", "Sources", "Collections", "Types", "Views"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
-        for title in ["Browse", "Files", "Recently Deleted", "Kitchen quotes", "Reading list"] {
+        for title in ["Files", "Recently Deleted", "Kitchen quotes", "Reading list"] {
             XCTAssertFalse(sidebarText(title).exists, "\(title) is not in the sidebar")
         }
-        XCTAssertTrue(instanceMenu.exists)
+        XCTAssertTrue(instanceName.exists)
+        XCTAssertTrue(settingsButton.exists)
+        XCTAssertTrue(element("SidebarRecentlyDeleted").exists)
         for identifier in ["SidebarSources", "SidebarCollections"] {
             let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -53,17 +56,13 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
-        instanceMenu.click()
-        let settings = app.menuItems["Settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.menuItems["Recently Deleted"].exists)
-        settings.click()
+    func testTheFootsSettingsButtonOpensSettingsInTheWindowAndAPlaceLeavesIt() {
+        settingsButton.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists, "the pages take the list's column")
         XCTAssertTrue(sidebar.exists, "the sidebar stays")
         XCTAssertEqual(app.windows.count, 1)
-        attachScreenshot("SettingsFromInstanceMenu")
+        attachScreenshot("SettingsFromSidebarFoot")
         sidebarText("Inbox").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertFalse(settingsPages.exists)

@@ -191,6 +191,18 @@
     "Views" : {
       "extractionState" : "manual"
     },
+    "Browse" : {
+      "extractionState" : "manual"
+    },
+    "Show All" : {
+      "extractionState" : "manual"
+    },
+    "Connection Settings" : {
+      "extractionState" : "manual"
+    },
+    "Connecting to the server." : {
+      "extractionState" : "manual"
+    },
     "Edit" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
