@@ -40,7 +40,7 @@ struct LibraryPerformanceTests {
                 content: .file(.png, byteCount: 1_024)))
         }
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: Fixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)

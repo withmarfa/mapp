@@ -87,17 +87,9 @@ import Observation
     private(set) var library: MarfaLibrary?
     /// How the server stands while no copy is open: connecting to it, or why its copy could not be opened.
     private var standing = State.disconnected
-    /// Called with what a library could not keep, for the app to tell the person.
-    @ObservationIgnored var onNotKept: (MarfaLibrary.NotKept) -> Void = { _ in }
+    /// What the person is told, from this host and from every library it opens.
+    let notices = Notices()
     private(set) var isBusy = false
-    /// Addresses that send the key unencrypted to another machine, in the order they were attached. The package
-    /// tells each address once in a run, so a notice waits here until a window shows it, and is never replaced.
-    private(set) var plainHTTPNotices: [PlainHTTPNotice] = []
-    /// Hands the oldest waiting notice to the window that shows it.
-    func takePlainHTTPNotice() -> PlainHTTPNotice? {
-        plainHTTPNotices.isEmpty ? nil : plainHTTPNotices.removeFirst()
-    }
-
     private var watching: [Task<Void, Never>] = []
     private var reading: Task<Void, Never>?
     private var instanceNames: [String: String]
@@ -416,10 +408,11 @@ import Observation
 
     private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
-        let library = MarfaLibrary(source: source)
-        library.onNotKept = { [weak self] in self?.onNotKept($0) }
+        let library = MarfaLibrary(source: source, notices: notices)
         self.library = library
-        if let notice = connection.server(key: "").takePlainHTTPNotice() { plainHTTPNotices.append(notice) }
+        if let notice = connection.server(key: "").takePlainHTTPNotice() {
+            notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))
+        }
         let states = source.connectionStates()
         var wasOnline = source.connectionState == .online
         // A value already on its way from a source that has since been left is dropped.

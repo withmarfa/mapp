@@ -20,7 +20,8 @@ import Observation
 /// the undo runs.
 @Observable final class MarfaLibrary: ItemLibrary {
     private(set) var isLoaded = false
-    var failure: (title: String, message: String)?
+    /// Where the library tells the person what it could not do or keep: the host's, for every library it opens.
+    @ObservationIgnored let notices: Notices
     var notesToPurge: Set<ItemID> = []
     private(set) var catalogue = Catalogue()
     private(set) var syncReport: SyncReport
@@ -68,19 +69,6 @@ import Observation
     /// The text of each item's last save until the source answers it, so text a closing source refuses can be
     /// given back to the person. Only the last is kept, since it holds everything typed before it.
     @ObservationIgnored private var lastTyped: [ItemID: (write: WriteID, text: String)] = [:]
-    /// Where a write this library's closed source would not take is told, with the text it carried. By then the
-    /// windows read another library, so this one's `failure` would be shown nowhere. Set by the app; without it
-    /// the library's own `failure` says so.
-    @ObservationIgnored var onNotKept: ((NotKept) -> Void)?
-
-    /// A write no queue holds: the source had closed, or it could not be made. `reason`, in the person's words, says
-    /// why when it was not that the source had closed.
-    nonisolated struct NotKept: Hashable, Sendable {
-        var title: String
-        var text: String?
-        var reason: String?
-    }
-
     /// Why text typed over an item that can no longer be written is not kept.
     static var cantChange: String {
         String(localized: "This item can’t be changed now, so MAPP couldn’t keep what you typed.")
@@ -118,8 +106,9 @@ import Observation
     /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
-    init(source: any ItemSource, now: @escaping () -> Date = Date.init) {
+    init(source: any ItemSource, notices: Notices, now: @escaping () -> Date = Date.init) {
         self.source = source
+        self.notices = notices
         self.now = now
         syncReport = source.syncReport
         connection = MarfaHost.state(source.connectionState)
@@ -179,7 +168,7 @@ import Observation
             self.catalogue = catalogue
             reindex()
         case .unavailable(let failure):
-            self.failure = (String(localized: "Can’t Read This Library"), failure.message)
+            notices.tell(String(localized: "Can’t Read This Library"), failure.message)
         }
     }
 
@@ -187,7 +176,7 @@ import Observation
         do {
             return try await source.bodies(of: ids)
         } catch {
-            failure = (String(localized: "Can’t Read This Library"), error.localizedDescription)
+            notices.tell(String(localized: "Can’t Read This Library"), error.localizedDescription)
             return []
         }
     }
@@ -277,16 +266,16 @@ import Observation
         if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
-                notKept(refusal.title, text: typed ?? refusal.text)
+                notices.notKept(refusal.title, text: typed ?? refusal.text)
             } else if problem.notQueued, let text = typed ?? refusal.unqueuedText {
                 // Nothing queued it, so the text is in no write the person could copy it from, and the page is
                 // about to show the text the library holds.
-                notKept(refusal.title, text: text, reason: message)
+                notices.notKept(refusal.title, text: text, reason: message)
             } else if let typed {
                 // The refused write stays listed, but the page is about to show the text the library holds.
-                notKept(refusal.title, text: typed, reason: String(localized: "\(message) The change is also listed in Settings."))
+                notices.notKept(refusal.title, text: typed, reason: String(localized: "\(message) The change is also listed in Settings."))
             } else {
-                failure = (refusal.title, message)
+                notices.tell(refusal.title, message)
             }
         }
         if let created = creating.removeValue(forKey: id), case .refused = outcome, records[created] == nil {
@@ -338,7 +327,7 @@ import Observation
         refusals[id] = refusal
         if !source.submit(write, as: id) {
             refusals[id] = nil
-            notKept(title, text: refusal.text)
+            notices.notKept(title, text: refusal.text)
         }
         return id
     }
@@ -364,15 +353,6 @@ import Observation
 
     func wasTouched(_ id: ItemID) -> Bool {
         written.contains(id) || index.links(touching: id).contains { $0.holder != id }
-    }
-
-    /// Told where the person sees it, with the text they typed, since nothing else holds that text.
-    func notKept(_ title: String, text: String?, reason: String? = nil) {
-        if let onNotKept {
-            onNotKept(NotKept(title: title, text: text, reason: reason))
-        } else {
-            failure = (title, reason ?? MarfaEngine.notKept)
-        }
     }
 
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
@@ -591,7 +571,7 @@ import Observation
                 lastFound = hits
             case .failure(let error):
                 searches[query] = Search(revision: revision, hits: searches[query]?.hits ?? lastFound, running: false)
-                failure = (String(localized: "Can’t Search"), error.localizedDescription)
+                notices.tell(String(localized: "Can’t Search"), error.localizedDescription)
             }
             searchRevision += 1
         }

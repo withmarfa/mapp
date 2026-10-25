@@ -498,7 +498,7 @@ final class EditorController: NSObject {
             log.notice("preview diagnostic: \(message, privacy: .public)")
         case .error(let message):
             log.error("page error: \(message, privacy: .public)")
-            library?.failure = (String(localized: "Editor Couldn’t Complete the Action"), message)
+            library?.notices.tell(String(localized: "Editor Couldn’t Complete the Action"), message)
         }
     }
 }

@@ -1,87 +1,62 @@
 import AppKit
-import Marfa
 import SwiftUI
 
 extension View {
-    /// What the library asks of whoever is in front: to confirm erasing notes for good, and to hear of a change
-    /// that could not be made. Every window carries these; the one in front takes each request as it comes, so it
-    /// shows once, in a note's own window too, and stays until it is answered.
+    /// Asks whoever is in front to confirm erasing notes for good. Every window that shows a library carries this;
+    /// the one in front takes each request as it comes, so it shows once, in a note's own window too.
     func libraryDialogs() -> some View {
         modifier(LibraryDialogs())
     }
 
-    /// Tells changes a library closed before keeping, in whichever window is in front, since the library that
-    /// refused them is no longer shown anywhere. Their text goes to the clipboard as the person is told, so it
-    /// outlives the alert; a later refusal adds to the alert and the clipboard until the person answers.
-    func unkeptChanges(_ libraries: Libraries) -> some View {
-        modifier(UnkeptChanges(libraries: libraries))
-    }
-
-    /// Warns, once, in whichever window is in front, that the server's address sends the key unencrypted.
-    func plainHTTPNotice(_ host: MarfaHost) -> some View {
-        modifier(PlainHTTPAlert(host: host))
+    /// Tells the person, in one window in front, each notice in the order it was told: something a library could
+    /// not do, a change it could not keep, or an address that sends the key unencrypted. A notice carrying text the
+    /// person typed puts it on the clipboard as they are first told, so it outlives the alert.
+    func notices(_ notices: Notices) -> some View {
+        modifier(NoticeAlert(notices: notices))
     }
 }
 
-private struct PlainHTTPAlert: ViewModifier {
-    let host: MarfaHost
+private struct NoticeAlert: ViewModifier {
+    let notices: Notices
     @Environment(\.appearsActive) private var appearsActive
-    @State private var shown: PlainHTTPNotice?
+    @State private var window = UUID()
+    @State private var shown: Notices.Notice?
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: host.plainHTTPNotices, initial: true, take)
-            .onChange(of: shown, take)
+            .onChange(of: notices.waiting.first?.id, initial: true, take)
+            .onChange(of: notices.shownIn, take)
             .onChange(of: appearsActive, take)
-            .alert(
-                Words.plainHTTPTitle,
-                isPresented: Binding { shown != nil } set: { if !$0 { shown = nil } },
-                presenting: shown
-            ) { _ in
-            } message: { notice in
-                Text(Words.plainHTTP(origin: notice.origin))
+            .onDisappear {
+                shown = nil
+                notices.released(by: window)
             }
-    }
-
-    private func take() {
-        guard appearsActive, shown == nil, let notice = host.takePlainHTTPNotice() else { return }
-        shown = notice
-    }
-}
-
-private struct UnkeptChanges: ViewModifier {
-    let libraries: Libraries
-    @Environment(\.appearsActive) private var appearsActive
-    @State private var shown: Libraries.Unkept?
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: libraries.unkept, initial: true, take)
-            .onChange(of: appearsActive, take)
             .alert(
                 shown?.title ?? "",
                 isPresented: Binding { shown != nil } set: {
-                    if !$0 {
-                        shown = nil
-                        libraries.unkept = nil
+                    if !$0, let shown {
+                        self.shown = nil
+                        notices.answered(shown.id)
                     }
                 },
                 presenting: shown
             ) { _ in
-            } message: { unkept in
-                Text(unkept.message)
+            } message: { notice in
+                Text(notice.message)
             }
     }
 
     private func take() {
-        guard appearsActive, let unkept = libraries.unkept else { return }
-        // Kept until the person has answered, so text refused while the alert is up is added to it and to the
-        // clipboard rather than replacing what the first refusal left there.
-        if let text = unkept.text {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        }
-        shown = unkept
+        guard appearsActive, shown == nil else { return }
+        shown = notices.show(in: window, copying: Notices.copyToClipboard)
+    }
+}
+
+extension Notices {
+    /// Where a notice puts the text the person typed, for them to paste back.
+    static func copyToClipboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 
@@ -89,17 +64,10 @@ private struct LibraryDialogs: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.appearsActive) private var appearsActive
     @State private var purging: Set<ItemID> = []
-    @State private var failure: Failure?
-
-    private struct Failure {
-        let title: String
-        let message: String
-    }
 
     func body(content: Content) -> some View {
         content
             .onChange(of: library.notesToPurge, initial: true, take)
-            .onChange(of: library.failure?.title, initial: true, take)
             .onChange(of: appearsActive, take)
             .confirmationDialog(
                 "^[Delete \(purging.count) note](inflect: true) immediately?",
@@ -108,13 +76,6 @@ private struct LibraryDialogs: ViewModifier {
                 Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
             } message: {
                 Text("You can’t undo this action.")
-            }
-            .alert(
-                failure?.title ?? "",
-                isPresented: Binding { failure != nil } set: { if !$0 { failure = nil } }
-            ) {
-            } message: {
-                Text(failure?.message ?? "")
             }
     }
 
@@ -125,10 +86,6 @@ private struct LibraryDialogs: ViewModifier {
             // A library that cannot erase is never asked to.
             if library.canPurge { purging = library.notesToPurge }
             library.notesToPurge = []
-        }
-        if let asked = library.failure {
-            failure = Failure(title: asked.title, message: asked.message)
-            library.failure = nil
         }
     }
 }

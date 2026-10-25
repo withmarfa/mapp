@@ -60,7 +60,7 @@ extension EditorController {
                 else { _ = await renderer.printDocument(in: window, title: title) }
             } catch {
                 guard noteID == id, self.generation == generation else { return }
-                library?.failure = (String(localized: "Couldn’t Print Note"), error.localizedDescription)
+                library?.notices.tell(String(localized: "Couldn’t Print Note"), error.localizedDescription)
             }
         }
     }

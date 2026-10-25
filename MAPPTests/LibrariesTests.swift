@@ -81,41 +81,20 @@ import Testing
         #expect(libraries.current == nil)
     }
 
-    /// A library the windows have left tells what it could not keep through the app, which gathers each text
-    /// until the window in front tells the person.
-    @Test func whatALeftLibraryCouldNotKeepIsGatheredForTheWindowInFront() async throws {
+    /// A library the windows have left tells what it could not keep, and what it could not do, through the host's
+    /// notices, which the window in front shows whatever library it reads by then.
+    @Test func whatALeftLibraryTellsReachesTheWindowInFront() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         let library = try #require(libraries.current as? MarfaLibrary)
         try await libraries.host.disconnect()
 
-        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Book the hotel"))
-        #expect(libraries.unkept?.title == "Couldn’t Save “Trip”")
-        #expect(libraries.unkept?.text == "Book the hotel")
-        #expect(libraries.unkept?.message == "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
-
-        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Plan”", text: "Pack"))
-        #expect(libraries.unkept?.title == "Some Changes Weren’t Saved")
-        #expect(libraries.unkept?.text == "Book the hotel\n\nPack")
-    }
-
-    @Test func textNotKeptForAReasonIsToldWithTheReasonAndOnlyThatReasonIsShared() async throws {
-        let bench = try HostBench()
-        let libraries = try libraries(bench)
-        try await libraries.host.connect(address: address, key: "key")
-        let library = try #require(libraries.current as? MarfaLibrary)
-
-        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Book the hotel", reason: "This item can’t be changed now."))
-        #expect(libraries.unkept?.message == "This item can’t be changed now. Your text is on the clipboard, so you can paste it back.")
-
-        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Trip”", text: "Pack", reason: "This item can’t be changed now."))
-        #expect(libraries.unkept?.message == "This item can’t be changed now. Your text is on the clipboard, so you can paste it back.")
-
-        library.onNotKept?(MarfaLibrary.NotKept(title: "Couldn’t Save “Plan”", text: "Rest", reason: "Try again in a moment."))
-        #expect(libraries.unkept?.title == "Some Changes Weren’t Saved")
-        #expect(libraries.unkept?.text == "Book the hotel\n\nPack\n\nRest")
-        #expect(libraries.unkept?.message == "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
+        library.updateBody(of: ItemID("gone"), to: "Book the hotel", readAt: ItemVersion(0))
+        _ = library.createItem(typeID: "", title: "", body: "", parentID: nil, in: .allNotes, undoManager: nil)
+        let told = libraries.host.notices.waiting
+        #expect(told.map(\.text) == ["Book the hotel", nil])
+        #expect(told.last?.title == "Can’t Create Item")
     }
 
     @Test func anotherServerIsAnotherLibrary() async throws {

@@ -24,7 +24,7 @@ struct SidebarNavigationTests {
         var deleted = FakeItemLibrary.note("Deleted", modified: date, state: .trashed)
         deleted.source = "reader"
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [first, second, deleted], catalogue: LibraryFixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(Set(library.sourceCounts.map(\.name)) == ["reader", "Reader"])

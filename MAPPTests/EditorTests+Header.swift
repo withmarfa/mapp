@@ -109,7 +109,7 @@ extension EditorTests {
         #expect(hidden == true)
         #expect(try await page.markdown() == nil)
         // Resizing the header and the window raises nothing in the page.
-        #expect(page.library.failure == nil)
+        #expect(page.library.notices.waiting.last == nil)
     }
 
     @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
@@ -145,7 +145,7 @@ extension EditorTests {
             try await page.frames()
         }
         #expect(page.changes.isEmpty)
-        #expect(page.library.failure == nil)
+        #expect(page.library.notices.waiting.last == nil)
     }
 
     @Test func anUpdateForTheItemJustLeftCannotReloadIt() async throws {
@@ -170,7 +170,7 @@ extension EditorTests {
     func aSelectedItemLoadsWhenItsMissingBodyArrives(versionChanged: Bool) async throws {
         typealias F = LibraryFixture
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         let editor = EditorController(library: library)
@@ -199,7 +199,7 @@ extension EditorTests {
     func aMissingBodyCannotReopenAnItemAfterLeavingIt(close: Bool) async throws {
         typealias F = LibraryFixture
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         let editor = EditorController(library: library)

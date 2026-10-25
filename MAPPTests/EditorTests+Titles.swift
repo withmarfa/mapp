@@ -24,7 +24,7 @@ extension EditorTests {
         library.recover([ticket], undoManager: nil)
         let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
         #expect(kept, "a draft no window holds cannot stop quitting")
-        #expect(library.failure == nil)
+        #expect(library.notices.waiting.last == nil)
         #expect(library.item(ticket)?.title == "Review the findings")
     }
 
@@ -35,7 +35,7 @@ extension EditorTests {
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         #expect(await !host.flushAll())
-        #expect(host.library.failure?.message == "The title for “Review the findings” is empty. Open the item to enter a title or discard your changes.")
+        #expect(host.library.notices.waiting.last?.message == "The title for “Review the findings” is empty. Open the item to enter a title or discard your changes.")
     }
 
     @Test func aRefusedStatusIsForgottenOnMovingToAnotherItem() async throws {
@@ -69,7 +69,7 @@ extension EditorTests {
         #expect(!kept)
         #expect(shown.count == 1, "one refusal is told, and its window shows its item")
         let told = try #require(shown.first)
-        let message = try #require(library.failure?.message)
+        let message = try #require(library.notices.waiting.last?.message)
         let window = told == first.ticket ? first.window : second.window
         #expect(message.contains(told == first.ticket ? "“Review the findings”" : "“Field notes”"), "\(message)")
         #expect(window.isKeyWindow || window.isMainWindow || NSApp.orderedWindows.first === window, "the window holding the draft comes forward")
@@ -81,12 +81,12 @@ extension EditorTests {
         try await host.type("Review before quitting")
         #expect(await host.flushAll())
         try await host.page.wait { host.library.item(host.ticket)?.title == "Review before quitting" }
-        #expect(host.library.failure == nil)
+        #expect(host.library.notices.waiting.last == nil)
 
         try await host.type("")
         #expect(await !host.flushAll(), "a title that cannot be saved stops quitting rather than being lost")
         #expect(host.library.item(host.ticket)?.title == "Review before quitting")
-        #expect(host.library.failure?.message.contains("“Review before quitting” is empty") == true)
+        #expect(host.library.notices.waiting.last?.message.contains("“Review before quitting” is empty") == true)
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
     }
 
@@ -99,12 +99,12 @@ extension EditorTests {
         host.shown.id = ItemPreviewFixtures.noteID
         try await host.waitForTitle("Field notes")
         #expect(await !host.flushAll())
-        let message = try #require(host.library.failure?.message)
+        let message = try #require(host.library.notices.waiting.last?.message)
         #expect(message.contains("“Review the findings” is empty"), "\(message)")
         // Deleting a note keeps the window, so a refused title is tried again but stops nothing.
-        host.library.failure = nil
+        host.library.notices.answerAll()
         #expect(await host.flushAll(leaving: false))
-        #expect(host.library.failure == nil)
+        #expect(host.library.notices.waiting.last == nil)
         #expect(host.drafts.draft(for: host.ticket, key: "title").rejected)
     }
 
@@ -115,8 +115,8 @@ extension EditorTests {
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         host.window.performClose(nil)
-        try await host.waitFor("the refusal to be told") { host.library.failure != nil }
-        #expect(host.library.failure?.message.contains("“Review the findings” is empty") == true)
+        try await host.waitFor("the refusal to be told") { host.library.notices.waiting.last != nil }
+        #expect(host.library.notices.waiting.last?.message.contains("“Review the findings” is empty") == true)
         #expect(host.window.isVisible, "the window stays open with the title that could not be saved")
     }
 

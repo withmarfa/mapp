@@ -108,7 +108,7 @@ import Testing
 
     @Test @MainActor func arrivingItemsRemainEditableAndNewestFirst() async throws {
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         let older = LibraryFixture.item(ItemID("older"), LibraryFixture.note, "Older", age: 2)
         let newer = LibraryFixture.item(ItemID("newer"), LibraryFixture.note, "Newer", age: 1)
         source.report.update { $0.fill = LibraryFill(state: .filling, listed: 1, expected: 2) }

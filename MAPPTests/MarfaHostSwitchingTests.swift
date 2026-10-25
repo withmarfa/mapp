@@ -112,7 +112,7 @@ import Testing
         let start = clock.now
         #expect(await libraries.flushEditors(within: .milliseconds(200)) == false)
         #expect(clock.now - start < .seconds(5))
-        #expect(libraries.current?.failure?.title == "Couldn’t Quit")
+        #expect(libraries.current?.notices.waiting.last?.title == "Couldn’t Quit")
         source.queuing.withLock { $0 = false }
     }
 }

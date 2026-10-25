@@ -44,15 +44,15 @@ import Testing
         let switched = "http://plain-\(UUID().uuidString.lowercased()).test"
         let host = try HostBench().host()
         try await host.connect(address: address, key: "k")
-        #expect(host.plainHTTPNotices.map(\.origin) == [address])
-        #expect(host.takePlainHTTPNotice()?.origin == address)
+        #expect(host.notices.waiting.map { [$0.title, $0.message] } == [[Words.plainHTTPTitle, Words.plainHTTP(origin: address)]])
+        host.notices.answerAll()
 
         try await host.changeAddress(to: switched, key: "k")
-        #expect(host.takePlainHTTPNotice()?.origin == switched)
+        #expect(host.notices.waiting.map(\.message) == [Words.plainHTTP(origin: switched)])
 
         let again = try HostBench().host()
         try await again.connect(address: address, key: "k")
-        #expect(again.plainHTTPNotices.isEmpty)
+        #expect(again.notices.waiting.isEmpty)
     }
 
     @Test func aNoticeStillWaitingIsNotReplacedByTheNext() async throws {
@@ -61,17 +61,14 @@ import Testing
         let host = try HostBench().host()
         try await host.connect(address: first, key: "k")
         try await host.changeAddress(to: second, key: "k")
-        #expect(host.plainHTTPNotices.map(\.origin) == [first, second])
-        #expect(host.takePlainHTTPNotice()?.origin == first)
-        #expect(host.takePlainHTTPNotice()?.origin == second)
-        #expect(host.takePlainHTTPNotice() == nil)
+        #expect(host.notices.waiting.map(\.message) == [Words.plainHTTP(origin: first), Words.plainHTTP(origin: second)])
     }
 
     @Test func thisMachineAndHTTPSAreNotTold() async throws {
         for address in ["http://localhost:8210", "http://127.0.0.1:8210", "http://[::1]:8210", "https://\(UUID().uuidString.lowercased()).test"] {
             let host = try HostBench().host()
             try await host.connect(address: address, key: "k")
-            #expect(host.plainHTTPNotices.isEmpty, "\(address)")
+            #expect(host.notices.waiting.isEmpty, "\(address)")
         }
     }
 

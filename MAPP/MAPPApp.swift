@@ -41,8 +41,7 @@ struct MAPPApp: App {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
                 .interfaceTextStyle()
-                .unkeptChanges(libraries)
-                .plainHTTPNotice(libraries.host)
+                .notices(libraries.host.notices)
                 .environment(libraries)
                 .environment(libraries.host)
         }
@@ -72,8 +71,7 @@ struct MAPPApp: App {
             }
             .interfaceTextStyle()
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-            .unkeptChanges(libraries)
-            .plainHTTPNotice(libraries.host)
+            .notices(libraries.host.notices)
         }
         .defaultSize(width: 640, height: 720)
     }
@@ -105,11 +103,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Nothing typed is lost to quitting: each page hands over its last edit and each library keeps its writes on
     /// this Mac, in its copy's queue, before the app goes. The server is not
-    /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long.
+    /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long. A change
+    /// not kept that no window has told, as when no window is open, is told here, so its text reaches the clipboard.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in
             let kept = await libraries.flushEditors(within: .seconds(5))
-            NSApp.reply(toApplicationShouldTerminate: kept)
+            let told = kept && libraries.host.notices.tellBeforeQuitting(copying: Notices.copyToClipboard) { notice in
+                let alert = NSAlert()
+                alert.messageText = notice.title
+                alert.informativeText = notice.message
+                alert.runModal()
+            }
+            NSApp.reply(toApplicationShouldTerminate: told)
         }
         return .terminateLater
     }

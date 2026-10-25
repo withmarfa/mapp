@@ -224,12 +224,12 @@ extension MarfaLibrary {
         else { return false }
         let cantChange = String(localized: "Can’t Change This Relationship")
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
-            failure = (cantChange, String(localized: "A link is changed in the text that holds it."))
+            notices.tell(cantChange, String(localized: "A link is changed in the text that holds it."))
             return false
         }
         let holds = end.info.cardinality(atTarget: end.atTarget)
         if holds == .one, targetIDs.count > 1 {
-            failure = (cantChange, String(localized: "Only one item can be chosen here."))
+            notices.tell(cantChange, String(localized: "Only one item can be chosen here."))
             return false
         }
         let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
@@ -252,7 +252,7 @@ extension MarfaLibrary {
             let sourceType: TypeID? = end.atTarget ? farType : item.type
             let targetType: TypeID? = end.atTarget ? item.type : farType
             if let problem = linkProblem(link, sourceType: sourceType, targetType: targetType) {
-                failure = (cantChange, problem)
+                notices.tell(cantChange, problem)
                 return false
             }
             let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
@@ -264,19 +264,19 @@ extension MarfaLibrary {
                 guard end.isInverse else {
                     let chosen = self.item(other)?.title ?? ""
                     let holder = self.item(old)?.title ?? ""
-                    failure = (
+                    notices.tell(
                         cantChange, String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first.")
                     )
                     return false
                 }
                 guard !replacingOwn else {
-                    failure = (cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
+                    notices.tell(cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
                     return false
                 }
                 change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
             } else if replacingOwn {
                 guard removing.count == 1 else {
-                    failure = (cantChange, String(localized: "Choose one item here, or remove the link first."))
+                    notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
                     return false
                 }
                 // The end that stays holds one link, and its other end changes. A two-way link may point here instead,
@@ -286,7 +286,7 @@ extension MarfaLibrary {
                 } else if let old = held(by: id, farEnd).first(where: { (farIsTarget ? $0.source : $0.target) == removing[0] }) {
                     change.moving.append(.init(edge: old.id, end: farIsTarget ? .source : .target, to: other, from: removing[0]))
                 } else {
-                    failure = (cantChange, String(localized: "Choose one item here, or remove the link first."))
+                    notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
                     return false
                 }
                 change.removing = []

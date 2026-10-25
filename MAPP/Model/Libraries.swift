@@ -24,17 +24,6 @@ import Observation
     /// forgotten when Settings is put away and opened again.
     let marfaSettings: MarfaSettingsModel
 
-    /// Changes a Marfa library could not keep because its copy closed first, for the window in front to tell,
-    /// since by then the windows read another library and the one that refused them is shown nowhere.
-    var unkept: Unkept?
-
-    nonisolated struct Unkept: Hashable, Sendable {
-        var title: String
-        var message: String
-        /// The text the person typed that no library holds, for them to put back.
-        var text: String?
-    }
-
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
@@ -44,7 +33,6 @@ import Observation
         marfaSettings = MarfaSettingsModel(host: host)
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
-        host.onNotKept = { [weak self] in self?.tell($0) }
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -88,32 +76,6 @@ import Observation
         sidebarLayouts.update(sidebarLayoutKey, change)
     }
 
-    /// Gathers what is not kept until the person has been told, so a second refusal adds its text to the first.
-    func tell(_ notKept: MarfaLibrary.NotKept) {
-        let texts = [unkept?.text, notKept.text].compactMap { $0 }.filter { !$0.isEmpty }
-        let text = texts.isEmpty ? nil : texts.joined(separator: "\n\n")
-        let title = unkept == nil ? notKept.title : String(localized: "Some Changes Weren’t Saved")
-        let message = Self.unkeptMessage(for: notKept, text: text, earlier: unkept?.message)
-        unkept = Unkept(title: title, message: message, text: text)
-    }
-
-    /// What the person is told: the reason the change was not kept and where their text is. Changes not kept for
-    /// different reasons share the plainest account of them.
-    private static func unkeptMessage(for notKept: MarfaLibrary.NotKept, text: String?, earlier: String?) -> String {
-        let message: String
-        if let reason = notKept.reason {
-            message = text == nil ? reason : String(localized: "\(reason) Your text is on the clipboard, so you can paste it back.")
-        } else if text == nil {
-            message = String(localized: "MAPP closed the library before it could keep your change. Make the change again.")
-        } else {
-            message = String(localized: "MAPP closed the library before it could keep what you typed. Your text is on the clipboard, so you can paste it back.")
-        }
-        guard let earlier, earlier != message else { return message }
-        return text == nil
-            ? String(localized: "MAPP couldn’t keep some of your changes. Make them again.")
-            : String(localized: "MAPP couldn’t keep some of what you typed. Your text is on the clipboard, so you can paste it back.")
-    }
-
     /// Hands every open page's last edit to the library it came from, and returns once each library keeps its
     /// writes on this Mac, never waiting on a server. Run before anything changes which library the windows read,
     /// and before quitting.
@@ -136,7 +98,7 @@ import Observation
             Task { [host] in
                 try? await Task.sleep(for: limit)
                 guard first.resume(continuation, with: false) else { return }
-                host.library?.failure = (
+                host.notices.tell(
                     String(localized: "Couldn’t Quit"),
                     String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment."))
             }
