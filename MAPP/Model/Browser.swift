@@ -26,6 +26,21 @@ final class Browser {
         }
     }
     var isCollectionItemPresented = false
+
+    /// The layouts the current place can show. Search is left out, so a search with no results keeps the layout.
+    /// A type's own place counts the type even while it holds no items.
+    func availableViewModes(in library: any ItemLibrary) -> [ItemViewMode] {
+        guard library.isLoaded else { return ItemViewMode.allCases }
+        var types = Set(library.items(in: item).map(\.type))
+        if case .itemType(let type) = item { types.insert(TypeID(type)) }
+        return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
+    }
+
+    /// A window left on a layout its place cannot show goes back to the list without saying so.
+    func fallBackToListIfUnavailable(in library: any ItemLibrary) {
+        guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
+        viewMode = .list
+    }
     /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     var boardFields: [SidebarItem: String] = [:]

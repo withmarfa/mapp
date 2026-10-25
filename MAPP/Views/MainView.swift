@@ -257,6 +257,10 @@ struct MainView: View {
         }
         // A window restores what it showed once the library has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it.
+        // A layout the place cannot show (Board with no choice fields) is not offered, and a window left on one
+        // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
+        .onChange(of: browser.availableViewModes(in: library), initial: true) { browser.fallBackToListIfUnavailable(in: library) }
+        .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }

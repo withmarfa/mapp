@@ -4,14 +4,16 @@ import SwiftUI
 struct ItemViewOptions: View {
     /// Nil while no window is in front, which leaves the choices in the menu, dimmed.
     let browser: Browser?
+    /// The layouts the window's place can show; all of them while no window is in front.
+    var modes = ItemViewMode.allCases
 
     var body: some View {
         Group {
-            choice("View as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
-            choice("View as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
-            choice("View as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
-            choice("View as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
-            choice("View as Agenda", systemImage: ItemViewMode.agenda.symbol, .agenda, key: "5")
+            choice("as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
+            choice("as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
+            choice("as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
+            choice("as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
+            choice("as Agenda", systemImage: ItemViewMode.agenda.symbol, .agenda, key: "5")
         }
         .disabled(browser == nil)
     }
@@ -26,24 +28,29 @@ struct ItemViewOptions: View {
         }
     }
 
+    @ViewBuilder
     private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, key: KeyEquivalent) -> some View {
-        Toggle(title, systemImage: systemImage, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
-            .keyboardShortcut(key)
-            .accessibilityIdentifier(identifier(mode))
+        if modes.contains(mode) {
+            Toggle(title, systemImage: systemImage, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
+                .keyboardShortcut(key)
+                .accessibilityIdentifier(identifier(mode))
+        }
     }
 }
 
 /// One pop-up button stays at the window's trailing side whichever view is shown.
 struct ViewModeMenu: View {
+    @CurrentLibrary private var library
     @Bindable var browser: Browser
 
     var body: some View {
+        let modes = browser.availableViewModes(in: library)
         Picker("View As", selection: $browser.viewMode) {
-            Text("List").tag(ItemViewMode.list)
-            Text("Gallery").tag(ItemViewMode.gallery)
-            Text("Table").tag(ItemViewMode.table)
-            Text("Board").tag(ItemViewMode.board)
-            Text("Agenda").tag(ItemViewMode.agenda)
+            if modes.contains(.list) { Text("as List").tag(ItemViewMode.list) }
+            if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
+            if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
+            if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
+            if modes.contains(.agenda) { Text("as Agenda").tag(ItemViewMode.agenda) }
         } currentValueLabel: {
             Image(systemName: browser.viewMode.symbol)
         }

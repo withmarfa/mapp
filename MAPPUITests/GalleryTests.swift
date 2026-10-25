@@ -20,7 +20,7 @@ final class GalleryTests: XCTestCase {
 
     private func choose(_ mode: String) {
         app.menuBars.menuBarItems["View"].click()
-        let option = app.menuBars.menuItems["View as \(mode)"]
+        let option = app.menuBars.menuItems["as \(mode)"]
         XCTAssertTrue(option.waitForExistence(timeout: 2))
         option.click()
     }

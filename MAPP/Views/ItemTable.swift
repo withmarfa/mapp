@@ -26,16 +26,12 @@ struct ItemTable: View {
             .overlay {
                 if allRows.isEmpty {
                     if browser.isSearching {
-                        ContentUnavailableView.search(text: browser.searchText)
+                        EmptyState.search(browser.searchText)
                     } else {
-                        ContentUnavailableView("No Items", systemImage: "tablecells")
+                        EmptyState("No Items")
                     }
                 } else if rows.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Matching Items", systemImage: "line.3.horizontal.decrease")
-                    } description: {
-                        Text("No items match the filters.")
-                    } actions: {
+                    EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
                         Button("Clear Filters") { browser.tableOptions[browser.item, default: .init()].filters = [:] }
                     }
                 }

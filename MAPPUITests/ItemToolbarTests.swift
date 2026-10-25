@@ -134,9 +134,9 @@ final class ItemToolbarTests: XCTestCase {
 
     func testViewMenuOffersTheThreeViewsAndHistoryShortcuts() {
         app.menuBars.menuBarItems["View"].click()
-        XCTAssertTrue(app.menuBars.menuItems["View as List"].exists)
-        XCTAssertTrue(app.menuBars.menuItems["View as Gallery"].exists)
-        XCTAssertTrue(app.menuBars.menuItems["View as Table"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["as List"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["as Gallery"].exists)
+        XCTAssertTrue(app.menuBars.menuItems["as Table"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Back"].exists)
         XCTAssertTrue(app.menuBars.menuItems["Forward"].exists)
         app.typeKey(.escape, modifierFlags: [])
@@ -179,7 +179,7 @@ final class ItemToolbarTests: XCTestCase {
     }
 
     func testViewAsShowsTheTableWithItsOwnFilterAndViewOptions() {
-        show("Table")
+        show("as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["NoteList"].exists, "the table spans the window")
@@ -192,12 +192,12 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertFalse(window.menuItems["Group by Date"].exists, "the table groups by its columns")
         capture("Table View Options menu")
         app.typeKey(.escape, modifierFlags: [])
-        show("Gallery")
+        show("as Gallery")
         XCTAssertTrue(control("ItemGallery").waitForExistence(timeout: 3))
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
         app.typeKey("3", modifierFlags: .command)
         XCTAssertTrue(table.waitForExistence(timeout: 3))
-        show("List")
+        show("as List")
         XCTAssertTrue(window.outlines["NoteList"].waitForExistence(timeout: 3))
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }

@@ -22,14 +22,8 @@ struct ItemBoard: View {
                 Divider()
                 board(ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue), key: field.key)
             } else if items.isEmpty {
-                if browser.isSearching { ContentUnavailableView.search(text: browser.searchText) }
-                else { ContentUnavailableView("No Items", systemImage: "rectangle.split.3x1") }
-            } else {
-                ContentUnavailableView {
-                    Label("No Board Fields", systemImage: "rectangle.split.3x1")
-                } description: {
-                    Text("These items have no choice fields or text fields with recommended values. Choose another place or use List, Gallery, or Table.")
-                }
+                if browser.isSearching { EmptyState.search(browser.searchText) }
+                else { EmptyState("No Items") }
             }
         }
         .background(.windowBackground)

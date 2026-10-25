@@ -93,9 +93,9 @@ struct NoteList: View {
         .overlay {
             if ids.isEmpty {
                 if browser.isSearching {
-                    ContentUnavailableView.search(text: browser.searchText)
+                    EmptyState.search(browser.searchText)
                 } else {
-                    ContentUnavailableView(browser.item == .files ? "No Files" : "No Items", systemImage: browser.item == .files ? "doc" : "note.text")
+                    EmptyState(browser.item == .files ? "No Files" : "No Items")
                 }
             }
         }
