@@ -63,3 +63,7 @@ Open `MAPP.xcodeproj`, choose the `MAPP` scheme, and open `MAPP/Views/ItemPrevie
 - **Unsaved Property Input** lets a rejected save be exercised by editing the field and committing it.
 
 `MAPP/Views/ItemProperties.swift` also previews the individual property controls. `MAPP/Views/FileItemContent.swift` contains the file-view previews. Review the real app for editor behavior, window resizing, keyboard navigation, and saving; the component canvas is for iterating on each piece.
+
+## License
+
+MAPP is licensed under the Apache License 2.0. See [LICENSE](LICENSE). `editor/src/style.css` is adapted from another project and keeps its own MIT license notice.
