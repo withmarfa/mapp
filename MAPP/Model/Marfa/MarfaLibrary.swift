@@ -97,8 +97,11 @@ import Observation
 
     private nonisolated struct Refusal {
         var title: String
-        /// What a create carried, which a closing source would otherwise lose.
+        /// What the write carried, which a closing source would otherwise lose.
         var text: String?
+        /// What the person typed into the write, which a refusal before queueing would otherwise lose
+        /// (`unqueuedText(_:)`).
+        var unqueuedText: String?
     }
 
     private nonisolated struct Replacement {
@@ -275,10 +278,10 @@ import Observation
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
                 notKept(refusal.title, text: typed ?? refusal.text)
-            } else if problem.notQueued, let typed {
+            } else if problem.notQueued, let text = typed ?? refusal.unqueuedText {
                 // Nothing queued it, so the text is in no write the person could copy it from, and the page is
                 // about to show the text the library holds.
-                notKept(refusal.title, text: typed, reason: message)
+                notKept(refusal.title, text: text, reason: message)
             } else if let typed {
                 // The refused write stays listed, but the page is about to show the text the library holds.
                 notKept(refusal.title, text: typed, reason: String(localized: "\(message) The change is also listed in Settings."))
@@ -330,10 +333,12 @@ import Observation
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
         recordWritten(write)
-        refusals[id] = Refusal(title: title, text: Self.createdText(write))
+        let unqueued = Self.unqueuedText(write)
+        let refusal = Refusal(title: title, text: unqueued ?? Self.createdText(write), unqueuedText: unqueued)
+        refusals[id] = refusal
         if !source.submit(write, as: id) {
             refusals[id] = nil
-            notKept(title, text: Self.typedText(write))
+            notKept(title, text: refusal.text)
         }
         return id
     }
@@ -370,9 +375,21 @@ import Observation
         }
     }
 
-    private static func typedText(_ write: ItemWrite) -> String? {
-        if case .editBody(_, let text, _, _) = write { return text }
-        return createdText(write)
+    /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
+    /// a body, a create's title and body (a create with a title alone, such as New's, gives nothing back), and the
+    /// text values of a property edit, a title among them.
+    private static func unqueuedText(_ write: ItemWrite) -> String? {
+        switch write {
+        case .editBody(_, let text, _, _):
+            return text
+        case .create(_, let draft):
+            return draft.body.isEmpty ? nil : createdText(write)
+        case .editProperties(_, let changes, _, _):
+            let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value?.string }
+            return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+        default:
+            return nil
+        }
     }
 
     /// The text a create holds, which a source that closes before it answers gives back to the person.

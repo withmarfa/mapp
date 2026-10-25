@@ -319,7 +319,7 @@ actor MarfaEngine {
                 return (catalogue, rows, edges)
             }
         } catch {
-            failures.append(Self.failure(error))
+            readFailed(error)
             publish([])
             return
         }
@@ -406,7 +406,7 @@ actor MarfaEngine {
                 read.append((row, id, held))
             }
         } catch {
-            failures.append(Self.failure(error))
+            readFailed(error)
         }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
         for (row, id, _) in read {
@@ -491,7 +491,7 @@ actor MarfaEngine {
         do {
             queue = try await Self.asking(hub) { try await copy.queue.all() }
         } catch {
-            failures.append(Self.failure(error))
+            readFailed(error)
             return
         }
         counted.formIntersection(queue.map(\.id))
@@ -659,6 +659,14 @@ actor MarfaEngine {
         return .success(released)
     }
 
+    /// A read the copy refuses while a hydration is under way is no failure to tell: the copy says `.refreshed` when
+    /// the hydration ends, and the engine reads it all again then. A source move hydrates a large library again
+    /// after every move, so telling it would put up an alert after an ordinary change of parent.
+    private func readFailed(_ error: any Error) {
+        if case MarfaError.hydrationIncomplete = error { return }
+        failures.append(Self.failure(error))
+    }
+
     private static func failure(_ error: any Error) -> SourceFailure {
         if let failure = error as? SourceFailure { return failure }
         return SourceFailure(kind: .failed, message: (error as? MarfaError)?.message ?? error.localizedDescription)
@@ -775,7 +783,19 @@ actor MarfaEngine {
     nonisolated static func problem(for error: MarfaError) -> SyncProblem {
         switch error {
         case .hydrationIncomplete, .copyExpired: SyncProblem(code: error.code(), message: notCurrent)
-        default: SyncProblem(code: error.code(), message: error.message)
+        default: SyncProblem(code: refusalCode(of: error), message: error.message)
+        }
+    }
+
+    /// The server's code for a refusal, as a drain's verdict names it, where the package refused a write the same way
+    /// before queueing it; `code()` names only the kind of error, such as `forbidden` for `type_not_permitted`.
+    nonisolated static func refusalCode(of error: MarfaError) -> String {
+        switch error {
+        case .notFound(let code, _), .unauthorized(let code, _), .forbidden(let code, _), .validation(let code, _),
+            .rateLimited(let code, _, _), .server(_, let code, _):
+            code
+        default:
+            error.code()
         }
     }
 
@@ -1238,7 +1258,7 @@ actor MarfaEngine {
                 #endif
                 _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered(ids: ids) }
             } catch {
-                failures.append(Self.failure(error))
+                readFailed(error)
             }
         }
         if !leaving.isEmpty { await reread(leaving) }
