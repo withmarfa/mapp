@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 @testable import MAPP
 
 /// A library held in memory, with no server and no store, so the views' models can be tested through
@@ -21,8 +22,8 @@ final class FakeItemLibrary: ItemLibrary {
     var relationshipWrites: [(item: ItemID, field: String, targets: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
-    /// What `attach` answers, which may wait or throw; nil attaches nothing.
-    var attaching: (() async throws -> [Embed])?
+    /// What `attach` answers, which may wait; nil attaches nothing.
+    var attaching: (() async -> AttachReport)?
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], now: Date = .now) {
         self.items = items
@@ -164,6 +165,27 @@ final class FakeItemLibrary: ItemLibrary {
     /// How long fetching each file takes, as a server's can.
     var fetchDelay: [ItemID: Duration] = [:]
 
+    /// Binds an embed of `note` named `name` as Marfa's core does when the text is saved: to a new file item
+    /// fetched as `file`, where one is given, or else to `resolution`.
+    @discardableResult
+    func bindEmbed(_ name: String, in note: ItemID, file: URL? = nil, resolution: NoteReferenceResolution = .missing) -> ItemID? {
+        var bound = resolution
+        var made: ItemID?
+        if let file {
+            let id = ItemID.mint()
+            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            items.append(Item(
+                id: id, type: TypeID("core.file"), title: name, titleRule: .property("title"), content: .file(UTType(filenameExtension: file.pathExtension) ?? .data, byteCount: Int64(size)),
+                version: ItemVersion(1), created: now(), modified: now()))
+            files[id] = file
+            bound = .resolved(id)
+            made = id
+        }
+        guard let index = items.firstIndex(where: { $0.id == note }) else { return made }
+        items[index].boundEmbeds.append(BoundEmbed(name: name, resolution: bound))
+        return made
+    }
+
     func fileURL(of id: ItemID) async throws -> URL? {
         fetches += 1
         if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }
@@ -255,8 +277,8 @@ final class FakeItemLibrary: ItemLibrary {
         notesToPurge.subtract(ids)
     }
 
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
-        try await attaching?() ?? []
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
+        await attaching?() ?? AttachReport()
     }
 
     private func change(_ ids: Set<ItemID>, _ body: (inout Item) -> Void) {

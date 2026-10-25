@@ -228,6 +228,12 @@ export class NoteEditor {
             const file = await window.webkit?.messageHandlers?.embeds?.postMessage(embed)
             if (!file || context.signal.aborted)
               return { kind: 'missing', label: reference.label ?? reference.reference }
+            if ('unavailable' in file)
+              return {
+                kind: 'error',
+                label: reference.label ?? reference.reference,
+                message: file.unavailable,
+              }
             described.set(JSON.stringify(embed), file)
             if (file.kind === 'file') return { kind: 'file', label: file.name }
             if (file.kind === 'pdf')

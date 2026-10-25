@@ -310,8 +310,8 @@ extension LiveMarfaTests {
 
                 // A file attached through the package, and embedded where the page writes it.
                 let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
-                let embeds = try await library.attach([(name: "MAPPTEST attachment \(token).png", data: png)], to: host)
-                let embed = try #require(embeds.first)
+                let report = await library.attach([(name: "MAPPTEST attachment \(token).png", data: png)], to: host)
+                let embed = try #require(report.embeds.first, "\(report.failed)")
                 #expect(embed.name == "MAPPTEST attachment \(token).png")
                 library.updateBody(of: host, to: "A picture: ![\(embed.name)](\(embed.link))")
                 await source.flush()
@@ -323,6 +323,10 @@ extension LiveMarfaTests {
                 // The path-style embed the page writes reads back as the file the package attached.
                 let links = try await source.copy.items.links(in: host.rawValue)
                 #expect(links.embeds.map(\.target) == [.item(id: file.rawValue)])
+                // The page is served the file through the copy's binding, fetched and kept under its title.
+                let shown = await library.openEmbeddedFile(.path(embed.link), in: host, waiting: .seconds(30)).file
+                #expect(shown?.length == UInt64(png.count))
+                #expect(shown?.url.lastPathComponent == embed.name)
                 try #require(await eventually(.seconds(30)) {
                     if case .file(_, let size)? = library.item(file)?.content { size == Int64(png.count) } else { false }
                 })

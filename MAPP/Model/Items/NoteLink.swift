@@ -88,6 +88,13 @@ nonisolated struct BoundLink: Hashable, Sendable {
     let resolution: NoteReferenceResolution
 }
 
+/// An embed in an item's text with what the library bound it to: the file item it shows, or why there is none.
+nonisolated struct BoundEmbed: Hashable, Sendable {
+    /// The file's name as the library reads it from the embed (`EmbedReference.name`).
+    let name: String
+    let resolution: NoteReferenceResolution
+}
+
 /// Marfa trims Unicode White_Space, which excludes format characters such as U+200B.
 nonisolated enum NoteName {
     static func trimmed(_ text: String) -> String {

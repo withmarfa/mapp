@@ -690,17 +690,28 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func attachedFilesGoToTheSourceAndTheTextItGivesIsWhatThePageWrites() async throws {
         let (library, source) = try await loaded()
-        let embeds = try await library.attach(
-            [(name: "a.png", data: Data([1])), (name: "b.png", data: Data([2]))], to: F.n1)
-        #expect(embeds.map(\.name) == ["a.png", "b.png"])
-        #expect(embeds.map(\.link) == ["a.png", "b.png"])
+        let report = await library.attach([(name: "a.png", data: Data([1])), (name: "b.png", data: Data([2]))], to: F.n1)
+        #expect(report.embeds.map(\.name) == ["a.png", "b.png"])
+        #expect(report.embeds.map(\.link) == ["a.png", "b.png"])
+        #expect(report.failed.isEmpty)
         #expect(source.attaching.attached.withLock { $0.map(\.item) } == [F.n1, F.n1])
         #expect(source.writes.isEmpty)
+    }
 
-        source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The file can’t be written into the text.") }
-        await #expect(throws: SourceFailure.self) {
-            try await library.attach([(name: "c.png", data: Data([3]))], to: F.n1)
-        }
+    @Test func twoFilesWithOneNameEachKeepTheirBytes() async throws {
+        let (library, source) = try await loaded()
+        _ = await library.attach([(name: "Image.png", data: Data([1])), (name: "Image.png", data: Data([2]))], to: F.n1)
+        #expect(source.attaching.attached.withLock { $0.map(\.data) } == [Data([1]), Data([2])])
+    }
+
+    @Test func aFileThatFailsLeavesTheOthersAttachedAndIsNamed() async throws {
+        let (library, source) = try await loaded()
+        source.attaching.failures.withLock { $0["b.png"] = SourceFailure(kind: .failed, message: "The server is out of space.") }
+        let report = await library.attach(
+            [(name: "a.png", data: Data([1])), (name: "b.png", data: Data([2])), (name: "c.png", data: Data([3]))], to: F.n1)
+        #expect(report.embeds.map(\.name) == ["a.png", "c.png"])
+        #expect(report.failed.map(\.name) == ["b.png"])
+        #expect(report.failed.map(\.reason) == ["The server is out of space."])
     }
 
     @Test func aRefusalTheSourceAnswersReachesThePerson() async throws {

@@ -99,10 +99,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Not undoable, so the views confirm it first, and only where `canPurge`.
     func deletePermanently(_ ids: Set<ItemID>)
     /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
-    /// sends them elsewhere may have to wait, and may fail.
-    /// A failure means nothing was inserted into the note, though files already stored may remain; the editor's
-    /// alert says so plainly.
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed]
+    /// sends them elsewhere may have to wait. Each file is attached on its own, so one that fails leaves the
+    /// others attached, and the report names it.
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport
 }
 
 extension ItemLibrary {

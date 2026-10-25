@@ -615,8 +615,9 @@ struct EditorTests {
         )
         let page = try await Page()
         let library = page.library
-        serveEmbeds(page.editor, from: root.url)
         let note = library.add("![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n")
+        library.bindEmbed("Attachments/Photo 1.png", in: note.id, file: root.url.appending(path: "Attachments/Photo 1.png"))
+        library.bindEmbed("Attachments/link.png", in: note.id, file: root.url.appending(path: "Attachments/link.png"))
         page.editor.load(note)
         var widths: [Int] = []
         for _ in 0..<40 {
@@ -627,11 +628,11 @@ struct EditorTests {
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(widths == [4])
-        let expectedMissing = [["name": "b", "status": "File Not Found"]]
-        let absent = try await settle(page.editor,
-            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
-            as: [[String: String]].self) { $0 == expectedMissing }
-        #expect(absent == expectedMissing)
+        let expectedRefused = [["name": "b", "status": "File could not be loaded"]]
+        let refused = try await settle(page.editor,
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=error]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
+            as: [[String: String]].self) { $0 == expectedRefused }
+        #expect(refused == expectedRefused, "a file reached through a link is not opened")
         let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         #expect(rejected?["snapshotError"] == nil)
         #expect(rejected?["assetCount"] as? Int == 1)
@@ -658,19 +659,6 @@ struct EditorTests {
         return value
     }
 
-    /// Serves the page's embeds from `root` as a library will once it resolves them through the working copy's
-    /// links: a name from `Attachments/`, a path from `directory`, each opened only inside `root`.
-    func serveEmbeds(_ editor: EditorController, from root: URL, directory: String = "") {
-        editor.embeds.open = { reference, _ in
-            guard let real = OpenFile.realPath(of: root) else { return nil }
-            let file = switch reference {
-            case .name(let name): real.appending(path: "Attachments/\(name)")
-            case .path(let path): real.appending(path: directory).appending(path: path.removingPercentEncoding ?? path).standardized
-            }
-            return await OpenFile.open(file, inside: root)
-        }
-    }
-
     @Test func eachKindOfEmbeddedFileShowsAsWhatItIs() async throws {
         let root = try TemporaryFolder()
         let attachments = root.url.appending(path: "Attachments")
@@ -687,12 +675,18 @@ struct EditorTests {
 
         ![[Plan.pdf]]
 
-        ![[Budget.csv]] ![[Missing.zip]] ![far](../../outside.png) ![[A note]]
+        ![[Budget.csv]] ![[Missing.zip]] ![far](../../outside.png) ![[A note]] ![[Offline.png]]
 
         """
         let page = try await Page()
-        serveEmbeds(page.editor, from: root.url, directory: "Projects")
         let note = page.library.add(body)
+        for name in ["Photo.png", "Clip.mov", "Plan.pdf", "Budget.csv"] {
+            page.library.bindEmbed(name, in: note.id, file: attachments.appending(path: name))
+        }
+        page.library.bindEmbed("../Attachments/Tone.wav", in: note.id, file: attachments.appending(path: "Tone.wav"))
+        page.library.bindEmbed("Missing.zip", in: note.id)
+        page.library.bindEmbed("../../outside.png", in: note.id)
+        page.library.bindEmbed("Offline.png", in: note.id, resolution: .refused("The Marfa server can’t be reached."))
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -723,6 +717,8 @@ struct EditorTests {
             "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
             as: [[String: String]].self) { $0 == expectedMissing }
         #expect(missing == expectedMissing)
+        let unavailable = try await settle(editor, "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=error] .inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0 == ["Offline.png"] }
+        #expect(unavailable == ["Offline.png"], "a file that can't be had now says so, rather than that it is missing")
 
         #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
         #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
@@ -738,8 +734,8 @@ struct EditorTests {
         let size = try #require(try movie.resourceValues(forKeys: [.fileSizeKey]).fileSize)
         try #require(UInt64(size) > 2 * EmbeddedFiles.window, "the movie is \(size) bytes")
         let page = try await Page()
-        serveEmbeds(page.editor, from: root.url)
         let note = page.library.add("![[Long.mov]]\n")
+        page.library.bindEmbed("Long.mov", in: note.id, file: movie)
         // WebKit loads no media for a page outside a window.
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -761,8 +757,8 @@ struct EditorTests {
         try FileManager.default.createDirectory(at: root.url.appending(path: "Attachments"), withIntermediateDirectories: true)
         try Data("a,b\n".utf8).write(to: root.url.appending(path: "Attachments/Budget.csv"))
         let page = try await Page()
-        serveEmbeds(page.editor, from: root.url)
         let note = page.library.add("A sheet: ![[Budget.csv]]\n")
+        page.library.bindEmbed("Budget.csv", in: note.id, file: root.url.appending(path: "Attachments/Budget.csv"))
         page.editor.load(note)
         _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
         try await page.run("document.querySelector('.inkkit-file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
@@ -797,7 +793,7 @@ struct EditorTests {
 
     @Test func attachedImagesAreInsertedIntoTheNote() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
-        library.attaching = { [Embed(link: "Attachments/Photo.png", name: "Photo")] }
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
         #expect(try await settledMarkdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true)
@@ -806,12 +802,30 @@ struct EditorTests {
 
     @Test func imagesTheLibraryCannotKeepAreReportedInThePersonsWords() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
-        library.attaching = { throw SourceFailure(kind: .failed, message: "The server is out of space.") }
+        library.attaching = { AttachReport(failed: [(name: "Photo.png", reason: "The server is out of space.")]) }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
         #expect(try await settledMarkdown(editor) == nil, "nothing is inserted")
         #expect(library.failure?.title == "Can’t Attach Images")
-        #expect(library.failure?.message == "The images weren’t added to the note. The server is out of space.")
+        #expect(library.failure?.message == "“Photo.png” couldn’t be attached. The server is out of space.")
+    }
+
+    @Test func imagesThatWereAttachedAreInsertedAndThoseThatWerentAreNamed() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = {
+            AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")], failed: [(name: "Other.png", reason: "The server is out of space.")])
+        }
+        let folder = try TemporaryFolder()
+        let large = folder.url.appending(path: "Large.png")
+        try #require(FileManager.default.createFile(atPath: large.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: large)
+        try handle.truncate(atOffset: UInt64(PastedImages.largestImage + 1))
+        try handle.close()
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted + [.file(large)]))
+        #expect(try await settledMarkdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true)
+        #expect(library.failure?.title == "Some Images Weren’t Attached")
+        #expect(library.failure?.message == "“Large.png” is larger than 50 MB or can’t be read.\n“Other.png” couldn’t be attached. The server is out of space.")
     }
 
     @Test func imagesAttachedAfterTheNoteChangesAreNotInsertedIntoTheNextOne() async throws {
@@ -823,7 +837,7 @@ struct EditorTests {
         library.attaching = {
             started = true
             for await _ in gate { break }
-            return [Embed(link: "Attachments/Photo.png", name: "Photo")]
+            return AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")])
         }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))

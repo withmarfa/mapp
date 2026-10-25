@@ -19,6 +19,11 @@ export interface EmbeddedFile {
   opens: boolean
 }
 
+/** Why an embed's file can't be shown now, such as a file not yet downloaded while the server can't be reached. */
+export interface UnavailableFile {
+  unavailable: string
+}
+
 export type EditorMessage =
   | { type: 'ready' }
   | { type: 'error' | 'diagnostic'; message: string }
@@ -66,7 +71,9 @@ declare global {
       messageHandlers?: {
         host?: { postMessage(message: EditorMessage): void }
         /** Answers with what the app knows of a file a note embeds, or null when it has none. */
-        embeds?: { postMessage(request: EmbedRequest): Promise<EmbeddedFile | null> }
+        embeds?: {
+          postMessage(request: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null>
+        }
         /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
          *  `resolve` with whether each name is missing. */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }

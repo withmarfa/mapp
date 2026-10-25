@@ -116,6 +116,12 @@ final class RecordingSchemeTask: NSObject, WKURLSchemeTask {
     func didFailWithError(_ error: any Error) { failure = error }
 }
 
+extension EmbedResolution {
+    init(_ file: OpenFile?) {
+        self = file.map { .file($0) } ?? .missing
+    }
+}
+
 @Suite(.serialized)
 struct EmbeddedFilesTests {
     /// A directory of files, a link out of it, and a directory outside it. It answers an embed as a library will
@@ -156,9 +162,9 @@ struct EmbeddedFilesTests {
             }
         }
 
-        func open(_ reference: EmbedReference, in item: ItemID) async -> OpenFile? {
-            guard let file = resolve(reference, in: item) else { return nil }
-            return await OpenFile.open(file, inside: root.url)
+        func open(_ reference: EmbedReference, in item: ItemID) async -> EmbedResolution {
+            guard let file = resolve(reference, in: item) else { return .missing }
+            return EmbedResolution(await OpenFile.open(file, inside: root.url))
         }
     }
 

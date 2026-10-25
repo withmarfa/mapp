@@ -44,9 +44,16 @@ nonisolated struct Embed: Hashable, Sendable {
 }
 
 nonisolated protocol EmbedResolver: Sendable {
-    /// Attaches each file to the item and says what the page writes in its text to show it. A failure means no
-    /// text is to be written, though files already attached may remain.
-    func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
+    /// Attaches the file to the item and says what the page writes in its text to show it. A failure means the
+    /// file was not attached.
+    func attach(_ file: URL, to item: ItemID) async throws -> Embed
+}
+
+/// What attaching files gave: the text to write for each file attached, in order, and the name of each that
+/// wasn't, with why.
+nonisolated struct AttachReport: Sendable {
+    var embeds: [Embed] = []
+    var failed: [(name: String, reason: String)] = []
 }
 
 /// The Marfa working copy behind the library, as the library and the host use it, so both are tested without a

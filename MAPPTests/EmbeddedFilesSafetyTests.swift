@@ -62,12 +62,12 @@ struct EmbeddedFilesSafetyTests {
         try secret.write(to: outside.appending(path: "Photo.png"))
         let files = EmbeddedFiles()
         files.open = { reference, item in
-            guard let url = folder.resolve(reference, in: item) else { return nil }
+            guard let url = folder.resolve(reference, in: item) else { return .missing }
             // What another writer to the folder could do between finding the file and opening it.
             let attachments = folder.root.url.appending(path: "Attachments")
             try? FileManager.default.moveItem(at: attachments, to: folder.root.url.appending(path: "Moved"))
             try? FileManager.default.createSymbolicLink(at: attachments, withDestinationURL: outside)
-            return await OpenFile.open(url, inside: folder.root.url)
+            return EmbedResolution(await OpenFile.open(url, inside: folder.root.url))
         }
         let task = StrictSchemeTask(EmbeddedFiles.url(for: .path("../Attachments/Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
@@ -81,10 +81,10 @@ struct EmbeddedFilesSafetyTests {
         let file = folder.root.url.appending(path: "Attachments/Photo.png")
         let files = EmbeddedFiles()
         files.open = { reference, item in
-            guard let url = folder.resolve(reference, in: item) else { return nil }
+            guard let url = folder.resolve(reference, in: item) else { return .missing }
             try? FileManager.default.removeItem(at: file)
             mkfifo(file.path, 0o644)
-            return await OpenFile.open(url, inside: folder.root.url)
+            return EmbedResolution(await OpenFile.open(url, inside: folder.root.url))
         }
         let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)

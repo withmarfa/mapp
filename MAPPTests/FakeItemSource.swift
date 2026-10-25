@@ -2,18 +2,18 @@ import Foundation
 import Synchronization
 @testable import MAPP
 
-/// Embeds that keep what they are asked to attach, as the file's name inside the text the page writes for it, and
-/// fail where the test says.
+/// Embeds that keep what they are asked to attach, with its bytes, as the file's name inside the text the page
+/// writes for it, and fail for the names the test says.
 nonisolated final class FakeEmbeds: EmbedResolver {
-    let attached = Mutex<[(file: String, item: ItemID)]>([])
-    let failure = Mutex<SourceFailure?>(nil)
+    let attached = Mutex<[(file: String, data: Data, item: ItemID)]>([])
+    /// The failure for each file name; any other is attached.
+    let failures = Mutex<[String: SourceFailure]>([:])
 
-    func attach(_ files: [URL], to item: ItemID) async throws -> [Embed] {
-        if let failure = failure.withLock({ $0 }) { throw failure }
-        return files.map { file in
-            attached.withLock { $0.append((file.lastPathComponent, item)) }
-            return Embed(link: file.lastPathComponent, name: file.lastPathComponent)
-        }
+    func attach(_ file: URL, to item: ItemID) async throws -> Embed {
+        if let failure = failures.withLock({ $0[file.lastPathComponent] }) { throw failure }
+        let data = try Data(contentsOf: file)
+        attached.withLock { $0.append((file.lastPathComponent, data, item)) }
+        return Embed(link: file.lastPathComponent, name: file.lastPathComponent)
     }
 }
 

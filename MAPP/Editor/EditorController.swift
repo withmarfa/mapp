@@ -43,7 +43,7 @@ final class EditorController: NSObject {
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
-    @ObservationIgnored let embeds = EmbeddedFiles()
+    @ObservationIgnored private let embeds = EmbeddedFiles()
     /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
     /// was told it may be.
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
@@ -122,7 +122,9 @@ final class EditorController: NSObject {
         }
         Self.open.add(self)
         webView.controller = self
-        embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
+        embeds.open = { [weak self] reference, item in
+            await self?.library?.openEmbeddedFile(reference, in: item, waiting: Self.embedWait) ?? .missing
+        }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         noteRequests.suggest = { [weak self] query, source in
             guard let self, let current = self.library else { return [] }
@@ -576,26 +578,22 @@ final class EditorController: NSObject {
         call("findReplace", String(range.location), String(NSMaxRange(range)), json(text), String(state.generation), json(state.snapshotID), json(batch))
     }
 
-    /// Puts images into the note: into the attachments folder, and linked where they were dropped, given in the
-    /// page's own coordinates, or at the caret. Whether there were images to take; they are read and placed
-    /// once their files have been read, if the note is still the one on the page.
+    /// Attaches images to the note and links them where they were dropped, given in the page's own coordinates, or
+    /// at the caret. Whether there were images to take; they are read and placed once their files have been read,
+    /// if the note is still the one on the page. Each image that couldn't be taken is named, and the rest are
+    /// still placed, so trying again adds only those named.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let noteID, library != nil, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
-            let files = await PastedImages.read(sources)
+            let (files, skipped) = await PastedImages.read(sources)
             guard self.noteID == noteID, isEditable, let library else { return }
-            let embeds: [Embed]
-            do {
-                embeds = try await library.attach(files, to: noteID)
-            } catch {
-                library.failure = (String(localized: "Can’t Attach Images"), String(localized: "The images weren’t added to the note. \(error.localizedDescription)"))
-                return
-            }
+            let report = files.isEmpty ? AttachReport() : await library.attach(files, to: noteID)
+            Self.reportUnattached(skipped: skipped, failed: report.failed, attached: report.embeds.count, to: library)
             // The images are kept either way; they go into the note only if it is still the one on the page.
             guard self.noteID == noteID, isEditable else { return }
-            let images = embeds.map { ["src": $0.link, "alt": $0.name] }
+            let images = report.embeds.map { ["src": $0.link, "alt": $0.name] }
             guard !images.isEmpty else { return }
             if let point {
                 call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(height)))
@@ -604,6 +602,17 @@ final class EditorController: NSObject {
             }
         }
         return true
+    }
+
+    private static func reportUnattached(
+        skipped: [String], failed: [(name: String, reason: String)], attached: Int, to library: any ItemLibrary
+    ) {
+        guard !skipped.isEmpty || !failed.isEmpty else { return }
+        let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
+        let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
+            + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
+        let title = attached == 0 ? String(localized: "Can’t Attach Images") : String(localized: "Some Images Weren’t Attached")
+        library.failure = (title, lines.joined(separator: "\n"))
     }
 
     // MARK: Printing
@@ -672,11 +681,14 @@ final class EditorController: NSObject {
 
     // MARK: Embedded files
 
+    /// How long the page waits for Marfa to bind an embed not yet bound, as one just pasted is once its text is saved.
+    nonisolated static let embedWait = Duration.seconds(10)
+
     /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder: always for
     /// one that might run when opened (`EmbeddedFiles.opens`), whatever the page asked.
     func openEmbed(_ reference: EmbedReference, in item: ItemID, revealing: Bool = false) {
         Task {
-            guard let url = await library?.openEmbeddedFile(reference, in: item)?.url else { return }
+            guard let url = await library?.openEmbeddedFile(reference, in: item).file?.url else { return }
             if revealing || !EmbeddedFiles.opens(url) {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } else {

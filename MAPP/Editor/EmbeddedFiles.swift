@@ -16,28 +16,85 @@ nonisolated enum EmbedReference: Hashable, Sendable {
         if let name = dict["name"] as? String { return (ItemID(item), .name(name)) }
         return nil
     }
+
+    /// The file's name as Marfa reads it from the embed, which is the name `Item.boundEmbeds` keeps: a name up to
+    /// any `|` or `#`, trimmed; a path up to any `?` or `#`, with its percent escapes decoded byte by byte.
+    var name: String {
+        switch self {
+        case .name(let name):
+            return NoteName.trimmed(String(name.split(separator: /[|#]/, maxSplits: 1, omittingEmptySubsequences: false)[0]))
+        case .path(let path):
+            let bytes = Array(path.utf8.prefix { $0 != UInt8(ascii: "?") && $0 != UInt8(ascii: "#") })
+            var decoded: [UInt8] = []
+            var at = 0
+            while at < bytes.count {
+                if bytes[at] == UInt8(ascii: "%"), at + 2 < bytes.count,
+                   let byte = UInt8(String(decoding: bytes[at + 1...at + 2], as: UTF8.self), radix: 16) {
+                    decoded.append(byte)
+                    at += 3
+                } else {
+                    decoded.append(bytes[at])
+                    at += 1
+                }
+            }
+            return String(decoding: decoded, as: UTF8.self)
+        }
+    }
 }
 
 // MARK: Resolving
 
-extension ItemLibrary {
-    /// The embedded file opened for reading, or nil where there is none. The one place an embed becomes a file,
-    /// which the page's scheme, its Open and the gallery's thumbnails all ask. Nothing resolves an embed yet:
-    /// that waits on the working copy's links and attachments (`links(in:)`), whose file is then opened with
-    /// `OpenFile.open(_:inside:)`.
-    func openEmbeddedFile(_ reference: EmbedReference, in item: ItemID) async -> OpenFile? {
-        nil
+/// What an embed shows: its file, opened for reading, nothing, or why its file can't be shown now.
+nonisolated enum EmbedResolution: Sendable {
+    case file(OpenFile)
+    case missing
+    case unavailable(String)
+
+    var file: OpenFile? {
+        if case .file(let file) = self { file } else { nil }
     }
 }
 
-nonisolated enum EmbedPaths {
-    /// An address, which the page never loads: a scheme, `//` or `#`.
-    static func isAddress(_ destination: String) -> Bool {
-        if destination.hasPrefix("//") || destination.hasPrefix("#") { return true }
-        guard let colon = destination.firstIndex(of: ":") else { return false }
-        let scheme = destination[..<colon]
-        return scheme.first?.isASCII == true && scheme.first?.isLetter == true
-            && scheme.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "+.-".contains($0)) }
+extension ItemLibrary {
+    /// The file an item's embed shows, the one place an embed becomes a file, which the page's scheme, its Open
+    /// and the gallery all ask. Marfa's core binds each embed to its file item when the text is saved
+    /// (`Item.boundEmbeds`); an embed it has not bound yet, as one just pasted, is waited on for up to `waiting`,
+    /// since the text is saved a moment after it is typed. The file is fetched if this Mac doesn't hold it.
+    func openEmbeddedFile(_ reference: EmbedReference, in item: ItemID, waiting: Duration = .zero) async -> EmbedResolution {
+        let name = reference.name
+        let deadline = ContinuousClock.now + waiting
+        var bound = self.item(item)?.boundEmbeds.first { $0.name == name }
+        while bound == nil || bound?.resolution == .pending, ContinuousClock.now < deadline, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+            bound = self.item(item)?.boundEmbeds.first { $0.name == name }
+        }
+        switch bound?.resolution {
+        case .resolved(let file):
+            return await open(file)
+        case .ambiguous:
+            return .unavailable(String(localized: "More than one file has this name."))
+        case .refused(let reason):
+            return .unavailable(reason)
+        case .pending:
+            return .unavailable(String(localized: "This file isn’t in Marfa yet."))
+        case .missing, nil:
+            return .missing
+        }
+    }
+
+    private func open(_ file: ItemID) async -> EmbedResolution {
+        let url: URL
+        do {
+            guard let fetched = try await fileURL(of: file) else { return .missing }
+            url = fetched
+        } catch {
+            return .unavailable(error.localizedDescription)
+        }
+        // Opened by its real path, since the descriptor is opened through no link and a temporary folder is under one.
+        guard let folder = OpenFile.realPath(of: url.deletingLastPathComponent()),
+              let opened = await OpenFile.open(folder.appending(path: url.lastPathComponent), inside: folder)
+        else { return .unavailable(String(localized: "This file can’t be opened.")) }
+        return .file(opened)
     }
 }
 
@@ -52,7 +109,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     nonisolated static let piece = 1 << 20
 
     /// The file an item's embed names, opened; `ItemLibrary.openEmbeddedFile` for the editor's library.
-    var open: (EmbedReference, ItemID) async -> OpenFile? = { _, _ in nil }
+    var open: (EmbedReference, ItemID) async -> EmbedResolution = { _, _ in .missing }
     /// Changed for each note the page shows, so a file changed on disk is loaded again rather than taken from
     /// WebKit's memory of the page.
     var version = 0
@@ -71,7 +128,10 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         let version = version
         let exporting = (message.body as? [String: Any])?["export"] as? Bool == true
         Task {
-            guard let file = await open(reference, item), self.version == version else { return replyHandler(nil, nil) }
+            let resolution = await open(reference, item)
+            guard self.version == version else { return replyHandler(nil, nil) }
+            if case .unavailable(let reason) = resolution, !exporting { return replyHandler(["unavailable": reason], nil) }
+            guard let file = resolution.file else { return replyHandler(nil, nil) }
             let type = UTType(filenameExtension: file.url.pathExtension)
             if exporting {
                 // Portable exports read the checked descriptor, never the path resolved before it opened.
@@ -239,7 +299,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     private func serve(_ task: any WKURLSchemeTask, _ id: ObjectIdentifier) async {
         guard let url = task.request.url else { return finish(task, id, failing: URLError(.badURL)) }
         if url.host == "icon" { return serveIcon(task, id, url) }
-        guard let (item, reference) = Self.request(in: url), let file = await open(reference, item) else {
+        guard let (item, reference) = Self.request(in: url), let file = await open(reference, item).file else {
             if respond(task, id, status: 404) { finish(task, id) }
             return
         }

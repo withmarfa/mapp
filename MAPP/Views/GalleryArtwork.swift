@@ -49,11 +49,10 @@ enum GalleryArtworkCache {
     private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
         switch item.content {
         case .markdown:
-            let body = library.body(of: item.id)?.text
-            return await GalleryPreview.image(for: item, body: body, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
+            return await GalleryPreview.image(for: item, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
         case .file(let type, _):
             if type.conforms(to: .image) {
-                return await GalleryPreview.image(for: item, body: nil, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
+                return await GalleryPreview.image(for: item, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
             }
             guard let url = await GalleryPreview.fileURL(of: item, in: library), !Task.isCancelled else { return nil }
             return await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) }
