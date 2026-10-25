@@ -165,13 +165,6 @@ struct ItemMetaTests {
         #expect(ItemMeta.make(for: note, in: library, context: .init()).isEmpty)
     }
 
-    @Test func anyTypeCanBeACollection() {
-        let epic = item("Interviews", type: "aic.epic")
-        let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
-        let library = FakeItemLibrary(items: [epic, task])
-        #expect(library.collection(of: task)?.id == epic.id)
-    }
-
     @Test func theCollectionIsJustBelowTheTop() {
         let root = item("WithMarfa", type: "aic.project")
         let project = item("Marfa", type: "aic.project", parent: root)

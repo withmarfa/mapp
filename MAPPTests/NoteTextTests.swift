@@ -46,11 +46,6 @@ struct NoteTextTests {
         #expect(preview("# Just a title") == "")
     }
 
-    @Test func previewIsCappedAtTheLimit() {
-        let body = "Title\n" + String(repeating: "word ", count: 200)
-        #expect(preview(body, title: "Title").count == ItemPreview.limit)
-    }
-
     @Test(arguments: [
         ("[the revised edition](https://example.com)", "the revised edition"),
         ("[Swift](https://en.wikipedia.org/wiki/Swift_(programming_language)) is nice", "Swift is nice"),

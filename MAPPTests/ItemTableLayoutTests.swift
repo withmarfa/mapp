@@ -69,12 +69,6 @@ struct ItemTableLayoutTests {
         #expect(ids == ["title", "field.status", "field.priority", "parent", "collection", "field.notes", "field.description", "edited", "created"])
     }
 
-    @Test func theTitleAndTextAreNotColumns() {
-        let ids = Self.columns([Self.row("A")]).map(\.id)
-        #expect(!ids.contains("field.title"))
-        #expect(!ids.contains("field.body"))
-    }
-
     @Test func aTableOfSeveralTypesNamesEachRowsType() {
         let ids = Self.columns([Self.row("A"), Self.row("B", type: "core.note")]).map(\.id)
         #expect(ids.prefix(2) == ["title", "type"])

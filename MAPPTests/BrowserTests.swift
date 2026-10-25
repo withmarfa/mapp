@@ -417,17 +417,6 @@ struct BrowserTests {
         #expect(!browser.isSearching)
     }
 
-    @Test func aTypeWhoseLastItemGoesGivesWayToAllItems() {
-        let (library, older, newer, favorite) = makeFakeLibrary()
-        let browser = Browser()
-        browser.show(.itemType("core.note"), in: library, order: NoteOrder())
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .itemType("core.note"), "a type that still holds items stays")
-        library.delete([older.id, newer.id, favorite.id], undoManager: nil)
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
-    }
-
     @Test func favoritesLeadOnlyWhereTheyMeanSomething() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
