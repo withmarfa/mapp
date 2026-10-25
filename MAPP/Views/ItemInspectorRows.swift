@@ -5,16 +5,18 @@ enum InspectorMetrics {
     static let nameWidth: CGFloat = 92
     static let rowHeight: CGFloat = 28
     static let gap: CGFloat = 8
+    /// The space between a section's divider and the heading of the next.
+    static let sectionGap: CGFloat = 10
 }
 
-/// A section's heading: small, bold and secondary.
+/// A section's heading: small, semibold and secondary, as the system's inspectors head theirs.
 struct InspectorHeading: View {
     let title: LocalizedStringKey
-    var topPadding: CGFloat = 14
+    var topPadding: CGFloat = InspectorMetrics.sectionGap
 
     var body: some View {
         Text(title)
-            .interfaceFont(.subheadline.bold())
+            .interfaceFont(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
             .padding(.top, topPadding)
             .padding(.bottom, 6)
@@ -174,6 +176,6 @@ struct InspectorAddMenu<Content: View>: View {
 /// A hairline between two sections, in place of a box around either.
 struct InspectorSectionDivider: View {
     var body: some View {
-        Divider().padding(.top, 14)
+        Divider().padding(.top, InspectorMetrics.sectionGap + 2)
     }
 }

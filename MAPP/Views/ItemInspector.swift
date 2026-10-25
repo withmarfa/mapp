@@ -65,8 +65,8 @@ struct ItemInspectorHost: View {
 }
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable. It reads as
-/// a property sheet: the type's properties, the item's relationships, then its details, folded away until asked
-/// for.
+/// a property sheet: the type's properties, the item's relationships, then its details, which the person can fold
+/// away.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
     let item: Item
@@ -85,7 +85,7 @@ struct ItemInspector: View {
     let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) -> Bool
     var drafts: DetailsPresentation? = nil
-    @State private var detailsOpen = false
+    @AppStorage(InterfaceKey.inspectorDetailsOpen) private var detailsOpen = true
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
     /// The host remakes the inspector for another item, which forgets them.
     @State private var revealed: Set<String> = []
@@ -120,7 +120,7 @@ struct ItemInspector: View {
                 }
                 if hasRelationships {
                     if hasProperties { InspectorSectionDivider() }
-                    InspectorHeading(title: "Relationships", topPadding: hasProperties ? 10 : 2)
+                    InspectorHeading(title: "Relationships", topPadding: hasProperties ? InspectorMetrics.sectionGap : 2)
                     ForEach(shownRelationships) { relationship in
                         ItemRelationshipRow(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
                                             onRemove: { onRemove(relationship, $0) })
@@ -183,19 +183,22 @@ struct ItemInspector: View {
         Button {
             withAnimation(.snappy(duration: 0.2)) { detailsOpen.toggle() }
         } label: {
-            HStack(spacing: 4) {
+            // As a sidebar section folds: the heading reads as the others do, with the disclosure at its end.
+            HStack {
                 Text("Details")
+                Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 9 * InterfaceStyle.scale(for: textSize), weight: .bold))
+                    .font(.system(size: 10 * InterfaceStyle.scale(for: textSize), weight: .semibold))
+                    .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(detailsOpen ? 90 : 0))
                     .accessibilityHidden(true)
             }
-            .interfaceFont(.subheadline.bold())
+            .interfaceFont(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .padding(.top, hasProperties || hasRelationships ? 10 : 2)
+        .padding(.top, hasProperties || hasRelationships ? InspectorMetrics.sectionGap : 2)
         .padding(.bottom, 6)
         .accessibilityAddTraits(.isHeader)
         .accessibilityValue(detailsOpen ? Text("Expanded") : Text("Collapsed"))
@@ -203,8 +206,8 @@ struct ItemInspector: View {
     }
 
     @ViewBuilder private var details: some View {
-        detail("Created", item.created.formatted(date: .abbreviated, time: .shortened))
-        detail("Edited", item.modified.formatted(date: .abbreviated, time: .shortened))
+        detail("Created", ItemDate(date: item.created, hasTime: true).text())
+        detail("Edited", ItemDate(date: item.modified, hasTime: true).text())
         if let source = item.source { detail("Made by", source) }
         if let place { detail("Place", place) }
         detail("Version", item.version.rawValue.formatted())
@@ -217,7 +220,7 @@ struct ItemInspector: View {
         }
         ForEach(otherProperties) { property in
             InspectorRow(name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type))) {
-                Text(ItemValueText.string(property.value))
+                Text(Self.text(of: property.value))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -230,6 +233,12 @@ struct ItemInspector: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// A value no field describes, with a date in it read as the fields' dates are.
+    private static func text(of value: PropertyValue) -> String {
+        if let string = value.string, let date = ItemDate.parse(string) { return date.text() }
+        return ItemValueText.string(value)
     }
 
     /// The catalogue's label for a key, else the key written for reading.
