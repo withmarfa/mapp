@@ -90,8 +90,8 @@ actor MarfaDownloads: DownloadedFiles {
         changing = true
         defer { finished() }
         _ = try await copy.blobs.setBudget(budget.marfa)
-        // The copy holds the budget; the record matters only if the copy is replaced, when an unwritten one
-        // returns the budget to Automatic.
+        // The copy holds the budget. The record matters only when the copy is replaced, since the new one starts
+        // at Automatic.
         try? record?.write(budget)
     }
 
