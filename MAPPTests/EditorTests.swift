@@ -60,9 +60,11 @@ struct EditorTests {
             return shown
         }
 
-        /// Waits for something the page does in its own time, such as reporting an edit after a pause.
+        /// Waits for something the page does in its own time, such as reporting an edit after a pause. It returns as
+        /// soon as the condition holds, so the limit costs nothing when all is well; it is long because the first page
+        /// of a test process starts WebKit cold, which takes 4 to 9 seconds on a hosted runner.
         func wait(_ condition: () -> Bool) async throws {
-            for _ in 0..<100 where !condition() {
+            for _ in 0..<600 where !condition() {
                 try await Task.sleep(for: .milliseconds(50))
             }
             try #require(condition())
