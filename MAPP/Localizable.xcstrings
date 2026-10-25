@@ -745,28 +745,6 @@
     "Deleted %@" : {
 
     },
-    "Deleted items stay here for %lld days, then they’re deleted for good." : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Deleted items stay here for %lld day, then they’re deleted for good."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Deleted items stay here for %lld days, then they’re deleted for good."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Descending" : {
 
     },
@@ -825,9 +803,6 @@
       "extractionState" : "manual"
     },
     "Edit Relationship" : {
-      "extractionState" : "manual"
-    },
-    "Edit…" : {
       "extractionState" : "manual"
     },
     "Edited" : {
@@ -1038,12 +1013,6 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items you delete appear here before they’re deleted for good." : {
-
-    },
-    "Items you’ve deleted. Restore them, or delete them for good." : {
-
-    },
     "Keep Copy" : {
       "extractionState" : "manual"
     },
@@ -1091,9 +1060,6 @@
       "extractionState" : "manual"
     },
     "Library" : {
-
-    },
-    "Library Settings" : {
 
     },
     "Library unavailable" : {
@@ -1177,9 +1143,6 @@
     "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again." : {
       "extractionState" : "manual"
     },
-    "MAPP is reading your Marfa library, so it doesn’t need a notes folder. Your notes folder is used again if you disconnect." : {
-      "extractionState" : "manual"
-    },
     "MAPP keeps the key in your Keychain and doesn’t show it again." : {
       "extractionState" : "manual"
     },
@@ -1196,9 +1159,6 @@
       "extractionState" : "manual"
     },
     "Marfa Server" : {
-      "extractionState" : "manual"
-    },
-    "Marfa Server Address Key Connect Disconnect Offline Sync Changes Waiting" : {
       "extractionState" : "manual"
     },
     "Markdown Source" : {
@@ -1238,10 +1198,6 @@
       "extractionState" : "manual"
     },
     "New Item" : {
-      "extractionState" : "manual",
-      "generatesSymbol" : false
-    },
-    "New Item…" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
@@ -1314,9 +1270,6 @@
     "Notes List" : {
 
     },
-    "Nothing Deleted" : {
-
-    },
     "Number" : {
       "extractionState" : "manual"
     },
@@ -1361,9 +1314,6 @@
 
     },
     "Open a library to choose what its sidebar shows." : {
-
-    },
-    "Open a library to see what you’ve deleted from it." : {
 
     },
     "Open Copy" : {
@@ -1709,9 +1659,6 @@
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
     },
-    "The file was attached, but its name can’t be written into the text." : {
-      "extractionState" : "manual"
-    },
     "The file may have moved or become unavailable. Select it again to retry." : {
       "extractionState" : "manual"
     },
@@ -1840,9 +1787,6 @@
     },
     "This kind of item has no text to edit." : {
       "extractionState" : "manual"
-    },
-    "This library can’t delete items for good right now." : {
-
     },
     "This library is being brought up to date. Try again in a moment." : {
       "extractionState" : "manual"

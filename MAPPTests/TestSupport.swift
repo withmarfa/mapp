@@ -19,14 +19,6 @@ final class TemporaryFolder {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(text.utf8).write(to: file)
     }
-
-    func read(_ path: String) -> String? {
-        try? String(contentsOf: url.appending(path: path), encoding: .utf8)
-    }
-
-    func exists(_ path: String) -> Bool {
-        FileManager.default.fileExists(atPath: url.appending(path: path).path)
-    }
 }
 
 extension ItemLibrary {

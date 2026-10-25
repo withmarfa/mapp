@@ -49,11 +49,9 @@ struct NoteOrganizeActions: View {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
         } else {
             let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
-            Group {
-                Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
-                    library.setFavorite(ids, !allFavorites, undoManager: undoManager)
-                }
-                }
+            Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
+                library.setFavorite(ids, !allFavorites, undoManager: undoManager)
+            }
             .disabled(notes.isEmpty)
         }
     }

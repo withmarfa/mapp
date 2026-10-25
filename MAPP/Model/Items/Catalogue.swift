@@ -29,7 +29,6 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let bodyField: String?
     let parent: TypeID?
     var description: String?
-    /// A files library's types have none.
     var version: Int64?
     /// With the roles it inherits, as Marfa resolves them.
     var roles: [String] = []

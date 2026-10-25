@@ -101,7 +101,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
 
-    /// Every editor open, so their edits can be handed over before the app quits or changes folder.
+    /// Every editor open, so their edits can be handed over before the app quits or changes library.
     @ObservationIgnored static let open = NSHashTable<EditorController>.weakObjects()
 
     init(library: any ItemLibrary) {

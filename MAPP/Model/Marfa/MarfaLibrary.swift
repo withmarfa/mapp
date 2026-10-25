@@ -112,7 +112,7 @@ import Observation
         var running: Bool
     }
 
-    /// Searches keep the items not in the bin, as the files library's do.
+    /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
     init(source: any ItemSource, now: @escaping () -> Date = Date.init) {

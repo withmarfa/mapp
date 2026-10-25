@@ -35,8 +35,7 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
     case failingAlone = "failing_alone"
 }
 
-/// One of the contract's six verdicts on a write. A files source answers `accepted`, or `refused` when the disk
-/// write fails.
+/// One of the contract's six verdicts on a write.
 nonisolated enum WriteOutcome: Hashable, Sendable {
     case accepted
     /// Applied over changes made since, field by field.

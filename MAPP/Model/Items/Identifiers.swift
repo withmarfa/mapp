@@ -39,7 +39,7 @@ nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {
     init(_ rawValue: String) { self.rawValue = rawValue }
 }
 
-/// The version of an item a reader holds. A files source counts within one session; Marfa's is the server's.
+/// The version of an item a reader holds, as the server counts it.
 nonisolated struct ItemVersion: RawRepresentable, Hashable, Comparable, Sendable {
     let rawValue: Int64
     init(rawValue: Int64) { self.rawValue = rawValue }

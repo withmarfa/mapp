@@ -102,8 +102,8 @@ nonisolated enum NoteReferenceResolution: Hashable, Sendable {
     case resolved(ItemID)
     case missing
     case ambiguous([ItemID])
-    /// Not looked up on the server yet; only a Marfa library has these.
+    /// Not looked up on the server yet.
     case pending
-    /// The server refused the lookup or the write of the edge; only a Marfa library has these.
+    /// The server refused the lookup or the write of the edge.
     case refused(String)
 }
