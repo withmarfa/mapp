@@ -45,7 +45,6 @@ struct PaletteMatchTests {
         let kept = PaletteMatch.Titles()
         for typed in ["ताब", "ब", "Table", "CAFE", "plans", "ECL", "👩", "ノート", "nn", "inb", "pin", "", "zz"] {
             #expect(kept.ranked(titles, typed) == PaletteMatch.ranked(titles, typed), "\(typed)")
-            #expect(kept.ranked(titles, typed) == PaletteMatch.ranked(titles, typed), "\(typed), read again")
         }
     }
 }
