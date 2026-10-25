@@ -338,9 +338,11 @@ final class EditorController: NSObject {
         // process ended comes back with the text it last reported.
         guard isReady, generation != abandonedGeneration else { return done(leave()) }
         var finished = false
+        var watchdog: Task<Void, Never>?
         func finish(_ kept: Bool) {
             guard !finished else { return }
             finished = true
+            watchdog?.cancel()
             done(kept)
         }
         func capture() {
@@ -359,9 +361,10 @@ final class EditorController: NSObject {
                 finish(leave())
             }
         }
-        Task { [self] in
+        // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
+        watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.flushLimit)
-            guard !finished else { return }
+            guard let self, !finished else { return }
             guard self.noteID == noteID, self.generation == generation else { return finish(false) }
             abandonedGeneration = generation
             let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
