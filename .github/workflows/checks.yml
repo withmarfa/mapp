@@ -84,8 +84,9 @@ jobs:
           xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS'
           -derivedDataPath build -only-testing:MAPPTests -retry-tests-on-failure -test-iterations 3
           -test-repetition-relaunch-enabled YES -resultBundlePath TestResults.xcresult test
-      - name: Show why tests failed
-        if: failure()
+      # Also after a pass, so a test that passed only on a retry is seen.
+      - name: Show failed attempts
+        if: always() && hashFiles('TestResults.xcresult/**') != ''
         run: |
           xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
             | python3 -c "
@@ -99,7 +100,7 @@ jobs:
           for n in json.load(sys.stdin)['testNodes']:
               walk(n)
           for message, count in seen.most_common(15):
-              print(count, message)
+              print("::warning::%dx %s" % (count, message))
           "
 
   checks:

@@ -24,6 +24,10 @@ if [[ -n "${CI_TAG:-}" ]]; then
     print -u2 -- "The tag $CI_TAG is not a version such as 1.2.3."
     exit 1
   }
+  [[ "$version" =~ '^0+(\.0+){0,2}$' ]] && {
+    print -u2 -- "The tag $CI_TAG would build version 0.0.0."
+    exit 1
+  }
   # The version is a build setting of each target; it is set here, in this copy only.
   sed -i '' "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $version;/" MAPP.xcodeproj/project.pbxproj
   # A project that no longer carries the setting would leave the build at 0.0.0.
