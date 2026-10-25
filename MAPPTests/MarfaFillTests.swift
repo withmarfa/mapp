@@ -79,8 +79,9 @@ import Testing
         await source.close()
     }
 
-    /// A read refused while the copy hydrates again, as after a move of an edge's source, is told to nobody; the
-    /// hydration's end reads the copy again.
+    /// A copy hydrating again, as after a move of an edge's source, refuses edge reads (`device/read-partial-unheld-refused`).
+    /// A server change read meanwhile keeps the edges it last read and is told to nobody; the hydration's end reads
+    /// the copy again.
     @Test func aReadRefusedDuringAHydrationIsNoFailure() async throws {
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
@@ -94,14 +95,13 @@ import Testing
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
-        _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
 
         reads.hydrating.withLock { $0 = true }
-        source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
-        reads.hydrating.withLock { $0 = false }
-        source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
+        let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
+        source.events.yield(.change(Change(origin: .server(event: "item.created", cursor: "arrived"),
+                                          itemId: try #require(created.itemId), edgeId: nil)))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
+        #expect(reads.refused.withLock { $0 } > 0, "the change was read while the copy refused edge reads")
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })
         await source.close()
     }
@@ -149,29 +149,23 @@ private nonisolated final class FillingReads: MarfaReading {
     }
 }
 
-/// Reads the copy as it is, except while `hydrating`, when the copy refuses them as one hydrating again would.
+/// Reads the copy as it is, except while `hydrating`, when it refuses edge reads as a copy hydrating again does.
 private nonisolated final class HydratingReads: MarfaReading {
     let read: MarfaRead
     let hydrating = Mutex(false)
+    let refused = Mutex(0)
 
     init(copy: WorkingCopy) { read = MarfaRead(copy: copy) }
 
     private func refuseWhileHydrating() throws {
-        if hydrating.withLock({ $0 }) { throw MarfaError.hydrationIncomplete(message: "The copy is not whole") }
+        guard hydrating.withLock({ $0 }) else { return }
+        refused.withLock { $0 += 1 }
+        throw MarfaError.hydrationIncomplete(message: "The copy is not whole")
     }
 
-    func status() async throws -> Status {
-        try refuseWhileHydrating()
-        return try await read.status()
-    }
-    func items() async throws -> Rows<Marfa.Item> {
-        try refuseWhileHydrating()
-        return try await read.items()
-    }
-    func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] {
-        try refuseWhileHydrating()
-        return try await read.edges(ofTypes: types)
-    }
+    func status() async throws -> Status { try await read.status() }
+    func items() async throws -> Rows<Marfa.Item> { try await read.items() }
+    func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
     func edges(touching id: String) async throws -> [Marfa.Edge] {
         try refuseWhileHydrating()
         return try await read.edges(touching: id)
