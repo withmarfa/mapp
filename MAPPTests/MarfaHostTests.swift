@@ -340,6 +340,34 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: host.state, isLaunching: false, isBusy: false) == .failed)
     }
 
+    /// Discarding the copy takes it from under nobody: while another process writes it, it stays, marked to go.
+    @Test(.timeLimit(.minutes(1)))
+    func discardingACopyAnotherProcessWritesLeavesIt() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.keys.save("k", for: first)
+        let store = bench.location.store(for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        await (try await WorkingCopy.open(store: store)).close()
+        let holder: OtherProcessLock
+        do {
+            holder = try await OtherProcessLock(store)
+        } catch OtherProcessLock.Failure.notStarted(let reason) {
+            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
+            return
+        }
+        defer { holder.release() }
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .inUse, message: "The package’s words.") }
+        let host = bench.host()
+        await host.launch()
+        try #require(host.state == .inUse)
+
+        await expect(.notRemoved(key: nil, copy: Words.inUse)) { () throws(MarfaHost.Problem) in
+            try await host.disconnect(.discardCopy(nil))
+        }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+    }
+
     @Test func connectingToAServerWhoseCopyADifferentVersionMadeIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host()
@@ -1158,8 +1186,7 @@ extension LiveMarfaTests {
         #expect(libraries.mode == .marfa)
     }
 
-    /// Quitting waits until the copy has queued every write, but only so long, so a copy that cannot answer
-    /// never keeps the app from quitting.
+    /// Quitting waits until the copy has queued every write, but only so long, and says why it did not quit.
     @Test func quittingWaitsForTheCopyToQueueButOnlySoLong() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
@@ -1175,6 +1202,7 @@ extension LiveMarfaTests {
         let start = clock.now
         #expect(await libraries.flushEditors(within: .milliseconds(200)) == false)
         #expect(clock.now - start < .seconds(5))
+        #expect(libraries.current?.failure?.title == "Couldn’t Quit")
         source.queuing.withLock { $0 = false }
     }
 }

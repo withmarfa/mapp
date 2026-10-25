@@ -503,13 +503,41 @@ import Observation
         markDiscarded(connection, false)
     }
 
+    /// Removes the copy while holding its writer lock, so another copy of the app still writing it never has it
+    /// taken away underneath. The package offers no removal of its own that does this.
     private func removeCopy(_ connection: MarfaConnection) async throws {
         let directory = location.directory(for: connection)
-        try await Self.offMain {
-            if FileManager.default.fileExists(atPath: directory.path) {
-                try FileManager.default.removeItem(at: directory)
+        let held = try await Self.holdWriterLock(of: location.store(for: connection))
+        do {
+            try await Self.offMain {
+                if FileManager.default.fileExists(atPath: directory.path) {
+                    try FileManager.default.removeItem(at: directory)
+                }
             }
+        } catch {
+            await held?.close()
+            throw error
         }
+        await held?.close()
+    }
+
+    /// Opens the store as its writer, or nil where there is no store to hold or the package will not open it, as
+    /// with one another version of the app made, which leaves no lock to take.
+    @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
+        guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+        let copy: WorkingCopy
+        do {
+            copy = try await WorkingCopy.open(store: store)
+        } catch MarfaError.readingHandle {
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
+        } catch {
+            return nil
+        }
+        guard copy.handle == .writer else {
+            await copy.close()
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
+        }
+        return copy
     }
 
     private static func message(_ error: any Error) -> String {
