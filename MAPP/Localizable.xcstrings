@@ -62,6 +62,12 @@
     "Automatic" : {
       "extractionState" : "manual"
     },
+    "Can’t Discard This Copy" : {
+      "extractionState" : "manual"
+    },
+    "Connect to this server again with its key to see them." : {
+      "extractionState" : "manual"
+    },
     "Couldn’t Quit" : {
 
     },
@@ -72,6 +78,9 @@
       "extractionState" : "manual"
     },
     "Current limit: %@" : {
+      "extractionState" : "manual"
+    },
+    "Disconnected, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
     "Download Limit" : {
@@ -86,11 +95,23 @@
     "Keep All Downloads" : {
       "extractionState" : "manual"
     },
+    "Keep the copy and the changes stay on this Mac." : {
+      "extractionState" : "manual"
+    },
     "Listing items…" : {
+      "extractionState" : "manual"
+    },
+    "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “%@” to the Trash. Anything in it that hasn’t reached the server is lost." : {
       "extractionState" : "manual"
     },
     "MAPP is still saving your changes on this Mac. Try again in a moment." : {
 
+    },
+    "MAPP kept the copy, because it now holds a different number of changes than you saw." : {
+      "extractionState" : "manual"
+    },
+    "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw." : {
+      "extractionState" : "manual"
     },
     "Reading downloaded files…" : {
       "extractionState" : "manual"
@@ -101,11 +122,20 @@
     "Space Used" : {
       "extractionState" : "manual"
     },
+    "Switched Servers, but the Copy Was Kept" : {
+      "extractionState" : "manual"
+    },
+    "The copy in the folder “%@” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it." : {
+      "extractionState" : "manual"
+    },
     "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
 
+    },
+    "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
+      "extractionState" : "manual"
     },
     "Unavailable" : {
       "extractionState" : "manual"
@@ -1122,9 +1152,6 @@
     "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t tell what’s waiting in the copy on this Mac." : {
-      "extractionState" : "manual"
-    },
     "MAPP can’t tell whether that copy holds changes that haven’t reached the server." : {
       "extractionState" : "manual"
     },
@@ -1816,9 +1843,6 @@
       "extractionState" : "manual"
     },
     "To keep what you wrote, copy it before you discard this change." : {
-      "extractionState" : "manual"
-    },
-    "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again." : {
       "extractionState" : "manual"
     },
     "Today" : {

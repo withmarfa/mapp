@@ -26,7 +26,7 @@ extension LiveMarfaTests {
             } catch {}
             #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
             #expect(await eventually { host.state == .online }, "\(host.state)")
-            try await host.disconnect(.discardCopy(nil))
+            try await discardEverything(host)
         }
 
         /// Writes made to an item another device purged meanwhile are refused by the server. Each refusal is a
@@ -111,7 +111,7 @@ extension LiveMarfaTests {
             #expect(await eventually { host.state == .keyRefused }, "\(host.state)")
             try await host.replaceKey(try LiveMarfa.key())
             #expect(await eventually { host.state == .online }, "\(host.state)")
-            try await host.disconnect(.discardCopy(nil))
+            try await discardEverything(host)
         }
     }
 }

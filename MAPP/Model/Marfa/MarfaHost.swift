@@ -9,6 +9,9 @@ import Observation
     typealias Opener = @Sendable (MarfaConnection, any KeyStore, MarfaStoreLocation) async throws -> any ItemSource
     /// Reads the name the server at an address gives itself. It sends no key.
     typealias Describer = @Sendable (MarfaConnection) async throws -> String
+    /// Removes the copy at a store, agreed to hold this many unsent changes. Tests stand in for the package's
+    /// answers that a real copy can't be made to give.
+    typealias Remover = @Sendable (URL, UInt64) async throws -> Void
 
     nonisolated enum State: Hashable, Sendable {
         case disconnected
@@ -34,8 +37,8 @@ import Observation
         /// Left on disk, so connecting the same address again goes on from it and sends what waits.
         case keepCopy
         /// Removed with the writes the person was shown in `changesWaiting`, which they agreed to lose. A write
-        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil agrees to
-        /// whatever a copy that could not be read holds.
+        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil is only for a
+        /// copy another version made, and agrees to the count it reported; with none, the choice is refused.
         case discardCopy(UnsentWrites?)
     }
 
@@ -63,13 +66,32 @@ import Observation
         /// still on disk, or both; each message says why. A discarded copy is never opened as it is:
         /// connecting its address again removes it first, or fails with this.
         case notRemoved(key: String?, copy: String?)
+        /// The copy was not removed, and is no longer marked to go: the package would not remove it. `key` is why
+        /// the key is still in the key store, where it is.
+        case copyKept(CopyKept, key: String?)
+        /// The person chose to discard a copy whose changes were not counted for them, which the package never
+        /// removes. Nothing was left; `folder` is where the copy is, for the person to remove.
+        case cannotDiscard(folder: String)
         case notConnected
         /// Another connect, disconnect or change of key is under way.
         case busy
     }
 
+    /// Why the package left a copy the person chose to discard. The copy keeps every change in it.
+    nonisolated enum CopyKept: Hashable, Sendable {
+        /// It holds `now` changes the server has not taken, not the number the person was shown and agreed to
+        /// lose. Connecting to the address again opens it and sends them.
+        case changed(now: UInt64)
+        /// Its changes can't be counted, and the package never removes a copy it can't count. `folder` is where it
+        /// is, for the person to remove.
+        case unreadable(folder: String)
+        /// It is a folder's store, which is not MAPP's to remove.
+        case notMapps(folder: String)
+    }
+
     private static let addressKey = "MarfaAddress"
-    /// Addresses whose copy the person discarded but which could not be removed.
+    /// The address of each copy the person discarded but which could not be removed, with the number of changes
+    /// they agreed to lose with it.
     private static let discardedKey = "MarfaDiscardedCopies"
     /// The last name each server gave itself, by address, so a launch and an offline window show it.
     private static let namesKey = "MarfaInstanceNames"
@@ -79,6 +101,7 @@ import Observation
     let location: MarfaStoreLocation
     private let opener: Opener
     private let describer: Describer
+    private let remover: Remover
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
@@ -105,13 +128,15 @@ import Observation
     init(
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
         opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) },
-        describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name }
+        describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
+        remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) }
     ) {
         self.defaults = defaults
         self.keys = keys
         self.location = location
         self.opener = opener
         self.describer = describer
+        self.remover = remover
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
 
@@ -184,6 +209,7 @@ import Observation
         guard let connection else { return }
         try begin()
         defer { isBusy = false }
+        let agreed = try agreedLoss(choice, of: connection)
         if let source {
             try await close(source, for: choice)
         } else if choice == nil, hasCopy(connection) {
@@ -196,7 +222,7 @@ import Observation
         defaults.removeObject(forKey: Self.addressKey)
         self.connection = nil
         standing = .disconnected
-        if let problem = await finishLeaving(connection, discarding: choice != .keepCopy) { throw problem }
+        if let problem = await finishLeaving(connection, agreed: agreed) { throw problem }
     }
 
     /// Takes a new key for the address connected to, for a key refused or replaced on the server. A key that
@@ -274,6 +300,7 @@ import Observation
         if connection == old { return try await replaceKey(key) }
         try begin()
         defer { isBusy = false }
+        let agreed = try agreedLoss(choice, of: old)
         let current = source
         if current != nil { guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
         if let current, choice == nil {
@@ -299,7 +326,7 @@ import Observation
                 // The move is abandoned, so the copy made for it goes too.
                 await opened.close()
                 try? await Self.offMain { [keys] in try keys.delete(for: connection) }
-                if fresh { try? await removeCopy(connection) }
+                if fresh { _ = await removeCopy(connection, agreed: 0) }
                 throw error
             }
         }
@@ -308,7 +335,7 @@ import Observation
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
-        if let problem = await finishLeaving(old, discarding: choice != .keepCopy) { throw problem }
+        if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
     }
 
     // MARK: Lifecycle
@@ -453,97 +480,114 @@ import Observation
         library = nil
     }
 
-    /// Removes the key, and the copy where it was discarded, once the copy is closed. A discarded copy is marked
-    /// before anything is removed and unmarked only once it is gone, so neither a removal that fails nor a quit
+    /// The number of changes the person agreed to lose when they chose to discard the copy: the count they were
+    /// shown, 0 where nothing waited. Nil where they chose to keep it. The package removes a copy only when this
+    /// is its own count, so a copy whose count was not shown is refused here, before anything is left.
+    private func agreedLoss(_ choice: DisconnectChoice?, of connection: MarfaConnection) throws(Problem) -> UInt64? {
+        switch choice {
+        case .keepCopy:
+            return nil
+        case nil:
+            return 0
+        case .discardCopy(let shown?):
+            return UInt64(shown.count)
+        case .discardCopy(nil):
+            // A copy another version made says how many it held, and the person was shown that.
+            if case .otherVersion(let held?) = state { return held }
+            throw .cannotDiscard(folder: location.directory(for: connection).path)
+        }
+    }
+
+    /// Removes the key, and the copy where it was discarded (`agreed` is the number of changes the person agreed
+    /// to lose with it), once the copy is closed. A discarded copy is marked before anything is removed and
+    /// unmarked only once it is gone or the package has refused it, so neither a removal that fails nor a quit
     /// part way lets it be opened again as it was.
-    private func finishLeaving(_ connection: MarfaConnection, discarding: Bool) async -> Problem? {
-        if discarding { markDiscarded(connection, true) }
+    private func finishLeaving(_ connection: MarfaConnection, agreed: UInt64?) async -> Problem? {
+        if let agreed { markDiscarded(connection, agreed: agreed) }
         var key: String?
         var copy: String?
+        var kept: CopyKept?
         do {
             try await Self.offMain { [keys] in try keys.delete(for: connection) }
         } catch {
             key = Self.message(error)
         }
-        if discarding {
-            do {
-                try await removeCopy(connection)
-                markDiscarded(connection, false)
-            } catch {
-                copy = Self.message(error)
+        if let agreed {
+            switch await removeCopy(connection, agreed: agreed) {
+            case .removed:
+                markDiscarded(connection, agreed: nil)
+            case .failed(let message):
+                copy = message
+            case .kept(let reason):
+                markDiscarded(connection, agreed: nil)
+                kept = reason
             }
         }
+        if let kept { return .copyKept(kept, key: key) }
         return key == nil && copy == nil ? nil : .notRemoved(key: key, copy: copy)
     }
 
-    private func markDiscarded(_ connection: MarfaConnection, _ marked: Bool) {
-        let address = connection.address.absoluteString
-        var discarded = defaults.stringArray(forKey: Self.discardedKey) ?? []
-        discarded.removeAll { $0 == address }
-        if marked { discarded.append(address) }
-        defaults.set(discarded, forKey: Self.discardedKey)
+    private var discarded: [String: Int] {
+        defaults.dictionary(forKey: Self.discardedKey) as? [String: Int] ?? [:]
+    }
+
+    private func markDiscarded(_ connection: MarfaConnection, agreed: UInt64?) {
+        var marks = discarded
+        marks[connection.address.absoluteString] = agreed.map { Int(clamping: $0) }
+        defaults.set(marks, forKey: Self.discardedKey)
     }
 
     /// A copy the person discarded is removed before its address is opened again, or not opened at all.
     private func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
-        guard (defaults.stringArray(forKey: Self.discardedKey) ?? []).contains(connection.address.absoluteString)
-        else { return }
-        do {
-            try await removeCopy(connection)
-        } catch {
-            throw .notRemoved(key: nil, copy: Self.message(error))
+        guard let agreed = discarded[connection.address.absoluteString] else { return }
+        switch await removeCopy(connection, agreed: UInt64(agreed)) {
+        case .removed:
+            markDiscarded(connection, agreed: nil)
+        case .failed(let message):
+            throw .notRemoved(key: nil, copy: message)
+        case .kept(let reason):
+            markDiscarded(connection, agreed: nil)
+            throw .copyKept(reason, key: nil)
         }
-        markDiscarded(connection, false)
     }
 
-    /// Removes the copy while holding its writer lock, so another copy of the app still writing it never has it
-    /// taken away underneath. The package offers no removal of its own that does this.
-    private func removeCopy(_ connection: MarfaConnection) async throws {
+    private enum Removal {
+        case removed
+        /// Still on disk, and still marked to go; the words are why.
+        case failed(String)
+        /// Still on disk, and no longer marked to go.
+        case kept(CopyKept)
+    }
+
+    /// Has the package remove the copy and what it fetched. The package holds the copy's writer lock from
+    /// counting its changes to removing it, so a discard never takes a copy from another copy of the app still
+    /// writing it, and never loses a change the person was not shown: `agreed` is the number they were. A copy
+    /// that holds no more than that (a write was sent while the sheet was open, or the store is already gone
+    /// from an earlier part-way removal) loses nothing the person did not agree to, so it is asked again, once,
+    /// with the number it holds.
+    private func removeCopy(_ connection: MarfaConnection, agreed: UInt64, retrying: Bool = false) async -> Removal {
         let directory = location.directory(for: connection)
-        let held = try await Self.holdWriterLock(of: location.store(for: connection))
         do {
+            try await remover(location.store(for: connection), agreed)
+            // The package removes the copy's files and leaves the folder that held them.
             try await Self.offMain {
                 if FileManager.default.fileExists(atPath: directory.path) {
                     try FileManager.default.removeItem(at: directory)
                 }
             }
-        } catch {
-            await held?.close()
-            throw error
-        }
-        await held?.close()
-    }
-
-    /// Opens the store as its writer, or nil where there is no store to hold. A store another version of the app
-    /// made is refused by `open`, which releases the lock as it does: with nothing unsent, the package replaces it
-    /// with an empty one held as its writer, and refuses while another process writes it. One holding changes
-    /// the server has not taken, which the person was shown and chose to discard, cannot be held, so it is removed
-    /// without the lock, as is a store that cannot be opened at all. A store another process writes is refused.
-    @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
-        guard FileManager.default.fileExists(atPath: store.path) else { return nil }
-        let copy: WorkingCopy
-        do {
-            copy = try await WorkingCopy.open(store: store)
-        } catch MarfaError.wrongSchema(_, _, 0?, _) {
-            do {
-                copy = try await WorkingCopy.replaceRefused(store: store)
-            } catch MarfaError.readingHandle {
-                throw SourceFailure(kind: .inUse, message: Words.inUse)
-            }
-        } catch MarfaError.wrongSchema {
-            return nil
+            return .removed
         } catch MarfaError.readingHandle {
-            throw SourceFailure(kind: .inUse, message: Words.inUse)
+            return .failed(Words.inUse)
+        } catch MarfaError.unsentDiffers(_, let now?, _, _) {
+            if now <= agreed, !retrying { return await removeCopy(connection, agreed: now, retrying: true) }
+            return .kept(.changed(now: now))
+        } catch MarfaError.unsentDiffers {
+            return .kept(.unreadable(folder: directory.path))
+        } catch MarfaError.invalid {
+            return .kept(.notMapps(folder: directory.path))
         } catch {
-            // No process can open it either, and the person chose to discard it, so keeping it would refuse its
-            // address for good.
-            return nil
+            return .failed(Self.message(error))
         }
-        guard copy.handle == .writer else {
-            await copy.close()
-            throw SourceFailure(kind: .inUse, message: Words.inUse)
-        }
-        return copy
     }
 
     private static func message(_ error: any Error) -> String {

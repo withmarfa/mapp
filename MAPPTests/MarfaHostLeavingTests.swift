@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -59,7 +60,7 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "k")
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: bench.root.path)
         do {
-            try await host.disconnect(.discardCopy(nil))
+            try await discardEverything(host)
             Issue.record("said the copy was removed")
         } catch {}
         #expect(bench.hasCopy(first))
@@ -123,13 +124,13 @@ import Testing
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
-        let seen = Mutex<[String]?>(nil)
+        let seen = Mutex<[String: Int]?>(nil)
         bench.keys.onDelete.withLock {
-            $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.stringArray(forKey: "MarfaDiscardedCopies") ?? [] } }
+            $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] ?? [:] } }
         }
         try await host.disconnect()
-        #expect(seen.withLock { $0 } == ["http://first.test:8210"])
-        #expect(bench.defaults.stringArray(forKey: "MarfaDiscardedCopies") ?? [] == [])
+        #expect(seen.withLock { $0 } == ["http://first.test:8210": 0], "marked with the number of changes agreed to be lost")
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
         #expect(!bench.hasCopy(first))
     }
 

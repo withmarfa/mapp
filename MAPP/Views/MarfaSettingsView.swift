@@ -132,6 +132,15 @@ struct DepartureSheet: View {
         if case .otherVersion(let unsent) = model.host.state { unsent } else { nil }
     }
 
+    /// Whether the person has been shown how many changes they would lose. The package removes a copy only
+    /// against that number, so a copy whose changes can't be counted is kept, never discarded.
+    private var canDiscard: Bool { departure.unsent != nil || otherVersionUnsent != nil }
+
+    /// Where the copy is, for the person to remove when MAPP can't.
+    private var copyFolder: String {
+        model.host.configuredConnection.map { model.host.location.directory(for: $0).path } ?? ""
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Changes Haven’t Been Sent")
@@ -146,10 +155,12 @@ struct DepartureSheet: View {
             } else if let held = otherVersionUnsent {
                 Text(Words.notSent(Int(clamping: held)))
             } else {
-                Text("MAPP can’t tell what’s waiting in the copy on this Mac.")
+                Text(Words.cannotDiscard(folder: copyFolder))
             }
             Group {
-                if isOtherVersion {
+                if !canDiscard {
+                    Text("Keep the copy and the changes stay on this Mac.")
+                } else if isOtherVersion {
                     Text("Keep the copy and the changes stay on this Mac. Install the previous build of MAPP from TestFlight and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
                 } else {
                     Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
@@ -162,10 +173,12 @@ struct DepartureSheet: View {
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("DepartureCancel")
                 Spacer()
-                Button(isDisconnecting ? "Discard Changes and Disconnect" : "Discard Changes and Switch", role: .destructive) {
-                    Task { await model.answer(.discardCopy) }
+                if canDiscard {
+                    Button(isDisconnecting ? "Discard Changes and Disconnect" : "Discard Changes and Switch", role: .destructive) {
+                        Task { await model.answer(.discardCopy) }
+                    }
+                    .accessibilityIdentifier("DepartureDiscard")
                 }
-                .accessibilityIdentifier("DepartureDiscard")
                 Button(isDisconnecting ? "Keep Copy and Disconnect" : "Keep Copy and Switch") {
                     Task { await model.answer(.keepCopy) }
                 }

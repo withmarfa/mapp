@@ -273,9 +273,9 @@ struct ConnectionStatusTests {
         #expect(some.detail == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. 3 changes on this Mac haven’t reached the server. They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again.")
         #expect(Words.otherVersion(unsent: 1).contains("1 change on this Mac hasn’t reached the server."))
 
-        // The count stays unread after the previous build sends everything, so the way out is to discard the copy.
+        // The count stays unread after the previous build sends everything, and the package never removes a copy it can’t count, so the way out is to remove the copy’s folder.
         let unknown = try #require(ConnectionStatus(.otherVersion(unsent: nil)).detail)
-        #expect(unknown == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. MAPP can’t tell whether that copy holds changes that haven’t reached the server. To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again.")
+        #expect(unknown == "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it. MAPP can’t tell whether that copy holds changes that haven’t reached the server. To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again.")
 
         let inUse = ConnectionStatus(.inUse)
         #expect(inUse.title == "Library unavailable")

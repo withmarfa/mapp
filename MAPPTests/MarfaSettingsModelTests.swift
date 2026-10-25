@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -81,7 +82,9 @@ import Testing
         MarfaHost.Problem.noKey, .keyStore(message: "SecItemAdd failed: -25299"), .keyRefused,
         .serverUnreachable(reason: "network: refused"), .notRemoved(key: "errSecItemNotFound", copy: nil),
         .notRemoved(key: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
-        .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse
+        .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
+        .copyKept(.changed(now: 2), key: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), key: "errSecItemNotFound"),
+        .copyKept(.notMapps(folder: "/Library/Marfa/ab12"), key: nil), .cannotDiscard(folder: "/Library/Marfa/ab12")
     ])
     func everyProblemIsToldAsWhatHappenedAndWhatToDo(problem: MarfaHost.Problem) throws {
         let notice = try #require(MarfaSettingsModel.notice(for: problem))
@@ -259,6 +262,7 @@ import Testing
 
     @Test func discardingPassesTheChangesThePersonWasShownAndRemovesTheCopy() async throws {
         let bench = try HostBench()
+        bench.servers.storedWrites.withLock { $0 = 2 }
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -277,6 +281,7 @@ import Testing
     /// A write that lands while the person decides is not one they were shown, so they are asked again.
     @Test func aChangeThatArrivesAfterTheQuestionIsAskedAgainAndTheCopyIsKept() async throws {
         let bench = try HostBench()
+        bench.servers.storedWrites.withLock { $0 = 2 }
         let (model, _) = model(bench)
         await connect(model)
         let source = try #require(bench.servers.last)
@@ -287,6 +292,10 @@ import Testing
 
         source.report.set(SyncReport(waiting: 3, queueRead: true))
         #expect(await eventually { model.host.waitingChanges == 3 })
+        let store = bench.location.store(for: first)
+        let copy = try await WorkingCopy.open(store: store)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("late")]))
+        await copy.close()
         await model.answer(.discardCopy)
         let departure = try #require(model.departure)
         #expect(departure.isAskedAgain)

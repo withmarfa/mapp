@@ -141,8 +141,8 @@ nonisolated enum Words {
 
     /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
     /// version can send the changes in it that the server has not taken, so the way forward is through it. A count
-    /// that can't be read stays unread after that version sends everything, so the way out then is to discard the
-    /// copy.
+    /// that can't be read stays unread after that version sends everything, and the package never removes a copy it
+    /// can't count, so the way out then is to remove the copy's folder.
     static func otherVersion(unsent: UInt64?) -> String {
         let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
         switch unsent {
@@ -154,9 +154,15 @@ nonisolated enum Words {
         case nil:
             return [
                 lead, String(localized: "MAPP can’t tell whether that copy holds changes that haven’t reached the server."),
-                String(localized: "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent everything, update MAPP and choose Disconnect, then Discard Changes and Disconnect. After that, connect to the server again."),
+                String(localized: "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
             ].joined(separator: " ")
         }
+    }
+
+    /// The package removes a copy only when it can count the changes in it, so a copy it can't count is left for the
+    /// person, who is shown where it is.
+    static func cannotDiscard(folder: String) -> String {
+        String(localized: "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }
 
     /// Another process holds the copy as its writer, which on this Mac is another copy of MAPP.
