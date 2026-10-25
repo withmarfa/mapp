@@ -116,6 +116,13 @@ final class RecordingSchemeTask: NSObject, WKURLSchemeTask {
     func didFailWithError(_ error: any Error) { failure = error }
 }
 
+extension EmbedReference {
+    /// `![[name]]`, an embed by name.
+    static func wiki(_ name: String) -> Self { Self(text: "![[\(name)]]") }
+    /// `![](path)`, an embed by path.
+    static func image(_ path: String) -> Self { Self(text: "![](\(path))") }
+}
+
 extension EmbedResolution {
     init(_ file: OpenFile?) {
         self = file.map { .file($0) } ?? .missing
@@ -156,10 +163,12 @@ struct EmbeddedFilesTests {
         /// Where an embed points, before anything is opened.
         func resolve(_ reference: EmbedReference, in item: ItemID) -> URL? {
             guard item == note, let real = OpenFile.realPath(of: root.url) else { return nil }
-            return switch reference {
-            case .name(let name): real.appending(path: "Attachments/\(name)")
-            case .path(let path): real.appending(path: "Projects/\(path)").standardized
+            let text = reference.text
+            if text.hasPrefix("![["), text.hasSuffix("]]") {
+                return real.appending(path: "Attachments/\(text.dropFirst(3).dropLast(2))")
             }
+            guard let open = text.firstIndex(of: "("), text.hasSuffix(")") else { return nil }
+            return real.appending(path: "Projects/\(text[text.index(after: open)..<text.index(before: text.endIndex)])").standardized
         }
 
         func open(_ reference: EmbedReference, in item: ItemID) async -> EmbedResolution {
@@ -185,7 +194,7 @@ struct EmbeddedFilesTests {
         let folder = try Folder()
         let bytes = Data((0..<3000).map { UInt8($0 % 251) })
         try folder.write(bytes, to: "Attachments/Tone.wav")
-        let reference = EmbedReference.name("Tone.wav")
+        let reference = EmbedReference.wiki("Tone.wav")
 
         let whole = try await serve(folder, reference)
         #expect(whole.response?.statusCode == 200)
@@ -214,13 +223,13 @@ struct EmbeddedFilesTests {
         let window = Int(EmbeddedFiles.window)
         let large = Data(count: window + 3000)
         try folder.write(large, to: "Attachments/Long.mov")
-        let first = try await serve(folder, .name("Long.mov"), range: "bytes=0-")
+        let first = try await serve(folder, .wiki("Long.mov"), range: "bytes=0-")
         #expect(first.response?.statusCode == 206)
         #expect(first.response?.value(forHTTPHeaderField: "Content-Range") == "bytes 0-\(window - 1)/\(window + 3000)", "an open-ended range is answered a window at a time")
         #expect(first.received == window)
-        let rest = try await serve(folder, .name("Long.mov"), range: "bytes=\(window)-")
+        let rest = try await serve(folder, .wiki("Long.mov"), range: "bytes=\(window)-")
         #expect(rest.response?.value(forHTTPHeaderField: "Content-Range") == "bytes \(window)-\(window + 2999)/\(window + 3000)")
-        let asked = try await serve(folder, .name("Long.mov"), range: "bytes=0-\(window + 99)")
+        let asked = try await serve(folder, .wiki("Long.mov"), range: "bytes=0-\(window + 99)")
         #expect(asked.received == window + 100, "a closed range is answered whole")
 
         let past = try await serve(folder, reference, range: "bytes=5000-")
@@ -228,9 +237,9 @@ struct EmbeddedFilesTests {
         #expect(past.response?.value(forHTTPHeaderField: "Content-Range") == "bytes */3000")
         #expect(past.received == 0)
 
-        let missing = try await serve(folder, .name("Gone.wav"))
+        let missing = try await serve(folder, .wiki("Gone.wav"))
         #expect(missing.response?.statusCode == 404)
-        let linked = try await serve(folder, .path("../Attachments/link.png"))
+        let linked = try await serve(folder, .image("../Attachments/link.png"))
         #expect(linked.response?.statusCode == 404)
     }
 
@@ -249,7 +258,7 @@ struct EmbeddedFilesTests {
 
     @Test func aNameWithCharactersAQueryUsesIsCarriedWhole() throws {
         let item = ItemID.mint()
-        for reference in [EmbedReference.name("R&D = 100% + more?#.png"), .path("../A%20b/c&d.png#page=2")] {
+        for reference in [EmbedReference.wiki("R&D = 100% + more?#.png"), .image("../A%20b/c&d.png#page=2")] {
             let url = EmbeddedFiles.url(for: reference, in: item, version: 3)
             let request = try #require(EmbeddedFiles.request(in: url))
             #expect(request.item == item)
@@ -283,7 +292,7 @@ struct EmbeddedFilesTests {
         var peak = before
         let files = EmbeddedFiles()
         files.open = { reference, item in await folder.open(reference, in: item) }
-        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Large.mov"), in: folder.note, version: 1))
+        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .wiki("Large.mov"), in: folder.note, version: 1))
         task.keepsData = false
         task.onPiece = { peak = max(peak, Self.footprint()) }
         files.webView(WKWebView(), start: task)
@@ -300,7 +309,7 @@ struct EmbeddedFilesTests {
         let files = EmbeddedFiles()
         files.open = { reference, item in await folder.open(reference, in: item) }
         let webView = WKWebView()
-        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Long.wav"), in: folder.note, version: 1))
+        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .wiki("Long.wav"), in: folder.note, version: 1))
         task.keepsData = false
         task.onPiece = { files.webView(webView, stop: task) }
         files.webView(webView, start: task)

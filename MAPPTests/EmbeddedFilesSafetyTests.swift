@@ -35,7 +35,7 @@ struct EmbeddedFilesSafetyTests {
         let files = EmbeddedFiles()
         files.open = { reference, item in await folder.open(reference, in: item) }
         let webView = WKWebView()
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .wiki("Photo.png"), in: folder.note, version: 1))
         files.webView(webView, start: task)
         task.stopped = true
         files.webView(webView, stop: task)
@@ -69,7 +69,7 @@ struct EmbeddedFilesSafetyTests {
             try? FileManager.default.createSymbolicLink(at: attachments, withDestinationURL: outside)
             return EmbedResolution(await OpenFile.open(url, inside: folder.root.url))
         }
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .path("../Attachments/Photo.png"), in: folder.note, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .image("../Attachments/Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
         for _ in 0..<200 where !task.finished && !task.failed { try await Task.sleep(for: .milliseconds(5)) }
         #expect(task.status == 404)
@@ -86,7 +86,7 @@ struct EmbeddedFilesSafetyTests {
             mkfifo(file.path, 0o644)
             return EmbedResolution(await OpenFile.open(url, inside: folder.root.url))
         }
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .wiki("Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
         for _ in 0..<200 where !task.finished && !task.failed && task.status == nil { try await Task.sleep(for: .milliseconds(5)) }
         let answered = task.finished || task.failed || task.status != nil
@@ -107,7 +107,7 @@ struct EmbeddedFilesSafetyTests {
         for name in refused {
             try folder.root.write(script, to: "Attachments/\(name)")
             chmod(folder.root.url.appending(path: "Attachments/\(name)").path, 0o755)
-            let url = try #require(folder.resolve(.name(name), in: folder.note))
+            let url = try #require(folder.resolve(.wiki(name), in: folder.note))
             #expect(!EmbeddedFiles.opens(url), "Open would hand \(name), marked executable, to an app")
             chmod(url.path, 0o644)
             #expect(!EmbeddedFiles.opens(url), "Open would hand \(name) to an app that runs or follows it, or is of no kind it can tell")

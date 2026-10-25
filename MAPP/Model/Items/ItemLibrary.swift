@@ -45,6 +45,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
+    /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
+    /// in the text (`Item.boundEmbeds`) may not cover it yet.
+    func hasUnreadSave(_ id: ItemID) -> Bool
     /// The `[[link]]` that the text of `source` can hold and the library resolves, from that note, to this item and
     /// no other, or nil when no spelling does. A name `source` already links keeps its first target, so it is not
     /// used for another item.

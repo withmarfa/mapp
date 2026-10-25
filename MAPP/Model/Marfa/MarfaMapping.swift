@@ -133,7 +133,7 @@ nonisolated enum MarfaMapping {
         let bound = (bodyLinks?.links ?? []).map { name in
             BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
-        let embeds = (bodyLinks?.embeds ?? []).map { BoundEmbed(name: $0.name, resolution: resolution(of: $0.target)) }
+        let embeds = (bodyLinks?.embeds ?? []).map { BoundEmbed(text: $0.text, resolution: resolution(of: $0.target)) }
         let content = content(of: row, catalogue: catalogue)
         let preview: String
         if case .file(let fileType, let byteCount) = content {

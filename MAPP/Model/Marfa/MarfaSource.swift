@@ -532,7 +532,7 @@ extension SourceSnapshot {
             let gone = Set(ids)
             items.removeAll { gone.contains($0.id) }
         case .catalogue(let catalogue): self.catalogue = catalogue
-        case .bodyChanged, .answered, .unavailable: break
+        case .bodyChanged, .answered, .taken, .unavailable: break
         }
     }
 }

@@ -24,43 +24,78 @@ import Testing
         if case .unavailable(let reason) = resolution { reason } else { nil }
     }
 
-    @Test func anEmbedShowsTheFileItWasBoundToByTheNameMarfaReads() async throws {
-        library.bindEmbed("Photo 1.png", in: note, file: try file("kept", Data("png".utf8)))
-        library.bindEmbed("Gone.png", in: note)
-
-        let byPath = await library.openEmbeddedFile(.path("Photo%201.png?size=2#top"), in: note).file
-        #expect(byPath?.length == 3)
-        #expect(await library.openEmbeddedFile(.name(" Photo 1.png |300"), in: note).file?.length == 3)
-        #expect(await library.openEmbeddedFile(.name("Gone.png"), in: note).file == nil)
-        #expect(reason(await library.openEmbeddedFile(.name("Gone.png"), in: note)) == nil, "a name bound to nothing is missing")
-        #expect(EmbedReference.path("a%2x%41").name == "a%2xA", "an escape that is not one stays as typed")
+    func open(_ text: String, waiting: Duration = .zero) async -> EmbedResolution {
+        await library.openEmbeddedFile(EmbedReference(text: text), in: note, waiting: waiting)
     }
 
-    @Test func anEmbedNotYetBoundIsWaitedOnThenShown() async throws {
-        let url = try file("kept", Data("png".utf8))
-        let opening = Task { await library.openEmbeddedFile(.name("Pasted.png"), in: note, waiting: .seconds(5)) }
-        try await Task.sleep(for: .milliseconds(200))
-        library.bindEmbed("Pasted.png", in: note, file: url)
-        #expect(await opening.value.file?.length == 3)
+    @Test func anEmbedShowsTheFileBoundToItsTextAsWritten() async throws {
+        library.bindEmbed(#"![](a\_b.png)"#, in: note, file: try file("kept", Data("png".utf8)))
+        library.bindEmbed("![[Gone.png]]", in: note)
 
-        library.bindEmbed("Later.png", in: note, resolution: .pending)
-        #expect(reason(await library.openEmbeddedFile(.name("Later.png"), in: note, waiting: .milliseconds(200))) != nil)
+        #expect(await open(#"![](a\_b.png)"#).file?.length == 3)
+        #expect(await open("![](a_b.png)").file == nil, "another embed of a similar name is not this one")
+        #expect(await open("![[a\\_b.png]]").file == nil, "an embed of another kind is not this one")
+        #expect(await open("![[Gone.png]]").file == nil)
+        #expect(reason(await open("![[Gone.png]]")) == nil, "an embed bound to nothing is missing")
+    }
+
+    @Test func anEmbedIsWaitedOnOnlyWhileItsTextIsNotYetRead() async throws {
+        let url = try file("kept", Data("png".utf8))
+        let opening = Task { await open("![[Pasted.png]]", waiting: .seconds(5)) }
+        try await Task.sleep(for: .milliseconds(200))
+        library.bindEmbed("![[Pasted.png]]", in: note, file: url)
+        #expect(await opening.value.file?.length == 3, "an embed not yet in the text the copy read is waited on")
+
+        library.bindEmbed("![[Gone.png]]", in: note, bound: false)
+        library.unreadSaves = [note]
+        let saving = Task { await open("![[Gone.png]]", waiting: .seconds(5)) }
+        try await Task.sleep(for: .milliseconds(200))
+        library.bindEmbed("![[Gone.png]]", in: note, file: url)
+        #expect(await saving.value.file?.length == 3, "a save the copy has not read yet is waited on")
+        library.unreadSaves = []
+
+        library.bindEmbed("![[Dr. Smith]]", in: note, bound: false)
+        let started = ContinuousClock.now
+        #expect(await open("![[Dr. Smith]]", waiting: .seconds(5)).file == nil)
+        #expect(ContinuousClock.now - started < .seconds(1), "an embed the read text holds but Marfa did not bind is no file")
     }
 
     @Test func aFileThatCanNotBeShownSaysWhy() async throws {
-        library.bindEmbed("Photo.png", in: note, file: try file("kept", Data("png".utf8)))
-        library.bindEmbed("Twin.png", in: note, resolution: .ambiguous([]))
+        library.bindEmbed("![[Photo.png]]", in: note, file: try file("kept", Data("png".utf8)))
+        library.bindEmbed("![[Twin.png]]", in: note, resolution: .ambiguous([]))
+        library.bindEmbed("![[Later.png]]", in: note, resolution: .pending)
         library.fetchFails = true
 
-        #expect(reason(await library.openEmbeddedFile(.name("Photo.png"), in: note)) == "The server can’t be reached.")
-        #expect(reason(await library.openEmbeddedFile(.name("Twin.png"), in: note)) == "More than one file has this name.")
+        #expect(reason(await open("![[Photo.png]]")) == "The server can’t be reached.")
+        #expect(reason(await open("![[Twin.png]]")) == "More than one file has this name.")
+        #expect(reason(await open("![[Later.png]]")) != nil)
     }
 
-    @Test func aNotesPictureIsItsFirstEmbeddedImage() async throws {
-        library.bindEmbed("Budget.csv", in: note, file: try file("Budget.csv", Data("a,b\n".utf8)))
-        library.bindEmbed("Photo.png", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
+    @Test func aNotesPictureIsItsFirstEmbeddedImageReadThroughTheResolver() async throws {
+        library.bindEmbed("![[Budget.csv]]", in: note, file: try file("Budget.csv", Data("a,b\n".utf8)))
+        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
         let item = try #require(library.item(note))
 
-        #expect(await GalleryPreview.image(for: item, in: library)?.width == 5)
+        func picture() async -> String {
+            switch await GalleryPreview.image(for: item, in: library) {
+            case .image(let image): "\(image.width)"
+            case .none: "none"
+            case .failed: "failed"
+            }
+        }
+        #expect(await picture() == "5")
+
+        library.fetchFails = true
+        #expect(await picture() == "failed", "a picture that could not be had now is not taken for none")
+    }
+
+    @Test func aPictureThatFailedIsTriedAgain() async throws {
+        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
+        let item = try #require(library.item(note))
+        library.fetchFails = true
+        #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library) == nil)
+
+        library.fetchFails = false
+        #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width == 5)
     }
 }

@@ -3,42 +3,18 @@ import Darwin
 import UniformTypeIdentifiers
 import WebKit
 
-/// An embed as a note names a file: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
-/// does. A path is as the markdown writes it, still percent-encoded and with any query or fragment.
-nonisolated enum EmbedReference: Hashable, Sendable {
-    case path(String)
-    case name(String)
+/// An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a\_b.png)`: the page names an embed
+/// this way and Marfa's core lists each one it bound this way (`BoundEmbed.text`), so the two are matched whole,
+/// kind included, and MAPP reads no name out of an embed itself.
+nonisolated struct EmbedReference: Hashable, Sendable {
+    let text: String
 
-    /// The item and embed the page names, as `{ item, path }` or `{ item, name }`.
+    /// The item and embed the page names, as `{ item, text }`.
     static func request(_ body: Any?) -> (item: ItemID, reference: EmbedReference)? {
-        guard let dict = body as? [String: Any], let item = dict["item"] as? String, !item.isEmpty else { return nil }
-        if let path = dict["path"] as? String { return (ItemID(item), .path(path)) }
-        if let name = dict["name"] as? String { return (ItemID(item), .name(name)) }
-        return nil
-    }
-
-    /// The file's name as Marfa reads it from the embed, which is the name `Item.boundEmbeds` keeps: a name up to
-    /// any `|` or `#`, trimmed; a path up to any `?` or `#`, with its percent escapes decoded byte by byte.
-    var name: String {
-        switch self {
-        case .name(let name):
-            return NoteName.trimmed(String(name.split(separator: /[|#]/, maxSplits: 1, omittingEmptySubsequences: false)[0]))
-        case .path(let path):
-            let bytes = Array(path.utf8.prefix { $0 != UInt8(ascii: "?") && $0 != UInt8(ascii: "#") })
-            var decoded: [UInt8] = []
-            var at = 0
-            while at < bytes.count {
-                if bytes[at] == UInt8(ascii: "%"), at + 2 < bytes.count,
-                   let byte = UInt8(String(decoding: bytes[at + 1...at + 2], as: UTF8.self), radix: 16) {
-                    decoded.append(byte)
-                    at += 3
-                } else {
-                    decoded.append(bytes[at])
-                    at += 1
-                }
-            }
-            return String(decoding: decoded, as: UTF8.self)
-        }
+        guard let dict = body as? [String: Any], let item = dict["item"] as? String, !item.isEmpty,
+              let text = dict["text"] as? String, !text.isEmpty
+        else { return nil }
+        return (ItemID(item), EmbedReference(text: text))
     }
 }
 
@@ -58,18 +34,22 @@ nonisolated enum EmbedResolution: Sendable {
 extension ItemLibrary {
     /// The file an item's embed shows, the one place an embed becomes a file, which the page's scheme, its Open
     /// and the gallery all ask. Marfa's core binds each embed to its file item when the text is saved
-    /// (`Item.boundEmbeds`); an embed it has not bound yet, as one just pasted, is waited on for up to `waiting`,
-    /// since the text is saved a moment after it is typed. The file is fetched if this Mac doesn't hold it.
-    func openEmbeddedFile(_ reference: EmbedReference, in item: ItemID, waiting: Duration = .zero) async -> EmbedResolution {
-        let name = reference.name
+    /// (`Item.boundEmbeds`), and lists no embed it does not take for a file, such as one of a note. An embed is
+    /// waited on, for up to `waiting`, only while the text holding it has not been read by the copy, as one just
+    /// pasted has not; once it has, an embed the core did not bind is no file. The file is fetched if this Mac
+    /// doesn't hold it, unless `wanted` turns its item down, which answers `missing`.
+    func openEmbeddedFile(
+        _ reference: EmbedReference, in item: ItemID, waiting: Duration = .zero, if wanted: (Item) -> Bool = { _ in true }
+    ) async -> EmbedResolution {
         let deadline = ContinuousClock.now + waiting
-        var bound = self.item(item)?.boundEmbeds.first { $0.name == name }
-        while bound == nil || bound?.resolution == .pending, ContinuousClock.now < deadline, !Task.isCancelled {
+        var bound = binding(of: reference, in: item)
+        while bound == nil, isUnread(reference, in: item), ContinuousClock.now < deadline, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(100))
-            bound = self.item(item)?.boundEmbeds.first { $0.name == name }
+            bound = binding(of: reference, in: item)
         }
-        switch bound?.resolution {
+        switch bound {
         case .resolved(let file):
+            if let held = self.item(file), !wanted(held) { return .missing }
             return await open(file)
         case .ambiguous:
             return .unavailable(String(localized: "More than one file has this name."))
@@ -80,6 +60,16 @@ extension ItemLibrary {
         case .missing, nil:
             return .missing
         }
+    }
+
+    private func binding(of reference: EmbedReference, in item: ItemID) -> NoteReferenceResolution? {
+        self.item(item)?.boundEmbeds.first { $0.text == reference.text }?.resolution
+    }
+
+    /// Whether the copy may not yet have read the text holding the embed: a save of the item is on its way, or the
+    /// page shows the embed before its text reached the library.
+    private func isUnread(_ reference: EmbedReference, in item: ItemID) -> Bool {
+        hasUnreadSave(item) || body(of: item)?.text.contains(reference.text) != true
     }
 
     private func open(_ file: ItemID) async -> EmbedResolution {
@@ -190,15 +180,11 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     private nonisolated static let valueAllowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+#?"))
 
     nonisolated static func url(for reference: EmbedReference, in item: ItemID, version: Int) -> URL {
-        let (key, value) = switch reference {
-        case .path(let path): ("path", path)
-        case .name(let name): ("name", name)
-        }
         var components = URLComponents()
         components.scheme = scheme
         components.host = "file"
         components.path = "/"
-        components.percentEncodedQueryItems = [("item", item.rawValue), (key, value), ("v", String(version))].map {
+        components.percentEncodedQueryItems = [("item", item.rawValue), ("text", reference.text), ("v", String(version))].map {
             URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: valueAllowed))
         }
         return components.url!
@@ -221,10 +207,8 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         func value(_ name: String) -> String? {
             items.first { $0.name == name }?.value?.removingPercentEncoding
         }
-        guard let item = value("item"), !item.isEmpty else { return nil }
-        if let path = value("path") { return (ItemID(item), .path(path)) }
-        if let name = value("name") { return (ItemID(item), .name(name)) }
-        return nil
+        guard let item = value("item"), !item.isEmpty, let text = value("text"), !text.isEmpty else { return nil }
+        return (ItemID(item), EmbedReference(text: text))
     }
 
     // MARK: Ranges

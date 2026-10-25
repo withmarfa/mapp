@@ -616,8 +616,8 @@ struct EditorTests {
         let page = try await Page()
         let library = page.library
         let note = library.add("![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n")
-        library.bindEmbed("Attachments/Photo 1.png", in: note.id, file: root.url.appending(path: "Attachments/Photo 1.png"))
-        library.bindEmbed("Attachments/link.png", in: note.id, file: root.url.appending(path: "Attachments/link.png"))
+        library.bindEmbed("![a](Attachments/Photo%201.png)", in: note.id, file: root.url.appending(path: "Attachments/Photo 1.png"))
+        library.bindEmbed("![b](Attachments/link.png)", in: note.id, file: root.url.appending(path: "Attachments/link.png"))
         page.editor.load(note)
         var widths: [Int] = []
         for _ in 0..<40 {
@@ -680,13 +680,13 @@ struct EditorTests {
         """
         let page = try await Page()
         let note = page.library.add(body)
-        for name in ["Photo.png", "Clip.mov", "Plan.pdf", "Budget.csv"] {
-            page.library.bindEmbed(name, in: note.id, file: attachments.appending(path: name))
+        for (text, name) in [("![[Photo.png|3]]", "Photo.png"), ("![[Clip.mov]]", "Clip.mov"), ("![[Plan.pdf]]", "Plan.pdf"), ("![[Budget.csv]]", "Budget.csv")] {
+            page.library.bindEmbed(text, in: note.id, file: attachments.appending(path: name))
         }
-        page.library.bindEmbed("../Attachments/Tone.wav", in: note.id, file: attachments.appending(path: "Tone.wav"))
-        page.library.bindEmbed("Missing.zip", in: note.id)
-        page.library.bindEmbed("../../outside.png", in: note.id)
-        page.library.bindEmbed("Offline.png", in: note.id, resolution: .refused("The Marfa server can’t be reached."))
+        page.library.bindEmbed("![](../Attachments/Tone.wav)", in: note.id, file: attachments.appending(path: "Tone.wav"))
+        page.library.bindEmbed("![[Missing.zip]]", in: note.id)
+        page.library.bindEmbed("![far](../../outside.png)", in: note.id)
+        page.library.bindEmbed("![[Offline.png]]", in: note.id, resolution: .refused("The Marfa server can’t be reached."))
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -708,10 +708,10 @@ struct EditorTests {
 
         let labels = try await settle(editor, "[...document.querySelectorAll('.inkkit-file-label')].map(e => e.textContent)", as: [String].self) { $0?.contains("Budget.csv") == true }
         #expect(labels?.contains("Budget.csv") == true)
-        #expect(labels?.contains("Note reference: A note. Open to edit source.") == true)
         let expectedMissing = [
             ["name": "Missing.zip", "status": "File Not Found"],
             ["name": "far", "status": "File Not Found"],
+            ["name": "A note", "status": "File Not Found"],
         ]
         let missing = try await settle(editor,
             "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
@@ -735,7 +735,7 @@ struct EditorTests {
         try #require(UInt64(size) > 2 * EmbeddedFiles.window, "the movie is \(size) bytes")
         let page = try await Page()
         let note = page.library.add("![[Long.mov]]\n")
-        page.library.bindEmbed("Long.mov", in: note.id, file: movie)
+        page.library.bindEmbed("![[Long.mov]]", in: note.id, file: movie)
         // WebKit loads no media for a page outside a window.
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -758,13 +758,13 @@ struct EditorTests {
         try Data("a,b\n".utf8).write(to: root.url.appending(path: "Attachments/Budget.csv"))
         let page = try await Page()
         let note = page.library.add("A sheet: ![[Budget.csv]]\n")
-        page.library.bindEmbed("Budget.csv", in: note.id, file: root.url.appending(path: "Attachments/Budget.csv"))
+        page.library.bindEmbed("![[Budget.csv]]", in: note.id, file: root.url.appending(path: "Attachments/Budget.csv"))
         page.editor.load(note)
         _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
         try await page.run("document.querySelector('.inkkit-file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         try await page.wait { page.editor.menuEmbed != nil }
         #expect(page.editor.menuEmbed?.item == note.id)
-        #expect(page.editor.menuEmbed?.reference == .name("Budget.csv"))
+        #expect(page.editor.menuEmbed?.reference == .wiki("Budget.csv"))
         _ = page.editor.takeMenuEmbed()
         try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         _ = try await page.editor.webView.evaluateJavaScript("1")

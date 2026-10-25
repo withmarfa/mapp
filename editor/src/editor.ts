@@ -31,9 +31,8 @@ export function isPreviewDiagnostic(error: Error): boolean {
 }
 
 /** The words the app hands the page. InkKit rejects a label it does not know, so only InkKit's own go to it;
- *  the header's, the note reference's and the Link to Note command's are MAPP's. */
+ *  the header's and the Link to Note command's are MAPP's. */
 export interface AppWords {
-  noteReference?: string
   linkToNote?: string
 }
 export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
@@ -51,13 +50,13 @@ export function splitLabels(all: AppLabels): {
   header: Partial<HeaderLabels>
   words: AppWords
 } {
-  const { noteReference, linkToNote, ...rest } = all
+  const { linkToNote, ...rest } = all
   const header: Partial<HeaderLabels> = {}
   for (const key of headerLabelKeys) {
     if (key in rest) header[key] = rest[key]
     delete rest[key]
   }
-  return { editor: rest, header, words: { noteReference, linkToNote } }
+  return { editor: rest, header, words: { linkToNote } }
 }
 
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
@@ -120,10 +119,9 @@ const tables: Partial<Record<FormatCommand, TableCommand>> = {
   deleteRow: 'deleteRow',
   deleteColumn: 'deleteColumn',
 }
+/** An embed as the note's text holds it, which is how Marfa lists the embeds it bound. */
 function request(reference: FileReference, item: string): EmbedRequest {
-  return reference.kind === 'wiki'
-    ? { item, name: reference.target }
-    : { item, path: reference.reference }
+  return { item, text: reference.raw }
 }
 
 /** The names of notes to offer after `[[`, unless the person has typed past the request. */
@@ -154,12 +152,6 @@ function linkRef(reference: WikiLinkReference): LinkRef {
 /** The heading text as a link names it: compared ignoring case and the spacing around and inside it. */
 function headingKey(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
-function isNoteReference(reference: FileReference): boolean {
-  const target = reference.target.split('?')[0]!
-  const name = target.split('/').pop() ?? target
-  return /\.(md|markdown|txt)$/i.test(name) || (reference.kind === 'wiki' && !name.includes('.'))
 }
 
 /** The app bridge uses only InkKit's public facade; native libraries retain file and save policy. */
@@ -217,13 +209,6 @@ export class NoteEditor {
         labels,
         files: {
           async resolve(reference, context) {
-            if (isNoteReference(reference))
-              return {
-                kind: 'file',
-                label:
-                  words.noteReference?.replace('%@', reference.label ?? reference.reference) ??
-                  `Note reference: ${reference.label ?? reference.reference}. Open to edit source.`,
-              }
             const embed = request(reference, context.documentId)
             const file = await window.webkit?.messageHandlers?.embeds?.postMessage(embed)
             if (!file || context.signal.aborted)
@@ -261,11 +246,6 @@ export class NoteEditor {
             }
           },
           open(reference, context) {
-            if (isNoteReference(reference)) {
-              host.setEditingMode('source', context.generation)
-              host.focus()
-              return
-            }
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })
           },
           contextMenu(reference, _point, context) {

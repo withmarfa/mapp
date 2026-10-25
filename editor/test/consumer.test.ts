@@ -80,18 +80,39 @@ test('source edits share undo and reject stale mode changes', async () =>
     expect(editor.snapshot().text).toBe('Replacement\n')
   }))
 
-test('note embeds describe unsupported transclusion and open source without changing Markdown', async () =>
-  withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    const labels = [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
-    expect(labels).toContain('Note reference: A note. Open to edit source.')
-    expect(labels).toContain('Note reference: Section. Open to edit source.')
-    expect(labels.join(' ')).not.toContain('File unavailable')
-    const button = document.querySelector<HTMLButtonElement>('.inkkit-file-control')!
-    button.click()
-    expect(document.querySelector('textarea')).not.toBeNull()
-    expect(editor.markdown()).toBeNull()
-  }))
+test('an embed asks the app by its text as written, and one the app does not answer is missing', async () => {
+  const asked: unknown[] = []
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        embeds: {
+          postMessage: async (request: unknown) => {
+            asked.push(request)
+            return null
+          },
+        },
+      },
+    },
+  })
+  try {
+    await withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
+      await vi.waitFor(() => expect(asked).toHaveLength(2))
+      expect(asked).toEqual([
+        { item: 'note', text: '![[A note]]' },
+        { item: 'note', text: '![Section](note.md#part)' },
+      ])
+      await vi.waitFor(() =>
+        expect(
+          [...document.querySelectorAll('.inkkit-file-status')].map((e) => e.textContent),
+        ).toEqual(['File unavailable', 'File unavailable']),
+      )
+      expect(editor.snapshot().text).toBe('![[A note]]\n\n![Section](note.md#part)\n')
+    })
+  } finally {
+    delete (window as { webkit?: unknown }).webkit
+  }
+})
 
 test('cached native Find scopes reject same-note edits and ordered replacement batches stop at intervening edits', async () =>
   withEditor('one one\n', (editor) => {
@@ -320,9 +341,7 @@ test("the words the app sends mount InkKit, with the app's own kept out of its l
       'untitled',
     ].sort(),
   )
-  expect(labels.words.noteReference).toContain('%@')
   expect(labels.words.linkToNote).toBeTruthy()
-  expect(Object.keys(labels.editor)).not.toContain('noteReference')
   expect(Object.keys(labels.editor)).not.toContain('linkToNote')
   expect(Object.keys(labels.editor)).not.toContain('untitled')
 
@@ -334,13 +353,7 @@ test("the words the app sends mount InkKit, with the app's own kept out of its l
     labels.editor,
     labels.words,
   )
-  editor.setItem('note')
-  editor.load('![[A note]]\n', 1)
   try {
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
-      labels.words.noteReference!.replace('%@', 'A note'),
-    )
     await expect(
       NoteEditor.mount(
         document.createElement('div'),

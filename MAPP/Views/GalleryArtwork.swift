@@ -37,25 +37,30 @@ enum GalleryArtworkCache {
         storage.object(forKey: key(item, bucket(width)))?.artwork
     }
 
+    /// Nil when there is no picture. A picture that couldn't be made now, as when a file can't be fetched offline,
+    /// is not kept, so the card asks again when it next shows.
     static func artwork(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
         let bucket = bucket(width)
         let key = key(item, bucket)
         if let entry = storage.object(forKey: key) { return entry.artwork }
-        let artwork = await make(for: item, width: bucket, scale: scale, in: library)
-        if !Task.isCancelled { storage.setObject(Entry(artwork), forKey: key) }
-        return artwork
+        let made = await make(for: item, width: bucket, scale: scale, in: library)
+        guard let made else { return nil }
+        if !Task.isCancelled { storage.setObject(Entry(made), forKey: key) }
+        return made
     }
 
-    private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
-        switch item.content {
-        case .markdown:
-            return await GalleryPreview.image(for: item, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
-        case .file(let type, _):
-            if type.conforms(to: .image) {
-                return await GalleryPreview.image(for: item, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
-            }
-            guard let url = await GalleryPreview.fileURL(of: item, in: library), !Task.isCancelled else { return nil }
-            return await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) }
+    /// Nil for a picture that couldn't be made now; `.some(nil)` for an item with none.
+    private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork?? {
+        if case .file(let type, _) = item.content, !type.conforms(to: .image) {
+            let url: URL?
+            do { url = try await GalleryPreview.fileURL(of: item, in: library) } catch { return nil }
+            guard let url, !Task.isCancelled else { return .some(nil) }
+            return .some(await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) })
+        }
+        switch await GalleryPreview.image(for: item, in: library) {
+        case .image(let image): return GalleryArtwork(image: image, isDocument: false)
+        case .none: return .some(nil)
+        case .failed: return nil
         }
     }
 

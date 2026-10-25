@@ -165,24 +165,33 @@ final class FakeItemLibrary: ItemLibrary {
     /// How long fetching each file takes, as a server's can.
     var fetchDelay: [ItemID: Duration] = [:]
 
-    /// Binds an embed of `note` named `name` as Marfa's core does when the text is saved: to a new file item
-    /// fetched as `file`, where one is given, or else to `resolution`.
+    /// Notes whose saved text the copy has not read yet.
+    var unreadSaves: Set<ItemID> = []
+
+    func hasUnreadSave(_ id: ItemID) -> Bool { unreadSaves.contains(id) }
+
+    /// Puts the embed `text` in the text of `note`, unless it is there already, and binds it as Marfa's core does
+    /// when the text is saved: to a new file item fetched as `file`, where one is given, or else to `resolution`.
+    /// An embed the core does not take for a file, such as one of a note, is not `bound`.
     @discardableResult
-    func bindEmbed(_ name: String, in note: ItemID, file: URL? = nil, resolution: NoteReferenceResolution = .missing) -> ItemID? {
-        var bound = resolution
+    func bindEmbed(
+        _ text: String, in note: ItemID, file: URL? = nil, resolution: NoteReferenceResolution = .missing, bound: Bool = true
+    ) -> ItemID? {
+        if bodies[note]?.contains(text) != true { bodies[note, default: ""] += text + "\n" }
+        var binding = resolution
         var made: ItemID?
         if let file {
             let id = ItemID.mint()
             let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             items.append(Item(
-                id: id, type: TypeID("core.file"), title: name, titleRule: .property("title"), content: .file(UTType(filenameExtension: file.pathExtension) ?? .data, byteCount: Int64(size)),
+                id: id, type: TypeID("core.file"), title: file.lastPathComponent, titleRule: .property("title"), content: .file(UTType(filenameExtension: file.pathExtension) ?? .data, byteCount: Int64(size)),
                 version: ItemVersion(1), created: now(), modified: now()))
             files[id] = file
-            bound = .resolved(id)
+            binding = .resolved(id)
             made = id
         }
-        guard let index = items.firstIndex(where: { $0.id == note }) else { return made }
-        items[index].boundEmbeds.append(BoundEmbed(name: name, resolution: bound))
+        guard bound, let index = items.firstIndex(where: { $0.id == note }) else { return made }
+        items[index].boundEmbeds.append(BoundEmbed(text: text, resolution: binding))
         return made
     }
 

@@ -90,8 +90,8 @@ nonisolated struct BoundLink: Hashable, Sendable {
 
 /// An embed in an item's text with what the library bound it to: the file item it shows, or why there is none.
 nonisolated struct BoundEmbed: Hashable, Sendable {
-    /// The file's name as the library reads it from the embed (`EmbedReference.name`).
-    let name: String
+    /// The embed as the text holds it, such as `![[photo.png|400]]`, which is how the page names it too.
+    let text: String
     let resolution: NoteReferenceResolution
 }
 

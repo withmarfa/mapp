@@ -33,6 +33,8 @@ nonisolated enum SourceChange: Hashable, Sendable {
     case removed([ItemID])
     case bodyChanged(ItemID, ItemVersion)
     case answered(WriteID, WriteOutcome)
+    /// The write is in the copy, and every item it changed has been read again and sent before this.
+    case taken(WriteID)
     case catalogue(Catalogue)
     case unavailable(SourceFailure)
 }

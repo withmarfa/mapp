@@ -361,6 +361,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.updateBody(of: F.n1, to: "Typed")
         #expect(source.writes == [.editBody(F.n1, "Typed", base: ItemVersion(1), merge: .asRead)])
         #expect(library.body(of: F.n1)?.text == "Typed")
+        #expect(library.hasUnreadSave(F.n1))
+        source.send(.taken(try #require(source.submitted.first?.id)))
+        #expect(await eventually { !library.hasUnreadSave(F.n1) }, "the copy has read the save back")
 
         // A read that raced the write gives older text, which the library does not take.
         source.setBody("Note bod", of: F.n1)

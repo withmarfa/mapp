@@ -850,7 +850,6 @@ final class EditorController: NSObject {
             "filePDFPreview": String(localized: "Open to view this PDF"),
             "wikiMissing": String(localized: "Link unavailable"),
             "formattedEditor": String(localized: "Note"),
-            "noteReference": String(localized: "Note reference: %@. Open to edit source."),
             "sourceEditor": String(localized: "Markdown Source"),
             "copyCode": String(localized: "Copy"),
             "tableAddRow": String(localized: "Add Row"),

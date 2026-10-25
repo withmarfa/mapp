@@ -324,7 +324,7 @@ extension LiveMarfaTests {
                 let links = try await source.copy.items.links(in: host.rawValue)
                 #expect(links.embeds.map(\.target) == [.item(id: file.rawValue)])
                 // The page is served the file through the copy's binding, fetched and kept under its title.
-                let shown = await library.openEmbeddedFile(.path(embed.link), in: host, waiting: .seconds(30)).file
+                let shown = await library.openEmbeddedFile(EmbedReference(text: "![\(embed.name)](\(embed.link))"), in: host, waiting: .seconds(30)).file
                 #expect(shown?.length == UInt64(png.count))
                 #expect(shown?.url.lastPathComponent == embed.name)
                 try #require(await eventually(.seconds(30)) {
