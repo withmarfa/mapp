@@ -25,10 +25,11 @@ nonisolated final class Latest<Value: Hashable & Sendable>: Sendable {
         let token = UUID()
         // Cancelling a watching task runs this while the runtime holds the task's status lock, and `update` tells a
         // watcher a value, which needs that lock, while it holds ours. Taking our lock here would make the two wait
-        // on each other, so the watcher is taken out from elsewhere. A value told to it before then is dropped.
+        // on each other, so the watcher is taken out from elsewhere. A value told to it before then is dropped, and
+        // the next update takes it out itself. A lower quality of service here would starve behind busy updaters.
         continuation.onTermination = { [weak self] _ in
             guard let self else { return }
-            DispatchQueue.global(qos: .utility).async { self.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
+            DispatchQueue.global().async { self.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
         }
         let finished = state.withLock { state in
             guard !state.finished else { return true }
@@ -44,14 +45,19 @@ nonisolated final class Latest<Value: Hashable & Sendable>: Sendable {
         update { $0 = value }
     }
 
-    /// Watchers are told inside the lock, since two updaters racing would otherwise tell an older value last.
+    /// Watchers are told inside the lock, since two updaters racing would otherwise tell an older value last. A
+    /// watcher that has ended is taken out here, so ended watchers never pile up while updates keep the lock busy.
     func update(_ change: (inout Value) -> Void) {
         state.withLock { state in
             var value = state.value
             change(&value)
             guard value != state.value else { return }
             state.value = value
-            for watcher in state.watchers.values { watcher.yield(value) }
+            var ended: [UUID] = []
+            for (token, watcher) in state.watchers {
+                if case .terminated = watcher.yield(value) { ended.append(token) }
+            }
+            for token in ended { state.watchers.removeValue(forKey: token) }
         }
     }
 
