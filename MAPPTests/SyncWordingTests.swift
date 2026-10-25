@@ -200,6 +200,18 @@ struct ProblemWordingTests {
         #expect(key.explanation == "It will be sent once the server accepts a key. Enter a new one in Settings.")
     }
 
+    /// Undo Change puts the item back as the server has it, so an edit that carried text is confirmed, as Discard is,
+    /// and its text goes to the clipboard before it is withdrawn.
+    @Test func undoingAnEditThatCarriedTextIsConfirmedAndCopiesTheText() {
+        for kind in [SyncProblemEntry.Kind.blocked(.failingAlone), .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved)] {
+            let confirmation = wording(entry(kind)).confirmation(for: .withdraw)
+            #expect(confirmation?.title == "Undo this change?")
+            #expect(confirmation?.copiesText == true)
+        }
+        #expect(wording(entry(.blocked(.failingAlone), title: nil, body: nil)).confirmation(for: .withdraw) == nil)
+        #expect(wording(entry(.refused)).confirmation(for: .discard)?.copiesText == false)
+    }
+
     @Test func aWriteThatDiedCanBeTriedAgainAndNothingElse() {
         let wording = wording(entry(.dead))
         #expect(wording.actions.map(\.action) == [.tryAgain])
