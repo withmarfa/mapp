@@ -1165,6 +1165,7 @@ extension LiveMarfaTests {
                 let holding = LiveMarfa.Flag()
                 await source.engine.whenAnswering {
                     holding.set()
+                    // Holds the answers for longer than the check below waits, as a slow engine would.
                     try? await Task.sleep(for: .seconds(2))
                 }
                 let before = await source.engine.sync.drains
@@ -1172,6 +1173,8 @@ extension LiveMarfaTests {
                 source.submit(.tag(id, ItemTag.favorite, on: true), as: tagged)
                 #expect(await LiveMarfa.until { holding.isSet })
                 await source.engine.sync.drain()
+                // Time for a second drain, which nothing signals when none is sent. It is shorter than the hold above,
+                // so the answers are still held and the count must not have moved.
                 try await Task.sleep(for: .milliseconds(800))
                 #expect(await source.engine.sync.drains == before + 1)
                 await source.engine.whenAnswering(nil)

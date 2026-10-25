@@ -86,6 +86,7 @@ struct MarfaDrainAnswersTests {
         let holding = LiveMarfa.Flag()
         await source.engine.whenAnswering {
             holding.set()
+            // Holds the engine while it takes the first report, as a slow one would be held.
             try? await Task.sleep(for: .milliseconds(500))
         }
         source.events.yield(.change(Change(origin: .queueDrained(firstReport), itemId: nil, edgeId: nil)))

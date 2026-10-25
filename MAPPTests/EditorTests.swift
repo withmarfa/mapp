@@ -861,15 +861,17 @@ struct EditorTests {
         page.editor.exportPDF(to: url)
         // The size is watched rather than the file read, and a PDF far larger than one short note's fails at once,
         // so pagination that runs away cannot fill the disk before the test gives up.
-        var bytes = 0
-        let end = ContinuousClock.now + waitLimit
-        while ContinuousClock.now < end {
-            try await Task.sleep(for: .milliseconds(100))
+        var bytes = 0, runaway = 0
+        _ = await eventually {
             let now = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-            try #require(now <= 5_000_000, "the PDF has grown to \(now) bytes")
-            if now > 0, now == bytes { break }
-            bytes = now
+            defer { bytes = now }
+            if now > 5_000_000 {
+                runaway = now
+                return true
+            }
+            return now > 0 && now == bytes
         }
+        try #require(runaway == 0, "the PDF has grown to \(runaway) bytes")
         try #require(bytes > 0, "no PDF was written")
         let document = try #require(PDFDocument(url: url))
         #expect((1...2).contains(document.pageCount), "a short note prints on a page or two")
@@ -1486,6 +1488,7 @@ struct EditorTests {
         gather()
         for _ in 0..<times {
             ticks.count += 1
+            // Lets each change reach the page before the next, as a person's edits arrive spaced apart.
             try await Task.sleep(for: .milliseconds(100))
             gather()
         }

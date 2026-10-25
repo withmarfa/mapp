@@ -88,7 +88,7 @@ These hold across the app. The nested files say how the library keeps them.
   Without them, each live test fails rather than skips.
 - Replace `test` with `build` to build only. The built app is `build/Build/Products/Debug/MAPP.app`.
 - A Debug build launched with `-MAPPSampleLibrary` connects an isolated Marfa host to a sample library held in memory for the length of the run. The UI tests use it. Add `-MAPPSampleUnconfigured` to start with no server set instead, as a first launch does, `-MAPPCollectionSample` for tasks and events, and `-MAPPSelectItem <item id>` to select that item once the library holds it, for a run nobody can click.
-- To point that Debug build at a test server, run its binary with `MARFA_API_URL` and `MARFA_API_KEY` in the environment: the isolated host connects to that server, keeping the key in memory only.
+- To point that Debug build at a test server, run its binary with `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` in the environment: the isolated host connects to that server, keeping the key in memory only.
 - The editor page has its own commands; see `editor/AGENTS.md`.
 
 ## Signing

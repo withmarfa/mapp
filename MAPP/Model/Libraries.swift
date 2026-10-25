@@ -187,8 +187,8 @@ import Observation
             // A debug build can be pointed at a test server by hand, in place of the sample. The key stays in memory
             // and the address goes only to the sample defaults cleared above, so nothing reaches the Keychain or the
             // saved server.
-            if let address = environment["MARFA_API_URL"], let connection = try? MarfaConnection(address: address),
-                let key = environment["MARFA_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
+            if let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
+                let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
             {
                 let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore([connection: key]), location: location(root: root))
                 host.presetTestServer(connection)

@@ -648,22 +648,6 @@
 			};
 			name = Debug;
 		};
-		331200043066ED47005D07A2 /* Debug Tests configuration for PBXNativeTarget "MAPPUITests" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.withmarfa.mapp.uitests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TEST_TARGET_NAME = MAPP;
-			};
-			name = "Debug Tests";
-		};
 		3303FE3A3066ED47005D07A2 /* Release configuration for PBXNativeTarget "MAPPUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -714,7 +698,6 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3303FE393066ED47005D07A2 /* Debug configuration for PBXNativeTarget "MAPPUITests" */,
-				331200043066ED47005D07A2 /* Debug Tests configuration for PBXNativeTarget "MAPPUITests" */,
 				3303FE3A3066ED47005D07A2 /* Release configuration for PBXNativeTarget "MAPPUITests" */,
 			);
 			defaultConfigurationName = Release;
