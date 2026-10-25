@@ -164,6 +164,7 @@ nonisolated final class FailingSearchSource: ItemSource {
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")
     }
+    func items(inView view: ItemID) async throws -> [ItemID] { try await inner.items(inView: view) }
     func queueSubmitted() async {}
     func close() async {}
     func refresh() {}

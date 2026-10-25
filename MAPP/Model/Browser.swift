@@ -266,13 +266,16 @@ final class Browser {
     }
 
     /// A place that is gone can no longer be shown, so the window moves to All Items: a collection no longer
-    /// active, or a type that no longer holds an item.
+    /// active, a type that no longer holds an item, or a view deleted elsewhere.
     func placeRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .collection(let id) = sidebarItem, library.item(id)?.state != .active {
             show(.allNotes, in: library, order: order)
         }
         // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
         if case .itemType(let type) = sidebarItem, library.isLoaded, library.count(in: .itemType(type)) == 0 {
+            show(.allNotes, in: library, order: order)
+        }
+        if case .view(let id) = sidebarItem, library.isLoaded, !library.views.contains(where: { $0.id == id }) {
             show(.allNotes, in: library, order: order)
         }
         if case .favoriteItem(let id) = sidebarItem,
@@ -328,6 +331,7 @@ final class Browser {
         case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
+        case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allNotes
         case .inbox, .recents, .allNotes, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
         }
         let ids = Set(snapshot.selection)

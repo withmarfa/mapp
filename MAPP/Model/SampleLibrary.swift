@@ -99,6 +99,18 @@ nonisolated enum SampleLibrary {
     /// The sample's catalogue as the app reads it.
     static var catalogue: Catalogue { MarfaMapping.catalogue(itemTypes: itemTypes, edgeTypes: edgeTypes) }
 
+    // MARK: Views
+
+    /// Views as another app might have saved them, each with the query it stands for.
+    static let views: [(view: LibraryView, lists: @Sendable (Marfa.Item) -> Bool)] = [
+        (LibraryView(id: ItemID("view-favorite-notes"), title: "Favorite Notes"), { row in
+            row.type == "core.note" && row.tags.contains(ItemTag.favorite)
+        }),
+        (LibraryView(id: ItemID("view-in-progress"), title: "Tasks in Progress"), { row in
+            row.type == "core.task" && row.properties["status"] == .string("in_progress")
+        }),
+    ]
+
     // MARK: Items
 
     static func items(now: Date, collections: Bool) -> [Marfa.Item] {
@@ -199,7 +211,9 @@ nonisolated enum SampleLibrary {
 private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     let copy: WorkingCopy
 
-    private var whole: Status { Status(sliceTypes: ["*"], sliceTier: .all, hydration: .complete) }
+    private var whole: Status {
+        Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)
+    }
 
     func status() async throws -> Status { whole }
     func items() async throws -> Rows<Marfa.Item> { try await MarfaRead(copy: copy).items() }
@@ -207,9 +221,17 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
         try await MarfaRead(copy: copy).edges(ofTypes: types)
     }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(touching: id) }
+    // The fake copy holds no views, so the sample answers its own over the items the copy holds.
+    func views() async throws -> [LibraryView] { SampleLibrary.views.map(\.view) }
+    func items(inView id: String) async throws -> [Marfa.Item] {
+        guard let view = SampleLibrary.views.first(where: { $0.view.id.rawValue == id }) else {
+            throw MarfaError.notFound(code: "not_held", message: "The copy holds no view \(id).")
+        }
+        return try await copy.items.list().rows.filter { $0.state == .active && view.lists($0) }
+    }
 
     func readStatus() async throws -> Status { whole }
-    func hydrate(types: [String], tier: SliceTier) async throws -> HydrateReport {
+    func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
         throw FakeCopyError.unsupported(call: "hydrate")
     }
     func catchUp() async throws {}

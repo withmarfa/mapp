@@ -22,6 +22,15 @@ nonisolated enum MarfaMapping {
     static let attachmentEdge = "attached-to"
     static let parentEdge = "parent-of"
 
+    /// Marfa keeps what apps share, such as saved views, as `system.*` rows, which are no items of the library. The
+    /// copy holds `system.view` so the sidebar can list the views (`MarfaSync.slice`), and only that prefix is tested.
+    static func isLibraryItem(_ row: Marfa.Item) -> Bool { !row.type.hasPrefix("system.") }
+
+    /// A view still in use, as the sidebar lists it.
+    static func view(_ view: SavedView) -> LibraryView? {
+        view.state == .revoked ? nil : LibraryView(id: ItemID(view.id), title: view.settings.title)
+    }
+
     // MARK: Catalogue
 
     static func catalogue(itemTypes: [Marfa.ItemType], edgeTypes: [Marfa.EdgeType]) -> Catalogue {

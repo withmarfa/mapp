@@ -613,6 +613,9 @@
     "Can’t Search" : {
       "extractionState" : "manual"
     },
+    "Can’t Show This View" : {
+      "extractionState" : "manual"
+    },
     "Can’t Use the New Key" : {
       "extractionState" : "manual"
     },
@@ -1590,6 +1593,9 @@
     "Show Types" : {
 
     },
+    "Show Views" : {
+
+    },
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
@@ -1919,6 +1925,9 @@
 
     },
     "View Options" : {
+
+    },
+    "Views" : {
 
     },
     "Wait for the current step to finish, then try again." : {

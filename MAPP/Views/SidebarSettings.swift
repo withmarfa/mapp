@@ -44,6 +44,11 @@ struct SidebarSettings: View {
                     Text("New types appear here automatically.")
                 }
             }
+            if plan.library.contains(.views) {
+                Section("Views") {
+                    row(.views, title: String(localized: "Show Views"), in: library, plan: plan, among: [])
+                }
+            }
         }
         .settingsForm()
         .accessibilityIdentifier("SidebarSettings")
@@ -114,6 +119,7 @@ struct SidebarSettings: View {
         case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
         case .types: String(localized: "Types")
+        case .views: String(localized: "Views")
         case .files: library.name(of: .files)
         case .type(let id): Self.typeNode(id, in: plan.types)?.label ?? id
         }
@@ -128,6 +134,7 @@ struct SidebarSettings: View {
         case .sources: "antenna.radiowaves.left.and.right"
         case .collections: "square.stack"
         case .types: "square.grid.2x2"
+        case .views: SidebarPlace.viewSymbol
         case .files: "doc"
         case .type(let id): Self.typeNode(id, in: plan.types)?.symbol ?? TypeSymbol.fallback
         }

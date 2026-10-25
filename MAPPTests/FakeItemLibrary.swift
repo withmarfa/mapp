@@ -12,6 +12,9 @@ final class FakeItemLibrary: ItemLibrary {
     let notices = Notices()
     var notesToPurge: Set<ItemID> = []
     var catalogue = FakeItemLibrary.testCatalogue
+    var views: [LibraryView] = []
+    /// What each view lists, by view.
+    var viewMembers: [ItemID: [ItemID]] = [:]
     var canPurge = false
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
@@ -107,6 +110,7 @@ final class FakeItemLibrary: ItemLibrary {
             case .itemType(let type): item.state == .active && item.type == TypeID(type)
             case .collection(let id): item.state == .active && isBelow(item, id)
             case .files: item.state == .active && item.isFile
+            case .view(let id): item.state == .active && viewMembers[id]?.contains(item.id) == true
             case .recentlyDeleted: item.state == .trashed
             }
         }
@@ -126,6 +130,7 @@ final class FakeItemLibrary: ItemLibrary {
         switch place {
         case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
         case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
+        case .view(let id): views.first { $0.id == id }?.title ?? ""
         default: "\(place)"
         }
     }

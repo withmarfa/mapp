@@ -63,6 +63,7 @@ struct Sidebar: View {
             ForEach(plan.shownLibrary, id: \.key) { section in
                 switch section {
                 case .types: typesSection(plan)
+                case .views: viewsSection
                 default: EmptyView()
                 }
             }
@@ -76,12 +77,26 @@ struct Sidebar: View {
         .onChange(of: favorites.map(\.id)) {
             browser.placeRemoved(in: library, order: order)
         }
+        .onChange(of: library.views.map(\.id)) {
+            browser.placeRemoved(in: library, order: order)
+        }
     }
 
     private func selectionRows(_ plan: SidebarPlan) -> [String] {
         plan.shownTop.map(\.key) + plan.shownBrowse.map(\.key) + plan.shownLibrary.map(\.key)
             + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
-            + library.itemTypeCounts.map { $0.id.rawValue }
+            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue)
+    }
+
+    /// A view lists what the copy holds of its items, read on its own, so its row has no count.
+    private var viewsSection: some View {
+        Section("Views") {
+            ForEach(library.views) { view in
+                row(.view(view.id), symbol: SidebarPlace.viewSymbol, title: view.title, hiding: .views, counted: false)
+                    .accessibilityIdentifier("SidebarView-\(view.id.rawValue)")
+            }
+        }
+        .accessibilityIdentifier("SidebarViews")
     }
 
     private func typesSection(_ plan: SidebarPlan) -> some View {

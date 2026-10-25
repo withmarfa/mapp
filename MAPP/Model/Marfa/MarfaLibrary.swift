@@ -24,6 +24,7 @@ import Observation
     @ObservationIgnored let notices: Notices
     var notesToPurge: Set<ItemID> = []
     private(set) var catalogue = Catalogue()
+    private(set) var views: [LibraryView] = []
     private(set) var syncReport: SyncReport
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
     /// How the server stands, for the app to show beside the library.
@@ -35,6 +36,7 @@ import Observation
     /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
     private var membershipRevision = 0
     private var searchRevision = 0
+    private var viewRevision = 0
 
     @ObservationIgnored let source: any ItemSource
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
@@ -45,6 +47,12 @@ import Observation
     @ObservationIgnored private var searchOrder: [String] = []
     /// What the last search to finish found, shown while the next one runs so the list does not empty per key.
     @ObservationIgnored private var lastFound: [ItemID] = []
+    /// What each view last listed, read from the copy beside the views as a search is.
+    @ObservationIgnored private var viewed: [ItemID: Search] = [:]
+    /// Views whose list could not be read, told once until one is read again.
+    @ObservationIgnored private var viewsFailing: Set<ItemID> = []
+    /// Bumped when the views change, so a read begun before is dropped.
+    @ObservationIgnored private var viewsGeneration = 0
     /// Text writes the source has not answered, by item. While any wait, the text the person gave is what the
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
@@ -167,6 +175,8 @@ import Observation
         case .catalogue(let catalogue):
             self.catalogue = catalogue
             reindex()
+        case .views(let views):
+            take(views)
         case .unavailable(let failure):
             notices.tell(String(localized: "Can’t Read This Library"), failure.message)
         }
@@ -184,6 +194,7 @@ import Observation
     /// Keeps the records the views already observe, so a second load tells each of them what changed.
     private func load(_ snapshot: SourceSnapshot, bodies: [ItemBody]) {
         catalogue = snapshot.catalogue
+        take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
         for (id, record) in records where !present.contains(id) {
             record.isHeld = false
@@ -245,6 +256,15 @@ import Observation
             guard let record = records[body.id], record.body != body else { continue }
             record.body = body
         }
+    }
+
+    /// A view changed elsewhere may list other items, so each is read again when next shown.
+    private func take(_ views: [LibraryView]) {
+        if self.views != views { self.views = views }
+        viewed = [:]
+        viewsGeneration += 1
+        viewsFailing.formIntersection(views.map(\.id))
+        viewRevision += 1
     }
 
     private func reindex() {
@@ -425,6 +445,7 @@ import Observation
     }
 
     func items(in place: SidebarItem) -> [Item] {
+        if case .view(let id) = place { return items(inView: id) }
         let content = contentRevision
         let membership = membershipRevision
         if let held = listed[place], held.content == content { return held.items }
@@ -441,6 +462,7 @@ import Observation
 
     func count(in place: SidebarItem) -> Int {
         if place == .recents { return min(index.ids(in: .active).count, Self.recentLimit) }
+        if case .view = place { return items(in: place).count }
         let revision = membershipRevision
         if let held = counted[place], held.revision == revision { return held.count }
         let count = members(of: place).count
@@ -463,6 +485,8 @@ import Observation
             return Set(index.ids(in: .active).filter { records[$0]?.item.source == name })
         // Listed in its own order by `items(in:)` and counted by its limit, so never read here.
         case .recents: return []
+        // Read from the copy by `items(inView:)`, so never read here.
+        case .view: return []
         case .favorites: return index.favorites
         case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
         case .itemType(let type): return index.activeByType[TypeID(type)] ?? []
@@ -493,6 +517,7 @@ import Observation
         case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
         case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
         case .files: String(localized: "Files")
+        case .view(let id): views.first { $0.id == id }?.title ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
         }
     }
@@ -574,6 +599,50 @@ import Observation
                 notices.tell(String(localized: "Can’t Search"), error.localizedDescription)
             }
             searchRevision += 1
+        }
+    }
+
+    // MARK: Views
+
+    /// Answers from the copy's own reading of the view, which runs beside the views as a search does: until it
+    /// returns, the last list stands, and a change to the items reads it again. The list is what the copy holds.
+    private func items(inView id: ItemID) -> [Item] {
+        _ = viewRevision
+        let revision = contentRevision
+        let held = viewed[id]
+        if views.contains(where: { $0.id == id }), held.map({ $0.revision != revision && !$0.running }) ?? true {
+            startViewRead(id, at: revision)
+        }
+        return Self.ordered((held?.hits ?? []).compactMap { id in
+            records[id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
+        })
+    }
+
+    /// A view the copy cannot answer, such as one asking for a type it does not hold, keeps what it last listed
+    /// and says why once, rather than at every change; it is not asked again until the items change.
+    private func startViewRead(_ id: ItemID, at revision: Int) {
+        viewed[id, default: Search(revision: revision, hits: [], running: true)].running = true
+        let generation = viewsGeneration
+        Task { [weak self, source] in
+            let found: Result<[ItemID], any Error>
+            do {
+                found = .success(try await source.items(inView: id))
+            } catch {
+                found = .failure(error)
+            }
+            // The views changed while it ran, so what it read may be of a view since changed.
+            guard let self, viewsGeneration == generation else { return }
+            switch found {
+            case .success(let hits):
+                viewed[id] = Search(revision: revision, hits: hits, running: false)
+                viewsFailing.remove(id)
+            case .failure(let error):
+                viewed[id] = Search(revision: revision, hits: viewed[id]?.hits ?? [], running: false)
+                if viewsFailing.insert(id).inserted {
+                    notices.tell(String(localized: "Can’t Show This View"), error.localizedDescription)
+                }
+            }
+            viewRevision += 1
         }
     }
 

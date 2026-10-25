@@ -9,6 +9,9 @@ nonisolated protocol MarfaReading: Sendable {
     func items() async throws -> Rows<Marfa.Item>
     func edges(ofTypes types: [String]) async throws -> [Marfa.Edge]
     func edges(touching id: String) async throws -> [Marfa.Edge]
+    /// The views still in use, as the sidebar lists them.
+    func views() async throws -> [LibraryView]
+    func items(inView id: String) async throws -> [Marfa.Item]
 }
 
 nonisolated struct MarfaRead: MarfaReading {
@@ -23,4 +26,8 @@ nonisolated struct MarfaRead: MarfaReading {
     func edges(touching id: String) async throws -> [Marfa.Edge] {
         try await copy.edges.from(id) + copy.edges.to(id)
     }
+    func views() async throws -> [LibraryView] {
+        try await copy.items.views().rows.compactMap(MarfaMapping.view)
+    }
+    func items(inView id: String) async throws -> [Marfa.Item] { try await copy.items.list(inView: id).rows }
 }

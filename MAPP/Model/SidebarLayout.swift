@@ -9,9 +9,14 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case collections
     /// The section that holds the library's types.
     case types
+    /// The section that lists the views saved on the server.
+    case views
     case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
+
+    /// Every saved view's symbol: a view is a filtered list, whatever it lists.
+    static let viewSymbol = "line.3.horizontal.decrease.circle"
 
     var key: String {
         switch self {
@@ -22,6 +27,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .sources: "sources"
         case .collections: "collections"
         case .types: "types"
+        case .views: "views"
         case .files: "files"
         case .type(let id): "type:" + id
         }
@@ -104,7 +110,8 @@ struct SidebarPlan {
     /// The Browse section: every item, the sources they came from, and the collections they are filed under. Files
     /// are included in Items.
     let browse: [SidebarPlace]
-    /// The Types section, where the library holds any types.
+    /// The Types section, where the library holds any types, then the Views section, where the server has saved any
+    /// views the library can read.
     let library: [SidebarPlace]
     /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
     /// of their items.
@@ -116,7 +123,7 @@ struct SidebarPlan {
         top = layout.ordered([.inbox, .recents, .favorites])
         browse = layout.ordered([.all, .sources, .collections])
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
-        self.library = types.isEmpty ? [] : [.types]
+        self.library = (types.isEmpty ? [] : [.types]) + (library.views.isEmpty ? [] : [.views])
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }

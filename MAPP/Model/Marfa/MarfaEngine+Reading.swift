@@ -24,7 +24,7 @@ extension MarfaEngine {
                 var rows: [String: Marfa.Item] = [:]
                 var edges: [Marfa.Edge] = []
                 let listed = try await reading.items()
-                for row in listed { rows[row.id] = row }
+                for row in listed where MarfaMapping.isLibraryItem(row) { rows[row.id] = row }
                 let status = try await reading.status()
                 hub.report.update { $0.fill = LibraryFill(status, completeness: listed.completeness) }
                 do {
@@ -53,7 +53,25 @@ extension MarfaEngine {
         for row in rows.values where Self.mayName(row, catalogue: catalogue) { await readLinks(of: row) }
         await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
         await readQueue()
+        await readViews()
         publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
+    }
+
+    /// Reads the views the copy holds, and tells readers once they differ. One view this build cannot read refuses
+    /// them all (`invalid`), so the sidebar lists none rather than some; any other failure, such as a hydration
+    /// under way, keeps the views last read.
+    func readViews() async {
+        let views: [LibraryView]
+        do {
+            views = LibraryView.ordered(try await Self.asking(hub) { try await reading.views() })
+        } catch MarfaError.invalid {
+            views = []
+        } catch {
+            return
+        }
+        guard views != self.views else { return }
+        self.views = views
+        if painted { hub.publish(.views(views)) }
     }
 
     /// A row that left the copy: one in the bin went there with its delete answered, so Recently Deleted keeps it,
@@ -125,6 +143,15 @@ extension MarfaEngine {
         } catch {
             readFailed(error)
         }
+        // A view's row changes the views, never the items.
+        let named = Set(read.map(\.id))
+        if read.contains(where: { $0.row.map { !MarfaMapping.isLibraryItem($0) } ?? false })
+            || views.contains(where: { named.contains($0.id.rawValue) }) {
+            await readViews()
+        }
+        read = read.map { entry in
+            entry.row.map(MarfaMapping.isLibraryItem) == false ? (row: nil, id: entry.id, held: []) : entry
+        }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
         for (row, id, _) in read {
             let previous = rows[id]
@@ -185,7 +212,8 @@ extension MarfaEngine {
     /// and a restore waiting for its answer keeps its row hidden.
     func take(bin found: [Marfa.Item], complete: Bool) {
         var next: [String: Marfa.Item] = complete ? [:] : binned
-        for row in found where rows[row.id] == nil && restoring[row.id] == nil && row.state == .trashed {
+        for row in found where rows[row.id] == nil && restoring[row.id] == nil && row.state == .trashed
+            && MarfaMapping.isLibraryItem(row) {
             next[row.id] = row
         }
         let changed = Set(binned.keys).union(next.keys).filter { binned[$0] != next[$0] }
@@ -286,7 +314,7 @@ extension MarfaEngine {
         if !painted {
             painted = true
             let ordered = items.values.sorted { $0.created > $1.created }
-            hub.publish(.loaded(SourceSnapshot(items: ordered, catalogue: catalogue)))
+            hub.publish(.loaded(SourceSnapshot(items: ordered, catalogue: catalogue, views: views)))
         } else {
             if !removed.isEmpty { hub.publish(.removed(removed)) }
             if !upserted.isEmpty { hub.publish(.upserted(upserted)) }

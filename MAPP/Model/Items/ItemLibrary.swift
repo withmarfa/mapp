@@ -16,6 +16,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Items a person has asked to erase for good, until a window asks them to confirm.
     var notesToPurge: Set<ItemID> { get set }
     var catalogue: Catalogue { get }
+    /// The views saved on the server, by title, each a place of its own (`SidebarItem.view`). Empty where there are
+    /// none or they cannot be read.
+    var views: [LibraryView] { get }
     /// Whether items in Recently Deleted can be deleted for good now.
     var canPurge: Bool { get }
     /// How many days an item stays in Recently Deleted, where the library sets it.
