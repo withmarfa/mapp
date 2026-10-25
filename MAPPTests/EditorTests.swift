@@ -628,7 +628,7 @@ struct EditorTests {
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(widths == [4])
-        let expectedRefused = [["name": "b", "status": "File could not be loaded"]]
+        let expectedRefused = [["name": "b", "status": "This file can’t be opened."]]
         let refused = try await settle(page.editor,
             "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=error]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
             as: [[String: String]].self) { $0 == expectedRefused }
