@@ -101,8 +101,8 @@ extension MarfaLibrary {
             default: "Incoming " + end.info.label
             }
         }
-        let known = WorkbenchSchema.label(for: name)
-        if known != name { return known }
+        // The child's end of parent-of names the item it is filed under.
+        if end.info.id == MarfaMapping.parentEdge { return "Parent" }
         return name == end.info.id ? end.info.label : MarfaMapping.label(forField: name)
     }
 

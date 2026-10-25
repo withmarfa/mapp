@@ -31,11 +31,10 @@ nonisolated struct ItemMeta: Hashable, Sendable {
     var isEmpty: Bool { pieces.isEmpty }
 
     /// What a list tells about itself: whether it holds several types, the collection it lists (which its rows need
-    /// not name again), and whether it mixes places.
+    /// not name again), and whether it is the Inbox.
     struct Context: Hashable, Sendable {
         var mixesTypes = false
         var collection: ItemID?
-        var showsPlaces = false
         var isInbox = false
     }
 
@@ -50,10 +49,7 @@ nonisolated struct ItemMeta: Hashable, Sendable {
         if let collection = library.collection(of: item), collection.id != context.collection {
             pieces.append(Piece(symbol: TypeSymbol.name(for: collection.type, in: library.catalogue), label: collection.title))
         }
-        if context.showsPlaces, let folder = library.folder(of: item), !pieces.contains(where: { $0.label == folder.name }) {
-            pieces.append(Piece(symbol: "folder", label: folder.name))
-        }
-        // A server's feed items wait in the Inbox; a folder's loose notes are the Inbox, which says nothing.
+        // Feed items wait in the Inbox, which the Inbox's own list need not say.
         if item.tier == .feed, !context.isInbox {
             pieces.append(Piece(symbol: "tray", label: String(localized: "Inbox")))
         }

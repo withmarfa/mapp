@@ -32,23 +32,13 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     }
 }
 
-/// Where a Marfa library's working copy lives: in the app's own storage, one directory for each server address,
-/// never inside a notes folder, which a folder device or the person could sync or move.
+/// Where a Marfa library's working copy lives: in the app's own storage, one directory for each server address.
 nonisolated struct MarfaStoreLocation: Hashable, Sendable {
-    enum Problem: Error, Hashable, Sendable {
-        case insideNotesFolder
-    }
-
     static let applicationSupport = URL.applicationSupportDirectory.appending(path: "Marfa", directoryHint: .isDirectory)
 
     let root: URL
 
-    init(root: URL = Self.applicationSupport, notesFolder: URL? = nil) throws(Problem) {
-        if let notesFolder {
-            let folder = notesFolder.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-            let candidate = root.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-            if candidate.starts(with: folder) { throw .insideNotesFolder }
-        }
+    init(root: URL = Self.applicationSupport) {
         self.root = root
     }
 

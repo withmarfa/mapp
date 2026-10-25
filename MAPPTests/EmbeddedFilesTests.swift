@@ -118,30 +118,23 @@ final class RecordingSchemeTask: NSObject, WKURLSchemeTask {
 
 @Suite(.serialized)
 struct EmbeddedFilesTests {
-    /// A notes folder with a note in `Projects/` and files around it, and a folder outside it.
+    /// A directory of files, a link out of it, and a directory outside it. It answers an embed as a library will
+    /// once it resolves them: a name from `Attachments/`, a path from `Projects/`, opened only inside the directory.
     final class Folder {
         let root: TemporaryFolder
         let outside: TemporaryFolder
-        let bin: TemporaryFolder
-        let note: Note
-        let library: NoteLibrary
+        let note = ItemID.mint()
 
-        init(body: String = "") throws {
+        init() throws {
             root = try TemporaryFolder()
             outside = try TemporaryFolder()
-            bin = try TemporaryFolder()
             let png = try EmbedFixtures.png()
-            for path in ["Attachments/Photo.png", "Projects/Beside.png", "Other/Beside.png", "a/z/pic.png", "bz/pic.png", "Top.png", "Deep/er/Top.png"] {
-                try Self.put(png, at: path, in: root)
-            }
-            try root.write("Plan\n", to: "Projects/Plan.md")
+            try Self.put(png, at: "Attachments/Photo.png", in: root)
             try root.write("Hidden\n", to: ".marfa/Secret.png")
             try png.write(to: outside.url.appending(path: "secret.png"))
             let manager = FileManager.default
             try manager.createSymbolicLink(at: root.url.appending(path: "Attachments/link.png"), withDestinationURL: outside.url.appending(path: "secret.png"))
             try manager.createSymbolicLink(at: root.url.appending(path: "Linked"), withDestinationURL: outside.url)
-            note = Note(path: "Projects/Embeds.md", text: body, created: .now)
-            library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
         }
 
         func write(_ data: Data, to path: String) throws {
@@ -154,80 +147,27 @@ struct EmbeddedFilesTests {
             try data.write(to: file)
         }
 
-        func file(_ reference: EmbedReference) async -> String? {
-            let base = FolderFiles.realPath(of: root.url)?.pathComponents.count ?? 0
-            return await library.embeddedFile(reference, in: note.id)?.pathComponents.dropFirst(base).joined(separator: "/")
+        /// Where an embed points, before anything is opened.
+        func resolve(_ reference: EmbedReference, in item: ItemID) -> URL? {
+            guard item == note, let real = OpenFile.realPath(of: root.url) else { return nil }
+            return switch reference {
+            case .name(let name): real.appending(path: "Attachments/\(name)")
+            case .path(let path): real.appending(path: "Projects/\(path)").standardized
+            }
         }
-    }
 
-    @Test func aPathIsReadFromTheNoteAndAFolderRootAsMarfaReadsIt() async throws {
-        let folder = try Folder()
-        #expect(await folder.file(.path("../Attachments/Photo.png")) == "Attachments/Photo.png")
-        #expect(await folder.file(.path("/Attachments/Photo.png")) == "Attachments/Photo.png")
-        #expect(await folder.file(.path("Beside.png")) == "Projects/Beside.png")
-        #expect(await folder.file(.path("./Beside.png?size=2#top")) == "Projects/Beside.png")
-        #expect(await folder.file(.path("..%2FAttachments%2FPhoto.png")) == "Attachments/Photo.png")
-        #expect(await folder.file(.path("../attachments/PHOTO.PNG")) != nil, "a path names a file whatever its case")
-    }
-
-    @Test func nothingOutsideTheFolderIsReached() async throws {
-        let folder = try Folder()
-        #expect(await folder.file(.path("../../secret.png")) == nil, "a path leading out of the folder")
-        #expect(await folder.file(.path("../../../../../../../../etc/hosts")) == nil)
-        #expect(await folder.file(.path(folder.outside.url.appending(path: "secret.png").path)) == nil, "an absolute path is read from the folder's root")
-        #expect(await folder.file(.path("/etc/hosts")) == nil)
-        #expect(await folder.file(.path("../Attachments/link.png")) == nil, "a symbolic link to a file")
-        #expect(await folder.file(.path("../Linked/secret.png")) == nil, "a symbolic link to a folder")
-        #expect(await folder.file(.name("secret.png")) == nil, "a name never reaches through a link")
-        #expect(await folder.file(.path("../.marfa/Secret.png")) == nil, "a hidden file")
-        #expect(await folder.file(.path("../Attachments")) == nil, "a folder")
-        #expect(await folder.file(.path("https://example.com/Photo.png")) == nil)
-        #expect(await folder.file(.path("//example.com/Photo.png")) == nil)
-        let stranger = ItemID.mint()
-        #expect(await folder.library.embeddedFile(.path("../Attachments/Photo.png"), in: stranger) == nil, "an item the library does not hold")
-    }
-
-    @Test func aDocumentEmbeddedIsANoteNotAFile() async throws {
-        let folder = try Folder()
-        #expect(await folder.file(.path("Plan.md")) == nil)
-        #expect(await folder.file(.name("Plan.md")) == nil)
-        #expect(await folder.file(.name("Plan")) == nil)
-    }
-
-    @Test func aNameIsResolvedAsObsidianAndMarfaResolveIt() async throws {
-        let folder = try Folder()
-        #expect(await folder.file(.name("Photo.png")) == "Attachments/Photo.png")
-        #expect(await folder.file(.name("photo.PNG")) == "Attachments/Photo.png")
-        #expect(await folder.file(.name("Beside.png")) == "Projects/Beside.png", "the note's own directory first")
-        #expect(await folder.file(.name("Top.png")) == "Top.png", "the path from the root")
-        #expect(await folder.file(.name("z/pic.png")) == "a/z/pic.png", "at a directory's edge, never inside a name")
-        #expect(await folder.file(.name("/Attachments/Photo.png")) == "Attachments/Photo.png")
-        #expect(await folder.file(.name("../Attachments/Photo.png")) == "Attachments/Photo.png", "`../` is a path")
-        #expect(await folder.file(.name("./Beside.png")) == "Projects/Beside.png")
-        #expect(await folder.file(.name("Gone.png")) == nil)
-        #expect(EmbedPaths.named("pic.png", from: "", among: ["x/y/pic.png", "x/pic.png", "w/pic.png"]) == "w/pic.png", "the shallowest, then path order")
-    }
-
-    @Test func aFileWrittenJustNowIsFoundByName() async throws {
-        let folder = try Folder()
-        #expect(await folder.file(.name("New.png")) == nil)
-        // The folder was just listed; the file arrives within the moment that listing is reused.
-        try folder.write(try EmbedFixtures.png(), to: "Attachments/New.png")
-        #expect(await folder.file(.name("New.png")) == "Attachments/New.png")
-    }
-
-    @Test func aFileInsideAPackageIsFoundByNameAsMarfaFindsIt() async throws {
-        let folder = try Folder()
-        try folder.write(try EmbedFixtures.png(), to: "Trip.textbundle/assets/Map.png")
-        #expect(await folder.file(.name("Map.png")) == "Trip.textbundle/assets/Map.png")
+        func open(_ reference: EmbedReference, in item: ItemID) async -> OpenFile? {
+            guard let file = resolve(reference, in: item) else { return nil }
+            return await OpenFile.open(file, inside: root.url)
+        }
     }
 
     // MARK: Serving
 
     func serve(_ folder: Folder, _ reference: EmbedReference, range: String? = nil, keepingData: Bool = true) async throws -> RecordingSchemeTask {
         let files = EmbeddedFiles()
-        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
-        let task = RecordingSchemeTask(EmbeddedFiles.url(for: reference, in: folder.note.id, version: 1), range: range)
+        files.open = { reference, item in await folder.open(reference, in: item) }
+        let task = RecordingSchemeTask(EmbeddedFiles.url(for: reference, in: folder.note, version: 1), range: range)
         task.keepsData = keepingData
         files.webView(WKWebView(), start: task)
         for _ in 0..<2000 where !task.finished && task.failure == nil { try await Task.sleep(for: .milliseconds(5)) }
@@ -336,8 +276,8 @@ struct EmbeddedFilesTests {
         try #require(before > 0)
         var peak = before
         let files = EmbeddedFiles()
-        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
-        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Large.mov"), in: folder.note.id, version: 1))
+        files.open = { reference, item in await folder.open(reference, in: item) }
+        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Large.mov"), in: folder.note, version: 1))
         task.keepsData = false
         task.onPiece = { peak = max(peak, Self.footprint()) }
         files.webView(WKWebView(), start: task)
@@ -352,9 +292,9 @@ struct EmbeddedFilesTests {
         let folder = try Folder()
         try folder.write(Data(count: 8 * EmbeddedFiles.piece), to: "Attachments/Long.wav")
         let files = EmbeddedFiles()
-        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
+        files.open = { reference, item in await folder.open(reference, in: item) }
         let webView = WKWebView()
-        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Long.wav"), in: folder.note.id, version: 1))
+        let task = RecordingSchemeTask(EmbeddedFiles.url(for: .name("Long.wav"), in: folder.note, version: 1))
         task.keepsData = false
         task.onPiece = { files.webView(webView, stop: task) }
         files.webView(webView, start: task)

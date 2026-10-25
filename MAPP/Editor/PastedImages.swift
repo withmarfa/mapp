@@ -1,7 +1,7 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// Images to put in the attachments folder: image files by their own names, and image data, as a screenshot
+/// Images to attach to a note: image files by their own names, and image data, as a screenshot
 /// is copied, under a name of the moment.
 enum PastedImages {
     /// The largest image taken in by a paste or drop.

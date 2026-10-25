@@ -275,7 +275,6 @@ struct MarfaMappingTests {
         #expect(abs(item.created.timeIntervalSince1970 - 1_791_247_942.021) < 0.001)
         #expect(item.modified == Date(timeIntervalSince1970: 1_791_248_400))
         #expect(item.trashed == item.modified)
-        #expect(item.container == nil)
         #expect(Self.item(Self.row("u", tier: nil)).tier == .library)
         #expect(Self.item(Self.row("r", state: .revoked)).state == .archived)
     }
@@ -415,29 +414,9 @@ struct MarfaMappingTests {
         #expect(states[ItemID("f")] == conflict)
     }
 
-    // MARK: Places
-
-    @Test func placesFollowTheCatalogueAndTheItemsHeld() {
-        let items = [
-            Self.item(Self.row("p2", type: "aic.project", properties: ["title": "Beta"])),
-            Self.item(Self.row("p1", type: "aic.project", properties: ["title": "Alpha"])),
-            Self.item(Self.row("old", type: "aic.project", properties: ["title": "Gone"], state: .trashed)),
-            Self.item(Self.row("t")),
-            Self.item(Self.row("e", type: "core.entity", properties: ["name": "Ada"]))
-        ]
-        let places = MarfaMapping.places(items: items, catalogue: Self.catalogue)
-        #expect(places.map(\.id) == [
-            .inbox, .all, .favorites, .archive, .type(TypeID("aic.project")),
-            .type(TypeID("core.entity")), .type(TypeID("aic.ticket")), .recentlyDeleted
-        ])
-        #expect(places.first { $0.id == .inbox }?.query == ItemQuery(tier: .feed))
-        #expect(places.first { $0.id == .favorites }?.drop == .tag(ItemTag.favorite))
-        #expect(places.first { $0.id == .recentlyDeleted }?.query == ItemQuery(states: [.trashed]))
-    }
-
     @Test func aSnapshotTakesEachChangeInTurn() {
         let first = Self.item(Self.row("1")), second = Self.item(Self.row("2"))
-        var snapshot = SourceSnapshot(items: [first], catalogue: Catalogue(), places: [])
+        var snapshot = SourceSnapshot(items: [first], catalogue: Catalogue())
         var edited = first
         edited.title = "Edited"
         snapshot.apply(.upserted([edited, second]))

@@ -21,7 +21,7 @@ final class WindowTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
@@ -41,7 +41,7 @@ final class WindowTests: XCTestCase {
     private func groupIdentifier(for name: String) -> String? {
         switch name {
         case "Favorites": "SidebarFavorites"
-        case "Folders": "SidebarFolders"
+        case "Types": "SidebarTypes"
         default: nil
         }
     }
@@ -55,7 +55,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testSidebarListsEverySectionWithCounts() {
-        for name in ["Inbox", "Recents", "Items", "Favorites", "Folders", "Work", "Home", "Personal", "Reading"] {
+        for name in ["Inbox", "Recents", "Items", "Favorites", "Types", "Note"] {
             XCTAssertTrue(sidebarItem(name).exists, "\(name) is missing")
         }
         XCTAssertGreaterThan(count(of: "Items"), 0)
@@ -64,12 +64,6 @@ final class WindowTests: XCTestCase {
     func testTheFirstNoteIsSelectedAndShownInThePage() {
         XCTAssertTrue(page.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
-    }
-
-    func testSelectingAFolderShowsOnlyItsNotes() {
-        sidebarItem("Work").click()
-        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(row(titled: "Weekly review").exists)
     }
 
     func testSelectingANoteShowsIt() {
@@ -141,25 +135,14 @@ final class WindowTests: XCTestCase {
         restore.click()
         XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Draft agenda").exists, "only the one restored leaves")
-        sidebarItem("Personal").click()
+        sidebarItem("Items").click()
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
-    }
-
-    func testNewFolderIsNamedInPlace() {
-        app.typeKey("n", modifierFlags: [.command, .shift])
-        let field = sidebar.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 2))
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText("Projects")
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
     }
 
     /// The list's search, a field only once its button beside View Options is clicked.
     private var listSearch: XCUIElement { window.searchFields["ColumnSearch"] }
 
-    func testTheListsSearchFindsNotesAcrossFoldersAndEscapePutsItAway() {
+    func testTheListsSearchFindsNotesAndEscapePutsItAway() {
         XCTAssertFalse(listSearch.exists, "a button until it is clicked")
         window.toolbars.buttons["Search"].firstMatch.click()
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
@@ -178,17 +161,6 @@ final class WindowTests: XCTestCase {
         sidebarItem("Favorites").click()
         XCTAssertTrue(row(titled: "Garden ideas").waitForExistence(timeout: 2))
         XCTAssertFalse(sidebarItem("Garden ideas").exists, "favorites are listed in the workspace")
-    }
-
-    func testMovingTheSelectedNoteAwaySelectsTheNextOne() {
-        sidebarItem("Work").click()
-        XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(waitForText("BEGINSWITH", "Weekly review"))
-        row(titled: "Weekly review").rightClick()
-        window.menuItems["Move To"].click()
-        window.menuItems["Home"].click()
-        XCTAssertTrue(row(titled: "Weekly review").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(waitForText("NOT BEGINSWITH", "Weekly review"), "the page still shows the moved note")
     }
 
     // MARK: Keyboard, menus and windows
@@ -215,7 +187,6 @@ final class WindowTests: XCTestCase {
     }
 
     func testTheDeleteKeyDeletesTheSelectedNote() {
-        sidebarItem("Personal").click()
         row(titled: "Bike service").click()
         app.typeKey(.delete, modifierFlags: [])
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
@@ -238,11 +209,11 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        // New Item leads what "new" finds; the arrow key moves on to New Folder.
+        // New Item leads what "new" finds.
         app.typeText("new")
-        app.typeKey(.downArrow, modifierFlags: [])
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(sidebar.textFields.firstMatch.waitForExistence(timeout: 2), "the new folder's name is being edited")
+        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 3), "the command made a new item")
     }
 
     func testEscapePutsTheCommandPaletteAway() {
@@ -288,26 +259,6 @@ final class WindowTests: XCTestCase {
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
-    }
-
-    func testAFolderIsRenamedFromTheMenuAndDeletedWithTheDeleteKey() {
-        sidebarItem("Reading").click()
-        app.menuBars.menuBarItems["File"].click()
-        app.menuBars.menuItems["Rename Folder"].click()
-        let field = sidebar.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 2))
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText("Books")
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(sidebarItem("Books").waitForExistence(timeout: 2))
-        app.typeKey(.delete, modifierFlags: [])
-        let confirm = app.sheets.buttons["Delete Folder"].firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 2))
-        XCTAssertTrue(app.sheets.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Books")).element(boundBy: 0).exists)
-        XCTAssertTrue(app.sheets.staticTexts["Its notes will be moved to Recently Deleted."].exists)
-        confirm.click()
-        XCTAssertTrue(sidebarItem("Books").waitForNonExistence(timeout: 2))
     }
 
     func testDoubleClickingANoteOpensItInItsOwnWindow() {
@@ -384,26 +335,9 @@ final class WindowTests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
 
-    func testTheFoldersHeadingCreatesANewFolderFromItsContextMenu() {
-        let heading = sidebarItem("Folders")
-        heading.rightClick()
-        let newFolder = window.menuItems["New Folder"]
-        XCTAssertTrue(newFolder.waitForExistence(timeout: 2))
-        newFolder.click()
-        let field = sidebar.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 2))
-        field.click()
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText("Projects")
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(sidebarItem("Projects").waitForExistence(timeout: 2))
-    }
-
     // MARK: The page under the toolbar
 
     func testALongNoteStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
-        sidebarItem("Reading").click()
         row(titled: "The Design of Everyday Things").click()
         XCTAssertTrue(waitForText("BEGINSWITH", "The Design of Everyday Things"))
         // The sample alone can fit a restored, maximized window. Add enough text to overflow any

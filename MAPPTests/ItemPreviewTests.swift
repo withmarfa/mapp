@@ -82,27 +82,25 @@ struct ItemPreviewTests {
 
 struct TypeSymbolTests {
     @Test(arguments: [
-        ("core.note", "doc.text"), ("aic.ticket.task", "checkmark.circle"), ("core.event", "calendar"),
-        ("aic.decision", "signpost.right"), ("aic.agent.log", "list.bullet.rectangle"), ("aic.agent.session", "clock"),
-        ("aic.epic", "flag"), ("aic.ticket", "ticket"), ("aic.ticket.feature", "sparkles"), ("aic.ticket.spike", "bolt"),
-        ("core.bookmark", "bookmark"), ("core.person", "person"), ("core.file", "doc"), ("core.image", "photo"),
-        ("aic.project", "square.stack"),
+        ("core.note", "doc.text"), ("core.task", "checkmark.circle"), ("core.event", "calendar"),
+        ("core.bookmark", "bookmark"), ("core.entity.person", "person"), ("core.file", "doc"), ("core.file.image", "photo"),
     ])
-    func eachKnownTypeHasItsSymbol(id: String, symbol: String) {
-        #expect(TypeSymbol.name(for: TypeID(id)) == symbol)
+    func eachBuiltInTypeHasItsSymbol(id: String, symbol: String) {
+        #expect(TypeSymbol.name(for: TypeID(id), in: Catalogue()) == symbol)
     }
 
-    @Test func anUnknownTypeTakesItsNearestKnownParent() {
+    @Test func anotherTypeTakesItsNearestBuiltInAncestor() {
         let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("acme.bug"), label: "Bug", fields: [], titleField: nil, bodyField: nil, parent: TypeID("aic.ticket")),
+            ItemTypeInfo(id: TypeID("acme.bug"), label: "Bug", fields: [], titleField: nil, bodyField: nil, parent: TypeID("core.task")),
             ItemTypeInfo(id: TypeID("acme.crash"), label: "Crash", fields: [], titleField: nil, bodyField: nil, parent: TypeID("acme.bug")),
         ])
-        #expect(TypeSymbol.name(for: TypeID("acme.crash"), in: catalogue) == "ticket")
+        #expect(TypeSymbol.name(for: TypeID("acme.crash"), in: catalogue) == "checkmark.circle")
     }
 
-    @Test func aTypeNothingKnowsIsADocument() {
-        #expect(TypeSymbol.name(for: TypeID("acme.widget")) == "doc")
-        #expect(TypeSymbol.name(for: TypeID("")) == "doc")
+    @Test func aTypeNamedLikeABuiltInIsNotOne() {
+        // The app reads no meaning into a type's name, only into the catalogue's parents.
+        #expect(TypeSymbol.name(for: TypeID("acme.task"), in: Catalogue()) == "doc")
+        #expect(TypeSymbol.name(for: TypeID(""), in: Catalogue()) == "doc")
     }
 
     @Test func aParentCycleEnds() {
@@ -137,14 +135,14 @@ struct ItemMetaTests {
     }
 
     @Test func aMixedListNamesTheTypeAndTheProject() {
-        let project = item("Field Research", type: "aic.project")
-        let epic = item("Interviews", type: "aic.epic", parent: project)
-        let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
-        let library = FakeItemLibrary(items: [project, epic, task])
+        let project = item("Field Research", type: "test.project")
+        let notes = item("Interviews", parent: project)
+        let task = item("Book rooms", type: "core.task", parent: notes)
+        let library = FakeItemLibrary(items: [project, notes, task])
         let meta = ItemMeta.make(for: task, in: library, context: .init(mixesTypes: true))
-        // The project is the top of the chain, so the task is in the collection just below it: its epic.
+        // The project is the top of the chain, so the task is in the collection just below it: the note it is filed under.
         #expect(meta.pieces.map(\.label) == ["Task", "Interviews"])
-        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle", "flag"])
+        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle", "doc.text"])
     }
 
     @Test func aListOfOneTypeLeavesTheTypeOut() {
@@ -164,7 +162,7 @@ struct ItemMetaTests {
     @Test func anItemWithNoProjectAndNothingToSayHasNoLine() {
         let note = item("Loose note")
         let library = FakeItemLibrary(items: [note])
-        #expect(ItemMeta.make(for: note, in: library, context: .init(showsPlaces: true, isInbox: false)).isEmpty)
+        #expect(ItemMeta.make(for: note, in: library, context: .init()).isEmpty)
     }
 
     @Test func anyTypeCanBeACollection() {

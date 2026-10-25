@@ -41,7 +41,7 @@ final class EditorController: NSObject {
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
-    @ObservationIgnored private let embeds = EmbeddedFiles()
+    @ObservationIgnored let embeds = EmbeddedFiles()
     /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
     /// was told it may be.
     @ObservationIgnored private(set) var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?

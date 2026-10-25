@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The actions for a set of notes, shared by the list's context menu and the menu bar: where it goes (favorites, move),
-/// then what removes it. The More menu places the same two parts apart, with other commands between them.
+/// The actions for a set of notes, shared by the list's context menu and the menu bar: whether it is a favorite, then
+/// what removes it. The More menu places the same two parts apart, with other commands between them.
 struct NoteActions: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
@@ -23,14 +23,14 @@ private struct NoteActionContext {
     let ids: Set<ItemID>
     let keepsPlace: Bool
 
-    /// Files mode moves, deletes and favors notes only, so a file selected takes none of these.
+    /// Deleting and favoring act on notes, so a file selected takes none of these.
     var notes: [Item] { ids.compactMap { library.item($0) }.filter { !$0.isFile } }
     var allDeleted: Bool { !notes.isEmpty && notes.allSatisfy { $0.state == .trashed } }
     /// Nothing to act on and nowhere to keep the items in place, as the context menu has none.
     var isEmpty: Bool { notes.isEmpty && !keepsPlace }
 }
 
-/// Favorites and Move To for notes, or Recover and Move To for deleted ones.
+/// Favorites for notes, or Recover for deleted ones.
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
@@ -47,15 +47,13 @@ struct NoteOrganizeActions: View {
             EmptyView()
         } else if context.allDeleted {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-            NoteMoveMenu(ids: ids, notes: notes, undoManager: undoManager)
         } else {
             let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
             Group {
                 Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
                     library.setFavorite(ids, !allFavorites, undoManager: undoManager)
                 }
-                NoteMoveMenu(ids: ids, notes: notes, undoManager: undoManager)
-            }
+                }
             .disabled(notes.isEmpty)
         }
     }
@@ -77,33 +75,13 @@ struct NoteRemoveActions: View {
             Button(inMenuBar ? "Delete Note Immediately…" : "Delete Immediately…", systemImage: "trash", role: .destructive) {
                 library.notesToPurge = ids
             }
-            .disabled(!library.capabilities.contains(.purge))
+            .disabled(!library.canPurge)
         } else {
             Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
                 library.deleteAfterSaving(ids, undoManager: undoManager)
             }
             .disabled(context.notes.isEmpty)
         }
-    }
-}
-
-struct NoteMoveMenu: View {
-    @CurrentLibrary private var library
-    let ids: Set<ItemID>
-    let notes: [Item]
-    let undoManager: UndoManager?
-
-    var body: some View {
-        Menu("Move To", systemImage: "folder") {
-            Button("Inbox", systemImage: "tray") { library.move(ids, to: nil, undoManager: undoManager) }
-                .disabled(notes.allSatisfy { $0.container == nil && $0.state == .active })
-            Divider()
-            ForEach(library.folders) { folder in
-                Button(folder.name, systemImage: "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
-                    .disabled(notes.allSatisfy { $0.container == ContainerID(folder.id) && $0.state == .active })
-            }
-        }
-        .disabled(!library.capabilities.contains(.move))
     }
 }
 

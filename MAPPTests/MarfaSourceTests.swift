@@ -129,7 +129,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
 
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         let log = ChangeLog(source)
@@ -194,7 +194,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -218,7 +218,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         await source.close()
         let store = location.store(for: connection)
@@ -243,7 +243,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.makeItAnEarlierVersion(store)
@@ -269,7 +269,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.execute(store, "ALTER TABLE queue RENAME COLUMN depends_on TO depends")
@@ -294,7 +294,7 @@ struct MarfaSourceOfflineTests {
         }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.makeItAnEarlierVersion(store)
@@ -328,7 +328,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.makeItAnEarlierVersion(store)
@@ -356,7 +356,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.makeItAnEarlierVersion(store)
@@ -394,7 +394,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let directory = location.directory(for: connection)
         let parent = directory.deletingLastPathComponent()
         let name = directory.lastPathComponent
@@ -423,7 +423,7 @@ struct MarfaSourceOfflineTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
         try Self.makeItAnEarlierVersion(store)
@@ -514,14 +514,14 @@ struct MarfaSourceOfflineTests {
     @Test func aMissingKeyIsDenied() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         await #expect(throws: SourceFailure.self) {
-            _ = try await MarfaSource.open(connection, keys: MemoryKeyStore(), location: try MarfaStoreLocation(root: scratch()))
+            _ = try await MarfaSource.open(connection, keys: MemoryKeyStore(), location: MarfaStoreLocation(root: scratch()))
         }
     }
 
     private func open(_ root: URL, at address: String = "http://127.0.0.1:9") async throws -> MarfaSource {
         let connection = try MarfaConnection(address: address)
         return try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection: "unused"]), location: try MarfaStoreLocation(root: root))
+            connection, keys: MemoryKeyStore([connection: "unused"]), location: MarfaStoreLocation(root: root))
     }
 
     /// An address nothing answers holds a connection open until it times out, which must not hold up a write.
@@ -1060,7 +1060,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             return try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                location: try MarfaStoreLocation(root: root))
+                location: MarfaStoreLocation(root: root))
         }
 
         /// Runs `body` with a fresh copy, already refreshed, and purges every id it mints, however it ends.
@@ -1162,7 +1162,7 @@ extension LiveMarfaTests {
 
                 var state = try await apply(.tag(item.id, ItemTag.favorite, on: true))
                 #expect(state.item(titled: title)?.isFavorite == true)
-                let favorites = try #require(state.snapshot?.places.first { $0.id == .favorites }?.query)
+                let favorites = ItemQuery(tags: [ItemTag.favorite])
                 let favorite = try #require(state.item(titled: title))
                 #expect(favorites.matches(favorite, catalogue: try #require(state.snapshot?.catalogue)))
 
@@ -1183,16 +1183,6 @@ extension LiveMarfaTests {
                 #expect(state.item(titled: title)?.tier == .feed)
                 state = try await apply(.retier(item.id, .library, base: try #require(state.item(titled: title)).version))
                 #expect(state.item(titled: title)?.tier == .library)
-
-                // A write only files make is refused in plain words, and queues nothing.
-                let unsupported = WriteID()
-                source.submit(.move(item.id, to: nil), as: unsupported)
-                let refused = try #require(await log.wait { $0.answer(to: unsupported) != nil })
-                guard case .refused(let problem) = refused.answer(to: unsupported) else {
-                    Issue.record("a move was not refused")
-                    return
-                }
-                #expect(problem.code == "unsupported")
 
                 // The server keeps the bin once the delete is sent, and the item stays shown from it.
                 let binned = WriteID()
@@ -1309,7 +1299,7 @@ extension LiveMarfaTests {
         private func conflictFromAnEarlierLaunch(_ root: URL, _ made: LiveMarfa.Made) async throws {
             let address = try #require(LiveMarfa.address), key = try #require(LiveMarfa.key)
             let connection = try MarfaConnection(address: address)
-            let location = try MarfaStoreLocation(root: root)
+            let location = MarfaStoreLocation(root: root)
             let keys = MemoryKeyStore([connection: key])
             let a = made.mint(), b = made.mint()
             let tag = UUID().uuidString.prefix(8)
@@ -1587,7 +1577,7 @@ struct MarfaSourceClosingTests {
         let root = scratch()
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let keys = MemoryKeyStore([connection: "unused"])
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         return (source, connection, keys, location, root)
     }

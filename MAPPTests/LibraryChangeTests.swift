@@ -81,13 +81,11 @@ struct LibraryChangeTests {
         browser.selection = [old.items[0].id]
         browser.sidebarItem = .favorites
         browser.searchText = "hotel"
-        browser.renamingNote = old.items[0].id
 
         browser.adopt(new)
         #expect(browser.selection.isEmpty, "the new library has none of the old selection's items")
         #expect(browser.sidebarItem == .allNotes)
         #expect(browser.searchText == "")
-        #expect(browser.renamingNote == nil)
     }
 
     @Test func theFirstLibraryAWindowIsShownLeavesItAsItWas() {
@@ -134,30 +132,17 @@ struct LibraryChangeTests {
 
     // MARK: Files
 
-    @Test func aFileAtHandIsShownAtOnce() throws {
-        let library = FakeItemLibrary(now: start)
-        let id = ItemID.mint()
-        let url = URL(filePath: "/tmp/at-hand.pdf")
-        library.files[id] = url
-        #expect(ItemFileResolution.atHand(id, in: library) == .ready(url))
-    }
-
-    @Test func aFileFetchedLaterIsAskedForWhereItIsNotAtHand() async {
+    @Test func aFileIsFetchedWhenAskedFor() async {
         let library = FakeItemLibrary(now: start)
         let id = ItemID.mint()
         let url = URL(filePath: "/tmp/fetched.pdf")
-        library.fetchable[id] = url
-        #expect(ItemFileResolution.atHand(id, in: library) == nil)
+        library.files[id] = url
         #expect(await ItemFileResolution.fetch(id, in: library) == .ready(url))
     }
 
-    @Test func aLibraryWithoutFilesSaysSoWithoutBreakingAnything() async {
+    @Test func anItemWithNoFileSaysSo() async {
         let library = FakeItemLibrary(now: start)
-        let id = ItemID.mint()
-        #expect(ItemFileResolution.atHand(id, in: library) == nil)
-        #expect(await ItemFileResolution.fetch(id, in: library) == .unavailable)
-        #expect(library.folderURL == nil)
-        #expect(library.path(of: id) == nil)
+        #expect(await ItemFileResolution.fetch(.mint(), in: library) == .unavailable)
     }
 
     @Test func aFileThatCannotBeFetchedIsAFailureNotAnAbsence() async {
@@ -171,7 +156,7 @@ struct LibraryChangeTests {
         let library = FakeItemLibrary(now: start)
         let a = ItemID.mint(), b = ItemID.mint()
         let urlA = URL(filePath: "/tmp/a.pdf"), urlB = URL(filePath: "/tmp/b.pdf")
-        library.fetchable = [a: urlA, b: urlB]
+        library.files = [a: urlA, b: urlB]
         library.fetchDelay[a] = .milliseconds(300)
         let loader = ItemFileLoader()
 
@@ -184,23 +169,17 @@ struct LibraryChangeTests {
         #expect(loader.shown?.id == b)
     }
 
-    @Test func sharingUsesTheFileAtHandOrTheOneFetchedToShow() {
-        let library = FakeItemLibrary(now: start)
+    @Test func sharingUsesTheFileFetchedToShow() {
         let browser = Browser()
         let id = ItemID.mint()
         let fetched = URL(filePath: "/tmp/fetched.pdf")
-        #expect(browser.fileURL(of: id, in: library) == nil)
+        #expect(browser.fileURL(of: id) == nil)
 
         browser.fileFetched(id, at: fetched)
-        #expect(browser.fileURL(of: id, in: library) == fetched)
-        #expect(browser.fileURL(of: .mint(), in: library) == nil, "another item's file is not this one's")
-
-        let atHand = URL(filePath: "/tmp/at-hand.pdf")
-        library.files[id] = atHand
-        #expect(browser.fileURL(of: id, in: library) == atHand)
+        #expect(browser.fileURL(of: id) == fetched)
+        #expect(browser.fileURL(of: .mint()) == nil, "another item's file is not this one's")
 
         browser.fileFetched(id, at: nil)
-        library.files = [:]
-        #expect(browser.fileURL(of: id, in: library) == nil)
+        #expect(browser.fileURL(of: id) == nil)
     }
 }

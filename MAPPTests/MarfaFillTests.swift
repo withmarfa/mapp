@@ -85,7 +85,7 @@ import Testing
         let older = LibraryFixture.item(ItemID("older"), LibraryFixture.note, "Older", age: 2)
         let newer = LibraryFixture.item(ItemID("newer"), LibraryFixture.note, "Newer", age: 1)
         source.report.update { $0.fill = LibraryFill(state: .filling, listed: 1, expected: 2) }
-        source.send(.loaded(SourceSnapshot(items: [older], catalogue: LibraryFixture.catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: [older], catalogue: LibraryFixture.catalogue)))
         for _ in 0..<100 where !library.isLoaded { try await Task.sleep(for: .milliseconds(10)) }
         source.send(.upserted([newer]))
         for _ in 0..<100 where library.item(newer.id) == nil { try await Task.sleep(for: .milliseconds(10)) }

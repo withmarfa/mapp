@@ -1,4 +1,3 @@
-import AppKit
 import XCTest
 
 @MainActor
@@ -8,7 +7,7 @@ final class ItemJourneyTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
@@ -17,9 +16,21 @@ final class ItemJourneyTests: XCTestCase {
 
     func testCreateRelateEditAndReopen() {
         create(type: "Project", title: "Interface Test Project")
-        create(type: "Task", title: "Interface Test Task")
         let details = app.descendants(matching: .any)["DetailsToggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
+        details.click()
+        // Description is a field of the sample's Project type; the inspector offers only what the type declares.
+        let addProperty = app.descendants(matching: .any)["ItemInspectorAddProperty"]
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 3))
+        addProperty.click()
+        app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch.click()
+        let description = app.descendants(matching: .any)["ItemProperty.description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 3))
+        description.typeText("Saved through the native inspector")
+        app.typeKey(.tab, modifierFlags: [])
+        details.click()
+
+        create(type: "Task", title: "Interface Test Task")
         details.click()
         let addRelationship = app.descendants(matching: .any)["RelationshipAddMenu"]
         XCTAssertTrue(addRelationship.waitForExistence(timeout: 3))
@@ -33,14 +44,6 @@ final class ItemJourneyTests: XCTestCase {
         search.typeText("Interface Test Project")
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipCandidate.'")).firstMatch.click()
         app.buttons["RelationshipSave"].click()
-        let addProperty = app.descendants(matching: .any)["ItemInspectorAddProperty"]
-        XCTAssertTrue(addProperty.waitForExistence(timeout: 3))
-        addProperty.click()
-        app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch.click()
-        let description = app.descendants(matching: .any)["ItemProperty.description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 3))
-        description.typeText("Saved through the native inspector")
-        app.typeKey(.tab, modifierFlags: [])
         details.click()
         let editor = app.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
@@ -48,22 +51,18 @@ final class ItemJourneyTests: XCTestCase {
         editor.typeText("A document written through the existing editor.")
         let typedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: editor)
         wait(for: [typedBody], timeout: 5)
-        app.terminate()
-        app.launchArguments.append("-MAPPKeepSampleFolder")
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
-        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Interface Test Task")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        row.click()
-        XCTAssertTrue(app.webViews.firstMatch.textViews.firstMatch.waitForExistence(timeout: 3))
+
+        reopen("Interface Test Task")
         let reopened = app.webViews.firstMatch.textViews.firstMatch
+        XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
-        app.descendants(matching: .any)["DetailsToggle"].click()
+        details.click()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.waitForExistence(timeout: 3))
+        reopen("Interface Test Project")
         let savedDescription = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 3))
         XCTAssertEqual(savedDescription.value as? String, "Saved through the native inspector")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipTarget.' AND label CONTAINS %@", "Interface Test Project")).firstMatch.exists)
     }
 
     func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
@@ -99,11 +98,7 @@ final class ItemJourneyTests: XCTestCase {
         attachment.name = "Item page with pins and details"
         attachment.lifetime = .keepAlways
         add(attachment)
-        app.terminate()
-        app.launchArguments.append("-MAPPKeepSampleFolder")
-        app.launch()
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        row.click()
+        reopen("Body Focus Saved Task")
         let reopened = app.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: reopened)
@@ -113,21 +108,16 @@ final class ItemJourneyTests: XCTestCase {
         XCTAssertTrue(inspectorStatus.label.contains("Completed") || inspectorStatus.value as? String == "Completed")
     }
 
-    func testImportPhotoAndShowNativeViewer() {
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "MAPP/PreviewAssets/item-preview-photo.png")
-        app.menuBars.menuBarItems["File"].click()
-        app.menuItems["Import Files…"].click()
-        app.typeKey("g", modifierFlags: [.command, .shift])
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(source.path, forType: .string)
-        app.typeKey("v", modifierFlags: [.command])
-        app.typeKey(.return, modifierFlags: [])
-        let open = app.buttons["Open"]
-        XCTAssertTrue(open.waitForExistence(timeout: 3))
-        open.click()
-        XCTAssertTrue(app.buttons["Zoom In"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.images["item-preview-photo.png"].exists)
+    /// Leaves the item for another and comes back, so the page reads it again from the library. The sample
+    /// library lives only as long as the app, so a relaunch would find none of it.
+    private func reopen(_ title: String) {
+        let rows = app.outlines["NoteList"].staticTexts
+        let other = rows.matching(NSPredicate(format: "NOT (value BEGINSWITH %@)", title)).firstMatch
+        XCTAssertTrue(other.waitForExistence(timeout: 5))
+        other.click()
+        let row = rows.matching(NSPredicate(format: "value BEGINSWITH %@", title)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.click()
     }
 
     private func create(type: String, title: String) {

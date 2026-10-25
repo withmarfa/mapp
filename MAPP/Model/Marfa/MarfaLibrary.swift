@@ -35,7 +35,7 @@ import Observation
     private var membershipRevision = 0
     private var searchRevision = 0
 
-    @ObservationIgnored let source: any ConnectedItemSource
+    @ObservationIgnored let source: any ItemSource
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
@@ -115,7 +115,7 @@ import Observation
     /// Searches keep the items not in the bin, as the files library's do.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
-    init(source: any ConnectedItemSource, now: @escaping () -> Date = Date.init) {
+    init(source: any ItemSource, now: @escaping () -> Date = Date.init) {
         self.source = source
         self.now = now
         syncReport = source.syncReport
@@ -143,19 +143,11 @@ import Observation
         for task in following { task.cancel() }
     }
 
-    /// Purge needs the server, so it is offered only while the server can be reached. Moving, renaming files,
-    /// folders and importing are a files library's: the package attaches a file to an item, and has no call that
-    /// makes a file item of its own.
-    var capabilities: SourceCapabilities {
-        var offered = source.capabilities.intersection([.archive, .retype, .retier, .purge])
-        if connection != .online { offered.remove(.purge) }
-        return offered
-    }
+    /// Purge needs the server, so it is offered only while the server can be reached.
+    var canPurge: Bool { connection == .online }
 
     /// The server keeps the bin, and its own rules for how long.
     var trashDays: Int? { nil }
-    var folders: [Folder] { [] }
-    var completedImports: [UUID: ItemID] { [:] }
 
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
         try await source.resolve(problem, by: action)
@@ -183,9 +175,6 @@ import Observation
         case .catalogue(let catalogue):
             self.catalogue = catalogue
             reindex()
-        case .places:
-            // The sidebar's places are still the app's own; the source's are for when places drive it.
-            break
         case .unavailable(let failure):
             self.failure = (String(localized: "Can’t Read This Library"), failure.message)
         }
@@ -352,7 +341,7 @@ import Observation
         case .create(_, let draft):
             if let parent = draft.parent { written.insert(parent) }
         case .editProperties(let id, _, _, _), .editBody(let id, _, _, _), .retype(let id, _, _), .retier(let id, _, _),
-            .move(let id, _), .transition(let id, _), .purge(let id, _), .tag(let id, _, _):
+            .transition(let id, _), .purge(let id, _), .tag(let id, _, _):
             written.insert(id)
         case .link(let draft, _):
             written.formUnion([draft.source, draft.target])
@@ -361,8 +350,6 @@ import Observation
         case .moveEdge(let edge, _, let target):
             written.insert(target)
             if let link = index.links[edge] { written.formUnion([link.source, link.target]) }
-        case .place:
-            break
         }
     }
 
@@ -465,8 +452,7 @@ import Observation
         items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
     }
 
-    /// The Inbox is the feed tier. All Items is every active item in either tier, files among them, as All Notes
-    /// is in a folder. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
+    /// The Inbox is the feed tier. All Items is every active item in either tier, files among them. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
         case .inbox: return index.feed
@@ -485,7 +471,6 @@ import Observation
             let active = index.ids(in: .active)
             return index.reachable(from: id, type: MarfaMapping.parentEdge).subtracting([id]).intersection(active)
         case .recentlyDeleted: return index.ids(in: .trashed)
-        case .folder: return []
         }
     }
 
@@ -505,15 +490,11 @@ import Observation
         case .source(let name): name
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
-        case .folder: ""
         case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
         case .files: String(localized: "Files")
         case .recentlyDeleted: String(localized: "Recently Deleted")
         }
     }
-
-    func folder(_ id: ItemID) -> Folder? { nil }
-    func folder(of item: Item) -> Folder? { nil }
 
     func isGone(_ id: ItemID?) -> Bool {
         isLoaded && id.flatMap { item($0) } == nil
@@ -530,11 +511,6 @@ import Observation
         }
         return record.isHeld ? record.body : nil
     }
-
-    /// Marfa does not ask titles to differ.
-    func isItemTitleTaken(_ title: String) -> Bool { false }
-    func isNoteNameTaken(_ name: String, for id: ItemID) -> Bool { false }
-    func isFolderNameTaken(_ name: String, except id: ItemID?) -> Bool { false }
 
     // MARK: Links
 
@@ -602,16 +578,9 @@ import Observation
 
     // MARK: Files
 
-    var folderURL: URL? { nil }
     /// A file's bytes come from the server's blobs, so they are never at hand without asking.
-    func fileURL(for id: ItemID) -> URL? { nil }
-
     func fileURL(of id: ItemID) async throws -> URL? {
         guard item(id)?.isFile == true else { return nil }
         return try await source.fileURL(of: id)
     }
-
-    func path(of id: ItemID) -> String? { nil }
-    func fileName(of id: ItemID) -> String? { nil }
-    func imageBase(of id: ItemID) -> String? { nil }
 }

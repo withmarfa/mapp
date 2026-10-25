@@ -19,7 +19,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             let source = try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                location: try MarfaStoreLocation(root: root))
+                location: MarfaStoreLocation(root: root))
             let log = ChangeLog(source)
             do {
                 source.refresh()

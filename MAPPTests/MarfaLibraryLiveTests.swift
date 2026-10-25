@@ -18,7 +18,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             let source = try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                location: try MarfaStoreLocation(root: root))
+                location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
                 await source.flush()
@@ -226,7 +226,7 @@ extension LiveMarfaTests {
                 #expect(library.items(in: .allNotes).contains { $0.id == kept })
 
                 // Delete Permanently needs the server and takes the item out of the bin and the copy.
-                try #require(library.capabilities.contains(.purge))
+                try #require(library.canPurge)
                 library.deletePermanentlyOnConfirm([purged])
                 try #require(await eventually(.seconds(30)) { library.item(purged) == nil })
                 #expect(library.failure == nil, "\(String(describing: library.failure))")
@@ -255,7 +255,7 @@ extension LiveMarfaTests {
                 let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
                 let second = try await MarfaSource.open(
                     connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                    location: try MarfaStoreLocation(root: root))
+                    location: MarfaStoreLocation(root: root))
                 let fresh = MarfaLibrary(source: second)
                 second.refresh()
                 try #require(await eventually(.seconds(60)) {

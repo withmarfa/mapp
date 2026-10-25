@@ -17,7 +17,7 @@ struct MarfaConnectionTests {
 
     @Test func eachServerKeepsItsOwnCopyInTheAppsStorage() throws {
         let root = URL.temporaryDirectory.appending(path: "Stores", directoryHint: .isDirectory)
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let one = try MarfaConnection(address: "http://one.example")
         let two = try MarfaConnection(address: "http://two.example")
         #expect(location.directory(for: one) == location.directory(for: try MarfaConnection(address: "HTTP://ONE.example/")))
@@ -25,19 +25,6 @@ struct MarfaConnectionTests {
         #expect(location.store(for: one).deletingLastPathComponent() == location.directory(for: one))
         #expect(location.directory(for: one).deletingLastPathComponent().standardizedFileURL == root.standardizedFileURL)
         #expect(MarfaStoreLocation.applicationSupport.path.hasPrefix(URL.applicationSupportDirectory.path))
-    }
-
-    @Test func aCopyIsNeverPutInsideTheNotesFolder() {
-        let notes = URL.temporaryDirectory.appending(path: "Notes", directoryHint: .isDirectory)
-        #expect(throws: MarfaStoreLocation.Problem.insideNotesFolder) {
-            try MarfaStoreLocation(root: notes.appending(path: ".marfa-copy"), notesFolder: notes)
-        }
-        #expect(throws: MarfaStoreLocation.Problem.insideNotesFolder) {
-            try MarfaStoreLocation(root: notes, notesFolder: notes)
-        }
-        #expect(throws: Never.self) {
-            try MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "Elsewhere"), notesFolder: notes)
-        }
     }
 
     @Test func aKeyIsKeptForItsServerAlone() throws {

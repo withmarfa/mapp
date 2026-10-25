@@ -5,7 +5,7 @@ final class SelectionLifetimeTests: XCTestCase {
     func testSelectedOutlineSurvivesWorkspaceReplacement() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         defer { app.terminate() }
 

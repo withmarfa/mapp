@@ -52,11 +52,8 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
 /// library shows what it holds before, and without, the network.
-nonisolated final class MarfaSource: ItemSource, SyncReporting {
+nonisolated final class MarfaSource: ItemSource {
     let connection: MarfaConnection
-    /// Purge needs the server, which the library offers only while it can be reached; moving, renaming files,
-    /// folders and importing are a files library's.
-    let capabilities: SourceCapabilities = [.archive, .purge, .retype, .retier, .downloadedFiles]
     let embeds: any EmbedResolver
     let copy: WorkingCopy
     let downloadedFiles: (any DownloadedFiles)?
@@ -80,7 +77,7 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
     }
 
     /// Opens the working copy for `connection` and paints from it, asking the server nothing; `refresh()` then
-    /// brings it up to date. `location` keeps each server's copy apart, outside any notes folder. It reads the
+    /// brings it up to date. `location` keeps each server's copy apart. It reads the
     /// keychain and makes the directory, so it never runs on the main actor. `recreate` makes the directory a new
     /// copy goes in after the old one is set aside; tests replace it to make that step fail.
     @concurrent static func open(
@@ -319,8 +316,6 @@ nonisolated final class MarfaSource: ItemSource, SyncReporting {
         }
     }
 
-    func endEditing(_ item: ItemID) {}
-
     /// Returns once every write submitted before it has been queued and the queue drained where the server can
     /// be reached. The app never waits on the server like this; the tests that drive a server do.
     func flush() async {
@@ -521,7 +516,6 @@ extension SourceSnapshot {
             let gone = Set(ids)
             items.removeAll { gone.contains($0.id) }
         case .catalogue(let catalogue): self.catalogue = catalogue
-        case .places(let places): self.places = places
         case .bodyChanged, .answered, .unavailable: break
         }
     }

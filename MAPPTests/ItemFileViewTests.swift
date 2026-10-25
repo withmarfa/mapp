@@ -19,7 +19,7 @@ struct ItemFileViewTests {
             id: .mint(), type: TypeID("core.file"), title: "Shopping list.txt", titleRule: .property("title"),
             content: .file(.plainText, byteCount: 10), version: ItemVersion(1), created: now, modified: now)
         let library = FakeItemLibrary(items: [item], now: now)
-        library.fetchable[item.id] = blob
+        library.files[item.id] = blob
         return (library, item.id, folder)
     }
 

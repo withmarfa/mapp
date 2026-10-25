@@ -82,7 +82,7 @@ struct NoteLinkPicker: View {
                 .foregroundStyle(isHighlighted ? .white : .secondary)
             Text(item.title).lineLimit(1)
             Spacer(minLength: 8)
-            Text(library.folder(of: item)?.name ?? String(localized: "Inbox"))
+            Text(library.placeLabel(of: item))
                 .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
                 .lineLimit(1)
         }

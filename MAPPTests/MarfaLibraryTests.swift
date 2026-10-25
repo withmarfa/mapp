@@ -108,7 +108,7 @@ nonisolated enum LibraryFixture {
     ]
 
     static var snapshot: SourceSnapshot {
-        SourceSnapshot(items: items, catalogue: catalogue, places: [])
+        SourceSnapshot(items: items, catalogue: catalogue)
     }
 }
 
@@ -117,7 +117,7 @@ private func loaded(_ items: [Item] = LibraryFixture.items) async throws -> (Mar
     let source = FakeItemSource()
     for (id, text) in LibraryFixture.texts { source.setBody(text, of: id) }
     let library = MarfaLibrary(source: source)
-    source.send(.loaded(SourceSnapshot(items: items, catalogue: LibraryFixture.catalogue, places: [])))
+    source.send(.loaded(SourceSnapshot(items: items, catalogue: LibraryFixture.catalogue)))
     try #require(await eventually { library.isLoaded })
     return (library, source)
 }
@@ -164,8 +164,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.items(in: .collection(F.p2)).isEmpty)
         #expect(ids(library.items(in: .files)) == [F.f1])
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
-        #expect(library.items(in: .folder(F.p1)).isEmpty)
-        #expect(library.folders.isEmpty)
         for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
@@ -309,21 +307,12 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure?.message == String(localized: "This kind of item can’t be linked here."))
     }
 
-    @Test func whatOnlyFilesHaveAnswersNothing() async throws {
-        let (library, source) = try await loaded()
-        #expect(library.folderURL == nil)
-        #expect(library.fileURL(for: F.f1) == nil)
+    @Test func aFileIsFetchedAndANoteHasNoFile() async throws {
+        let (library, _) = try await loaded()
         #expect(try await library.fileURL(of: F.f1) == URL(filePath: "/dev/null"))
         #expect(try await library.fileURL(of: F.n1) == nil)
-        #expect(library.path(of: F.n1) == nil)
-        #expect(library.fileName(of: F.n1) == nil)
-        #expect(library.imageBase(of: F.n1) == nil)
-        #expect(library.folder(F.n1) == nil)
         #expect(library.trashDays == nil)
-        #expect(!library.isItemTitleTaken("Alpha"))
         #expect(library.idsForWindows([F.n1, ItemID("missing")]) == [F.n1])
-        library.leave(F.n1)
-        #expect(source.ended.withLock { $0 } == [F.n1])
     }
 }
 
@@ -504,9 +493,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func deletingForGoodSendsEachItemInTheBinAtTheVersionShown() async throws {
         let (library, source) = try await loaded()
-        source.offered.withLock { $0 = [.archive, .purge] }
         source.state.set(.online)
-        #expect(await eventually { library.capabilities.contains(.purge) })
+        #expect(await eventually { library.canPurge })
         var binned = try #require(library.item(F.n3))
         binned.version = ItemVersion(9)
         source.send(.upserted([binned]))
@@ -526,10 +514,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func deletingForGoodWaitsForTheServer() async throws {
         let (library, source) = try await loaded()
-        source.offered.withLock { $0 = [.archive, .purge] }
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
-        #expect(!library.capabilities.contains(.purge))
+        #expect(!library.canPurge)
         library.deletePermanentlyOnConfirm([F.n3])
         #expect(source.writes.isEmpty)
         #expect(library.failure?.title == String(localized: "Can’t Delete Immediately"))
@@ -701,28 +688,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.isEmpty)
     }
 
-    @Test func whatOnlyFilesDoIsSaidPlainly() async throws {
-        let (library, source) = try await loaded()
-        let cases: [(String, () -> Void)] = [
-            ("move", { library.move([F.n1], to: nil, undoManager: nil) }),
-            ("rename", { library.renameNote(F.n1, to: "X", undoManager: nil) }),
-            ("import", { library.importFiles([URL(filePath: "/dev/null")], folderID: nil, requestID: UUID()) }),
-            ("new folder", { _ = library.newFolder(undoManager: nil) }),
-            ("rename folder", { library.rename(F.n1, to: "X", undoManager: nil) }),
-            ("delete folder", { library.deleteFolder(F.n1, undoManager: nil) }),
-            ("order folders", { library.moveFolders([F.n1], before: nil, undoManager: nil) }),
-        ]
-        for (name, act) in cases {
-            library.failure = nil
-            act()
-            #expect(library.failure?.message == MarfaEngine.filesOnly, "\(name)")
-        }
-        #expect(!library.capabilities.contains(.importFiles))
-        #expect(!library.capabilities.contains(.move))
-        #expect(source.writes.isEmpty)
-        #expect(library.folders.isEmpty)
-    }
-
     @Test func attachedFilesGoToTheSourceAndTheTextItGivesIsWhatThePageWrites() async throws {
         let (library, source) = try await loaded()
         let embeds = try await library.attach(
@@ -742,10 +707,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         library.setFavorite([F.n2], true, undoManager: nil)
         let write = try #require(source.submitted.first?.id)
-        source.send(.answered(write, .refused(SyncProblem(code: "unsupported", message: MarfaEngine.filesOnly))))
+        source.send(.answered(write, .refused(SyncProblem(code: "unsupported", message: "Favorites can’t be changed here."))))
         #expect(await eventually { library.failure != nil })
         #expect(library.failure?.title == String(localized: "Can’t Add to Favorites"))
-        #expect(library.failure?.message == MarfaEngine.filesOnly)
+        #expect(library.failure?.message == "Favorites can’t be changed here.")
 
         // A conflict is the item's own state to show, not an alert; an answer told twice is told once.
         library.failure = nil
@@ -775,20 +740,18 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 @Suite struct MarfaLibrarySyncTests {
     typealias F = LibraryFixture
 
-    @Test func capabilitiesFollowTheSourceAndTheConnection() async throws {
+    @Test func purgeIsOfferedOnlyWhileTheServerCanBeReached() async throws {
         let (library, source) = try await loaded()
-        #expect(library.capabilities == [.archive])
+        #expect(!library.canPurge)
         #expect(library.connection == .connecting)
-        source.offered.withLock { $0 = [.archive, .purge, .move, .folders, .retype, .retier, .importFiles] }
-        #expect(library.capabilities == [.archive, .retype, .retier])
-        let watched = observes { _ = library.capabilities }
+        let watched = observes { _ = library.canPurge }
         source.state.set(.online)
         #expect(await eventually { library.connection == .online })
         #expect(watched.isSet)
-        #expect(library.capabilities == [.archive, .retype, .retier, .purge])
+        #expect(library.canPurge)
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
-        #expect(library.capabilities == [.archive, .retype, .retier])
+        #expect(!library.canPurge)
         source.state.set(.keyRefused)
         #expect(await eventually { library.connection == .keyRefused })
         source.state.set(.stopped(code: "x", message: "Stopped."))
@@ -893,7 +856,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let library = MarfaLibrary(source: source)
         let clock = ContinuousClock()
         let start = clock.now
-        source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue)))
         try #require(await eventually(.seconds(30)) { library.isLoaded })
         let load = (clock.now - start)
 
@@ -965,7 +928,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         replace(F.f1) { file in
             file.edgesOut = [Edge(id: EdgeID("at1"), type: "attached-to", source: F.f1, target: .item(F.n1), origin: .property("attached-to"))]
         }
-        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return library
     }

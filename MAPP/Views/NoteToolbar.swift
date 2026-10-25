@@ -178,7 +178,7 @@ private struct ItemToolbarActions {
     private var selectedFileURL: URL? {
         guard (browser?.selection.count ?? items.count) == 1,
               let id = browser?.selection.first ?? items.first?.id else { return nil }
-        return browser?.fileURL(of: id, in: library) ?? fileURL ?? library.fileURL(for: id)
+        return browser?.fileURL(of: id) ?? fileURL
     }
 
     var shareLink: some View {
@@ -267,10 +267,6 @@ private struct MoreMenu: View {
             Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(editableNote == nil)
-            if let browser {
-                Button("Rename…", systemImage: "pencil") { browser.renamingNote = notes.first?.id }
-                    .disabled(notes.count != 1 || !library.canRenameFile(of: notes.first))
-            }
             Divider()
             Menu("Page Width", systemImage: "arrow.left.and.right") {
                 PageWidthOptions().pickerStyle(.inline).labelsHidden()

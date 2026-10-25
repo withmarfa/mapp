@@ -21,10 +21,9 @@ enum GalleryPreview {
         return nil
     }
 
-    /// The file where it is at hand, else fetched when it is small enough that a grid of cards can afford it. A
-    /// larger file shows its type's icon until the person opens it.
+    /// The file, fetched when it is small enough that a grid of cards can afford it. A larger file shows its type's
+    /// icon until the person opens it.
     static func fileURL(of item: Item, in library: any ItemLibrary) async -> URL? {
-        if let url = library.fileURL(for: item.id) { return url }
         guard case .file(_, let byteCount) = item.content, byteCount <= fetchLimit else { return nil }
         return try? await library.fileURL(of: item.id)
     }

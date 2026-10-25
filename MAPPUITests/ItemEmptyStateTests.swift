@@ -11,7 +11,7 @@ final class ItemEmptyStateTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(list.waitForExistence(timeout: 5))

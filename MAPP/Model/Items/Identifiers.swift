@@ -39,13 +39,6 @@ nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {
     init(_ rawValue: String) { self.rawValue = rawValue }
 }
 
-/// Where a files source keeps an item: a folder at the top of the notes folder. A Marfa source has none.
-nonisolated struct ContainerID: RawRepresentable, Hashable, Codable, Sendable {
-    let rawValue: String
-    init(rawValue: String) { self.rawValue = rawValue }
-    init(_ rawValue: String) { self.rawValue = rawValue }
-}
-
 /// The version of an item a reader holds. A files source counts within one session; Marfa's is the server's.
 nonisolated struct ItemVersion: RawRepresentable, Hashable, Comparable, Sendable {
     let rawValue: Int64

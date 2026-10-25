@@ -21,8 +21,7 @@ struct ItemInspectorHost: View {
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
-                    path: library.path(of: id),
-                    place: Self.place(of: item, in: library),
+                    place: item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library"),
                     catalogue: library.catalogue,
                     hiddenKeys: library.hiddenPropertyKeys(of: item),
                     relationships: library.relationships(for: id),
@@ -53,14 +52,6 @@ struct ItemInspectorHost: View {
         .accessibilityIdentifier("ItemInspector")
     }
 
-    /// Where the item is kept: a folder of the notes folder, or the Inbox; for a Marfa item, its tier.
-    private static func place(of item: Item, in library: any ItemLibrary) -> String {
-        if library.path(of: item.id) != nil {
-            return library.folder(of: item)?.name ?? String(localized: "Inbox")
-        }
-        return item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library")
-    }
-
     private func open(_ id: ItemID) {
         guard let browser else {
             if library.item(id) != nil { openWindow(value: id) }
@@ -81,9 +72,7 @@ struct ItemInspector: View {
     let item: Item
     /// Nil for a type the catalogue does not hold, which is shown with no fields.
     let type: ItemTypeInfo?
-    /// Where the item is kept, for a library of files.
-    var path: String? = nil
-    /// The folder, the Inbox or the Library the item is in.
+    /// The Inbox or the Library, by the item's tier.
     var place: String? = nil
     /// Calls a property the item's type does not define by the label another type gives it.
     var catalogue = Catalogue()
@@ -218,16 +207,14 @@ struct ItemInspector: View {
         detail("Edited", item.modified.formatted(date: .abbreviated, time: .shortened))
         if let source = item.source { detail("Made by", source) }
         if let place { detail("Place", place) }
-        // Only a server counts an item's versions; a file has no such number.
-        if path == nil { detail("Version", item.version.rawValue.formatted()) }
+        detail("Version", item.version.rawValue.formatted())
         if case .file(let contentType, let byteCount) = item.content {
             detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
             // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
-            if path != nil || byteCount > 0 {
+            if byteCount > 0 {
                 detail("Size", ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
             }
         }
-        if let path { detail("Path", path) }
         ForEach(otherProperties) { property in
             InspectorRow(name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type))) {
                 Text(ItemValueText.string(property.value))

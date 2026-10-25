@@ -143,7 +143,7 @@ nonisolated enum MarfaMapping {
         return Item(
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
-            tier: row.tier.map(tier) ?? .library, container: nil, tags: Set(row.tags), version: ItemVersion(row.version),
+            tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
             source: row.source.isEmpty ? nil : row.source)
@@ -383,45 +383,6 @@ nonisolated enum MarfaMapping {
         case .refused: 3
         case .blocked: 4
         }
-    }
-
-    // MARK: Places
-
-    static func places(items: some Collection<Item>, catalogue: Catalogue) -> [Place] {
-        var places: [Place] = [
-            Place(
-                id: .inbox, title: String(localized: "Inbox"), symbol: "tray", section: .library,
-                query: ItemQuery(tier: .feed)),
-            Place(
-                id: .all, title: String(localized: "All Items"), symbol: "note.text", section: .library,
-                query: ItemQuery()),
-            Place(
-                id: .favorites, title: String(localized: "Favorites"), symbol: "star", section: .library,
-                query: ItemQuery(tags: [ItemTag.favorite]), drop: .tag(ItemTag.favorite)),
-            Place(
-                id: .archive, title: String(localized: "Archive"), symbol: "archivebox", section: .library,
-                query: ItemQuery(states: [.archived]), drop: .transition(.archived))
-        ]
-        let active = items.filter { $0.state == .active }
-        // Each type's place lists that type's own items, most first, so a count and its list agree.
-        let counts = Dictionary(grouping: active, by: \.type).mapValues(\.count)
-        let held = counts.keys.filter { !catalogue.isFileType($0) }
-        let labels = catalogue.displayLabels(for: held)
-        places += held.compactMap { catalogue.itemTypes[$0] }
-            .sorted {
-                let (a, b) = (counts[$0.id] ?? 0, counts[$1.id] ?? 0)
-                return a != b ? a > b : $0.label.localizedStandardCompare($1.label) == .orderedAscending
-            }
-            .map { type in
-                Place(
-                    id: .type(type.id), title: labels[type.id] ?? type.label, symbol: TypeSymbol.name(for: type.id, in: catalogue),
-                    section: .types, query: ItemQuery(types: [type.id], includesSubtypes: false))
-            }
-        places.append(
-            Place(
-                id: .recentlyDeleted, title: String(localized: "Recently Deleted"), symbol: "trash", section: .footer,
-                query: ItemQuery(states: [.trashed]), drop: .transition(.trashed)))
-        return places
     }
 }
 

@@ -1,87 +1,8 @@
 import Foundation
 import Testing
-import UniformTypeIdentifiers
 @testable import MAPP
 
-/// What a `[[link]]` written in one note names, as each library reads links.
-@Suite struct FolderLinkResolutionTests {
-    private func note(_ body: String, path: String? = nil, deleted: Bool = false) -> Note {
-        Note(body: body, path: path, created: .now, deleted: deleted ? .now : nil)
-    }
-
-    private func library(_ notes: Note...) -> (NoteLibrary, reader: ItemID) {
-        let reader = note("Reader\n\nSee the links.\n")
-        return (NoteLibrary(notes: [reader] + notes, store: RecordingStore()), reader.id)
-    }
-
-    @Test func aLinkNamesTheNoteByTitleIgnoringCaseAndSpacingAround() {
-        let plan = note("Plan\n\nThe plan.\n")
-        let (library, reader) = library(plan)
-        #expect(library.resolveLink(NoteLink(name: "Plan"), in: reader) == .resolved(plan.id))
-        #expect(library.resolveLink(NoteLink(name: "plan"), in: reader) == .resolved(plan.id))
-        #expect(library.resolveLink(NoteLink(name: "  Plan "), in: reader) == .resolved(plan.id))
-    }
-
-    @Test func aLinkNamesTheNoteByPathWithOrWithoutItsExtension() {
-        let quarterly = note("Quarterly planning\n", path: "Work/Quarterly.md")
-        let (library, reader) = library(quarterly)
-        #expect(library.resolveLink(NoteLink(name: "Work/Quarterly"), in: reader) == .resolved(quarterly.id))
-        #expect(library.resolveLink(NoteLink(name: "Work/Quarterly.md"), in: reader) == .resolved(quarterly.id))
-        #expect(library.resolveLink(NoteLink(name: "Quarterly.md"), in: reader) == .resolved(quarterly.id), "so does its file name")
-        #expect(library.resolveLink(NoteLink(name: "Work"), in: reader) == .missing, "a folder is not a note")
-    }
-
-    @Test func aLinkNamesTheNoteByTheIdentityItsFileDeclares() {
-        let identity = "33333333-3333-4333-8333-333333333333"
-        let declared = note("---\nmarfa_id: \(identity)\n---\nPlan\n", path: "Plan.md")
-        let (library, reader) = library(declared)
-        #expect(library.resolveLink(NoteLink(name: identity), in: reader) == .resolved(declared.id))
-    }
-
-    @Test func aLinkToNoNoteIsMissingAndNothingIsMade() {
-        let (library, reader) = library(note("Plan\n"))
-        let before = library.items(in: .allNotes).map(\.id)
-        #expect(library.resolveLink(NoteLink(name: "Nowhere"), in: reader) == .missing)
-        #expect(library.resolveLink(NoteLink(name: ""), in: reader) == .missing)
-        #expect(library.resolveLink(NoteLink(name: "33333333-3333-4333-8333-333333333333"), in: reader) == .missing)
-        #expect(library.items(in: .allNotes).map(\.id) == before)
-    }
-
-    @Test func aNameHoldingAnAliasOrHeadingSeparatorNamesNothing() {
-        let (library, reader) = library(note("Plan\n"))
-        #expect(library.resolveLink(NoteLink(name: "Plan#Soil"), in: reader) == .missing)
-        #expect(library.resolveLink(NoteLink(name: "Plan|alias"), in: reader) == .missing)
-    }
-
-    @Test func twoNotesWithOneTitleAreAmbiguousAndNeitherIsPicked() {
-        let home = note("Garden\n", path: "Home/Garden.md")
-        let work = note("Garden\n", path: "Work/Garden.md")
-        let (library, reader) = library(home, work)
-        guard case .ambiguous(let found) = library.resolveLink(NoteLink(name: "Garden"), in: reader) else {
-            Issue.record("a name two notes go by names neither")
-            return
-        }
-        #expect(Set(found) == [home.id, work.id])
-        #expect(library.resolveLink(NoteLink(name: "Home/Garden"), in: reader) == .resolved(home.id), "their paths tell them apart")
-    }
-
-    @Test func aDeletedNoteIsNotNamed() {
-        let (library, reader) = library(note("Plan\n", deleted: true))
-        #expect(library.resolveLink(NoteLink(name: "Plan"), in: reader) == .missing)
-    }
-
-    @Test func aLinkFollowsANoteMadeOrRenamedWithoutReadingAgain() {
-        let plan = note("Plan\n")
-        let (library, reader) = library(plan)
-        #expect(library.resolveLink(NoteLink(name: "Later"), in: reader) == .missing)
-        let later = note("Later\n")
-        library.notes.append(later)
-        #expect(library.resolveLink(NoteLink(name: "Later"), in: reader) == .resolved(later.id))
-        library.notes.removeAll { $0.id == plan.id }
-        #expect(library.resolveLink(NoteLink(name: "Plan"), in: reader) == .missing)
-    }
-}
-
+/// What a `[[link]]` written in one note names, as a Marfa library reads it from its copy.
 @MainActor
 @Suite struct MarfaLinkResolutionTests {
     typealias F = LibraryFixture
@@ -99,7 +20,7 @@ import UniformTypeIdentifiers
     private func loaded(_ items: [Item]) async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source)
-        source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
     }

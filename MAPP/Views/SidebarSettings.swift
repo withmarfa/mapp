@@ -19,7 +19,6 @@ struct SidebarSettings: View {
     }
 
     private func content(_ library: any ItemLibrary, plan: SidebarPlan) -> some View {
-        let folderRows = plan.library.filter { $0 == .folders }
         let topTypes = plan.types.map { SidebarPlace.type($0.id) }
         return Form {
             Section("Places") {
@@ -40,11 +39,6 @@ struct SidebarSettings: View {
                     Text("Types")
                 } footer: {
                     Text("New types appear here automatically.")
-                }
-            }
-            if !folderRows.isEmpty {
-                Section("Folders") {
-                    group(folderRows, in: library, plan: plan)
                 }
             }
         }
@@ -117,7 +111,6 @@ struct SidebarSettings: View {
         case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
         case .types: String(localized: "Types")
-        case .folders: String(localized: "Folders")
         case .files: library.name(of: .files)
         case .type(let id): Self.typeNode(id, in: plan.types)?.label ?? id
         }
@@ -132,7 +125,6 @@ struct SidebarSettings: View {
         case .sources: "antenna.radiowaves.left.and.right"
         case .collections: "square.stack"
         case .types: "square.grid.2x2"
-        case .folders: "folder"
         case .files: "doc"
         case .type(let id): Self.typeNode(id, in: plan.types)?.symbol ?? TypeSymbol.fallback
         }

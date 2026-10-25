@@ -3,17 +3,12 @@ import SwiftUI
 /// Where a file item's file is, however the library gets it.
 enum ItemFileResolution: Equatable {
     case ready(URL)
-    /// The library has no file for the item, as a library without files has none.
+    /// The library has no file for the item.
     case unavailable
     /// The library has one but could not get it.
     case failed
 
-    /// A file at hand, as a folder's are, which needs no wait.
-    @MainActor static func atHand(_ id: ItemID, in library: any ItemLibrary) -> Self? {
-        library.fileURL(for: id).map { .ready($0) }
-    }
-
-    /// A file fetched where it is not at hand, as a server's are.
+    /// The file, fetched from the library.
     @MainActor static func fetch(_ id: ItemID, in library: any ItemLibrary) async -> Self {
         do {
             return try await library.fileURL(of: id).map { .ready($0) } ?? .unavailable
@@ -37,10 +32,6 @@ enum ItemFileResolution: Equatable {
     func load(_ id: ItemID, in library: any ItemLibrary) async -> ItemFileResolution? {
         latest += 1
         let load = latest
-        if let atHand = ItemFileResolution.atHand(id, in: library) {
-            shown = (id, atHand)
-            return atHand
-        }
         shown = nil
         let fetched = await ItemFileResolution.fetch(id, in: library)
         guard load == latest, !Task.isCancelled else { return nil }
@@ -49,8 +40,7 @@ enum ItemFileResolution: Equatable {
     }
 }
 
-/// A file item's file, shown as soon as it is at hand and fetched where it is not. A library without files has
-/// nothing to show, and says so.
+/// A file item's file, shown once it is fetched. An item the library has no file for shows that it has none.
 struct ItemFileView: View {
     @CurrentLibrary private var library
     let id: ItemID

@@ -12,7 +12,6 @@ struct MAPPApp: App {
                 .interfaceTextStyle()
                 .unkeptChanges(libraries)
                 .environment(libraries)
-                .environment(libraries.folder)
                 .environment(libraries.host)
         }
         .defaultSize(width: 1100, height: 720)
@@ -35,7 +34,7 @@ struct MAPPApp: App {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     // An item's window has nothing to show without a library, as when one is restored before a
-                    // notes folder is chosen, or after the server's copy could not be opened.
+                    // server is set, or after the server's copy could not be opened.
                     ClosingView()
                 }
             }
@@ -52,9 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     override init() {
         #if DEBUG
-        // The sample folder starts as a person's first launch does, whatever an earlier run chose, so no UI test
+        // The sample library starts as a person's first launch does, whatever an earlier run chose, so no UI test
         // inherits another's settings, a hidden sidebar or a dragged column among them, which the window keeps.
-        if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder"),
+        if SampleLibrary.isRequested,
            !ProcessInfo.processInfo.arguments.contains("-MAPPKeepSampleSettings") {
             let defaults = UserDefaults.standard
             let kept = defaults.dictionaryRepresentation().keys.filter {
@@ -72,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Nothing typed is lost to quitting: each page hands over its last edit and each library keeps its writes on
-    /// this Mac, the folder's on disk and a server's in its copy's queue, before the app goes. The server is not
+    /// this Mac, in its copy's queue, before the app goes. The server is not
     /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in

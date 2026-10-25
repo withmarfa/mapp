@@ -2,46 +2,81 @@ import Foundation
 import Observation
 @testable import MAPP
 
-/// A library held in memory, with no folder and no store, so the views' models can be tested through
+/// A library held in memory, with no server and no store, so the views' models can be tested through
 /// `ItemLibrary` alone. It keeps items and bodies as given and answers the places by their plain meaning.
 @Observable
 final class FakeItemLibrary: ItemLibrary {
     var items: [Item]
     var bodies: [ItemID: String]
-    var folders: [Folder]
     var isLoaded = true
     var failure: (title: String, message: String)?
     var notesToPurge: Set<ItemID> = []
-    var catalogue = WorkbenchSchema.catalogue
-    var capabilities: SourceCapabilities = []
+    var catalogue = FakeItemLibrary.testCatalogue
+    var canPurge = false
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
     /// Whether `setItemRelationship` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
     var relationshipWrites: [(item: ItemID, field: String, targets: [ItemID])] = []
-    var completedImports: [UUID: ItemID] = [:]
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
     /// What `attach` answers, which may wait or throw; nil attaches nothing.
     var attaching: (() async throws -> [Embed])?
 
-    init(items: [Item] = [], bodies: [ItemID: String] = [:], folders: [Folder] = [], now: Date = .now) {
+    init(items: [Item] = [], bodies: [ItemID: String] = [:], now: Date = .now) {
         self.items = items
         self.bodies = bodies
-        self.folders = folders
         self.now = { now }
     }
 
-    /// A note as the fake holds one: an active core note in the Inbox, edited at `modified`.
+    /// A note as the fake holds one: an active core note in the library, or in the Inbox where `tier` is the feed,
+    /// edited at `modified`.
     static func note(
-        _ title: String, modified: Date, in folder: Folder? = nil, isFavorite: Bool = false, state: ItemState = .active
+        _ title: String, modified: Date, tier: Tier = .library, isFavorite: Bool = false, state: ItemState = .active,
+        id: ItemID = .mint()
     ) -> Item {
         Item(
-            id: .mint(), type: TypeID("core.note"), title: title, titleRule: .firstLine, state: state,
-            container: folder.map { ContainerID($0.id) }, tags: isFavorite ? [ItemTag.favorite] : [],
-            version: ItemVersion(1), created: modified, modified: modified)
+            id: id, type: TypeID("core.note"), title: title, titleRule: .firstLine, state: state, tier: tier,
+            tags: isFavorite ? [ItemTag.favorite] : [], version: ItemVersion(1), created: modified, modified: modified)
     }
+
+    /// A core note holding `body`, titled by its first line as one is, added to the library.
+    @discardableResult
+    func add(_ body: String, id: ItemID = .mint(), state: ItemState = .active) -> Item {
+        let firstLine = body.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let item = Self.note(
+            firstLine.trimmingCharacters(in: CharacterSet(charactersIn: "# ")), modified: now(), state: state, id: id)
+        items.append(item)
+        bodies[id] = body
+        return item
+    }
+
+    /// Notes, tasks with a status, projects that hold them, and files, as a server's catalogue might have them.
+    static let testCatalogue: Catalogue = {
+        let task = TypeID("core.task")
+        let project = TypeID("test.project")
+        let taskFields = [
+            ItemTypeInfo.Field(key: "status", label: "Status", kind: .choice(["todo", "in_progress", "done"]), declaredBy: task),
+            ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["high", "medium", "low"]), declaredBy: task),
+            ItemTypeInfo.Field(key: "assignee", label: "Assignee", kind: .text, declaredBy: task),
+        ]
+        let types = [
+            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(id: task, label: "Task", fields: taskFields, titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(
+                id: project, label: "Project",
+                fields: [ItemTypeInfo.Field(key: "description", label: "Description", kind: .text, declaredBy: project)],
+                titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(id: .file, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil),
+            ItemTypeInfo(id: TypeID("core.file.image"), label: "Image", fields: [], titleField: nil, bodyField: nil, parent: .file),
+        ]
+        // A child names its parent, so `parent-of` is written at its target, under its reverse name.
+        let parent = EdgeTypeInfo(
+            id: "parent-of", label: "Parent of", reverseName: "child-of", cardinality: .one, writtenAt: .target,
+            sourceTypes: [], targetTypes: [])
+        return Catalogue(itemTypes: types, edgeTypes: [parent])
+    }()
 
     // MARK: Reading
 
@@ -62,14 +97,13 @@ final class FakeItemLibrary: ItemLibrary {
         if place == .recents { return Self.recent(items) }
         return items.filter { item in
             switch place {
-            case .inbox: item.state == .active && item.container == nil
+            case .inbox: item.state == .active && item.tier == .feed
             case .allNotes: item.state == .active
             case .sources, .collections: false
             case .source(let name): item.state == .active && item.source == name
             case .recents: false
             case .favorites: item.state == .active && item.isFavorite
             case .favoriteItem(let id): item.id == id && item.state == .active && item.isFavorite
-            case .folder(let id): item.state == .active && item.container == ContainerID(id)
             case .itemType(let type): item.state == .active && item.type == TypeID(type)
             case .collection(let id): item.state == .active && isBelow(item, id)
             case .files: item.state == .active && item.isFile
@@ -88,9 +122,13 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func count(in place: SidebarItem) -> Int { items(in: place).count }
-    func name(of place: SidebarItem) -> String { "\(place)" }
-    func folder(_ id: ItemID) -> Folder? { folders.first { $0.id == id } }
-    func folder(of item: Item) -> Folder? { item.container.flatMap { container in folders.first { ContainerID($0.id) == container } } }
+    func name(of place: SidebarItem) -> String {
+        switch place {
+        case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
+        case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
+        default: "\(place)"
+        }
+    }
     func isGone(_ id: ItemID?) -> Bool { isLoaded && id.flatMap(item) == nil }
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID] { ids.filter { item($0) != nil } }
     func body(of id: ItemID) -> ItemBody? {
@@ -112,48 +150,38 @@ final class FakeItemLibrary: ItemLibrary {
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
-    func creationParentCandidates(typeID: String) -> [Item] { [] }
-    func isItemTitleTaken(_ title: String) -> Bool {
-        items.contains { $0.state == .active && $0.title.caseInsensitiveCompare(title) == .orderedSame }
-    }
-    func isNoteNameTaken(_ name: String, for id: ItemID) -> Bool { false }
-    func isFolderNameTaken(_ name: String, except id: ItemID?) -> Bool {
-        folders.contains { $0.id != id && $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
-    }
+    /// The items each type may be made under, by type.
+    var parentCandidates: [String: [ItemID]] = [:]
+    func creationParentCandidates(typeID: String) -> [Item] { (parentCandidates[typeID] ?? []).compactMap { item($0) } }
 
     // MARK: Files
 
-    var folderURL: URL? { nil }
-    /// Files at hand, as a folder's are; `fetchable` are those that arrive only when asked for, as a server's do.
+    /// The file each file item fetches as.
     var files: [ItemID: URL] = [:]
-    var fetchable: [ItemID: URL] = [:]
     var fetchFails = false
     /// How many times a file was asked for.
     @ObservationIgnored var fetches = 0
     /// How long fetching each file takes, as a server's can.
     var fetchDelay: [ItemID: Duration] = [:]
 
-    func fileURL(for id: ItemID) -> URL? { files[id] }
     func fileURL(of id: ItemID) async throws -> URL? {
         fetches += 1
         if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }
         if let delay = fetchDelay[id] { try await Task.sleep(for: delay) }
-        return files[id] ?? fetchable[id]
+        return files[id]
     }
-    func path(of id: ItemID) -> String? { nil }
-    func fileName(of id: ItemID) -> String? { nil }
-    func imageBase(of id: ItemID) -> String? { nil }
 
     // MARK: Writing
 
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID? {
-        guard !title.isEmpty, !isItemTitleTaken(title) else { return nil }
-        let container: ContainerID? = if case .folder(let id) = place { ContainerID(id) } else { nil }
+        guard !title.isEmpty else { return nil }
+        let id = ItemID.mint()
+        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
         let item = Item(
-            id: .mint(), type: TypeID(typeID), title: title, titleRule: .property("title"), container: container,
-            version: ItemVersion(1), created: now(), modified: now())
+            id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
+            version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? [])
         bodies[item.id] = body
         created.append(item)
         if !holdsCreations { deliverCreated() }
@@ -170,20 +198,25 @@ final class FakeItemLibrary: ItemLibrary {
         created = []
     }
 
+    /// Every text written, with the version it was typed on.
+    private(set) var bodyWrites: [(id: ItemID, text: String, readAt: ItemVersion)] = []
+
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        bodyWrites.append((id, body, readAt))
         bodies[id] = body
         items[index].version = ItemVersion(items[index].version.rawValue + 1)
         items[index].modified = now()
     }
 
-    func leave(_ id: ItemID) {}
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
-    func wasTouched(_ id: ItemID) -> Bool { false }
+    /// What `wasTouched` answers yes for, as a library does for an item another item points at.
+    var touched: Set<ItemID> = []
+    func wasTouched(_ id: ItemID) -> Bool { touched.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         relationshipWrites.append((id, field, targetIDs))
@@ -215,39 +248,9 @@ final class FakeItemLibrary: ItemLibrary {
         notesToPurge.subtract(ids)
     }
 
-    func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager?) {
-        change(ids) { $0.container = folderID.map(ContainerID.init) }
-    }
-
-    func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?) {
-        change([id]) { $0.title = name }
-    }
-
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
         try await attaching?() ?? []
     }
-    func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) {}
-    func consumeImportCompletion(_ requestID: UUID) { completedImports[requestID] = nil }
-
-    // MARK: Folders
-
-    func newFolder(undoManager: UndoManager?) -> Folder {
-        let folder = Folder(name: "New Folder")
-        folders.append(folder)
-        return folder
-    }
-
-    func rename(_ id: ItemID, to name: String, undoManager: UndoManager?) {
-        guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
-        folders[index].name = name
-    }
-
-    func deleteFolder(_ id: ItemID, undoManager: UndoManager?) {
-        delete(Set(items.filter { $0.container == ContainerID(id) }.map(\.id)), undoManager: undoManager)
-        folders.removeAll { $0.id == id }
-    }
-
-    func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager?) {}
 
     private func change(_ ids: Set<ItemID>, _ body: (inout Item) -> Void) {
         for index in items.indices where ids.contains(items[index].id) {

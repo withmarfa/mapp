@@ -6,9 +6,8 @@ import Testing
 
 /// A library that answers nothing of its own: the test sets its connection and report, and reads what it was
 /// asked to do.
-nonisolated final class FakeMarfaSource: MarfaHostedSource {
+nonisolated final class FakeMarfaSource: ItemSource {
     let connection: MarfaConnection
-    let capabilities: SourceCapabilities = []
     let embeds: any EmbedResolver = FakeEmbeds()
     let state = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport(queueRead: true))
@@ -74,7 +73,6 @@ nonisolated final class FakeMarfaSource: MarfaHostedSource {
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] { [] }
-    func endEditing(_ item: ItemID) {}
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
     let queuing = Mutex(false)
     let queued = Mutex(0)
@@ -173,7 +171,7 @@ nonisolated final class TestKeyStore: KeyStore {
 
     init() throws {
         defaults = try #require(UserDefaults(suiteName: suite))
-        location = try MarfaStoreLocation(root: root)
+        location = MarfaStoreLocation(root: root)
     }
 
     deinit {
@@ -987,7 +985,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             let source = try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                location: try MarfaStoreLocation(root: root))
+                location: MarfaStoreLocation(root: root))
             do {
                 let log = ChangeLog(source)
                 _ = try #require(await log.wait { $0.snapshot != nil })
@@ -1058,7 +1056,7 @@ extension LiveMarfaTests {
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "MarfaHostConnectReviewTests-\(UUID().uuidString)"))
-        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host(), defaults: defaults)
+        return Libraries(host: bench.host(), defaults: defaults)
     }
 
     /// A quit while the key and the copy are removed must not leave the address behind, or the next launch opens
@@ -1084,9 +1082,9 @@ extension LiveMarfaTests {
         #expect(next.source == nil)
     }
 
-    /// The windows go from one server's library to the other's, never through the notes folder, while the old
-    /// key and copy are removed.
-    @Test func switchingServersNeverShowsTheFolderBetween() async throws {
+    /// The windows go from one server's library to the other's, never through the welcome screen or a failure,
+    /// while the old key and copy are removed.
+    @Test func switchingServersShowsNothingBetween() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k1")
@@ -1095,13 +1093,12 @@ extension LiveMarfaTests {
         let watch = ModeWatch(libraries)
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "k2")
         watch.stop()
-        #expect(!watch.seen.contains(.files), "\(watch.seen)")
         #expect(watch.seen.allSatisfy { $0 == .marfa }, "\(watch.seen)")
         #expect(libraries.host.connection == second)
     }
 
-    /// A copy that closes as a key is replaced is waited for while it opens again, not shown as the notes folder.
-    @Test func aCopyOpenedAgainForAKeyIsWaitedForNotShownAsTheFolder() async throws {
+    /// A copy that closes as a key is replaced is waited for while it opens again, not shown as failed.
+    @Test func aCopyOpenedAgainForAKeyIsWaitedForNotShownAsFailed() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "good")
@@ -1117,7 +1114,7 @@ extension LiveMarfaTests {
         source.closesSlowly.withLock { $0 = false }
         _ = await replacing.result
         watch.stop()
-        #expect(!watch.seen.contains(.files), "\(watch.seen)")
+        #expect(!watch.seen.contains(.failed), "\(watch.seen)")
         #expect(watch.seen.contains(.opening), "\(watch.seen)")
         #expect(libraries.mode == .marfa)
     }

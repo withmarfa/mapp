@@ -25,7 +25,7 @@ struct NewItem {
     func isUntouched(in library: any ItemLibrary) -> Bool {
         guard let baseline, !library.wasTouched(id), let item = library.item(id), item.state == .active else { return false }
         guard item.title == baseline.title, item.tags == baseline.tags, item.properties == baseline.properties,
-              item.tier == baseline.tier, item.container == baseline.container,
+              item.tier == baseline.tier,
               item.parentID == nil || item.parentID == parentID,
               Self.connections(of: item) == Self.connections(of: baseline)
         else { return false }
@@ -53,13 +53,7 @@ extension Browser {
         guard library.isLoaded else { return nil }
         if let awaited = newItems.values.first(where: \.isAwaited) { return awaited.id }
         guard let typeID = newItemType(typeID, in: library) else { return nil }
-        var title = String(localized: "Untitled")
-        let untitled = title
-        var suffix = 2
-        while library.isItemTitleTaken(title) {
-            title = "\(untitled) \(suffix)"
-            suffix += 1
-        }
+        let title = String(localized: "Untitled")
         var parentID: ItemID?
         if case .collection(let id) = item, library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == id }) {
             parentID = id

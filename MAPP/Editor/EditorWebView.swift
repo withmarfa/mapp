@@ -26,7 +26,7 @@ final class EditorWebView: WKWebView {
 
     // MARK: Images
 
-    // Images dropped become files of the notes folder, linked from the note; everything else is the page's to
+    // Images dropped become attachments of the note, linked from its text; everything else is the page's to
     // take. Pasted images reach the app from the page, which hears the paste.
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         carriesImages(sender) ? .copy : super.draggingEntered(sender)

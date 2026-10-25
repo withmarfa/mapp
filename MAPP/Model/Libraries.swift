@@ -1,16 +1,13 @@
 import Foundation
 import Observation
 
-/// The library the windows read: a Marfa server's once the app is connected to one, the notes folder's
-/// otherwise. The app owns one of these, with the folder and the connection under it.
-///
-/// With no server set, which is how the app starts, the folder's library is chosen exactly as it was before
-/// there was a server to choose, and nothing here shows.
+/// The library the windows read: the connected Marfa server's, and none until a server is set and its copy is
+/// open. The app owns one of these, with the connection under it.
 @Observable @MainActor final class Libraries {
     /// What the windows have to show.
     nonisolated enum Mode: Hashable, Sendable {
-        /// The notes folder, which is not yet chosen until the person chooses one.
-        case files
+        /// No server is set, which is how the app starts, so the windows ask the person to connect to one.
+        case unconfigured
         case marfa
         /// A server is set and its copy is being opened, so a window waits rather than show another library or
         /// give up what it was restored with.
@@ -19,7 +16,6 @@ import Observation
         case failed
     }
 
-    let folder: NotesFolder
     let host: MarfaHost
     /// True from launch until the saved server's copy has been tried.
     private(set) var isLaunching: Bool
@@ -39,18 +35,16 @@ import Observation
         var text: String?
     }
 
-    @ObservationIgnored private var marfaLibrary: MarfaLibrary?
-
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
-    init(folder: NotesFolder, host: MarfaHost, defaults: UserDefaults = .standard) {
-        self.folder = folder
+    init(host: MarfaHost, defaults: UserDefaults = .standard) {
         self.host = host
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
+        host.onNotKept = { [weak self] in self?.tell($0) }
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -65,13 +59,12 @@ import Observation
             isLaunching: isLaunching, isBusy: host.isBusy)
     }
 
-    /// Which library the windows show. A server's copy is shown whenever it is open; a server set whose copy is
-    /// not open is never answered with the notes folder, which is not what the person asked to read. Leaving a
-    /// server forgets its address first, so the folder is what comes next; a copy closed to open again, as when
-    /// a key is replaced, is waited for, never shown as the folder in between.
+    /// Which library the windows show. A server's copy is shown whenever it is open. Leaving a server forgets its
+    /// address first, so the windows ask for another; a copy closed to open again, as when a key is replaced, is
+    /// waited for.
     nonisolated static func mode(hasSource: Bool, isConfigured: Bool, state: MarfaHost.State, isLaunching: Bool, isBusy: Bool) -> Mode {
         if hasSource { return .marfa }
-        guard isConfigured else { return .files }
+        guard isConfigured else { return .unconfigured }
         switch state {
         case .connecting: return .opening
         case .keyRefused, .unavailable, .otherVersion, .inUse: return isBusy ? .opening : .failed
@@ -79,39 +72,20 @@ import Observation
         }
     }
 
-    /// The library to read, nil where there is none to show: no folder chosen yet, or a server whose copy is not
-    /// open.
+    /// The library to read, nil where there is none to show: no server set, or a server whose copy is not open.
     var current: (any ItemLibrary)? {
-        switch mode {
-        case .files: folder.library
-        case .marfa: marfa()
-        case .opening, .failed: nil
-        }
+        mode == .marfa ? host.library : nil
     }
 
-    /// Names the library the windows read, so its sidebar layout is its own: a server by its address, the notes
-    /// folder by its path.
+    /// Names the library the windows read by its server's address, so its sidebar layout is its own.
     var sidebarLayoutKey: String {
-        switch mode {
-        case .marfa: "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
-        case .files, .opening, .failed: "folder:" + (folder.url?.standardizedFileURL.path ?? "")
-        }
+        "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
     }
 
     var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: sidebarLayoutKey) }
 
     func updateSidebarLayout(_ change: (inout SidebarLayout) -> Void) {
         sidebarLayouts.update(sidebarLayoutKey, change)
-    }
-
-    /// One library for as long as its source is the one open, so a window keeps what it holds as items change.
-    private func marfa() -> MarfaLibrary? {
-        guard let source = host.source else { return nil }
-        if let marfaLibrary, marfaLibrary.source === source { return marfaLibrary }
-        let library = MarfaLibrary(source: source)
-        library.onNotKept = { [weak self] in self?.tell($0) }
-        marfaLibrary = library
-        return library
     }
 
     /// Gathers what is not kept until the person has been told, so a second refusal adds its text to the first.
@@ -146,8 +120,7 @@ import Observation
     @discardableResult
     func flushEditors() async -> Bool {
         guard await Self.flush() else { return false }
-        folder.library?.finish()
-        await marfaLibrary?.finish()
+        await host.library?.finish()
         return true
     }
 
@@ -188,9 +161,9 @@ import Observation
     static func standard() -> Libraries {
         #if DEBUG
         // The UI tests, the screenshots, the unit tests hosted in the app and Xcode's previews, which start the whole
-        // app, never reach the person's saved server, Keychain, copies or notes folder.
+        // app, never reach the person's saved server, Keychain or copies.
         let environment = ProcessInfo.processInfo.environment
-        if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder")
+        if SampleLibrary.isRequested
             || environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
             || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
@@ -199,32 +172,35 @@ import Observation
             defaults.removePersistentDomain(forName: suite)
             let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
             try? FileManager.default.removeItem(at: root)
-            // A debug build can be pointed at a test server by hand. The key stays in memory and the address goes
-            // only to the sample defaults cleared above, so nothing reaches the Keychain or the saved server.
-            var presets: [MarfaConnection: String] = [:]
-            var server: MarfaConnection?
-            if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder"),
-                let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
+            guard SampleLibrary.isRequested, !SampleLibrary.startsUnconfigured else {
+                // The unit tests, previews and `-MAPPSampleUnconfigured` start with no server, as a first launch does.
+                let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root))
+                return Libraries(host: host, defaults: defaults)
+            }
+            // A debug build can be pointed at a test server by hand, in place of the sample. The key stays in memory
+            // and the address goes only to the sample defaults cleared above, so nothing reaches the Keychain or the
+            // saved server.
+            if let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
                 let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
             {
-                presets[connection] = key
-                server = connection
+                let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore([connection: key]), location: location(root: root))
+                host.presetTestServer(connection)
+                return Libraries(host: host, defaults: defaults)
             }
-            let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore(presets), location: location(root: root))
-            if let server { host.presetTestServer(server) }
-            return Libraries(folder: NotesFolder(defaults: defaults), host: host, defaults: defaults)
+            let sample = SampleLibrary.connection
+            let host = MarfaHost(
+                defaults: defaults, keys: MemoryKeyStore([sample: "sample"]), location: location(root: root),
+                opener: { connection, _, _ in SampleLibrary.open(connection) },
+                describer: { _ in SampleLibrary.name })
+            host.presetTestServer(sample)
+            return Libraries(host: host, defaults: defaults)
         }
         #endif
         let host = MarfaHost(defaults: .standard, keys: KeychainKeyStore(), location: location())
-        return Libraries(folder: NotesFolder(), host: host)
+        return Libraries(host: host)
     }
 
-    /// The initializer refuses only a root inside a notes folder, and none is given here.
     private static func location(root: URL = MarfaStoreLocation.applicationSupport) -> MarfaStoreLocation {
-        do {
-            return try MarfaStoreLocation(root: root)
-        } catch {
-            preconditionFailure("A copy’s location was refused: \(error)")
-        }
+        MarfaStoreLocation(root: root)
     }
 }

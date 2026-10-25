@@ -33,27 +33,17 @@ struct BrowserTests {
     }
 
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    let work = Folder(name: "Work")
-
-    func makeLibrary() -> (NoteLibrary, older: Note, newer: Note, favorite: Note) {
-        let older = Note(body: "# Older", created: start - 120)
-        let newer = Note(body: "# Newer", created: start - 60)
-        let favorite = Note(body: "# Favorite", created: start - 3600, folderID: work.id, isFavorite: true)
-        let library = NoteLibrary(notes: [older, newer, favorite], folders: [work], now: { start })
-        return (library, older, newer, favorite)
-    }
-
     /// The same three notes in a library held in memory, for what the browser asks of any library.
     func makeFakeLibrary() -> (FakeItemLibrary, older: Item, newer: Item, favorite: Item) {
-        let older = FakeItemLibrary.note("Older", modified: start - 120)
-        let newer = FakeItemLibrary.note("Newer", modified: start - 60)
-        let favorite = FakeItemLibrary.note("Favorite", modified: start - 3600, in: work, isFavorite: true)
-        let library = FakeItemLibrary(items: [older, newer, favorite], folders: [work], now: start)
+        let older = FakeItemLibrary.note("Older", modified: start - 120, tier: .feed)
+        let newer = FakeItemLibrary.note("Newer", modified: start - 60, tier: .feed)
+        let favorite = FakeItemLibrary.note("Favorite", modified: start - 3600, isFavorite: true)
+        let library = FakeItemLibrary(items: [older, newer, favorite], now: start)
         return (library, older, newer, favorite)
     }
 
     @Test func settingsIsAPlaceThatKeepsTheListAndSelectionBehindIt() {
-        let (library, _, newer, _) = makeLibrary()
+        let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.inbox, in: library, order: NoteOrder())
         browser.selection = [newer.id]
@@ -67,7 +57,7 @@ struct BrowserTests {
     }
 
     @Test func choosingAPlaceOrAnItemLeavesSettings() throws {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let item = try #require(library.item(older.id))
         let browser = Browser()
         browser.showSettings()
@@ -88,7 +78,7 @@ struct BrowserTests {
     }
 
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let item = try #require(library.item(older.id))
         let browser = Browser()
         browser.focusRequest = .page
@@ -154,7 +144,7 @@ struct BrowserTests {
 
     @Test func jumpingToANoteInAnotherPlaceLeavesNothingBetweenItAndTheNoteLeft() {
         let (library, older, newer, _) = makeFakeLibrary()
-        let planning = FakeItemLibrary.note("Planning", modified: start - 7200, in: work)
+        let planning = FakeItemLibrary.note("Planning", modified: start - 7200)
         library.items.append(planning)
         let browser = Browser()
         browser.show(.inbox, in: library, order: NoteOrder())
@@ -183,7 +173,7 @@ struct BrowserTests {
         let browser = Browser()
         browser.show(.inbox, in: library, order: NoteOrder())
         browser.selection = [older.id]
-        browser.show(.folder(work.id), in: library, order: NoteOrder())
+        browser.show(.favorites, in: library, order: NoteOrder())
         #expect(browser.selection == [favorite.id])
         browser.show(.inbox, in: library, order: NoteOrder())
         browser.selection = [older.id]
@@ -197,16 +187,16 @@ struct BrowserTests {
     // MARK: Making a new item
 
     @Test func newMakesTheItemAtOnceAndAsksForItsTitle() throws {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.allNotes, in: library, order: NoteOrder())
         browser.searchText = "Favorite"
-        let count = library.notes.count
+        let count = library.items.count
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(library.notes.count == count + 1)
-        let note = try #require(library.note(id))
-        #expect(note.title == "Untitled")
-        #expect(note.body.isEmpty)
+        #expect(library.items.count == count + 1)
+        let item = try #require(library.item(id))
+        #expect(item.title == "Untitled")
+        #expect(library.bodies[id] == "")
         #expect(library.item(id)?.type.rawValue == "core.note")
         #expect(browser.selection == [id])
         #expect(browser.focusRequest == .title)
@@ -217,7 +207,7 @@ struct BrowserTests {
     }
 
     @Test func newFromAPlaceThatDoesNotListNotesRevealsTheNewItemInItsType() throws {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.files, in: library, order: NoteOrder())
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
@@ -226,40 +216,35 @@ struct BrowserTests {
     }
 
     @Test func newMakesTheTypeChosenInTheMenu() throws {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
-        let id = try #require(browser.startNewItem(typeID: "aic.project", in: library, undoManager: nil))
-        #expect(library.item(id)?.type.rawValue == "aic.project")
+        let id = try #require(browser.startNewItem(typeID: "test.project", in: library, undoManager: nil))
+        #expect(library.item(id)?.type.rawValue == "test.project")
         #expect(browser.selection == [id])
     }
 
     @Test func newWithoutATypeMakesTheTypeOfThePlaceBeingShown() throws {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
-        browser.sidebarItem = .itemType("aic.ticket.feature")
+        browser.sidebarItem = .itemType("core.task")
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(library.item(id)?.type.rawValue == "aic.ticket.feature")
+        #expect(library.item(id)?.type.rawValue == "core.task")
     }
 
-    @Test(arguments: ["aic.project", "aic.ticket.task"])
+    @Test(arguments: ["test.project", "core.task"])
     func newInsideAnItemTakesItAsParentOnlyWhereTheTypeAllowsIt(typeID: String) throws {
-        let epic = Note(path: "Epics/Launch.md", text: "---\ntype: aic.epic\ntitle: Launch\n---\n", created: start)
-        let library = NoteLibrary(notes: [epic])
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        let library = FakeItemLibrary(items: [project], now: start)
+        library.parentCandidates["core.task"] = [project.id]
         let browser = Browser()
-        browser.sidebarItem = .collection(epic.id)
+        browser.sidebarItem = .collection(project.id)
         let id = try #require(browser.startNewItem(typeID: typeID, in: library, undoManager: nil))
         let created = try #require(library.item(id))
         #expect(created.type.rawValue == typeID)
-        #expect(created.parentID == (typeID == "aic.project" ? nil : epic.id))
+        #expect(created.parentID == (typeID == "core.task" ? project.id : nil))
         #expect(browser.selection == [id])
-    }
-
-    @Test func newItemsAreNamedUntitledAndUniqueSoTheyNeverClash() throws {
-        let existing = Note(path: "Notes/Untitled.md", text: "---\ntype: core.note\ntitle: Untitled\n---\n", created: start)
-        let library = NoteLibrary(notes: [existing])
-        let browser = Browser()
-        let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(library.note(id)?.title == "Untitled 2")
     }
 
     @Test func newMakesNothingWhileTheLibraryIsStillLoading() {
@@ -271,7 +256,7 @@ struct BrowserTests {
     }
 
     @Test func newLeavesSettings() {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.showSettings()
         browser.startNewItem(in: library, undoManager: nil)
@@ -314,54 +299,54 @@ struct BrowserTests {
     // MARK: Leaving a new item
 
     @Test func anItemLeftCompletelyEmptyIsMovedToRecentlyDeletedWhenAnotherIsChosen() throws {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let browser = Browser()
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
         browser.selection = [older.id]
         #expect(browser.leaveNewItem(id, closing: false, undoManager: nil))
-        #expect(library.note(id)?.isDeleted == true)
+        #expect(library.item(id)?.state == .trashed)
         #expect(library.notesToPurge.isEmpty, "an empty item is binned, never erased")
         #expect(browser.newItems.isEmpty)
-        #expect(library.note(older.id)?.isDeleted == false)
+        #expect(library.item(older.id)?.state == .active)
     }
 
     @Test func anEmptyItemIsDecidedWhenTheWindowOrAppClosesEvenWhileShown() throws {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
         #expect(!browser.leaveNewItem(id, closing: false, undoManager: nil), "it is still shown, as when Settings covers it")
-        #expect(library.note(id)?.isDeleted == false)
+        #expect(library.item(id)?.state == .active)
         #expect(browser.newItems[id] != nil)
         #expect(browser.leaveNewItem(id, closing: true, undoManager: nil))
-        #expect(library.note(id)?.isDeleted == true)
+        #expect(library.item(id)?.state == .trashed)
         #expect(library.notesToPurge.isEmpty)
     }
 
     @Test func anItemWithAnythingInItIsKept() throws {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let browser = Browser()
 
         let typedInto = try #require(browser.startNewItem(in: library, undoManager: nil))
         library.updateBody(of: typedInto, to: "Some text", readAt: try #require(library.item(typedInto)).version)
         browser.selection = [older.id]
         #expect(!browser.leaveNewItem(typedInto, closing: false, undoManager: nil))
-        #expect(library.note(typedInto)?.isDeleted == false)
+        #expect(library.item(typedInto)?.state == .active)
 
         let favorited = try #require(browser.startNewItem(in: library, undoManager: nil))
         library.setFavorite([favorited], true, undoManager: nil)
         browser.selection = [older.id]
         #expect(!browser.leaveNewItem(favorited, closing: false, undoManager: nil))
-        #expect(library.note(favorited)?.isDeleted == false)
+        #expect(library.item(favorited)?.state == .active)
 
         let titled = try #require(browser.startNewItem(in: library, undoManager: nil))
         browser.selection = [older.id]
         #expect(!browser.leaveNewItem(titled, closing: false, hasUnsavedTitle: true, undoManager: nil))
-        #expect(library.note(titled)?.isDeleted == false)
+        #expect(library.item(titled)?.state == .active)
         #expect(browser.newItems.isEmpty, "once left, it is an item like any other")
     }
 
     @Test func aBodyOfOnlyWhitespaceCountsAsEmpty() throws {
-        let (library, older, _, _) = makeLibrary()
+        let (library, older, _, _) = makeFakeLibrary()
         let browser = Browser()
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
         library.updateBody(of: id, to: " \n\n", readAt: try #require(library.item(id)).version)
@@ -369,15 +354,14 @@ struct BrowserTests {
         #expect(browser.leaveNewItem(id, closing: false, undoManager: nil))
     }
 
-    @Test func anEmptyItemAnotherNoteLinksToIsKept() throws {
-        let (library, older, _, _) = makeLibrary()
+    @Test func anEmptyItemTheLibrarySaysWasTouchedIsKept() throws {
+        let (library, older, _, _) = makeFakeLibrary()
         let browser = Browser()
         let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        let title = try #require(library.item(id)?.title)
-        library.updateBody(of: older.id, to: "See [[\(title)]]", readAt: try #require(library.item(older.id)).version)
+        library.touched.insert(id)
         browser.selection = [older.id]
         #expect(!browser.leaveNewItem(id, closing: false, undoManager: nil))
-        #expect(library.note(id)?.isDeleted == false)
+        #expect(library.item(id)?.state == .active)
     }
 
     // MARK: Keeping the selection in the list
@@ -433,21 +417,19 @@ struct BrowserTests {
         #expect(!browser.isSearching)
     }
 
-    @Test func aRemovedFolderGivesWayToAllNotes() {
-        let (library, _, _, favorite) = makeLibrary()
+    @Test func aTypeWhoseLastItemGoesGivesWayToAllItems() {
+        let (library, older, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
-        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
-        guard case .folder(let id) = browser.item else { return #expect(Bool(false)) }
-        #expect(browser.renamingFolder == id)
-        library.deleteFolder(id)
-        browser.folderRemoved(in: library, order: NoteOrder())
+        browser.show(.itemType("core.note"), in: library, order: NoteOrder())
+        browser.placeRemoved(in: library, order: NoteOrder())
+        #expect(browser.item == .itemType("core.note"), "a type that still holds items stays")
+        library.delete([older.id, newer.id, favorite.id], undoManager: nil)
+        browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
-        #expect(browser.renamingFolder == nil)
-        #expect(browser.selection == [favorite.id])
     }
 
     @Test func favoritesLeadOnlyWhereTheyMeanSomething() {
-        let (library, _, newer, _) = makeLibrary()
+        let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.group == .favorites)
@@ -457,50 +439,14 @@ struct BrowserTests {
 
     @Test func aLibraryThatCannotPurgeIsNeverAskedToEraseWhatIsDeleted() {
         let (library, older, newer, _) = makeFakeLibrary()
-        library.capabilities = []
+        library.canPurge = false
         library.delete([older.id], undoManager: nil)
         Browser.delete([older.id, newer.id], in: library, undoManager: nil)
         #expect(library.item(newer.id)?.state == .trashed, "what is live still goes to Recently Deleted")
         #expect(library.item(older.id)?.state == .trashed)
         #expect(library.notesToPurge.isEmpty)
-        library.capabilities = .purge
+        library.canPurge = true
         Browser.delete([older.id], in: library, undoManager: nil)
-        #expect(library.notesToPurge == [older.id])
-    }
-
-    @Test func dropsOnTheInboxAndFoldersNeedALibraryThatMoves() {
-        let (library, _, _, _) = makeFakeLibrary()
-        library.capabilities = []
-        #expect(!Browser.canDrop(on: .inbox, in: library))
-        #expect(!Browser.canDrop(on: .folder(work.id), in: library))
-        #expect(!Browser.canDrop(on: .recentlyDeleted, in: library), "Recently Deleted is no longer a place to drop on")
-        library.capabilities = .move
-        #expect(Browser.canDrop(on: .inbox, in: library))
-        #expect(Browser.canDrop(on: .folder(work.id), in: library))
-        for place: SidebarItem in [.allNotes, .favorites, .files, .itemType("core.note")] {
-            #expect(!Browser.canDrop(on: place, in: library))
-        }
-    }
-
-    @Test func aNewFolderIsMadeOnlyWhereTheLibraryEditsFolders() {
-        let (library, _, _, _) = makeFakeLibrary()
-        library.capabilities = []
-        let browser = Browser()
-        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
-        #expect(library.folders.count == 1)
-        #expect(browser.renamingFolder == nil)
-        library.capabilities = .folders
-        browser.newFolder(in: library, order: NoteOrder(), undoManager: nil)
-        #expect(library.folders.count == 2)
-        #expect(browser.renamingFolder == library.folders.last?.id)
-    }
-
-    @Test func deletingMovesLiveNotesAwayAndAsksBeforeErasingDeletedOnes() {
-        let (library, older, _, _) = makeLibrary()
-        Browser.delete([older.id], in: library, undoManager: nil)
-        #expect(library.note(older.id)?.isDeleted == true)
-        Browser.delete([older.id], in: library, undoManager: nil)
-        #expect(library.note(older.id) != nil)
         #expect(library.notesToPurge == [older.id])
     }
 
@@ -518,7 +464,7 @@ struct BrowserTests {
     }
 
     @Test func aRestoredWindowShowsATypeTheLibraryHoldsAndLeavesOneItDoesNot() {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let held = library.itemTypeCounts.first.map(\.id.rawValue) ?? ""
         #expect(!held.isEmpty)
         let browser = Browser()
@@ -530,7 +476,7 @@ struct BrowserTests {
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
         let (library, _, _, favorite) = makeFakeLibrary()
-        let snapshot = Browser.Snapshot(place: .folder(.mint()), selection: [.mint()])
+        let snapshot = Browser.Snapshot(place: .collection(.mint()), selection: [.mint()])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
@@ -538,28 +484,13 @@ struct BrowserTests {
     }
 
     @Test func snapshotsSurviveEncodingAsIdentifiers() throws {
-        let folder = ItemID("0198f2c4-7d1e-7a00-8000-000000000001")
+        let collection = ItemID("0198f2c4-7d1e-7a00-8000-000000000001")
         let note = ItemID("0198f2c4-7d1e-7a00-8000-000000000002")
-        let snapshot = Browser.Snapshot(place: .folder(folder), selection: [note])
+        let snapshot = Browser.Snapshot(place: .collection(collection), selection: [note])
         let data = try JSONEncoder().encode(snapshot)
         #expect(try JSONDecoder().decode(Browser.Snapshot.self, from: data) == snapshot)
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(json["selection"] as? [String] == [note.rawValue], "an identifier is kept as its own string")
-    }
-
-    @Test func aRestoredWindowFindsItsFolderAndNotesByIdentifierAfterTheyAreRenamed() {
-        let (library, older, _, _) = makeLibrary()
-        let work = library.folders[0]
-        let saved = Browser()
-        saved.show(.folder(work.id), in: library, order: NoteOrder())
-        saved.selection = [older.id]
-        let snapshot = saved.snapshot()
-        library.rename(work.id, to: "Office")
-        library.move([older.id], to: work.id)
-        let restored = Browser()
-        restored.restore(snapshot, in: library, order: NoteOrder())
-        #expect(restored.item == .folder(work.id))
-        #expect(restored.selection == [older.id])
     }
 
     @Test(arguments: [
@@ -568,7 +499,7 @@ struct BrowserTests {
         nil,
     ])
     func aWindowKeptByPathBeforeIdentifiersOrNotAtAllOpensAtItsDefault(saved: Data?) {
-        let (library, _, _, favorite) = makeLibrary()
+        let (library, _, _, favorite) = makeFakeLibrary()
         let browser = Browser()
         browser.restore(from: saved, in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
@@ -586,7 +517,7 @@ struct BrowserTests {
     }
 
     @Test func turningOffDateGroupingListsNotesUnderOneHeadingAfterTheFavorites() {
-        let (library, _, _, _) = makeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.allNotes, in: library, order: NoteOrder())
         let sections = browser.sections(in: library, order: NoteOrder(sort: .dateEdited, groupsByDate: false), now: start)

@@ -87,3 +87,23 @@ nonisolated struct BoundLink: Hashable, Sendable {
     let link: NoteLink
     let resolution: NoteReferenceResolution
 }
+
+/// Marfa trims Unicode White_Space, which excludes format characters such as U+200B.
+nonisolated enum NoteName {
+    static func trimmed(_ text: String) -> String {
+        let scalars = text.unicodeScalars
+        guard let first = scalars.firstIndex(where: { !$0.properties.isWhitespace }),
+              let last = scalars.lastIndex(where: { !$0.properties.isWhitespace }) else { return "" }
+        return String(String.UnicodeScalarView(scalars[first...last]))
+    }
+}
+
+nonisolated enum NoteReferenceResolution: Hashable, Sendable {
+    case resolved(ItemID)
+    case missing
+    case ambiguous([ItemID])
+    /// Not looked up on the server yet; only a Marfa library has these.
+    case pending
+    /// The server refused the lookup or the write of the edge; only a Marfa library has these.
+    case refused(String)
+}

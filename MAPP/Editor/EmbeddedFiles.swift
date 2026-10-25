@@ -1,6 +1,5 @@
 import AppKit
 import Darwin
-import Synchronization
 import UniformTypeIdentifiers
 import WebKit
 
@@ -22,52 +21,16 @@ nonisolated enum EmbedReference: Hashable, Sendable {
 // MARK: Resolving
 
 extension ItemLibrary {
-    /// The local file an item's embed names, or nil where there is none: a file inside the notes folder, reached
-    /// without a symbolic link, read as Marfa's core reads the embed (`EmbedPaths`). The one place an embed
-    /// becomes a file, which the page's scheme and its Open both ask.
-    func embeddedFile(_ reference: EmbedReference, in item: ItemID) async -> URL? {
-        guard let root = folderURL, let directory = imageBase(of: item) else { return nil }
-        return await EmbedPaths.file(reference, from: directory, in: root)
-    }
-
-    /// The embedded file opened for reading, or nil where there is none. The folder can change between
-    /// finding the file and opening it, so the file opened is checked again by what it is, not by the path
-    /// it was found at: everything the page is told and served comes from this descriptor.
+    /// The embedded file opened for reading, or nil where there is none. The one place an embed becomes a file,
+    /// which the page's scheme, its Open and the gallery's thumbnails all ask. Nothing resolves an embed yet:
+    /// that waits on the working copy's links and attachments (`links(in:)`), whose file is then opened with
+    /// `OpenFile.open(_:inside:)`.
     func openEmbeddedFile(_ reference: EmbedReference, in item: ItemID) async -> OpenFile? {
-        guard let root = folderURL, let file = await embeddedFile(reference, in: item) else { return nil }
-        return await OpenFile.open(file, inside: root)
+        nil
     }
 }
 
-/// How Marfa's core reads an embed's path or name (`body/embed.rs` and `body/text.rs` in marfa-core), and the
-/// folder's files it can name.
 nonisolated enum EmbedPaths {
-    /// A document embedded is a note shown in the note, which is text, not a file.
-    static let documentExtensions: Set<String> = ["md", "markdown", "txt"]
-
-    @concurrent static func file(_ reference: EmbedReference, from directory: String, in root: URL) async -> URL? {
-        let path: String?
-        switch reference {
-        case .path(let destination):
-            guard !isAddress(destination) else { return nil }
-            let local = decoded(destination)
-            path = local.isEmpty || isDocument(local) ? nil : joined(directory, local)
-        case .name(let typed):
-            let name = typed.trimmingCharacters(in: .whitespaces)
-            if name.isEmpty || isDocument(name) {
-                path = nil
-            } else if name.hasPrefix("./") || name.hasPrefix("../") {
-                path = joined(directory, name)
-            } else {
-                // A file just written may be newer than the folder's listing, so a name nothing answers to is
-                // looked for again in the folder as it now is.
-                path = named(name, from: directory, among: FolderFiles.paths(in: root))
-                    ?? named(name, from: directory, among: FolderFiles.paths(in: root, fresh: true))
-            }
-        }
-        return path.flatMap { FolderFiles.file(at: $0, in: root) }
-    }
-
     /// An address, which the page never loads: a scheme, `//` or `#`.
     static func isAddress(_ destination: String) -> Bool {
         if destination.hasPrefix("//") || destination.hasPrefix("#") { return true }
@@ -75,136 +38,6 @@ nonisolated enum EmbedPaths {
         let scheme = destination[..<colon]
         return scheme.first?.isASCII == true && scheme.first?.isLetter == true
             && scheme.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "+.-".contains($0)) }
-    }
-
-    /// The path without its query or fragment, its percent escapes decoded byte by byte.
-    static func decoded(_ destination: String) -> String {
-        let path = Array(destination.prefix { $0 != "?" && $0 != "#" }.utf8)
-        var bytes: [UInt8] = []
-        var index = 0
-        while index < path.count {
-            if path[index] == UInt8(ascii: "%"), index + 2 < path.count,
-               let byte = UInt8(String(decoding: path[index + 1...index + 2], as: UTF8.self), radix: 16) {
-                bytes.append(byte)
-                index += 3
-            } else {
-                bytes.append(path[index])
-                index += 1
-            }
-        }
-        return String(decoding: bytes, as: UTF8.self)
-    }
-
-    static func isDocument(_ path: String) -> Bool {
-        let name = path.split(separator: "/", omittingEmptySubsequences: false).last.map(String.init) ?? path
-        guard let dot = name.lastIndex(of: "."), dot != name.startIndex else { return false }
-        return documentExtensions.contains(name[name.index(after: dot)...].lowercased())
-    }
-
-    /// The path read from the note's directory, or from the folder's root where it opens with `/`; nil where it
-    /// leads out of the folder.
-    static func joined(_ directory: String, _ path: String) -> String? {
-        let rooted = path.hasPrefix("/")
-        var parts = rooted ? [] : directory.split(separator: "/").map(String.init)
-        for part in path.split(separator: "/").map(String.init) {
-            switch part {
-            case ".": continue
-            case "..":
-                guard parts.popLast() != nil else { return nil }
-            default: parts.append(part)
-            }
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: "/")
-    }
-
-    /// Names compared as macOS and Obsidian compare them, without regard to case or Unicode form.
-    static func folded(_ name: String) -> String {
-        name.precomposedStringWithCanonicalMapping.lowercased().precomposedStringWithCanonicalMapping
-    }
-
-    /// The file `![[name]]` names: the path from the folder's root, else the file whose path ends in the name at
-    /// a directory's edge, nearest the note, in its own directory first, then the shallowest, then the first in
-    /// path order, so every machine resolves it alike.
-    static func named(_ name: String, from directory: String, among paths: [String]) -> String? {
-        let wanted = folded(String(name.drop { $0 == "/" }))
-        let here = folded(directory.isEmpty ? "" : directory + "/")
-        func folder(_ path: String) -> String {
-            path.lastIndex(of: "/").map { String(path[...$0]) } ?? ""
-        }
-        return paths
-            .map { (path: $0, folded: folded($0)) }
-            .filter { $0.folded == wanted || $0.folded.hasSuffix("/" + wanted) }
-            .min { one, other in
-                let left = (one.folded == wanted ? 0 : 1, folder(one.folded) == here ? 0 : 1, one.path.count { $0 == "/" })
-                let right = (other.folded == wanted ? 0 : 1, folder(other.folded) == here ? 0 : 1, other.path.count { $0 == "/" })
-                if left != right { return left < right }
-                return one.path.utf8.lexicographicallyPrecedes(other.path.utf8)
-            }?
-            .path
-    }
-}
-
-/// The notes folder's own files, as an embed may name them: inside the folder, never through a symbolic link or
-/// a name starting with a dot, and only an ordinary file. Each URL is the file's real path, with no symbolic
-/// link anywhere in it, so `OpenFile` can refuse one put in the way after the file was found.
-nonisolated enum FolderFiles {
-    /// The folder's real path. `resolvingSymlinksInPath` keeps `/var` rather than `/private/var`, a path
-    /// that still runs through a link.
-    static func realPath(of root: URL) -> URL? {
-        guard let real = realpath(root.path, nil) else { return nil }
-        defer { free(real) }
-        return URL(filePath: String(cString: real), directoryHint: .isDirectory)
-    }
-
-    static func file(at path: String, in root: URL) -> URL? {
-        let parts = path.split(separator: "/").map(String.init)
-        guard !parts.isEmpty, var url = realPath(of: root) else { return nil }
-        let keys: Set<URLResourceKey> = [.isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey]
-        for (index, part) in parts.enumerated() {
-            guard !part.hasPrefix(".") else { return nil }
-            var next = url.appending(path: part, directoryHint: .notDirectory)
-            var values = try? next.resourceValues(forKeys: keys)
-            if values == nil {
-                // A path names a file whatever its case or Unicode form, as Marfa reads one on every machine.
-                let wanted = EmbedPaths.folded(part)
-                guard let match = (try? FileManager.default.contentsOfDirectory(atPath: url.path))?
-                    .first(where: { EmbedPaths.folded($0) == wanted })
-                else { return nil }
-                next = url.appending(path: match, directoryHint: .notDirectory)
-                values = try? next.resourceValues(forKeys: keys)
-            }
-            guard let values, values.isSymbolicLink != true else { return nil }
-            let last = index == parts.count - 1
-            guard last ? values.isRegularFile == true : values.isDirectory == true else { return nil }
-            url = next
-        }
-        return url
-    }
-
-    /// Every embed by name on a page reads the folder, so one reading serves those asked for together.
-    private static let recent = Mutex<(root: URL, at: ContinuousClock.Instant, paths: [String])?>(nil)
-
-    /// The paths of the folder's ordinary files, relative to it, as Marfa's core walks the folder: into every
-    /// directory, packages among them, but none whose name starts with a dot.
-    static func paths(in root: URL, fresh: Bool = false) -> [String] {
-        let now = ContinuousClock.now
-        if !fresh, let held = recent.withLock({ $0 }), held.root == root, now - held.at < .seconds(2) {
-            return held.paths
-        }
-        guard let base = realPath(of: root) else { return [] }
-        let depth = base.pathComponents.count
-        var paths: [String] = []
-        let walk = FileManager.default.enumerator(
-            at: base, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
-        )
-        while let url = walk?.nextObject() as? URL {
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
-                  values.isRegularFile == true, values.isSymbolicLink != true else { continue }
-            paths.append(url.pathComponents.dropFirst(depth).joined(separator: "/"))
-        }
-        recent.withLock { $0 = (root, now, paths) }
-        return paths
     }
 }
 
@@ -474,8 +307,8 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
 /// A file opened for reading by offset, so pieces can be read away from the main thread while WebKit asks for
 /// more. Opened through no symbolic link anywhere in its path and without waiting, so a pipe put in its place
 /// cannot hold a thread; then kept only if the file opened is an ordinary one whose real path is inside the
-/// notes folder, under no name starting with a dot. That check is of the descriptor, so a folder or file
-/// changed after the path was found can never put anything else behind it.
+/// directory it was looked for in, under no name starting with a dot. That check is of the descriptor, so a
+/// directory or file changed after the path was found can never put anything else behind it.
 nonisolated final class OpenFile: Sendable {
     let descriptor: Int32
     let length: UInt64
@@ -503,13 +336,21 @@ nonisolated final class OpenFile: Sendable {
         return OpenFile(descriptor: descriptor, length: UInt64(status.st_size), url: opened)
     }
 
+    /// A directory's real path. `resolvingSymlinksInPath` keeps `/var` rather than `/private/var`, a path that
+    /// still runs through a link.
+    static func realPath(of root: URL) -> URL? {
+        guard let real = realpath(root.path, nil) else { return nil }
+        defer { free(real) }
+        return URL(filePath: String(cString: real), directoryHint: .isDirectory)
+    }
+
     private static func path(of descriptor: Int32) -> URL? {
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         guard fcntl(descriptor, F_GETPATH, &buffer) == 0 else { return nil }
         return URL(filePath: String(cString: buffer), directoryHint: .notDirectory)
     }
 
-    /// The folder's path as the system writes a descriptor's, which keeps the case on disk and the firmlinked
+    /// The directory's path as the system writes a descriptor's, which keeps the case on disk and the firmlinked
     /// form, so the file's can be compared with it exactly.
     private static func folderPath(of root: URL) -> URL? {
         let descriptor = Darwin.open(root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)

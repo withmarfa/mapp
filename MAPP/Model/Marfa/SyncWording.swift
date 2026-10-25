@@ -3,7 +3,7 @@ import Foundation
 /// What the window says of how the library stands with its server, in the app's words. The model gives states
 /// and counts; this turns them into sentences, with no view in it, so each is tested as state in, words out.
 ///
-/// Nothing is said while everything is in step, and nothing at all while the app reads a folder.
+/// Nothing is said while everything is in step.
 nonisolated struct SyncStatus: Hashable, Sendable {
     nonisolated struct Note: Hashable, Sendable, Identifiable {
         enum Kind: Hashable, Sendable {

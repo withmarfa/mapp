@@ -29,12 +29,12 @@ nonisolated struct Property: Identifiable, Hashable, Sendable {
     var id: String { key }
 }
 
-// Not `Tag`, which would shadow Yams.Tag and Testing.Tag.
+// Not `Tag`, which would shadow Testing.Tag.
 nonisolated enum ItemTag {
     static let favorite = "favorite"
 }
 
-/// Something about an item as read that keeps it from being edited, such as front matter that does not parse.
+/// Something about an item as read that keeps it from being edited, such as properties the library could not read.
 nonisolated struct ItemProblem: Hashable, Sendable {
     let message: String
     /// The library could not read the item's text either, so the page shows none and says why.
@@ -62,7 +62,6 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var content: Content = .markdown
     var state: ItemState = .active
     var tier: Tier = .library
-    var container: ContainerID?
     var tags: Set<String> = []
     var version: ItemVersion
     var created: Date
@@ -76,7 +75,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     /// link by its own binding. Empty where links are read afresh.
     var boundLinks: [BoundLink] = []
     /// What made the item, as the library names it: for a Marfa item, the source of the key that wrote it. Nil
-    /// where the library does not know, as a folder does not.
+    /// where the library does not know.
     var source: String?
 
     /// The items the links in this item's text were already bound to, by the name each link is spelled with (read
@@ -130,4 +129,23 @@ nonisolated struct Edge: Identifiable, Hashable, Sendable {
     let source: ItemID
     let target: EdgeTarget
     let origin: EdgeOrigin
+}
+
+nonisolated extension Item {
+    /// Whether its properties and relationships can be changed. A file, a deleted item or one with a problem is read
+    /// only.
+    var isEditable: Bool { state == .active && problem == nil && !isFile }
+
+    /// Whether its text can be written in: text the library could not read is not shown, so nothing typed over the
+    /// empty page is written.
+    var isWritable: Bool { state == .active && !isFile && problem?.withholdsText != true }
+
+    var isFile: Bool {
+        if case .file = content { true } else { false }
+    }
+
+    /// What the library says a file item is, which is nil for a note and `.data` where it does not know.
+    var fileType: UTType? {
+        if case .file(let type, _) = content { type } else { nil }
+    }
 }

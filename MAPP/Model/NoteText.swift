@@ -1,13 +1,8 @@
 import Foundation
 
-/// Reads a note's words out of its markdown, as they read on screen: the first line, which names a note, and
-/// the lines a preview is made of.
+/// Reads an item's words out of its markdown, as they read on screen: the lines a preview and a search snippet
+/// are made of.
 nonisolated enum NoteText {
-    /// The first line with words in it, as it reads; nil for a note with nothing in it yet.
-    static func firstLine(of body: String) -> String? {
-        readableLines(of: body, limit: 1).first
-    }
-
     /// The note's text around the first place a search finds, as one line, to show why a note was found.
     static func snippet(of body: String, around query: String, reach: Int = 48) -> String? {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -20,40 +15,9 @@ nonisolated enum NoteText {
         return (start > text.startIndex ? "…" : "") + stretch + (end < text.endIndex ? "…" : "")
     }
 
-    /// The name a note's file takes from its first line.
-    static func fileName(for body: String) -> String {
-        name(for: firstLine(of: body) ?? "")
-    }
-
-    /// The name for a first line: the line as it reads, as a file can hold it, or New Note for none.
-    static func name(for line: String) -> String {
-        let name = fileSafe(line)
-        return name.isEmpty ? String(localized: "New Note") : name
-    }
-
-    /// Whether a file's name is the one a first line gives, or that name numbered, as a second note of the
-    /// same name is. Unless `exactly`, a name an earlier version gave the line also counts: it kept the line's
-    /// backslash escapes and character references as written (`Plan&#x20;`), and the note goes on following
-    /// its line, to take the name it should have when next left.
-    static func isName(_ fileTitle: String, of line: String, exactly: Bool = false) -> Bool {
-        let name = name(for: line)
-        if fileTitle == name { return true }
-        if fileTitle.hasPrefix(name + " "), let number = Int(fileTitle.dropFirst(name.count + 1)), number > 1 {
-            return true
-        }
-        let earlier = fileSafe(unescaped(fileTitle))
-        return !exactly && earlier != fileTitle && isName(earlier, of: line, exactly: true)
-    }
-
-    /// Whether a first line has characters its file's name cannot, so the note keeps the line as its `title`,
-    /// where Marfa reads a title from.
-    static func needsTitle(_ line: String) -> Bool {
-        line.contains(unsafeInName) || line.hasPrefix(".")
-    }
-
     /// A name as a file can take it: characters no file name can hold replaced, leading dots dropped, which
-    /// would hide the file, and short enough for any file system. The one place a name is made safe, for notes,
-    /// folders and attachments alike.
+    /// would hide the file, and short enough for any file system. The one place a name is made safe, for a file
+    /// the person saves or attaches.
     static func fileSafe(_ name: String) -> String {
         fitted(
             name.replacing(unsafeInName, with: "-")
@@ -65,52 +29,23 @@ nonisolated enum NoteText {
 
     private nonisolated(unsafe) static let unsafeInName = /[\/\\:\x00-\x1F\x7F]/
 
-    /// A name short enough for any file system, which counts bytes, with room for a number and `.md` after it.
-    static func fitted(_ name: String, room: Int = 0) -> String {
+    /// A name short enough for any file system, which counts bytes, with `room` left for an extension.
+    private static func fitted(_ name: String, room: Int = 0) -> String {
         var name = name
         while name.utf8.count > 200 - room { name.removeLast() }
         return name
     }
 
-    /// The body with its links into the attachments folder written from a new directory, as when the note moves
-    /// between the Inbox and a folder, so they still reach their files. Other links are left as written.
-    static func rebasingAttachmentLinks(in body: String, from old: String, to new: String) -> String {
-        guard old != new else { return body }
-        return body.replacing(markdownLink) { match in
-            let (whole, opening, destination) = match.output
-            let bracketed = destination.hasPrefix("<") && destination.hasSuffix(">")
-            let raw = bracketed ? String(destination.dropFirst().dropLast()) : String(destination)
-            guard let target = attachmentPath(raw, from: old) else { return String(whole) }
-            let depth = new.split(separator: "/").count
-            let encoded = target.split(separator: "/").map {
-                $0.addingPercentEncoding(withAllowedCharacters: linkPathAllowed) ?? String($0)
-            }
-            return String(opening) + (Array(repeating: "..", count: depth) + encoded).joined(separator: "/")
-        }
+    /// A file's name as an attachment can take it, keeping its extension, which says what it is.
+    static func attachmentName(_ name: String) -> String {
+        // A name such as `.png` is all extension.
+        let bare = name.hasPrefix(".") && !name.dropFirst().contains(".")
+        let ext = bare ? String(name.dropFirst()) : (name as NSString).pathExtension
+        let stem = bare ? "" : fileSafe((name as NSString).deletingPathExtension)
+        let short = fitted(stem, room: ext.utf8.count + 1)
+        let base = short.isEmpty ? String(localized: "Image") : short
+        return ext.isEmpty ? base : "\(base).\(fileSafe(ext))"
     }
-
-    /// Where a relative link from the directory leads, when it leads into the attachments folder.
-    private static func attachmentPath(_ link: String, from directory: String) -> String? {
-        guard !link.isEmpty, link.firstMatch(of: /^[a-zA-Z][a-zA-Z0-9+.-]*:|^\/|^#/) == nil,
-              let decoded = link.removingPercentEncoding
-        else { return nil }
-        var components = directory.split(separator: "/").map(String.init)
-        for part in decoded.split(separator: "/").map(String.init) {
-            switch part {
-            case ".": continue
-            case "..": if components.popLast() == nil { return nil }
-            default: components.append(part)
-            }
-        }
-        guard components.count > 1, components.first == FolderStore.attachments else { return nil }
-        return components.joined(separator: "/")
-    }
-
-    /// What a markdown link's path can hold as it is; spaces and brackets are escaped.
-    static let linkPathAllowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "()<> "))
-
-    /// A markdown link or image up to the end of its destination: `[text](` and the destination.
-    private nonisolated(unsafe) static let markdownLink = /(!?\[(?:[^\]\\]|\\.)*\]\()(<[^>\n]*>|[^)\s]+)/
 
     /// The body's lines as they read on screen, blank lines dropped, up to a limit, since a title and preview
     /// need only the first few. Code inside fences is kept as written. A preview skips headings, which only name
@@ -157,7 +92,7 @@ nonisolated enum NoteText {
                 .filter { !$0.isEmpty }
                 .joined(separator: "  ")
         }
-        // A control character reads as a space, and has no place in a title, a name or front matter.
+        // A control character reads as a space, and has no place in a title or a name.
         let readable = String(String.UnicodeScalarView(inlineText(text).unicodeScalars.map {
             $0.properties.generalCategory == .control ? " " : $0
         }))

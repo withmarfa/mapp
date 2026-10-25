@@ -154,16 +154,6 @@
     "“%@” already holds this link to “%@”. Remove it there first." : {
       "extractionState" : "manual"
     },
-    "“%@” changed while you were typing, so what you typed is in “%@”." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "“%1$@” changed while you were typing, so what you typed is in “%2$@”."
-          }
-        }
-      }
-    },
     "“%@” wasn’t created" : {
       "extractionState" : "manual"
     },
@@ -172,9 +162,6 @@
     },
     "“%@” wasn’t restored" : {
       "extractionState" : "manual"
-    },
-    "%@ (Conflicted Copy)" : {
-
     },
     "%@ Your text is on the clipboard, so you can paste it back." : {
       "extractionState" : "manual"
@@ -376,22 +363,13 @@
     "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again." : {
       "extractionState" : "manual"
     },
-    "A folder named “%@” already exists. Please choose a different name." : {
-
-    },
     "A link is changed in the text that holds it." : {
       "extractionState" : "manual"
     },
     "A new item wasn’t created" : {
       "extractionState" : "manual"
     },
-    "A note named “%@” is already in this folder. Please choose a different name." : {
-
-    },
     "A notes app for Marfa." : {
-
-    },
-    "A related file's metadata cannot be safely updated." : {
 
     },
     "A restore wasn’t sent" : {
@@ -488,9 +466,6 @@
     "Ascending" : {
 
     },
-    "Assignee" : {
-      "extractionState" : "manual"
-    },
     "Author Comment" : {
 
     },
@@ -554,9 +529,6 @@
     "Can’t Keep the Key" : {
       "extractionState" : "manual"
     },
-    "Can’t Link This Item" : {
-      "extractionState" : "manual"
-    },
     "Can’t Open the Library" : {
       "extractionState" : "manual"
     },
@@ -572,9 +544,6 @@
     "Can’t Reach the Server" : {
       "extractionState" : "manual"
     },
-    "Can’t Read the Notes Folder" : {
-
-    },
     "Can’t Read This Library" : {
       "extractionState" : "manual"
     },
@@ -585,9 +554,6 @@
       "extractionState" : "manual"
     },
     "Can’t Remove from Favorites" : {
-
-    },
-    "Can’t Rename Item" : {
 
     },
     "Can’t Search" : {
@@ -638,29 +604,17 @@
     "Choose" : {
 
     },
-    "Choose a Folder for Your Notes" : {
-
-    },
     "Choose a kind of item and give it a title." : {
       "extractionState" : "manual"
     },
     "Choose a single item to read or edit it." : {
 
     },
-    "Choose a unique title without characters that cannot be used in a file name." : {
-      "extractionState" : "manual"
-    },
     "Choose an item from the list to read or edit it." : {
-
-    },
-    "Choose Another Folder…" : {
 
     },
     "Choose Date" : {
       "extractionState" : "manual"
-    },
-    "Choose Folder…" : {
-
     },
     "Choose one item here, or remove the link first." : {
       "extractionState" : "manual"
@@ -707,9 +661,6 @@
     "Connect" : {
       "extractionState" : "manual"
     },
-    "Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again. Your notes folder is used again if you disconnect." : {
-      "extractionState" : "manual"
-    },
     "Connect to a server first." : {
       "extractionState" : "manual"
     },
@@ -717,9 +668,6 @@
       "extractionState" : "manual"
     },
     "Connected, up to date" : {
-
-    },
-    "Connecting to a Marfa server below reads its library instead. This folder is used again if you disconnect." : {
 
     },
     "Connecting…" : {
@@ -776,12 +724,6 @@
     "Delete Column" : {
 
     },
-    "Delete Folder" : {
-
-    },
-    "Delete Folder…" : {
-
-    },
     "Delete Immediately…" : {
 
     },
@@ -798,9 +740,6 @@
 
     },
     "Delete Row" : {
-
-    },
-    "Delete the folder “%@”?" : {
 
     },
     "Deleted %@" : {
@@ -827,9 +766,6 @@
           }
         }
       }
-    },
-    "Derived From" : {
-      "extractionState" : "manual"
     },
     "Descending" : {
 
@@ -915,9 +851,6 @@
     "Enter a Key" : {
       "extractionState" : "manual"
     },
-    "Epic" : {
-      "extractionState" : "manual"
-    },
     "Expand" : {
 
     },
@@ -932,9 +865,6 @@
     },
     "Favorites" : {
 
-    },
-    "Feature" : {
-      "extractionState" : "manual"
     },
     "Fields" : {
       "extractionState" : "manual"
@@ -979,15 +909,6 @@
 
     },
     "Fit" : {
-
-    },
-    "Folder" : {
-
-    },
-    "Folder Name" : {
-
-    },
-    "Folders" : {
 
     },
     "Footnote" : {
@@ -1069,9 +990,6 @@
         }
       }
     },
-    "Import Files…" : {
-      "extractionState" : "manual"
-    },
     "Important" : {
 
     },
@@ -1095,9 +1013,6 @@
     },
     "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it." : {
       "extractionState" : "manual"
-    },
-    "It may have been moved or deleted. Choose it again in Settings." : {
-
     },
     "It will be sent once the server accepts a key. Enter a new one in Settings." : {
       "extractionState" : "manual"
@@ -1127,12 +1042,6 @@
 
     },
     "Items you’ve deleted. Restore them, or delete them for good." : {
-
-    },
-    "Its metadata cannot be safely changed." : {
-
-    },
-    "Its notes will be moved to Recently Deleted." : {
 
     },
     "Keep Copy" : {
@@ -1271,9 +1180,6 @@
     "MAPP is reading your Marfa library, so it doesn’t need a notes folder. Your notes folder is used again if you disconnect." : {
       "extractionState" : "manual"
     },
-    "MAPP keeps each note as a markdown file in the folder you choose. Folders inside it become folders in MAPP." : {
-
-    },
     "MAPP keeps the key in your Keychain and doesn’t show it again." : {
       "extractionState" : "manual"
     },
@@ -1281,9 +1187,6 @@
       "extractionState" : "manual"
     },
     "MAPP kept the new key, but the copy of your library on this Mac can’t be opened." : {
-      "extractionState" : "manual"
-    },
-    "MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes. Your notes folder is used again." : {
       "extractionState" : "manual"
     },
     "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
@@ -1319,16 +1222,7 @@
     "Move Down" : {
 
     },
-    "Move Folder" : {
-
-    },
     "Move To" : {
-
-    },
-    "Move to %@" : {
-
-    },
-    "Move to Inbox" : {
 
     },
     "Move Up" : {
@@ -1337,20 +1231,11 @@
     "Name" : {
 
     },
-    "Name Taken" : {
-
-    },
     "Narrow" : {
 
     },
     "Needs attention" : {
       "extractionState" : "manual"
-    },
-    "New Folder" : {
-
-    },
-    "New Folder %lld" : {
-
     },
     "New Item" : {
       "extractionState" : "manual",
@@ -1383,9 +1268,6 @@
     },
     "No Files" : {
       "extractionState" : "manual"
-    },
-    "No folder chosen" : {
-
     },
     "No Item Selected" : {
       "extractionState" : "manual"
@@ -1427,9 +1309,6 @@
 
     },
     "Notes can’t be deleted immediately right now. They’re still in Recently Deleted." : {
-
-    },
-    "Notes Folder" : {
 
     },
     "Notes List" : {
@@ -1592,9 +1471,6 @@
     "Quote" : {
 
     },
-    "Reading notes from this folder" : {
-
-    },
     "Recently Deleted" : {
 
     },
@@ -1622,24 +1498,6 @@
     "Remove Parent" : {
 
     },
-    "Rename" : {
-
-    },
-    "Rename Folder" : {
-
-    },
-    "Rename Links" : {
-
-    },
-    "Rename Note" : {
-
-    },
-    "Rename Note…" : {
-
-    },
-    "Rename…" : {
-
-    },
     "Rendering diagram…" : {
 
     },
@@ -1652,9 +1510,6 @@
     "Reset Columns" : {
 
     },
-    "Resolve the existing target before replacing this relationship." : {
-      "extractionState" : "manual"
-    },
     "Restore" : {
 
     },
@@ -1666,9 +1521,6 @@
     },
     "Save" : {
       "extractionState" : "manual"
-    },
-    "Saved as a Copy" : {
-
     },
     "Search" : {
 
@@ -1766,9 +1618,6 @@
     },
     "Some Changes Weren’t Saved" : {
       "extractionState" : "manual"
-    },
-    "Some notes have tags that can’t be read or changed safely, so their files were left unchanged." : {
-
     },
     "Someday" : {
       "extractionState" : "manual"
@@ -1899,12 +1748,6 @@
     "The Marfa server refused this library’s key. Check the key in Settings." : {
       "extractionState" : "manual"
     },
-    "The new name cannot be represented safely in file links." : {
-
-    },
-    "The note’s file takes the new name." : {
-
-    },
     "The PDF exceeds the export limit of 200 pages or 64 MB." : {
 
     },
@@ -1944,20 +1787,11 @@
     "The server stopped this change from going through. Try again to send it." : {
       "extractionState" : "manual"
     },
-    "The tags of “%@” are written in a form that can’t be changed safely, so its file was left unchanged." : {
-
-    },
-    "The tags of “%@” can’t be read, so its file was left unchanged." : {
-
-    },
     "The title “%@” for “%@” couldn’t be saved. Open the item to change the title or discard your changes." : {
       "extractionState" : "manual"
     },
     "The title could not be saved. Enter a title." : {
       "extractionState" : "manual"
-    },
-    "The title could not be saved. Use a unique file name without slashes or line breaks." : {
-
     },
     "The title for “%@” is empty. Open the item to enter a title or discard your changes." : {
       "extractionState" : "manual"
@@ -1978,9 +1812,6 @@
 
     },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
-      "extractionState" : "manual"
-    },
-    "This change can’t be made in a Marfa library." : {
       "extractionState" : "manual"
     },
     "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it." : {
@@ -2026,9 +1857,6 @@
       "extractionState" : "manual"
     },
     "This link isn’t in the library." : {
-      "extractionState" : "manual"
-    },
-    "This metadata uses a form that cannot be safely changed. Your file has been left unchanged." : {
       "extractionState" : "manual"
     },
     "This needs the server. Try again when you’re back online." : {
@@ -2084,9 +1912,6 @@
 
     },
     "Unresolved connections will be preserved." : {
-      "extractionState" : "manual"
-    },
-    "Unresolved Relationship" : {
       "extractionState" : "manual"
     },
     "Untitled" : {

@@ -148,9 +148,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     return flag
 }
 
-nonisolated final class FailingSearchSource: ConnectedItemSource {
+nonisolated final class FailingSearchSource: ItemSource {
     let inner = FakeItemSource()
-    var capabilities: SourceCapabilities { inner.capabilities }
     var embeds: any EmbedResolver { inner.embeds }
     var connectionState: MarfaConnectionState { inner.connectionState }
     func connectionStates() -> AsyncStream<MarfaConnectionState> { inner.connectionStates() }
@@ -165,9 +164,12 @@ nonisolated final class FailingSearchSource: ConnectedItemSource {
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")
     }
-    func endEditing(_ item: ItemID) {}
     func queueSubmitted() async {}
     func close() async {}
+    func refresh() {}
+    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck { .accepted }
+    func unsentWrites() async -> UnsentWrites? { nil }
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome { .closed }
 }
 
 extension LiveMarfaTests {
@@ -181,7 +183,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try #require(LiveMarfa.address))
             let source = try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try #require(LiveMarfa.key)]),
-                location: try MarfaStoreLocation(root: root))
+                location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source)
             func end() async {
                 await source.flush()

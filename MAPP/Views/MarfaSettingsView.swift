@@ -37,7 +37,7 @@ struct MarfaSettingsView: View {
             } header: {
                 Text("Marfa Server")
             } footer: {
-                Text("Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again. Your notes folder is used again if you disconnect.")
+                Text("Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again.")
             }
             notice
         }

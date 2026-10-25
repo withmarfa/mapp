@@ -33,7 +33,7 @@ struct MarfaDrainAnswersTests {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -69,7 +69,7 @@ struct MarfaDrainAnswersTests {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -105,7 +105,7 @@ struct MarfaDrainAnswersTests {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -144,7 +144,7 @@ struct MarfaDrainAnswersTests {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = try MarfaStoreLocation(root: root)
+        let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })

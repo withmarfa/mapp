@@ -16,7 +16,7 @@ final class SettingsTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         XCTAssertTrue(list.waitForExistence(timeout: 5))
@@ -87,13 +87,13 @@ final class SettingsTests: XCTestCase {
     }
 
     func testSettingsReturnsToTheChosenPlace() {
-        sidebar.staticTexts["Personal"].click()
-        let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Bike service")).firstMatch
+        sidebar.staticTexts["Inbox"].click()
+        let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 5))
         for _ in 0..<2 {
             app.typeKey(",", modifierFlags: .command)
             XCTAssertTrue(settings.waitForExistence(timeout: 3))
-            sidebar.staticTexts["Personal"].click()
+            sidebar.staticTexts["Inbox"].click()
             XCTAssertTrue(note.waitForExistence(timeout: 5))
             XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch.exists)
         }
@@ -208,8 +208,8 @@ final class SettingsTests: XCTestCase {
         let originalHeight = row.frame.height
         let sidebarText = sidebar.staticTexts["Items"]
         let originalSidebarHeight = sidebarText.frame.height
-        let folderText = sidebar.staticTexts["Home"]
-        let originalFolderHeight = folderText.frame.height
+        let typeText = sidebar.staticTexts["Note"]
+        let originalTypeHeight = typeText.frame.height
         XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
         XCTAssertTrue(instanceMenu.exists)
         XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the instance menu belongs to the sidebar")
@@ -222,7 +222,7 @@ final class SettingsTests: XCTestCase {
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertGreaterThan(row.frame.height, originalHeight + 8, "list text and row height scale together")
-        XCTAssertGreaterThan(folderText.frame.height, originalFolderHeight + 3, "nested folder text scales with the interface")
+        XCTAssertGreaterThan(typeText.frame.height, originalTypeHeight + 3, "a type's row scales with the interface")
         XCTAssertGreaterThan(sidebarText.frame.height, originalSidebarHeight + 3, "sidebar text scales too")
         attachScreenshot("LargerInterfaceText")
         app.typeKey(",", modifierFlags: .command)
@@ -234,7 +234,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(noteSize.value as? String, "13 pt", "the note's own text setting stays independent")
         attachScreenshot("SeparateEditorTextSize")
         app.terminate()
-        app.launchArguments += ["-MAPPKeepSampleSettings", "-MAPPKeepSampleFolder"]
+        app.launchArguments += ["-MAPPKeepSampleSettings"]
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         app.typeKey(",", modifierFlags: .command)

@@ -2,39 +2,11 @@ import Foundation
 import Marfa
 import Observation
 
-/// A source read from a server: its items, what it has yet to send, and how the server stands.
-nonisolated protocol ConnectedItemSource: ItemSource, SyncReporting {
-    var downloadedFiles: (any DownloadedFiles)? { get }
-    var connectionState: MarfaConnectionState { get }
-    func connectionStates() -> AsyncStream<MarfaConnectionState>
-}
-
-nonisolated extension ConnectedItemSource {
-    var downloadedFiles: (any DownloadedFiles)? { nil }
-}
-
-/// What the host needs of a Marfa library beside reading and writing it, so its lifecycle is tested without a
-/// server.
-nonisolated protocol MarfaHostedSource: ConnectedItemSource {
-    /// Hydrates or catches up, then sends what waits; never waited on.
-    func refresh()
-    /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck
-    /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
-    /// cannot be read.
-    func unsentWrites() async -> UnsentWrites?
-    /// Closes only if every write not sent, read in the same step, is one of `agreed` (nil agrees to whatever
-    /// the copy holds); otherwise stays open and answers what is not sent.
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome
-}
-
-extension MarfaSource: MarfaHostedSource {}
-
 /// The Marfa library the app is connected to, from the address and key the person gives to the copy it opens.
 /// The address is kept in defaults, the key in the key store, and the copy in its own directory, so a launch
 /// paints from the copy before asking the server anything. The words for each state are the app's.
 @Observable @MainActor final class MarfaHost {
-    typealias Opener = @Sendable (MarfaConnection, any KeyStore, MarfaStoreLocation) async throws -> any MarfaHostedSource
+    typealias Opener = @Sendable (MarfaConnection, any KeyStore, MarfaStoreLocation) async throws -> any ItemSource
     /// Reads the name the server at an address gives itself. It sends no key.
     typealias Describer = @Sendable (MarfaConnection) async throws -> String
 
@@ -110,10 +82,13 @@ extension MarfaSource: MarfaHostedSource {}
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
-    private(set) var state = State.disconnected
-    /// The library to show, once its copy is open.
-    private(set) var source: (any MarfaHostedSource)?
-    private(set) var report = SyncReport()
+    /// The library to show, once its copy is open. It holds how its server stands and what its copy last
+    /// reported, so the host keeps neither while a copy is open.
+    private(set) var library: MarfaLibrary?
+    /// How the server stands while no copy is open: connecting to it, or why its copy could not be opened.
+    private var standing = State.disconnected
+    /// Called with what a library could not keep, for the app to tell the person.
+    @ObservationIgnored var onNotKept: (MarfaLibrary.NotKept) -> Void = { _ in }
     private(set) var isBusy = false
     private var watching: [Task<Void, Never>] = []
     private var reading: Task<Void, Never>?
@@ -122,6 +97,10 @@ extension MarfaSource: MarfaHostedSource {}
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
     @ObservationIgnored var handOverEdits: () async -> Bool = { true }
+
+    var source: (any ItemSource)? { library?.source }
+    var state: State { library?.connection ?? standing }
+    var report: SyncReport { library?.syncReport ?? SyncReport() }
 
     init(
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
@@ -192,7 +171,7 @@ extension MarfaSource: MarfaHostedSource {}
             try await open(connection)
         } catch {
             try? await Self.offMain { [keys] in try keys.delete(for: connection) }
-            state = .disconnected
+            standing = .disconnected
             throw error
         }
         remember(connection)
@@ -216,8 +195,7 @@ extension MarfaSource: MarfaHostedSource {}
         // at the next launch, with a key already gone.
         defaults.removeObject(forKey: Self.addressKey)
         self.connection = nil
-        state = .disconnected
-        report = SyncReport()
+        standing = .disconnected
         if let problem = await finishLeaving(connection, discarding: choice != .keepCopy) { throw problem }
     }
 
@@ -267,7 +245,7 @@ extension MarfaSource: MarfaHostedSource {}
 
     /// Whatever the server makes of the old key, the copy goes on with it; a copy that closes on it is opened
     /// again, as one that closed on the new key is.
-    private func giveBack(_ old: String?, to source: any MarfaHostedSource, _ connection: MarfaConnection) async throws(Problem) {
+    private func giveBack(_ old: String?, to source: any ItemSource, _ connection: MarfaConnection) async throws(Problem) {
         guard let old else { return }
         do {
             _ = try await source.tryKey(old)
@@ -278,10 +256,10 @@ extension MarfaSource: MarfaHostedSource {}
 
     /// Once pending edits are saved, a copy that could not take a key reopens with the stored key.
     /// Recovery is deferred while an editor cannot hand over its changes.
-    private func reopen(_ source: any MarfaHostedSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
+    private func reopen(_ source: any ItemSource, _ connection: MarfaConnection, after error: any Error) async throws(Problem) -> Never {
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         detach()
-        state = .connecting
+        standing = .connecting
         await source.close()
         try await open(connection)
         throw .unavailable(message: Self.message(error))
@@ -306,7 +284,7 @@ extension MarfaSource: MarfaHostedSource {}
         }
         let fresh = !hasCopy(connection)
         try await save(key, for: connection)
-        let opened: any MarfaHostedSource
+        let opened: any ItemSource
         do {
             try await clearDiscarded(connection)
             opened = try await Self.open(connection, keys: keys, location: location, with: opener)
@@ -326,7 +304,7 @@ extension MarfaSource: MarfaHostedSource {}
             }
         }
         // The new copy is shown before the old one's key and copy are removed, so the windows go from one library
-        // to the other and never show the notes folder between them.
+        // to the other and never show the connect page between them.
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
@@ -379,7 +357,7 @@ extension MarfaSource: MarfaHostedSource {}
     /// Closes `source` as `choice` allows. A kept copy loses nothing, so it closes whatever waits. Otherwise the
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
-    private func close(_ source: any MarfaHostedSource, for choice: DisconnectChoice?) async throws(Problem) {
+    private func close(_ source: any ItemSource, for choice: DisconnectChoice?) async throws(Problem) {
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
         let agreed: UnsentWrites?
         switch choice {
@@ -394,17 +372,17 @@ extension MarfaSource: MarfaHostedSource {}
 
     /// Opens the copy and paints from it; the server is asked only after.
     private func open(_ connection: MarfaConnection) async throws(Problem) {
-        state = .connecting
+        standing = .connecting
         do {
             try await clearDiscarded(connection)
             attach(try await Self.open(connection, keys: keys, location: location, with: opener), for: connection)
         } catch {
             switch error {
-            case .noKey: state = .keyRefused
-            case .unavailable(let message): state = .unavailable(message: message)
-            case .otherVersion(let unsent): state = .otherVersion(unsent: unsent)
-            case .inUse: state = .inUse
-            default: state = .disconnected
+            case .noKey: standing = .keyRefused
+            case .unavailable(let message): standing = .unavailable(message: message)
+            case .otherVersion(let unsent): standing = .otherVersion(unsent: unsent)
+            case .inUse: standing = .inUse
+            default: standing = .disconnected
             }
             throw error
         }
@@ -412,7 +390,7 @@ extension MarfaSource: MarfaHostedSource {}
 
     private static func open(
         _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation, with opener: Opener
-    ) async throws(Problem) -> any MarfaHostedSource {
+    ) async throws(Problem) -> any ItemSource {
         do {
             return try await opener(connection, keys, location)
         } catch let failure as SourceFailure {
@@ -428,26 +406,21 @@ extension MarfaSource: MarfaHostedSource {}
         }
     }
 
-    private func attach(_ source: any MarfaHostedSource, for connection: MarfaConnection) {
+    private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
-        self.source = source
-        state = Self.state(source.connectionState)
-        report = source.syncReport
+        let library = MarfaLibrary(source: source)
+        library.onNotKept = { [weak self] in self?.onNotKept($0) }
+        self.library = library
         let states = source.connectionStates()
-        let reports = source.syncReports()
         var wasOnline = source.connectionState == .online
         // A value already on its way from a source that has since been left is dropped.
         watching = [
             Task { [weak self] in
                 for await state in states where self?.source === source {
-                    self?.state = Self.state(state)
                     // Each return to the server may find it renamed.
                     if state == .online, !wasOnline { self?.readName(of: connection) }
                     wasOnline = state == .online
                 }
-            },
-            Task { [weak self] in
-                for await report in reports where self?.source === source { self?.report = report }
             }
         ]
         source.refresh()
@@ -475,7 +448,7 @@ extension MarfaSource: MarfaHostedSource {}
         watching = []
         reading?.cancel()
         reading = nil
-        source = nil
+        library = nil
     }
 
     /// Removes the key, and the copy where it was discarded, once the copy is closed. A discarded copy is marked

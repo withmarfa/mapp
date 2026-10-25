@@ -97,8 +97,4 @@ struct MarfaEngineTests {
         #expect(MarfaEngine.embeddable("Plan #2 [draft] | v^1.png") == "Plan -2 -draft- - v-1.png")
         #expect(MarfaEngine.embeddable("photo.png") == "photo.png")
     }
-
-    @Test func aWriteOnlyFilesMakeIsRefusedInPlainWords() {
-        #expect(MarfaEngine.filesOnly == String(localized: "This change can’t be made in a Marfa library."))
-    }
 }

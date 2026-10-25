@@ -3,36 +3,8 @@ import Testing
 @testable import MAPP
 
 struct NoteTextTests {
-    /// A new note's title and preview, as the list shows them while its name follows its first line.
-    func title(_ body: String) -> String { Note(body: body, created: .now).title }
-    func preview(_ body: String) -> String { Note(body: body, created: .now).preview }
-
-    @Test func titleIsTheFirstHeadingWithoutItsMarker() {
-        #expect(title("# Kitchen quotes\n\nThree quotes.") == "Kitchen quotes")
-    }
-
-    @Test func titleSkipsBlankLinesAndStructuralLines() {
-        #expect(title("\n\n---\n## Plan **for** the week") == "Plan for the week")
-    }
-
-    @Test func titleOfAnEmptyNoteIsNewNote() {
-        #expect(title("") == "New Note")
-        #expect(title("  \n\n") == "New Note")
-        #expect(title("# ") == "New Note")
-        #expect(title("- [ ]") == "New Note")
-    }
-
-    @Test func titleOfAPlainFirstLineIsThatLine() {
-        #expect(title("Podcast idea: short episodes") == "Podcast idea: short episodes")
-    }
-
-    @Test func noteKeepsItsTitleAndPreviewInStepWithItsBody() {
-        var note = Note(body: "# First", created: .now)
-        #expect(note.title == "First")
-        note.file.body = "# Second\nMore"
-        #expect(note.title == "Second")
-        #expect(note.preview == "More")
-    }
+    /// The preview a list row shows under an item with this title.
+    func preview(_ body: String, title: String = "") -> String { ItemPreview.text(of: body, title: title) }
 
     @Test func previewJoinsTheLinesAfterTheTitleAsPlainText() {
         let body = """
@@ -67,7 +39,7 @@ struct NoteTextTests {
     }
 
     @Test func previewNamesAnImageWithoutTheWidthItWasGiven() {
-        #expect(preview("Title\n\n![Dusk|320](Attachments/Dusk.png) and ![Photo\\|400](a.png)") == "Dusk and Photo")
+        #expect(preview("Title\n\n![Dusk|320](Attachments/Dusk.png) and ![Photo\\|400](a.png)", title: "Title") == "Dusk and Photo")
     }
 
     @Test func previewOfATitleOnlyNoteIsEmpty() {
@@ -76,7 +48,7 @@ struct NoteTextTests {
 
     @Test func previewIsCappedAtTheLimit() {
         let body = "Title\n" + String(repeating: "word ", count: 200)
-        #expect(preview(body).count == ItemPreview.limit)
+        #expect(preview(body, title: "Title").count == ItemPreview.limit)
     }
 
     @Test(arguments: [
@@ -120,63 +92,13 @@ struct NoteTextTests {
         #expect(NoteText.plainText(of: line[...]) == expected)
     }
 
-    @Test func escapedWikiDelimitersRemainInTitlesAndFileNames() {
+    @Test func escapedWikiDelimitersReadAsWritten() {
         let body = "![[A\\#B.png]]\n\n[[Name\\|part]] and \\<br>"
-        #expect(title(body) == "A#B.png")
-        #expect(NoteText.fileName(for: body) == "A#B.png")
-        #expect(preview(body) == "Name|part and <br>")
-        #expect(NoteText.fileName(for: "[[Name\\|part]]") == "Name|part")
+        #expect(preview(body, title: "A#B.png") == "Name|part and <br>")
     }
 
-    @Test(arguments: [
-        ("Groceries", "Groceries"),
-        ("Podcast idea: short episodes", "Podcast idea- short episodes"),
-        ("a/b\\c", "a-b-c"),
-        (".hidden plan", "hidden plan"),
-        ("  spaced  ", "spaced"),
-        ("", "New Note"),
-        ("...", "New Note"),
-    ])
-    func nameForAFirstLine(line: String, expected: String) {
-        #expect(NoteText.name(for: line) == expected)
-    }
-
-    @Test func aNameIsCutToFitAnyFileSystemAtACharacter() {
-        let name = NoteText.name(for: String(repeating: "é", count: 300))
-        #expect(name.utf8.count <= 200)
-        #expect(name.allSatisfy { $0 == "é" })
-    }
-
-    @Test func aFileIsKnownByTheNameItsFirstLineGivesNumberedOrNot() {
-        #expect(NoteText.isName("Groceries", of: "Groceries"))
-        #expect(NoteText.isName("Groceries 2", of: "Groceries"))
-        #expect(NoteText.isName("Plan- week", of: "Plan: week"))
-        #expect(!NoteText.isName("Groceries 1", of: "Groceries"))
-        #expect(!NoteText.isName("Shopping", of: "Groceries"))
-        #expect(!NoteText.isName("Groceries list", of: "Groceries"))
-        // A name an earlier version gave kept the line's character references and escapes as written.
-        #expect(NoteText.isName("Plan&#x20;", of: "Plan"))
-        #expect(NoteText.isName("R\\&D", of: "R&D"))
-        #expect(!NoteText.isName("Plan&#x20;", of: "Plan", exactly: true))
-        #expect(!NoteText.isName("Plan&#x20;", of: "Other"))
-    }
-
-    @Test func onlyALineANameCannotHoldNeedsATitle() {
-        #expect(NoteText.needsTitle("Plan: week"))
-        #expect(NoteText.needsTitle(".profile"))
-        #expect(!NoteText.needsTitle("R&D budget"))
-    }
-
-    @Test func aTitleReadsAsWrittenWhateverTheEditorEscaped() {
-        #expect(title("R\\&D: plan\n\nNext") == "R&D: plan")
-        #expect(preview("R\\&D: plan\n\nsnake\\_case") == "snake_case")
-    }
-
-    @Test func attachmentLinksFollowANoteToAnotherDepthAndOtherLinksStay() {
-        let body = "![a](Attachments/Photo%201.png) [site](https://e.com) ![b](<Attachments/b c.png>) ![x](Other/x.png)"
-        let moved = NoteText.rebasingAttachmentLinks(in: body, from: "", to: "Work")
-        #expect(moved == "![a](../Attachments/Photo%201.png) [site](https://e.com) ![b](../Attachments/b%20c.png) ![x](Other/x.png)")
-        #expect(NoteText.rebasingAttachmentLinks(in: moved, from: "Work", to: "") == "![a](Attachments/Photo%201.png) [site](https://e.com) ![b](Attachments/b%20c.png) ![x](Other/x.png)")
+    @Test func aPreviewReadsAsWrittenWhateverTheEditorEscaped() {
+        #expect(preview("R\\&D: plan\n\nsnake\\_case", title: "R&D: plan") == "snake_case")
     }
 
     @Test func aSnippetShowsTheTextAroundWhatWasFound() {
