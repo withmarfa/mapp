@@ -50,6 +50,9 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
+    "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
+
+    },
     "Attachment counts are unavailable." : {
       "extractionState" : "manual"
     },
@@ -98,7 +101,7 @@
     "Space Used" : {
       "extractionState" : "manual"
     },
-    "The editor stopped responding, so your latest changes might not be saved. To continue without them, try again." : {
+    "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {

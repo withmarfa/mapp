@@ -199,7 +199,9 @@ struct EditorTests {
             library.updateBody(of: note.id, to: "Outside\n")
             page.editor.noteChanged(library.item(note.id)!)
         }
-        #expect(!kept)
+        // The note is still the one being left, so leaving goes ahead.
+        #expect(kept)
+        #expect(library.unkept.isEmpty)
         #expect(captured == ["Pending\n"])
         // Sent as typed on the version before the outside change, so the source keeps both rather than one over the other.
         #expect(library.bodyWrites.contains { $0.text == "Pending\n" && $0.readAt == note.version })
@@ -240,15 +242,15 @@ struct EditorTests {
         try await page.wait { page.editor.isReady }
     }
 
-    /// A page that stops answering is given up on once: the person gets the last text it reported and is told,
-    /// and trying again goes ahead without waiting.
+    /// A page that stops answering is given up on once: the person is told, and trying again goes ahead without
+    /// waiting. The text it last reported is already saved, so it is not given back.
     @Test func aPageThatStopsAnsweringIsGivenUpOnAndTold() async throws {
         let page = try await Page()
         try await page.load("Original\n")
         try await page.run("window.editor.flush = () => { const end = Date.now() + 4000; while (Date.now() < end) {} }")
         let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
         #expect(!kept)
-        #expect(page.library.unkept.map(\.text) == ["Original\n"])
+        #expect(page.library.unkept.map(\.text) == [nil])
         let clock = ContinuousClock()
         let start = clock.now
         let keptAgain = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }

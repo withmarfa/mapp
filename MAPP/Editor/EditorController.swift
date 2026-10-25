@@ -324,9 +324,12 @@ final class EditorController: NSObject {
     /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
     ///
-    /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told and gets the
-    /// text it last reported, and the next flush goes ahead without it, so a stuck page never holds the window
-    /// or the app for good.
+    /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told, and the next
+    /// flush goes ahead without it, so a stuck page never holds the window or the app for good. What the page
+    /// last reported is already saved; only what it never reported is lost.
+    ///
+    /// Outside text reloading the note mid-flush leaves the note the one being left, so leaving goes ahead. A flush
+    /// whose note was replaced on the page stops, and the person is told why.
     func flush(leaving: Bool = true, closing: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         guard let noteID else { return done(true) }
         let generation = generation
@@ -347,8 +350,10 @@ final class EditorController: NSObject {
         }
         func capture() {
             guard !finished else { return }
-            if self.noteID == noteID, !isReady { return finish(leave()) }
-            guard self.noteID == noteID, self.generation == generation else { return finish(false) }
+            guard self.noteID == noteID else { return replaced() }
+            // A reload takes place after every earlier change was reported, and the page refuses a flush of the
+            // text it replaced.
+            if !isReady || self.generation != generation { return finish(leave()) }
             webView.evaluateJavaScript("window.editor.flush(\(generation))") { [self] result, error in
                 // A reply that comes after the page was given up on still holds the person's latest text.
                 if error == nil, let markdown = result as? String { report(markdown, of: generation) }
@@ -357,26 +362,42 @@ final class EditorController: NSObject {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
                 }
-                guard self.noteID == noteID, self.generation == generation else { return finish(false) }
+                guard self.noteID == noteID else { return replaced() }
                 finish(leave())
             }
+        }
+        func replaced() {
+            tellNotSaved(noteID, reason: Self.replacedReason)
+            finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
         watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.flushLimit)
-            guard let self, !finished else { return }
-            guard self.noteID == noteID, self.generation == generation else { return finish(false) }
-            abandonedGeneration = generation
-            let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
-            library?.notKept(
-                title ?? String(localized: "Couldn’t Save Note"), text: markdown,
-                reason: String(localized: "The editor stopped responding, so your latest changes might not be saved. To continue without them, try again."))
+            guard !finished else { return }
+            guard let self else { return finish(false) }
+            guard self.noteID == noteID else {
+                tellNotSaved(noteID, reason: Self.replacedReason)
+                return finish(false)
+            }
+            // The page answers in order, so one that has not answered this flush holds every later load too.
+            abandonedGeneration = self.generation
+            tellNotSaved(noteID, reason: String(localized: "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         capture()
     }
 
+    /// The page reports each change as it is made, so what it never reported is not on the page to give back.
+    private func tellNotSaved(_ noteID: ItemID, reason: String) {
+        let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
+        library?.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
+    }
+
     static let flushLimit = Duration.seconds(2)
+
+    private static var replacedReason: String {
+        String(localized: "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again.")
+    }
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
