@@ -9,8 +9,8 @@ function keyOf(link: LinkRef): string {
 }
 
 /**
- * What the page knows of whether the notes its links name exist, so InkKit can draw a link to a missing note
- * differently. InkKit asks about each link as it draws it and wants the answer at once (`WikiLinkAdapter.resolve`),
+ * What the page knows of whether the notes its links name exist, so Inkkit can draw a link to a missing note
+ * differently. Inkkit asks about each link as it draws it and wants the answer at once (`WikiLinkAdapter.resolve`),
  * but only the app can tell, and not at once. So an unknown link is drawn as a live one; the links of one pass
  * over the note go to the app together; and a link is drawn again only when an answer changes how it looks. The
  * answers belong to the note on the page and are asked again when the app says its library changed, keeping the
@@ -33,7 +33,7 @@ export class NoteLinkStatus {
     private readonly redraw: () => void,
   ) {}
 
-  /** What InkKit draws for the link: `missing` once the app has said so, otherwise nothing. */
+  /** What Inkkit draws for the link: `missing` once the app has said so, otherwise nothing. */
   status(link: LinkRef, item: string): { missing?: boolean } | undefined {
     this.adopt(item)
     if (!link.target) return undefined

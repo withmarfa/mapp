@@ -71,7 +71,7 @@ body {
   --inkkit-padding-top: 22px;
   --inkkit-padding-inline: 3rem;
   --inkkit-padding-bottom: 48px;
-  /* The reading column's margins, which InkKit's text uses and the header, outside its root, follows. */
+  /* The reading column's margins, which Inkkit's text uses and the header, outside its root, follows. */
   --inkkit-column-inset: max(
     var(--inkkit-padding-inline),
     calc((100% - var(--inkkit-reading-width)) / 2 + var(--inkkit-padding-inline))
@@ -287,9 +287,9 @@ body {
   background: var(--mark);
 }
 
-/* InkKit draws a wiki link as plain text, and one that names no note only with a tooltip
+/* Inkkit draws a wiki link as plain text, and one that names no note only with a tooltip
    (aicayzer/inkkit#159). A link takes the link color; one that names no note is muted and underlined with
-   dashes, so the cue is not color alone. Drop this when InkKit styles wiki links itself. */
+   dashes, so the cue is not color alone. Drop this when Inkkit styles wiki links itself. */
 .inkkit-wiki-link {
   color: var(--inkkit-accent-color);
 }
@@ -300,7 +300,7 @@ body {
   text-underline-offset: 2px;
 }
 
-/* InkKit draws text selection without filling the page margins. */
+/* Inkkit draws text selection without filling the page margins. */
 .ProseMirror ::selection {
   background: transparent;
 }

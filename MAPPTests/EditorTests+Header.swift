@@ -274,7 +274,7 @@ extension EditorTests {
         }
     }
 
-    /// The paste itself is InkKit's; this holds that it works through the pasteboard, the web view and the bridge.
+    /// The paste itself is Inkkit's; this holds that it works through the pasteboard, the web view and the bridge.
     @Test func htmlCopiedFromAWebPageIsPastedIntoTheNoteAsReadableText() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)

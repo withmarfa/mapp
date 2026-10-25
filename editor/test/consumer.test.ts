@@ -294,7 +294,7 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
   }
 })
 
-test("the words the app sends mount InkKit, with the app's own kept out of its labels", async () => {
+test("the words the app sends mount Inkkit, with the app's own kept out of its labels", async () => {
   const swift = readFileSync(
     resolve(import.meta.dirname, '../../MAPP/Editor/EditorController+PageSettings.swift'),
     'utf8',
@@ -395,7 +395,7 @@ test('the page reports a heading by its level and applies the level the app asks
   }
 })
 
-test('the header and the text share one column, which InkKit reads from one token', () => {
+test('the header and the text share one column, which Inkkit reads from one token', () => {
   const css = readFileSync(resolve(import.meta.dirname, '../src/style.css'), 'utf8')
   expect(css).toMatch(/body\s*{[^}]*--inkkit-column-inset:/)
   expect(css).toMatch(/#item-header\s*{[^}]*padding:[^;]*var\(--inkkit-column-inset\)/)
@@ -425,7 +425,7 @@ test('a refused edit stays out of the note and reaches the host, from a command 
   window.webkit = { messageHandlers: { host: { postMessage: (message) => posted.push(message) } } }
   try {
     await withEditor('A <!--note--> B\n', (editor) => {
-      // A code block cannot hold the hidden comment, so InkKit refuses the conversion.
+      // A code block cannot hold the hidden comment, so Inkkit refuses the conversion.
       expect(guardedCommand(() => editor.format('codeBlock'))).toMatchObject({
         commandError: 'preservation',
       })
