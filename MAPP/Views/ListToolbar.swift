@@ -13,7 +13,7 @@ struct ListToolbar: ToolbarContent {
             isExpanded: $browser.isSearchExpanded,
             text: $browser.searchText,
             prompt: String(localized: "Search"),
-            columnWidth: columnWidth,
+            layout: .column(width: columnWidth),
             focusRequests: browser.searchFocusRequests,
             onDown: { browser.focusRequest = .list }
         ) {

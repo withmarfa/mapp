@@ -42,21 +42,18 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists)
     }
 
-    func testSearchFillsItsColumnAndHasATrailingCloseButton() {
+    func testSearchFillsItsColumn() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
         let list = app.outlines["NoteList"]
         app.typeKey("f", modifierFlags: [.command, .option])
-        let search = app.searchFields["ColumnSearch"]
+        let search = app.textFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         capture("Full width column search")
-        let close = app.buttons["CloseColumnSearch"]
-        XCTAssertTrue(close.exists)
         XCTAssertLessThan(abs(search.frame.minX - list.frame.minX), 20)
         XCTAssertLessThan(abs(list.frame.maxX - search.frame.maxX), 20)
-        XCTAssertGreaterThan(close.frame.midX, search.frame.midX)
         search.typeText("tomatoes")
         XCTAssertEqual(search.value as? String, "tomatoes")
-        close.click()
+        search.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(search.waitForNonExistence(timeout: 3))
     }
 

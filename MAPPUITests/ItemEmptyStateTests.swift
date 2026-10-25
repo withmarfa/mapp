@@ -51,14 +51,14 @@ final class ItemEmptyStateTests: XCTestCase {
     func testAnEmptySearchLeavesTheContentPaneBlank() {
         sidebar.staticTexts["Items"].click()
         app.typeKey("f", modifierFlags: [.command, .option])
-        let search = window.searchFields["ColumnSearch"]
+        let search = window.textFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         search.typeText("No matching item for this empty state check")
         XCTAssertTrue(window.itemPageTitle.waitForNonExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         capture("Empty search and blank content pane")
-        window.buttons["CloseColumnSearch"].click()
+        search.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(search.waitForNonExistence(timeout: 3))
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
     }
