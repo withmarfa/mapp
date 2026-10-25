@@ -88,9 +88,12 @@ struct MainView: View {
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0.isFinite, $0 >= 280 { measuredWidths.list = $0 }
+                if $0.isFinite, $0 >= 280, !browser.showsSettings { measuredWidths.list = $0 }
             }
-            .navigationSplitViewColumnWidth(min: 280, ideal: listWidth, max: 480)
+            // The page list is about as wide as the sidebar; the list's own width is kept for the list.
+            .navigationSplitViewColumnWidth(
+                min: browser.showsSettings ? 200 : 280, ideal: browser.showsSettings ? 240 : listWidth,
+                max: browser.showsSettings ? 340 : 480)
         } detail: {
             if browser.showsSettings {
                 SettingsPageView(page: browser.settingsPage)

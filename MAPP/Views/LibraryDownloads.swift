@@ -52,7 +52,7 @@ struct LibraryDownloads: View {
                     change { try await files.removeDownloadedFiles() }
                 }
                 .disabled(working)
-            } else {
+            } else if !readFailed {
                 Text("Reading downloaded files…").foregroundStyle(.secondary)
             }
             if readFailed {

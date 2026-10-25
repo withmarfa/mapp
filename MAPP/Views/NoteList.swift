@@ -52,6 +52,8 @@ struct NoteList: View {
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .background(.windowBackground)
         .softSelection(rows: ids, selection: browser.selection)
         // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 >= 280 { width = $0 } }
