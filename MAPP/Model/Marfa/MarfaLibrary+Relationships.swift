@@ -275,13 +275,20 @@ extension MarfaLibrary {
                 }
                 change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
             } else if replacingOwn {
-                guard removing.count == 1, let old = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == removing[0] })
-                else {
+                guard removing.count == 1 else {
                     failure = (cantChange, String(localized: "Choose one item here, or remove the link first."))
                     return false
                 }
-                // The end that stays holds one link, and its other end changes.
-                change.moving.append(.init(edge: old.id, end: farIsTarget ? .target : .source, to: other, from: removing[0]))
+                // The end that stays holds one link, and its other end changes. A two-way link may point here instead,
+                // and then the end that moves is the one on the far side of that edge.
+                if let old = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == removing[0] }) {
+                    change.moving.append(.init(edge: old.id, end: farIsTarget ? .target : .source, to: other, from: removing[0]))
+                } else if let old = held(by: id, farEnd).first(where: { (farIsTarget ? $0.source : $0.target) == removing[0] }) {
+                    change.moving.append(.init(edge: old.id, end: farIsTarget ? .source : .target, to: other, from: removing[0]))
+                } else {
+                    failure = (cantChange, String(localized: "Choose one item here, or remove the link first."))
+                    return false
+                }
                 change.removing = []
             } else {
                 change.adding.append(link)

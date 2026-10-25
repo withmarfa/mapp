@@ -1202,4 +1202,24 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.label == "Parent")
         #expect(library.relationships(for: F.p1).first { $0.field == "inverse:parent-of" }?.label == "Children")
     }
+
+    /// A one-to-one relation holds one link whichever item made it, so replacing a link that points at this item
+    /// moves the end that is not this item's.
+    @Test func replacingALinkThatOnlyPointsHereMovesItsOtherEnd() async throws {
+        var catalogue = F.catalogue
+        catalogue.edgeTypes["partner"] = EdgeTypeInfo(
+            id: "partner", label: "Partner", reverseLabel: "Partner", reverseName: nil, cardinality: .one,
+            writtenAt: .source, sourceTypes: [], targetTypes: [], reverseCardinality: .one)
+        var items = F.items
+        items[items.firstIndex { $0.id == F.n2 }!].edgesOut += [
+            Edge(id: EdgeID("pt1"), type: "partner", source: F.n2, target: .item(F.n1), origin: .property("partner"))
+        ]
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(library.setItemRelationship(F.n1, field: "partner", targetIDs: [F.p1], undoManager: nil))
+        #expect(source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)], "sent \(source.writes)")
+        #expect(library.failure == nil)
+    }
 }
