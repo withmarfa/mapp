@@ -5,6 +5,7 @@ import { InkKitError } from '@aicayzer/inkkit'
 import { pickNote, suggestNotes } from '../src/bridge'
 import {
   NoteEditor,
+  caretOffset,
   isPreviewDiagnostic,
   guardedCommand,
   splitLabels,
@@ -541,4 +542,18 @@ test('a note link typed in double brackets becomes a link and is saved as typed'
       expect(document.querySelectorAll('.inkkit-wiki-link')).toHaveLength(1)
       expect(editor.snapshot().text).toBe(`See${link}\n`)
     })
+})
+
+test('the caret from quick add lands after the same text the person typed before it', async () => {
+  expect(caretOffset('Buy milk', 'Buy milk and eggs\n')).toBe(8)
+  expect(caretOffset('# Plan\n\nFirst **step', 'Plan\nFirst step done\n')).toBe(15)
+  expect(caretOffset('- one\n- tw', 'one\ntwo\n')).toBe(6)
+  expect(caretOffset('', 'Text\n')).toBe(0)
+  await withEditor('Buy milk and eggs\n', (editor) => {
+    editor.focusText('Buy milk')
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    expect(engine.textSnapshot(1).selection).toMatchObject({ from: 8, to: 8 })
+    editor.focusText(null)
+    expect(engine.textSnapshot(1).selection).toMatchObject({ from: 17, to: 17 })
+  })
 })

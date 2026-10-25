@@ -22,6 +22,7 @@ declare global {
       format(command: FormatCommand, arg?: string | number, expected?: number): void
       focus(): void
       focusTitle(item: string): void
+      focusText(prefix: string | null): void
       blurText(expected: number): void
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
@@ -183,6 +184,10 @@ window.editor = {
     editor.focus()
   },
   focusTitle: (item) => header.focusTitle(item),
+  focusText: (prefix) => {
+    header.cancelTitleFocus()
+    guardedCommand(() => editor.focusText(prefix))
+  },
   blurText: (expected: number) => {
     if (expected !== generation) return
     guardedCommand(() => editor.blur(expected))

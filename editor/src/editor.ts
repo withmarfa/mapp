@@ -60,6 +60,23 @@ export function splitLabels(all: AppLabels): {
   return { editor: rest, header, words: { noteReference, linkToNote } }
 }
 
+/**
+ * Where a caret typed after `prefix`, in the Markdown source, falls in `readable`, the text the page reads out: the
+ * offset just past the last of the prefix's characters found in order. Markup and spacing the readable text drops
+ * are passed over.
+ */
+export function caretOffset(prefix: string, readable: string): number {
+  let at = 0
+  for (const character of prefix) {
+    if (/\s/.test(character)) continue
+    const found = readable.indexOf(character, at)
+    // A character the page does not show, such as `#` or `*`, would otherwise send the caret on to a later match.
+    if (found < 0 || (/[#*_`>~\-[\]()!|=]/.test(character) && found > at + 1)) continue
+    at = found + character.length
+  }
+  return at
+}
+
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
   try {
     return action()
@@ -399,6 +416,14 @@ export class NoteEditor {
   }
   focus() {
     this.engine.focus()
+  }
+  /** Gives the text the keyboard with the caret after `prefix`, the source typed before it in quick add, or at the
+   *  end of the text when `prefix` is null. */
+  focusText(prefix: string | null) {
+    const snapshot = this.engine.textSnapshot(this.generation)
+    const end = snapshot.text.replace(/\n+$/, '').length
+    const at = prefix === null ? end : Math.min(caretOffset(prefix, snapshot.text), end)
+    this.engine.selectTextRange(this.range(at, at, snapshot), { focus: true, reveal: true })
   }
   blur(expected = this.generation) {
     this.engine.blur(expected)
