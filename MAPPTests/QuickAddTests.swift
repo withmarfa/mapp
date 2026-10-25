@@ -126,7 +126,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Idea"
         browser.quickAdd.draft?.body = "More of it"
         browser.putAwayQuickAdd()
-        browser.quickAdd.handOff(to: library.notices)
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
         #expect(browser.quickAdd.draft == nil)
         var clipboard: [String] = []
         let notice = library.notices.show(in: UUID()) { clipboard.append($0) }
@@ -134,11 +134,105 @@ struct QuickAddTests {
         #expect(clipboard == ["Idea\n\nMore of it"])
     }
 
+    @Test func aDraftLeftAsTheLibraryChangesGoesToTheClipboardAndSaysSo() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.title = "Idea"
+        browser.quickAdd.handOff(to: library.notices, because: .libraryChanged)
+        #expect(browser.quickAdd.draft == nil)
+        let notice = library.notices.show(in: UUID()) { _ in }
+        #expect(notice?.text == "Idea")
+        #expect(notice?.message.hasPrefix("The window changed to another library before the item was added.") == true)
+    }
+
+    @Test func aFileBeingAddedIsNotHandedOffAsTheWindowCloses() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
+        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        browser.quickAdd.draft?.title = "Holiday"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        #expect(library.notices.waiting.isEmpty, "the file and its title are being added")
+        released.yield()
+        #expect(await saving.value != nil)
+        #expect(library.addedFiles.first?.title == "Holiday")
+    }
+
+    @Test func textTypedWhileAFileIsAddedIsHandedOffAsTheWindowCloses() async throws {
+        let library = FakeItemLibrary(now: start)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
+        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.draft?.title = "Typed meanwhile"
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        #expect(library.notices.waiting.map(\.text) == ["Typed meanwhile"])
+        released.yield()
+        _ = await saving.value
+    }
+
+    @Test func textAFileCannotKeepStaysInSightAndHoldsTheFileBack() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Holiday"
+        browser.quickAdd.draft?.body = "Where we went"
+        browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
+        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(QuickAdd.holdsTextItCannotKeep(draft, in: library.catalogue))
+        #expect(QuickAdd.showsBody(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+
+        browser.quickAdd.createsMore = true
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.addedFiles.isEmpty)
+        #expect(browser.quickAdd.draft?.body == "Where we went")
+
+        browser.quickAdd.draft?.body = ""
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil)
+        #expect(library.addedFiles.count == 1)
+    }
+
+    @Test func textAKindWithoutTextCannotKeepStaysInSightAndHoldsTheItemBack() async throws {
+        let library = FakeItemLibrary(now: start)
+        let place = TypeID("test.place")
+        library.catalogue.itemTypes[place] = ItemTypeInfo(
+            id: place, label: "Place", fields: [], titleField: "title", bodyField: nil, parent: nil)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Lisbon"
+        browser.chooseQuickAddType(place.rawValue, in: library)
+        var draft = try #require(browser.quickAdd.draft)
+        #expect(!QuickAdd.showsBody(draft, in: library.catalogue), "no text, so no field for it")
+        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+
+        browser.quickAdd.draft?.body = "Typed as a note"
+        draft = try #require(browser.quickAdd.draft)
+        #expect(QuickAdd.showsBody(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.created.isEmpty)
+
+        browser.chooseQuickAddType("core.note", in: library)
+        draft = try #require(browser.quickAdd.draft)
+        #expect(!QuickAdd.holdsTextItCannotKeep(draft, in: library.catalogue))
+        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+    }
+
     @Test func anEmptyDraftTellsNothingAsTheWindowCloses() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
         browser.openQuickAdd(in: library)
-        browser.quickAdd.handOff(to: library.notices)
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
         #expect(library.notices.waiting.isEmpty)
     }
 
@@ -259,21 +353,15 @@ struct QuickAddTests {
         #expect(browser.selection.isEmpty)
     }
 
-    @Test func anItemAwaitedAndTheDraftsPlaceAreNotCarriedIntoTheNextLibrary() async throws {
+    @Test func anItemAwaitedIsNotCarriedIntoTheNextLibrary() async throws {
         let old = FakeItemLibrary(now: start)
         old.holdsCreations = true
         let browser = Browser()
         browser.adopt(old)
         _ = try #require(await browser.quickAdded("Old", in: old))
-        browser.openQuickAdd(typeID: "core.task", in: old)
-        browser.quickAdd.draft?.title = "Typed"
-        browser.quickAdd.draft?.parentID = .mint()
-        browser.quickAdd.draft?.properties = ["priority": .string("high")]
+        #expect(browser.newItem != nil)
 
         browser.adopt(FakeItemLibrary(now: start))
         #expect(browser.newItem == nil)
-        #expect(browser.quickAdd.draft?.title == "Typed")
-        #expect(browser.quickAdd.draft?.parentID == nil)
-        #expect(browser.quickAdd.draft?.properties.isEmpty == true)
     }
 }

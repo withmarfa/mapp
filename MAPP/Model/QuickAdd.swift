@@ -50,8 +50,18 @@ final class QuickAdd {
     var isPresented = false
     /// Create More: adding an item clears the panel for the next instead of opening the item.
     var createsMore = false
-    /// While a file is being added, so the panel does not add it twice.
-    private(set) var isSaving = false
+    /// The draft as it was when its file was sent, while the file is being added, so the panel does not add it
+    /// twice and a closing window does not hand off what is already on its way.
+    private var sending: Draft?
+    var isSaving: Bool { sending != nil }
+
+    /// Why a draft leaves the window before it is added.
+    enum Departure {
+        /// The window closed, or the app quit.
+        case closed
+        /// The window went on to another library, whose items and fields the draft's place and properties do not name.
+        case libraryChanged
+    }
 
     init() { Self.open.add(self) }
 
@@ -60,31 +70,33 @@ final class QuickAdd {
 
     /// Gives every window's draft to the clipboard through `notices`, as the app quits.
     static func handOffAll(to notices: Notices) {
-        for quickAdd in open.allObjects { quickAdd.handOff(to: notices) }
+        for quickAdd in open.allObjects { quickAdd.handOff(to: notices, because: .closed) }
     }
 
-    /// Gives a draft with anything in it to the clipboard through `notices`, which tells the person, as the window
-    /// closes or the app quits, since nothing else would keep it.
-    func handOff(to notices: Notices) {
+    /// Gives a draft with anything in it to the clipboard through `notices`, which tells the person, as it leaves
+    /// the window, since nothing else would keep it. A file being added, and the title sent with it, are on their
+    /// way already, so only what was typed besides them is handed off.
+    func handOff(to notices: Notices, because departure: Departure) {
         defer {
             draft = nil
             isPresented = false
         }
-        guard let draft, draft.hasContent else { return }
+        guard var draft else { return }
+        if let sending {
+            draft.file = nil
+            if NoteName.trimmed(draft.title) == NoteName.trimmed(sending.title) { draft.title = "" }
+        }
+        guard draft.hasContent else { return }
+        let reason = switch departure {
+        case .closed: String(localized: "Quick add closed before the item was added.")
+        case .libraryChanged: String(localized: "The window changed to another library before the item was added.")
+        }
         notices.notKept(
             String(localized: "Item Not Added"), text: draft.text,
-            reason: draft.text == nil
-                ? String(localized: "Quick add closed before the item was added. Add it again.")
-                : String(localized: "Quick add closed before the item was added."))
+            reason: draft.text == nil ? String(localized: "\(reason) Add it again.") : reason)
     }
 
-    /// The window shows another library, whose items and fields the draft's place and properties do not name.
-    func libraryChanged() {
-        draft?.parentID = nil
-        draft?.properties = [:]
-    }
-
-    fileprivate func saving(_ value: Bool) { isSaving = value }
+    fileprivate func saving(_ draft: Draft?) { sending = draft }
 
     // MARK: What is remembered
 
@@ -163,8 +175,24 @@ final class QuickAdd {
         catalogue.isFileType(TypeID(typeID))
     }
 
-    /// Whether the draft can be added: a title, or a file for a file, and a value for every required field.
+    /// Whether the draft holds text its kind does not keep, as when a note's text stays after the kind changes to
+    /// a file. The text stays in sight and holds the draft back until it is removed or the kind changes back, so
+    /// none is dropped.
+    static func holdsTextItCannotKeep(_ draft: Draft, in catalogue: Catalogue) -> Bool {
+        let keepsText = !isFile(draft.typeID, in: catalogue) && hasBody(draft.typeID, in: catalogue)
+        return !keepsText && !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Whether the panel shows the text: for a kind that keeps it, or while it holds text the kind cannot keep.
+    static func showsBody(_ draft: Draft, in catalogue: Catalogue) -> Bool {
+        (!isFile(draft.typeID, in: catalogue) && hasBody(draft.typeID, in: catalogue))
+            || holdsTextItCannotKeep(draft, in: catalogue)
+    }
+
+    /// Whether the draft can be added: a title, or a file for a file, a value for every required field, and no
+    /// text its kind cannot keep.
     static func canSave(_ draft: Draft, in catalogue: Catalogue) -> Bool {
+        if holdsTextItCannotKeep(draft, in: catalogue) { return false }
         if isFile(draft.typeID, in: catalogue) { return draft.file != nil }
         guard !NoteName.trimmed(draft.title).isEmpty else { return false }
         return fields(of: draft.typeID, in: catalogue).allSatisfy { field in
@@ -227,11 +255,11 @@ extension Browser {
         let isFile = QuickAdd.isFile(draft.typeID, in: library.catalogue)
         let id: ItemID?
         if isFile, let file = draft.file {
-            quickAdd.saving(true)
+            quickAdd.saving(draft)
             let title = NoteName.trimmed(draft.title)
             id = await library.addFile(
                 named: file.name, data: file.data, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: item)
-            quickAdd.saving(false)
+            quickAdd.saving(nil)
         } else {
             let properties = draft.properties.filter { $0.value != .null }
             id = library.createItem(

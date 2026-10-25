@@ -192,7 +192,7 @@ struct SidebarTests {
         #expect(browser.item == .allNotes)
     }
 
-    @Test func theNewItemMenuListsEveryCatalogueTypeButFilesByLabel() async throws {
+    @Test func theTypesToMakeAreEveryCatalogueTypeButFilesByLabel() async throws {
         let library = try await marfaLibrary()
         let types = library.creatableTypes
         #expect(types.map(\.label) == ["Album", "Bug", "Entity", "Note", "Project", "Task", "Ticket"])

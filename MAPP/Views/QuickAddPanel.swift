@@ -36,7 +36,7 @@ struct QuickAddPanel: View {
     private func content(_ draft: QuickAdd.Draft) -> some View {
         let catalogue = library.catalogue
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
-        let hasBody = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
+        let showsBody = QuickAdd.showsBody(draft, in: catalogue)
         return VStack(alignment: .leading, spacing: 0) {
             typeChips(draft)
                 .padding(.horizontal, 20)
@@ -44,7 +44,13 @@ struct QuickAddPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 if isFile { fileArea(draft) }
                 titleField(isFile: isFile)
-                if hasBody { bodyField(draft) }
+                if showsBody { bodyField(draft) }
+                if QuickAdd.holdsTextItCannotKeep(draft, in: catalogue) {
+                    Text("This kind of item doesn’t keep text. Remove the text, or choose another kind.")
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddTextNotKept")
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)

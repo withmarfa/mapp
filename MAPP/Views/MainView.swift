@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var undoManager
     @State private var browser = Browser()
     @State private var editorSlot = EditorSlot()
@@ -234,11 +235,13 @@ struct MainView: View {
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
-        // go; its drafts take no part in what other windows do.
-        .onDisappear {
+        // go; its drafts take no part in what other windows do. The library is the one this view showed, so a
+        // window whose libraries now read another has changed library rather than closed.
+        .onDisappear { [library, libraries] in
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()
-            browser.quickAdd.handOff(to: library.notices)
+            let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
+            browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }

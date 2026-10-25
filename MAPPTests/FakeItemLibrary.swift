@@ -268,8 +268,11 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every file added, and whether adding one is refused.
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
     var refusesFiles = false
+    /// Awaited before a file is added, so a test can act while it is being sent.
+    var sendingFile: (() async -> Void)?
 
     func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+        await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")
             return nil

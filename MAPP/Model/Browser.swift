@@ -231,8 +231,8 @@ final class Browser {
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
     /// it selected or searched named items the new library may not have, and the window's undo
-    /// would act on the library left. A new item awaited there will not come, and quick add's place and properties
-    /// named that library's items and fields, so only what was typed is kept.
+    /// would act on the library left. A new item awaited there will not come. Quick add's draft has already gone to
+    /// the clipboard, as the window's view of the library left went (`QuickAdd.Departure.libraryChanged`).
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
         guard libraryID != id else { return }
@@ -254,7 +254,6 @@ final class Browser {
         fetchedFile = nil
         newItem = nil
         focusCaret = nil
-        quickAdd.libraryChanged()
     }
 
     func fileFetched(_ id: ItemID, at url: URL?) {
