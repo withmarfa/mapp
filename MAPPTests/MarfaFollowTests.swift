@@ -54,12 +54,6 @@ private nonisolated let stopped = Change(origin: .stopped(.network(message: "gon
 private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a", edgeId: nil)
 
 @Suite struct MarfaFollowTests {
-    private func settle(until condition: () -> Bool) async {
-        let clock = ContinuousClock()
-        let end = clock.now + .seconds(10)
-        while !condition(), clock.now < end { try? await Task.sleep(for: .milliseconds(10)) }
-    }
-
     @Test func aStreamTheCoreEndedOnAFaultIsReplacedAndTheCopyIsReadAgain() async {
         let streams = Streams([finished(saved, stopped), finished(saved, stopped), finished(saved)])
         let task = MarfaFollow.start(
@@ -75,7 +69,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         let streams = Streams([finished(stopped), finished(stopped), finished(stopped)])
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
-        await settle { streams.waits.count >= 3 }
+        #expect(await eventually { streams.waits.count >= 3 })
         task.cancel()
 
         // A core that refuses a place again and again is asked at a falling rate, never in a tight loop.
@@ -86,7 +80,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         let streams = Streams([finished(stopped), finished(stopped), finished(saved, stopped), finished(stopped)])
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
-        await settle { streams.waits.count >= 4 }
+        #expect(await eventually { streams.waits.count >= 4 })
         task.cancel()
 
         #expect(Array(streams.waits.prefix(4)) == [
@@ -102,7 +96,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         }
         let streams = Streams([])
         let task = MarfaFollow.start(open, next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
-        await settle { streams.heard.count >= 2 }
+        #expect(await eventually { streams.heard.count >= 2 })
         task.cancel()
 
         #expect(streams.heard == [stopped, saved])
@@ -129,7 +123,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { _ in try? await Task.sleep(for: .seconds(60)) },
             tell: { streams.tell($0) })
-        await settle { streams.heard.count >= 1 }
+        #expect(await eventually { streams.heard.count >= 1 })
         task.cancel()
         await task.value
 

@@ -114,12 +114,7 @@ private actor FillServer: MarfaRefreshing {
     }
 
     private func wait(until condition: () async -> Bool) async throws {
-        let clock = ContinuousClock()
-        let end = clock.now + .seconds(5)
-        while !(await condition()), clock.now < end {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        try #require(await condition())
+        try #require(try await eventuallyAsking(condition))
     }
 
     @Test func fillsOnceThenCatchesUpAndFetchesAttachmentsAfterBoth() async throws {
@@ -270,7 +265,7 @@ private actor FillServer: MarfaRefreshing {
         let noteID = try #require(note.itemId)
         let server = FillServer(.complete)
         await server.observeAttachments(in: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"), refreshing: server)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), refreshing: server)
         source.events.yield(.paint)
         await source.queueSubmitted()
         await source.engine.sync.refresh()

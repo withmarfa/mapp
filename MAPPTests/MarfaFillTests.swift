@@ -20,7 +20,7 @@ import Testing
         ]])
         let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
         let reads = FillingReads(copy: copy, completeness: completeness)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Arriving") != nil })
@@ -59,7 +59,7 @@ import Testing
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
         let copy = try await store.open()
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "https://example.test"))
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -86,9 +86,9 @@ import Testing
         let newer = LibraryFixture.item(ItemID("newer"), LibraryFixture.note, "Newer", age: 1)
         source.report.update { $0.fill = LibraryFill(state: .filling, listed: 1, expected: 2) }
         source.send(.loaded(SourceSnapshot(items: [older], catalogue: LibraryFixture.catalogue)))
-        for _ in 0..<100 where !library.isLoaded { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(await eventually { library.isLoaded })
         source.send(.upserted([newer]))
-        for _ in 0..<100 where library.item(newer.id) == nil { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(await eventually { library.item(newer.id) != nil })
         #expect(library.items(in: .allNotes).map(\.id) == [newer.id, older.id])
         #expect(library.item(older.id)?.isWritable == true)
         #expect(library.syncReport.fill?.listed == 1)

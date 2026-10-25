@@ -1,5 +1,4 @@
 import AppKit
-import QuickLookUI
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
@@ -23,12 +22,6 @@ struct ItemFileViewTests {
         return (library, item.id, folder)
     }
 
-    private static func preview(in view: NSView?) -> NSView? {
-        guard let view else { return nil }
-        if view is QLPreviewView { return view }
-        return view.subviews.lazy.compactMap { preview(in: $0) }.first
-    }
-
     private static func spin() { RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02)) }
 
     private func show(_ id: ItemID, in library: FakeItemLibrary) -> NSWindow {
@@ -50,8 +43,9 @@ struct ItemFileViewTests {
         let window = show(id, in: library)
         defer { autoreleasepool { window.contentView = nil; window.close() } }
 
-        for _ in 0..<100 where library.fetches == 0 { try await Task.sleep(for: .milliseconds(20)) }
-        for _ in 0..<100 where Self.preview(in: window.contentView) == nil { try await Task.sleep(for: .milliseconds(20)) }
+        try #require(await eventually { library.fetches > 0 })
+        // The view shows the file as soon as the fetch answers; these passes lay it out and draw it, which is when
+        // a task attached to the replaced branch would fetch again.
         for _ in 0..<50 {
             Self.spin()
             window.contentView?.layoutSubtreeIfNeeded()
@@ -67,7 +61,8 @@ struct ItemFileViewTests {
         let window = show(id, in: library)
         defer { autoreleasepool { window.contentView = nil; window.close() } }
 
-        for _ in 0..<100 where library.fetches == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        try #require(await eventually { library.fetches > 0 })
+        // Time for a fetch the failure would set off again, which nothing signals when none is made.
         try await Task.sleep(for: .seconds(1))
         #expect(library.fetches == 1, "the file was fetched \(library.fetches) times")
     }

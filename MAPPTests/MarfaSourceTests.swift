@@ -54,28 +54,21 @@ nonisolated final class ChangeLog: Sendable {
     var current: State { box.state.withLock { $0 } }
 
     /// Waits for `condition` to hold, and answers the state that met it, or nil when it never did.
-    func wait(for timeout: Duration = .seconds(30), until condition: (State) -> Bool) async -> State? {
-        let clock = ContinuousClock()
-        let end = clock.now + timeout
-        while clock.now < end {
+    func wait(for limit: Duration = waitLimit, until condition: (State) -> Bool) async -> State? {
+        var met: State?
+        _ = await eventually(within: limit) {
             let current = self.current
-            if condition(current) { return current }
-            try? await Task.sleep(for: .milliseconds(50))
+            if condition(current) { met = current }
+            return met != nil
         }
-        return nil
+        return met
     }
 }
 
 nonisolated func waitForConnection(
-    _ source: MarfaSource, for timeout: Duration = .seconds(30), until condition: (MarfaConnectionState) -> Bool
+    _ source: MarfaSource, until condition: (MarfaConnectionState) -> Bool
 ) async -> Bool {
-    let clock = ContinuousClock()
-    let end = clock.now + timeout
-    while clock.now < end {
-        if condition(source.connectionState) { return true }
-        try? await Task.sleep(for: .milliseconds(50))
-    }
-    return false
+    await eventually { condition(source.connectionState) }
 }
 
 private func scratch() -> URL {
@@ -472,9 +465,7 @@ struct MarfaSourceOfflineTests {
         #expect(await sync.hydrations == 0)
 
         await sync.unreadable(["a"])
-        let clock = ContinuousClock()
-        let end = clock.now + .seconds(20)
-        while await sync.hydrations == 0, clock.now < end { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(try await eventuallyAsking { await sync.hydrations > 0 })
         #expect(await sync.hydrations == 1)
 
         // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
@@ -522,7 +513,7 @@ struct MarfaSourceOfflineTests {
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
         source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
         // Hydrating again against a closed port fails at once, which shows the hydration was tried.
-        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         await source.close()
     }
 
@@ -589,7 +580,7 @@ struct MarfaSourceOfflineTests {
         for step in 0..<16 {
             let parent = step.isMultiple(of: 2) ? second : first
             source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: WriteID())
-            let shown = await log.wait(for: .seconds(10)) { state in
+            let shown = await log.wait { state in
                 state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.target) == [.item(parent)]
             }
             #expect(shown != nil, "after move \(step) the child shows \(parent == second ? "parent two" : "parent one")")
@@ -733,7 +724,7 @@ struct MarfaSourceOfflineTests {
         // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
         source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
-        #expect(await waitForConnection(source, for: .seconds(8)) { if case .offline = $0 { true } else { false } })
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         let after = try await source.copy.queue.all()
         #expect(Set(after.map(\.id)) == Set(queued.map(\.id)))
         let shown = try #require(log.current.snapshot?.items.first { $0.id == child })
@@ -1214,7 +1205,7 @@ extension LiveMarfaTests {
                 let move = WriteID(), tagged = WriteID()
                 source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: move)
                 source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
-                let done = try #require(await log.wait(for: .seconds(60)) { state in
+                let done = try #require(await log.wait { state in
                     state.answer(to: move) != nil && state.answer(to: tagged) != nil
                         && state.snapshot?.items.first { $0.id == child }?.sync == .settled
                 })
@@ -1251,7 +1242,7 @@ extension LiveMarfaTests {
                 // `c` is below `b`, so it cannot become `b`'s parent.
                 let move = WriteID()
                 source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: c), as: move)
-                let refused = try #require(await log.wait(for: .seconds(60)) { $0.answer(to: move) != nil })
+                let refused = try #require(await log.wait { $0.answer(to: move) != nil })
                 guard case .refused(let problem)? = refused.answer(to: move) else {
                     Issue.record("the move was answered \(String(describing: refused.answer(to: move)))")
                     return
@@ -1333,14 +1324,8 @@ nonisolated enum LiveMarfa {
         func set() { value.withLock { $0 = true } }
     }
 
-    static func until(_ timeout: Duration = .seconds(20), _ condition: () async -> Bool) async -> Bool {
-        let clock = ContinuousClock()
-        let end = clock.now + timeout
-        while clock.now < end {
-            if await condition() { return true }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        return false
+    static func until(_ condition: () async -> Bool) async -> Bool {
+        (try? await eventuallyAsking(condition)) ?? false
     }
 
     /// Bins and then purges each item over HTTP. An item never made answers 404, which is fine.
@@ -1406,7 +1391,7 @@ struct MarfaSourceClosingTests {
         await withCheckedContinuation { source.events.yield(.close($0)) }
         let late = WriteID()
         #expect(source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Late", body: "")), as: late))
-        let told = try #require(await log.wait(for: .seconds(5)) { $0.answer(to: late) != nil })
+        let told = try #require(await log.wait { $0.answer(to: late) != nil })
         guard case .refused(let problem) = told.answer(to: late) else {
             Issue.record("a late write was answered \(String(describing: told.answer(to: late)))")
             return

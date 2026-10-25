@@ -38,7 +38,7 @@ extension LiveMarfaTests {
         /// Each link in the text, as typed, with the note it names once the server has answered for all of them.
         private func targets(of reader: ItemID, in source: MarfaSource, count: Int) async throws -> [String: BodyTarget] {
             var found: [String: BodyTarget] = [:]
-            _ = await LiveMarfa.until(.seconds(30)) {
+            _ = await LiveMarfa.until {
                 let links = (try? await source.copy.items.links(in: reader.rawValue))?.links ?? []
                 found = Dictionary(links.map { ($0.text, $0.target) }, uniquingKeysWith: { first, _ in first })
                 return links.count == count && !found.values.contains(.pending)

@@ -198,7 +198,7 @@ extension LiveMarfaTests {
             }
             do {
                 source.refresh()
-                try #require(await eventually(.seconds(60)) {
+                try #require(await eventually {
                     library.isLoaded && library.connection == .online && library.count(in: .allNotes) > 100
                 })
                 try await body(library, source, made)
@@ -215,7 +215,7 @@ extension LiveMarfaTests {
                 undoManager: nil))
             made.add(id)
             await source.flush()
-            try #require(await eventually(.seconds(20)) {
+            try #require(await eventually {
                 guard let item = library.item(id), let body = library.body(of: id) else { return false }
                 return item.sync == .settled && item.version.rawValue > 0 && body.version == item.version
             })
@@ -263,7 +263,7 @@ extension LiveMarfaTests {
                 let id = try await make(library, source, made, token)
                 let read = try #require(library.body(of: id)?.version)
                 try await otherDevice(id, sets: "theirs")
-                try #require(await eventually(.seconds(30)) { library.body(of: id)?.text == "theirs" })
+                try #require(await eventually { library.body(of: id)?.text == "theirs" })
                 library.updateBody(of: id, to: "start, mine", readAt: read)
                 try await settle(library, source)
                 let held = try await source.body(of: id).text
@@ -288,9 +288,9 @@ extension LiveMarfaTests {
                 let read = try #require(library.body(of: id)?.version)
                 source.submit(.editBody(id, "start, one", base: read, merge: .asRead), as: WriteID())
                 await source.flush()
-                try #require(await eventually(.seconds(20)) { library.item(id)?.sync == .settled })
+                try #require(await eventually { library.item(id)?.sync == .settled })
                 try await otherDevice(id, sets: "theirs")
-                let caughtUp = await LiveMarfa.until(.seconds(30)) { (try? await source.body(of: id).text) == "theirs" }
+                let caughtUp = await LiveMarfa.until { (try? await source.body(of: id).text) == "theirs" }
                 try #require(caughtUp)
                 source.submit(.editBody(id, "start, one, two", base: read, merge: .following), as: WriteID())
                 try await settle(library, source)
@@ -358,7 +358,7 @@ extension LiveMarfaTests {
                     typeID: "core.note", title: "MAPPTEST review \(token)", body: "captured", parentID: nil, in: .inbox,
                     undoManager: nil))
                 made.add(id)
-                #expect(await eventually(.seconds(20)) { library.items(in: .inbox).contains { $0.id == id } })
+                #expect(await eventually { library.items(in: .inbox).contains { $0.id == id } })
                 await source.flush()
                 try await Task.sleep(for: .seconds(2))
                 source.refresh()

@@ -50,7 +50,7 @@ struct MarfaDrainAnswersTests {
         try Self.recordAccepted(accepted.id, at: location.store(for: connection))
         source.events.yield(.change(Change(origin: .queueNotDrained(.storageFull(message: "full")), itemId: nil, edgeId: nil)))
         await source.queueSubmitted()
-        _ = try #require(await log.wait(for: .seconds(10)) { $0.answer(to: first) == .accepted })
+        _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         #expect(log.current.answer(to: second) == nil)
 
         // A later drain reports only the write it answered.

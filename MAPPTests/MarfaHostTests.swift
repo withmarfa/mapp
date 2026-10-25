@@ -191,16 +191,6 @@ nonisolated final class TestKeyStore: KeyStore {
     }
 }
 
-@MainActor func eventually(_ timeout: Duration = .seconds(10), _ condition: () -> Bool) async -> Bool {
-    let clock = ContinuousClock()
-    let end = clock.now + timeout
-    while clock.now < end {
-        if condition() { return true }
-        try? await Task.sleep(for: .milliseconds(20))
-    }
-    return condition()
-}
-
 @MainActor struct MarfaHostTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")
@@ -1050,13 +1040,13 @@ extension LiveMarfaTests {
 
         private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
             try await host.connect(address: try LiveMarfa.address(), key: try LiveMarfa.key())
-            #expect(await eventually(.seconds(30)) { host.state == .online && host.report.queueRead })
+            #expect(await eventually { host.state == .online && host.report.queueRead })
 
             let title = "MAPPTEST refused \(UUID().uuidString.prefix(8))"
             let id = made.mint()
             // The server makes no items of its own reserved types, so this is refused and nothing is made.
             try #require(host.source).submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: title)), as: WriteID())
-            #expect(await eventually(.seconds(30)) { !host.report.problems.isEmpty })
+            #expect(await eventually { !host.report.problems.isEmpty })
             let entry = try #require(host.report.problems.first { $0.itemID == id })
             #expect(entry.kind == .refused)
             #expect(entry.change == .create)
@@ -1083,13 +1073,13 @@ extension LiveMarfaTests {
             let address = try LiveMarfa.address()
             let key = try LiveMarfa.key()
             try await host.connect(address: address, key: key)
-            #expect(await eventually(.seconds(30)) { host.state == .online })
+            #expect(await eventually { host.state == .online })
             do {
                 try await host.replaceKey("mapptest-not-a-key-\(UUID().uuidString)")
                 Issue.record("took a key the server refuses")
             } catch {}
             #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
-            #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
+            #expect(await eventually { host.state == .online }, "\(host.state)")
             try await host.disconnect(.discardCopy(nil))
         }
 
@@ -1116,7 +1106,7 @@ extension LiveMarfaTests {
                     as: WriteID())
                 #expect(await eventually { source.syncReport.waiting == 2 })
                 source.refresh()
-                #expect(await eventually(.seconds(30)) { source.syncReport.problems.contains { $0.itemID == id } })
+                #expect(await eventually { source.syncReport.problems.contains { $0.itemID == id } })
                 let entry = try #require(source.syncReport.problems.first { $0.itemID == id })
                 #expect(entry.copyText == "MAPPTEST first words, then everything typed after")
                 #expect(entry.dependents.count == 1)
@@ -1138,9 +1128,9 @@ extension LiveMarfaTests {
             let bench = try HostBench()
             let host = host(bench)
             try await host.connect(address: try LiveMarfa.address(), key: "mapptest-not-a-key-\(UUID().uuidString)")
-            #expect(await eventually(.seconds(30)) { host.state == .keyRefused }, "\(host.state)")
+            #expect(await eventually { host.state == .keyRefused }, "\(host.state)")
             try await host.replaceKey(try LiveMarfa.key())
-            #expect(await eventually(.seconds(30)) { host.state == .online }, "\(host.state)")
+            #expect(await eventually { host.state == .online }, "\(host.state)")
             try await host.disconnect(.discardCopy(nil))
         }
     }
