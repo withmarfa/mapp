@@ -108,7 +108,7 @@ private struct WhenLoaded<Content: View>: View {
                           type: library.catalogue.itemTypes[item.type],
                           place: "Library", catalogue: library.catalogue,
                           hiddenKeys: library.hiddenPropertyKeys(of: item),
-                          relationships: [.init(field: "child-of", label: "Parent", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
+                          relationships: [.init(field: "child-of", label: library.catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel ?? "", targets: [.init(title: "Missing project", itemID: nil, resolution: .missing)], isEditable: true, allowsMultiple: false)],
                           mentions: [], onProperty: { _, _ in true }, onOpen: { _ in }, onEdit: { _ in }, onRemove: { _, _ in true })
         }
     }

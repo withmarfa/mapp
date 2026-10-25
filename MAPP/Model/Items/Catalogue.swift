@@ -122,7 +122,10 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     enum CascadeOnDelete: Hashable, Sendable { case cascade, orphan, block }
 
     let id: String
+    /// Marfa's name for the source end of a link, as it comes: the parent end of `parent-of` is `Children`.
     let label: String
+    /// Marfa's name for the target end, as it comes: the child end of `parent-of` is `Parent`.
+    let reverseLabel: String
     /// The name it is written under at its target, such as `child-of` for `parent-of`.
     let reverseName: String?
     /// How many of this edge the end it is written at may hold, which decides whether its field takes a list.
@@ -139,6 +142,13 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     var reverseCardinality: Cardinality = .many
     var cascadeOnDelete: CascadeOnDelete = .orphan
     var properties: [ItemTypeInfo.Field] = []
+
+    /// Whether both ends carry one name, so the relation reads the same from either item and its outgoing and
+    /// incoming links form one list.
+    var isTwoWay: Bool { label == reverseLabel }
+
+    /// The name of the end an item holds, as Marfa gives it.
+    func label(atTarget: Bool) -> String { atTarget ? reverseLabel : label }
 
     /// How many edges of this type one item holds as its source, or as its target.
     func cardinality(atTarget: Bool) -> Cardinality {

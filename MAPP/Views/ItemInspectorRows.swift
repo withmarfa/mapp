@@ -29,14 +29,25 @@ struct InspectorHeading: View {
 struct InspectorRow<Value: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
     /// Nil leaves the name column empty, for a row that belongs to the one above.
-    let name: LocalizedStringKey?
+    let name: Text?
     @ViewBuilder let value: Value
+
+    init(name: LocalizedStringKey?, @ViewBuilder value: () -> Value) {
+        self.name = name.map { Text($0) }
+        self.value = value()
+    }
+
+    /// A name that comes from Marfa, shown as it is.
+    init(verbatimName: String, @ViewBuilder value: () -> Value) {
+        name = Text(verbatim: verbatimName)
+        self.value = value()
+    }
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         InspectorRowLayout(nameWidth: InspectorMetrics.nameWidth * scale, gap: InspectorMetrics.gap * scale,
                            minHeight: InspectorMetrics.rowHeight * scale) {
-            Text(name ?? "")
+            (name ?? Text(verbatim: ""))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .accessibilityHidden(name == nil)
