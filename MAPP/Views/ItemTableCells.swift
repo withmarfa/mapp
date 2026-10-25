@@ -103,7 +103,7 @@ struct ItemTableCell: View {
             }
         case .date:
             if let current {
-                if let day = ItemTableValue.date(current) {
+                if let day = ItemDate.parse(current)?.date {
                     date(day, isDue: field.key == "due_at")
                 } else {
                     Text(current).foregroundStyle(.secondary)

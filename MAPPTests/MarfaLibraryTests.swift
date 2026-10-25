@@ -26,7 +26,7 @@ nonisolated enum LibraryFixture {
 
     static let ticketFields = [
         field("title", .text), field("body", .text), field("status", .choice(["open", "done"]), in: ticket),
-        field("due", .date, in: ticket),
+        field("due", .date(includesTime: false), in: ticket),
     ]
 
     static let catalogue = Catalogue(

@@ -37,7 +37,7 @@ struct MarfaCreationTests {
         #expect(properties[bodyKey] == .string(""))
     }
 
-    @Test(arguments: [ItemTypeInfo.Field.Kind.text, .number, .boolean, .date, .choice(["open"]), .other])
+    @Test(arguments: [ItemTypeInfo.Field.Kind.text, .number, .boolean, .date(includesTime: true), .choice(["open"]), .other])
     func anUnfilledRequiredFieldMakesNothingAndSaysWhich(_ kind: ItemTypeInfo.Field.Kind) async throws {
         let type = ItemTypeInfo(
             id: TypeID("test.record"), label: "Record",
@@ -66,7 +66,7 @@ struct MarfaCreationTests {
         #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Untitled", body: ""))])
     }
 
-    @Test(arguments: [ItemTypeInfo.Field.Kind.number, .boolean, .date, .choice(["open"]), .other])
+    @Test(arguments: [ItemTypeInfo.Field.Kind.number, .boolean, .date(includesTime: true), .choice(["open"]), .other])
     func aRequiredBodyOfAnotherShapeIsNotFilledWithEmptyText(_ kind: ItemTypeInfo.Field.Kind) throws {
         let catalogue = Self.catalogue(bodyKind: kind)
         #expect(throws: MarfaEngine.Refused.self) {

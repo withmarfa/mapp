@@ -126,19 +126,9 @@ nonisolated enum ItemTableValue {
         return ItemValueText.string(value)
     }
 
-    /// A date written as Marfa writes one: a day, or a moment in RFC 3339.
-    static func date(_ text: String?) -> Date? {
-        guard let text, !text.isEmpty else { return nil }
-        if let date = try? Date(text, strategy: .iso8601) { return date }
-        if let date = try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return date }
-        if text.count == 10 {
-            return try? Date(text, strategy: Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash))
-        }
-        return nil
-    }
-
     static func duration(_ row: ItemTableRow, start: String, end: String) -> TimeInterval? {
-        guard let from = date(string(row, key: start)), let to = date(string(row, key: end)), to >= from else { return nil }
+        guard let from = string(row, key: start).flatMap({ ItemDate.parse($0)?.date }),
+              let to = string(row, key: end).flatMap({ ItemDate.parse($0)?.date }), to >= from else { return nil }
         return to.timeIntervalSince(from)
     }
 }
@@ -193,7 +183,7 @@ nonisolated extension ItemTableColumn {
                 let text = ItemValueText.string(value)
                 return .rank(rank(of: text), text)
             case .date:
-                return ItemTableValue.date(value.string).map { .date($0) } ?? .text(ItemValueText.string(value))
+                return value.string.flatMap { ItemDate.parse($0)?.date }.map { .date($0) } ?? .text(ItemValueText.string(value))
             case .number:
                 if case .number(let number) = value { return .number(number) }
                 return .text(ItemValueText.string(value))

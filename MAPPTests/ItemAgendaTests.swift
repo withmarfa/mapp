@@ -7,9 +7,9 @@ struct ItemAgendaTests {
     private static let note = TypeID("example.note")
     private static let catalogue = Catalogue(itemTypes: [
         ItemTypeInfo(id: event, label: "Event", fields: [
-            .init(key: "starts_at", label: "Starts at", kind: .date, declaredBy: event),
-            .init(key: "due_at", label: "Due at", kind: .date, declaredBy: event),
-            .init(key: "published_at", label: "Published at", kind: .date, declaredBy: event),
+            .init(key: "starts_at", label: "Starts at", kind: .date(includesTime: true), declaredBy: event),
+            .init(key: "due_at", label: "Due at", kind: .date(includesTime: true), declaredBy: event),
+            .init(key: "published_at", label: "Published at", kind: .date(includesTime: true), declaredBy: event),
         ], titleField: nil, bodyField: nil, parent: nil),
         ItemTypeInfo(id: note, label: "Note", fields: [
             .init(key: "due_at", label: "Due at", kind: .text, declaredBy: note),
@@ -30,18 +30,6 @@ struct ItemAgendaTests {
              version: ItemVersion(1), created: .distantPast, modified: .distantPast)
     }
 
-    @Test func dateOnlyUsesTheLocalDay() throws {
-        for zone in ["America/Los_Angeles", "Pacific/Auckland", "Europe/London"] {
-            let calendar = Self.calendar(zone)
-            let date = try #require(ItemAgendaLayout.date("2026-10-24", calendar: calendar))
-            let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-            #expect(components.year == 2026)
-            #expect(components.month == 10)
-            #expect(components.day == 24)
-            #expect(components.hour == 0)
-        }
-    }
-
     @Test func timestampGroupsByItsLocalDayAndKeepsItsTime() throws {
         let calendar = Self.calendar()
         let raw = "2026-10-24T01:30:45.125Z"
@@ -57,7 +45,7 @@ struct ItemAgendaTests {
         #expect(calendar.component(.minute, from: instant) == 30)
         #expect(!dateOnly)
         #expect(kept == raw)
-        #expect(ItemAgendaLayout.date("2026-10-24T03:30:45.125+02:00", calendar: calendar) == instant)
+        #expect(ItemDate.parse("2026-10-24T03:30:45.125+02:00", calendar: calendar)?.date == instant)
     }
 
     @Test(arguments: [
@@ -72,10 +60,6 @@ struct ItemAgendaTests {
         let groups = ItemAgendaLayout.groups(for: [item], field: "due_at", catalogue: Self.catalogue)
         #expect(groups.map(\.id) == [.invalid])
         #expect(groups.flatMap(\.rows).map(\.id) == [item.id])
-    }
-
-    @Test func validLeapDayIsAccepted() {
-        #expect(ItemAgendaLayout.date("2024-02-29", calendar: Self.calendar()) != nil)
     }
 
     @Test func missingInvalidAndNonApplicableStaySeparate() {

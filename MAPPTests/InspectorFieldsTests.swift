@@ -223,7 +223,7 @@ struct InspectorFieldsTests {
         #expect(ItemTypeInfo.Field.displayLabel("URL") == "URL")
         #expect(ItemTypeInfo.Field.displayLabel("Due") == "Due")
         #expect(ItemTypeInfo.Field.displayLabel("") == "")
-        let field = ItemTypeInfo.Field(key: "completed_at", label: "Completed at", kind: .date, declaredBy: TypeID("aic.x"))
+        let field = ItemTypeInfo.Field(key: "completed_at", label: "Completed at", kind: .date(includesTime: false), declaredBy: TypeID("aic.x"))
         #expect(field.displayLabel == "Completed At")
         #expect(field.label == "Completed at")
     }
@@ -272,7 +272,7 @@ struct InspectorFieldsTests {
 
     @Test func aKeyEveryTypeLabelsTheSameKeepsThatLabel() {
         func type(_ id: String, _ label: String) -> ItemTypeInfo {
-            ItemTypeInfo(id: TypeID(id), label: id, fields: [.init(key: "due", label: label, kind: .date, declaredBy: TypeID(id))], titleField: nil, bodyField: nil, parent: nil)
+            ItemTypeInfo(id: TypeID(id), label: id, fields: [.init(key: "due", label: label, kind: .date(includesTime: false), declaredBy: TypeID(id))], titleField: nil, bodyField: nil, parent: nil)
         }
         let types = [type("aic.b", "Due B"), type("aic.a", "Due A"), type("aic.c", "Due C")]
         // The same answer whatever order the types arrive in and however the dictionary lays them out.

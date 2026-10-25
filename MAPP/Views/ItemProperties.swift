@@ -12,7 +12,6 @@ struct ItemPropertyRow: View {
     /// picker. A menu cannot be opened from code, so it reads "Choose" instead.
     var startsEditing = false
     @State private var localDraft = ItemPropertyDraft()
-    @State private var rowHovering = false
     @State private var choosingDate = false
     /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
     /// person's own, until the person is done typing it.
@@ -49,7 +48,6 @@ struct ItemPropertyRow: View {
                 }
             }
         }
-        .onHover { rowHovering = $0 }
         .onAppear { if !input.isDirty { seed(value) } }
         .task { if startsEditing { await beginEditing() } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
@@ -89,20 +87,24 @@ struct ItemPropertyRow: View {
                 .labelsHidden()
             }
         case .date:
-            HStack(spacing: 4) {
-                textField
-                // Always there, so the keyboard and VoiceOver reach it; it is drawn only where a pointer or the
-                // keyboard is, so the row at rest shows nothing but its value.
-                Button { choosingDate = true } label: { Image(systemName: "calendar") }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                    .focused($dateButtonFocused)
-                    .opacity(rowHovering || isFocused || dateButtonFocused || choosingDate ? 1 : 0)
-                    .accessibilityLabel("Choose Date")
-                    .accessibilityIdentifier("ItemPropertyDate.\(definition.key)")
-                    .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
+            // The value reads as a person writes a date, and changes only through the calendar, so what is stored
+            // is always one of the forms Marfa takes.
+            Button { choosingDate = true } label: {
+                Group {
+                    if let text = dateText { Text(verbatim: text) } else { InspectorPlaceholder(text: "None") }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
             }
-            .accessibilityAction(named: "Choose Date") { choosingDate = true }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .focused($dateButtonFocused)
+            .inspectorValue(isFocused: dateButtonFocused || choosingDate)
+            .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
+            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+            .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
+            .accessibilityHint("Opens a calendar")
+            .accessibilityIdentifier("ItemProperty.\(definition.key)")
         // Marfa only recommends these values, so any other text is as valid: the menu offers them, and Other… types one.
         case .text where definition.isPicked:
             if typingOwnValue {
@@ -127,6 +129,7 @@ struct ItemPropertyRow: View {
     private var readOnlyText: Text? {
         guard let value else { return nil }
         if definition.kind == .boolean, case .bool(let flag) = value { return Text(flag ? "Yes" : "No") }
+        if definition.kind.isDate, let text = dateText { return Text(verbatim: text) }
         if definition.isPicked, let option = value.string {
             return Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: option)))
         }
@@ -178,31 +181,61 @@ struct ItemPropertyRow: View {
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
-    private var datePicker: some View {
-        let dateOnly = isDateOnly
-        return VStack(spacing: 8) {
-            DatePicker("Choose Date", selection: Binding {
-                Self.date(value?.string) ?? Date()
-            } set: { setDate($0) }, displayedComponents: dateOnly ? [.date] : [.date, .hourAndMinute])
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            // The picker already shows today for an empty date, and picking the day it shows may change nothing.
-            Button("Today") { setDate(Date()) }
-                .buttonStyle(.borderless)
-                .accessibilityIdentifier("ItemPropertyToday.\(definition.key)")
-        }
-        .padding(12)
+    /// A date as the person reads it; a value that is not one keeps its text, and the row warns about it.
+    private var dateText: String? {
+        guard let text = value?.string, !text.isEmpty else { return nil }
+        return ItemDate.parse(text)?.text() ?? text
     }
 
-    /// A date of ten characters is a day, as an empty one is until the person picks a time.
-    private var isDateOnly: Bool { (value?.string ?? "").isEmpty || value?.string?.count == 10 }
+    private var storedDate: ItemDate? { value?.string.flatMap { ItemDate.parse($0) } }
 
-    private func setDate(_ selected: Date) {
-        let text = isDateOnly
-            ? selected.formatted(.iso8601.year().month().day().dateSeparator(.dash))
-            : selected.ISO8601Format()
+    /// A `datetime` field may hold a day or a moment, so it shows a time only once the value has one or the person
+    /// asks for one; a `date` field never does.
+    private var allowsTime: Bool {
+        if case .date(let includesTime) = definition.kind { includesTime } else { false }
+    }
+
+    private var datePicker: some View {
+        let hasTime = allowsTime && (storedDate?.hasTime ?? false)
+        return VStack(alignment: .leading, spacing: 10) {
+            DatePicker("Choose Date", selection: Binding {
+                storedDate?.date ?? Date()
+            } set: { setDate($0, includingTime: hasTime) }, displayedComponents: hasTime ? [.date, .hourAndMinute] : [.date])
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .accessibilityIdentifier("ItemPropertyDate.\(definition.key)")
+            if allowsTime {
+                Toggle("Time", isOn: Binding { hasTime } set: { include in
+                    setDate(storedDate?.date ?? Date(), includingTime: include)
+                })
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .accessibilityIdentifier("ItemPropertyTime.\(definition.key)")
+            }
+            HStack {
+                // The picker already shows today for an empty date, and picking the day it shows may change nothing.
+                Button("Today") { setDate(Date(), includingTime: hasTime) }
+                    .accessibilityIdentifier("ItemPropertyToday.\(definition.key)")
+                Spacer()
+                Button("Clear") { clearDate() }
+                    .disabled(value == nil)
+                    .accessibilityIdentifier("ItemPropertyClear.\(definition.key)")
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(12)
+        .fixedSize()
+    }
+
+    private func setDate(_ selected: Date, includingTime: Bool) {
+        let text = includingTime ? ItemDate.moment(selected) : ItemDate.day(selected)
         input.rejected = !onChange(.string(text))
         if !input.rejected { input.text = text; input.isDirty = false }
+    }
+
+    private func clearDate() {
+        input.rejected = !onChange(nil)
+        if !input.rejected { input.text = ""; input.isDirty = false; choosingDate = false }
     }
 
     private var textField: some View {
@@ -233,7 +266,7 @@ struct ItemPropertyRow: View {
         switch (definition.kind, value) {
         case (.text, .string), (.boolean, .bool), (.number, .number): valid = true
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
-        case (.date, .string(let text)): valid = text.isEmpty || Self.date(text) != nil
+        case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
         default: valid = false
         }
@@ -264,17 +297,6 @@ struct ItemPropertyRow: View {
         input.rejected = !onChange(value)
         if !input.rejected { input.isDirty = false }
     }
-
-    private static func date(_ value: String?) -> Date? {
-        guard let value else { return nil }
-        if let date = try? Date(value, strategy: .iso8601) { return date }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.isLenient = false
-        return formatter.date(from: value)
-    }
 }
 
 /// Displaying unfamiliar values is intentionally independent of their editable schema.
@@ -299,7 +321,7 @@ nonisolated enum ItemValueText {
                 ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
             }
-            ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date, declaredBy: TypeID("aic.decision")),
+            ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date(includesTime: false), declaredBy: TypeID("aic.decision")),
                             value: .string("2026-10-02"), isEditable: true, onChange: { _ in true })
         }
         .padding(16)

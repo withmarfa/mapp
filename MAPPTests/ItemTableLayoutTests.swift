@@ -154,13 +154,6 @@ struct ItemTableLayoutTests {
 
     // MARK: Dates
 
-    @Test func datesAreReadAsDaysOrMoments() throws {
-        #expect(ItemTableValue.date("2026-10-23") != nil)
-        #expect(ItemTableValue.date("2026-10-23T09:30:00Z") != nil)
-        #expect(ItemTableValue.date("2026-10-23T09:30:00.250Z") != nil)
-        #expect(ItemTableValue.date("next week") == nil)
-    }
-
     @Test func aDayReadsAsPeopleSayIt() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "Europe/London"))
