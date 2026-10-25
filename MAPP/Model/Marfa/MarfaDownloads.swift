@@ -58,7 +58,9 @@ actor MarfaDownloads: DownloadedFiles {
     func whenRemoving(_ hook: (@Sendable () async -> Void)?) { removing = hook }
     #endif
 
-    init(copy: WorkingCopy) { self.copy = copy }
+    init(copy: WorkingCopy) {
+        self.copy = copy
+    }
 
     func read() async throws -> DownloadedFileState {
         DownloadedFileState(try await copy.blobs.cache())

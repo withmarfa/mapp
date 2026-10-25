@@ -90,6 +90,14 @@ import Observation
     /// Called with what a library could not keep, for the app to tell the person.
     @ObservationIgnored var onNotKept: (MarfaLibrary.NotKept) -> Void = { _ in }
     private(set) var isBusy = false
+    /// Addresses that send the key unencrypted to another machine, in the order they were attached. The package
+    /// tells each address once in a run, so a notice waits here until a window shows it, and is never replaced.
+    private(set) var plainHTTPNotices: [PlainHTTPNotice] = []
+    /// Hands the oldest waiting notice to the window that shows it.
+    func takePlainHTTPNotice() -> PlainHTTPNotice? {
+        plainHTTPNotices.isEmpty ? nil : plainHTTPNotices.removeFirst()
+    }
+
     private var watching: [Task<Void, Never>] = []
     private var reading: Task<Void, Never>?
     private var instanceNames: [String: String]
@@ -411,6 +419,7 @@ import Observation
         let library = MarfaLibrary(source: source)
         library.onNotKept = { [weak self] in self?.onNotKept($0) }
         self.library = library
+        if let notice = connection.server(key: "").takePlainHTTPNotice() { plainHTTPNotices.append(notice) }
         let states = source.connectionStates()
         var wasOnline = source.connectionState == .online
         // A value already on its way from a source that has since been left is dropped.

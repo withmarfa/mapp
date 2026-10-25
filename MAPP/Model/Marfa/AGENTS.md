@@ -15,6 +15,7 @@
 - Each server address has its own copy in the app's own storage (`MarfaStoreLocation`).
 - `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`). The key is never shown again once entered. Tests use `MemoryKeyStore` and a temporary store location.
 - `MarfaHost` makes the one `MarfaLibrary` for the copy it opens (`MarfaHost.library`). While a copy is open, how the server stands and what the copy last reported are the library's (`connection`, `syncReport`); the host reads them from it and holds its own state only while no copy is open. Never subscribe to a source's states or reports a second time to keep a copy of them.
+- An address that sends the key over plain http to another machine is told once in each run, when its copy is first attached (`Server.takePlainHTTPNotice()`, `MarfaHost.plainHTTPNotices`), in the app's own words. A notice waits in order until a window shows it; a later one never replaces it. `localhost`, `127.0.0.0/8` and `::1` are not. MAPP reaches the server only through the package's core, not `URLSession`, so App Transport Security does not apply and `Info.plist` has no exception.
 - `MarfaHost` also reads the server's own name (`Server.instanceDescription()`, which sends no key) when a copy is attached and each time the connection returns online, off the main actor, and keeps the last name for each address in defaults. A failed read changes nothing. `LibraryDescription.name` shows the name, or the address's host until one has been read. Disconnecting or switching away forgets that address's name.
 
 ## Never lose a person's write
@@ -28,11 +29,11 @@
 - When the server is back, the copy's held stream drains the queue itself, once, and tells `queueDrained` with the report or `queueNotDrained` with the error. The engine takes those answers as it takes a drain of `MarfaSync`'s own, and `MarfaSync` starts no drain on `serverReachable`. Never start a second drain there.
 - A drain the copy runs itself can record answers while the engine is still taking an earlier report. The engine forgets only the answers it has taken (`forgetAnswered(ids:)` with `MarfaEngine.takenAnswers`), never all of them at once. A blocked or dead answer is applied but not marked taken: the copy keeps it for a release, which gives the write the same id and a new answer. A drain that stops on any error loses its report, so the engine reads the answers from the queue before anything forgets them (`MarfaEngine.takeAnswers`).
 - When a drain answer expires the copy (`copyExpired`, for example after a retype), `MarfaSync` hydrates again, which keeps the queue, and only then reads the answers from the queue. Never clear the queue to recover from an expired copy.
-- A copy another version of the app made is refused by the package with `MarfaError.wrongSchema`, which removes nothing and counts the copy's unsent changes. Another copy of MAPP may hold it, so a count of none does not mean nothing writes to it.
-  - With none, `MarfaSource.open` takes the copy's writer lock without waiting (`MarfaCopyReplacement`), renames the copy's directory aside in one step, releases the lock and makes a new copy from the server. If the new copy cannot be made, the old one goes back (`putBack`). Once a new copy opens, every `<name>.replaced-<digits>` beside it is removed.
-  - A lock held elsewhere moves nothing and the host is `.inUse`: the person quits the other copy of MAPP.
+- A copy another version of the app made is refused by the package with `MarfaError.wrongSchema`, which removes nothing and counts the copy's unsent changes.
+  - With none, `MarfaSource.open` has the package replace it (`WorkingCopy.replaceRefused`) with an empty copy, which hydrates from the server like a new one. The files the copy downloaded stay.
+  - The package replaces nothing while another process writes the copy (`readingHandle`), and the host is `.inUse`: the person quits the other copy of MAPP.
   - With changes, or a count that cannot be read, the copy stays and the host is `.otherVersion(unsent:)`: only the version that made it can send them, and Disconnect asks to keep the copy or discard the changes.
-  - Never remove a copy whose count the package did not give as none, and never remove one in place: set it aside under the lock.
+  - Never remove or replace a copy whose count the package did not give as none.
 - A refused write that carried content stays listed until the person discards it, and discarding one that carried text is confirmed, since the write holds the only copy.
 
 ## Rows the copy cannot read

@@ -1,13 +1,22 @@
 {
-  "originHash" : "94729fb8e9f5e8211179cf41647988bbb9eb40295dfa5ecbcbed5c86c03e5b94",
+  "originHash" : "08fa2355ed4b2df9fd7ef184a0c83c839f9876b0f8bb81edfbe9f7bea6972d46",
   "pins" : [
     {
       "identity" : "marfa-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/withmarfa/marfa-swift",
       "state" : {
-        "revision" : "7f488a6db3e2816aad6d3d4b1beb5d14d9561f3f",
-        "version" : "0.0.31"
+        "revision" : "c634daa8bdda906dadc02bd65ec768b31c2a120f",
+        "version" : "0.0.33"
+      }
+    },
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections",
+      "state" : {
+        "revision" : "844289ac455816e193f1dbbe014f3c4dbe429410",
+        "version" : "1.7.4"
       }
     },
     {
@@ -26,6 +35,15 @@
       "state" : {
         "revision" : "62595194f7d5951ef32129b15c0790ef24886867",
         "version" : "1.12.2"
+      }
+    },
+    {
+      "identity" : "swift-openapi-urlsession",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-urlsession",
+      "state" : {
+        "revision" : "c97e0f0187d95542b4a254f5bb4dc67f43bf73c9",
+        "version" : "1.4.0"
       }
     }
   ],

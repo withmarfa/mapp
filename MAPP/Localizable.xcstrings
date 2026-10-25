@@ -357,9 +357,6 @@
     "A deletion wasn’t sent" : {
       "extractionState" : "manual"
     },
-    "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. It held nothing that the server lacks, so nothing is lost. Quit and reopen MAPP to make a new copy from the server." : {
-      "extractionState" : "manual"
-    },
     "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again." : {
       "extractionState" : "manual"
     },
@@ -1764,6 +1761,9 @@
     "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it." : {
       "extractionState" : "manual"
     },
+    "This Connection Isn’t Encrypted" : {
+      "extractionState" : "manual"
+    },
     "This item can’t be changed now, so MAPP couldn’t keep what you typed." : {
       "extractionState" : "manual"
     },
@@ -1931,6 +1931,9 @@
       "extractionState" : "manual"
     },
     "Your key doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
+      "extractionState" : "manual"
+    },
+    "Your key is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
     },
     "Z to A" : {
