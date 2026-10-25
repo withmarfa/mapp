@@ -99,6 +99,9 @@ import Observation
         var title: String
         /// What a create carried, which a closing source would otherwise lose.
         var text: String?
+        /// Whether the create carried a body, which a refusal before queueing would otherwise lose; a title alone is
+        /// told with the refusal.
+        var carriesBody = false
     }
 
     private nonisolated struct Replacement {
@@ -275,10 +278,10 @@ import Observation
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
                 notKept(refusal.title, text: typed ?? refusal.text)
-            } else if problem.notQueued, let typed {
+            } else if problem.notQueued, let text = typed ?? (refusal.carriesBody ? refusal.text : nil) {
                 // Nothing queued it, so the text is in no write the person could copy it from, and the page is
                 // about to show the text the library holds.
-                notKept(refusal.title, text: typed, reason: message)
+                notKept(refusal.title, text: text, reason: message)
             } else if let typed {
                 // The refused write stays listed, but the page is about to show the text the library holds.
                 notKept(refusal.title, text: typed, reason: String(localized: "\(message) The change is also listed in Settings."))
@@ -330,7 +333,7 @@ import Observation
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
         recordWritten(write)
-        refusals[id] = Refusal(title: title, text: Self.createdText(write))
+        refusals[id] = Refusal(title: title, text: Self.createdText(write), carriesBody: Self.createCarriesBody(write))
         if !source.submit(write, as: id) {
             refusals[id] = nil
             notKept(title, text: Self.typedText(write))
@@ -373,6 +376,11 @@ import Observation
     private static func typedText(_ write: ItemWrite) -> String? {
         if case .editBody(_, let text, _, _) = write { return text }
         return createdText(write)
+    }
+
+    private static func createCarriesBody(_ write: ItemWrite) -> Bool {
+        guard case .create(_, let draft) = write else { return false }
+        return !draft.body.isEmpty
     }
 
     /// The text a create holds, which a source that closes before it answers gives back to the person.

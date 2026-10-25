@@ -775,7 +775,19 @@ actor MarfaEngine {
     nonisolated static func problem(for error: MarfaError) -> SyncProblem {
         switch error {
         case .hydrationIncomplete, .copyExpired: SyncProblem(code: error.code(), message: notCurrent)
-        default: SyncProblem(code: error.code(), message: error.message)
+        default: SyncProblem(code: refusalCode(of: error), message: error.message)
+        }
+    }
+
+    /// The server's code for a refusal, as a drain's verdict names it, where the package refused a write the same way
+    /// before queueing it; `code()` names only the kind of error, such as `forbidden` for `type_not_permitted`.
+    nonisolated static func refusalCode(of error: MarfaError) -> String {
+        switch error {
+        case .notFound(let code, _), .unauthorized(let code, _), .forbidden(let code, _), .validation(let code, _),
+            .rateLimited(let code, _, _), .server(_, let code, _):
+            code
+        default:
+            error.code()
         }
     }
 

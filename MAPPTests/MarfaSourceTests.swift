@@ -800,7 +800,10 @@ struct MarfaSourceOfflineTests {
             #expect(MarfaEngine.problem(for: error) == SyncProblem(code: error.code(), message: MarfaEngine.notCurrent))
         }
         let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing")
-        #expect(MarfaEngine.problem(for: other) == SyncProblem(code: other.code(), message: other.message))
+        #expect(MarfaEngine.problem(for: other) == SyncProblem(code: "invalid_properties", message: other.message))
+        // The package's own refusal names the server's code, as a drain's verdict would.
+        let reserved = MarfaError.forbidden(code: "type_not_permitted", message: "system.folder is written only through its own operation")
+        #expect(MarfaEngine.problem(for: reserved).code == "type_not_permitted")
     }
 
     @Test func aDrainIsJudgedByWhatItCouldNotSend() {

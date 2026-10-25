@@ -1062,6 +1062,24 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure == nil, "the person is told once")
     }
 
+    /// A create with a body that the package refused before queueing it, such as a reserved type, is in no queue,
+    /// so its text is given back with the server's reason.
+    @Test func aCreateRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        _ = try #require(library.createItem(
+            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .allNotes, undoManager: nil
+        ))
+        let write = try #require(source.submitted.last?.id)
+        let problem = SyncProblem(code: "type_not_permitted", message: "Not this type.", notQueued: true)
+        source.send(.answered(write, .refused(problem)))
+        #expect(await eventually { !told.isEmpty })
+        #expect(told.map(\.text) == ["Kept\n\nOnly copy"])
+        #expect(told.first?.reason == "Not this type.")
+        #expect(library.failure == nil, "the person is told once")
+    }
+
     /// A text save the server refused stays listed in Settings, but the page goes back to the server's text,
     /// so the typed text is also given back, with the reason and where the change is listed.
     @Test func textTheServerRefusedIsGivenBackAndPointsToLibrarySettings() async throws {
