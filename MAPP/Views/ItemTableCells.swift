@@ -89,12 +89,10 @@ struct ItemTableCell: View {
         let declares = library.catalogue.itemTypes[row.item.type]?.declares(field.key) ?? false
         let editable = declares && row.item.isEditable
         switch column.style {
-        case .status, .priority, .choice, .person where field.isPicked:
-            if editable {
-                picker(field, current: current)
-            } else if let current {
-                ItemTableCategory(column: column, value: current, title: column.label(ofCategory: current, in: [row]))
-            }
+        case .status, .priority, .choice:
+            picked(field, current: current, editable: editable)
+        case .person where field.isPicked:
+            picked(field, current: current, editable: editable)
         case .boolean:
             let isOn: Bool = if case .bool(let flag)? = row.item.value(of: field.key) { flag } else { false }
             if declares {
@@ -119,6 +117,15 @@ struct ItemTableCell: View {
             if let current { Text(current).foregroundStyle(.secondary).truncationMode(.tail) }
         default:
             if let current { Text(current).truncationMode(.tail) }
+        }
+    }
+
+    /// A value from a fixed set: a menu of the others where it can be changed, the value alone where it cannot.
+    @ViewBuilder private func picked(_ field: ItemTypeInfo.Field, current: String?, editable: Bool) -> some View {
+        if editable {
+            picker(field, current: current)
+        } else if let current {
+            ItemTableCategory(column: column, value: current, title: column.label(ofCategory: current, in: [row]))
         }
     }
 

@@ -27,7 +27,8 @@ nonisolated final class Latest<Value: Hashable & Sendable>: Sendable {
         // watcher a value, which needs that lock, while it holds ours. Taking our lock here would make the two wait
         // on each other, so the watcher is taken out from elsewhere. A value told to it before then is dropped.
         continuation.onTermination = { [weak self] _ in
-            DispatchQueue.global(qos: .utility).async { self?.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
+            guard let self else { return }
+            DispatchQueue.global(qos: .utility).async { self.state.withLock { _ = $0.watchers.removeValue(forKey: token) } }
         }
         let finished = state.withLock { state in
             guard !state.finished else { return true }

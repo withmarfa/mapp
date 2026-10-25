@@ -253,8 +253,7 @@ struct ItemPropertyRow: View {
         } else if case .number = definition.kind {
             let scanner = Scanner(string: input.text)
             scanner.locale = Locale(identifier: "en_US_POSIX")
-            var number = Decimal()
-            guard scanner.scanDecimal(&number), scanner.isAtEnd, !number.isNaN else {
+            guard let number = scanner.scanDecimal(), scanner.isAtEnd, !number.isNaN else {
                 input.rejected = true
                 return
             }

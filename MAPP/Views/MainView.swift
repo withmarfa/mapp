@@ -243,6 +243,7 @@ struct MainView: View {
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
+            let editor = editor
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onLeave = { [browser, details, weak editor] id, closing in
                 browser.leaveNewItem(id, closing: closing, hasUnsavedTitle: details.unsavedTitles.contains(id),
