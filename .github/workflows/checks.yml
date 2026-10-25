@@ -100,7 +100,7 @@ jobs:
           for n in json.load(sys.stdin)['testNodes']:
               walk(n)
           for message, count in seen.most_common(15):
-              print("::warning::%dx %s" % (count, message))
+              print('::warning::%dx %s' % (count, message))
           "
 
   checks:
