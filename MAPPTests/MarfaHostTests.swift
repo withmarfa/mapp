@@ -233,6 +233,33 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(await eventually { host.state == .unavailable(message: "The store is damaged.") })
     }
 
+    /// A key sent over plain http to another machine can be read on the way, so the person is told, once in a run
+    /// for each address, including one switched to. The package remembers each address for the whole test run, so
+    /// these are made up for this test.
+    @Test func aPlainHTTPAddressOnAnotherMachineIsToldOnce() async throws {
+        let address = "http://plain-\(UUID().uuidString.lowercased()).test:8210"
+        let switched = "http://plain-\(UUID().uuidString.lowercased()).test"
+        let host = try HostBench().host()
+        try await host.connect(address: address, key: "k")
+        #expect(host.plainHTTPNotice?.origin == address)
+        host.plainHTTPNotice = nil
+
+        try await host.changeAddress(to: switched, key: "k")
+        #expect(host.plainHTTPNotice?.origin == switched)
+
+        let again = try HostBench().host()
+        try await again.connect(address: address, key: "k")
+        #expect(again.plainHTTPNotice == nil)
+    }
+
+    @Test func thisMachineAndHTTPSAreNotTold() async throws {
+        for address in ["http://localhost:8210", "http://127.0.0.1:8210", "http://[::1]:8210", "https://\(UUID().uuidString.lowercased()).test"] {
+            let host = try HostBench().host()
+            try await host.connect(address: address, key: "k")
+            #expect(host.plainHTTPNotice == nil, "\(address)")
+        }
+    }
+
     @Test func aBadAddressOrAMissingKeyIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host()

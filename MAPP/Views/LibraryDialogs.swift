@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import SwiftUI
 
 extension View {
@@ -14,6 +15,37 @@ extension View {
     /// outlives the alert; a later refusal adds to the alert and the clipboard until the person answers.
     func unkeptChanges(_ libraries: Libraries) -> some View {
         modifier(UnkeptChanges(libraries: libraries))
+    }
+
+    /// Warns, once, in whichever window is in front, that the server's address sends the key unencrypted.
+    func plainHTTPNotice(_ host: MarfaHost) -> some View {
+        modifier(PlainHTTPAlert(host: host))
+    }
+}
+
+private struct PlainHTTPAlert: ViewModifier {
+    let host: MarfaHost
+    @Environment(\.appearsActive) private var appearsActive
+    @State private var shown: PlainHTTPNotice?
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: host.plainHTTPNotice, initial: true, take)
+            .onChange(of: appearsActive, take)
+            .alert(
+                Words.plainHTTPTitle,
+                isPresented: Binding { shown != nil } set: { if !$0 { shown = nil } },
+                presenting: shown
+            ) { _ in
+            } message: { notice in
+                Text(Words.plainHTTP(origin: notice.origin))
+            }
+    }
+
+    private func take() {
+        guard appearsActive, let notice = host.plainHTTPNotice else { return }
+        host.plainHTTPNotice = nil
+        shown = notice
     }
 }
 

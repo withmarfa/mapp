@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum DownloadBudget: Hashable, Sendable {
+nonisolated enum DownloadBudget: Hashable, Sendable, Codable {
     case automatic, bytes(UInt64), keepAll
 }
 

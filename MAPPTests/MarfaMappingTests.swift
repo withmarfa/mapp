@@ -45,8 +45,8 @@ struct MarfaMappingTests {
         edgeTypes: [
             EdgeType(id: "parent-of", label: "Parent of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target),
             EdgeType(id: "references", label: "References", cardinality: "many-to-many"),
-            EdgeType(id: "supersedes", cardinality: "one-to-one"),
-            EdgeType(id: "in-folder", cardinality: "many-to-many", targetTypeConstraints: ["system.folder"])
+            EdgeType(id: "supersedes", label: "Supersedes", cardinality: "one-to-one"),
+            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", targetTypeConstraints: ["system.folder"])
         ])
 
     private static func row(
@@ -139,7 +139,7 @@ struct MarfaMappingTests {
         let references = try #require(Self.catalogue.edgeTypes["references"])
         #expect(references.cardinality(atTarget: true) == .many)
         #expect(references.cardinality(atTarget: false) == .many)
-        let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", cardinality: "many-to-one"))
+        let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", label: "In thread", cardinality: "many-to-one"))
         #expect(thread.cardinality(atTarget: false) == .one)
         #expect(thread.cardinality(atTarget: true) == .many)
     }
@@ -157,8 +157,8 @@ struct MarfaMappingTests {
                     id: "knows", label: "Knows", description: "Two people know each other.", cardinality: "one-to-many",
                     reverseName: "known-by", writtenAt: .target, cascadeOnDelete: "block",
                     properties: [TypeField(name: "since", type: "date", declaredBy: "knows")]),
-                EdgeType(id: "owns", cardinality: "many-to-one", cascadeOnDelete: "cascade"),
-                EdgeType(id: "next", cardinality: "one-to-one", cascadeOnDelete: "unknown")
+                EdgeType(id: "owns", label: "Owns", cardinality: "many-to-one", cascadeOnDelete: "cascade"),
+                EdgeType(id: "next", label: "Next", cardinality: "one-to-one", cascadeOnDelete: "unknown")
             ])
         let contact = try #require(catalogue.itemTypes[TypeID("core.contact")])
         #expect(contact.description == "A person." && contact.version == 4)
@@ -216,9 +216,9 @@ struct MarfaMappingTests {
         let catalogue = MarfaMapping.catalogue(
             itemTypes: [],
             edgeTypes: [
-                EdgeType(id: "in-collection", cardinality: "many-to-many", targetTypeConstraints: ["role:container"]),
-                EdgeType(id: "mixed", cardinality: "many-to-many", sourceTypeConstraints: ["core.note", "role:container"]),
-                EdgeType(id: "open", cardinality: "many-to-many", sourceTypeConstraints: ["*"], targetTypeConstraints: ["*", "role:x"])
+                EdgeType(id: "in-collection", label: "In collection", cardinality: "many-to-many", targetTypeConstraints: ["role:container"]),
+                EdgeType(id: "mixed", label: "Mixed", cardinality: "many-to-many", sourceTypeConstraints: ["core.note", "role:container"]),
+                EdgeType(id: "open", label: "Open", cardinality: "many-to-many", sourceTypeConstraints: ["*"], targetTypeConstraints: ["*", "role:x"])
             ])
         let inCollection = try #require(catalogue.edgeTypes["in-collection"])
         #expect(inCollection.targetTypes.isEmpty && inCollection.targetRoles == ["container"])
