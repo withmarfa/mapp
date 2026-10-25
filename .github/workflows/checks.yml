@@ -33,7 +33,7 @@ jobs:
           if echo "$files" | grep -qE '^(editor/|MAPP/Editor/Page/editor\.html$|\.github/workflows/checks\.yml$)'; then
             echo "editor=true" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$files" | grep -vE '\.md$' | grep -qE '^(MAPP/|MAPPTests/|MAPP\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)'; then
+          if echo "$files" | grep -vE '\.md$' | grep -qE '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$)'; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -81,12 +81,16 @@ jobs:
       - run: sudo xcode-select -s /Applications/Xcode_27.1.app
       - name: Run the unit tests
         run: >
-          xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS'
-          -derivedDataPath build -only-testing:MAPPTests -retry-tests-on-failure -test-iterations 3
-          -test-repetition-relaunch-enabled YES -resultBundlePath TestResults.xcresult test
-      # Also after a pass, so a test that passed only on a retry is seen.
-      - name: Show failed attempts
-        if: always() && hashFiles('TestResults.xcresult/**') != ''
+          xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
+          -derivedDataPath build -resultBundlePath TestResults.xcresult test
+      # The UI tests take over the keyboard and mouse, so they run locally before a merge; here they
+      # are only built, so a change that breaks them is seen.
+      - name: Build the UI tests
+        run: >
+          xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS'
+          -derivedDataPath build build-for-testing
+      - name: Show failures
+        if: failure() && hashFiles('TestResults.xcresult/**') != ''
         run: |
           xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
             | python3 -c "
