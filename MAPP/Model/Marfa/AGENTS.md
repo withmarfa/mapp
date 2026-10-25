@@ -36,7 +36,7 @@
   - Never remove or replace a copy whose count the package did not give as none.
 - A refused write that carried content stays listed until the person discards it, and discarding one that carried text is confirmed, since the write holds the only copy. Undo Change on a write that carried text is confirmed too, and puts the text on the clipboard (`ProblemWording.confirmation(for:)`).
 - A refused text save is also given back through `notKept`, since the page then shows the library's text; the message says the change is listed in Settings.
-- A copy is removed only while MAPP holds its writer lock (`MarfaHost.removeCopy`), so a discard never takes a copy from another copy of the app still writing it; the removal fails as `inUse` instead. The package has no removal of its own that takes the lock, and none is possible for a copy it refuses as another version's, which is removed as before.
+- A copy is removed only while MAPP holds its writer lock (`MarfaHost.removeCopy`), so a discard never takes a copy from another copy of the app still writing it; the removal fails as `inUse` instead. The package has no removal of its own that takes the lock, and `WorkingCopy.open` releases the lock when it refuses a copy as another version's, so such a copy is removed without it.
 
 ## Rows the copy cannot read
 

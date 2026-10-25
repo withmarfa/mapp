@@ -522,7 +522,7 @@ import Observation
     }
 
     /// Opens the store as its writer, or nil where there is no store to hold or the package will not open it, as
-    /// with one another version of the app made, which leaves no lock to take.
+    /// with one another version of the app made: the package releases the lock as it refuses such a store.
     @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
         guard FileManager.default.fileExists(atPath: store.path) else { return nil }
         let copy: WorkingCopy
