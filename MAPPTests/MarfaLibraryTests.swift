@@ -953,6 +953,19 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.map(\.text) == ["Typed as it closed"])
     }
 
+    /// A create refused as the source closes gives back everything typed into it in quick add, its properties' text
+    /// among it, since nothing else holds that.
+    @Test func aCreateRefusedAsTheSourceClosesGivesBackItsPropertiesText() async throws {
+        let (library, source) = try await loaded()
+        _ = try #require(library.createItem(
+            typeID: LibraryFixture.task.rawValue, title: "Kept", body: "Only copy", properties: ["status": .string("open")],
+            parentID: nil, in: .allNotes, undoManager: nil))
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
+        #expect(await eventually { !library.notices.waiting.isEmpty })
+        #expect(library.notices.waiting.map(\.text) == ["Kept\n\nOnly copy\n\nopen"])
+    }
+
     /// A save that arrives after the row can no longer be written reaches nothing, so the person is told and the text
     /// goes where they can get it back.
     @Test func textTypedOverAnItemThatCannotBeWrittenIsGivenBack() async throws {

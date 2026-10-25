@@ -352,8 +352,8 @@ import Observation
     }
 
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
-    /// a body, a create's title and body, since the person typed them in quick add, and the text values of a
-    /// property edit, a title among them.
+    /// a body, a create's title, body and text values, since the person typed them in quick add, and the text values
+    /// of a property edit, a title among them.
     private static func unqueuedText(_ write: ItemWrite) -> String? {
         switch write {
         case .editBody(_, let text, _, _):
@@ -368,10 +368,12 @@ import Observation
         }
     }
 
-    /// The text a create holds, which a source that closes before it answers gives back to the person.
+    /// The text a create holds, its title, body and text values, which a source that closes before it answers
+    /// gives back to the person.
     private static func createdText(_ write: ItemWrite) -> String? {
         guard case .create(_, let draft) = write else { return nil }
-        return draft.body.isEmpty ? draft.title : draft.title + "\n\n" + draft.body
+        let values = draft.properties.sorted { $0.key < $1.key }.compactMap { $0.value.string }
+        return ([draft.title, draft.body] + values).filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
     /// A create is followed to its answer, so one refused before the source holds the item is told to the window that made it.
