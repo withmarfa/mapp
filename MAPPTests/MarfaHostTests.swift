@@ -1063,43 +1063,57 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let keys = MemoryKeyStore([connection: try LiveMarfa.key()])
             let location = MarfaStoreLocation(root: root)
-            var source = try await MarfaSource.open(connection, keys: keys, location: location)
-            var log = ChangeLog(source)
-            source.refresh()
-            try #require(await eventually { LiveMarfa.isWhole(source.syncReport) && source.connectionState == .online })
             let id = made.mint()
-            let created = WriteID()
-            source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST purged elsewhere", body: "One")), as: created)
-            await source.flush()
-            let settled = try #require(await log.wait { state in
-                state.answer(to: created) == .accepted && state.snapshot?.items.first { $0.id == id }?.sync == .settled
-            })
-            let version = try #require(settled.snapshot?.items.first { $0.id == id }?.version)
-            await source.close()
+            let first = try await MarfaSource.open(connection, keys: keys, location: location)
+            let version = try await closing(first) {
+                let log = ChangeLog(first)
+                first.refresh()
+                try #require(await eventually { LiveMarfa.isWhole(first.syncReport) && first.connectionState == .online })
+                let created = WriteID()
+                first.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST purged elsewhere", body: "One")), as: created)
+                await first.flush()
+                let settled = try #require(await log.wait { state in
+                    state.answer(to: created) == .accepted && state.snapshot?.items.first { $0.id == id }?.sync == .settled
+                })
+                return try #require(settled.snapshot?.items.first { $0.id == id }?.version)
+            }
 
             // Another device bins and purges the item while this copy is closed.
             await LiveMarfa.purge([id])
 
-            source = try await MarfaSource.open(connection, keys: keys, location: location)
-            log = ChangeLog(source)
-            _ = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
-            let typed = "MAPPTEST purged elsewhere, then everything typed after"
-            let edit = WriteID(), behind = WriteID()
-            source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
-            source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
-            #expect(await eventually { source.syncReport.waiting == 2 })
-            source.refresh()
-            // Each write names an item the server no longer holds, so each is refused on its own.
-            #expect(await eventually { source.syncReport.problems.count { $0.itemID == id } == 2 }, "\(source.syncReport.problems)")
-            let entries = source.syncReport.problems.filter { $0.itemID == id }
-            #expect(entries.allSatisfy { $0.kind == .refused && $0.reason?.code.isEmpty == false })
-            #expect(entries.allSatisfy { !$0.actions.contains(.tryAgain) && $0.actions.contains(.discard) })
-            let edited = try #require(entries.first { $0.change == .edit })
-            #expect(edited.copyText.contains(typed))
-            for entry in entries { #expect(try await source.resolve(entry.id, by: .discard)) }
-            #expect(await eventually { !source.syncReport.problems.contains { $0.itemID == id } })
-            #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
-            await source.close()
+            let source = try await MarfaSource.open(connection, keys: keys, location: location)
+            try await closing(source) {
+                let log = ChangeLog(source)
+                _ = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
+                let typed = "MAPPTEST purged elsewhere, then everything typed after"
+                let edit = WriteID(), behind = WriteID()
+                source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
+                source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
+                #expect(await eventually { source.syncReport.waiting == 2 })
+                source.refresh()
+                // Each write names an item the server no longer holds, so each is refused on its own.
+                #expect(await eventually { source.syncReport.problems.count { $0.itemID == id } == 2 }, "\(source.syncReport.problems)")
+                let entries = source.syncReport.problems.filter { $0.itemID == id }
+                #expect(entries.allSatisfy { $0.kind == .refused && $0.reason?.code.isEmpty == false })
+                #expect(entries.allSatisfy { !$0.actions.contains(.tryAgain) && $0.actions.contains(.discard) })
+                let edited = try #require(entries.first { $0.change == .edit })
+                #expect(edited.copyText.contains(typed))
+                for entry in entries { #expect(try await source.resolve(entry.id, by: .discard)) }
+                #expect(await eventually { !source.syncReport.problems.contains { $0.itemID == id } })
+                #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
+            }
+        }
+
+        /// Closes `source` whatever `body` does, so a failed check never leaves the copy open while its folder is removed.
+        private func closing<T>(_ source: MarfaSource, _ body: () async throws -> T) async throws -> T {
+            do {
+                let result = try await body()
+                await source.close()
+                return result
+            } catch {
+                await source.close()
+                throw error
+            }
         }
 
         /// A throwaway key on a throwaway copy, so the real key is never revoked.
