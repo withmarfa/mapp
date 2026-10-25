@@ -67,6 +67,9 @@ import Testing
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
+        // The declaration reloads the copy. A reload still running would paint the item made next, before the
+        // changes under test are read.
+        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
         source.events.yield(.change(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil)))
         source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
@@ -95,6 +98,9 @@ import Testing
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
+        // The declaration reloads the copy. A reload still running would paint the item made next, before the
+        // server's change is read.
+        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
 
         reads.hydrating.withLock { $0 = true }
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
