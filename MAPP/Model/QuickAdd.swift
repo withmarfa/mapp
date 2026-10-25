@@ -34,22 +34,11 @@ final class QuickAdd {
             isBlank(body) ? nil : PageCaret(offset: caret, in: body)
         }
 
-        /// Clears what was typed for the next item, keeping its kind and place.
-        mutating func clearForNext() {
-            title = ""
-            body = ""
-            caret = nil
-            properties = [:]
-            file = nil
-        }
-
         private func isBlank(_ text: String) -> Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     var draft: Draft?
     var isPresented = false
-    /// Create More: adding an item clears the panel for the next instead of opening the item.
-    var createsMore = false
     /// The draft as it was when its file was sent, while the file is being added, so the panel does not add it
     /// twice and a closing window does not hand off what is already on its way.
     private var sending: Draft?
@@ -144,16 +133,16 @@ final class QuickAdd {
         return types
     }
 
-    /// The kinds shown as chips, the sidebar's own first in its order, then File; the rest sit behind More. The
-    /// chosen kind is always shown.
-    static func chips(_ types: [ItemTypeOption], shown: [TypeID], chosen: String?) -> (chips: [ItemTypeOption], more: [ItemTypeOption]) {
-        var chips = shown.compactMap { id in types.first { $0.id == id } }
-        if chips.isEmpty, let note = types.first(where: { $0.id == TypeID("core.note") }) { chips.append(note) }
-        if let file = types.first(where: { $0.id == .file }), !chips.contains(file) { chips.append(file) }
-        if let chosen, let option = types.first(where: { $0.id.rawValue == chosen }), !chips.contains(option) {
-            chips.append(option)
+    /// The kinds as the kind menu lists them: first the sidebar's own in its order, then File, which Tab and
+    /// Shift-Tab move through; then, after a divider, the rest. The chosen kind is always among the first.
+    static func kindMenu(_ types: [ItemTypeOption], shown: [TypeID], chosen: String?) -> (first: [ItemTypeOption], rest: [ItemTypeOption]) {
+        var first = shown.compactMap { id in types.first { $0.id == id } }
+        if first.isEmpty, let note = types.first(where: { $0.id == TypeID("core.note") }) { first.append(note) }
+        if let file = types.first(where: { $0.id == .file }), !first.contains(file) { first.append(file) }
+        if let chosen, let option = types.first(where: { $0.id.rawValue == chosen }), !first.contains(option) {
+            first.append(option)
         }
-        return (chips, types.filter { !chips.contains($0) })
+        return (first, types.filter { !first.contains($0) })
     }
 
     /// The fields the panel offers for a kind: those the person can set, not its title or text.
@@ -246,7 +235,7 @@ extension Browser {
     }
 
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
-    /// panel clears for the next item with Create More, and otherwise closes and the window opens the item. Where
+    /// panel closes and the window opens the item. Where
     /// the library cannot make it, everything stays as typed and the library tells the person why. Nothing empty
     /// is ever written.
     @discardableResult
@@ -272,15 +261,11 @@ extension Browser {
             quickAdd.draft?.file = nil
             return id
         }
-        if quickAdd.createsMore {
-            quickAdd.draft?.clearForNext()
-        } else {
-            quickAdd.isPresented = false
-            quickAdd.draft = nil
-            let caret = QuickAdd.hasBody(draft.typeID, in: library.catalogue) ? draft.pageCaret : nil
-            newItem = NewItem(id: id, typeID: draft.typeID, library: library, caret: caret, isFile: isFile)
-            finishNewItem(in: library)
-        }
+        quickAdd.isPresented = false
+        quickAdd.draft = nil
+        let caret = QuickAdd.hasBody(draft.typeID, in: library.catalogue) ? draft.pageCaret : nil
+        newItem = NewItem(id: id, typeID: draft.typeID, library: library, caret: caret, isFile: isFile)
+        finishNewItem(in: library)
         return id
     }
 }

@@ -57,7 +57,7 @@ struct QuickAddTests {
         #expect(browser.focusCaret == nil)
     }
 
-    @Test func createMoreClearsWhatWasTypedAndKeepsTheKindAndPlace() async throws {
+    @Test func anItemGoesUnderTheCollectionShown() async throws {
         let project = Item(
             id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
@@ -65,18 +65,9 @@ struct QuickAddTests {
         library.parentCandidates["core.task"] = [project.id]
         let browser = Browser()
         browser.sidebarItem = .collection(project.id)
-        browser.openQuickAdd(typeID: "core.task", in: library)
-        browser.quickAdd.createsMore = true
-        browser.quickAdd.draft?.properties = ["priority": .string("low")]
-        let id = try #require(await browser.quickAdded("Book venue", in: library))
-
+        let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
         #expect(library.item(id)?.parentID == project.id)
-        #expect(browser.quickAdd.isPresented)
-        let draft = try #require(browser.quickAdd.draft)
-        #expect(draft.title.isEmpty && draft.body.isEmpty && draft.properties.isEmpty)
-        #expect(draft.typeID == "core.task")
-        #expect(draft.parentID == project.id)
-        #expect(browser.selection.isEmpty, "nothing opens while more are made")
+        #expect(!browser.quickAdd.isPresented)
     }
 
     @Test func aRefusedCreateKeepsEverythingAsTyped() async throws {
@@ -192,7 +183,6 @@ struct QuickAddTests {
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
         #expect(!QuickAdd.canSave(draft, in: library.catalogue))
 
-        browser.quickAdd.createsMore = true
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
         #expect(library.addedFiles.isEmpty)
         #expect(browser.quickAdd.draft?.body == "Where we went")
@@ -302,13 +292,13 @@ struct QuickAddTests {
         #expect(browser.quickAdd.isPresented)
     }
 
-    @Test func theChipsLeadWithTheSidebarsKindsAndFile() {
+    @Test func theKindMenuLeadsWithTheSidebarsKindsAndFile() {
         let library = FakeItemLibrary(now: start)
         let types = QuickAdd.types(in: library)
-        let (chips, more) = QuickAdd.chips(types, shown: [TypeID("core.task"), TypeID("core.note")], chosen: "test.project")
-        #expect(chips.map(\.id.rawValue) == ["core.task", "core.note", TypeID.file.rawValue, "test.project"])
-        #expect(more.isEmpty)
-        #expect(QuickAdd.chips(types, shown: [], chosen: nil).chips.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
+        let (first, rest) = QuickAdd.kindMenu(types, shown: [TypeID("core.task"), TypeID("core.note")], chosen: "test.project")
+        #expect(first.map(\.id.rawValue) == ["core.task", "core.note", TypeID.file.rawValue, "test.project"])
+        #expect(rest.isEmpty)
+        #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
     }
 
     @Test func pinnedFieldsAreKeptForEachLibraryAndKind() {

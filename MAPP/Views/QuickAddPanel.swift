@@ -1,10 +1,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N, the toolbar's New Item and the palette's New commands: a panel over the window for making one item. The
-/// kind of item comes first, then what it holds (a title and text, a file, or a title alone), then its properties
-/// and where it goes. ⌘Return adds it and opens it, or clears the panel for the next with Create More. Escape or a
-/// click outside puts it away, keeping what was typed for the window.
+/// ⌘N, the toolbar's New Item and the palette's New commands: a panel in the middle of the window for making one
+/// item. What it holds comes first (a title and text, a file, or a title alone), then its properties; the footer
+/// chooses the kind of item and where it goes. ⌘Return adds it and opens it. Escape, Cancel or a click outside
+/// puts it away, keeping what was typed for the window.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -38,9 +38,6 @@ struct QuickAddPanel: View {
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
         let showsBody = QuickAdd.showsBody(draft, in: catalogue)
         return VStack(alignment: .leading, spacing: 0) {
-            typeChips(draft)
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
             VStack(alignment: .leading, spacing: 10) {
                 if isFile { fileArea(draft) }
                 titleField(isFile: isFile)
@@ -53,7 +50,8 @@ struct QuickAddPanel: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
+            .padding(.top, 20)
+            Spacer(minLength: 0)
             propertyChips(draft)
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
@@ -61,8 +59,9 @@ struct QuickAddPanel: View {
                 .padding(.top, 16)
             bottomBar(draft, isFile: isFile)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
         }
+        .frame(minHeight: 300)
         .floatingPanelSurface(width: 620)
         .onKeyPress(.escape) {
             putAway()
@@ -82,33 +81,27 @@ struct QuickAddPanel: View {
 
     // MARK: Kind
 
-    private func typeChips(_ draft: QuickAdd.Draft) -> some View {
-        let types = QuickAdd.types(in: library)
+    /// The kind of item, as a pop-up button showing its symbol and name.
+    private func typePicker(_ draft: QuickAdd.Draft) -> some View {
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
-        let (chips, more) = QuickAdd.chips(types, shown: shown, chosen: draft.typeID)
-        return HStack(spacing: 6) {
-            ForEach(chips) { type in
-                Toggle(isOn: Binding { draft.typeID == type.id.rawValue } set: { if $0 { choose(type.id.rawValue) } }) {
-                    Label(type.label, systemImage: TypeSymbol.name(for: type.id, in: library.catalogue))
-                }
-                .accessibilityIdentifier("QuickAddType.\(type.id.rawValue)")
+        let (first, rest) = QuickAdd.kindMenu(QuickAdd.types(in: library), shown: shown, chosen: draft.typeID)
+        return Picker("Kind", selection: Binding { draft.typeID } set: { choose($0) }) {
+            ForEach(first) { type in kindLabel(type).tag(type.id.rawValue) }
+            if !rest.isEmpty {
+                Divider()
+                ForEach(rest) { type in kindLabel(type).tag(type.id.rawValue) }
             }
-            if !more.isEmpty {
-                Menu("More") {
-                    ForEach(more) { type in
-                        Button(type.label, systemImage: TypeSymbol.name(for: type.id, in: library.catalogue)) {
-                            choose(type.id.rawValue)
-                        }
-                    }
-                }
-                .fixedSize()
-                .accessibilityIdentifier("QuickAddMoreTypes")
-            }
-            Spacer(minLength: 0)
         }
-        .toggleStyle(.button)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .fixedSize()
+        .help("Kind of Item")
+        .accessibilityLabel("Kind of Item")
+        .accessibilityIdentifier("QuickAddType")
+    }
+
+    private func kindLabel(_ type: ItemTypeOption) -> some View {
+        Label(type.label, systemImage: TypeSymbol.name(for: type.id, in: library.catalogue))
     }
 
     private func choose(_ typeID: String) {
@@ -123,7 +116,7 @@ struct QuickAddPanel: View {
         guard let draft = quickAdd.draft, !draft.hasContent else { return .ignored }
         let types = QuickAdd.types(in: library)
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
-        let chips = QuickAdd.chips(types, shown: shown, chosen: draft.typeID).chips
+        let chips = QuickAdd.kindMenu(types, shown: shown, chosen: draft.typeID).first
         guard let index = chips.firstIndex(where: { $0.id.rawValue == draft.typeID }), chips.count > 1 else { return .ignored }
         let next = (index + (backward ? chips.count - 1 : 1)) % chips.count
         choose(chips[next].id.rawValue)
@@ -151,7 +144,7 @@ struct QuickAddPanel: View {
             .interfaceFont(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
             .hidden()
-            .frame(minHeight: 44, maxHeight: 260, alignment: .top)
+            .frame(minHeight: 120, maxHeight: 320, alignment: .top)
             .overlay {
                 ZStack(alignment: .topLeading) {
                     // The text view pads each line by its line fragment padding; moving it out by that much lines its text up with the title's.
@@ -270,6 +263,7 @@ struct QuickAddPanel: View {
                     Label("Add Property", systemImage: "plus")
                         .labelStyle(.iconOnly)
                 }
+                .menuIndicator(.hidden)
                 .fixedSize()
                 .help("Add Property")
                 .accessibilityIdentifier("QuickAddAddProperty")
@@ -328,58 +322,58 @@ struct QuickAddPanel: View {
 
     private func bottomBar(_ draft: QuickAdd.Draft, isFile: Bool) -> some View {
         let label = QuickAdd.types(in: library).first { $0.id.rawValue == draft.typeID }?.label ?? ""
-        return HStack(spacing: 12) {
-            if !isFile { placeChip(draft) }
-            Spacer(minLength: 8)
-            Toggle("Create More", isOn: $quickAdd.createsMore)
-                .toggleStyle(.checkbox)
-                .accessibilityIdentifier("QuickAddCreateMore")
-            Button(String(localized: "Add \(label)")) { save() }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!QuickAdd.canSave(draft, in: library.catalogue) || quickAdd.isSaving)
-                .accessibilityIdentifier("QuickAddAdd")
-        }
-    }
-
-    private func placeChip(_ draft: QuickAdd.Draft) -> some View {
-        let candidates = library.creationParentCandidates(typeID: draft.typeID)
-        let parent = draft.parentID.flatMap { library.item($0) }
-        return Menu {
-            Button("No Parent") { quickAdd.draft?.parentID = nil }
-            if !candidates.isEmpty { Divider() }
-            ForEach(candidates) { candidate in
-                Button(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue)) {
-                    quickAdd.draft?.parentID = candidate.id
+        return HStack(spacing: 8) {
+            typePicker(draft)
+            if !isFile { parentPicker(draft) }
+            Spacer(minLength: 12)
+            Button("Cancel") { putAway() }
+                .accessibilityIdentifier("QuickAddCancel")
+            Button {
+                save()
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Add \(label)")
+                    Text(verbatim: "⌘↩")
+                        .opacity(0.7)
+                        .accessibilityHidden(true)
                 }
             }
-        } label: {
-            if let parent {
-                Label(parent.title, systemImage: TypeSymbol.name(for: parent.type, in: library.catalogue))
-            } else {
-                Label("No Parent", systemImage: "tray")
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!QuickAdd.canSave(draft, in: library.catalogue) || quickAdd.isSaving)
+            .accessibilityIdentifier("QuickAddAdd")
+        }
+        .controlSize(.large)
+    }
+
+    /// Where the item goes, as a pop-up button: no parent, or one of the items its kind can go under.
+    private func parentPicker(_ draft: QuickAdd.Draft) -> some View {
+        var candidates = library.creationParentCandidates(typeID: draft.typeID)
+        if let parentID = draft.parentID, !candidates.contains(where: { $0.id == parentID }), let parent = library.item(parentID) {
+            candidates.insert(parent, at: 0)
+        }
+        return Picker("Parent", selection: Binding { draft.parentID } set: { quickAdd.draft?.parentID = $0 }) {
+            Label("No Parent", systemImage: "tray").tag(ItemID?.none)
+            if !candidates.isEmpty { Divider() }
+            ForEach(candidates) { candidate in
+                Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
+                    .tag(Optional(candidate.id))
             }
         }
-        .menuStyle(.button)
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
+        .pickerStyle(.menu)
+        .labelsHidden()
         .fixedSize()
-        .disabled(candidates.isEmpty && parent == nil)
+        .disabled(candidates.isEmpty)
+        .help("Parent")
+        .accessibilityLabel("Parent")
         .accessibilityIdentifier("QuickAddParent")
     }
 
     private func save() {
         guard let typeID = quickAdd.draft?.typeID else { return }
-        let createsMore = quickAdd.createsMore
         Task {
             guard await browser.saveQuickAdd(in: library, undoManager: undoManager) != nil else { return }
             lastType = typeID
-            if createsMore {
-                added = []
-                bodySelection = nil
-                focus = .title
-            }
         }
     }
 
