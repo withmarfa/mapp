@@ -46,7 +46,7 @@ extension Browser {
     /// Makes an item at once, in the place being shown, and opens it in the page with its title ready to type.
     /// `typeID` is the type chosen in the New menu; without one the item is of the place's type, or a note. The
     /// item is made as any other is, so it is queued, undoable and told of like the rest. Nil where nothing was
-    /// made, for which the library's `failure` says why. A second New while the first is awaited makes nothing more.
+    /// made, and the library tells the person why. A second New while the first is awaited makes nothing more.
     @discardableResult
     func startNewItem(typeID: String? = nil, in library: any ItemLibrary, undoManager: UndoManager?) -> ItemID? {
         leaveSettings()
