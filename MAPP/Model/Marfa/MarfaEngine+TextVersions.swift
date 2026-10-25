@@ -17,7 +17,7 @@ extension MarfaEngine {
         while true {
             attempt += 1
             let held = try await heldVersion(id)
-            let version = try await typedOn()
+            let version = Self.version(read: try await typedOn(), holding: held)
             let steady = try await heldVersion(id) == held && version <= held
             let edit = Edit(
                 properties: properties, replaceProperties: replacing, baseVersion: version, type: type, tier: tier)
@@ -32,6 +32,14 @@ extension MarfaEngine {
                 continue
             }
         }
+    }
+
+    /// The version text read at `read` stands at once the copy holds `held`. A page that opens a note as soon as it
+    /// is made reads this device's own create before the server answers it, at version 0, which no server holds
+    /// (`device/version-local-create`); once answered, that text is version 1 (`versions/create-version-one`), so an
+    /// edit typed on it goes on version 1, where an edit sent on 0 would be refused.
+    nonisolated static func version(read: Int64, holding held: Int64) -> Int64 {
+        read == 0 && held > 0 ? 1 : read
     }
 
     /// The version an edit that follows the person's last edit of the text was typed on: the version their own

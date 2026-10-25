@@ -28,6 +28,13 @@ struct MarfaEngineTests {
             updatedAt: "2026-10-06T00:00:00Z", tags: [])
     }
 
+    /// Text read on this device's own create before the server answered it is version 1 once the copy holds the
+    /// answer; any other version read stays as it is.
+    @Test(arguments: [(Int64(0), Int64(0), Int64(0)), (0, 1, 1), (0, 3, 1), (2, 3, 2), (3, 3, 3)])
+    func textReadOnACreateGoesOnTheVersionItsAnswerMade(read: Int64, held: Int64, expected: Int64) {
+        #expect(MarfaEngine.version(read: read, holding: held) == expected)
+    }
+
     @Test func onlyTextThatCanLinkOrEmbedIsAskedForItsLinks() {
         func asks(_ body: String, type: String = "core.note") -> Bool {
             MarfaEngine.mayName(Self.row(type, ["title": "T", "body": .string(body)]), catalogue: Self.catalogue)

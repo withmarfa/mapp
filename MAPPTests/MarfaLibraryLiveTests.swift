@@ -396,5 +396,35 @@ extension LiveMarfaTests {
                 }
             }
         }
+
+        /// Text typed into a note the page opened before its create was answered, saved after each answer as the page
+        /// saves while the person types, is kept, as `SampleLibraryTests` checks over the fake copy.
+        @Test(.timeLimit(.minutes(2)))
+        func textTypedOnANoteJustMadeIsKeptSaveAfterSave() async throws {
+            try await withLibrary { library, source, made in
+                let title = "MAPPTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
+                let id = try #require(library.createItem(
+                    typeID: "core.note", title: title, body: "Ask about the leak under the sink.", parentID: nil,
+                    in: .allNotes, undoManager: nil))
+                made.add(id)
+                // The page opens the note as soon as it is made, so it reads the text of the create before the server
+                // answers it, at version 0.
+                let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
+                try #require(await eventually {
+                    library.body(of: id)?.version == ItemVersion(1) && library.syncReport.waiting == 0
+                })
+                var text = read.text
+                for typed in [" T", "omorrow", "."] {
+                    text += typed
+                    library.saveText(text, of: id, readAt: read.version, failing: title)
+                    await source.flush()
+                    try #require(await eventually { library.syncReport.waiting == 0 })
+                }
+                #expect(library.notices.waiting.isEmpty, "\(library.notices.waiting)")
+                #expect(library.syncReport.problems.isEmpty)
+                #expect(library.body(of: id)?.text == "Ask about the leak under the sink. Tomorrow.")
+                #expect(try await source.copy.items.get(id.rawValue)?.version == 4)
+            }
+        }
     }
 }
