@@ -313,6 +313,7 @@ struct CommandPalette: View {
         items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
         // The types the sidebar shows, under the names it gives them.
         items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
+        items += library.views.map { (.view($0.id), SidebarPlace.viewSymbol, $0.title) }
         return items.map { item, systemImage, title in
             Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)

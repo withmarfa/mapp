@@ -145,9 +145,13 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private func hideButton(_ place: SidebarPlace) -> some View {
-        Button("Hide from Sidebar") {
-            libraries.updateSidebarLayout { $0.setHidden(place, true) }
+    /// A view's row hides the whole Views section, which its title says, since the layout keeps no view of its own.
+    @ViewBuilder private func hideButton(_ place: SidebarPlace) -> some View {
+        let hide = { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
+        if place == .views {
+            Button("Hide Views from Sidebar", action: hide)
+        } else {
+            Button("Hide from Sidebar", action: hide)
         }
     }
 
