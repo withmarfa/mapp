@@ -193,6 +193,18 @@ nonisolated struct ProblemWording: Hashable, Sendable {
         var id: SyncAction { action }
     }
 
+    /// What an action that loses the person's text asks before it runs.
+    nonisolated struct Confirmation: Hashable, Sendable, Identifiable {
+        let action: SyncAction
+        var title: String
+        var message: String
+        var button: String
+        /// Puts the text on the clipboard as the action runs.
+        var copiesText: Bool
+
+        var id: SyncAction { action }
+    }
+
     var headline: String
     var explanation: String
     /// Each field the server refused, with its reason.
@@ -249,6 +261,27 @@ nonisolated struct ProblemWording: Hashable, Sendable {
         self.explanation = explanation
         self.details = details
         actions = entry.actions.map { Self.action($0, for: entry.kind) }
+    }
+
+    /// A write that carried text holds the only copy of it, so losing it is confirmed. Discarding asks the person
+    /// to copy it first. Undoing the change copies it for them, since the page then shows the server's text and
+    /// the row goes. A conflicted copy goes to Recently Deleted, so discarding it is not confirmed.
+    func confirmation(for action: SyncAction) -> Confirmation? {
+        guard canCopyText, let offered = actions.first(where: { $0.action == action }) else { return nil }
+        switch action {
+        case .discard where copy == nil:
+            return Confirmation(
+                action: action, title: String(localized: "Discard this change?"),
+                message: String(localized: "What you wrote is lost unless you copy it first."),
+                button: offered.title, copiesText: false)
+        case .withdraw:
+            return Confirmation(
+                action: action, title: String(localized: "Undo this change?"),
+                message: String(localized: "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back."),
+                button: offered.title, copiesText: true)
+        default:
+            return nil
+        }
     }
 
     private static func name(of entry: SyncProblemEntry, title: (ItemID) -> String?) -> String? {

@@ -23,6 +23,9 @@
 "This lane isn’t available for every selected item. Check each item’s type and required fields." : { "extractionState" : "manual" },
 "View as Agenda" : { "extractionState" : "manual" },
 "View as Board" : { "extractionState" : "manual" },
+    "%@ The change is also listed in Settings." : {
+
+    },
     "%llu couldn’t be downloaded" : {
       "extractionState" : "manual"
     },
@@ -47,6 +50,9 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
+    "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
+
+    },
     "Attachment counts are unavailable." : {
       "extractionState" : "manual"
     },
@@ -55,6 +61,9 @@
     },
     "Automatic" : {
       "extractionState" : "manual"
+    },
+    "Couldn’t Quit" : {
+
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
       "extractionState" : "manual"
@@ -80,6 +89,9 @@
     "Listing items…" : {
       "extractionState" : "manual"
     },
+    "MAPP is still saving your changes on this Mac. Try again in a moment." : {
+
+    },
     "Reading downloaded files…" : {
       "extractionState" : "manual"
     },
@@ -89,8 +101,17 @@
     "Space Used" : {
       "extractionState" : "manual"
     },
+    "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+
+    },
+    "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
+
+    },
     "Unavailable" : {
       "extractionState" : "manual"
+    },
+    "Undo this change?" : {
+
     },
     "Updating library…" : {
       "extractionState" : "manual"
@@ -1649,9 +1670,6 @@
     },
     "The copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
-    },
-    "The editor could not finish the current change. Keep this window open and try again." : {
-
     },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 

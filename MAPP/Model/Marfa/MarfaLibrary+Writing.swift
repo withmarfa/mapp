@@ -43,7 +43,9 @@ extension MarfaLibrary {
     // MARK: Text
 
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
-        guard let item = item(id), self.body(of: id)?.text != body else { return }
+        // A page can hand over text for an item another device purged meanwhile, which no queue takes.
+        guard let item = item(id) else { return notKept(String(localized: "Couldn’t Save Note"), text: body, reason: Self.cantChange) }
+        guard self.body(of: id)?.text != body else { return }
         let title = String(localized: "Couldn’t Save “\(item.title)”")
         // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
         // could not read, is kept nowhere, so the person gets the text back.

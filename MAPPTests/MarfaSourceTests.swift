@@ -82,44 +82,6 @@ private func scratch() -> URL {
     URL.temporaryDirectory.appending(path: "MarfaSourceTests-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
-/// Holds a copy's writer lock from a child `sqlite3` process, with an exclusive transaction kept open on its input.
-/// POSIX locks belong to a process, so this is a holder that SQLite in the test's own process knows nothing of.
-private final class OtherProcessLock {
-    enum Failure: Error {
-        case notStarted(String)
-        case notHeld
-    }
-
-    private let process = Process()
-    private let input = Pipe()
-
-    init(_ store: URL) async throws {
-        let output = Pipe()
-        process.executableURL = URL(filePath: "/usr/bin/sqlite3")
-        process.arguments = [store.path + ".writer-lock"]
-        process.standardInput = input
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            throw Failure.notStarted(String(describing: error))
-        }
-        input.fileHandleForWriting.write(Data("BEGIN EXCLUSIVE;\nSELECT 'held';\n".utf8))
-        // The line comes back only once the transaction has begun.
-        for try await line in output.fileHandleForReading.bytes.lines where line == "held" { return }
-        release()
-        throw Failure.notHeld
-    }
-
-    /// Ends the process, which ends its transaction. It is safe to call twice.
-    func release() {
-        guard process.isRunning else { return }
-        process.terminate()
-        process.waitUntilExit()
-    }
-}
-
 /// A server that refuses every connection, so a copy made for it never hears from it.
 @Suite(.serialized)
 struct MarfaSourceOfflineTests {
@@ -300,7 +262,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// Gives the queue the shape and write kind an earlier build used, as the package's own test does.
-    private static func makeItAnEarlierVersion(_ store: URL) throws {
+    static func makeItAnEarlierVersion(_ store: URL) throws {
         try execute(
             store,
             """
@@ -312,7 +274,7 @@ struct MarfaSourceOfflineTests {
         try execute(store, "UPDATE queue SET kind = 'merge_metadata'")
     }
 
-    private static func execute(_ store: URL, _ statements: String) throws {
+    static func execute(_ store: URL, _ statements: String) throws {
         var database: OpaquePointer?
         try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }

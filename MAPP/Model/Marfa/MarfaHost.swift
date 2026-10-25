@@ -503,13 +503,54 @@ import Observation
         markDiscarded(connection, false)
     }
 
+    /// Removes the copy while holding its writer lock, so another copy of the app still writing it never has it
+    /// taken away underneath. The package offers no removal of its own that does this.
     private func removeCopy(_ connection: MarfaConnection) async throws {
         let directory = location.directory(for: connection)
-        try await Self.offMain {
-            if FileManager.default.fileExists(atPath: directory.path) {
-                try FileManager.default.removeItem(at: directory)
+        let held = try await Self.holdWriterLock(of: location.store(for: connection))
+        do {
+            try await Self.offMain {
+                if FileManager.default.fileExists(atPath: directory.path) {
+                    try FileManager.default.removeItem(at: directory)
+                }
             }
+        } catch {
+            await held?.close()
+            throw error
         }
+        await held?.close()
+    }
+
+    /// Opens the store as its writer, or nil where there is no store to hold. A store another version of the app
+    /// made is refused by `open`, which releases the lock as it does: with nothing unsent, the package replaces it
+    /// with an empty one held as its writer, and refuses while another process writes it. One holding changes
+    /// the server has not taken, which the person was shown and chose to discard, cannot be held, so it is removed
+    /// without the lock, as is a store that cannot be opened at all. A store another process writes is refused.
+    @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
+        guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+        let copy: WorkingCopy
+        do {
+            copy = try await WorkingCopy.open(store: store)
+        } catch MarfaError.wrongSchema(_, _, 0?, _) {
+            do {
+                copy = try await WorkingCopy.replaceRefused(store: store)
+            } catch MarfaError.readingHandle {
+                throw SourceFailure(kind: .inUse, message: Words.inUse)
+            }
+        } catch MarfaError.wrongSchema {
+            return nil
+        } catch MarfaError.readingHandle {
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
+        } catch {
+            // No process can open it either, and the person chose to discard it, so keeping it would refuse its
+            // address for good.
+            return nil
+        }
+        guard copy.handle == .writer else {
+            await copy.close()
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
+        }
+        return copy
     }
 
     private static func message(_ error: any Error) -> String {

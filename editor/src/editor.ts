@@ -389,6 +389,8 @@ export class NoteEditor {
     return snapshot.text === this.original ? null : snapshot.text
   }
   flush(expected = this.generation): string | null {
+    // A later load or reload reported this generation's text before it replaced it.
+    if (expected < this.generation) return null
     const text = this.snapshot(expected).text
     if (this.pendingChanged?.generation === expected) this.pendingChanged = undefined
     if (text === this.reported) return null

@@ -33,7 +33,7 @@ struct SyncProblemRow: View {
     let problem: SyncProblemEntry
     let isOnline: Bool
     @State private var failed: String?
-    @State private var isConfirmingDiscard = false
+    @State private var confirming: ProblemWording.Confirmation?
     @State private var isWorking = false
 
     private var wording: ProblemWording { ProblemWording(problem) { library.item($0)?.title } }
@@ -84,19 +84,25 @@ struct SyncProblemRow: View {
             }
         }
         .controlSize(.small)
-        .confirmationDialog("Discard this change?", isPresented: $isConfirmingDiscard) {
-            Button("Discard", role: .destructive) { resolve(.discard) }
-        } message: {
-            Text("What you wrote is lost unless you copy it first.")
+        .confirmationDialog(
+            confirming?.title ?? "",
+            isPresented: Binding { confirming != nil } set: { if !$0 { confirming = nil } },
+            presenting: confirming
+        ) { confirmation in
+            Button(confirmation.button, role: .destructive) {
+                if confirmation.copiesText { copyText() }
+                resolve(confirmation.action)
+            }
+        } message: { confirmation in
+            Text(confirmation.message)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SyncProblem")
     }
 
     private func act(_ action: ProblemWording.Action) {
-        // A write that carried text is the only copy of it, so it is confirmed. A copy goes to Recently Deleted.
-        if action.action == .discard, wording.canCopyText, wording.copy == nil {
-            isConfirmingDiscard = true
+        if let confirmation = wording.confirmation(for: action.action) {
+            confirming = confirmation
         } else {
             resolve(action.action)
         }
