@@ -70,7 +70,8 @@ declare global {
     webkit?: {
       messageHandlers?: {
         host?: { postMessage(message: EditorMessage): void }
-        /** Answers with what the app knows of a file a note embeds, or null when it has none. */
+        /** Answers with what the app knows of a file a note embeds, why the file can't be shown now, or null
+         *  when it has none. */
         embeds?: {
           postMessage(request: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null>
         }
