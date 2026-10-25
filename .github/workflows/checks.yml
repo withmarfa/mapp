@@ -1,0 +1,96 @@
+name: Checks
+
+# Each job runs only when its files changed, so a docs-only change finishes in seconds.
+# The final job, "Checks", always runs; make it the one required check.
+on:
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      editor: ${{ steps.filter.outputs.editor }}
+      swift: ${{ steps.filter.outputs.swift }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: filter
+        # The first parent of the merge commit is the base, so this diff is the pull request's own change.
+        run: |
+          files=$(git diff --name-only HEAD^1 HEAD)
+          echo "$files"
+          if echo "$files" | grep -qE '^(editor/|MAPP/Editor/Page/editor\.html$|\.github/workflows/checks\.yml$)'; then
+            echo "editor=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$files" | grep -vE '\.md$' | grep -qE '^(MAPP/|MAPPTests/|MAPP\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)'; then
+            echo "swift=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  editor:
+    name: Editor
+    needs: changes
+    if: needs.changes.outputs.editor == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: editor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: editor/package.json
+          cache: true
+          cache_dependency_path: editor/pnpm-lock.yaml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - name: Rebuild the page and compare
+        run: |
+          pnpm build
+          git diff --exit-code -- ../MAPP/Editor/Page/editor.html
+
+  swift:
+    name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.swift == 'true'
+    # The hosted image with Xcode 27 (a public preview at the time of writing).
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      - name: Run the unit tests
+        run: >
+          xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS'
+          -derivedDataPath build -only-testing:MAPPTests test
+
+  checks:
+    name: Checks
+    needs: [changes, editor, swift]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job that ran to pass
+        run: |
+          [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "false" ]]

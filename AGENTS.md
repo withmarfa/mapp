@@ -19,7 +19,7 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - Use scoped Conventional Commits in the present tense, lowercase and short: `feat(app):`, `fix(editor):`, `test(model):`.
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
-- No CI runs on pull requests: Xcode Cloud only archives tagged releases, and GitHub runs only Dependabot. Run the tests locally before you merge.
+- GitHub-hosted checks (`.github/workflows/checks.yml`) run on pull requests, each only when its files changed: the editor's tests, typecheck, format check and a rebuild of the page that must match the committed `editor.html`, and the app's unit tests (`-only-testing:MAPPTests`, never UI tests). The final job, `Checks`, always runs and is the one to require. Xcode Cloud only archives tagged releases. Run every test locally, including the UI tests, before you merge.
 - While working, run only the tests a change touches (`-only-testing:MAPPTests/<Suite>`), and every test once before merging.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
@@ -86,7 +86,7 @@ These hold across the app. The nested files say how each library keeps them.
 - A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Every version is `0.0.x` until the first public release, and each release is the latest tag plus `0.0.1`.
 - Never write a version into a file. `MARKETING_VERSION` stays `0.0.0` in the repository.
 - To release when a release is called, tag the merged commit on `main` with the next version and push the tag. A tag beginning with `v` starts the Xcode Cloud workflow, which archives the app and gives it to internal TestFlight testers. There is no other distribution, so no Sparkle and no notarization.
-- In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secret `MAPP_DEVELOPMENT_TEAM` and sets `MARKETING_VERSION` from the tag. Xcode Cloud numbers the builds.
+- In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secret `MAPP_DEVELOPMENT_TEAM` and sets `MARKETING_VERSION` from the tag. A tag build stops if the team secret is unset or the version was not written. Xcode Cloud numbers the builds.
 - Agents cannot see Xcode Cloud. Check a release in App Store Connect: the build for the tag's version appears under TestFlight.
 
 ## Code Review Rules
