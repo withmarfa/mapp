@@ -33,7 +33,7 @@ struct MarfaViewsTests {
                 row("view-planning", "system.view", ["title": "Planning", "query": ["types": ["core.note"]]]),
             ],
             itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
-        let reading = ViewReads(read: MarfaRead(copy: fake.copy), views: views, members: ["view-planning": ["n1", "view-planning"]])
+        let reading = ViewReads(read: MarfaRead(copy: fake.copy), views: views)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: reading, refreshing: reading)
         source.events.yield(.paint)
         return source
@@ -51,6 +51,19 @@ struct MarfaViewsTests {
         #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
         // A view lists only items, even where its read names a view's own row.
         #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n1")] })
+        await source.close()
+    }
+
+    @Test func aViewWhoseFilterChangesElsewhereListsAnew() async throws {
+        let views = SavedViews([Self.planning])
+        let source = Self.source(views: views)
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n1")] })
+        // Another device changes what the view asks for, not its title, so only its version tells it apart.
+        views.members.withLock { $0["view-planning"] = ["n2"] }
+        views.list.withLock { $0 = [LibraryView(id: Self.planning.id, title: Self.planning.title, version: 2)] }
+        source.events.yield(.change(Change(origin: .server(event: "item.updated", cursor: "2"), itemId: Self.planning.id.rawValue, edgeId: nil)))
+        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n2")] })
         await source.close()
     }
 
@@ -123,6 +136,26 @@ struct MarfaViewsTests {
         #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
     }
 
+    @Test func aChangedViewDropsItsListAndTheOthersKeepTheirs() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning, Self.reading])
+        source.viewMembers.withLock { $0 = [Self.planning.id: [F.n1], Self.reading.id: [F.t1]] }
+        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
+        #expect(await eventually { library.items(in: .view(Self.reading.id)).map(\.id) == [F.t1] })
+
+        // Neither can be read again, so each shows what it kept: nothing for the view that changed.
+        source.viewFails.withLock { $0 = true }
+        let reads = source.viewReads.withLock { $0 }
+        source.send(.views([LibraryView(id: Self.planning.id, title: Self.planning.title, version: 2), Self.reading]))
+        #expect(await eventually {
+            _ = library.items(in: .view(Self.planning.id))
+            _ = library.items(in: .view(Self.reading.id))
+            return source.viewReads.withLock { $0 } >= reads + 2
+        })
+        #expect(await eventually { library.items(in: .view(Self.planning.id)).isEmpty })
+        #expect(library.items(in: .view(Self.reading.id)).map(\.id) == [F.t1])
+    }
+
     @Test func aViewTheCopyCannotAnswerKeepsItsListAndSaysSoOnce() async throws {
         let F = LibraryFixture.self
         let (library, source) = try await Self.loaded(views: [Self.planning])
@@ -175,6 +208,8 @@ struct MarfaViewsTests {
 /// The views the server holds, which a test changes as another device would.
 private nonisolated final class SavedViews: Sendable {
     let list: Mutex<[LibraryView]>
+    /// The ids each view lists, as the copy answers them.
+    let members = Mutex<[String: [String]]>(["view-planning": ["n1", "view-planning"]])
     init(_ views: [LibraryView]) { list = Mutex(views) }
 }
 
@@ -182,7 +217,6 @@ private nonisolated final class SavedViews: Sendable {
 private nonisolated struct ViewReads: MarfaReading, MarfaRefreshing {
     let read: MarfaRead
     let views: SavedViews
-    let members: [String: [String]]
 
     func status() async throws -> Status { try await readStatus() }
     func items() async throws -> Rows<Marfa.Item> { try await read.items() }
@@ -190,7 +224,7 @@ private nonisolated struct ViewReads: MarfaReading, MarfaRefreshing {
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await read.edges(touching: id) }
     func views() async throws -> [LibraryView] { views.list.withLock { $0 } }
     func items(inView id: String) async throws -> [Marfa.Item] {
-        let ids = members[id] ?? []
+        let ids = views.members.withLock { $0[id] ?? [] }
         return try await read.items().rows.filter { ids.contains($0.id) }
     }
 

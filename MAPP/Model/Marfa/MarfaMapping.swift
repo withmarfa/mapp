@@ -28,7 +28,7 @@ nonisolated enum MarfaMapping {
 
     /// A view still in use, as the sidebar lists it.
     static func view(_ view: SavedView) -> LibraryView? {
-        view.state == .revoked ? nil : LibraryView(id: ItemID(view.id), title: view.settings.title)
+        view.state == .revoked ? nil : LibraryView(id: ItemID(view.id), title: view.settings.title, version: view.version)
     }
 
     // MARK: Catalogue

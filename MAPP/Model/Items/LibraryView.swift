@@ -5,6 +5,8 @@ import Foundation
 nonisolated struct LibraryView: Identifiable, Hashable, Sendable {
     let id: ItemID
     var title: String
+    /// Changes with every change to the view, so one whose query changed but not its title still differs.
+    var version: Int64 = 0
 
     /// By title, as the sidebar lists them, with the id settling two of one title.
     static func ordered(_ views: [LibraryView]) -> [LibraryView] {

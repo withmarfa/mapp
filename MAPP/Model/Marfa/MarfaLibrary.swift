@@ -258,10 +258,13 @@ import Observation
         }
     }
 
-    /// A view changed elsewhere may list other items, so each is read again when next shown.
+    /// A view changed elsewhere may list other items, so its last list is dropped. The others keep theirs until
+    /// read again, since a read begun before is dropped.
     private func take(_ views: [LibraryView]) {
+        let current = Set(views)
+        viewed = viewed.filter { id, _ in self.views.contains { $0.id == id && current.contains($0) } }
+            .mapValues { Search(revision: -1, hits: $0.hits, running: false) }
         if self.views != views { self.views = views }
-        viewed = [:]
         viewsGeneration += 1
         viewsFailing.formIntersection(views.map(\.id))
         viewRevision += 1
