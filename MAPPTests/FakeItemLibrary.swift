@@ -209,6 +209,13 @@ final class FakeItemLibrary: ItemLibrary {
         items[index].modified = now()
     }
 
+    /// Every text the library was handed and could not keep, as the person would be told it.
+    private(set) var unkept: [MarfaLibrary.NotKept] = []
+
+    func notKept(_ title: String, text: String?, reason: String?) {
+        unkept.append(MarfaLibrary.NotKept(title: title, text: text, reason: reason))
+    }
+
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []

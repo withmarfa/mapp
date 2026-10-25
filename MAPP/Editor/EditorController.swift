@@ -13,6 +13,8 @@ final class EditorController: NSObject {
     private(set) var caret = CaretState()
     private(set) var isReady = false
     @ObservationIgnored private var hasLoadedPage = false
+    /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
+    @ObservationIgnored private var abandonedGeneration: Int?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false
@@ -321,31 +323,57 @@ final class EditorController: NSObject {
     /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
     /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
     /// anything asked of it later. The reply keeps this controller alive until it arrives.
+    ///
+    /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told and gets the
+    /// text it last reported, and the next flush goes ahead without it, so a stuck page never holds the window
+    /// or the app for good.
     func flush(leaving: Bool = true, closing: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         guard let noteID else { return done(true) }
-        guard isReady else { return done(!hasLoadedPage) }
         let generation = generation
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        func leave() -> Bool {
+            if leaving { onLeave(noteID, closing) }
+            return true
+        }
+        // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
+        // process ended comes back with the text it last reported.
+        guard isReady, generation != abandonedGeneration else { return done(leave()) }
+        var finished = false
+        func finish(_ kept: Bool) {
+            guard !finished else { return }
+            finished = true
+            done(kept)
+        }
         func capture() {
-            guard self.noteID == noteID, self.generation == generation else { return done(false) }
+            guard !finished else { return }
+            if self.noteID == noteID, !isReady { return finish(leave()) }
+            guard self.noteID == noteID, self.generation == generation else { return finish(false) }
             webView.evaluateJavaScript("window.editor.flush(\(generation))") { [self] result, error in
-                if error != nil {
-                    if ContinuousClock.now < deadline {
-                        Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
-                    } else {
-                        library?.failure = (String(localized: "Couldn’t Save Note"), String(localized: "The editor could not finish the current change. Keep this window open and try again."))
-                        done(false)
-                    }
+                // A reply that comes after the page was given up on still holds the person's latest text.
+                if error == nil, let markdown = result as? String { report(markdown, of: generation) }
+                guard !finished else { return }
+                guard error == nil else {
+                    Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
                 }
-                if let markdown = result as? String { report(markdown, of: generation) }
-                guard self.noteID == noteID, self.generation == generation else { return done(false) }
-                if leaving { onLeave(noteID, closing) }
-                done(true)
+                guard self.noteID == noteID, self.generation == generation else { return finish(false) }
+                finish(leave())
             }
+        }
+        Task { [self] in
+            try? await Task.sleep(for: Self.flushLimit)
+            guard !finished else { return }
+            guard self.noteID == noteID, self.generation == generation else { return finish(false) }
+            abandonedGeneration = generation
+            let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
+            library?.notKept(
+                title ?? String(localized: "Couldn’t Save Note"), text: markdown,
+                reason: String(localized: "The editor stopped responding, so your latest changes might not be saved. To continue without them, try again."))
+            finish(false)
         }
         capture()
     }
+
+    static let flushLimit = Duration.seconds(2)
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
@@ -363,7 +391,6 @@ final class EditorController: NSObject {
             }
             editor.flush(leaving: leaving, closing: leaving, then: gate.arrive)
         }
-        Task { try? await Task.sleep(for: .seconds(3)); gate.open(false) }
     }
 
     private final class Gate {
@@ -871,6 +898,8 @@ final class EditorController: NSObject {
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
         case .changed(let markdown, let generation):
+            // A page that reports again is answering, so the next flush waits for it as before.
+            if generation == abandonedGeneration { abandonedGeneration = nil }
             report(markdown, of: generation)
         case .state(let state):
             guard state.generation == generation else { return }

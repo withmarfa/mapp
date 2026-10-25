@@ -124,7 +124,8 @@ import Observation
         return true
     }
 
-    /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish.
+    /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish. A page or a title
+    /// that cannot be handed over has told the person already; a library still keeping its writes is told here.
     func flushEditors(within limit: Duration) async -> Bool {
         let first = FirstOf()
         return await withCheckedContinuation { continuation in
@@ -132,9 +133,12 @@ import Observation
                 let kept = await flushEditors()
                 first.resume(continuation, with: kept)
             }
-            Task {
+            Task { [host] in
                 try? await Task.sleep(for: limit)
-                first.resume(continuation, with: false)
+                guard first.resume(continuation, with: false) else { return }
+                host.library?.failure = (
+                    String(localized: "Couldn’t Quit"),
+                    String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment."))
             }
         }
     }
@@ -143,10 +147,13 @@ import Observation
     private final class FirstOf {
         private var done = false
 
-        func resume(_ continuation: CheckedContinuation<Bool, Never>, with value: Bool) {
-            guard !done else { return }
+        /// Whether this answer was the first.
+        @discardableResult
+        func resume(_ continuation: CheckedContinuation<Bool, Never>, with value: Bool) -> Bool {
+            guard !done else { return false }
             done = true
             continuation.resume(returning: value)
+            return true
         }
     }
 

@@ -221,13 +221,39 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
         #expect(!kept)
         #expect(!left)
-        #expect(page.library.failure != nil)
+        #expect(!page.library.unkept.isEmpty)
         try await page.run("window.editor.flush = window.savedFlush")
         let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         try await page.load("Replacement\n")
         let rejected = try await page.editor.webView.callAsyncJavaScript("try { window.editor.flush(expected); return false } catch { return true }", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? Bool
         #expect(rejected == true)
         #expect(try await page.markdown() == nil)
+    }
+
+    /// The page reports each change as it is made, so one whose process ended holds nothing back while it reloads.
+    @Test func aPageWhoseProcessEndedDoesNotHoldUpLeaving() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        page.editor.webViewWebContentProcessDidTerminate(page.editor.webView)
+        let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
+        #expect(kept)
+        try await page.wait { page.editor.isReady }
+    }
+
+    /// A page that stops answering is given up on once: the person gets the last text it reported and is told,
+    /// and trying again goes ahead without waiting.
+    @Test func aPageThatStopsAnsweringIsGivenUpOnAndTold() async throws {
+        let page = try await Page()
+        try await page.load("Original\n")
+        try await page.run("window.editor.flush = () => { const end = Date.now() + 4000; while (Date.now() < end) {} }")
+        let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
+        #expect(!kept)
+        #expect(page.library.unkept.map(\.text) == ["Original\n"])
+        let clock = ContinuousClock()
+        let start = clock.now
+        let keptAgain = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
+        #expect(keptAgain)
+        #expect(clock.now - start < .seconds(1))
     }
 
     @Test func reselectingTheNoteAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
@@ -240,7 +266,7 @@ struct EditorTests {
         let replacementItem = try #require(page.library.item(replacement.id))
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         page.editor.select(replacementItem)
-        try await page.wait { page.library.failure != nil }
+        try await page.wait { !page.library.unkept.isEmpty }
         #expect(page.editor.noteID == originalID)
 
         page.editor.select(original)
@@ -264,7 +290,7 @@ struct EditorTests {
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         page.editor.close()
         #expect(!page.editor.hasNote)
-        try await page.wait { page.library.failure != nil }
+        try await page.wait { !page.library.unkept.isEmpty }
         #expect(page.editor.noteID == id)
         #expect(!page.editor.hasNote)
         let retainedID = try #require(id)
@@ -388,7 +414,7 @@ struct EditorTests {
         let laterRejected = proxy.windowShouldClose(window)
         #expect(!laterRejected)
         try await Task.sleep(for: .milliseconds(2200))
-        #expect(page.library.failure != nil)
+        #expect(!page.library.unkept.isEmpty)
         proxy.detach()
         #expect(window.delegate === host)
         window.delegate = nil

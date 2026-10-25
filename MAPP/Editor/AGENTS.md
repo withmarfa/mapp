@@ -20,7 +20,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 ## Saving
 
 - Each load of a note gets a generation, and each edit reports the generation and the version of the text it was typed on (`EditorController`). Never save an edit without its version, and never let an edit from an earlier generation save into the note now on the page.
-- A failed capture of the page's last edit cancels quitting, closing the window, or changing libraries, and the person is told. The editor stays open so the text can be recovered.
+- A failed capture of the page's last edit cancels quitting, closing the window, or changing libraries, and the person is told. A page that cannot hand over its edit within `EditorController.flushLimit` (busy, or stuck in a composition) is given up on: the library's `notKept` puts the text the page last reported on the clipboard and says why, and the next flush of that load goes ahead without the page, until the page reports a change again. A page whose process ended reported every change as it was made, so it never holds up a flush while it reloads.
 - Images go into a note through `library.attach(_:to:)`, and the page inserts the returned link with `insertImages`. The editor then saves it like typing.
 
 ## Header

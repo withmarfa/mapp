@@ -77,6 +77,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion)
+    /// Tells the person that `text` was not kept, with `reason` where there is one, and puts it on the clipboard.
+    func notKept(_ title: String, text: String?, reason: String?)
     /// Every note being written is left and every change handed over, as the app quits or the library changes:
     /// returns once each is kept on this Mac, never waiting on a server.
     func finish() async
