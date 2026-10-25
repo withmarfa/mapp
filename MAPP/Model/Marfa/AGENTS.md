@@ -12,8 +12,9 @@
 - The copy holds both tiers (`hydrate(types:tier: .all)`), so the Inbox and the rest of the library read from one copy, offline too.
 - An item's properties keep the order the server gives them (`JSONObject`). Properties, bodies and answers cross the package as values, never as JSON text; the app parses none.
 - The package's `Item`, `Edge`, `Edit`, `Draft`, `ListFilters`, `SearchFilters`, `SearchHit`, `BinPage`, `ItemState`, `Tier` and `JSONValue` are the core's own types. `MemberImportVisibility` is on, so a file that reads their members imports each one by name (`import struct MarfaCore.Item`). Never `import MarfaCore` whole: it makes `QueuedWrite`, `MarfaError`, `DrainReport` and other names the package declares itself ambiguous.
-- Each server address has its own copy in the app's own storage (`MarfaStoreLocation`), never inside a notes folder.
+- Each server address has its own copy in the app's own storage (`MarfaStoreLocation`).
 - `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`). The key is never shown again once entered. Tests use `MemoryKeyStore` and a temporary store location.
+- `MarfaHost` makes the one `MarfaLibrary` for the copy it opens (`MarfaHost.library`). While a copy is open, how the server stands and what the copy last reported are the library's (`connection`, `syncReport`); the host reads them from it and holds its own state only while no copy is open. Never subscribe to a source's states or reports a second time to keep a copy of them.
 - `MarfaHost` also reads the server's own name (`Server.instanceDescription()`, which sends no key) when a copy is attached and each time the connection returns online, off the main actor, and keeps the last name for each address in defaults. A failed read changes nothing. `LibraryDescription.name` shows the name, or the address's host until one has been read. Disconnecting or switching away forgets that address's name.
 
 ## Never lose a person's write
@@ -61,7 +62,7 @@
 
 - Delete Permanently is `purge`, which is never queued. Offer it only while the server can be reached. It runs after the writes submitted before it have been sent, at the version the person was shown, and the server's answer is its verdict.
 - The bin is the server's. The engine keeps a deleted item's last row for Recently Deleted until `MarfaSync` reads the bin.
-- A Marfa folder (`system.folder`) is not a MAPP folder: it holds a device's sync settings and places no item. Do not use the package's folder calls, keep `.folders` out of a Marfa source's capabilities, and show no folders.
+- A Marfa folder (`system.folder`) holds a device's sync settings and places no item. MAPP syncs no folders: do not use the package's folder calls, and show a folder only as a fact on an item.
 
 ## Wording
 
