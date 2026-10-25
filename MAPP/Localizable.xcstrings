@@ -649,6 +649,9 @@
     "Code Block" : {
 
     },
+    "Code Language" : {
+
+    },
     "Collapse" : {
 
     },
@@ -1492,6 +1495,9 @@
     },
     "Search Items" : {
       "extractionState" : "manual"
+    },
+    "Search Languages" : {
+
     },
     "Search List" : {
 
