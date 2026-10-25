@@ -63,11 +63,11 @@ export function splitLabels(all: AppLabels): {
 /**
  * Where a caret typed after `prefix`, in the Markdown source, falls in `readable`, the text the page reads out: the
  * offset just past the last of the prefix's characters found in order. Markup and spacing the readable text drops
- * are passed over.
+ * are passed over, and so is a link's source the page does not show.
  */
 export function caretOffset(prefix: string, readable: string): number {
   let at = 0
-  for (const character of prefix) {
+  for (const character of shownText(prefix)) {
     if (/\s/.test(character)) continue
     const found = readable.indexOf(character, at)
     // A character the page does not show, such as `#` or `*`, would otherwise send the caret on to a later match.
@@ -75,6 +75,18 @@ export function caretOffset(prefix: string, readable: string): number {
     at = found + character.length
   }
   return at
+}
+
+/**
+ * The Markdown source with each link reduced to what Inkkit shows of it: an embed's name without its width, a wiki
+ * link's alias where it has one, and a link's or image's text without its target or width. A link still being typed
+ * when the caret was placed counts as ended there.
+ */
+function shownText(source: string): string {
+  return source
+    .replace(/!\[\[([^\]|]*)(?:\|[^\]]*)?(?:\]\]|$)/g, '$1')
+    .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)(?:\]\]|$)/g, '$1')
+    .replace(/!?\[([^\]]*?)(?:\|\d+)?\](?:\([^)]*(?:\)|$)|\[[^\]]*(?:\]|$))/g, '$1')
 }
 
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {

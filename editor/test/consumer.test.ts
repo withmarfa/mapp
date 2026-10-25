@@ -549,6 +549,23 @@ test('the caret from quick add lands after the same text the person typed before
   expect(caretOffset('# Plan\n\nFirst **step', 'Plan\nFirst step done\n')).toBe(15)
   expect(caretOffset('- one\n- tw', 'one\ntwo\n')).toBe(6)
   expect(caretOffset('', 'Text\n')).toBe(0)
+})
+
+test('the caret from quick add passes over the parts of a link the page does not show', async () => {
+  // Each readable text is what Inkkit shows for the source before it.
+  expect(caretOffset('[link](https://e.com)', 'link one two three\n')).toBe(4)
+  expect(caretOffset('[link](https://e.com) one', 'link one two three\n')).toBe(8)
+  expect(caretOffset('[link](https://e.c', 'link one two three\n')).toBe(4)
+  expect(caretOffset('[ref][1] z', 'ref z\n')).toBe(5)
+  expect(caretOffset('See [[Plan|the plan]]', 'See the plan today\n')).toBe(12)
+  expect(caretOffset('See [[Plan|the pl', 'See the plan today\n')).toBe(10)
+  expect(caretOffset('[[Plan#Goals]] z', 'Plan#Goals z\n')).toBe(12)
+  expect(caretOffset('![photo](a.png) after', 'photo after\n')).toBe(11)
+  expect(caretOffset('![photo|400](a.png) after', 'photo after\n')).toBe(11)
+  expect(caretOffset('x ![[img.png|400]] after', 'x img.png after\n')).toBe(15)
+})
+
+test('the caret from quick add is placed in the page', async () => {
   await withEditor('Buy milk and eggs\n', (editor) => {
     editor.focusText('Buy milk')
     const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
