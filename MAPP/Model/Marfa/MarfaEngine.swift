@@ -84,7 +84,7 @@ actor MarfaEngine {
 
     let sync: MarfaSync
     let copy: WorkingCopy
-    let downloads: MarfaDownloads
+    private let downloads: MarfaDownloads
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
@@ -147,7 +147,7 @@ actor MarfaEngine {
     var sentAsRead: Set<String> = []
     var following: Task<Void, Never>?
     var painted = false
-    var closed = false
+    private var closed = false
 
     #if DEBUG
     /// Run before each drain's answers are taken, for the tests.
