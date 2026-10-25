@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The instance at the foot of the sidebar, below its places, types and views: its name, a dot where the server is
-/// not reached, and the buttons for the Console, Recently Deleted and Settings. A click on the name opens the page of
+/// not reached, and the buttons for the Console, Settings and Recently Deleted. A click on the name opens the page of
 /// Settings that holds the server's connection.
 struct SidebarFoot: View {
     @CurrentLibrary private var library
