@@ -181,6 +181,9 @@
     "“%@” is larger than %@ or can’t be read." : {
       "extractionState" : "manual"
     },
+    "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
+      "extractionState" : "manual"
+    },
     "“%@” wasn’t created" : {
       "extractionState" : "manual"
     },
@@ -988,6 +991,9 @@
           }
         }
       }
+    },
+    "Images Weren’t Added to the Note" : {
+      "extractionState" : "manual"
     },
     "Important" : {
 

@@ -581,7 +581,8 @@ final class EditorController: NSObject {
     /// Attaches images to the note and links them where they were dropped, given in the page's own coordinates, or
     /// at the caret. Whether there were images to take; they are read and placed once their files have been read,
     /// if the note is still the one on the page. Each image that couldn't be taken is named, and the rest are
-    /// still placed, so trying again adds only those named.
+    /// still placed, so trying again adds only those named. Images attached after the note left the page are named
+    /// too, since they are in the note's attachments but not in its text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let noteID, library != nil, !sources.isEmpty else { return false }
@@ -590,9 +591,13 @@ final class EditorController: NSObject {
             let (files, skipped) = await PastedImages.read(sources)
             guard self.noteID == noteID, isEditable, let library else { return }
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: noteID)
-            Self.reportUnattached(skipped: skipped, failed: report.failed, attached: report.embeds.count, to: library)
             // The images are kept either way; they go into the note only if it is still the one on the page.
-            guard self.noteID == noteID, isEditable else { return }
+            let placed = self.noteID == noteID && isEditable
+            Self.reportUnplaced(
+                skipped: skipped, failed: report.failed, attached: report.embeds.count,
+                unplaced: placed ? [] : report.embeds.map(\.name), in: library.item(noteID)?.title ?? "", to: library
+            )
+            guard placed else { return }
             let images = report.embeds.map { ["src": $0.link, "alt": $0.name] }
             guard !images.isEmpty else { return }
             if let point {
@@ -604,14 +609,22 @@ final class EditorController: NSObject {
         return true
     }
 
-    private static func reportUnattached(
-        skipped: [String], failed: [(name: String, reason: String)], attached: Int, to library: any ItemLibrary
+    private static func reportUnplaced(
+        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], in note: String,
+        to library: any ItemLibrary
     ) {
-        guard !skipped.isEmpty || !failed.isEmpty else { return }
+        guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty else { return }
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
-        let title = attached == 0 ? String(localized: "Can’t Attach Images") : String(localized: "Some Images Weren’t Attached")
+            + unplaced.map { String(localized: "“\($0)” was attached to “\(note)” but isn’t in its text, because the note was no longer open for editing.") }
+        let title = if skipped.isEmpty && failed.isEmpty {
+            String(localized: "Images Weren’t Added to the Note")
+        } else if attached == 0 {
+            String(localized: "Can’t Attach Images")
+        } else {
+            String(localized: "Some Images Weren’t Attached")
+        }
         library.failure = (title, lines.joined(separator: "\n"))
     }
 

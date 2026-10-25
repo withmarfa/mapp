@@ -828,7 +828,7 @@ struct EditorTests {
         #expect(library.failure?.message == "“Large.png” is larger than 50 MB or can’t be read.\n“Other.png” couldn’t be attached. The server is out of space.")
     }
 
-    @Test func imagesAttachedAfterTheNoteChangesAreNotInsertedIntoTheNextOne() async throws {
+    @Test func imagesAttachedAfterTheNoteChangesAreNamedAndNotInsertedIntoTheNextOne() async throws {
         let first = FakeItemLibrary.note("Plan", modified: .now)
         let second = FakeItemLibrary.note("Other", modified: .now)
         let library = FakeItemLibrary(items: [first, second])
@@ -849,7 +849,8 @@ struct EditorTests {
         open.finish()
         #expect(try await settledMarkdown(editor) == nil, "the note now on the page takes nothing")
         #expect(editor.noteID == second.id)
-        #expect(library.failure == nil)
+        #expect(library.failure?.title == "Images Weren’t Added to the Note")
+        #expect(library.failure?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the note was no longer open for editing.")
     }
 
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {
