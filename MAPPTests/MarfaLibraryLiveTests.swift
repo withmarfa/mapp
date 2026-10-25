@@ -6,8 +6,8 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// The library over a real copy of the test instance, in the Live test plan. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
-    /// ends, passed or not.
+    /// The library over a real copy of the test instance, in the Live test plan. Every item it makes has a title
+    /// starting `MAPPTEST ` and is purged when the test ends, passed or not.
     @MainActor
     @Suite(.serialized)
     struct MarfaLibraryLiveTests {

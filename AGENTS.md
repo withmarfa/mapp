@@ -71,7 +71,7 @@ These hold across the app. The nested files say how the library keeps them.
   xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
   ```
 
-  They run without a window or a Dock icon, so they can run while the Mac is in use or locked.
+  They show no window and no Dock icon, so they can run while the Mac is in use.
 - Run the UI tests, which take control of the keyboard and mouse:
 
   ```sh
