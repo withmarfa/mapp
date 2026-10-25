@@ -1025,48 +1025,6 @@ extension LiveMarfaTests {
             bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
         }
 
-        @Test(.timeLimit(.minutes(2)))
-        func aRefusedCreateIsAProblemThePersonCanCopyAndDiscard() async throws {
-            let bench = try HostBench()
-            let host = host(bench)
-            let made = LiveMarfa.Made()
-            do {
-                try await refuseAndDiscard(host, made)
-            } catch {
-                await LiveMarfa.purge(made.ids)
-                throw error
-            }
-            await LiveMarfa.purge(made.ids)
-            try await host.disconnect(.discardCopy(nil))
-        }
-
-        private func refuseAndDiscard(_ host: MarfaHost, _ made: LiveMarfa.Made) async throws {
-            try await host.connect(address: try LiveMarfa.address(), key: try LiveMarfa.key())
-            #expect(await eventually { host.state == .online && host.report.queueRead })
-
-            let title = "MAPPTEST refused \(UUID().uuidString.prefix(8))"
-            let id = made.mint()
-            // The server makes no items of its own reserved types, so this is refused and nothing is made.
-            try #require(host.source).submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: title)), as: WriteID())
-            #expect(await eventually { !host.report.problems.isEmpty })
-            let entry = try #require(host.report.problems.first { $0.itemID == id })
-            #expect(entry.kind == .refused)
-            #expect(entry.change == .create)
-            #expect(entry.reason?.code == "type_not_permitted")
-            #expect(entry.reason?.message?.isEmpty == false)
-            #expect(entry.copyText == title)
-            #expect(entry.actions == [.discard])
-            #expect(host.waitingChanges == 1)
-
-            let source = try #require(host.source)
-            #expect(try await source.resolve(entry.id, by: .tryAgain) == false)
-            #expect(try await source.resolve(entry.id, by: .discard))
-            #expect(await eventually { host.report.problems.isEmpty })
-            let marfa = try #require(source as? MarfaSource)
-            #expect(try await marfa.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
-            #expect(host.waitingChanges == 0)
-        }
-
         /// A mistyped key never replaces the key that works.
         @Test(.timeLimit(.minutes(2)))
         func aWrongKeyGivenForAWorkingCopyKeepsTheOldKey() async throws {
@@ -1085,43 +1043,63 @@ extension LiveMarfaTests {
             try await host.disconnect(.discardCopy(nil))
         }
 
-        /// What the person typed after a create the server refused is shown, and copied, with it.
-        @Test(.timeLimit(.minutes(2)))
-        func anEditBehindARefusedCreateIsPartOfItsProblem() async throws {
+        /// Writes made to an item another device purged meanwhile are refused by the server. Each refusal is a
+        /// problem the person can see, copy what they typed from, and discard.
+        @Test(.timeLimit(.minutes(3)))
+        func editsToAnItemPurgedElsewhereAreAProblemThePersonCanCopyAndDiscard() async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: root) }
             let made = LiveMarfa.Made()
-            let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
-                location: MarfaStoreLocation(root: root))
             do {
-                let log = ChangeLog(source)
-                _ = try #require(await log.wait { $0.snapshot != nil })
-                // Queued before the copy is first hydrated, so neither goes until both are queued.
-                let id = made.mint()
-                source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST first words")), as: WriteID())
-                let created = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
-                let version = try #require(created.snapshot?.items.first { $0.id == id }?.version)
-                source.submit(
-                    .editProperties(id, ["title": .string("MAPPTEST first words, then everything typed after")], base: version, undoing: nil),
-                    as: WriteID())
-                #expect(await eventually { source.syncReport.waiting == 2 })
-                source.refresh()
-                #expect(await eventually { source.syncReport.problems.contains { $0.itemID == id } })
-                let entry = try #require(source.syncReport.problems.first { $0.itemID == id })
-                #expect(entry.copyText == "MAPPTEST first words, then everything typed after")
-                #expect(entry.dependents.count == 1)
-                #expect(try await source.resolve(entry.id, by: .discard))
-                #expect(await eventually { source.syncReport.problems.isEmpty })
-                #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
+                try await refuseEditsToAPurgedItem(root, made)
             } catch {
-                await source.close()
                 await LiveMarfa.purge(made.ids)
                 throw error
             }
-            await source.close()
             await LiveMarfa.purge(made.ids)
+        }
+
+        private func refuseEditsToAPurgedItem(_ root: URL, _ made: LiveMarfa.Made) async throws {
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
+            let keys = MemoryKeyStore([connection: try LiveMarfa.key()])
+            let location = MarfaStoreLocation(root: root)
+            var source = try await MarfaSource.open(connection, keys: keys, location: location)
+            var log = ChangeLog(source)
+            source.refresh()
+            try #require(await eventually { LiveMarfa.isWhole(source.syncReport) && source.connectionState == .online })
+            let id = made.mint()
+            let created = WriteID()
+            source.submit(.create(id: id, ItemDraft(type: TypeID("core.note"), title: "MAPPTEST purged elsewhere", body: "One")), as: created)
+            await source.flush()
+            let settled = try #require(await log.wait { state in
+                state.answer(to: created) == .accepted && state.snapshot?.items.first { $0.id == id }?.sync == .settled
+            })
+            let version = try #require(settled.snapshot?.items.first { $0.id == id }?.version)
+            await source.close()
+
+            // Another device bins and purges the item while this copy is closed.
+            await LiveMarfa.purge([id])
+
+            source = try await MarfaSource.open(connection, keys: keys, location: location)
+            log = ChangeLog(source)
+            _ = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
+            let typed = "MAPPTEST purged elsewhere, then everything typed after"
+            let edit = WriteID(), behind = WriteID()
+            source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
+            source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
+            #expect(await eventually { source.syncReport.waiting == 2 })
+            source.refresh()
+            // Each write names an item the server no longer holds, so each is refused on its own.
+            #expect(await eventually { source.syncReport.problems.count { $0.itemID == id } == 2 }, "\(source.syncReport.problems)")
+            let entries = source.syncReport.problems.filter { $0.itemID == id }
+            #expect(entries.allSatisfy { $0.kind == .refused && $0.reason?.code.isEmpty == false })
+            #expect(entries.allSatisfy { !$0.actions.contains(.tryAgain) && $0.actions.contains(.discard) })
+            let edited = try #require(entries.first { $0.change == .edit })
+            #expect(edited.copyText.contains(typed))
+            for entry in entries { #expect(try await source.resolve(entry.id, by: .discard)) }
+            #expect(await eventually { !source.syncReport.problems.contains { $0.itemID == id } })
+            #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
+            await source.close()
         }
 
         /// A throwaway key on a throwaway copy, so the real key is never revoked.

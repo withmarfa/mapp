@@ -28,7 +28,7 @@ extension LiveMarfaTests {
             do {
                 source.refresh()
                 try #require(await eventually {
-                    library.isLoaded && library.connection == .online && library.count(in: .allNotes) > 100
+                    library.isLoaded && library.connection == .online && LiveMarfa.isWhole(library.syncReport)
                 })
                 try await body(library, source, made)
             } catch {
@@ -40,9 +40,27 @@ extension LiveMarfaTests {
 
         @Test(.timeLimit(.minutes(2)))
         func browsesEveryPlaceAndFollowsEdgesBothWays() async throws {
-            try await withLibrary { library, _, _ in
-                let types = Set(library.items(in: .allNotes).map(\.type)).map { SidebarItem.itemType($0.rawValue) }
-                for place in [SidebarItem.inbox, .allNotes, .favorites, .files, .recentlyDeleted] + types {
+            try await withLibrary { library, source, made in
+                let token = "zb" + UUID().uuidString.prefix(8).lowercased()
+                @MainActor func make(_ title: String, under parent: ItemID? = nil, in place: SidebarItem = .allNotes) throws -> ItemID {
+                    let id = library.createItem(
+                        typeID: "core.note", title: "MAPPTEST \(title) \(token)", body: "Made by the MAPP tests.",
+                        parentID: parent, in: place, undoManager: nil)
+                    if let id { made.add(id) }
+                    return try #require(id)
+                }
+                let project = try make("project")
+                let captured = try make("captured", in: .inbox)
+                try #require(await eventually { library.item(project) != nil })
+                let children = [try make("first child", under: project), try make("second child", under: project)]
+                await source.flush()
+                try #require(await eventually {
+                    Set(library.relationships(for: project).first { $0.field == "inverse:parent-of" }?.targets.compactMap(\.itemID) ?? [])
+                        == Set(children) && library.item(captured) != nil
+                })
+
+                let types = Set(library.items(in: .allNotes).map(\.type))
+                for place in [SidebarItem.inbox, .allNotes, .favorites, .files, .recentlyDeleted] + types.map({ SidebarItem.itemType($0.rawValue) }) {
                     let items = library.items(in: place)
                     #expect(library.count(in: place) == items.count, "\(place)")
                     #expect(!library.name(of: place).isEmpty, "\(place)")
@@ -50,40 +68,31 @@ extension LiveMarfaTests {
                     case .recentlyDeleted: #expect(items.allSatisfy { $0.state == .trashed })
                     case .favorites: #expect(items.allSatisfy { $0.isFavorite && $0.state == .active })
                     case .inbox: #expect(items.allSatisfy { $0.tier == .feed })
+                    // A type's place holds only its own items, never its subtypes'.
+                    case .itemType(let type): #expect(items.allSatisfy { $0.type == TypeID(type) && $0.state == .active }, "\(place)")
                     default: #expect(items.allSatisfy { $0.state == .active }, "\(place)")
                     }
                 }
                 #expect(library.items(in: .allNotes).allSatisfy { !$0.title.isEmpty })
                 // One copy holds both tiers: the Inbox is the feed, and All Items has the feed's items among the rest.
                 let inbox = library.items(in: .inbox)
-                #expect(!inbox.isEmpty)
+                #expect(inbox.contains { $0.id == captured })
+                #expect(!inbox.contains { $0.id == project })
                 #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .allNotes).map(\.id))))
-                #expect(library.items(in: .allNotes).contains { $0.tier == .library })
-                // A type's place holds its subtypes.
-                let tickets = library.items(in: .itemType("aic.ticket"))
-                #expect(tickets.contains { $0.type != TypeID("aic.ticket") })
 
-                // A project lists everything below it, not itself; each child holds it as `child-of`.
-                let projects = library.items(in: .itemType("aic.project"))
-                let project = try #require(projects.first { project in
-                    library.relationships(for: project.id).contains { $0.field == "inverse:parent-of" && !$0.targets.isEmpty }
-                })
-                let children = try #require(library.relationships(for: project.id).first { $0.field == "inverse:parent-of" })
-                #expect(children.label == "Children")
-                let beneath = Set(library.items(in: .collection(project.id)).map(\.id))
-                #expect(!beneath.contains(project.id))
-                for child in children.targets {
-                    let id = try #require(child.itemID)
-                    let parent = library.relationships(for: id).first { $0.field == "child-of" }
-                    #expect(parent?.targets.map(\.itemID) == [project.id])
+                // A collection lists everything below it, not itself; each child holds it as `child-of`.
+                let below = try #require(library.relationships(for: project).first { $0.field == "inverse:parent-of" })
+                #expect(below.label == "Children")
+                let beneath = Set(library.items(in: .collection(project)).map(\.id))
+                #expect(beneath == Set(children))
+                for child in children {
+                    let parent = library.relationships(for: child).first { $0.field == "child-of" }
+                    #expect(parent?.targets.map(\.itemID) == [project])
                     #expect(parent?.label == "Parent")
-                    if library.item(id)?.state == .active { #expect(beneath.contains(id)) }
                 }
-                #expect(library.body(of: project.id) != nil)
-                #expect(!library.relationshipCandidates(for: project.id, field: "about").isEmpty)
-
-                let word = try #require(project.title.split(separator: " ").first { $0.count > 3 }.map(String.init))
-                #expect(await eventually { library.items(matching: word).contains { $0.id == project.id } })
+                #expect(library.body(of: project)?.text == "Made by the MAPP tests.")
+                #expect(!library.relationshipCandidates(for: project, field: "about").isEmpty)
+                #expect(await eventually { library.items(matching: token).contains { $0.id == project } })
             }
         }
 
@@ -132,8 +141,15 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually { library.item(child)?.title == title })
 
+                @MainActor func rehydrated(after before: Int) async throws -> Bool {
+                    try await eventuallyAsking {
+                        guard LiveMarfa.isWhole(library.syncReport) else { return false }
+                        return await source.engine.sync.hydrations > before
+                    }
+                }
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
                 // holds none, and a refusal would leave it where it was.
+                let moving = await source.engine.sync.hydrations
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
@@ -150,10 +166,15 @@ extension LiveMarfaTests {
                         && library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
                 #expect(await eventually { library.syncReport.waiting == 0 })
+                // A relationship written while the copy hydrates again is refused until it is whole.
+                try #require(try await rehydrated(after: moving))
+                let undoing = await source.engine.sync.hydrations
                 undo.undo()
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
-                })
+                }, "\(String(describing: library.failure))")
+                await source.flush()
+                try #require(try await rehydrated(after: undoing))
                 // Without a parent, then under another, each seen from both ends, and undone.
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [], undoManager: undo)) }
                 #expect(await eventually {
@@ -258,14 +279,15 @@ extension LiveMarfaTests {
                 let fresh = MarfaLibrary(source: second)
                 second.refresh()
                 try #require(await eventually {
-                    fresh.isLoaded && fresh.connection == .online && fresh.count(in: .allNotes) > 100
+                    fresh.isLoaded && fresh.connection == .online && LiveMarfa.isWhole(fresh.syncReport)
                 })
                 try #require(await eventually { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
                 #expect(await eventually { fresh.body(of: note)?.text == "In the bin." })
 
+                // The copy never held the item, so it is restored once the server has taken it.
                 fresh.recover([note], undoManager: nil)
-                #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
                 try #require(await eventually { fresh.item(note)?.state == .active })
+                #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
                 #expect(fresh.failure == nil, "\(String(describing: fresh.failure))")
                 await second.flush()
                 await second.close()

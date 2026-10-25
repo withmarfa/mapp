@@ -838,6 +838,13 @@ extension LiveMarfaTests {
                 location: MarfaStoreLocation(root: root))
         }
 
+        /// Refreshes a fresh copy and waits until it holds the whole library and the engine has published it.
+        private func hydrated(_ source: MarfaSource) async throws {
+            source.refresh()
+            try #require(await eventually { LiveMarfa.isWhole(source.syncReport) && source.connectionState == .online })
+            await source.queueSubmitted()
+        }
+
         /// Runs `body` with a fresh copy, already refreshed, and purges every id it mints, however it ends.
         private func withSource(
             _ body: (MarfaSource, ChangeLog, LiveMarfa.Made) async throws -> Void
@@ -847,9 +854,8 @@ extension LiveMarfaTests {
             let source = try await open(root)
             let log = ChangeLog(source)
             do {
-                source.refresh()
-                #expect(await waitForConnection(source) { $0 == .online })
-                _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
+                try await hydrated(source)
+                _ = try #require(await log.wait { $0.snapshot != nil })
                 try await body(source, log, made)
             } catch {
                 await source.close()
@@ -865,48 +871,63 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(2)))
         func readsTheLibraryAndPaintsItAgainBeforeTheNetwork() async throws {
             let root = scratch()
+            let made = LiveMarfa.Made()
             defer { try? FileManager.default.removeItem(at: root) }
+            do {
+                try await readsAndPaintsAgain(root, made)
+            } catch {
+                await LiveMarfa.purge(made.ids)
+                throw error
+            }
+            await LiveMarfa.purge(made.ids)
+        }
+
+        private func readsAndPaintsAgain(_ root: URL, _ made: LiveMarfa.Made) async throws {
             let source = try await open(root)
             let log = ChangeLog(source)
-            source.refresh()
-            let hydrated = try #require(await log.wait { state in
-                (state.snapshot?.items.count ?? 0) > 100 && state.snapshot?.catalogue.itemTypes[TypeID("aic.project")] != nil
+            try await hydrated(source)
+            let catalogue = try #require(await log.wait { $0.snapshot != nil }?.snapshot?.catalogue)
+            #expect(catalogue.itemTypes[Self.note]?.titleField == "title")
+            #expect(catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseName == "child-of")
+
+            // A child holds its parent as `child-of`, and the copy lists it beneath the parent.
+            let token = "zp" + UUID().uuidString.prefix(8).lowercased()
+            let parent = made.mint(), child = made.mint()
+            source.submit(.create(id: parent, ItemDraft(type: Self.note, title: "MAPPTEST parent \(token)", body: "Above.")), as: WriteID())
+            source.submit(
+                .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST child \(token)", body: "Below.", parent: parent)),
+                as: WriteID())
+            await source.flush()
+            let filed = try #require(await log.wait { state in
+                [parent, child].allSatisfy { id in state.snapshot?.items.first { $0.id == id }?.sync == .settled }
+                    && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains {
+                        $0.type == "child-of" && $0.target == .item(parent)
+                    } == true
             })
-            #expect(await waitForConnection(source) { $0 == .online })
-            let snapshot = try #require(hydrated.snapshot)
-            let catalogue = snapshot.catalogue
-            #expect(catalogue.itemTypes[TypeID("aic.project")]?.titleField == "title")
-            #expect(catalogue.edgeTypes["parent-of"]?.reverseName == "child-of")
+            let snapshot = try #require(filed.snapshot)
             #expect(snapshot.items.allSatisfy { !$0.title.isEmpty })
+            let beneath = try await source.copy.items.list(ListFilters(beneath: parent.rawValue)).map { ItemID($0.id) }
+            #expect(Set(beneath).subtracting([parent]) == [child])
 
-            // A project's children hold it as `child-of`, and the copy lists them beneath it.
-            let projects = snapshot.items.filter { $0.type == TypeID("aic.project") }.map(\.id)
-            let project = try #require(projects.first { id in
-                snapshot.items.contains { $0.edgesOut.contains { $0.type == "child-of" && $0.target == .item(id) } }
+            let parentItem = try #require(snapshot.items.first { $0.id == parent })
+            let body = try await source.body(of: parent)
+            #expect(body.text == "Above.")
+            #expect(body.version == parentItem.version)
+            #expect(parentItem.properties.allSatisfy { $0.key != "body" })
+
+            #expect(await LiveMarfa.until {
+                (try? await source.search("\(token)", in: ItemQuery(types: [Self.note])))?.contains(parent) == true
             })
-            let children = snapshot.items.filter { item in
-                item.edgesOut.contains { $0.type == "child-of" && $0.target == .item(project) }
-            }
-            let beneath = try await source.copy.items.list(ListFilters(beneath: project.rawValue)).map { ItemID($0.id) }
-            #expect(!children.isEmpty)
-            #expect(Set(children.map(\.id)).isSubset(of: Set(beneath)))
-
-            let projectItem = try #require(snapshot.items.first { $0.id == project })
-            let body = try await source.body(of: project)
-            #expect(body.version == projectItem.version)
-            #expect(projectItem.properties.allSatisfy { $0.key != "body" })
-
-            let word = try #require(projectItem.title.split(separator: " ").first { $0.count > 3 }.map(String.init))
-            let found = try await source.search(word, in: ItemQuery(types: [TypeID("aic.project")]))
-            #expect(found.contains(project))
-            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == TypeID("aic.project") })
-            let count = snapshot.items.count
+            let found = try await source.search(token, in: ItemQuery(types: [Self.note]))
+            #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == Self.note })
+            let count = try #require(log.current.snapshot?.items.count)
             await source.close()
 
             let reopened = try await open(root)
             let again = ChangeLog(reopened)
             let repainted = try #require(await again.wait { $0.snapshot != nil })
             #expect(repainted.snapshot?.items.count == count)
+            #expect(repainted.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(parent) } == true)
             #expect(reopened.connectionState == .connecting)
             await reopened.close()
         }
@@ -1000,14 +1021,22 @@ extension LiveMarfaTests {
         /// The copy holds both tiers, so the Inbox, which is the feed, and the rest of the library read from one copy.
         @Test(.timeLimit(.minutes(2)))
         func holdsBothTiersInOneCopy() async throws {
-            try await withSource { source, log, _ in
+            try await withSource { source, log, made in
                 let status = try await source.copy.status()
                 #expect(status.sliceTier == .all)
-                let items = try #require(log.current.snapshot?.items)
-                #expect(items.contains { $0.tier == .feed })
-                #expect(items.contains { $0.tier == .library })
-                let feed = try await source.copy.items.list(ListFilters(tier: .feed))
-                #expect(Set(feed.map { ItemID($0.id) }).isSubset(of: Set(items.map(\.id))))
+                let token = UUID().uuidString.prefix(8)
+                let captured = made.mint(), filed = made.mint()
+                source.submit(.create(id: captured, ItemDraft(type: Self.note, title: "MAPPTEST feed \(token)", tier: .feed)), as: WriteID())
+                source.submit(.create(id: filed, ItemDraft(type: Self.note, title: "MAPPTEST library \(token)")), as: WriteID())
+                await source.flush()
+                _ = try #require(await log.wait { state in
+                    state.snapshot?.items.first { $0.id == captured }?.tier == .feed
+                        && state.snapshot?.items.first { $0.id == filed }?.tier == .library
+                })
+                // The copy's whole feed, the Inbox, is in the one snapshot beside the library's items.
+                let feed = Set(try await source.copy.items.list(ListFilters(tier: .feed)).map { ItemID($0.id) })
+                #expect(feed.contains(captured) && !feed.contains(filed))
+                #expect(await log.wait { state in feed.isSubset(of: Set(state.snapshot?.items.map(\.id) ?? [])) } != nil)
             }
         }
 
@@ -1081,8 +1110,7 @@ extension LiveMarfaTests {
 
             var source = try await MarfaSource.open(connection, keys: keys, location: location)
             var log = ChangeLog(source)
-            source.refresh()
-            _ = try #require(await log.wait { ($0.snapshot?.items.count ?? 0) > 100 })
+            try await hydrated(source)
             source.submit(.create(id: a, ItemDraft(type: Self.note, title: "MAPPTEST earlier A \(tag)", body: "One")), as: WriteID())
             source.submit(.create(id: b, ItemDraft(type: Self.note, title: "MAPPTEST earlier B \(tag)", body: "One")), as: WriteID())
             let both = try #require(await log.wait { state in
@@ -1220,7 +1248,10 @@ extension LiveMarfaTests {
                 #expect(done.answer(to: move) == .accepted)
                 #expect(done.answer(to: tagged) == .accepted)
                 // The answers are told once the copy is hydrated again, so reading the moved ends fails nowhere.
-                #expect(!done.changes.contains { if case .unavailable = $0 { true } else { false } })
+                let unavailable = done.changes.compactMap { change -> String? in
+                    if case .unavailable(let failure) = change { failure.message } else { nil }
+                }
+                #expect(unavailable.isEmpty, "\(unavailable)")
                 let moved = try #require(done.snapshot?.items.first { $0.id == child })
                 #expect(moved.edgesOut.contains { $0.target == .item(second) })
                 #expect(!moved.edgesOut.contains { $0.target == .item(first) })
@@ -1263,24 +1294,25 @@ extension LiveMarfaTests {
             }
         }
 
-        @Test(.timeLimit(.minutes(1)))
-        func aRefusedWriteIsReportedAndKept() async throws {
+        /// The package refuses a create of a reserved type before queueing it, with the server's own code, so it is
+        /// answered at once, nothing waits in the queue, and nothing reaches the server.
+        @Test(.timeLimit(.minutes(2)))
+        func aWriteThePackageRefusesIsAnsweredAtOnceAndNotQueued() async throws {
             try await withSource { source, log, made in
-                // The server makes no items of its own reserved types, so this is refused and nothing is made.
                 let write = WriteID()
-                source.submit(.create(id: made.mint(), ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST refused")), as: write)
+                let id = made.mint()
+                source.submit(.create(id: id, ItemDraft(type: TypeID("system.folder"), title: "MAPPTEST refused")), as: write)
                 let answered = try #require(await log.wait { $0.answer(to: write) != nil })
                 guard case .refused(let problem) = answered.answer(to: write) else {
                     Issue.record("the create was not refused: \(String(describing: answered.answer(to: write)))")
                     return
                 }
                 #expect(problem.code == "type_not_permitted")
-                let held = try await source.copy.queue.all().filter { write in
-                    if case .refused = write.verdict { write.kind == .createItem } else { false }
-                }
-                #expect(held.count == 1)
-                #expect(held.first?.body.isEmpty == false)
-                for write in held { _ = try await source.copy.queue.discard(write.id) }
+                #expect(problem.notQueued)
+                #expect(problem.message?.isEmpty == false)
+                #expect(try await source.copy.queue.all().isEmpty)
+                #expect(source.syncReport.problems.isEmpty)
+                #expect(try await source.copy.items.get(id.rawValue) == nil)
             }
         }
     }
@@ -1330,6 +1362,13 @@ nonisolated enum LiveMarfa {
         private let value = Mutex(false)
         var isSet: Bool { value.withLock { $0 } }
         func set() { value.withLock { $0 = true } }
+    }
+
+    /// Whether a copy holds the whole library. A large library is listed in pages, with its relationships and the
+    /// feed after its first rows, and a move of an edge's source hydrates it again, so a test that reads what the
+    /// server holds, or writes a relationship, waits for this.
+    static func isWhole(_ report: SyncReport) -> Bool {
+        report.fill?.state == .complete && report.phase == .current
     }
 
     static func until(_ condition: () async -> Bool) async -> Bool {

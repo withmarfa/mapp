@@ -248,10 +248,31 @@ extension LiveMarfaTests {
             try #require(report.verdicts.allSatisfy { $0.verdict == .accepted }, "the other device's write: \(report.verdicts)")
         }
 
-        private func settle(_ library: MarfaLibrary, _ source: MarfaSource) async throws {
+        /// Sends what waits and waits for the server's conflicted copy of the item, holding `text`, to reach the library.
+        private func conflictedCopy(
+            _ library: MarfaLibrary, _ source: MarfaSource, _ token: String, holding text: String
+        ) async throws -> [MAPP.Item] {
             await source.flush()
-            try await Task.sleep(for: .seconds(3))
+            _ = await eventually {
+                library.items(in: .allNotes).contains {
+                    $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
+                        && library.body(of: $0.id)?.text == text
+                }
+            }
+            return library.items(in: .allNotes).filter {
+                $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
+            }
+        }
+
+        /// Sends what waits and waits until the copy holds `text` with nothing left to send. A drain's answers are
+        /// taken before a flush returns, so a conflict would show by then.
+        private func sent(_ library: MarfaLibrary, _ source: MarfaSource, _ id: ItemID, holding text: String) async throws {
             await source.flush()
+            let held = try await eventuallyAsking {
+                guard library.syncReport.waiting == 0 else { return false }
+                return try await source.body(of: id).text == text
+            }
+            #expect(held)
         }
 
         /// The finding reproduced: the page reports typing made on "start" after the copy took in another device's
@@ -265,11 +286,8 @@ extension LiveMarfaTests {
                 try await otherDevice(id, sets: "theirs")
                 try #require(await eventually { library.body(of: id)?.text == "theirs" })
                 library.updateBody(of: id, to: "start, mine", readAt: read)
-                try await settle(library, source)
+                let copies = try await conflictedCopy(library, source, token, holding: "start, mine")
                 let held = try await source.body(of: id).text
-                let copies = library.items(in: .allNotes).filter {
-                    $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
-                }
                 Attachment.record("held: \(held)\ncopies: \(copies.map { library.body(of: $0.id)?.text ?? "" })", named: "LateReport.txt")
                 #expect(held == "theirs")
                 #expect(copies.count == 1)
@@ -293,11 +311,8 @@ extension LiveMarfaTests {
                 let caughtUp = await LiveMarfa.until { (try? await source.body(of: id).text) == "theirs" }
                 try #require(caughtUp)
                 source.submit(.editBody(id, "start, one, two", base: read, merge: .following), as: WriteID())
-                try await settle(library, source)
+                let copies = try await conflictedCopy(library, source, token, holding: "start, one, two")
                 let held = try await source.body(of: id).text
-                let copies = library.items(in: .allNotes).filter {
-                    $0.tags.contains(MarfaProblems.conflictedCopyTag) && $0.title.contains(token)
-                }
                 Attachment.record("held: \(held)\ncopies: \(copies.map { library.body(of: $0.id)?.text ?? "" })", named: "Following.txt")
                 #expect(held == "theirs")
                 #expect(copies.compactMap { library.body(of: $0.id)?.text } == ["start, one, two"])
@@ -314,9 +329,7 @@ extension LiveMarfaTests {
                 library.updateBody(of: id, to: "first edit")
                 busy(seconds: 3)
                 library.updateBody(of: id, to: "first edit, second edit")
-                await source.flush()
-                try await Task.sleep(for: .seconds(3))
-                await source.flush()
+                try await sent(library, source, id, holding: "first edit, second edit")
                 let held = try await source.body(of: id).text
                 let problems = conflicts(library, id, token)
                 Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.failure))", named: "Busy.txt")
@@ -335,11 +348,10 @@ extension LiveMarfaTests {
                 for index in 0..<30 {
                     text += " w\(index)"
                     library.updateBody(of: id, to: text)
+                    // The pauses between the page's reports, which let earlier saves drain while later ones are typed.
                     try await Task.sleep(for: .milliseconds([40, 90, 150, 220][index % 4]))
                 }
-                await source.flush()
-                try await Task.sleep(for: .seconds(3))
-                await source.flush()
+                try await sent(library, source, id, holding: text)
                 let held = try await source.body(of: id).text
                 let problems = conflicts(library, id, token)
                 Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.failure))", named: "Typing.txt")
@@ -360,10 +372,11 @@ extension LiveMarfaTests {
                 made.add(id)
                 #expect(await eventually { library.items(in: .inbox).contains { $0.id == id } })
                 await source.flush()
+                try #require(await eventually { library.item(id)?.sync == .settled })
+                try await source.engine.sync.refreshNow()
+                // Gives the changes the catch-up brought time to reach the library before checking that the item
+                // did not leave the Inbox.
                 try await Task.sleep(for: .seconds(2))
-                source.refresh()
-                try await Task.sleep(for: .seconds(4))
-                await source.flush()
                 Attachment.record("held: \(library.item(id) != nil), tier: \(String(describing: library.item(id)?.tier)), inbox: \(library.items(in: .inbox).count), failure: \(String(describing: library.failure))", named: "Inbox.txt")
                 #expect(library.items(in: .inbox).contains { $0.id == id })
             }
