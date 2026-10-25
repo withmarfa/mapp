@@ -99,8 +99,8 @@ import Observation
         var title: String
         /// What a create carried, which a closing source would otherwise lose.
         var text: String?
-        /// Whether the create carried a body, which a refusal before queueing would otherwise lose; a title alone is
-        /// told with the refusal.
+        /// Whether the create carried a body, which a refusal before queueing would otherwise lose. A create with a
+        /// title alone, such as New's, gives nothing back.
         var carriesBody = false
     }
 
