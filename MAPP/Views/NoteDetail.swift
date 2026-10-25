@@ -143,12 +143,12 @@ struct NotePage: View {
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             editor.select(item)
         }
-        // The editor takes in only a change to the note's text or its state. A change the server has taken takes a
-        // new version, but the copy shows a delete or a recovery before then, and a server that keeps its own text
-        // over the person's changes the text without one. The action may run on an earlier copy of this view, so
-        // the note is read as it is now.
+        // The editor takes in only a change to the note's text or to whether it can be written in. A change the
+        // server has taken takes a new version, but the copy shows a delete, a recovery or a problem before then,
+        // and a server that keeps its own text over the person's changes the text without one. The action may run
+        // on an earlier copy of this view, so the note is read as it is now.
         .onChange(of: item.version) { noteChanged() }
-        .onChange(of: item.state) { noteChanged() }
+        .onChange(of: item.isWritable) { noteChanged() }
         .onChange(of: library.body(of: item.id)) { noteChanged() }
     }
 
