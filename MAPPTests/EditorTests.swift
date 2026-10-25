@@ -334,6 +334,7 @@ struct EditorTests {
     @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
         let page = try await Page()
         try await page.load("```mermaid\nnot a valid diagram [\n```\n")
+        // Time for the diagram's failure to reach the app, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(300))
         #expect(page.library.failure == nil)
         #expect(try await page.markdown() == nil)

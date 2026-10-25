@@ -170,7 +170,7 @@ struct EmbeddedFilesTests {
         let task = RecordingSchemeTask(EmbeddedFiles.url(for: reference, in: folder.note, version: 1), range: range)
         task.keepsData = keepingData
         files.webView(WKWebView(), start: task)
-        for _ in 0..<2000 where !task.finished && task.failure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        try #require(await eventually { task.finished || task.failure != nil })
         try #require(task.finished)
         return task
     }
@@ -281,7 +281,7 @@ struct EmbeddedFilesTests {
         task.keepsData = false
         task.onPiece = { peak = max(peak, Self.footprint()) }
         files.webView(WKWebView(), start: task)
-        for _ in 0..<6000 where !task.finished && task.failure == nil { try await Task.sleep(for: .milliseconds(5)) }
+        try #require(await eventually { task.finished || task.failure != nil })
         try #require(task.finished)
         #expect(UInt64(task.received) == size)
         #expect(task.largestPiece <= EmbeddedFiles.piece)
@@ -298,6 +298,7 @@ struct EmbeddedFilesTests {
         task.keepsData = false
         task.onPiece = { files.webView(webView, stop: task) }
         files.webView(webView, start: task)
+        // Time for a piece sent after the stop, which nothing signals when none is sent.
         try await Task.sleep(for: .milliseconds(300))
         #expect(task.received == EmbeddedFiles.piece, "WebKit throws on a task it has stopped")
         #expect(!task.finished)

@@ -685,6 +685,7 @@ nonisolated final class TestKeyStore: KeyStore {
         let change = Task { try await host.changeAddress(to: "http://second.test:8210", key: "two") }
         #expect(await eventually { bench.servers.opening.withLock { $0 } })
         old.report.set(SyncReport(waiting: 1, queueRead: true))
+        // Time for the change of address, held at opening, to see the old copy's report.
         try await Task.sleep(for: .milliseconds(100))
         bench.servers.slow.withLock { $0 = false }
         let result = await change.result
@@ -873,6 +874,7 @@ struct MarfaHostOfflineTests {
         let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
         source.events.yield(.change(Change(origin: .stopped(ended), itemId: nil, edgeId: nil)))
         #expect(await eventually { host.state == .keyRefused })
+        // Time for a reconnection the refused key should not set off.
         try await Task.sleep(for: .seconds(1))
         #expect(host.state == .keyRefused)
 
@@ -1217,6 +1219,7 @@ extension LiveMarfaTests {
         let watch = ModeWatch(libraries)
         let replacing = Task { try await libraries.host.replaceKey("new") }
         #expect(await eventually { source.calls.contains("close") })
+        // Holds the close a little, as a slow one would be held.
         try await Task.sleep(for: .milliseconds(50))
         source.closesSlowly.withLock { $0 = false }
         _ = await replacing.result

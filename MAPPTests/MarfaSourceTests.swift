@@ -307,6 +307,7 @@ struct MarfaSourceOfflineTests {
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
         source.refresh()
+        // Time for the refresh to reach the server that never answers, so the write meets it hanging.
         try await Task.sleep(for: .milliseconds(200))
         let clock = ContinuousClock()
         let start = clock.now
@@ -470,6 +471,7 @@ struct MarfaSourceOfflineTests {
 
         // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
         await sync.unreadable(["a"])
+        // Time for a second hydration, which nothing signals when none is asked for.
         try await Task.sleep(for: .milliseconds(500))
         #expect(await sync.hydrations == 1)
         await source.close()

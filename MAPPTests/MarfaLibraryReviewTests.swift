@@ -90,6 +90,7 @@ import Testing
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
         #expect(await eventually { library.failure != nil })
+        // Time for an unlink the refusal should not set off.
         try await Task.sleep(for: .milliseconds(200))
         #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
     }
@@ -135,9 +136,8 @@ import Testing
         source.inner.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         _ = library.items(matching: "body")
-        try await Task.sleep(for: .milliseconds(300))
+        #expect(await eventually { library.failure != nil }, "a search that threw is shown as no results, and nothing says so")
         #expect(library.items(matching: "body").isEmpty)
-        #expect(library.failure != nil, "a search that threw is shown as no results, and nothing says so")
     }
 }
 

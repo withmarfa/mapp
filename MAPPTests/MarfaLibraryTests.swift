@@ -729,6 +729,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         source.queuing.withLock { $0 = true }
         let finished = Task { await library.finish() }
+        // Time for finishing to return early, which it must not.
         try await Task.sleep(for: .milliseconds(100))
         #expect(source.queues.withLock { $0 } == 0, "finishing returned before the source had queued its writes")
         source.queuing.withLock { $0 = false }
