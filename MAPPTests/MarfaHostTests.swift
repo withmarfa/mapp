@@ -368,6 +368,40 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(FileManager.default.fileExists(atPath: store.path))
     }
 
+    /// An earlier version of the app may still be writing a copy this version refuses, so it stays too.
+    @Test(.timeLimit(.minutes(1)))
+    func discardingACopyADifferentVersionWritesLeavesIt() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.keys.save("k", for: first)
+        let store = bench.location.store(for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        await (try await WorkingCopy.open(store: store)).close()
+        try MarfaSourceOfflineTests.makeItAnEarlierVersion(store)
+        let holder: OtherProcessLock
+        do {
+            holder = try await OtherProcessLock(store)
+        } catch OtherProcessLock.Failure.notStarted(let reason) {
+            Issue.record("The test sandbox forbids starting /usr/bin/sqlite3, so another process can't hold the lock here: \(reason)")
+            return
+        }
+        defer { holder.release() }
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .inUse, message: "The package’s words.") }
+        let host = bench.host()
+        await host.launch()
+
+        await expect(.notRemoved(key: nil, copy: Words.inUse)) { () throws(MarfaHost.Problem) in
+            try await host.disconnect(.discardCopy(nil))
+        }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+
+        // Once that process lets go, the copy marked to go is removed before the address opens again.
+        holder.release()
+        bench.servers.failure.withLock { $0 = nil }
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
     @Test func connectingToAServerWhoseCopyADifferentVersionMadeIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host()

@@ -521,16 +521,23 @@ import Observation
         await held?.close()
     }
 
-    /// Opens the store as its writer, or nil where there is no store to hold or the package will not open it, as
-    /// with one another version of the app made: the package releases the lock as it refuses such a store.
+    /// Opens the store as its writer, or nil where there is no store to hold. A store another version of the app
+    /// made is refused by `open`, which releases the lock as it does: with nothing unsent, the package replaces it
+    /// with an empty one held as its writer, and refuses while another process writes it. One holding changes
+    /// the server has not taken, which the person was shown and chose to discard, cannot be held, so it is removed
+    /// without the lock.
     @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
         guard FileManager.default.fileExists(atPath: store.path) else { return nil }
         let copy: WorkingCopy
         do {
             copy = try await WorkingCopy.open(store: store)
-        } catch MarfaError.readingHandle {
-            throw SourceFailure(kind: .inUse, message: Words.inUse)
-        } catch {
+        } catch MarfaError.wrongSchema(_, _, 0?, _) {
+            do {
+                copy = try await WorkingCopy.replaceRefused(store: store)
+            } catch MarfaError.readingHandle {
+                throw SourceFailure(kind: .inUse, message: Words.inUse)
+            }
+        } catch MarfaError.wrongSchema {
             return nil
         }
         guard copy.handle == .writer else {

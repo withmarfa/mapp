@@ -262,7 +262,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// Gives the queue the shape and write kind an earlier build used, as the package's own test does.
-    private static func makeItAnEarlierVersion(_ store: URL) throws {
+    static func makeItAnEarlierVersion(_ store: URL) throws {
         try execute(
             store,
             """
@@ -274,7 +274,7 @@ struct MarfaSourceOfflineTests {
         try execute(store, "UPDATE queue SET kind = 'merge_metadata'")
     }
 
-    private static func execute(_ store: URL, _ statements: String) throws {
+    static func execute(_ store: URL, _ statements: String) throws {
         var database: OpaquePointer?
         try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
