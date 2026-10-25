@@ -109,7 +109,6 @@ struct MainView: View {
             Sidebar(browser: browser, order: order)
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)
-            SidebarFoot(browser: browser)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
             if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }

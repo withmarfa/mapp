@@ -23,7 +23,7 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     func testSidebarListsTopPlacesThenTypesAndViews() {
-        let destinations = ["Inbox", "Recents", "Favorites", "Browse", "Items", "Sources", "Collections", "Types", "Views"]
+        let destinations = ["Inbox", "Recents", "Favorites", "Browse", "Items", "Sources", "Collections", "Types"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }

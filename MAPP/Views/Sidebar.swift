@@ -67,13 +67,10 @@ struct Sidebar: View {
                 }
             }
 
-            Section("Views") {
-                Text("Not connected yet")
-                    .foregroundStyle(.secondary)
-                    .selectionDisabled()
-            }
         }
         .listStyle(.sidebar)
+        // The system's scroll edge shows the foot over a material only while rows pass beneath it.
+        .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
         .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         .onChange(of: favorites.map(\.id)) {
@@ -225,10 +222,7 @@ private struct TypesHeading: View {
     let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())
     let browser = Browser()
     NavigationSplitView {
-        VStack(spacing: 0) {
-            Sidebar(browser: browser, order: NoteOrder())
-            SidebarFoot(browser: browser)
-        }
+        Sidebar(browser: browser, order: NoteOrder())
         .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 340)
         .toolbar {
             ToolbarItem { NewItemButton(browser: browser) }

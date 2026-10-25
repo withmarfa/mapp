@@ -11,14 +11,43 @@ struct SidebarFoot: View {
     @StoredOrder private var order
     let browser: Browser
 
-    private var address: URL? { libraries.host.connection?.address }
+    var body: some View {
+        let name = LibraryDescription.name(libraries)
+        let address = libraries.host.connection?.address
+        if let host, host.source != nil {
+            SyncStatusReading(host: host) { status in
+                row(name, address, dot: SidebarStatusDot(host.state), status: status)
+            }
+        } else {
+            row(name, address, dot: nil, status: nil)
+        }
+    }
+
+    private func row(_ name: String, _ address: URL?, dot: SidebarStatusDot?, status: SyncStatus?) -> some View {
+        SidebarFootRow(
+            name: name, dot: dot, status: status, hasConsole: address != nil,
+            openConnection: { browser.showSettings(.library) },
+            openConsole: { if let address { openURL(address) } },
+            openRecentlyDeleted: { browser.show(.recentlyDeleted, in: library, order: order) },
+            openSettings: { browser.showSettings() })
+    }
+}
+
+/// The foot's row, given what it shows and what its buttons do.
+struct SidebarFootRow: View {
+    let name: String
+    let dot: SidebarStatusDot?
+    let status: SyncStatus?
+    let hasConsole: Bool
+    let openConnection: () -> Void
+    let openConsole: () -> Void
+    let openRecentlyDeleted: () -> Void
+    let openSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button {
-                browser.showSettings(.library)
-            } label: {
-                Text(LibraryDescription.name(libraries))
+        HStack(alignment: .center, spacing: 6) {
+            Button(action: openConnection) {
+                Text(name)
                     .interfaceFont(.body)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -26,34 +55,28 @@ struct SidebarFoot: View {
             .buttonStyle(.plain)
             .help("Connection Settings")
             .accessibilityIdentifier("SidebarLibrary")
-            if let host, host.source != nil {
-                SyncStatusReading(host: host) { status in dot(for: host.state, status: status) }
-            }
+            if let dot { statusDot(dot) }
             Spacer(minLength: 0)
-            if let address {
-                iconButton("Console", symbol: "arrow.up.right.square", id: "SidebarConsole") { openURL(address) }
+            if hasConsole {
+                iconButton("Console", symbol: "person.crop.circle", id: "SidebarConsole", action: openConsole)
             }
-            iconButton("Recently Deleted", symbol: "trash", id: "SidebarRecentlyDeleted") {
-                browser.show(.recentlyDeleted, in: library, order: order)
-            }
-            iconButton("Settings", symbol: "gearshape", id: "SidebarOpenSettings") { browser.showSettings() }
+            iconButton("Settings", symbol: "gearshape", id: "SidebarOpenSettings", action: openSettings)
+            iconButton("Recently Deleted", symbol: "trash", id: "SidebarRecentlyDeleted", action: openRecentlyDeleted)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder private func dot(for state: MarfaHost.State, status: SyncStatus) -> some View {
-        if let dot = SidebarStatusDot(state) {
-            let detail = status.primary?.detail ?? String(localized: "Connecting to the server.")
-            Circle()
-                .fill(dot == .trouble ? Color.red : Color.orange)
-                .frame(width: 7, height: 7)
-                .help(detail)
-                .accessibilityLabel(status.primary?.title ?? String(localized: "Connecting…"))
-                .accessibilityHint(detail)
-                .accessibilityIdentifier("SyncStatus")
-        }
+    private func statusDot(_ dot: SidebarStatusDot) -> some View {
+        let detail = status?.primary?.detail ?? String(localized: "Connecting to the server.")
+        return Circle()
+            .fill(dot == .trouble ? Color.red : Color.orange)
+            .frame(width: 7, height: 7)
+            .help(detail)
+            .accessibilityLabel(status?.primary?.title ?? String(localized: "Connecting…"))
+            .accessibilityHint(detail)
+            .accessibilityIdentifier("SyncStatus")
     }
 
     private func iconButton(_ title: LocalizedStringKey, symbol: String, id: String, action: @escaping () -> Void) -> some View {
@@ -61,7 +84,7 @@ struct SidebarFoot: View {
             Image(systemName: symbol)
                 .interfaceFont(.callout)
                 .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
+                .frame(width: 24, height: 24, alignment: .center)
                 .contentShape(.rect)
         }
         .buttonStyle(.borderless)
