@@ -19,7 +19,7 @@ import Testing
 
     private func loaded(_ items: [Item]) async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)

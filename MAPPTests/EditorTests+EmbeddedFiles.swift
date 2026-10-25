@@ -159,7 +159,7 @@ extension EditorTests {
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
         #expect(try await eventuallyAsking { try await markdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true })
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 
     @Test func imagesTheLibraryCannotKeepAreReportedInThePersonsWords() async throws {
@@ -167,10 +167,10 @@ extension EditorTests {
         library.attaching = { throw SourceFailure(kind: .failed, message: "The server is out of space.") }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
-        #expect(await eventually { library.notices.newest != nil })
+        #expect(await eventually { library.notices.waiting.last != nil })
         #expect(try await markdown(editor) == nil, "nothing is inserted")
-        #expect(library.notices.newest?.title == "Can’t Attach Images")
-        #expect(library.notices.newest?.message == "The images weren’t added to the note. The server is out of space.")
+        #expect(library.notices.waiting.last?.title == "Can’t Attach Images")
+        #expect(library.notices.waiting.last?.message == "The images weren’t added to the note. The server is out of space.")
     }
 
     @Test func imagesAttachedAfterTheNoteChangesAreNotInsertedIntoTheNextOne() async throws {
@@ -198,6 +198,6 @@ extension EditorTests {
         try await Task.sleep(for: .milliseconds(300))
         #expect(try await markdown(editor) == nil, "the note now on the page takes nothing")
         #expect(editor.noteID == second.id)
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 }

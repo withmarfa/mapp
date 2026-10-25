@@ -106,7 +106,7 @@ import Observation
     /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
-    init(source: any ItemSource, notices: Notices = Notices(), now: @escaping () -> Date = Date.init) {
+    init(source: any ItemSource, notices: Notices, now: @escaping () -> Date = Date.init) {
         self.source = source
         self.notices = notices
         self.now = now

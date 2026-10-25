@@ -17,7 +17,7 @@ struct MarfaCreationTests {
                 TypeField(name: bodyKey, type: "string", required: true, declaredBy: "test.parent"),
             ], titleField: titleKey, bodyField: bodyKey)], edgeTypes: [])
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
@@ -29,7 +29,7 @@ struct MarfaCreationTests {
         }
         #expect(submittedID == id)
         #expect(browser.isAwaitingNewItem)
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
 
         let properties = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
 
@@ -47,7 +47,7 @@ struct MarfaCreationTests {
                 .init(key: "needed", label: "Needed", kind: kind, declaredBy: TypeID("test.parent"), required: true),
             ], titleField: "title", bodyField: "body", parent: TypeID("test.parent"))
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: Catalogue(itemTypes: [type], edgeTypes: []))))
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
@@ -59,9 +59,9 @@ struct MarfaCreationTests {
         #expect(!undo.canUndo)
         #expect(!browser.isAwaitingNewItem)
         #expect(browser.newItems.isEmpty)
-        #expect(library.notices.newest?.title == String(localized: "Can’t Create Item"))
-        #expect(library.notices.newest?.message.contains("Needed") == true)
-        #expect(library.notices.newest?.message.contains("draft") == false)
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
+        #expect(library.notices.waiting.last?.message.contains("Needed") == true)
+        #expect(library.notices.waiting.last?.message.contains("draft") == false)
 
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })

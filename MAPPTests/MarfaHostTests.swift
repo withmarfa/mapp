@@ -44,8 +44,8 @@ import Testing
         let switched = "http://plain-\(UUID().uuidString.lowercased()).test"
         let host = try HostBench().host()
         try await host.connect(address: address, key: "k")
-        #expect(host.notices.waiting == [Notices.Notice(title: Words.plainHTTPTitle, message: Words.plainHTTP(origin: address))])
-        host.notices.removeAll()
+        #expect(host.notices.waiting.map { [$0.title, $0.message] } == [[Words.plainHTTPTitle, Words.plainHTTP(origin: address)]])
+        host.notices.answerAll()
 
         try await host.changeAddress(to: switched, key: "k")
         #expect(host.notices.waiting.map(\.message) == [Words.plainHTTP(origin: switched)])

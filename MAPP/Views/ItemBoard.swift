@@ -195,9 +195,9 @@ struct ItemBoard: View {
         defer { undoManager?.endUndoGrouping() }
         for (id, change) in changes {
             guard case .set(let value) = change else { continue }
-            let told = library.notices.waiting.count
+            let told = library.notices.told
             guard library.setItemProperty(id, key: key, value: value, undoManager: undoManager) else {
-                if library.notices.waiting.count == told {
+                if library.notices.told == told {
                     library.notices.tell(String(localized: "Can’t Move Items"), String(localized: "A change couldn’t be saved. The board shows the values currently held by the library."))
                 }
                 return

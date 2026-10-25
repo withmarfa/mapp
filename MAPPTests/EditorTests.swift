@@ -336,7 +336,7 @@ struct EditorTests {
         try await page.load("```mermaid\nnot a valid diagram [\n```\n")
         // Time for the diagram's failure to reach the app, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(300))
-        #expect(page.library.notices.newest == nil)
+        #expect(page.library.notices.waiting.last == nil)
         #expect(try await page.markdown() == nil)
     }
 
@@ -565,7 +565,7 @@ struct EditorTests {
         typealias F = LibraryFixture
         let source = FakeItemSource()
         for (id, text) in F.texts { source.setBody(text, of: id) }
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         let editor = EditorController(library: library)

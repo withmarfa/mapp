@@ -203,7 +203,7 @@ struct BrowserTests {
         #expect(!browser.isSearching)
         #expect(browser.items(in: library).contains { $0.id == id })
         #expect(!browser.isAwaitingNewItem)
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 
     @Test func newFromAPlaceThatDoesNotListNotesRevealsTheNewItemInItsType() throws {

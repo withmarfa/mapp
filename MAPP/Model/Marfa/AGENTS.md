@@ -20,7 +20,7 @@
 
 ## Never lose a person's write
 
-- A write that reaches a source after it closed is refused (`MarfaEngine.closedCode`), and the library tells the person through `Notices.notKept`, which puts its text on the clipboard as the front window shows it.
+- A write that reaches a source after it closed is refused (`MarfaEngine.closedCode`), and the library tells the person through `Notices.notKept`, which puts its text on the clipboard as a window first shows it.
 - Leaving a copy, by disconnecting or switching server, reads the copy's own queue in the same step as it closes, after the submitted writes are queued. While any writes wait, the person chooses to keep the copy or discard it. A discard names exactly the writes the person was shown; a write that lands after keeps the copy, and the person is asked again.
 - A discarded copy is marked before anything is removed and is never opened again as it was.
 - Disconnecting forgets the address before it removes the key and the copy, so a quit partway through never reopens that server. Switching server shows the new server's library before the old key and copy are removed.

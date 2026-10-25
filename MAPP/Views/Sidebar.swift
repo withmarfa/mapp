@@ -169,7 +169,7 @@ struct Sidebar: View {
 #if DEBUG
 #Preview("Sample Sidebar") {
     Sidebar(browser: Browser(), order: NoteOrder())
-        .environment(\.library, MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection)))
+        .environment(\.library, MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection), notices: Notices()))
         .environment(ItemPreviewFixtures.libraries(named: "MAPP.SidebarPreview"))
         .frame(width: 260, height: 740)
 }
@@ -198,7 +198,7 @@ struct Sidebar: View {
             id: "edge-\(index)", sourceId: "collection-\(index)", targetId: "child-\(index)", edgeType: "parent-of",
             properties: [:], version: 1, createdAt: SampleLibrary.stamp(date), updatedAt: SampleLibrary.stamp(date))
     }
-    let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date))
+    let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())
     let browser = Browser()
     NavigationSplitView {
         VStack(spacing: 0) {

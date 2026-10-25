@@ -8,9 +8,9 @@ extension View {
         modifier(LibraryDialogs())
     }
 
-    /// Tells the person, in whichever window is in front, each notice in the order it was told: something a library
-    /// could not do, a change it could not keep, or an address that sends the key unencrypted. A notice carrying
-    /// text the person typed puts it on the clipboard as they are told, so it outlives the alert.
+    /// Tells the person, in one window in front, each notice in the order it was told: something a library could
+    /// not do, a change it could not keep, or an address that sends the key unencrypted. A notice carrying text the
+    /// person typed puts it on the clipboard as they are first told, so it outlives the alert.
     func notices(_ notices: Notices) -> some View {
         modifier(NoticeAlert(notices: notices))
     }
@@ -19,18 +19,24 @@ extension View {
 private struct NoticeAlert: ViewModifier {
     let notices: Notices
     @Environment(\.appearsActive) private var appearsActive
+    @State private var window = UUID()
     @State private var shown: Notices.Notice?
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: notices.waiting.first, initial: true, take)
+            .onChange(of: notices.waiting.first?.id, initial: true, take)
+            .onChange(of: notices.shownIn, take)
             .onChange(of: appearsActive, take)
+            .onDisappear {
+                shown = nil
+                notices.released(by: window)
+            }
             .alert(
                 shown?.title ?? "",
                 isPresented: Binding { shown != nil } set: {
                     if !$0, let shown {
-                        notices.answered(shown)
                         self.shown = nil
+                        notices.answered(shown.id)
                     }
                 },
                 presenting: shown
@@ -41,14 +47,16 @@ private struct NoticeAlert: ViewModifier {
     }
 
     private func take() {
-        guard appearsActive, let notice = notices.waiting.first else { return }
-        // Changes not kept while the alert is up gather into the notice shown, so the clipboard gets all of their
-        // text rather than only the last.
-        if let text = notice.text, text != shown?.text {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        }
-        shown = notice
+        guard appearsActive, shown == nil else { return }
+        shown = notices.show(in: window, copying: Notices.copyToClipboard)
+    }
+}
+
+extension Notices {
+    /// Where a notice puts the text the person typed, for them to paste back.
+    static func copyToClipboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 

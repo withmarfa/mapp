@@ -18,7 +18,7 @@ extension LiveMarfaTests {
             let source = try await MarfaSource.open(
                 connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
-            let library = MarfaLibrary(source: source)
+            let library = MarfaLibrary(source: source, notices: Notices())
             func end() async {
                 await source.flush()
                 await source.close()
@@ -154,7 +154,7 @@ extension LiveMarfaTests {
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
                 })
-                #expect(library.notices.newest == nil)
+                #expect(library.notices.waiting.last == nil)
                 #expect(await eventually {
                     library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
@@ -172,7 +172,7 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]
-                }, "\(String(describing: library.notices.newest))")
+                }, "\(String(describing: library.notices.waiting.last))")
                 await source.flush()
                 try #require(try await rehydrated(after: undoing))
                 // Without a parent, then under another, each seen from both ends, and undone.
@@ -202,7 +202,7 @@ extension LiveMarfaTests {
                 #expect(await eventually { library.item(child)?.isFavorite == false })
 
                 await source.flush()
-                #expect(library.notices.newest == nil, "\(String(describing: library.notices.newest))")
+                #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
 
                 // The bin: a delete the server has taken leaves the copy, and the item is still in Recently Deleted,
                 // from where undoing the delete restores it.
@@ -213,7 +213,7 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually { library.item(other)?.state == .active })
                 #expect(!library.items(in: .recentlyDeleted).contains { $0.id == other })
-                #expect(library.notices.newest == nil, "\(String(describing: library.notices.newest))")
+                #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
             }
         }
 
@@ -249,7 +249,7 @@ extension LiveMarfaTests {
                 try #require(library.canPurge)
                 library.deletePermanentlyOnConfirm([purged])
                 try #require(await eventually { library.item(purged) == nil })
-                #expect(library.notices.newest == nil, "\(String(describing: library.notices.newest))")
+                #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
                 let bin = try await source.copy.items.bin()
                 #expect(!bin.items.contains { $0.id == purged.rawValue })
                 #expect(!bin.items.contains { $0.id == kept.rawValue })
@@ -276,7 +276,7 @@ extension LiveMarfaTests {
                 let second = try await MarfaSource.open(
                     connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
                     location: MarfaStoreLocation(root: root))
-                let fresh = MarfaLibrary(source: second)
+                let fresh = MarfaLibrary(source: second, notices: Notices())
                 second.refresh()
                 try #require(await eventually {
                     fresh.isLoaded && fresh.connection == .online && LiveMarfa.isWhole(fresh.syncReport)
@@ -288,7 +288,7 @@ extension LiveMarfaTests {
                 fresh.recover([note], undoManager: nil)
                 try #require(await eventually { fresh.item(note)?.state == .active })
                 #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
-                #expect(fresh.notices.newest == nil, "\(String(describing: fresh.notices.newest))")
+                #expect(fresh.notices.waiting.last == nil, "\(String(describing: fresh.notices.waiting.last))")
                 await second.flush()
                 await second.close()
             }
@@ -348,7 +348,7 @@ extension LiveMarfaTests {
                     if case .file(_, let size)? = library.item(file)?.content { size == Int64(png.count) } else { false }
                 })
                 #expect(library.items(in: .files).contains { $0.id == file })
-                #expect(library.notices.newest == nil, "\(String(describing: library.notices.newest))")
+                #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
             }
         }
     }

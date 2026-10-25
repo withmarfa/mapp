@@ -13,7 +13,7 @@ struct ItemLibraryTests {
     func loaded() async throws -> (library: any ItemLibrary, source: FakeItemSource) {
         let source = FakeItemSource()
         for (id, text) in F.texts { source.setBody(text, of: id) }
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         return (library, source)
@@ -35,7 +35,7 @@ struct ItemLibraryTests {
         let one = follow { _ = library.item(F.n1) }
         source.send(.upserted([item]))
         #expect(await eventually { list() && one() })
-        let notice = follow { _ = library.notices.newest }
+        let notice = follow { _ = library.notices.waiting.last }
         library.notices.tell("Title", "Message")
         #expect(notice())
     }
@@ -45,7 +45,7 @@ struct ItemLibraryTests {
         var item = try #require(library.item(F.n1))
         item.title = "Changed"
         item.version = ItemVersion(2)
-        let notice = follow { _ = library.notices.newest }
+        let notice = follow { _ = library.notices.waiting.last }
         source.send(.upserted([item]))
         try #require(await eventually { library.item(F.n1)?.title == "Changed" })
         #expect(!notice())
@@ -60,12 +60,12 @@ struct ItemLibraryTests {
         library.canPurge = false
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")
-        #expect(library.notices.newest?.title == "Can’t Delete Immediately")
-        #expect(library.notices.newest?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
-        library.notices.removeAll()
+        #expect(library.notices.waiting.last?.title == "Can’t Delete Immediately")
+        #expect(library.notices.waiting.last?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
+        library.notices.answerAll()
         library.canPurge = true
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) == nil)
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 }

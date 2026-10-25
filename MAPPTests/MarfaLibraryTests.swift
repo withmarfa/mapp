@@ -116,7 +116,7 @@ nonisolated enum LibraryFixture {
 private func loaded(_ items: [Item] = LibraryFixture.items) async throws -> (MarfaLibrary, FakeItemSource) {
     let source = FakeItemSource()
     for (id, text) in LibraryFixture.texts { source.setBody(text, of: id) }
-    let library = MarfaLibrary(source: source)
+    let library = MarfaLibrary(source: source, notices: Notices())
     source.send(.loaded(SourceSnapshot(items: items, catalogue: LibraryFixture.catalogue)))
     try #require(await eventually { library.isLoaded })
     return (library, source)
@@ -139,7 +139,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func isLoadedOnlyOnceTheCopyAndItsTextAreRead() async throws {
         let source = FakeItemSource()
         source.setBody("Alpha body", of: F.p1)
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         #expect(!library.isLoaded)
         #expect(!library.isGone(F.p1))
         source.send(.loaded(F.snapshot))
@@ -251,9 +251,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // The list reads the search again as it redraws for the change.
         #expect(await eventually {
             _ = library.items(matching: "body")
-            return library.notices.newest != nil
+            return library.notices.waiting.last != nil
         })
-        #expect(library.notices.newest?.title == String(localized: "Can’t Search"))
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Search"))
         #expect(library.items(matching: "body").map(\.id) == [F.n1])
     }
 
@@ -305,7 +305,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.relationships(for: F.n1).contains { $0.field == "in-collection" })
         #expect(library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [album.id], undoManager: nil))
         #expect(!library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [F.p1], undoManager: nil))
-        #expect(library.notices.newest?.message == String(localized: "This kind of item can’t be linked here."))
+        #expect(library.notices.waiting.last?.message == String(localized: "This kind of item can’t be linked here."))
     }
 
     @Test func aFileIsFetchedAndANoteHasNoFile() async throws {
@@ -348,10 +348,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
         let (library, source) = try await loaded()
         #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .allNotes, undoManager: nil) == nil)
-        #expect(library.notices.newest?.title == String(localized: "Can’t Create Item"))
-        library.notices.removeAll()
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
+        library.notices.answerAll()
         #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .allNotes, undoManager: nil) == nil)
-        #expect(library.notices.newest != nil)
+        #expect(library.notices.waiting.last != nil)
         #expect(source.writes.isEmpty)
     }
 
@@ -374,7 +374,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.setBody("Typed, merged", of: F.n1, version: 2)
         source.send(.answered(try #require(source.submitted.first?.id), .accepted))
         #expect(await eventually { library.body(of: F.n1)?.text == "Typed, merged" })
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
 
         // The next edit goes from the version of the text now held.
         library.updateBody(of: F.n1, to: "Again")
@@ -408,7 +408,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         #expect(!library.setItemProperty(F.t1, key: "status", value: .string("maybe"), undoManager: undo))
-        #expect(library.notices.newest?.title == String(localized: "Invalid Property"))
+        #expect(library.notices.waiting.last?.title == String(localized: "Invalid Property"))
         #expect(!library.setItemProperty(F.t1, key: "nope", value: .string("x"), undoManager: undo))
         #expect(!library.setItemProperty(F.t1, key: "body", value: .string("x"), undoManager: undo))
         #expect(!library.setItemProperty(F.n3, key: "title", value: .string("x"), undoManager: undo))
@@ -472,15 +472,15 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.transition(F.n1, .active)])
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
 
         // A restore the server refuses is told in the server's own words.
         library.recover([F.n3], undoManager: nil)
         let restore = try #require(source.submitted.last?.id)
         source.send(.answered(restore, .refused(SyncProblem(code: "item_not_found", message: "The server doesn’t hold this item."))))
-        #expect(await eventually { library.notices.newest != nil })
-        #expect(library.notices.newest?.title == String(localized: "Can’t Recover"))
-        #expect(library.notices.newest?.message == "The server doesn’t hold this item.")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Recover"))
+        #expect(library.notices.waiting.last?.message == "The server doesn’t hold this item.")
     }
 
     @Test func anItemTheCopyNoLongerHoldsIsNotRecovered() async throws {
@@ -508,9 +508,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         let purge = try #require(source.submitted.last?.id)
         source.send(.answered(purge, .refused(SyncProblem(code: "version_conflict", message: "The item changed after you saw it."))))
-        #expect(await eventually { library.notices.newest != nil })
-        #expect(library.notices.newest?.title == String(localized: "Can’t Delete Immediately"))
-        #expect(library.notices.newest?.message == "The item changed after you saw it.")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete Immediately"))
+        #expect(library.notices.waiting.last?.message == "The item changed after you saw it.")
     }
 
     @Test func deletingForGoodWaitsForTheServer() async throws {
@@ -520,11 +520,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(!library.canPurge)
         library.deletePermanentlyOnConfirm([F.n3])
         #expect(source.writes.isEmpty)
-        #expect(library.notices.newest?.title == String(localized: "Can’t Delete Immediately"))
-        library.notices.removeAll()
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete Immediately"))
+        library.notices.answerAll()
         library.deletePermanently([F.n3])
         #expect(source.writes.isEmpty)
-        #expect(library.notices.newest?.title == String(localized: "Can’t Delete Immediately"))
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete Immediately"))
     }
 
     @Test func aLinkIsAddedRemovedAndReplacedByAMove() async throws {
@@ -536,7 +536,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
         undo.endUndoGrouping()
         #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)])
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
         // The undo moves it back, to the parent it had.
         source.clearWrites()
         undo.undo()
@@ -553,7 +553,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p1)])
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
         source.clearWrites()
 
         // Removing the parent, then choosing one for an end that holds none, are each one write.
@@ -595,23 +595,23 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded(F.items + [bug2])
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
         #expect(!library.setItemRelationship(F.t1, field: "inverse:supersedes", targetIDs: [F.e1, bug2.id], undoManager: nil))
-        #expect(library.notices.newest?.message == String(localized: "Only one item can be chosen here."))
+        #expect(library.notices.waiting.last?.message == String(localized: "Only one item can be chosen here."))
         #expect(source.writes.isEmpty)
 
         // The first bug is already superseded by the second. That link is the second bug's own, so the task does
         // not take it: the person is told which item holds it, and nothing is sent.
-        library.notices.removeAll()
+        library.notices.answerAll()
         #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
-        #expect(library.notices.newest?.message
+        #expect(library.notices.waiting.last?.message
             == String(localized: "“\("Bug two")” already holds this link to “\("Bug one")”. Remove it there first."))
         #expect(source.writes.isEmpty)
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.targets.map(\.itemID) == [bug2.id])
         // Chosen from the other end, the second bug's own link changes from the first bug to the task: the edge's
         // target moves.
-        library.notices.removeAll()
+        library.notices.answerAll()
         #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
         #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)])
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 
     /// Both ends hold one link of their type, so the one move cannot also free the end it takes from.
@@ -625,17 +625,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             bug("d", supersedes: ItemID("b"), edge: "s2")])
         // `a`, superseded by `c`, would be superseded by `d` instead, which supersedes `b`: two edges would change.
         #expect(!library.setItemRelationship(ItemID("a"), field: "inverse:supersedes", targetIDs: [ItemID("d")], undoManager: nil))
-        #expect(library.notices.newest?.message
+        #expect(library.notices.waiting.last?.message
             == String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
         #expect(source.writes.isEmpty)
         // From `c`'s own side, `b` is held by `d` as its own link, which is never taken from it.
-        library.notices.removeAll()
+        library.notices.answerAll()
         #expect(!library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil))
-        #expect(library.notices.newest?.message
+        #expect(library.notices.waiting.last?.message
             == String(localized: "“\("Bug d")” already holds this link to “\("Bug b")”. Remove it there first."))
         #expect(source.writes.isEmpty)
         // Replacing its own link for an item that holds none is one move of the end that goes.
-        library.notices.removeAll()
+        library.notices.answerAll()
         #expect(library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [F.t1], undoManager: nil))
         #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)])
     }
@@ -647,9 +647,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: nil)
         let move = try #require(source.submitted.last?.id)
         source.send(.answered(move, .refused(SyncProblem(code: "edge_cycle", message: "That would close a cycle."))))
-        #expect(await eventually { library.notices.newest != nil })
-        #expect(library.notices.newest?.title == String(localized: "Can’t Change This Relationship"))
-        #expect(library.notices.newest?.message == "That would close a cycle.")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"))
+        #expect(library.notices.waiting.last?.message == "That would close a cycle.")
         #expect(library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.e1])
         #expect(source.writes.count == 1)
     }
@@ -660,11 +660,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let cycle = String(localized: "This would link the item back to itself through the items between them.")
         // The task's child is below it, so it cannot become the task's parent.
         #expect(!library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.t1], undoManager: nil))
-        #expect(library.notices.newest?.message == cycle)
+        #expect(library.notices.waiting.last?.message == cycle)
         // Nor can the project take its own grandchild as its parent from the other end.
-        library.notices.removeAll()
+        library.notices.answerAll()
         #expect(!library.setItemRelationship(F.t1, field: "inverse:parent-of", targetIDs: [F.p1], undoManager: nil))
-        #expect(library.notices.newest?.message == cycle)
+        #expect(library.notices.waiting.last?.message == cycle)
         #expect(source.writes.isEmpty)
         #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.p1])
     }
@@ -680,9 +680,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             (F.p1, "inverse:parent-of", [F.p1]),
         ]
         for (id, field, targets) in refusals {
-            library.notices.removeAll()
+            library.notices.answerAll()
             #expect(!library.setItemRelationship(id, field: field, targetIDs: targets, undoManager: nil), "\(field) \(targets)")
-            #expect(library.notices.newest?.title == String(localized: "Can’t Change This Relationship"), "\(field) \(targets)")
+            #expect(library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"), "\(field) \(targets)")
         }
         #expect(!library.setItemRelationship(F.f1, field: "about", targetIDs: [F.p1], undoManager: nil))
         #expect(!library.setItemRelationship(F.n1, field: "nothing", targetIDs: [F.p1], undoManager: nil))
@@ -709,18 +709,18 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.setFavorite([F.n2], true, undoManager: nil)
         let write = try #require(source.submitted.first?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "unsupported", message: "Favorites can’t be changed here."))))
-        #expect(await eventually { library.notices.newest != nil })
-        #expect(library.notices.newest?.title == String(localized: "Can’t Add to Favorites"))
-        #expect(library.notices.newest?.message == "Favorites can’t be changed here.")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Add to Favorites"))
+        #expect(library.notices.waiting.last?.message == "Favorites can’t be changed here.")
 
         // A conflict is the item's own state to show, not an alert; an answer told twice is told once.
-        library.notices.removeAll()
+        library.notices.answerAll()
         source.send(.answered(write, .refused(SyncProblem(code: "again"))))
         library.setFavorite([F.n2], false, undoManager: nil)
         source.send(.answered(try #require(source.submitted.last?.id), .conflicted(sibling: F.n1, fields: ["tags"])))
         source.send(.unavailable(SourceFailure(kind: .failed, message: "The copy can’t be read.")))
-        #expect(await eventually { library.notices.newest != nil })
-        #expect(library.notices.newest?.message == "The copy can’t be read.")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.message == "The copy can’t be read.")
     }
 
     /// Finishing waits until the source has queued every write, and not for the server, so quitting offline is
@@ -836,7 +836,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     private static func loaded() async throws -> MarfaLibrary {
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         var items = F.items
         func replace(_ id: ItemID, _ change: (inout MAPP.Item) -> Void) {
             if let position = items.firstIndex(where: { $0.id == id }) { change(&items[position]) }
@@ -906,8 +906,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         #expect(!browser.isAwaitingNewItem, "New can be used again")
         #expect(browser.selection.isEmpty)
-        #expect(library.notices.newest?.title == "Can’t Create Item")
-        #expect(library.notices.newest?.message == MarfaEngine.notCurrent)
+        #expect(library.notices.waiting.last?.title == "Can’t Create Item")
+        #expect(library.notices.waiting.last?.message == MarfaEngine.notCurrent)
 
         let again = try #require(browser.startNewItem(in: library, undoManager: nil))
         #expect(again != id, "a second New makes another item rather than naming the refused one")
@@ -974,7 +974,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         await source.close()
         library.setFavorite([LibraryFixture.n1], false, undoManager: nil)
-        #expect(library.notices.newest?.message == "MAPP closed the library before it could keep your change. Make the change again.")
+        #expect(library.notices.waiting.last?.message == "MAPP closed the library before it could keep your change. Make the change again.")
         #expect(source.submitted.isEmpty)
     }
 
@@ -1008,7 +1008,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         library.updateBody(of: LibraryFixture.n1, to: "Typed as the row turned unreadable")
         #expect(library.notices.waiting.map(\.text) == ["Typed as the row turned unreadable"])
-        #expect(library.notices.newest?.message == "\(MarfaLibrary.cantChange) Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "\(MarfaLibrary.cantChange) Your text is on the clipboard, so you can paste it back.")
         #expect(source.writes.isEmpty)
     }
 
@@ -1032,7 +1032,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         library.updateBody(of: LibraryFixture.n1, to: "Typed as it was purged")
         #expect(library.notices.waiting.map(\.text) == ["Typed as it was purged"])
-        #expect(library.notices.newest?.message == "\(MarfaLibrary.cantChange) Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "\(MarfaLibrary.cantChange) Your text is on the clipboard, so you can paste it back.")
         #expect(source.writes.isEmpty)
     }
 
@@ -1045,7 +1045,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.answered(write, .refused(SyncProblem(code: "copy_expired", message: "Try again in a moment.", notQueued: true))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
         #expect(library.notices.waiting.map(\.text) == ["Typed while the copy was brought up to date"])
-        #expect(library.notices.newest?.message == "Try again in a moment. Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "Try again in a moment. Your text is on the clipboard, so you can paste it back.")
         #expect(library.notices.waiting.count == 1, "the person is told once")
     }
 
@@ -1061,7 +1061,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.answered(write, .refused(problem)))
         #expect(await eventually { !library.notices.waiting.isEmpty })
         #expect(library.notices.waiting.map(\.text) == ["Kept\n\nOnly copy"])
-        #expect(library.notices.newest?.message == "Not this type. Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "Not this type. Your text is on the clipboard, so you can paste it back.")
         #expect(library.notices.waiting.count == 1, "the person is told once")
     }
 
@@ -1075,7 +1075,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.answered(write, .refused(problem)))
         #expect(await eventually { !library.notices.waiting.isEmpty })
         #expect(library.notices.waiting.map(\.text) == ["Typed title"])
-        #expect(library.notices.newest?.message == "Try again in a moment. Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "Try again in a moment. Your text is on the clipboard, so you can paste it back.")
         #expect(library.notices.waiting.count == 1, "the person is told once")
     }
 
@@ -1088,7 +1088,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.answered(write, .refused(SyncProblem(code: "validation_error", message: "Too long."))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
         #expect(library.notices.waiting.map(\.text) == ["Refused later"])
-        #expect(library.notices.newest?.message == "Too long. The change is also listed in Settings. Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "Too long. The change is also listed in Settings. Your text is on the clipboard, so you can paste it back.")
         #expect(library.notices.waiting.count == 1, "the person is told once")
     }
 }
@@ -1110,7 +1110,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         items[items.firstIndex { $0.id == F.n1 }!].edgesOut += [link("rel1", from: F.n1, to: F.p1)]
         items[items.firstIndex { $0.id == F.n2 }!].edgesOut += [link("rel2", from: F.n2, to: F.n1)]
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
@@ -1153,11 +1153,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
             Edge(id: EdgeID("pt1"), type: "partner", source: F.n2, target: .item(F.n1), origin: .property("partner"))
         ]
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(library.setItemRelationship(F.n1, field: "partner", targetIDs: [F.p1], undoManager: nil))
         #expect(source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)], "sent \(source.writes)")
-        #expect(library.notices.newest == nil)
+        #expect(library.notices.waiting.last == nil)
     }
 }

@@ -152,7 +152,7 @@ struct InspectorFieldsTests {
 
     @MainActor private static func marfa(_ items: [MAPP.Item], types: [ItemTypeInfo]) async throws -> MarfaLibrary {
         let source = FakeItemSource()
-        let library = MarfaLibrary(source: source)
+        let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: Catalogue(itemTypes: types))))
         try #require(await eventually { library.isLoaded })
         return library
