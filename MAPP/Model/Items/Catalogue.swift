@@ -154,9 +154,6 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     func cardinality(atTarget: Bool) -> Cardinality {
         (writtenAt == .target) == atTarget ? cardinality : reverseCardinality
     }
-
-    func allowsAnySource() -> Bool { sourceTypes.isEmpty && sourceRoles.isEmpty }
-    func allowsAnyTarget() -> Bool { targetTypes.isEmpty && targetRoles.isEmpty }
 }
 
 nonisolated struct Catalogue: Hashable, Sendable {

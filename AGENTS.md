@@ -1,6 +1,6 @@
 # MAPP
 
-MAPP is a native macOS markdown notes app with a sidebar, a list, and a page, in the manner of Notes and Mail. It reads and writes a library only through a Marfa server, by the `marfa-swift` package's working copy, and names no item type of its own: what it shows of a type comes from the server's catalogue. With no server set, the window asks the person to connect. The note editor is a web page built on InkKit and hosted in a `WKWebView`.
+MAPP is a native macOS markdown notes app with a sidebar, a list, and a page, in the manner of Notes and Mail. It reads and writes a library only through a Marfa server, by the `marfa-swift` package's working copy, and names no item type of its own: what it shows of a type comes from the server's catalogue. With no server set, the window asks the person to connect. The note editor is a web page built on Inkkit and hosted in a `WKWebView`.
 
 ## Instruction files
 
@@ -94,8 +94,8 @@ These hold across the app. The nested files say how the library keeps them.
 ## Signing
 
 - A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
-- To sign with the team, run `infisical run -- scripts/render-local-signing.sh`, which writes `Config/Local.xcconfig` from Infisical.
-- Never commit a team identifier, and never edit the rendered file by hand.
+- To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. How a contributor keeps that line is their own; the repository holds no tool for it.
+- Never commit a team identifier.
 
 ## Versions and releases
 

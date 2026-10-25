@@ -444,9 +444,6 @@
     "All Items" : {
       "extractionState" : "manual"
     },
-    "All Notes" : {
-
-    },
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
@@ -476,9 +473,6 @@
       "extractionState" : "manual"
     },
     "Appearance" : {
-
-    },
-    "Archive" : {
 
     },
     "Ascending" : {
@@ -754,13 +748,7 @@
     "Delete Notes" : {
 
     },
-    "Delete Permanently" : {
-
-    },
     "Delete Row" : {
-
-    },
-    "Deleted %@" : {
 
     },
     "Descending" : {
@@ -1194,9 +1182,6 @@
     "More than one item matches" : {
       "extractionState" : "manual"
     },
-    "Move" : {
-
-    },
     "Move Down" : {
 
     },
@@ -1221,9 +1206,6 @@
     },
     "New Key" : {
       "extractionState" : "manual"
-    },
-    "New Note" : {
-
     },
     "New types appear here automatically." : {
 
@@ -1384,9 +1366,6 @@
     },
     "Paste your key" : {
       "extractionState" : "manual"
-    },
-    "Path" : {
-
     },
     "PDF" : {
       "extractionState" : "manual"

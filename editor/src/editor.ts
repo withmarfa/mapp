@@ -30,7 +30,7 @@ export function isPreviewDiagnostic(error: Error): boolean {
   )
 }
 
-/** The words the app hands the page. InkKit rejects a label it does not know, so only InkKit's own go to it;
+/** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
  *  the header's, the note reference's and the Link to Note command's are MAPP's. */
 export interface AppWords {
   noteReference?: string
@@ -65,7 +65,7 @@ export function guardedCommand<T>(action: () => T): T | { commandError: string; 
     return action()
   } catch (error) {
     if (error instanceof InkKitError) {
-      // InkKit tells only the caller of a refused edit, so the app is told here, where it tells the person.
+      // Inkkit tells only the caller of a refused edit, so the app is told here, where it tells the person.
       if (error.code === 'preservation') postToHost({ type: 'error', message: error.message })
       return { commandError: error.code, message: error.message }
     }
@@ -134,9 +134,9 @@ export function wikiSuggest(
   return context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId)
 }
 
-/** Draws the note's links again. InkKit offers no call for it, so this sends the event it hears itself when
+/** Draws the note's links again. Inkkit offers no call for it, so this sends the event it hears itself when
  *  something that changes how links are drawn changes, such as a load or a switch of editing mode; every
- *  link then asks the adapter again. A test mounts the real InkKit and fails if a release stops hearing it. */
+ *  link then asks the adapter again. A test mounts the real Inkkit and fails if a release stops hearing it. */
 function redrawWikiLinks(root: HTMLElement): void {
   root.querySelector('.ProseMirror')?.dispatchEvent(new Event('inkkit-media-policy'))
 }
@@ -162,7 +162,7 @@ function isNoteReference(reference: FileReference): boolean {
   return /\.(md|markdown|txt)$/i.test(name) || (reference.kind === 'wiki' && !name.includes('.'))
 }
 
-/** The app bridge uses only InkKit's public facade; native libraries retain file and save policy. */
+/** The app bridge uses only Inkkit's public facade; native libraries retain file and save policy. */
 export class NoteEditor {
   private engine!: InkKitEditor
   private finding = false
@@ -274,7 +274,7 @@ export class NoteEditor {
         wikiLinks: {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: wikiSuggest,
-          // The app tells which names no note answers to, and InkKit draws those links as missing.
+          // The app tells which names no note answers to, and Inkkit draws those links as missing.
           resolve: (reference, context) =>
             host.links.status(linkRef(reference), context.documentId),
           // A link to this note's own heading is the page's to follow. Any other names a note, which only the

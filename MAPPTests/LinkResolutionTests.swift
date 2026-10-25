@@ -63,7 +63,7 @@ import Testing
         let a = item(ItemID("a"), "Plan"), b = item(ItemID("b"), "Plan two")
         let source = item(reader, "Reader", links: [bound("Plan | alias", .resolved(a.id)), bound("Plan|alias", .resolved(b.id))])
         let (library, _) = try await loaded([source, a, b])
-        // InkKit hands the page the parts as written, spaces included.
+        // Inkkit hands the page the parts as written, spaces included.
         #expect(library.resolveLink(NoteLink(name: "Plan ", alias: " alias"), in: reader) == .resolved(a.id))
         #expect(library.resolveLink(NoteLink(name: "Plan", alias: "alias"), in: reader) == .resolved(b.id))
         // Spaces around the whole text are trimmed, as Marfa trims it.
@@ -79,7 +79,7 @@ import Testing
 
     @Test func aLinkWithEscapedCharactersIsMatchedToWhatMarfaBoundItTo() async throws {
         let a = item(ItemID("a"), "A"), b = item(ItemID("b"), "B")
-        // Marfa keeps the backslashes in the text it reports; InkKit hands the page the characters they stand for.
+        // Marfa keeps the backslashes in the text it reports; Inkkit hands the page the characters they stand for.
         let source = item(reader, "Reader", links: [
             bound("Plan|a\\#b", .resolved(a.id)), bound("Plan#A\\#B", .resolved(b.id)), bound("Plan#Soil|a\\|b", .missing)])
         let (library, _) = try await loaded([source, a, b])

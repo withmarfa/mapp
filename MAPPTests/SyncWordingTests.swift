@@ -21,19 +21,19 @@ struct SyncStatusTests {
 
     @Test func nothingIsSaidWhileDisconnected() {
         let status = SyncStatus(state: .disconnected, report: report(waiting: 3, oldest: 99, problems: [entry()]), now: now)
-        #expect(status.isQuiet)
+        #expect(status.notes.isEmpty)
         #expect(status.primary == nil)
     }
 
     @Test func nothingIsSaidWhileEverythingIsInStep() {
         for state in [MarfaHost.State.online, .connecting] {
-            #expect(SyncStatus(state: state, report: report(), now: now).isQuiet)
+            #expect(SyncStatus(state: state, report: report(), now: now).notes.isEmpty)
         }
     }
 
     @Test func aChangeSentWithinMomentsIsNotWorthALine() {
         let status = SyncStatus(state: .online, report: report(waiting: 1, oldest: 1), now: now)
-        #expect(status.isQuiet)
+        #expect(status.notes.isEmpty)
     }
 
     @Test func aChangeStillWaitingOnlineSaysItIsBeingSent() throws {

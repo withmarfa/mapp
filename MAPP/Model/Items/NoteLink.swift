@@ -1,11 +1,11 @@
 import Foundation
 
 /// A `[[link]]` as the page reads it: the name before any `|` or `#`, the heading after `#`, and the alias after `|`,
-/// with the backslash escapes of `[`, `]`, `|`, `#` and `\` taken out, as InkKit reads a link and as the page posts it.
+/// with the backslash escapes of `[`, `]`, `|`, `#` and `\` taken out, as Inkkit reads a link and as the page posts it.
 ///
 /// Marfa binds each spelling of a link on its own, so two links to one name can name two notes, and it tells spellings
 /// apart by their text, spaces inside the brackets included. So the parts keep the spaces between the brackets and only
-/// the text as a whole is trimmed, as Marfa trims it. Two spellings InkKit does not tell apart in what it hands the page
+/// the text as a whole is trimmed, as Marfa trims it. Two spellings Inkkit does not tell apart in what it hands the page
 /// stay one link here: `[[Plan]]` and `[[Plan|Plan]]` (an alias that repeats the link is none).
 nonisolated struct NoteLink: Hashable, Sendable {
     var name: String
@@ -51,7 +51,7 @@ nonisolated struct NoteLink: Hashable, Sendable {
         }
     }
 
-    /// A backslash before `[`, `]`, `|`, `#` or `\` stands for that character, as InkKit reads it.
+    /// A backslash before `[`, `]`, `|`, `#` or `\` stands for that character, as Inkkit reads it.
     static func unescaped(_ text: String) -> String {
         var result = ""
         var characters = text.makeIterator()

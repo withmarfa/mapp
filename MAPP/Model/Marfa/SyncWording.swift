@@ -29,7 +29,6 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     /// Most important first; the window shows the first and the list of problems shows them all.
     private(set) var notes: [Note] = []
 
-    var isQuiet: Bool { notes.isEmpty }
     var primary: Note? { notes.first }
 
     init(state: MarfaHost.State, report: SyncReport, now: Date) {

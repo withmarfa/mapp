@@ -222,11 +222,11 @@ struct MarfaMappingTests {
             ])
         let inCollection = try #require(catalogue.edgeTypes["in-collection"])
         #expect(inCollection.targetTypes.isEmpty && inCollection.targetRoles == ["container"])
-        #expect(inCollection.allowsAnySource() && !inCollection.allowsAnyTarget())
+        #expect(inCollection.sourceTypes.isEmpty && inCollection.sourceRoles.isEmpty)
         let mixed = try #require(catalogue.edgeTypes["mixed"])
         #expect(mixed.sourceTypes == [TypeID("core.note")] && mixed.sourceRoles == ["container"])
         let open = try #require(catalogue.edgeTypes["open"])
-        #expect(open.allowsAnySource() && open.allowsAnyTarget())
+        #expect(open.sourceTypes.isEmpty && open.sourceRoles.isEmpty && open.targetTypes.isEmpty && open.targetRoles.isEmpty)
     }
 
     // MARK: Items
