@@ -49,14 +49,3 @@ struct FormatCommands: Commands {
         .disabled(!enabled)
     }
 }
-
-extension Format {
-    /// The commands that work on a table the caret is in.
-    var needsTable: Bool {
-        switch self {
-        case .addRowAbove, .addRowBelow, .addColumnBefore, .addColumnAfter, .deleteRow, .deleteColumn,
-             .alignLeft, .alignCenter, .alignRight: true
-        default: false
-        }
-    }
-}

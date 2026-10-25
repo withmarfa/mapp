@@ -2,7 +2,7 @@
 
 <img src="Design/AppIcon.png" width="128" alt="">
 
-A native macOS items app for a Marfa library: a sidebar, a list and a page, in the manner of Notes and Mail. MAPP reads and writes only through a Marfa server. Until you set one, the window asks you to connect to your Marfa, and Connect opens Settings > Library.
+A native macOS markdown notes app for a Marfa library: a sidebar, a list and a page, in the manner of Notes and Mail. MAPP reads and writes only through a Marfa server. Until you set one, the window asks you to connect to your Marfa, and Connect opens Settings > Library.
 
 Requires macOS 27 and Xcode 27. Open `MAPP.xcodeproj` and run the `MAPP` scheme, or see `AGENTS.md` for the command line.
 
@@ -15,8 +15,6 @@ DEVELOPMENT_TEAM = <your team ID>
 ```
 
 `Config/Signing.xcconfig` includes it when it exists. Don't commit a team ID.
-
-
 
 ## Item interface
 
@@ -56,12 +54,11 @@ For a disposable sample tour, launch a Debug build with `-MAPPSampleLibrary -MAP
 
 Open `MAPP.xcodeproj`, choose the `MAPP` scheme, and open `MAPP/Views/ItemPreviewFixtures.swift`. Enable Editor > Canvas and resume a named preview. These previews use fixed sample items and an in-memory library; they do not read or write a person's library.
 
-- **Grouped Sidebar** in `Sidebar.swift` shows the native disclosure groups and the Favorites destination. **Sidebar: 100 Collections** exercises long labels, scrolling, the header, and footer in a native split view.
-- **Settings: Appearance** and its five siblings in `SettingsPreviews.swift` show each Settings page in the window, on the in-memory library.
-- **Editable Page Header** and **Long Title and Narrow Page** in `ItemPageHeader.swift` show inline title editing and status/parent controls.
+- **Sample Sidebar** and **Sidebar Without Favorites** in `Sidebar.swift` show the native disclosure groups with and without the Favorites destination. **Sidebar: 100 Collections** exercises long labels, scrolling, the header, and footer in a native split view.
+- **Settings: Appearance** and its four siblings in `SettingsPreviews.swift` show each Settings page in the window, on the in-memory library.
 - **Ticket Details** and **Project and Related Work** show dynamic properties and relationships.
 - **Missing and Unfamiliar Values** shows unresolved targets and preserved unfamiliar properties.
-- **Relationship Selection** and **New Item** expose the native editing flows.
+- **Relationship Selection** exposes the native editing flow for connections.
 - **Complete Item Window** renders the actual split view, toolbar, editor, and inspector against the in-memory library.
 - **Unsaved Property Input** lets a rejected save be exercised by editing the field and committing it.
 

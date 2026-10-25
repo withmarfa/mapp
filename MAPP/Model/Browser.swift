@@ -48,7 +48,6 @@ final class Browser {
     var searchFocusRequests = 0
     /// The items New made in this window that have not been left yet (see `NewItem`).
     var newItems: [ItemID: NewItem] = [:]
-    var isImportingFiles = false
     /// A file the library had to fetch to show, so the commands that share it have its location too.
     private(set) var fetchedFile: (id: ItemID, url: URL)?
     /// The library this window was last shown, so a different one starts the window afresh.

@@ -16,7 +16,7 @@ nonisolated extension ItemTypeInfo.Field.Kind {
 }
 
 nonisolated extension DateFormatter {
-    /// A date with no time, as the workbench's fields write one.
+    /// A date with no time, as a date field holds one.
     static var itemDay: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
