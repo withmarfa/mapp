@@ -100,3 +100,14 @@ jobs:
           for message, count in seen.most_common(15):
               print(count, message)
           "
+
+  checks:
+    name: Checks
+    needs: [changes, editor, swift]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job that ran to pass
+        run: |
+          [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "false" ]]
