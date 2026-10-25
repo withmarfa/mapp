@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N, the toolbar's New Item and the palette's New commands: a panel in the middle of the window for making one
+/// ⌘N, the toolbar's New Item and the palette's New commands: a panel near the top of the window for making one
 /// item. What it holds comes first (a title and text, a file, or a title alone), then its properties; the footer
 /// chooses the kind of item and where it goes. ⌘Return adds it and opens it. Escape, Cancel or a click outside
 /// puts it away, keeping what was typed for the window.
@@ -41,6 +41,7 @@ struct QuickAddPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 if isFile { fileArea(draft) }
                 titleField(isFile: isFile)
+                propertyChips(draft)
                 if showsBody { bodyField(draft) }
                 if QuickAdd.holdsTextItCannotKeep(draft, in: catalogue) {
                     Text("This kind of item doesn’t keep text. Remove the text, or choose another kind.")
@@ -52,9 +53,6 @@ struct QuickAddPanel: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
             Spacer(minLength: 0)
-            propertyChips(draft)
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
             Divider()
                 .padding(.top, 16)
             bottomBar(draft, isFile: isFile)
@@ -264,6 +262,7 @@ struct QuickAddPanel: View {
                         .labelStyle(.iconOnly)
                 }
                 .menuIndicator(.hidden)
+                .buttonBorderShape(.circle)
                 .fixedSize()
                 .help("Add Property")
                 .accessibilityIdentifier("QuickAddAddProperty")
@@ -352,16 +351,37 @@ struct QuickAddPanel: View {
         if let parentID = draft.parentID, !candidates.contains(where: { $0.id == parentID }), let parent = library.item(parentID) {
             candidates.insert(parent, at: 0)
         }
-        return Picker("Parent", selection: Binding { draft.parentID } set: { quickAdd.draft?.parentID = $0 }) {
-            Label("No Parent", systemImage: "tray").tag(ItemID?.none)
-            if !candidates.isEmpty { Divider() }
-            ForEach(candidates) { candidate in
-                Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
-                    .tag(Optional(candidate.id))
+        let chosen = candidates.first { $0.id == draft.parentID }
+        // A menu button, not a pop-up button: a pop-up is as wide as its longest title, a menu button as wide as the chosen one.
+        return Menu {
+            Picker("Parent", selection: Binding { draft.parentID } set: { quickAdd.draft?.parentID = $0 }) {
+                Label("No Parent", systemImage: "tray").tag(ItemID?.none)
+                if !candidates.isEmpty { Divider() }
+                ForEach(candidates) { candidate in
+                    Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
+                        .tag(Optional(candidate.id))
+                }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            HStack(spacing: 6) {
+                if let chosen {
+                    Label(chosen.title, systemImage: TypeSymbol.name(for: chosen.type, in: library.catalogue))
+                } else {
+                    Label("No Parent", systemImage: "tray")
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .frame(maxWidth: 220)
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
         .fixedSize()
         .disabled(candidates.isEmpty)
         .help("Parent")

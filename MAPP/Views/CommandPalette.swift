@@ -72,7 +72,7 @@ struct CommandPalette: View {
                         }
                         .padding(6)
                     }
-                    .frame(maxHeight: 340)
+                    .frame(maxHeight: 460)
                     .onChange(of: highlighted) { proxy.scrollTo(highlighted) }
                 }
             }
