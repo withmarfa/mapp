@@ -90,18 +90,6 @@ struct NoteLinksTests {
         #expect(await index.names(matching: "gard", among: Array(items.dropFirst()), limit: 10).contains("garden"))
     }
 
-    @Test func theSuggestionScoresAreTheCommandPalettesForTheSameTitles() {
-        let pairs = [
-            ("किताब", "ताब"), ("किताब", "ता"), ("किताब", "ब"), ("किताब", "किता"), ("किTable", "Table"),
-            ("Café plans", "plans"), ("Café plans", "CAFE"), ("Éclair", "ECL"), ("👩‍💻 project", "👩"), ("👩‍💻 project", "project"),
-            ("日本語のノート", "ノート"), ("New Note", "nn"), ("New Note", "nx"), ("Move to Inbox", "inb"), ("Unpin Note", "pin"),
-            ("Spinach", "pin"), ("Pin Note", "pin"),
-        ]
-        for (title, typed) in pairs {
-            #expect(NoteLinks.score(folded: Array(NoteLinks.fold(title)), NoteLinks.Query(typed)) == PaletteMatch.score(title, typed), "\(title) for \(typed)")
-        }
-    }
-
     @Test func aLibraryNamesTheNoteChosenByTitleOrByIdentity() {
         let alone = note("Garden ideas", minutes: 1)
         let twin = note("garden IDEAS", minutes: 2)

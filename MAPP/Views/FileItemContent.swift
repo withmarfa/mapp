@@ -66,11 +66,7 @@ struct FileItemContent: View {
             }
             .padding()
             if type.conforms(to: .pdf) {
-                if PDFDocument(url: url) != nil {
-                    FilePDFView(url: url)
-                } else {
-                    ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
-                }
+                FilePDFPreview(url: url)
             } else if type.conforms(to: .image) {
                 FileImageView(url: url, title: title, zoom: zoom)
             } else {
@@ -81,45 +77,74 @@ struct FileItemContent: View {
     }
 }
 
-private struct FilePDFView: NSViewRepresentable {
+/// Reads the document once for its file, rather than each time the preview's body runs.
+private struct FilePDFPreview: View {
     let url: URL
+    @State private var loaded: (url: URL, document: PDFDocument?)?
+
+    var body: some View {
+        Group {
+            if let loaded, loaded.url == url {
+                if let document = loaded.document {
+                    FilePDFView(document: document)
+                } else {
+                    ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
+                }
+            }
+        }
+        .task(id: url) { loaded = (url, PDFDocument(url: url)) }
+    }
+}
+
+private struct FilePDFView: NSViewRepresentable {
+    let document: PDFDocument
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
         view.autoScales = true
         view.displayMode = .singlePageContinuous
-        view.document = PDFDocument(url: url)
+        view.document = document
         return view
     }
     func updateNSView(_ view: PDFView, context: Context) {
-        if view.document?.documentURL != url { view.document = PDFDocument(url: url) }
+        if view.document !== document { view.document = document }
     }
 }
 
+/// Decodes the image once for its file, off the main actor, since the body runs again on every zoom and resize.
 private struct FileImageView: View {
     let url: URL
     let title: String
     let zoom: Double
-    private var previewImage: NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceThumbnailMaxPixelSize: 3000,
-                kCGImageSourceCreateThumbnailWithTransform: true
-              ] as CFDictionary) else { return nil }
-        return NSImage(cgImage: thumbnail, size: .zero)
-    }
+    @State private var decoded: (url: URL, image: NSImage?)?
+
     var body: some View {
         GeometryReader { geometry in
-            if let image = previewImage {
-                ScrollView([.horizontal, .vertical]) {
-                    Image(nsImage: image).resizable().scaledToFit()
-                        .frame(width: max(1, geometry.size.width) * zoom, height: max(1, geometry.size.height) * zoom)
-                        .accessibilityLabel(title)
+            if let decoded, decoded.url == url {
+                if let image = decoded.image {
+                    ScrollView([.horizontal, .vertical]) {
+                        Image(nsImage: image).resizable().scaledToFit()
+                            .frame(width: max(1, geometry.size.width) * zoom, height: max(1, geometry.size.height) * zoom)
+                            .accessibilityLabel(title)
+                    }
+                } else {
+                    ContentUnavailableView("Can’t Preview This Image", systemImage: "photo", description: Text("Open the file in another app to view it."))
                 }
-            } else {
-                ContentUnavailableView("Can’t Preview This Image", systemImage: "photo", description: Text("Open the file in another app to view it."))
             }
         }
+        .task(id: url) {
+            let image = await Self.decode(url)
+            guard !Task.isCancelled else { return }
+            decoded = (url, image.map { NSImage(cgImage: $0, size: .zero) })
+        }
+    }
+
+    @concurrent private static func decode(_ url: URL) async -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 3000,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ] as CFDictionary)
     }
 }
 

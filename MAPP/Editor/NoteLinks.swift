@@ -61,49 +61,6 @@ nonisolated enum NoteLinks {
         name.precomposedStringWithCanonicalMapping.lowercased().precomposedStringWithCanonicalMapping
     }
 
-    /// What was typed after `[[`, folded once for scoring many titles. Scores follow the command palette's
-    /// (`PaletteMatch`), read here from titles kept folded.
-    nonisolated struct Query: Sendable {
-        fileprivate let characters: [Character]
-        fileprivate let letters: [Character]
-
-        init(_ text: String) {
-            let folded = NoteLinks.fold(text.trimmingCharacters(in: .whitespaces))
-            characters = Array(folded)
-            letters = folded.filter { !$0.isWhitespace }
-        }
-
-        var isEmpty: Bool { characters.isEmpty }
-    }
-
-    static func fold(_ text: String) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-    }
-
-    /// Lower is better; nil when the title does not answer the query. `title` is folded and read as characters.
-    static func score(folded title: [Character], _ query: Query) -> Int? {
-        guard !query.isEmpty else { return 0 }
-        let wanted = query.characters
-        if title.count >= wanted.count {
-            if title.starts(with: wanted) { return 0 }
-            var start = 1
-            let last = title.count - wanted.count
-            while start <= last {
-                if title[start] == wanted[0], title[start...].starts(with: wanted) {
-                    return title[start - 1].isLetter ? 2 : 1
-                }
-                start += 1
-            }
-        }
-        guard !query.letters.isEmpty else { return nil }
-        var next = 0
-        for character in title where character == query.letters[next] {
-            next += 1
-            if next == query.letters.count { return 3 }
-        }
-        return nil
-    }
-
     /// Keeps each note's title folded for matching, so a query that grows one letter at a time folds nothing again
     /// and a library of tens of thousands of notes is read in one pass. It works off the main actor, on a copy of
     /// the items, so typing in the page and the window never wait on it.
@@ -127,14 +84,14 @@ nonisolated enum NoteLinks {
         /// edited), each once. A title another note also goes by is not offered, since a link to it would not say
         /// which note, nor one the note it is typed in already links to another note (`established`).
         func names(matching text: String, among items: [Item], established: [String: ItemID] = [:], limit: Int) -> [String] {
-            let query = Query(text)
+            let query = PaletteMatch.Query(text)
             var notes = 0
             var best: [(title: String, score: Int, modified: Date)] = []
             for item in items where !item.isFile {
                 notes += 1
                 if let kept = entries[item.id], kept.version == item.version, kept.title == item.title { continue }
                 if let old = entries[item.id] { forget(old.key) }
-                let folded = NoteLinks.fold(item.title)
+                let folded = PaletteMatch.fold(item.title)
                 let entry = Entry(
                     version: item.version, title: item.title, folded: Array(folded), key: NoteLinks.nameKey(NoteName.trimmed(item.title)),
                     nameable: NoteLinks.canName(item.title), modified: item.modified)
@@ -152,7 +109,7 @@ nonisolated enum NoteLinks {
             for item in items where !item.isFile {
                 guard let entry = entries[item.id], entry.nameable, holders[entry.key] == 1,
                       established[entry.key].map({ $0 == item.id }) ?? true,
-                      let score = NoteLinks.score(folded: entry.folded, query) else { continue }
+                      let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
                 Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
             }
             return best.map(\.title)

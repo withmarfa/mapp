@@ -21,6 +21,8 @@ struct CommandPalette: View {
     @State private var highlighted = 0
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private var returnFocus: Browser.Pane = .list
+    /// Every note's title folded once while the palette is open, so a keystroke folds only what was typed.
+    @State private var titles = PaletteMatch.Titles()
     @FocusState private var isFieldFocused: Bool
 
     private struct Entry: Identifiable {
@@ -159,7 +161,7 @@ struct CommandPalette: View {
 
     private func matching(_ entries: [Entry]) -> [Entry] {
         // A search's results are already what it found, most recently edited first.
-        mode == .search ? entries : PaletteMatch.ranked(entries.map(\.title), query).map { entries[$0] }
+        mode == .search ? entries : titles.ranked(entries.map(\.title), query).map { entries[$0] }
     }
 
     /// The commands first, then the places, then the notes, the order in which equally good matches are listed.

@@ -10,6 +10,8 @@ struct NoteLinkPicker: View {
     @State private var highlighted = 0
     /// Read once, so typing in the field narrows a list that is already sorted.
     @State private var notes: [Item] = []
+    /// The notes' titles folded once, so a keystroke folds only what was typed.
+    @State private var titles = PaletteMatch.Titles()
     /// A note was chosen that no link can name alone, so the person is asked for another.
     @State private var refused = false
     @FocusState private var isFieldFocused: Bool
@@ -17,8 +19,7 @@ struct NoteLinkPicker: View {
     private static let limit = 50
 
     private var matches: [Item] {
-        let titles = notes.map(\.title)
-        let ranked = PaletteMatch.ranked(titles, query)
+        let ranked = titles.ranked(notes.map(\.title), query)
         return ranked.prefix(Self.limit).map { notes[$0] }
     }
 
