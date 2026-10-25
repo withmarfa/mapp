@@ -525,7 +525,7 @@ import Observation
     /// made is refused by `open`, which releases the lock as it does: with nothing unsent, the package replaces it
     /// with an empty one held as its writer, and refuses while another process writes it. One holding changes
     /// the server has not taken, which the person was shown and chose to discard, cannot be held, so it is removed
-    /// without the lock.
+    /// without the lock, as is a store that cannot be opened at all. A store another process writes is refused.
     @concurrent private nonisolated static func holdWriterLock(of store: URL) async throws -> WorkingCopy? {
         guard FileManager.default.fileExists(atPath: store.path) else { return nil }
         let copy: WorkingCopy
@@ -538,6 +538,12 @@ import Observation
                 throw SourceFailure(kind: .inUse, message: Words.inUse)
             }
         } catch MarfaError.wrongSchema {
+            return nil
+        } catch MarfaError.readingHandle {
+            throw SourceFailure(kind: .inUse, message: Words.inUse)
+        } catch {
+            // No process can open it either, and the person chose to discard it, so keeping it would refuse its
+            // address for good.
             return nil
         }
         guard copy.handle == .writer else {

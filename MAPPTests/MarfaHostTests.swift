@@ -368,6 +368,23 @@ nonisolated final class TestKeyStore: KeyStore {
         #expect(FileManager.default.fileExists(atPath: store.path))
     }
 
+    /// A copy that cannot be opened at all can be held by no process, and the person chose to discard it.
+    @Test(.timeLimit(.minutes(1)))
+    func discardingACopyThatCannotBeOpenedRemovesIt() async throws {
+        let bench = try HostBench()
+        bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
+        bench.keys.save("k", for: first)
+        let store = bench.location.store(for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        try Data(repeating: 0x5A, count: 8192).write(to: store)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The package’s words.") }
+        let host = bench.host()
+        await host.launch()
+
+        try await host.disconnect(.discardCopy(nil))
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
     /// An earlier version of the app may still be writing a copy this version refuses, so it stays too.
     @Test(.timeLimit(.minutes(1)))
     func discardingACopyADifferentVersionWritesLeavesIt() async throws {
