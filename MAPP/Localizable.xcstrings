@@ -592,7 +592,7 @@
     "Caution" : {
 
     },
-    "Change Parent…" : {
+    "Change %@…" : {
 
     },
     "Changes Haven’t Been Sent" : {
@@ -1373,9 +1373,6 @@
     "Page Width" : {
 
     },
-    "Parent" : {
-      "extractionState" : "manual"
-    },
     "Paste a new key" : {
       "extractionState" : "manual"
     },
@@ -1463,7 +1460,7 @@
     "Remove from Favorites" : {
 
     },
-    "Remove Parent" : {
+    "Remove %@" : {
 
     },
     "Rendering diagram…" : {

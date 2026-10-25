@@ -50,7 +50,7 @@ nonisolated enum MarfaMapping {
         let held = type.writtenAt == .target ? ends.first : ends.last
         let other = type.writtenAt == .target ? ends.last : ends.first
         return EdgeTypeInfo(
-            id: type.id, label: type.label, reverseName: type.reverseName,
+            id: type.id, label: type.label, reverseLabel: type.reverseLabel, reverseName: type.reverseName,
             cardinality: held == "one" ? .one : .many, writtenAt: type.writtenAt == .target ? .target : .source,
             sourceTypes: constraints(type.sourceTypeConstraints).types,
             targetTypes: constraints(type.targetTypeConstraints).types,

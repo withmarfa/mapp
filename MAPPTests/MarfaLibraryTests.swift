@@ -51,22 +51,22 @@ nonisolated enum LibraryFixture {
         ],
         edgeTypes: [
             EdgeTypeInfo(
-                id: "parent-of", label: "Parent of", reverseName: "child-of", cardinality: .one, writtenAt: .target,
+                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
                 sourceTypes: [], targetTypes: []),
             EdgeTypeInfo(
-                id: "about", label: "About", reverseName: nil, cardinality: .many, writtenAt: .source,
+                id: "about", label: "About", reverseLabel: "Subject of", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: []),
             EdgeTypeInfo(
-                id: "supersedes", label: "Supersedes", reverseName: nil, cardinality: .one, writtenAt: .source,
+                id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", reverseName: nil, cardinality: .one, writtenAt: .source,
                 sourceTypes: [ticket], targetTypes: [ticket], reverseCardinality: .one),
             EdgeTypeInfo(
-                id: "in-collection", label: "In collection", reverseName: nil, cardinality: .many, writtenAt: .source,
+                id: "in-collection", label: "In collection", reverseLabel: "Collection of", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: [], targetRoles: ["container"]),
             EdgeTypeInfo(
-                id: "references", label: "References", reverseName: nil, cardinality: .many, writtenAt: .source,
+                id: "references", label: "References", reverseLabel: "Referenced by", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: []),
             EdgeTypeInfo(
-                id: "in-folder", label: "In folder", reverseName: nil, cardinality: .many, writtenAt: .source,
+                id: "in-folder", label: "In folder", reverseLabel: "Folder of", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: [TypeID("system.folder")]),
         ])
 
@@ -274,10 +274,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         let project = library.relationships(for: F.p1)
         #expect(project.first { $0.field == "inverse:about" }?.targets.map(\.itemID) == [F.n1])
-        #expect(project.first { $0.field == "inverse:about" }?.label == "Items About This")
+        #expect(project.first { $0.field == "inverse:about" }?.label == "Subject of")
         #expect(project.first { $0.field == "child-of" }?.targets.isEmpty == true)
 
         let note = library.relationships(for: F.n1)
+        #expect(note.first { $0.field == "about" }?.label == "About")
         #expect(note.first { $0.field == "about" }?.allowsMultiple == true)
         #expect(!note.contains { $0.field == "supersedes" })
         #expect(library.bodyMentions(for: F.n1).map(\.itemID) == [F.t1])
@@ -905,7 +906,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     private static var catalogue: Catalogue {
         var catalogue = F.catalogue
         catalogue.edgeTypes["attached-to"] = EdgeTypeInfo(
-            id: "attached-to", label: "Attached to", reverseName: nil, cardinality: .many, writtenAt: .source,
+            id: "attached-to", label: "Attached to", reverseLabel: "Attachments", reverseName: nil, cardinality: .many, writtenAt: .source,
             sourceTypes: [MarfaMapping.fileType], targetTypes: [])
         return catalogue
     }
@@ -946,7 +947,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aLinkShowsAtItsTargetAsLinkedFromAndIsChangedInTheText() async throws {
         let library = try await Self.loaded()
         let linked = try #require(library.relationships(for: F.t1).first { $0.field == "inverse:references" })
-        #expect(linked.label == "Linked From")
+        #expect(linked.label == "Referenced by")
         #expect(linked.targets.map(\.itemID) == [F.n1])
         #expect(!linked.isEditable)
         #expect(!library.setItemRelationship(F.t1, field: "inverse:references", targetIDs: [], undoManager: nil))
@@ -1151,5 +1152,54 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(told.map(\.text) == ["Refused later"])
         #expect(told.first?.reason == "Too long. The change is also listed in Settings.")
         #expect(library.failure == nil, "the person is told once")
+    }
+}
+
+/// A relation whose two ends share one name reads the same from either item, so its links are one list.
+@MainActor
+@Suite struct MarfaLibraryTwoWayTests {
+    typealias F = LibraryFixture
+
+    private static func loaded() async throws -> (MarfaLibrary, FakeItemSource) {
+        var catalogue = F.catalogue
+        catalogue.edgeTypes["related"] = EdgeTypeInfo(
+            id: "related", label: "Related to", reverseLabel: "Related to", reverseName: nil, cardinality: .many,
+            writtenAt: .source, sourceTypes: [], targetTypes: [])
+        var items = F.items
+        func link(_ id: String, from source: ItemID, to target: ItemID) -> Edge {
+            Edge(id: EdgeID(id), type: "related", source: source, target: .item(target), origin: .property("related"))
+        }
+        items[items.firstIndex { $0.id == F.n1 }!].edgesOut += [link("rel1", from: F.n1, to: F.p1)]
+        items[items.firstIndex { $0.id == F.n2 }!].edgesOut += [link("rel2", from: F.n2, to: F.n1)]
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source)
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        return (library, source)
+    }
+
+    @Test func aTwoWayRelationShowsItsOutgoingAndIncomingLinksAsOneList() async throws {
+        let (library, _) = try await Self.loaded()
+        let related = library.relationships(for: F.n1).filter { $0.field.hasSuffix("related") }
+        #expect(related.count == 1)
+        #expect(related.first?.label == "Related to")
+        #expect(Set(related.first?.targets.compactMap(\.itemID) ?? []) == [F.p1, F.n2])
+        // The item it points at reads it the same way, from the other side.
+        #expect(library.relationships(for: F.p1).first { $0.field.hasSuffix("related") }?.targets.map(\.itemID) == [F.n1])
+    }
+
+    @Test func removingFromTheCombinedListRemovesTheLinkInTheDirectionItWasMade() async throws {
+        let (library, source) = try await Self.loaded()
+        source.clearWrites()
+        #expect(library.setItemRelationship(F.n1, field: "related", targetIDs: [F.p1], undoManager: nil))
+        #expect(source.writes == [.unlink(EdgeID("rel2"))])
+    }
+
+    @Test func aOneWayRelationNamesEachEndByItsOwnLabel() async throws {
+        let (library, _) = try await Self.loaded()
+        #expect(library.relationships(for: F.n1).first { $0.field == "about" }?.label == "About")
+        #expect(library.relationships(for: F.p1).first { $0.field == "inverse:about" }?.label == "Subject of")
+        #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.label == "Parent")
+        #expect(library.relationships(for: F.p1).first { $0.field == "inverse:parent-of" }?.label == "Children")
     }
 }

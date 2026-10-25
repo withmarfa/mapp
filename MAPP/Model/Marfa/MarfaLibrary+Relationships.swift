@@ -91,19 +91,10 @@ extension MarfaLibrary {
         }
     }
 
-    private func label(of name: String, _ end: FieldEnd) -> String {
-        if end.isInverse {
-            return switch end.info.id {
-            case MarfaMapping.parentEdge: "Children"
-            case "about": "Items About This"
-            case MarfaMapping.bodyLinkEdge: "Linked From"
-            case MarfaMapping.attachmentEdge: "Attachments"
-            default: "Incoming " + end.info.label
-            }
-        }
-        // The child's end of parent-of names the item it is filed under.
-        if end.info.id == MarfaMapping.parentEdge { return "Parent" }
-        return name == end.info.id ? end.info.label : MarfaMapping.label(forField: name)
+    /// The name Marfa gives the end of the link this field is: the edge type's `label` on its source end and its
+    /// `reverseLabel` on its target end.
+    private func label(_ end: FieldEnd) -> String {
+        end.info.label(atTarget: end.atTarget)
     }
 
     private func target(_ id: ItemID) -> ItemRelationshipTarget {
@@ -120,7 +111,7 @@ extension MarfaLibrary {
         }
         var results = fields.map { name, end in
             ItemRelationship(
-                field: name, label: label(of: name, end), targets: others(of: id, end).map(target),
+                field: name, label: label(end), targets: others(of: id, end).map(target),
                 isEditable: item.isEditable, allowsMultiple: end.info.cardinality == .many)
         }
         let pointing = index.links(touching: id).filter { $0.holder != id }
@@ -129,9 +120,19 @@ extension MarfaLibrary {
             let holders = pointing.filter { $0.type == type }.map { $0.holder }
             let targets = holders.filter { self.item($0) != nil }.map(target)
                 .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            // A two-way relation reads the same from both items, so the links pointing here join the ones this item
+            // holds in a single list.
+            if end.info.isTwoWay, let own = fields.firstIndex(where: { !$0.end.isInverse && $0.end.info.id == type }) {
+                let held = results[own]
+                results[own] = ItemRelationship(
+                    field: held.field, label: held.label,
+                    targets: held.targets + targets.filter { incoming in !held.targets.contains { $0.id == incoming.id } },
+                    isEditable: held.isEditable, allowsMultiple: held.allowsMultiple)
+                continue
+            }
             // The text that links an item is the linking item's to change, not a relationship of this one.
             results.append(ItemRelationship(
-                field: Self.inversePrefix + type, label: label(of: type, end), targets: targets,
+                field: Self.inversePrefix + type, label: label(end), targets: targets,
                 isEditable: item.isEditable && type != MarfaMapping.bodyLinkEdge,
                 allowsMultiple: end.info.reverseCardinality == .many))
         }
@@ -231,11 +232,16 @@ extension MarfaLibrary {
             failure = (cantChange, String(localized: "Only one item can be chosen here."))
             return false
         }
-        let current = others(of: id, end)
+        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        // A two-way relation is one list of the links this item holds and the ones pointing at it.
+        let own = others(of: id, end)
+        let incoming = !end.isInverse && end.info.isTwoWay ? others(of: id, farEnd) : []
+        let current = own + incoming.filter { !own.contains($0) }
         let adding = targetIDs.filter { !current.contains($0) }
         let removing = current.filter { !targetIDs.contains($0) }
-        var change = RelationshipChange(removing: removing.map { draft(id, $0, end) })
-        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        var change = RelationshipChange(removing: removing.flatMap { other in
+            (own.contains(other) ? [draft(id, other, end)] : []) + (incoming.contains(other) ? [draft(id, other, farEnd)] : [])
+        })
         let farHolds = end.info.cardinality(atTarget: !end.atTarget)
         // Replacing this item's own link moves the far end; taking another item's link moves this item's end.
         let farIsTarget = !end.atTarget

@@ -84,13 +84,15 @@ nonisolated enum SampleLibrary {
 
     static let edgeTypes: [Marfa.EdgeType] = [
         EdgeType(
-            id: "parent-of", label: "Children", description: "Files one item under another.",
+            id: "parent-of", label: "Children", reverseLabel: "Parent", description: "Files one item under another.",
             cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target, cascadeOnDelete: "cascade",
             shipped: true),
-        EdgeType(id: "about", label: "About", cardinality: "many-to-many", shipped: true),
-        EdgeType(id: "references", label: "References", cardinality: "many-to-many", shipped: true),
+        EdgeType(id: "about", label: "About", reverseLabel: "Subject of", cardinality: "many-to-many", shipped: true),
+        EdgeType(id: "references", label: "References", reverseLabel: "Referenced by", cardinality: "many-to-many", shipped: true),
         EdgeType(
-            id: "attached-to", label: "Attached To", cardinality: "many-to-one", reverseName: "has-attachment",
+            id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", cardinality: "one-to-one", shipped: true),
+        EdgeType(
+            id: "attached-to", label: "Attached to", reverseLabel: "Attachments", cardinality: "many-to-one", reverseName: "has-attachment",
             shipped: true),
     ]
 

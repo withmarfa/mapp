@@ -10,7 +10,7 @@ struct ItemRelationshipRow: View {
     @State private var rejected = false
 
     var body: some View {
-        InspectorRow(name: LocalizedStringKey(ItemTypeInfo.Field.displayLabel(relationship.label))) {
+        InspectorRow(verbatimName: relationship.label) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(relationship.targets) { target in
                     ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
@@ -217,16 +217,17 @@ struct ItemRelationshipPicker: View {
 
 #Preview("Wrapping Connections") {
     let id = ItemID("10000000-0000-0000-0000-000000000001")
+    let names = SampleLibrary.catalogue.edgeTypes
     let parent = ItemRelationship(
-        field: "child-of", label: "Parent", targets: [
+        field: "child-of", label: names["parent-of"]?.reverseLabel ?? "", targets: [
             .init(title: "Field Research: review the observations and photographs from every location", itemID: id, resolution: .resolved(id))
         ], isEditable: true, allowsMultiple: false)
     let about = ItemRelationship(
-        field: "about", label: "About", targets: [
+        field: "about", label: names["about"]?.label ?? "", targets: [
             .init(title: "Field notes", itemID: id, resolution: .resolved(id)),
             .init(title: "Interview with the site manager", itemID: nil, resolution: .missing)
         ], isEditable: true, allowsMultiple: true)
-    let supersedes = ItemRelationship(field: "supersedes", label: "Supersedes", targets: [], isEditable: true, allowsMultiple: false)
+    let supersedes = ItemRelationship(field: "supersedes", label: names["supersedes"]?.label ?? "", targets: [], isEditable: true, allowsMultiple: false)
     VStack(alignment: .leading, spacing: 0) {
         ItemRelationshipRow(relationship: parent, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
         ItemRelationshipRow(relationship: about, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })

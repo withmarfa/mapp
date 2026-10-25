@@ -73,7 +73,7 @@ final class FakeItemLibrary: ItemLibrary {
         ]
         // A child names its parent, so `parent-of` is written at its target, under its reverse name.
         let parent = EdgeTypeInfo(
-            id: "parent-of", label: "Parent of", reverseName: "child-of", cardinality: .one, writtenAt: .target,
+            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
             sourceTypes: [], targetTypes: [])
         return Catalogue(itemTypes: types, edgeTypes: [parent])
     }()

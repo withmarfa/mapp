@@ -71,7 +71,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     }
 
     let id: String
-    let label: String
+    var label: String
     let content: Content
     let style: Style
     /// Whether the column shows until the person hides it.
@@ -91,7 +91,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
 
     static let title = ItemTableColumn(id: "title", label: String(localized: "Name"), content: .title, style: .title)
     static let type = ItemTableColumn(id: "type", label: String(localized: "Type"), content: .type, style: .text)
-    static let parent = ItemTableColumn(id: "parent", label: String(localized: "Parent"), content: .parent, style: .link)
+    static let parent = ItemTableColumn(id: "parent", label: "", content: .parent, style: .link)
     static let collection = ItemTableColumn(id: "collection", label: String(localized: "Collection"), content: .collection, style: .link)
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
     static let created = ItemTableColumn(
@@ -307,6 +307,8 @@ nonisolated enum ItemTableLayout {
         // The parent is worth a column where it is something other than the collection, such as a ticket's epic.
         let isCollection: Bool = if case .collection = place { true } else { false }
         var parent = ItemTableColumn.parent
+        // The column is headed with Marfa's name for the child end of the parent link.
+        if let name = catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel { parent.label = name }
         parent.isShownByDefault = rows.count(where: { $0.parent != nil && $0.parent?.id != $0.collection?.id }) >= threshold
         columns.append(parent)
         if !isCollection, rows.contains(where: { $0.collection != nil }) { columns.append(.collection) }

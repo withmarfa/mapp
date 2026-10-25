@@ -70,7 +70,7 @@ struct ItemPageHeader: ViewModifier {
             parent: parent.map {
                 // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
                 let title = $0.targets.first?.title
-                return PageHeader.Pin(label: title ?? String(localized: "Parent"), enabled: title != nil || $0.isEditable,
+                return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
                                       empty: title == nil, opensMenu: title != nil)
             },
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
@@ -130,11 +130,11 @@ struct ItemPageHeader: ViewModifier {
                 }
                 open.isEnabled = target.itemID.map { library.item($0) != nil } ?? false
                 menu.addItem(open)
-                let change = actionItem(String(localized: "Change Parent…")) { choosingParent.wrappedValue = rect }
+                let change = actionItem(String(localized: "Change \(parent.label)…")) { choosingParent.wrappedValue = rect }
                 change.isEnabled = parent.isEditable
                 menu.addItem(change)
                 menu.addItem(.separator())
-                let remove = actionItem(String(localized: "Remove Parent")) {
+                let remove = actionItem(String(localized: "Remove \(parent.label)")) {
                     Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager)
                 }
                 remove.isEnabled = parent.isEditable

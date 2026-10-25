@@ -17,7 +17,7 @@ struct ItemLayerTests {
         ],
         edgeTypes: [
             EdgeTypeInfo(
-                id: "parent-of", label: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
+                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
                 sourceTypes: [], targetTypes: [])
         ])
 
