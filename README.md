@@ -6,6 +6,17 @@ A native macOS items app for a Marfa library: a sidebar, a list and a page, in t
 
 Requires macOS 27 and Xcode 27. Open `MAPP.xcodeproj` and run the `MAPP` scheme, or see `AGENTS.md` for the command line.
 
+## Signing
+
+A checkout builds and runs without a developer account: Xcode signs it to run locally. To sign with your own team, create `Config/Local.xcconfig`, which git ignores, with your team ID:
+
+```
+DEVELOPMENT_TEAM = <your team ID>
+```
+
+`Config/Signing.xcconfig` includes it when it exists. Don't commit a team ID.
+
+
 
 ## Item interface
 

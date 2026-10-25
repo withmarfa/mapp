@@ -94,8 +94,8 @@ These hold across the app. The nested files say how the library keeps them.
 ## Signing
 
 - A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
-- To sign with the team, run `infisical run -- scripts/render-local-signing.sh`, which writes `Config/Local.xcconfig` from Infisical.
-- Never commit a team identifier, and never edit the rendered file by hand.
+- To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. How a contributor keeps that line is their own; the repository holds no tool for it.
+- Never commit a team identifier.
 
 ## Versions and releases
 
