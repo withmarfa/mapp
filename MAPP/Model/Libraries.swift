@@ -187,11 +187,12 @@ import Observation
     /// The app's own: the person's defaults and Keychain, and the copy in the app's own storage.
     static func standard() -> Libraries {
         #if DEBUG
-        // The UI tests, the screenshots and the unit tests hosted in the app never reach the person's saved server,
-        // Keychain, copies or notes folder.
+        // The UI tests, the screenshots, the unit tests hosted in the app and Xcode's previews, which start the whole
+        // app, never reach the person's saved server, Keychain, copies or notes folder.
         let environment = ProcessInfo.processInfo.environment
         if ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder")
             || environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
+            || environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         {
             let suite = "MAPP.SampleMarfa"
             let defaults = UserDefaults(suiteName: suite) ?? .standard
