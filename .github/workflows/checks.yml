@@ -82,7 +82,8 @@ jobs:
       - name: Run the unit tests
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS'
-          -derivedDataPath build -only-testing:MAPPTests -retry-tests-on-failure -test-iterations 3 -resultBundlePath TestResults.xcresult test
+          -derivedDataPath build -only-testing:MAPPTests -retry-tests-on-failure -test-iterations 3
+          -test-repetition-relaunch-enabled YES -resultBundlePath TestResults.xcresult test
       - name: Show why tests failed
         if: failure()
         run: |
