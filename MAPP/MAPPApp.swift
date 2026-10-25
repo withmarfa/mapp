@@ -108,6 +108,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in
             let kept = await libraries.flushEditors(within: .seconds(5))
+            // A draft in quick add has no other home once its window goes, so it is told with the rest.
+            if kept { QuickAdd.handOffAll(to: libraries.host.notices) }
             let told = kept && libraries.host.notices.tellBeforeQuitting(copying: Notices.copyToClipboard) { notice in
                 let alert = NSAlert()
                 alert.messageText = notice.title

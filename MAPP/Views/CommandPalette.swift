@@ -14,6 +14,7 @@ struct CommandPalette: View {
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let browser: Browser
     let editor: EditorController
     let mode: Browser.Palette
@@ -76,11 +77,7 @@ struct CommandPalette: View {
                 }
             }
         }
-        .frame(width: 520)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial, in: .rect(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
-        .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+        .floatingPanelSurface(width: 520)
         .onKeyPress(.downArrow) {
             highlighted = min(highlighted + 1, max(entries.count - 1, 0))
             return .handled
@@ -231,7 +228,16 @@ struct CommandPalette: View {
                     add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
                 }
             }
-            add(String(localized: "New Item"), "plus", "⌘N") { browser.startNewItem(in: library, undoManager: undoManager) }
+            entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), systemImage: "plus", shortcut: "⌘N",
+                                 takesFocus: true) {
+                browser.openQuickAdd(remembered: lastType, in: library)
+            })
+            for type in QuickAdd.types(in: library) {
+                entries.append(Entry(id: "command:new:" + type.id.rawValue, title: String(localized: "New \(type.label)"),
+                                     systemImage: TypeSymbol.name(for: type.id, in: library.catalogue), takesFocus: true) {
+                    browser.openQuickAdd(typeID: type.id.rawValue, in: library)
+                })
+            }
             if browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
             }

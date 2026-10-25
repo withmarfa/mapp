@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 @testable import MAPP
 
 /// A library held in memory, with no server and no store, so the views' models can be tested through
@@ -178,14 +179,24 @@ final class FakeItemLibrary: ItemLibrary {
 
     // MARK: Writing
 
+    /// While set, `createItem` refuses every create and tells the person, as a library does a type it cannot make.
+    var refusesCreations = false
+
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
+        in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID? {
         guard !title.isEmpty else { return nil }
+        guard !refusesCreations else {
+            notices.tell("Can’t Create Item", "Refused")
+            return nil
+        }
         let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
+            properties: properties.sorted { $0.key < $1.key }.map { Property(key: $0.key, value: $0.value) },
+            tier: place == .inbox ? .feed : .library,
             version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? [])
         bodies[item.id] = body
         created.append(item)
@@ -219,9 +230,6 @@ final class FakeItemLibrary: ItemLibrary {
     var refusedCreations: Set<ItemID> = []
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
-    /// What `wasTouched` answers yes for, as a library does for an item another item points at.
-    var touched: Set<ItemID> = []
-    func wasTouched(_ id: ItemID) -> Bool { touched.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         relationshipWrites.append((id, field, targetIDs))
@@ -255,6 +263,24 @@ final class FakeItemLibrary: ItemLibrary {
 
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
         try await attaching?() ?? []
+    }
+
+    /// Every file added, and whether adding one is refused.
+    private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
+    var refusesFiles = false
+
+    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+        guard !refusesFiles else {
+            notices.tell("Can’t Add File", "Refused")
+            return nil
+        }
+        addedFiles.append((name, data, title, parentID))
+        let id = ItemID.mint()
+        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
+        items.append(Item(
+            id: id, type: .file, title: title ?? name, titleRule: .property("title"), content: .file(.data, byteCount: Int64(data.count)),
+            version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? []))
+        return id
     }
 
     private func change(_ ids: Set<ItemID>, _ body: (inout Item) -> Void) {

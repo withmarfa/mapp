@@ -55,14 +55,21 @@ final class Browser {
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
-    /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note.
-    var palette: Palette?
+    /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note. One panel is out at a time,
+    /// so the palette puts quick add away, keeping its draft.
+    var palette: Palette? {
+        didSet { if palette != nil { quickAdd.isPresented = false } }
+    }
+    /// The window's quick-add panel and what is typed in it.
+    let quickAdd = QuickAdd()
     /// Whether the list's search is out as a field, rather than a button beside View Options.
     var isSearchExpanded = false
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
     var searchFocusRequests = 0
-    /// The items New made in this window that have not been left yet (see `NewItem`).
-    var newItems: [ItemID: NewItem] = [:]
+    /// The item quick add made that the window opens once its library holds it (see `NewItem`).
+    var newItem: NewItem?
+    /// Where the page puts the caret when it next takes the keyboard for a new item.
+    var focusCaret: PageCaret?
     /// A file the library had to fetch to show, so the commands that share it have its location too.
     private(set) var fetchedFile: (id: ItemID, url: URL)?
     /// The library this window was last shown, so a different one starts the window afresh.
@@ -224,8 +231,8 @@ final class Browser {
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
     /// it selected or searched named items the new library may not have, and the window's undo
-    /// would act on the library left. The items New made there were left as the editors handed over, so none is
-    /// followed any more.
+    /// would act on the library left. A new item awaited there will not come, and quick add's place and properties
+    /// named that library's items and fields, so only what was typed is kept.
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
         guard libraryID != id else { return }
@@ -245,7 +252,9 @@ final class Browser {
         isSearchExpanded = false
         palette = nil
         fetchedFile = nil
-        newItems = [:]
+        newItem = nil
+        focusCaret = nil
+        quickAdd.libraryChanged()
     }
 
     func fileFetched(_ id: ItemID, at url: URL?) {

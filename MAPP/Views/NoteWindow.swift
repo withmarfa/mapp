@@ -87,7 +87,7 @@ struct NoteWindow: View {
         // the window's undo would act on the library left.
         .onDisappear {
             // A window that never showed a note made no editor.
-            editorSlot.made?.flush(closing: true)
+            editorSlot.made?.flush()
             editorSlot.made?.windowWent()
             undoManager?.removeAllActions()
         }

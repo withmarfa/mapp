@@ -22,29 +22,19 @@ struct ListToolbar: ToolbarContent {
     }
 }
 
-/// Makes an item of the chosen type in the place being shown, and opens it.
+/// Opens quick add, to make an item in the place being shown.
 struct NewItemButton: View {
     @CurrentLibrary private var library
-    @Environment(\.undoManager) private var undoManager
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let browser: Browser?
 
     var body: some View {
-        Menu {
-            ForEach(library.creatableTypes) { type in
-                Button {
-                    browser?.startNewItem(typeID: type.id.rawValue, in: library, undoManager: undoManager)
-                } label: {
-                    Label(type.label, systemImage: TypeSymbol.name(for: type.id, in: library.catalogue))
-                }
-                .disabled(browser?.isAwaitingNewItem == true)
-            }
-        } label: {
-            Label("New Item", systemImage: "plus")
-                .labelStyle(.iconOnly)
+        Button("New Item", systemImage: "plus") {
+            browser?.openQuickAdd(remembered: lastType, in: library)
         }
-        .menuStyle(.borderlessButton)
+        .labelStyle(.iconOnly)
         .help("New Item")
         .accessibilityIdentifier("NewItemToolbar")
-        .disabled(browser == nil || !library.isLoaded || library.creatableTypes.isEmpty)
+        .disabled(browser == nil || !library.isLoaded || QuickAdd.types(in: library).isEmpty)
     }
 }

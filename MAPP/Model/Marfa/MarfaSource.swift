@@ -375,7 +375,7 @@ nonisolated final class MarfaSource: ItemSource {
 }
 
 /// Attaches files through the engine, which asks the package to queue each one's upload, its file item and its
-/// edge to the item, and says what to write in the text to embed it.
+/// edge to the item, and says what to write in the text to embed it. A file added on its own goes the same way.
 nonisolated struct MarfaEmbeds: EmbedResolver {
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
@@ -390,6 +390,15 @@ nonisolated struct MarfaEmbeds: EmbedResolver {
             embeds.append(try result.get())
         }
         return embeds
+    }
+
+    func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID {
+        let result = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.addFile(file, title: title, tier: tier, parent: parent, continuation)) {
+                continuation.resume(returning: .failure(SourceFailure(kind: .missing, message: MarfaEngine.closedLibrary)))
+            }
+        }
+        return try result.get()
     }
 }
 

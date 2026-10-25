@@ -198,18 +198,20 @@ struct MainView: View {
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
-                ZStack(alignment: .top) {
-                    // A click anywhere else puts the palette away, as it does a menu.
-                    Color.clear
-                        .contentShape(.rect)
-                        .onTapGesture {
-                            browser.palette = nil
-                            browser.focusRequest = .list
-                        }
+                FloatingPanel {
+                    browser.palette = nil
+                    browser.focusRequest = .list
+                } content: {
                     CommandPalette(browser: browser, editor: editor, mode: palette)
                         // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
                         .id(palette)
-                        .padding(.top, 72)
+                }
+            } else if browser.quickAdd.isPresented, browser.quickAdd.draft != nil {
+                FloatingPanel {
+                    browser.putAwayQuickAdd()
+                    if browser.focusRequest == nil { browser.focusRequest = .list }
+                } content: {
+                    QuickAddPanel(browser: browser, quickAdd: browser.quickAdd, editor: editor)
                 }
             }
         }
@@ -234,17 +236,14 @@ struct MainView: View {
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do.
         .onDisappear {
-            editorSlot.made?.flush(closing: true)
+            editorSlot.made?.flush()
             editorSlot.made?.windowWent()
+            browser.quickAdd.handOff(to: library.notices)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             let editor = editor
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onLeave = { [browser, details, weak editor] id, closing in
-                browser.leaveNewItem(id, closing: closing, hasUnsavedTitle: details.unsavedTitles.contains(id),
-                                     undoManager: editor?.webView.window?.undoManager)
-            }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
             editor.onOpenNote = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
@@ -274,9 +273,6 @@ struct MainView: View {
         .onChange(of: newItemIsSettled) {
             if newItemIsSettled { browser.finishNewItem(in: library) }
         }
-        // An item New made that the page never held, as when the selection moved on at once, has no editor to say
-        // it was left.
-        .onChange(of: browser.selection) { leaveNewItemsNeverShown() }
         #if DEBUG
         // A sample launch can open an item without a click, as `-MAPPSelectItem <id>`, once the library holds it.
         .onChange(of: launchSelection.map { library.item($0) != nil }, initial: true) {
@@ -296,12 +292,6 @@ struct MainView: View {
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
-
-    private func leaveNewItemsNeverShown() {
-        for id in browser.newItems.keys where editor.noteID != id {
-            browser.leaveNewItem(id, closing: false, hasUnsavedTitle: details.unsavedTitles.contains(id), undoManager: undoManager)
-        }
-    }
 
     #if DEBUG
     private var launchSelection: ItemID? {

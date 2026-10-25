@@ -41,14 +41,14 @@ struct GalleryTests {
         #expect(restored.selection == [newer.id])
     }
 
-    @Test func aNewItemOpensInThePageAndReturningToGalleryOrChangingPlaceReturnsToTheGrid() {
+    @Test func aNewItemOpensInThePageAndReturningToGalleryOrChangingPlaceReturnsToTheGrid() async {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.viewMode = .gallery
         browser.show(.allNotes, in: library, order: NoteOrder())
         browser.openCollectionSelection()
         #expect(!browser.showsCollection)
-        let id = browser.startNewItem(in: library, undoManager: nil)
+        let id = await browser.quickAdded("New", in: library)
         #expect(!browser.showsCollection, "the new item opens in the page, not behind the grid")
         #expect(browser.selection == id.map { [$0] })
         browser.returnToCollection()

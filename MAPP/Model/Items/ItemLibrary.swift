@@ -72,10 +72,15 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // MARK: Writing
 
-    /// Nil when the item cannot be made, and the library tells the person why.
+    /// Nil when the item cannot be made, and the library tells the person why. The properties go in the create
+    /// itself, so a type whose fields are required is made whole in one write.
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
+        in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID?
+    /// Adds a file as an item of its own, of the file type its contents say, titled `title` or by its name, under
+    /// `parentID` where one is given. Nil when it could not be added, and the library tells the person why.
+    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID?
     /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
@@ -86,10 +91,6 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
     /// library has told the person. A library that refuses a create at once answers nil from `createItem` instead.
     func wasRefused(creating id: ItemID) -> Bool
-    /// Whether the library has written to the item since making it, or another item is connected to it. A library
-    /// that waits for its source to report a write answers from the writes it made too, since the copy it shows may
-    /// not hold them yet; one that takes each write into its copy at once answers from the copy's connections alone.
-    func wasTouched(_ id: ItemID) -> Bool
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     @discardableResult
@@ -108,6 +109,12 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
+
+    func createItem(
+        typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
+    ) -> ItemID? {
+        createItem(typeID: typeID, title: title, body: body, properties: [:], parentID: parentID, in: place, undoManager: undoManager)
+    }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
     /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
