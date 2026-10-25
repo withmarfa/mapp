@@ -208,7 +208,7 @@ struct MainView: View {
                         .id(palette)
                 }
             } else if browser.quickAdd.isPresented, browser.quickAdd.draft != nil {
-                FloatingPanel {
+                FloatingPanel(placement: .center) {
                     browser.putAwayQuickAdd()
                     if browser.focusRequest == nil { browser.focusRequest = .list }
                 } content: {
