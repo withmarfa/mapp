@@ -162,7 +162,7 @@ private nonisolated final class FillingReads: MarfaReading {
         edgeReads.withLock { $0 += 1 }
         throw MarfaError.hydrationIncomplete(message: "Edges are not ready")
     }
-    func views() async throws -> [LibraryView] { [] }
+    func views() async throws -> Rows<LibraryView> { Rows([]) }
     func items(inView id: String) async throws -> [Marfa.Item] { [] }
 }
 
@@ -187,6 +187,6 @@ private nonisolated final class HydratingReads: MarfaReading {
         try refuseWhileHydrating()
         return try await read.edges(touching: id)
     }
-    func views() async throws -> [LibraryView] { try await read.views() }
+    func views() async throws -> Rows<LibraryView> { try await read.views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 }

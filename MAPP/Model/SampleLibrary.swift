@@ -222,7 +222,7 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(touching: id) }
     // The fake copy holds no views, so the sample answers its own over the items the copy holds.
-    func views() async throws -> [LibraryView] { SampleLibrary.views.map(\.view) }
+    func views() async throws -> Rows<LibraryView> { Rows(SampleLibrary.views.map(\.view)) }
     func items(inView id: String) async throws -> [Marfa.Item] {
         guard let view = SampleLibrary.views.first(where: { $0.view.id.rawValue == id }) else {
             throw MarfaError.notFound(code: "not_held", message: "The copy holds no view \(id).")

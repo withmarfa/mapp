@@ -67,6 +67,29 @@ struct MarfaViewsTests {
         await source.close()
     }
 
+    /// A hydration under way answers the views that have arrived, so a view not yet back is not taken as deleted.
+    @Test func viewsReadPartwayThroughAHydrationKeepTheOnesAlreadyRead() async throws {
+        let views = SavedViews([Self.planning])
+        let source = Self.source(views: views)
+        let library = MarfaLibrary(source: source, notices: Notices())
+        try #require(await eventually { library.views == [Self.planning] })
+        let browser = Browser()
+        browser.show(.view(Self.planning.id), in: library, order: NoteOrder())
+
+        views.completeness.withLock { $0 = .partial }
+        views.list.withLock { $0 = [Self.reading] }
+        source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
+        #expect(await eventually { library.views == [Self.planning, Self.reading] })
+        browser.placeRemoved(in: library, order: NoteOrder())
+        #expect(browser.sidebarItem == .view(Self.planning.id))
+
+        // Once whole, the answer is what the copy holds.
+        views.completeness.withLock { $0 = .complete }
+        source.events.yield(.change(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil)))
+        #expect(await eventually { library.views == [Self.reading] })
+        await source.close()
+    }
+
     @Test func aViewDeletedElsewhereLeavesTheSidebarAndItsPlace() async throws {
         let views = SavedViews([Self.planning])
         let source = Self.source(views: views)
@@ -210,6 +233,7 @@ private nonisolated final class SavedViews: Sendable {
     let list: Mutex<[LibraryView]>
     /// The ids each view lists, as the copy answers them.
     let members = Mutex<[String: [String]]>(["view-planning": ["n1", "view-planning"]])
+    let completeness = Mutex(Completeness.complete)
     init(_ views: [LibraryView]) { list = Mutex(views) }
 }
 
@@ -222,7 +246,9 @@ private nonisolated struct ViewReads: MarfaReading, MarfaRefreshing {
     func items() async throws -> Rows<Marfa.Item> { try await read.items() }
     func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await read.edges(touching: id) }
-    func views() async throws -> [LibraryView] { views.list.withLock { $0 } }
+    func views() async throws -> Rows<LibraryView> {
+        Rows(views.list.withLock { $0 }, completeness: views.completeness.withLock { $0 })
+    }
     func items(inView id: String) async throws -> [Marfa.Item] {
         let ids = views.members.withLock { $0[id] ?? [] }
         return try await read.items().rows.filter { ids.contains($0.id) }

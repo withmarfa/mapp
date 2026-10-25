@@ -58,12 +58,21 @@ extension MarfaEngine {
     }
 
     /// Reads the views the copy holds, and tells readers once they differ. One view this build cannot read refuses
-    /// them all (`invalid`), so the sidebar lists none rather than some; any other failure, such as a hydration
-    /// under way, keeps the views last read.
+    /// them all (`invalid`), so the sidebar lists none rather than some; any other failure keeps the views last
+    /// read. A hydration under way answers only the views that have arrived, so those join the views last read and
+    /// none leaves until the answer is whole: a window on a view not yet back is not moved off it.
     func readViews() async {
         let views: [LibraryView]
         do {
-            views = LibraryView.ordered(try await Self.asking(hub) { try await reading.views() })
+            let read = try await Self.asking(hub) { try await reading.views() }
+            switch read.completeness {
+            // A stale copy holds every view it held, only perhaps older.
+            case .complete, .stale:
+                views = LibraryView.ordered(read.rows)
+            case .partial:
+                let arrived = Set(read.rows.map(\.id))
+                views = LibraryView.ordered(read.rows + self.views.filter { !arrived.contains($0.id) })
+            }
         } catch MarfaError.invalid {
             views = []
         } catch {
