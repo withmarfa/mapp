@@ -11,8 +11,7 @@ final class GalleryTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+        app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
     }

@@ -11,8 +11,7 @@ final class SidebarNavigationTests: XCTestCase {
 
     override func setUp() async throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+        app = XCUIApplication.sample()
         app.launch()
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(list.waitForExistence(timeout: 5))

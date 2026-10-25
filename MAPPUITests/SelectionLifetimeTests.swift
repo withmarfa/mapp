@@ -4,8 +4,7 @@ import XCTest
 final class SelectionLifetimeTests: XCTestCase {
     func testSelectedOutlineSurvivesWorkspaceReplacement() {
         continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
+        let app = XCUIApplication.sample()
         app.launch()
         defer { app.terminate() }
 
