@@ -1080,6 +1080,22 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure == nil, "the person is told once")
     }
 
+    /// A title the package refused before queueing it, such as while the copy hydrates again, is in no queue, so
+    /// what the person typed is given back with the reason.
+    @Test func aTitleRefusedBeforeItWasQueuedIsGivenBack() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        #expect(library.setItemProperty(LibraryFixture.n1, key: "title", value: .string("Typed title"), undoManager: nil))
+        let write = try #require(source.submitted.last?.id)
+        let problem = SyncProblem(code: "hydration_incomplete", message: "Try again in a moment.", notQueued: true)
+        source.send(.answered(write, .refused(problem)))
+        #expect(await eventually { !told.isEmpty })
+        #expect(told.map(\.text) == ["Typed title"])
+        #expect(told.first?.reason == "Try again in a moment.")
+        #expect(library.failure == nil, "the person is told once")
+    }
+
     /// A text save the server refused stays listed in Settings, but the page goes back to the server's text,
     /// so the typed text is also given back, with the reason and where the change is listed.
     @Test func textTheServerRefusedIsGivenBackAndPointsToLibrarySettings() async throws {
