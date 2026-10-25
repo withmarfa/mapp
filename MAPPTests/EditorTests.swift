@@ -207,6 +207,30 @@ struct EditorTests {
         #expect(library.bodyWrites.contains { $0.text == "Pending\n" && $0.readAt == note.version })
     }
 
+    /// The page puts a reload off while the person composes, so after outside text reloads the note it can still hold
+    /// text of the generation the flush began on, which the flush must still ask for.
+    @Test func aFlushRetriedAfterOutsideTextReloadsTheNoteStillAsksThePage() async throws {
+        let library = FakeItemLibrary()
+        let note = library.add("Original\n")
+        let page = try await Page(library: library)
+        page.editor.load(try #require(library.item(note.id)))
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        var captured: [String] = []
+        page.editor.onChange = { id, text, read in captured.append(text); library.updateBody(of: id, to: text, readAt: read) }
+        try await page.run("""
+            window.flushes = 0
+            window.editor.flush = () => { if (window.flushes++ === 0) throw new Error('composition'); return 'Composed\\n' }
+            """)
+        let kept = await withCheckedContinuation { continuation in
+            page.editor.flush { continuation.resume(returning: $0) }
+            library.updateBody(of: note.id, to: "Outside\n")
+            page.editor.noteChanged(library.item(note.id)!)
+        }
+        #expect(kept)
+        #expect(captured == ["Composed\n"])
+        #expect(library.bodyWrites.contains { $0.text == "Composed\n" && $0.readAt == note.version })
+    }
+
     @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
         let page = try await Page()
         try await page.load("Original\n")
@@ -227,8 +251,9 @@ struct EditorTests {
         try await page.run("window.editor.flush = window.savedFlush")
         let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         try await page.load("Replacement\n")
-        let rejected = try await page.editor.webView.callAsyncJavaScript("try { window.editor.flush(expected); return false } catch { return true }", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? Bool
-        #expect(rejected == true)
+        // The page hands back no text of the note it replaced.
+        let handedBack = try await page.editor.webView.callAsyncJavaScript("return window.editor.flush(expected)", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? String
+        #expect(handedBack == nil)
         #expect(try await page.markdown() == nil)
     }
 

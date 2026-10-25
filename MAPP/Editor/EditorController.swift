@@ -351,9 +351,10 @@ final class EditorController: NSObject {
         func capture() {
             guard !finished else { return }
             guard self.noteID == noteID else { return replaced() }
-            // A reload takes place after every earlier change was reported, and the page refuses a flush of the
-            // text it replaced.
-            if !isReady || self.generation != generation { return finish(leave()) }
+            guard isReady else { return finish(leave()) }
+            // Asked for the generation the flush began on even after outside text reloaded the note: the page puts
+            // a reload off while the person composes, so it can still hold text of that generation. A page that
+            // has moved past it reported that text as it moved, and answers nil.
             webView.evaluateJavaScript("window.editor.flush(\(generation))") { [self] result, error in
                 // A reply that comes after the page was given up on still holds the person's latest text.
                 if error == nil, let markdown = result as? String { report(markdown, of: generation) }
@@ -374,7 +375,9 @@ final class EditorController: NSObject {
         watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.flushLimit)
             guard !finished else { return }
-            guard let self else { return finish(false) }
+            guard let self else {
+                preconditionFailure("An unfinished flush's pending reply or retry holds its editor.")
+            }
             guard self.noteID == noteID else {
                 tellNotSaved(noteID, reason: Self.replacedReason)
                 return finish(false)

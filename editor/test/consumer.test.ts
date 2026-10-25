@@ -137,6 +137,32 @@ test('one logical task-list command reports only final source while later turns 
   }
 })
 
+test('a flush of a generation the page has reloaded past hands back nothing, since the reload reported it', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const changes: [string, number][] = []
+  const editor = await NoteEditor.mount(root, {
+    changed(text, generation) {
+      changes.push([text, generation])
+    },
+    stateChanged() {},
+    find() {},
+    copy() {},
+    openLink() {},
+  })
+  editor.setItem('note')
+  editor.load('Milk\n', 1)
+  try {
+    editor.format('taskList')
+    editor.reload('Outside\n', 2)
+    expect(changes).toEqual([['- [ ] Milk\n', 1]])
+    expect(editor.flush(1)).toBeNull()
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
 test('explicit flush returns a pending logical edit without a later duplicate report', async () => {
   const root = document.createElement('div')
   document.body.append(root)
