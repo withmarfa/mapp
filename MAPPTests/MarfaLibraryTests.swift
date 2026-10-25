@@ -1106,8 +1106,21 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let held = try #require(library.body(of: LibraryFixture.n1)?.text)
 
         library.updateBody(of: LibraryFixture.n1, to: held)
-        library.updateBody(of: ItemID("nowhere"), to: "Nobody's")
         #expect(told.isEmpty)
+    }
+
+    /// The page's last save can arrive for an item another device purged meanwhile, which no queue will take.
+    @Test func textForAnItemThatLeftTheCopyIsGivenBack() async throws {
+        let (library, source) = try await loaded()
+        var told: [MarfaLibrary.NotKept] = []
+        library.onNotKept = { told.append($0) }
+        source.send(.removed([LibraryFixture.n1]))
+        try #require(await eventually { library.item(LibraryFixture.n1) == nil })
+
+        library.updateBody(of: LibraryFixture.n1, to: "Typed as it was purged")
+        #expect(told.map(\.text) == ["Typed as it was purged"])
+        #expect(told.first?.reason == MarfaLibrary.cantChange)
+        #expect(source.writes.isEmpty)
     }
 
     /// A text save the package refused before queueing it is in no queue, so the typed text is given back with the
@@ -1125,15 +1138,18 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.failure == nil, "the person is told once")
     }
 
-    /// A text save the server refused is in the queue, listed with its text, so it is told as it was.
-    @Test func textTheServerRefusedStaysInTheQueueAndIsToldAsAFailure() async throws {
+    /// A text save the server refused stays listed in Settings, but the page goes back to the server's text,
+    /// so the typed text is also given back, with the reason and where the change is listed.
+    @Test func textTheServerRefusedIsGivenBackAndPointsToLibrarySettings() async throws {
         let (library, source) = try await loaded()
         var told: [MarfaLibrary.NotKept] = []
         library.onNotKept = { told.append($0) }
         library.updateBody(of: LibraryFixture.n1, to: "Refused later")
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: "validation_error", message: "Too long."))))
-        #expect(await eventually { library.failure != nil })
-        #expect(told.isEmpty)
+        #expect(await eventually { !told.isEmpty })
+        #expect(told.map(\.text) == ["Refused later"])
+        #expect(told.first?.reason == "Too long. The change is also listed in Settings.")
+        #expect(library.failure == nil, "the person is told once")
     }
 }

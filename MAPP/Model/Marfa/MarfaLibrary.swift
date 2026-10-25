@@ -272,14 +272,18 @@ import Observation
         let typed = textWrites[id].flatMap { item in lastTyped[item].flatMap { $0.write == id ? $0.text : nil } }
         if let item = textWrites[id], lastTyped[item]?.write == id { lastTyped[item] = nil }
         if case .refused(let problem) = outcome, let refusal {
+            let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
                 notKept(refusal.title, text: typed ?? refusal.text)
             } else if problem.notQueued, let typed {
                 // Nothing queued it, so the text is in no write the person could copy it from, and the page is
                 // about to show the text the library holds.
-                notKept(refusal.title, text: typed, reason: problem.message ?? String(localized: "The Marfa server refused this change."))
+                notKept(refusal.title, text: typed, reason: message)
+            } else if let typed {
+                // The refused write stays listed, but the page is about to show the text the library holds.
+                notKept(refusal.title, text: typed, reason: String(localized: "\(message) The change is also listed in Settings."))
             } else {
-                failure = (refusal.title, problem.message ?? String(localized: "The Marfa server refused this change."))
+                failure = (refusal.title, message)
             }
         }
         if let created = creating.removeValue(forKey: id), case .refused = outcome, records[created] == nil {
