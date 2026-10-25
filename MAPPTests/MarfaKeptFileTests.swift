@@ -27,6 +27,16 @@ import Testing
         #expect(copy.deletingLastPathComponent().lastPathComponent == "sha256:a")
     }
 
+    @Test func aKeptCopyIsReadOnlySoAnotherAppCanNotSaveOverMarfasFile() async throws {
+        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "bytes"), hash: "sha256:a", name: "a.txt", in: kept)
+
+        let permissions = try FileManager.default.attributesOfItem(atPath: copy.path)[.posixPermissions] as? Int
+        #expect(permissions == 0o444)
+        #expect(throws: (any Error).self) { try Data("edited".utf8).write(to: copy) }
+        await MarfaSource.removeKeptCopies(in: kept)
+        #expect(!FileManager.default.fileExists(atPath: copy.path), "a read-only copy is still removed with the rest")
+    }
+
     @Test func aHashAlreadyKeptIsAnsweredWithoutCopyingAgain() async throws {
         let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "first"), hash: "sha256:a", name: "a.txt", in: kept)
 

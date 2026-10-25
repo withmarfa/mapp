@@ -295,6 +295,8 @@ nonisolated final class MarfaSource: ItemSource {
         let partial = directory.appending(path: ".\(UUID().uuidString).partial", directoryHint: .notDirectory)
         try manager.copyItem(at: file, to: partial)
         do {
+            // Read-only, so an app Open hands it to offers a duplicate rather than saving over Marfa's file.
+            try manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: partial.path)
             try manager.moveItem(at: partial, to: kept)
         } catch {
             try? manager.removeItem(at: partial)
