@@ -12,7 +12,7 @@ nonisolated enum NoteLinks {
     }
 
     /// Whether the text is spelled as an identity, which a link reads as the item with that identity before it
-    /// looks at any title, as the folder index (`declaredID`) and Marfa (`is_id`) both do.
+    /// looks at any title, as Marfa (`is_id`) does.
     static func looksLikeIdentity(_ text: String) -> Bool {
         text.count == 36 && UUID(uuidString: text) != nil
     }
@@ -28,10 +28,8 @@ nonisolated enum NoteLinks {
     /// A link that names an item by its identity and shows its title: `[[identity|Title]]`, which Marfa reads as
     /// naming the identity and the page shows as the title. The title is made a single line and its `\`, `[`, `]`,
     /// `|` and `#` are escaped for the page's linked syntax; a title with nothing left shows nothing.
-    /// A notes folder reads a link's target up to the first bracket, so a title holding one is left out of the
-    /// label there (`readsBrackets: false`) rather than make a link the folder cannot see.
-    static func identityLink(to identity: String, titled title: String, readsBrackets: Bool = true) -> String {
-        let shown = readsBrackets || !title.contains(where: { $0 == "[" || $0 == "]" }) ? label(title) : ""
+    static func identityLink(to identity: String, titled title: String) -> String {
+        let shown = label(title)
         return shown.isEmpty ? "[[\(identity)]]" : "[[\(identity)|\(shown)]]"
     }
 

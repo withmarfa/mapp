@@ -8,7 +8,7 @@ final class ItemLayoutTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     }
@@ -40,7 +40,6 @@ final class ItemLayoutTests: XCTestCase {
         app.typeKey("n", modifierFlags: .command)
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         capture("New item narrow width")
-        XCTAssertFalse(app.buttons["Import File…"].exists)
         XCTAssertFalse(app.buttons["Back"].exists)
     }
 
@@ -63,7 +62,7 @@ final class ItemLayoutTests: XCTestCase {
     }
 
     func testHeaderScrollsWithTheBodyAndTitleMovesIntoToolbar() {
-        app.outlines["Sidebar"].staticTexts["Reading"].click()
+        app.outlines["Sidebar"].staticTexts["Items"].click()
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "The Design of Everyday Things")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
@@ -113,7 +112,7 @@ final class ItemLayoutTests: XCTestCase {
         let settings = app.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         // Choosing the place shown before leaves Settings with the window as it was.
-        app.outlines["Sidebar"].staticTexts["Reading"].click()
+        app.outlines["Sidebar"].staticTexts["Items"].click()
         XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
         XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the note's scroll position")
         XCTAssertFalse(header.isHittable)

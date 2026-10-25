@@ -29,7 +29,6 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let bodyField: String?
     let parent: TypeID?
     var description: String?
-    /// A files library's types have none.
     var version: Int64?
     /// With the roles it inherits, as Marfa resolves them.
     var roles: [String] = []
@@ -230,7 +229,7 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return known + properties.filter { !fields.contains($0.key) }
     }
 
-    /// Properties given unordered, as a note's front matter is read, put the rest in order by key.
+    /// Properties given unordered, as a queued write holds them, put the rest in order by key.
     func ordered(_ properties: [String: PropertyValue], for type: TypeID) -> [Property] {
         ordered(properties.map { Property(key: $0, value: $1) }.sorted { $0.key < $1.key }, for: type)
     }

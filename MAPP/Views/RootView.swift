@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// A main window: the notes of the library the app reads once there is one, and until then a page saying why not.
 struct RootView: View {
@@ -30,13 +29,13 @@ struct RootView: View {
 
     @ViewBuilder private var workspace: some View {
         switch libraries.mode {
-        case .files, .marfa:
+        case .unconfigured:
+            WelcomeView(browser: browser)
+        case .marfa:
             if let library = libraries.current {
                 MainView(browser: browser)
                     // A different library is a different set of items, and the window starts afresh with it.
                     .id(ObjectIdentifier(library))
-            } else {
-                WelcomeView()
             }
         case .opening:
             ProgressView("Opening Your Library…")
@@ -48,7 +47,6 @@ struct RootView: View {
 }
 
 /// A server is set, but its library can't be shown, because its key was refused or its copy can't be opened.
-/// The notes folder is not shown in its place, which is not what the app was set to read.
 struct LibraryUnavailableView: View {
     @Environment(Libraries.self) private var libraries
     let browser: Browser
@@ -73,23 +71,21 @@ struct LibraryUnavailableView: View {
     }
 }
 
-/// Asks for the folder that holds the notes, on first launch or when the one chosen before has gone.
+/// Asks the person to connect to their Marfa, on first launch or after they disconnect.
 struct WelcomeView: View {
-    @Environment(NotesFolder.self) private var folder
-    @State private var isChoosing = false
+    let browser: Browser
 
     var body: some View {
         ContentUnavailableView {
-            Label("Choose a Folder for Your Notes", systemImage: "folder")
+            Label("Connect to Your Marfa", systemImage: "server.rack")
         } description: {
-            Text("MAPP keeps each note as a markdown file in the folder you choose. Folders inside it become folders in MAPP.")
+            Text("MAPP reads and writes your library on a Marfa server. Enter its address and your key in Settings.")
         } actions: {
-            Button("Choose Folder…") { isChoosing = true }
+            Button("Connect…") { browser.showSettings(.library) }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("WelcomeConnect")
         }
         .frame(minWidth: 480, minHeight: 360)
-        .fileImporter(isPresented: $isChoosing, allowedContentTypes: [.folder]) { result in
-            if case .success(let url) = result { folder.choose(url) }
-        }
+        .accessibilityIdentifier("Welcome")
     }
 }

@@ -18,12 +18,12 @@ struct RecentlyDeletedActions: View {
             Button("Restore") { library.recover(selection, undoManager: undoManager) }
                 .disabled(selection.isEmpty)
             Button("Delete Permanently…", role: .destructive) { library.notesToPurge = selection }
-                .disabled(selection.isEmpty || !library.capabilities.contains(.purge))
+                .disabled(selection.isEmpty || !library.canPurge)
             Menu("More", systemImage: "ellipsis") {
                 Button("Empty Recently Deleted…", role: .destructive) {
                     library.notesToPurge = Set(library.items(in: .recentlyDeleted).map(\.id))
                 }
-                .disabled(library.count(in: .recentlyDeleted) == 0 || !library.capabilities.contains(.purge))
+                .disabled(library.count(in: .recentlyDeleted) == 0 || !library.canPurge)
             }
             .labelStyle(.iconOnly)
             .menuIndicator(.hidden)

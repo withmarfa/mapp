@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct MainView: View {
     @CurrentLibrary private var library
@@ -16,9 +15,6 @@ struct MainView: View {
     @State private var listWidth: CGFloat = 350
     @State private var measuredWidths = ColumnWidths()
     @State private var galleryWidth: CGFloat = 900
-    @State private var noteName = ""
-    @State private var takenNoteName: String?
-    @State private var importRequestID: UUID?
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -52,7 +48,7 @@ struct MainView: View {
         // Settings replaces both column toolbar providers even when the split keeps three columns.
         // Release the outgoing providers before mounting that workspace or changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
-        renamingWindow.id(workspacePresentation)
+        dialogsWindow.id(workspacePresentation)
         .onChange(of: workspacePresentation) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
@@ -233,12 +229,7 @@ struct MainView: View {
             guard browser.usesCollection else { return }
             browser.keepSelection(from: old, to: new)
         }
-        .onChange(of: library.folders) {
-            browser.folderRemoved(in: library, order: order)
-        }
-        .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.folderRemoved(in: library, order: order) }
-        .onChange(of: library.items(in: .allNotes).map(\.id), revealImportedItem)
-        .onChange(of: completedImportID, revealImportedItem)
+        .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.placeRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         .onChange(of: browser.snapshot()) { _, snapshot in
@@ -253,8 +244,7 @@ struct MainView: View {
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onLeave = { [library, browser, details, weak editor] id, closing in
-                library.leave(id)
+            editor.onLeave = { [browser, details, weak editor] id, closing in
                 browser.leaveNewItem(id, closing: closing, hasUnsavedTitle: details.unsavedTitles.contains(id),
                                      undoManager: editor?.webView.window?.undoManager)
             }
@@ -266,16 +256,15 @@ struct MainView: View {
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
             }
         }
-        // A window restores what it showed once the folder has been read, since before then nothing is there. A
+        // A window restores what it showed once the library has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it.
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
             if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample"),
-               ProcessInfo.processInfo.arguments.contains("-MAPPSampleFolder") {
-                browser.sidebarItem = .itemType("aic.ticket.task")
+            if SampleLibrary.isRequested, SampleLibrary.withCollections {
+                browser.sidebarItem = .itemType("core.task")
                 browser.viewMode = .board
             }
             #endif
@@ -300,34 +289,9 @@ struct MainView: View {
         return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 
-    private var importingWindow: some View {
+    private var dialogsWindow: some View {
         presentedWindow
-        .fileImporter(isPresented: $browser.isImportingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result {
-                let requestID = UUID()
-                importRequestID = requestID
-                library.importFiles(urls, folderID: browser.selectedFolder, requestID: requestID)
-            }
-        }
         .libraryDialogs()
-    }
-
-    private var renamingWindow: some View {
-        importingWindow
-        .alert("Rename Note", isPresented: Binding { browser.renamingNote != nil } set: { if !$0 { browser.renamingNote = nil } }) {
-            TextField("Name", text: $noteName)
-            Button("Rename") { renameNote() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The note’s file takes the new name.")
-        }
-        .onChange(of: browser.renamingNote) {
-            noteName = browser.renamingNote.flatMap { library.fileName(of: $0) } ?? ""
-        }
-        .alert("Name Taken", isPresented: Binding { takenNoteName != nil } set: { if !$0 { takenNoteName = nil } }) {
-        } message: {
-            Text("A note named “\(takenNoteName ?? "")” is already in this folder. Please choose a different name.")
-        }
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }
@@ -341,27 +305,11 @@ struct MainView: View {
     #if DEBUG
     private var launchSelection: ItemID? {
         let arguments = ProcessInfo.processInfo.arguments
-        guard arguments.contains("-MAPPSampleFolder"), let flag = arguments.firstIndex(of: "-MAPPSelectItem"),
+        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MAPPSelectItem"),
               arguments.indices.contains(flag + 1) else { return nil }
         return ItemID(arguments[flag + 1])
     }
     #endif
-
-    private var completedImportID: ItemID? {
-        importRequestID.flatMap { library.completedImports[$0] }
-    }
-
-    private func revealImportedItem() {
-        guard let requestID = importRequestID, let id = completedImportID,
-              library.item(id) != nil else { return }
-        browser.leaveSettings()
-        browser.sidebarItem = .allNotes
-        browser.searchText = ""
-        browser.selection = [id]
-        browser.openCollectionSelection()
-        library.consumeImportCompletion(requestID)
-        importRequestID = nil
-    }
 
     /// The list's search comes out as a field, which takes the keyboard.
     private func grantFocusRequest() {
@@ -381,17 +329,6 @@ struct MainView: View {
         case nil: return
         }
         browser.focusRequest = nil
-    }
-
-    /// A name another note in the folder has is refused with an alert, as the Finder does.
-    private func renameNote() {
-        guard let id = browser.renamingNote else { return }
-        let name = NoteText.fileSafe(noteName)
-        if library.isNoteNameTaken(name, for: id) {
-            takenNoteName = name
-        } else {
-            library.renameNote(id, to: name, undoManager: undoManager)
-        }
     }
 }
 

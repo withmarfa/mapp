@@ -3,7 +3,7 @@ import SwiftUI
 /// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the list shows and
 /// orders items and moves back and forward through the items the window has shown.
 struct AppCommands: Commands {
-    /// Nil while no library is open: before a folder is chosen, or while a server's copy opens.
+    /// Nil while no library is open: before a server is set, or while a server's copy opens.
     let library: (any ItemLibrary)?
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
@@ -21,21 +21,13 @@ struct AppCommands: Commands {
             }
                 .keyboardShortcut("n")
                 .disabled(browser == nil || library?.isLoaded != true)
-            Button("Import Files…") { browser?.isImportingFiles = true }
-                .disabled(browser == nil || library?.isLoaded != true || library?.capabilities.contains(.importFiles) != true)
-            Button("New Folder", systemImage: "folder.badge.plus") {
-                if let library { browser?.newFolder(in: library, order: order, undoManager: notes?.undoManager) }
-            }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-            // A folder made before the notes folder is read would be lost in the reading.
-            .disabled(browser == nil || library?.isLoaded != true || !editsFolders)
             Button("New Window", systemImage: "macwindow.badge.plus") {
                 openWindow(id: "main")
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
         }
 
-        // The note and folder commands sit with the File menu's making and opening, above Close, as Notes has them.
+        // The note commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
             let ids: Set<ItemID> = notes?.ids ?? []
             // The note commands act on notes; a file selected has only its share and its window.
@@ -48,25 +40,12 @@ struct AppCommands: Commands {
             .disabled(browser == nil || ids.isEmpty)
             Divider()
             NoteShareLink(share: library.map { library in
-                NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0, in: library) } : nil, in: library)
+                NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
             } ?? NoteShare())
-            Button("Rename Note…", systemImage: "pencil") {
-                browser?.renamingNote = ids.count == 1 ? shown.first?.id : nil
-            }
-            .disabled(browser == nil || ids.count != 1 || shown.count != 1 || library?.canRenameFile(of: shown.first) != true)
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                     .environment(\.library, library)
             }
-            Divider()
-            Button("Rename Folder", systemImage: "pencil") {
-                browser?.renamingFolder = browser?.selectedFolder
-            }
-            .disabled(browser?.selectedFolder == nil || !editsFolders)
-            Button("Delete Folder…", systemImage: "folder.badge.minus") {
-                browser?.folderToDelete = browser?.selectedFolder
-            }
-            .disabled(browser?.selectedFolder == nil || !editsFolders)
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
@@ -131,8 +110,6 @@ struct AppCommands: Commands {
 }
 
 extension AppCommands {
-    private var editsFolders: Bool { library?.capabilities.contains(.folders) == true }
-
     private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
 
     private var canGoBack: Bool {

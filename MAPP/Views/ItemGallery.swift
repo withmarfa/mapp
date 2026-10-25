@@ -195,9 +195,6 @@ struct ItemGallery: View {
             Button("Open in New Window", systemImage: "macwindow") {
                 for id in library.idsForWindows(selected) { openWindow(value: id) }
             }
-            if selected.count == 1, library.canRenameFile(of: item) {
-                Button("Rename…", systemImage: "pencil") { browser.renamingNote = item.id }
-            }
             Divider()
             NoteActions(ids: selected, undoManager: undoManager)
         }

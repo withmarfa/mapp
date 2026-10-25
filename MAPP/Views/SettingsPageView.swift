@@ -103,22 +103,13 @@ private struct EditorSettings: View {
     }
 }
 
-/// The name of the library in use: the name a server gave itself, its host until one has been read, or the notes
-/// folder's name.
+/// The name of the library in use: the name a server gave itself, or its host until one has been read.
 @MainActor
 enum LibraryDescription {
     static func name(_ libraries: Libraries) -> String {
-        switch libraries.mode {
-        case .marfa, .opening, .failed:
-            if let connection = libraries.host.configuredConnection {
-                if let name = libraries.host.instanceName(for: connection) { return name }
-                return connection.address.host() ?? connection.address.absoluteString
-            }
-            return String(localized: "Marfa")
-        case .files:
-            guard let url = libraries.folder.url else { return String(localized: "No folder chosen") }
-            return FileManager.default.displayName(atPath: url.path)
-        }
+        guard let connection = libraries.host.configuredConnection else { return String(localized: "Marfa") }
+        if let name = libraries.host.instanceName(for: connection) { return name }
+        return connection.address.host() ?? connection.address.absoluteString
     }
 }
 

@@ -51,10 +51,6 @@ extension MarfaLibrary {
         saveText(body, of: id, readAt: readAt, failing: title)
     }
 
-    func leave(_ id: ItemID) {
-        source.endEditing(id)
-    }
-
     /// Waits only until the source holds every write in its queue on this Mac, never for the server, so quitting
     /// or leaving the library offline keeps every write without waiting on the network.
     func finish() async {
@@ -164,10 +160,10 @@ extension MarfaLibrary {
     }
 
     /// Destroys items in the bin at the server, which only a server that can be reached does, so it is only where
-    /// `capabilities` has `purge`. It is sent at the version the person was shown.
+    /// `canPurge`. It is sent at the version the person was shown.
     func deletePermanently(_ ids: Set<ItemID>) {
         notesToPurge.subtract(ids)
-        guard capabilities.contains(.purge) else {
+        guard canPurge else {
             failure = (
                 String(localized: "Can’t Delete Immediately"),
                 String(localized: "The Marfa server can’t be reached. The items are still in Recently Deleted."))
@@ -179,29 +175,6 @@ extension MarfaLibrary {
         }
     }
 
-    // MARK: What only files have
-
-    func move(_ ids: Set<ItemID>, to folderID: ItemID?, undoManager: UndoManager?) { filesOnly() }
-    func renameNote(_ id: ItemID, to name: String, undoManager: UndoManager?) { filesOnly() }
-    func importFiles(_ sources: [URL], folderID: ItemID?, requestID: UUID) { filesOnly() }
-    func consumeImportCompletion(_ requestID: UUID) {}
-
-    /// The views offer folders only where `capabilities` has them, so this answers a folder the library never
-    /// holds.
-    @discardableResult
-    func newFolder(undoManager: UndoManager?) -> Folder {
-        filesOnly()
-        return Folder(name: "")
-    }
-
-    func rename(_ id: ItemID, to name: String, undoManager: UndoManager?) { filesOnly() }
-    func deleteFolder(_ id: ItemID, undoManager: UndoManager?) { filesOnly() }
-    func moveFolders(_ ids: [ItemID], before target: ItemID?, undoManager: UndoManager?) { filesOnly() }
-
-    private func filesOnly() {
-        failure = (String(localized: "Couldn’t Make This Change"), MarfaEngine.filesOnly)
-    }
-
     /// The files go to the source as files of their own, which this removes once it has taken them. Each is
     /// attached to the item by the package, which says what the page writes in the text to embed it.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed] {
@@ -210,7 +183,7 @@ extension MarfaLibrary {
         defer { try? FileManager.default.removeItem(at: directory) }
         var urls: [URL] = []
         for file in files {
-            let url = directory.appending(path: NoteLibrary.attachmentName(file.name))
+            let url = directory.appending(path: NoteText.attachmentName(file.name))
             try file.data.write(to: url)
             urls.append(url)
         }

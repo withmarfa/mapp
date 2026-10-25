@@ -7,10 +7,8 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case inbox, recents, all, favorites, sources
     /// The index of items other items are filed under.
     case collections
-    /// The section that holds a Marfa library's types.
+    /// The section that holds the library's types.
     case types
-    /// The section that holds a notes folder's folders.
-    case folders
     case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
@@ -24,7 +22,6 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .sources: "sources"
         case .collections: "collections"
         case .types: "types"
-        case .folders: "folders"
         case .files: "files"
         case .type(let id): "type:" + id
         }
@@ -94,25 +91,18 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 struct SidebarPlan {
     /// Main destinations; Files are included in Items.
     let top: [SidebarPlace]
-    /// The Types section, or Folders for a folder-backed library.
+    /// The Types section, where the library holds any types.
     let library: [SidebarPlace]
-    /// The types the Types section lists, nested, which only a library without folders has. The person orders the
-    /// top rows; the rows under one keep the order of their items.
+    /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
+    /// of their items.
     let types: [TypeNode]
     let layout: SidebarLayout
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
         top = layout.ordered([.inbox, .recents, .all, .sources, .collections, .favorites])
-        var rows: [SidebarPlace] = []
-        if library.capabilities.contains(.folders) {
-            rows.append(.folders)
-            types = []
-        } else {
-            types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
-            if !types.isEmpty { rows.append(.types) }
-        }
-        self.library = layout.ordered(rows)
+        types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
+        self.library = types.isEmpty ? [] : [.types]
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
@@ -132,7 +122,7 @@ struct SidebarPlan {
 }
 
 /// The layouts a person has made, one for each library, kept in the defaults. A library is named by its server's
-/// address or its notes folder's path, so each keeps its own.
+/// address, so each keeps its own.
 @Observable @MainActor
 final class SidebarLayouts {
     private static let defaultsKey = "sidebarLayouts"

@@ -4,13 +4,13 @@ import Foundation
 nonisolated enum TypeSymbol {
     static let fallback = "doc"
 
-    /// A type is known by the last segment of its identifier (`aic.ticket.task` is a `task`). One the table does
-    /// not know takes its nearest ancestor's symbol, where the catalogue names a parent.
-    static func name(for type: TypeID, in catalogue: Catalogue = Catalogue()) -> String {
+    /// Marfa's built-in types have their own symbols. Any other type takes its nearest built-in ancestor's
+    /// symbol, following the parents the catalogue names, so the app names no type a person or an app defined.
+    static func name(for type: TypeID, in catalogue: Catalogue) -> String {
         var visited: Set<TypeID> = []
         var current: TypeID? = type
         while let id = current, visited.insert(id).inserted {
-            if let symbol = bySegment[segment(of: id)] { return symbol }
+            if let symbol = builtIn[id] { return symbol }
             current = catalogue.itemTypes[id]?.parent
         }
         return fallback
@@ -26,21 +26,13 @@ nonisolated enum TypeSymbol {
         type.rawValue.split(whereSeparator: { $0 == "." || $0 == "/" }).last.map(String.init)?.lowercased() ?? ""
     }
 
-    private static let bySegment = [
-        "note": "doc.text",
-        "task": "checkmark.circle",
-        "event": "calendar",
-        "decision": "signpost.right",
-        "log": "list.bullet.rectangle",
-        "session": "clock",
-        "epic": "flag",
-        "ticket": "ticket",
-        "feature": "sparkles",
-        "spike": "bolt",
-        "bookmark": "bookmark",
-        "person": "person",
-        "file": "doc",
-        "image": "photo",
-        "project": "square.stack",
+    private static let builtIn: [TypeID: String] = [
+        TypeID("core.note"): "doc.text",
+        TypeID("core.task"): "checkmark.circle",
+        TypeID("core.event"): "calendar",
+        TypeID("core.bookmark"): "bookmark",
+        TypeID("core.entity.person"): "person",
+        TypeID("core.file"): "doc",
+        TypeID("core.file.image"): "photo",
     ]
 }

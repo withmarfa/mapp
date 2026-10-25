@@ -8,53 +8,12 @@ import Testing
 struct SidebarTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    // MARK: Folder library
-
-    func folderLibrary() -> NoteLibrary {
-        func note(_ name: String, type: String? = nil, deleted: Bool = false) -> Note {
-            let front = type.map { "---\ntype: \($0)\n---\n" } ?? ""
-            return Note(
-                path: "\(name).md", text: front + "# \(name)\n", created: start, deleted: deleted ? start : nil)
-        }
-        return NoteLibrary(
-            notes: [
-                note("One", type: "aic.ticket.task"), note("Two", type: "aic.ticket.task"),
-                note("Three", type: "aic.ticket.feature"), note("Plan", type: "aic.project"), note("Plain"),
-                note("Gone", type: "aic.ticket.feature", deleted: true),
-            ],
-            folders: [], store: RecordingStore(), now: { start })
-    }
-
-    @Test func aFolderLibraryCountsEachTypeExactly() {
-        let counts = folderLibrary().itemTypeCounts
-        let byID = Dictionary(uniqueKeysWithValues: counts.map { ($0.id.rawValue, $0.count) })
-        #expect(byID["aic.ticket.task"] == 2)
-        #expect(byID["aic.ticket.feature"] == 1)
-        // No type is special: a project is counted like any other.
-        #expect(byID["aic.project"] == 1)
-        #expect(counts.map(\.label) == ["Task", "Feature", "Note", "Project"])
-        #expect(counts.allSatisfy { $0.count > 0 })
-    }
-
-    @Test func aFolderLibraryShowsFoldersAndNoTypes() {
-        let library = folderLibrary()
-        let plan = SidebarPlan(library, layout: SidebarLayout())
-        #expect(plan.types.isEmpty)
-        #expect(plan.shownTop.contains(.collections), "The index remains available when empty")
-        #expect(plan.library == [.folders])
-    }
-
-    @Test func recentlyDeletedCountsWhatTheBinHolds() {
-        #expect(folderLibrary().count(in: .recentlyDeleted) == 1)
-        #expect(NoteLibrary(notes: [], folders: [], store: RecordingStore(), now: { start }).count(in: .recentlyDeleted) == 0)
-    }
-
     // MARK: Marfa library
 
     func marfaLibrary(_ items: [Item] = LibraryFixture.items, catalogue: Catalogue = LibraryFixture.catalogue) async throws -> MarfaLibrary {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source)
-        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return library
     }
@@ -66,7 +25,8 @@ struct SidebarTests {
         // the file types are reached through All Items.
         #expect(counts.map(\.label) == ["Note", "Project", "Bug", "Entity", "Task"])
         #expect(counts.map(\.count) == [2, 2, 1, 1, 1])
-        #expect(counts.map(\.symbol) == ["doc.text", "square.stack", "ticket", "doc", "checkmark.circle"])
+        // Project, Bug and Task descend from Note and take its symbol; Entity has no built-in symbol.
+        #expect(counts.map(\.symbol) == ["doc.text", "doc.text", "doc.text", "doc", "doc.text"])
     }
 
     @Test func aMarfaTypeCountsOnlyItsOwnItemsAndItsListAgrees() async throws {
@@ -182,9 +142,9 @@ struct SidebarTests {
         let tree = library.collectionTree
         // Alpha holds Epic task, which holds Bug one. Beta, with nothing filed under it, is no collection.
         #expect(tree.map(\.title) == ["Alpha"])
-        #expect(tree.first?.symbol == "square.stack")
+        #expect(tree.first?.symbol == "doc.text")
         #expect(tree.first?.children.map(\.title) == ["Epic task"])
-        #expect(tree.first?.children.first?.symbol == "checkmark.circle")
+        #expect(tree.first?.children.first?.symbol == "doc.text")
         #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types])
     }
 
@@ -218,17 +178,17 @@ struct SidebarTests {
     @Test func aTypeWhoseLastItemGoesLeavesTheListAndTheWindowMovesToAllItems() async throws {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source)
-        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
         browser.show(.itemType(LibraryFixture.entity.rawValue), in: library, order: NoteOrder())
         #expect(browser.item == .itemType(LibraryFixture.entity.rawValue))
-        browser.folderRemoved(in: library, order: NoteOrder())
+        browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .itemType(LibraryFixture.entity.rawValue))
         source.send(.removed([LibraryFixture.en1]))
         try #require(await eventually { library.isGone(LibraryFixture.en1) })
         #expect(!library.itemTypeCounts.contains { $0.id == LibraryFixture.entity })
-        browser.folderRemoved(in: library, order: NoteOrder())
+        browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .allNotes)
     }
 
@@ -236,11 +196,11 @@ struct SidebarTests {
         let library = try await marfaLibrary()
         let types = library.creatableTypes
         #expect(types.map(\.label) == ["Album", "Bug", "Entity", "Note", "Project", "Task", "Ticket"])
-        #expect(types.first { $0.id == LibraryFixture.project }?.symbol == "square.stack")
+        #expect(types.first { $0.id == LibraryFixture.project }?.symbol == "doc.text")
         #expect(types.allSatisfy { !$0.symbol.isEmpty })
     }
 
-    @Test func aMarfaLibraryShowsTypesNotFolders() async throws {
+    @Test func aLibraryShowsItsTypesWithoutFiles() async throws {
         let library = try await marfaLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.library == [.types])
@@ -258,7 +218,6 @@ struct SidebarTests {
     @Test func filesStayUnderItemsWithoutAddingAnotherSidebarDestination() async throws {
         let library = try await marfaLibrary()
         #expect(SidebarPlan(library, layout: SidebarLayout()).top == [.inbox, .recents, .all, .sources, .collections, .favorites])
-        #expect(SidebarPlan(folderLibrary(), layout: SidebarLayout()).top == [.inbox, .recents, .all, .sources, .collections, .favorites])
     }
 
     @Test func recentsListsTheItemsEditedMostRecentlyUpToTheLimit() {
@@ -274,9 +233,6 @@ struct SidebarTests {
     @Test func eachLibrarysRecentsFollowsItsEdits() async throws {
         let library = try await marfaLibrary()
         #expect(library.count(in: .recents) == library.items(in: .recents).count)
-        let folder = folderLibrary()
-        #expect(folder.count(in: .recents) == folder.items(in: .recents).count)
-        #expect(folder.items(in: .recents).count == 5)
     }
 
     @Test func aLibraryWithNothingFiledHasNoCollectionsSection() async throws {
@@ -305,7 +261,7 @@ struct SidebarTests {
         let layouts = SidebarLayouts(defaults: defaults)
         layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.types))
-        #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.folders))
+        #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isCollapsed(.collections))
         #expect(!layouts.layout(for: "marfa:two").isCollapsed(.types))
     }
 
@@ -361,11 +317,11 @@ struct SidebarTests {
         let defaults = UserDefaults(suiteName: "SidebarTests.persist")!
         defaults.removePersistentDomain(forName: "SidebarTests.persist")
         defer { defaults.removePersistentDomain(forName: "SidebarTests.persist") }
-        SidebarLayouts(defaults: defaults).update("folder:/notes") {
+        SidebarLayouts(defaults: defaults).update("marfa:one") {
             $0.setHidden(.type(LibraryFixture.entity.rawValue), true)
             $0.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)
         }
-        let layout = SidebarLayouts(defaults: defaults).layout(for: "folder:/notes")
+        let layout = SidebarLayouts(defaults: defaults).layout(for: "marfa:one")
         #expect(layout.isHidden(.type(LibraryFixture.entity.rawValue)))
         #expect(layout.ordered([.inbox, .all]) == [.all, .inbox])
     }

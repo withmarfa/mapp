@@ -1,23 +1,18 @@
-import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// The Library page of Settings: where the notes are kept and how that stands, then the connection to a Marfa
-/// server, then each change that needs the person.
+/// The Library page of Settings: the library in use and how it stands, then the connection to a Marfa server,
+/// then each change that needs the person.
 struct LibrarySettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
-    @State private var isChoosing = false
 
     private var host: MarfaHost { libraries.host }
-    private var folder: NotesFolder { libraries.folder }
 
     var body: some View {
         Form {
             Section { LibrarySummary() }
-            if libraries.mode == .files { folderSection }
             MarfaSettingsView(model: libraries.marfaSettings)
-            if let library, library.capabilities.contains(.downloadedFiles), let files = library.downloadedFiles {
+            if let library, let files = library.downloadedFiles {
                 LibraryDownloads(files: files)
                     .id(ObjectIdentifier(library))
             }
@@ -35,10 +30,6 @@ struct LibrarySettings: View {
         }
         .settingsForm()
         .accessibilityIdentifier("LibrarySettings")
-        .fileImporter(isPresented: $isChoosing, allowedContentTypes: [.folder]) { result in
-            // Open notes hand over their last edits to the folder they came from before it is changed.
-            if case .success(let url) = result { EditorController.flushAll { kept in if kept { folder.choose(url) } } }
-        }
         // A question about changes that wait is put again when Settings is next opened, not answered by leaving.
         .onDisappear { libraries.marfaSettings.cancelDeparture() }
         .sheet(item: Binding { libraries.marfaSettings.departure } set: { if $0 == nil, !libraries.marfaSettings.isWorking { libraries.marfaSettings.cancelDeparture() } }) { departure in
@@ -49,31 +40,7 @@ struct LibrarySettings: View {
         .confirmationDialog("Disconnect from this server?", isPresented: Bindable(libraries.marfaSettings).isConfirmingDisconnect) {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
         } message: {
-            Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes. Your notes folder is used again.")
-        }
-    }
-
-    private var folderSection: some View {
-        Section {
-            if let url = folder.url {
-                LabeledContent("Folder") {
-                    Text(url.path(percentEncoded: false))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .textSelection(.enabled)
-                }
-                HStack {
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                    Button("Choose Another Folder…") { isChoosing = true }
-                }
-            } else {
-                Button("Choose Folder…") { isChoosing = true }
-            }
-        } header: {
-            Text("Notes Folder")
-        } footer: {
-            Text("Connecting to a Marfa server below reads its library instead. This folder is used again if you disconnect.")
+            Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes.")
         }
     }
 }
@@ -117,34 +84,22 @@ private struct LibrarySummary: View {
         .accessibilityIdentifier("LibrarySummary")
     }
 
-    /// A server is its symbol in a rounded square tinted with the accent; a folder is the icon Finder gives it.
+    /// A server is its symbol in a rounded square tinted with the accent, fainter while none is set.
     private var symbol: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(Color.accentColor.opacity(isServer ? 0.14 : 0.08))
-            if isServer {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundStyle(Color.accentColor)
-            } else if let url = libraries.folder.url {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                    .resizable()
-                    .scaledToFit()
-                    .padding(8)
-            } else {
-                Image(systemName: "folder")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundStyle(Color.accentColor)
-            }
+            Image(systemName: "server.rack")
+                .font(.system(size: 26, weight: .regular))
+                .foregroundStyle(Color.accentColor)
         }
         .frame(width: 56, height: 56)
         .accessibilityHidden(true)
     }
 
-    /// The full address of a server, or the path of a folder.
+    /// The full address of the server.
     private var address: String? {
-        if let connection = host.configuredConnection { return connection.address.absoluteString }
-        return libraries.folder.url?.path(percentEncoded: false)
+        host.configuredConnection?.address.absoluteString
     }
 
     private var disconnect: some View {
@@ -187,11 +142,7 @@ private struct LibrarySummary: View {
     }
 
     private func words(_ status: SyncStatus) -> (line: String, detail: String?, color: Color) {
-        guard isServer else {
-            return libraries.folder.url == nil
-                ? (String(localized: "No folder chosen"), nil, .secondary)
-                : (String(localized: "Reading notes from this folder"), nil, .green)
-        }
+        guard isServer else { return (String(localized: "Not connected"), nil, .secondary) }
         let connection = ConnectionStatus(host.state)
         if let note = status.primary {
             return (note.line, connection.detail ?? note.detail, note.dotColor)

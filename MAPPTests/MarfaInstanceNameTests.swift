@@ -10,7 +10,7 @@ import Testing
 
     private func libraries(_ bench: HostBench, host: MarfaHost) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "MarfaInstanceNameTests-\(UUID().uuidString)"))
-        return Libraries(folder: NotesFolder(defaults: defaults), host: host, defaults: defaults)
+        return Libraries(host: host, defaults: defaults)
     }
 
     @Test func theNameIsReadOnceTheConnectionIsSet() async throws {

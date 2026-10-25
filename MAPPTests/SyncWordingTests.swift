@@ -19,7 +19,7 @@ struct SyncStatusTests {
             actions: MarfaProblems.actions(for: kind))
     }
 
-    @Test func nothingIsSaidWhileTheAppReadsAFolder() {
+    @Test func nothingIsSaidWhileDisconnected() {
         let status = SyncStatus(state: .disconnected, report: report(waiting: 3, oldest: 99, problems: [entry()]), now: now)
         #expect(status.isQuiet)
         #expect(status.primary == nil)

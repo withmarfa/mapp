@@ -9,13 +9,13 @@ import Testing
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
-        return Libraries(folder: NotesFolder(defaults: defaults), host: bench.host(), defaults: defaults)
+        return Libraries(host: bench.host(), defaults: defaults)
     }
 
-    @Test func withNoServerSetTheFolderIsAlwaysTheLibrary() {
+    @Test func withNoServerSetTheWindowsAskForOne() {
         for state in [MarfaHost.State.disconnected, .online, .keyRefused] {
             for flag in [false, true] {
-                #expect(Libraries.mode(hasSource: false, isConfigured: false, state: state, isLaunching: flag, isBusy: flag) == .files)
+                #expect(Libraries.mode(hasSource: false, isConfigured: false, state: state, isLaunching: flag, isBusy: flag) == .unconfigured)
             }
         }
     }
@@ -31,16 +31,15 @@ import Testing
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .connecting, isLaunching: false, isBusy: true) == .opening)
     }
 
-    @Test func aSavedServerWhoseCopyWillNotOpenIsNeverAnsweredWithTheFolder() {
+    @Test func aSavedServerWhoseCopyWillNotOpenFails() {
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .keyRefused, isLaunching: false, isBusy: false) == .failed)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .unavailable(message: "x"), isLaunching: false, isBusy: false) == .failed)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: .disconnected, isLaunching: false, isBusy: false) == .failed)
     }
 
-    /// A copy closed to open again, as when a key is replaced, is waited for: the windows never show the notes
-    /// folder, nor say the library can't open, in between. Leaving a server forgets its address first, so the
-    /// folder follows at once.
-    @Test func aCopyBeingReopenedIsWaitedForNeverShownAsTheFolder() {
+    /// A copy closed to open again, as when a key is replaced, is waited for: the windows never say the library
+    /// can't open in between. Leaving a server forgets its address first, so the welcome follows at once.
+    @Test func aCopyBeingReopenedIsWaitedFor() {
         for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: false, isConfigured: true, state: state, isLaunching: false, isBusy: true) == .opening)
         }
@@ -49,9 +48,9 @@ import Testing
     @Test func withNoServerSetNothingChangesAndTheHostIsNeverOpened() throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
-        #expect(libraries.mode == .files)
+        #expect(libraries.mode == .unconfigured)
         #expect(libraries.isLaunching == false)
-        #expect(libraries.current == nil, "no notes folder is chosen yet")
+        #expect(libraries.current == nil)
         #expect(libraries.host.source == nil)
         #expect(bench.servers.opened.isEmpty)
     }
@@ -64,12 +63,12 @@ import Testing
         libraries.updateSidebarLayout { $0.setHidden(.favorites, true) }
         #expect(libraries.sidebarLayout.isHidden(.favorites))
 
-        try await libraries.host.disconnect()
-        #expect(libraries.sidebarLayoutKey.hasPrefix("folder:"))
-        #expect(!libraries.sidebarLayout.isHidden(.favorites), "the folder's sidebar is its own")
+        try await libraries.host.changeAddress(to: "http://second.test:8210", key: "other")
+        #expect(libraries.sidebarLayoutKey == "marfa:http://second.test:8210")
+        #expect(!libraries.sidebarLayout.isHidden(.favorites), "another server's sidebar is its own")
     }
 
-    @Test func connectingChoosesTheServersLibraryAndDisconnectingGivesTheFolderBack() async throws {
+    @Test func connectingChoosesTheServersLibraryAndDisconnectingAsksForOneAgain() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
@@ -78,7 +77,7 @@ import Testing
         #expect(libraries.current as? MarfaLibrary === library, "one library for as long as its source is open")
 
         try await libraries.host.disconnect()
-        #expect(libraries.mode == .files)
+        #expect(libraries.mode == .unconfigured)
         #expect(libraries.current == nil)
     }
 
@@ -145,7 +144,7 @@ import Testing
         #expect(libraries.host.state == .connecting, "the library shows before the server has answered")
     }
 
-    @Test func aSavedServerWithNoKeyShowsAPageNotTheFolder() async throws {
+    @Test func aSavedServerWithNoKeyShowsAPageSayingSo() async throws {
         let bench = try HostBench()
         bench.defaults.set(address, forKey: "MarfaAddress")
         let libraries = try libraries(bench)

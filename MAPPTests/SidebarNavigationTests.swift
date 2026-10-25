@@ -6,8 +6,8 @@ struct SidebarNavigationTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
     @Test func recentlyDeletedRestoresAsAnOrdinaryWorkspace() {
-        let note = Note(body: "Deleted text", created: date, deleted: date)
-        let library = NoteLibrary(notes: [note], now: { date })
+        let note = FakeItemLibrary.note("Deleted text", modified: date, state: .trashed)
+        let library = FakeItemLibrary(items: [note], now: date)
         let browser = Browser()
         browser.restore(.init(place: .recentlyDeleted, selection: [note.id], viewMode: .gallery), in: library, order: NoteOrder())
         #expect(browser.item == .recentlyDeleted)
@@ -25,7 +25,7 @@ struct SidebarNavigationTests {
         deleted.source = "reader"
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source)
-        source.send(.loaded(SourceSnapshot(items: [first, second, deleted], catalogue: LibraryFixture.catalogue, places: [])))
+        source.send(.loaded(SourceSnapshot(items: [first, second, deleted], catalogue: LibraryFixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(Set(library.sourceCounts.map(\.name)) == ["reader", "Reader"])
         #expect(library.sourceCounts.allSatisfy { $0.count == 1 })
@@ -38,9 +38,9 @@ struct SidebarNavigationTests {
     }
 
     @Test func aFavoriteShortcutSelectsTheActualItemInsteadOfTheFirstFavorite() {
-        let first = Note(body: "# First favorite", created: date, isFavorite: true)
-        let second = Note(body: "# Second favorite", created: date - 100, isFavorite: true)
-        let library = NoteLibrary(notes: [first, second], now: { date })
+        let first = FakeItemLibrary.note("First favorite", modified: date, isFavorite: true)
+        let second = FakeItemLibrary.note("Second favorite", modified: date - 100, isFavorite: true)
+        let library = FakeItemLibrary(items: [first, second], now: date)
         let browser = Browser()
         browser.searchText = "First"
         browser.show(.favoriteItem(second.id), in: library, order: NoteOrder())
@@ -53,44 +53,28 @@ struct SidebarNavigationTests {
     }
 
     @Test func aShortcutToAnItemNoLongerFavoriteFallsBackToTheRemainingFavorites() {
-        let first = Note(body: "# First favorite", created: date, isFavorite: true)
-        let second = Note(body: "# Second favorite", created: date - 100, isFavorite: true)
-        let library = NoteLibrary(notes: [first, second], now: { date })
+        let first = FakeItemLibrary.note("First favorite", modified: date, isFavorite: true)
+        let second = FakeItemLibrary.note("Second favorite", modified: date - 100, isFavorite: true)
+        let library = FakeItemLibrary(items: [first, second], now: date)
         let browser = Browser()
         browser.show(.favoriteItem(first.id), in: library, order: NoteOrder())
-        library.setFavorite([first.id], false)
-        browser.folderRemoved(in: library, order: NoteOrder())
+        library.setFavorite([first.id], false, undoManager: nil)
+        browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
         #expect(browser.selection == [second.id])
         #expect(library.items(in: .favoriteItem(first.id)).isEmpty)
     }
 
     @Test func aDeletedFavoriteShortcutLeavesAnEmptyFavoritesCollection() {
-        let favorite = Note(body: "# Only favorite", created: date, isFavorite: true)
-        let library = NoteLibrary(notes: [favorite], now: { date })
+        let favorite = FakeItemLibrary.note("Only favorite", modified: date, isFavorite: true)
+        let library = FakeItemLibrary(items: [favorite], now: date)
         let browser = Browser()
         browser.show(.favoriteItem(favorite.id), in: library, order: NoteOrder())
-        library.delete([favorite.id])
-        browser.folderRemoved(in: library, order: NoteOrder())
+        library.delete([favorite.id], undoManager: nil)
+        browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
         #expect(browser.selection.isEmpty)
         #expect(library.items(in: .favoriteItem(favorite.id)).isEmpty)
-    }
-
-    @Test func aFavoriteShortcutRestoresByItsIdentifierWhereverItsFileIsNow() throws {
-        let favorite = Note(body: "# Favorite", path: "Notes/Favorite.md", created: date, isFavorite: true)
-        let library = NoteLibrary(notes: [favorite], now: { date })
-        let browser = Browser()
-        browser.show(.favoriteItem(favorite.id), in: library, order: NoteOrder())
-        let data = try JSONEncoder().encode(browser.snapshot())
-        let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: data)
-        let reloaded = Note(id: favorite.id, path: "Elsewhere/Renamed.md", text: favorite.file.text, created: date)
-        let restoredLibrary = NoteLibrary(notes: [reloaded], now: { date })
-        let restored = Browser()
-        restored.restore(snapshot, in: restoredLibrary, order: NoteOrder())
-        #expect(restored.item == .favoriteItem(favorite.id))
-        #expect(restored.selection == [favorite.id])
-        #expect(snapshot.place == .favoriteItem(favorite.id))
     }
 
     @Test func aSnapshotSavedBeforeFavoritesFailsToDecodeSoTheWindowOpensAtItsDefault() {
@@ -99,8 +83,8 @@ struct SidebarNavigationTests {
     }
 
     @Test func restoringAShortcutToAnItemNoLongerFavoriteReturnsToFavorites() {
-        let note = Note(body: "# Former favorite", path: "Notes/Former favorite.md", created: date)
-        let library = NoteLibrary(notes: [note], now: { date })
+        let note = FakeItemLibrary.note("Former favorite", modified: date)
+        let library = FakeItemLibrary(items: [note], now: date)
         let browser = Browser()
         browser.restore(.init(place: .favoriteItem(note.id), selection: [note.id]), in: library, order: NoteOrder())
         #expect(browser.item == .favorites)
@@ -108,22 +92,14 @@ struct SidebarNavigationTests {
     }
 
     @Test func aProjectFavoriteAndItsProjectCollectionHaveDistinctDestinations() throws {
-        let library = NoteLibrary(notes: [], now: { date })
-        let project = try #require(library.createItem(typeID: "aic.project", title: "Field research").flatMap { library.note($0) })
-        let child = try #require(library.createItem(typeID: "aic.ticket.task", title: "Read the findings", parentID: project.id).flatMap { library.note($0) })
-        library.setFavorite([project.id], true)
+        let library = FakeItemLibrary(now: date)
+        let project = try #require(library.createItem(typeID: "test.project", title: "Field research", body: "", parentID: nil, in: .allNotes, undoManager: nil).flatMap { library.item($0) })
+        let child = try #require(library.createItem(typeID: "core.task", title: "Read the findings", body: "", parentID: project.id, in: .allNotes, undoManager: nil).flatMap { library.item($0) })
+        library.setFavorite([project.id], true, undoManager: nil)
         #expect(SidebarItem.collection(project.id) != .favoriteItem(project.id))
         #expect(library.items(in: .collection(project.id)).map(\.id) == [child.id])
         #expect(library.items(in: .favoriteItem(project.id)).map(\.id) == [project.id])
-        #expect(library.items(in: .itemType("aic.project")).map(\.id) == [project.id])
-        #expect(library.name(of: .itemType("aic.project")) == "Project")
-    }
-
-    @Test func shortcutAndProjectTitlesUseTheSharedItemProjection() {
-        let project = Note(path: "Projects/Folded.md", text: "---\ntype: aic.project\ntitle: >-\n  Folded\n  project\ntags: [favorite]\n---\nProject content.\n", created: date)
-        let library = NoteLibrary(notes: [project], now: { date })
-        #expect(library.item(project.id)?.title == "Folded project")
-        #expect(library.name(of: .favoriteItem(project.id)) == "Folded project")
-        #expect(library.name(of: .collection(project.id)) == "Folded project")
+        #expect(library.items(in: .itemType("test.project")).map(\.id) == [project.id])
+        #expect(library.name(of: .itemType("test.project")) == "Project")
     }
 }

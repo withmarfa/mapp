@@ -10,24 +10,23 @@ import WebKit
 @Suite(.serialized)
 struct EditorTests {
     /// An editor whose page has loaded, reporting each change it makes.
-    final class Harness {
+    final class Harness<Library: ItemLibrary> {
         /// The editor holds its library weakly, so the harness keeps the one it loads from.
-        let library: NoteLibrary
+        let library: Library
         let editor: EditorController
         var changes: [String] = []
 
-        init(library: NoteLibrary = NoteLibrary()) async throws {
+        init(library: Library) async throws {
             self.library = library
             editor = EditorController(library: library)
             editor.onChange = { [unowned self] _, markdown, _ in changes.append(markdown) }
             try await wait { self.editor.isReady }
         }
 
-        func load(_ body: String, deleted: Bool = false) async throws {
-            let note = Note(body: body, created: .now, deleted: deleted ? .now : nil)
-            library.notes.append(note)
-            editor.load(try #require(library.item(note.id)))
-            try await wait { self.editor.noteID == note.id }
+        /// Shows the item and waits until the page holds it.
+        func show(_ id: ItemID) async throws {
+            editor.load(try #require(library.item(id)))
+            try await wait { self.editor.noteID == id }
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
         }
@@ -70,6 +69,8 @@ struct EditorTests {
         }
     }
 
+    typealias Page = Harness<FakeItemLibrary>
+
     let kitchen = """
     # Kitchen quotes
 
@@ -88,7 +89,7 @@ struct EditorTests {
     }
 
     @Test func selectingAnotherItemReturnsTheBodyToReading() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
                                   styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -124,10 +125,10 @@ struct EditorTests {
     }
 
     @Test func deferredFocusBelongsToTheRequestedItem() async throws {
-        let first = Note(body: "First", created: .now)
-        let second = Note(body: "Second", created: .now)
-        let library = NoteLibrary(notes: [first, second])
-        let page = try await Harness(library: library)
+        let library = FakeItemLibrary()
+        let first = library.add("First")
+        let second = library.add("Second")
+        let page = try await Page(library: library)
         page.editor.load(try #require(library.item(first.id)))
         page.editor.focus(first.id)
         page.editor.load(try #require(library.item(second.id)))
@@ -170,9 +171,9 @@ struct EditorTests {
     }
 
     @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
-        let first = Note(body: "First\n", created: .now)
-        let second = Note(body: "Second\n", created: .now)
-        let library = NoteLibrary(notes: [first, second])
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
         let editor = EditorController(library: library)
         editor.load(try #require(library.item(first.id)))
         #expect(!editor.isReady)
@@ -185,9 +186,9 @@ struct EditorTests {
     }
 
     @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
-        let note = Note(body: "Original\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: RecordingStore())
-        let page = try await Harness(library: library)
+        let library = FakeItemLibrary()
+        let note = library.add("Original\n")
+        let page = try await Page(library: library)
         page.editor.load(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         var captured: [String] = []
@@ -200,19 +201,18 @@ struct EditorTests {
         }
         #expect(!kept)
         #expect(captured == ["Pending\n"])
-        #expect(library.note(note.id)?.body == "Outside\n")
-        #expect(library.notes.contains { $0.id != note.id && $0.body == "Pending\n" })
+        // Sent as typed on the version before the outside change, so the source keeps both rather than one over the other.
+        #expect(library.bodyWrites.contains { $0.text == "Pending\n" && $0.readAt == note.version })
     }
 
     @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Original\n")
         var left = false
         page.editor.onLeave = { _, _ in left = true }
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         let originalID = page.editor.noteID
-        let replacement = Note(body: "Replacement\n", created: .now)
-        page.library.notes.append(replacement)
+        let replacement = page.library.add("Replacement\n")
         let kept = await withCheckedContinuation { continuation in
             page.editor.flush { continuation.resume(returning: $0) }
             page.editor.load(page.library.item(replacement.id)!)
@@ -231,13 +231,12 @@ struct EditorTests {
     }
 
     @Test func reselectingTheNoteAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Original\n")
         let originalID = try #require(page.editor.noteID)
         let original = try #require(page.library.item(originalID))
         let generation = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
-        let replacement = Note(body: "Replacement\n", created: .now)
-        page.library.notes.append(replacement)
+        let replacement = page.library.add("Replacement\n")
         let replacementItem = try #require(page.library.item(replacement.id))
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         page.editor.select(replacementItem)
@@ -259,7 +258,7 @@ struct EditorTests {
     }
 
     @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Original\n")
         let id = page.editor.noteID
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
@@ -279,7 +278,7 @@ struct EditorTests {
     }
 
     @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("```mermaid\nnot a valid diagram [\n```\n")
         try await Task.sleep(for: .milliseconds(300))
         #expect(page.library.failure == nil)
@@ -287,7 +286,7 @@ struct EditorTests {
     }
 
     @Test func nativeFindReplacementBatchUsesScopedReadableTextAndEmojiGeometry() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: -10000, y: -10000, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.webView
@@ -312,7 +311,7 @@ struct EditorTests {
     }
 
     @Test func nativeFindGeometryFollowsViewportAndAppearanceChanges() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -370,7 +369,7 @@ struct EditorTests {
             var permitsClose = true
             func windowShouldClose(_ sender: NSWindow) -> Bool { permitsClose }
         }
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Draft\n")
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -397,7 +396,7 @@ struct EditorTests {
     }
 
     @Test func aNoteOpenedAndLeftAloneIsNotRewritten() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load(kitchen)
         #expect(try await page.markdown() == nil)
         // Longer than the pause after which the page reports an edit.
@@ -406,7 +405,7 @@ struct EditorTests {
     }
 
     @Test func aHeadingHasNativeFormatStateAndItsAuthoredSource() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
             styleMask: [.titled], backing: .buffered, defer: false
@@ -436,7 +435,7 @@ struct EditorTests {
     }
 
     @Test func formattingReportsTheNoteAsMarkdown() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Milk\n")
         page.editor.format(.checklist)
         try await page.wait { !page.changes.isEmpty }
@@ -444,7 +443,7 @@ struct EditorTests {
     }
 
     @Test func aTableMadeInThePageIsWrittenWithoutAlignment() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Quotes\n")
         page.editor.format(.table)
         try await page.wait { !page.changes.isEmpty }
@@ -455,7 +454,7 @@ struct EditorTests {
     }
 
     @Test func undoAndRedoGoThroughThePagesOwnHistory() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Milk\n")
         page.editor.format(.checklist)
         try await page.wait { page.editor.caret.canUndo }
@@ -465,7 +464,7 @@ struct EditorTests {
     }
 
     @Test func aDeletedNoteCannotBeEdited() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Old list\n", deleted: true)
         #expect(!page.editor.isEditable)
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'x')")
@@ -475,7 +474,7 @@ struct EditorTests {
     }
 
     @Test func anEditNotYetReportedIsHandedOverOnFlush() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Draft\n")
         page.editor.format(.title)
         page.editor.flush()
@@ -484,10 +483,9 @@ struct EditorTests {
     }
 
     @Test func aNoteWhoseTextCannotBeReadIsNotOpenedForWriting() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Kept\n")
-        let note = Note(body: "Plan\n", created: .now)
-        let item = try #require(NoteLibrary(notes: [note]).item(note.id))
+        let item = FakeItemLibrary.note("Plan", modified: .now)
         // The editor's library has no text for this item, so the page must not open an empty note to type into.
         page.editor.load(item)
         _ = try await page.editor.webView.evaluateJavaScript("1")
@@ -496,64 +494,19 @@ struct EditorTests {
         #expect(page.editor.noteID != item.id)
     }
 
-    @Test func aFirstLineTypedWithASpaceAtItsEndNamesTheFileWithoutIt() async throws {
-        let store = RecordingStore()
-        let note = Note(body: "Plan\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: store)
-        let page = try await Harness(library: library)
-        page.editor.onChange = { id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-        page.editor.onLeave = { id, _ in library.leave(id) }
-        page.editor.load(try #require(library.item(note.id)))
-        _ = try await page.editor.webView.evaluateJavaScript("1")
-        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, 'R&D plan ')")
-        // Leaving the note renames its file after its first line.
-        page.editor.flush()
-        try await page.wait { library.note(note.id)?.path != "Plan.md" }
-        #expect(library.note(note.id)?.path == "R&D plan.md")
-        #expect(library.note(note.id)?.title == "R&D plan")
-    }
-
     /// The page reports a heading's availability by its level, so the Format menu offers Title, Heading, and
     /// Subheading in an editable note.
     @Test func headingCommandsAreAvailableInANote() async throws {
-        let note = Note(body: "Milk\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: RecordingStore())
-        let page = try await Harness(library: library)
-        page.editor.load(try #require(library.item(note.id)))
+        let page = try await Page()
+        try await page.load("Milk\n")
         try await page.wait { page.editor.canApply(.title) }
         #expect(page.editor.canApply(.heading))
         #expect(page.editor.canApply(.subheading))
     }
 
-    /// An edit still waiting to be reported when another change to the note is taken in was typed on the text
-    /// before that change. Laid over the note it would replace text the person never saw, so it is kept beside the
-    /// note as a copy, and the note and the page keep the other change.
-    @Test func anEditOverlappingAnOutsideChangeIsKeptAsACopy() async throws {
-        let note = Note(body: "Milk\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: RecordingStore())
-        let page = try await Harness(library: library)
-        var reported: [String] = []
-        page.editor.onChange = { id, markdown, read in reported.append(markdown); library.updateBody(of: id, to: markdown, readAt: read) }
-        page.editor.load(try #require(library.item(note.id)))
-        _ = try await page.editor.webView.evaluateJavaScript("1")
-        try await page.wait { page.editor.canApply(.checklist) }
-        page.editor.format(.checklist)
-        // Another window's text, typed on the text it held.
-        library.updateBody(of: note.id, to: "Outside\n")
-        page.editor.noteChanged(try #require(library.item(note.id)))
-        for _ in 0..<100 where library.notes.count == 1 { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(reported == ["- [ ] Milk\n"])
-        try #require(library.notes.count == 2)
-        #expect(library.note(note.id)?.body == "Outside\n")
-        let copy = try #require(library.notes.first { $0.id != note.id })
-        #expect(copy.body == "- [ ] Milk\n")
-        #expect(copy.path == "Milk (Conflicted Copy).md")
-        #expect(library.failure?.title == String(localized: "Saved as a Copy"))
-        #expect(try await page.shownText(until: "Outside") == "Outside")
-    }
-
-    /// The same in a Marfa library: the edit is sent as typed on the version before the other device's text, so the
-    /// server keeps both, and the page shows the other device's text rather than taking the edit back over it.
+    /// An edit still waiting to be reported when another device's text is taken in was typed on the text before it,
+    /// so it is sent as typed on that older version and the server keeps both. The page shows the other device's
+    /// text rather than taking the edit back over it.
     @Test func anEditOverlappingAnotherDevicesTextIsSentAsTypedOnTheOlderVersion() async throws {
         typealias F = LibraryFixture
         let source = FakeItemSource()
@@ -594,9 +547,8 @@ struct EditorTests {
         #expect(shown == "Theirs")
     }
 
-    @Test func anImageInTheNotesFolderShowsAndOneLinkedFromOutsideDoesNot() async throws {
+    @Test func anImageInTheFilesShowsAndOneLinkedFromOutsideDoesNot() async throws {
         let root = try TemporaryFolder()
-        let bin = try TemporaryFolder()
         let outside = try TemporaryFolder()
         let png = try #require(NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
@@ -608,10 +560,11 @@ struct EditorTests {
         try FileManager.default.createSymbolicLink(
             at: root.url.appending(path: "Attachments/link.png"), withDestinationURL: outside.url.appending(path: "secret.png")
         )
-        let note = Note(body: "![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness(library: library)
-        page.editor.load(try #require(library.item(note.id)))
+        let page = try await Page()
+        let library = page.library
+        serveEmbeds(page.editor, from: root.url)
+        let note = library.add("![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n")
+        page.editor.load(note)
         var widths: [Int] = []
         for _ in 0..<40 {
             widths = try await page.editor.webView.evaluateJavaScript(
@@ -652,9 +605,21 @@ struct EditorTests {
         return value
     }
 
+    /// Serves the page's embeds from `root` as a library will once it resolves them through the working copy's
+    /// links: a name from `Attachments/`, a path from `directory`, each opened only inside `root`.
+    func serveEmbeds(_ editor: EditorController, from root: URL, directory: String = "") {
+        editor.embeds.open = { reference, _ in
+            guard let real = OpenFile.realPath(of: root) else { return nil }
+            let file = switch reference {
+            case .name(let name): real.appending(path: "Attachments/\(name)")
+            case .path(let path): real.appending(path: directory).appending(path: path.removingPercentEncoding ?? path).standardized
+            }
+            return await OpenFile.open(file, inside: root)
+        }
+    }
+
     @Test func eachKindOfEmbeddedFileShowsAsWhatItIs() async throws {
         let root = try TemporaryFolder()
-        let bin = try TemporaryFolder()
         let attachments = root.url.appending(path: "Attachments")
         try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
         try EmbedFixtures.png(width: 5, height: 2).write(to: attachments.appending(path: "Photo.png"))
@@ -672,9 +637,9 @@ struct EditorTests {
         ![[Budget.csv]] ![[Missing.zip]] ![far](../../outside.png) ![[A note]]
 
         """
-        let note = Note(path: "Projects/Embeds.md", text: body, created: .now)
-        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness(library: library)
+        let page = try await Page()
+        serveEmbeds(page.editor, from: root.url, directory: "Projects")
+        let note = page.library.add(body)
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 1400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -682,7 +647,7 @@ struct EditorTests {
             window.contentView = nil
             window.close()
         }
-        page.editor.load(try #require(library.item(note.id)))
+        page.editor.load(note)
         let editor = page.editor
 
         let image = try await settle(editor, "(() => { const i = document.querySelector('.inkkit-image img'); return i ? [i.naturalWidth, Math.round(i.getBoundingClientRect().width)] : [] })()", as: [Int].self) { $0 == [5, 3] }
@@ -707,7 +672,6 @@ struct EditorTests {
         #expect(missing == expectedMissing)
 
         #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
-        #expect(await library.embeddedFile(.name("Plan.pdf"), in: note.id)?.lastPathComponent == "Plan.pdf")
         #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
 
         #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
@@ -715,14 +679,14 @@ struct EditorTests {
 
     @Test func aVideoLargerThanOneAnswerPlaysToItsEnd() async throws {
         let root = try TemporaryFolder()
-        let bin = try TemporaryFolder()
-        let movie = root.url.appending(path: "Long.mov")
+        try FileManager.default.createDirectory(at: root.url.appending(path: "Attachments"), withIntermediateDirectories: true)
+        let movie = root.url.appending(path: "Attachments/Long.mov")
         try EmbedFixtures.longMovie(to: movie, padding: Int(2 * EmbeddedFiles.window))
         let size = try #require(try movie.resourceValues(forKeys: [.fileSizeKey]).fileSize)
         try #require(UInt64(size) > 2 * EmbeddedFiles.window, "the movie is \(size) bytes")
-        let note = Note(path: "Embeds.md", text: "![[Long.mov]]\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness(library: library)
+        let page = try await Page()
+        serveEmbeds(page.editor, from: root.url)
+        let note = page.library.add("![[Long.mov]]\n")
         // WebKit loads no media for a page outside a window.
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 900), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -731,7 +695,7 @@ struct EditorTests {
             window.contentView = nil
             window.close()
         }
-        page.editor.load(try #require(library.item(note.id)))
+        page.editor.load(note)
         let duration = try await settle(page.editor, "(() => { const v = document.querySelector('video'); return v && v.readyState >= 1 ? v.duration : -1 })()", as: Double.self) { ($0 ?? -1) > 0 }
         try #require((duration ?? 0) > 3)
         try await page.run("const v = document.querySelector('video'); v.currentTime = v.duration - 0.1")
@@ -741,19 +705,17 @@ struct EditorTests {
 
     @Test func theContextMenuOverAnEmbeddedFileKnowsWhichFile() async throws {
         let root = try TemporaryFolder()
-        let bin = try TemporaryFolder()
         try FileManager.default.createDirectory(at: root.url.appending(path: "Attachments"), withIntermediateDirectories: true)
         try Data("a,b\n".utf8).write(to: root.url.appending(path: "Attachments/Budget.csv"))
-        let note = Note(path: "Embeds.md", text: "A sheet: ![[Budget.csv]]\n", created: .now)
-        let library = NoteLibrary(notes: [note], store: FolderStore(root: root.url, bin: bin.url))
-        let page = try await Harness(library: library)
-        page.editor.load(try #require(library.item(note.id)))
+        let page = try await Page()
+        serveEmbeds(page.editor, from: root.url)
+        let note = page.library.add("A sheet: ![[Budget.csv]]\n")
+        page.editor.load(note)
         _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
         try await page.run("document.querySelector('.inkkit-file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         try await page.wait { page.editor.menuEmbed != nil }
         #expect(page.editor.menuEmbed?.item == note.id)
         #expect(page.editor.menuEmbed?.reference == .name("Budget.csv"))
-        #expect(await library.embeddedFile(.name("Budget.csv"), in: note.id)?.lastPathComponent == "Budget.csv")
         _ = page.editor.takeMenuEmbed()
         try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
         _ = try await page.editor.webView.evaluateJavaScript("1")
@@ -824,7 +786,7 @@ struct EditorTests {
     }
 
     @Test func anEditRewritesOnlyTheBlockItTouched() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let written = "Title\n=====\n\n* star bullet\n* another\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n\n\n\nMilk\n"
         try await page.load(written)
         page.editor.format(.checklist)
@@ -833,7 +795,7 @@ struct EditorTests {
     }
 
     @Test func aNoteExportsAsAPDFOfItsTextAndPageStyle() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -881,22 +843,21 @@ struct EditorTests {
     }
 
     /// An element's frame in the page's window, as left, top, width and height.
-    static func rect(_ selector: String, in page: Harness) async throws -> [Double] {
+    static func rect(_ selector: String, in page: Page) async throws -> [Double] {
         try #require(try await page.editor.webView.evaluateJavaScript(
             "(() => { const r = document.querySelector(\(json(selector))).getBoundingClientRect(); return [r.left, r.top, r.width, r.height] })()"
         ) as? [Double])
     }
 
     @Test func aNewItemsTitleTakesTheKeyboardWhenThePageShowsThatItem() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
         window.orderFrontRegardless()
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        let note = Note(body: "", created: .now)
-        page.library.notes.append(note)
-        page.editor.load(try #require(page.library.item(note.id)))
+        let note = page.library.add("")
+        page.editor.load(note)
         try await page.wait { page.editor.noteID == note.id }
         page.editor.focus(note.id, onTitle: true)
         page.editor.setHeader(Self.header("Untitled", id: note.id))
@@ -913,7 +874,7 @@ struct EditorTests {
     }
 
     @Test func theItemHeaderScrollsWithTheTextInsideThePageAndKeepsItsMargins() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -975,7 +936,7 @@ struct EditorTests {
     }
 
     @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let container = page.editor.container
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -1011,10 +972,10 @@ struct EditorTests {
     }
 
     @Test func anUpdateForTheItemJustLeftCannotReloadIt() async throws {
-        let first = Note(body: "First item\n", created: .now)
-        let second = Note(body: "Second item\n", created: .now)
-        let library = NoteLibrary(notes: [first, second])
-        let page = try await Harness(library: library)
+        let library = FakeItemLibrary()
+        let first = library.add("First item\n")
+        let second = library.add("Second item\n")
+        let page = try await Page(library: library)
         page.editor.load(try #require(library.item(first.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         page.editor.load(try #require(library.item(second.id)))
@@ -1024,7 +985,7 @@ struct EditorTests {
         _ = try await page.editor.webView.evaluateJavaScript("1")
         _ = try await page.editor.webView.evaluateJavaScript("1")
         #expect(page.editor.noteID == second.id)
-        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == second.body)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Second item\n")
         #expect(page.changes.isEmpty)
     }
 
@@ -1093,7 +1054,7 @@ struct EditorTests {
     }
 
     @Test func textPastedIntoTheTitleComesInOnOneLineAndOneUndoTakesItOut() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -1138,7 +1099,7 @@ struct EditorTests {
 
     /// The paste itself is InkKit's; this holds that it works through the pasteboard, the web view and the bridge.
     @Test func htmlCopiedFromAWebPageIsPastedIntoTheNoteAsReadableText() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -1177,7 +1138,7 @@ struct EditorTests {
     }
 
     @Test func aPinAsksForItsMenuUnderItsFrameInTheEditor() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -1226,16 +1187,18 @@ struct EditorTests {
 
     /// The preview library's ticket on a page in a window of its own, driven through the page.
     final class HostedPage {
-        let library: NoteLibrary
+        let library: MarfaLibrary
         let ticket = ItemPreviewFixtures.ticketID
-        let page: Harness
+        let page: Harness<MarfaLibrary>
         let drafts = DetailsPresentation()
         let shown: Shown
         let window: NSWindow
 
-        init(library: NoteLibrary = ItemPreviewFixtures.library, showing id: ItemID = ItemPreviewFixtures.ticketID) async throws {
+        init(library: MarfaLibrary = ItemPreviewFixtures.library, showing id: ItemID = ItemPreviewFixtures.ticketID) async throws {
             self.library = library
             page = try await Harness(library: library)
+            // The preview library reads its copy as it opens.
+            try await page.wait { library.isLoaded }
             page.editor.titleDrafts = drafts
             shown = Shown(id)
             window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -1326,17 +1289,18 @@ struct EditorTests {
         try await page.wait { library.item(ticket)?.title == "Review the findings" }
         try await host.waitForTitle("Review the findings")
 
-        // A title the library refuses stays as typed, with the reason, and survives moving to another note and back.
-        try await host.type("Review/photographs")
+        // A title the library refuses, as a Marfa library does an empty one, stays as typed, with the reason, and
+        // survives moving to another note and back.
+        try await host.type("")
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         #expect(library.item(ticket)?.title == "Review the findings")
-        #expect(try await host.shownTitle() == "Review/photographs")
+        #expect(try await host.shownTitle() == "")
         host.shown.id = ItemPreviewFixtures.noteID
         try await host.waitForTitle("Field notes")
         #expect(try await host.titleError() == false)
         host.shown.id = ticket
-        try await host.waitForTitle("Review/photographs")
+        try await host.waitForTitle("")
         #expect(try await host.titleError() == true)
 
         // Discard Changes gives the saved title back.
@@ -1355,10 +1319,10 @@ struct EditorTests {
             try await host.waitForTitle(title)
         }
         // Deleted elsewhere, the note becomes read-only and its header gives way to the banner.
-        host.library.delete([host.ticket])
+        host.library.delete([host.ticket], undoManager: nil)
         try await host.page.wait { !host.page.editor.isEditable }
         try await host.waitFor("the header to hide") { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }
-        host.library.recover([host.ticket])
+        host.library.recover([host.ticket], undoManager: nil)
         try await host.page.wait { host.page.editor.isEditable }
         try await host.waitFor("the header to show") { try await host.value("document.getElementById('item-header').hidden") as? Bool == false }
     }
@@ -1374,13 +1338,14 @@ struct EditorTests {
     struct Released {
         weak var editor: EditorController?
         weak var webView: EditorWebView?
-        weak var library: NoteLibrary?
+        weak var library: MarfaLibrary?
         var isEmpty: Bool { editor == nil && webView == nil && library == nil }
     }
 
     /// Opens the item in a window of its own, as the app's item window shows it, sets its title as `edit` says,
     /// and closes the window the way ⌘W does.
-    static func openAndClose(_ library: NoteLibrary, item: ItemID, edit: (EditorController, EditorWebView) async throws -> Void = { _, _ in }) async throws -> Released {
+    static func openAndClose(_ library: MarfaLibrary, item: ItemID, edit: (EditorController, EditorWebView) async throws -> Void = { _, _ in }) async throws -> Released {
+        for _ in 0..<200 where !library.isLoaded { try await Task.sleep(for: .milliseconds(50)) }
         // The app's run loop empties its autorelease pool after every event; a test's await does not, so the
         // window's own steps are made in pools of their own.
         let window = autoreleasepool {
@@ -1411,7 +1376,8 @@ struct EditorTests {
     }
 
     /// An item's page in a window of its own, with an editor and drafts of its own, through to its window closing.
-    static func openAndCloseAPage(_ library: NoteLibrary, item: ItemID) async throws -> Released {
+    static func openAndCloseAPage(_ library: MarfaLibrary, item: ItemID) async throws -> Released {
+        for _ in 0..<200 where !library.isLoaded { try await Task.sleep(for: .milliseconds(50)) }
         let editor = EditorController(library: library)
         let drafts = DetailsPresentation()
         editor.titleDrafts = drafts
@@ -1535,7 +1501,7 @@ struct EditorTests {
         _ = try await Self.openAndClose(library, item: ticket) { editor, web in
             _ = try await web.evaluateJavaScript("""
                 const title = document.getElementById('ItemPageTitle'); title.focus()
-                document.execCommand('selectAll'); document.execCommand('insertText', false, 'Review/photos')
+                document.execCommand('selectAll'); document.execCommand('delete')
                 title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); 0
                 """)
             for _ in 0..<200 where try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool != true {
@@ -1586,9 +1552,9 @@ struct EditorTests {
         var shown: [ItemID] = []
         first.page.editor.onShowRefusedTitle = { shown.append($0) }
         second.page.editor.onShowRefusedTitle = { shown.append($0) }
-        first.drafts.draft(for: first.ticket, key: "title").text = "Review/photos"
+        first.drafts.draft(for: first.ticket, key: "title").text = ""
         first.drafts.draft(for: first.ticket, key: "title").isDirty = true
-        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").text = "Field/notes"
+        second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").text = ""
         second.drafts.draft(for: ItemPreviewFixtures.noteID, key: "title").isDirty = true
         let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
         #expect(!kept)
@@ -1596,7 +1562,7 @@ struct EditorTests {
         let told = try #require(shown.first)
         let message = try #require(library.failure?.message)
         let window = told == first.ticket ? first.window : second.window
-        #expect(message.contains(told == first.ticket ? "“Review/photos”" : "“Field/notes”"), "\(message)")
+        #expect(message.contains(told == first.ticket ? "“Review the findings”" : "“Field notes”"), "\(message)")
         #expect(window.isKeyWindow || window.isMainWindow || NSApp.orderedWindows.first === window, "the window holding the draft comes forward")
     }
 
@@ -1605,27 +1571,27 @@ struct EditorTests {
         defer { host.close() }
         try await host.type("Review before quitting")
         #expect(await host.flushAll())
-        #expect(host.library.item(host.ticket)?.title == "Review before quitting")
+        try await host.page.wait { host.library.item(host.ticket)?.title == "Review before quitting" }
         #expect(host.library.failure == nil)
 
-        try await host.type("Review/before quitting")
+        try await host.type("")
         #expect(await !host.flushAll(), "a title that cannot be saved stops quitting rather than being lost")
         #expect(host.library.item(host.ticket)?.title == "Review before quitting")
-        #expect(host.library.failure?.message.contains("“Review/before quitting”") == true)
+        #expect(host.library.failure?.message.contains("“Review before quitting” is empty") == true)
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
     }
 
     @Test func aRefusedTitleForANoteNoLongerShownStillStopsQuittingAndNamesTheNote() async throws {
         let host = try await HostedPage()
         defer { host.close() }
-        try await host.type("Review/photos")
+        try await host.type("")
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         host.shown.id = ItemPreviewFixtures.noteID
         try await host.waitForTitle("Field notes")
         #expect(await !host.flushAll())
         let message = try #require(host.library.failure?.message)
-        #expect(message.contains("“Review/photos”") && message.contains("“Review the findings”"), "\(message)")
+        #expect(message.contains("“Review the findings” is empty"), "\(message)")
         // Deleting a note keeps the window, so a refused title is tried again but stops nothing.
         host.library.failure = nil
         #expect(await host.flushAll(leaving: false))
@@ -1633,31 +1599,15 @@ struct EditorTests {
         #expect(host.drafts.draft(for: host.ticket, key: "title").rejected)
     }
 
-    @Test func aTitleRefusedBecauseTheNameWasTakenIsSavedOnceTheNameIsFree() async throws {
-        let host = try await HostedPage()
-        defer { host.close() }
-        let taken = Note(path: "Tickets/Taken.md", text: "Taken\n", created: .now)
-        host.library.notes.append(taken)
-        try await host.type("Taken")
-        try await host.pressReturn()
-        try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
-        host.shown.id = ItemPreviewFixtures.noteID
-        try await host.waitForTitle("Field notes")
-        #expect(host.library.setItemProperty(taken.id, key: "title", value: .string("Taken before"), undoManager: nil))
-        #expect(await host.flushAll())
-        #expect(host.library.item(host.ticket)?.title == "Taken")
-        #expect(!host.drafts.draft(for: host.ticket, key: "title").isDirty)
-    }
-
     @Test func closingTheWindowWithARefusedTitleIsCancelledAndSaysWhy() async throws {
         let host = try await HostedPage()
         defer { host.close() }
-        try await host.type("Review/photos")
+        try await host.type("")
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
         host.window.performClose(nil)
         try await host.waitFor("the refusal to be told") { host.library.failure != nil }
-        #expect(host.library.failure?.message.contains("“Review/photos”") == true)
+        #expect(host.library.failure?.message.contains("“Review the findings” is empty") == true)
         #expect(host.window.isVisible, "the window stays open with the title that could not be saved")
     }
 
@@ -1701,21 +1651,17 @@ struct EditorTests {
 
     // MARK: Notes the page links to
 
-    private func addNotes(_ titles: [String], to page: Harness) -> [ItemID] {
-        titles.map { title in
-            let note = Note(body: title + "\n", created: .now)
-            page.library.notes.append(note)
-            return note.id
-        }
+    private func addNotes(_ titles: [String], to page: Page) -> [ItemID] {
+        titles.map { page.library.add($0 + "\n").id }
     }
 
-    private func ask(_ page: Harness, _ request: String) async throws -> Any? {
+    private func ask(_ page: Page, _ request: String) async throws -> Any? {
         try await page.editor.webView.callAsyncJavaScript(
             "return await window.webkit.messageHandlers.notes.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
     }
 
     @Test func theNotesAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         _ = addNotes(["Garden ideas", "Bike service", "Gardening tools"], to: page)
         try await page.load("Intro\n")
         let names = try await ask(page, "{ type: 'suggest', query: 'gard' }") as? [String]
@@ -1726,7 +1672,7 @@ struct EditorTests {
     }
 
     @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
         try await page.load("Intro\n")
         let current = try #require(page.editor.noteID)
@@ -1740,7 +1686,7 @@ struct EditorTests {
     }
 
     @Test func linkToNoteDeclinedClosedOrAskedFromAnotherNoteAnswersWithNothing() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
         try await page.load("Intro\n")
         let current = try #require(page.editor.noteID)
@@ -1775,7 +1721,7 @@ struct EditorTests {
     }
 
     @Test func theSlashMenuAndItsWordsComeFromTheAppsStrings() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("\n")
         let labels = try await page.editor.webView.evaluateJavaScript("window.mappLabels") as? [String: String]
         #expect(labels?["linkToNote"] == "Link to Note")
@@ -1785,7 +1731,7 @@ struct EditorTests {
     }
 
     @Test func quotesAndDashesStayAsTypedBecauseSmartPunctuationIsOff() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = page.editor.container
@@ -1814,7 +1760,7 @@ struct EditorTests {
 
     // MARK: Link to Note keeps which note was chosen
 
-    private func pending(_ page: Harness) async throws -> ItemID {
+    private func pending(_ page: Page) async throws -> ItemID {
         let current = try #require(page.editor.noteID)
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
@@ -1822,25 +1768,22 @@ struct EditorTests {
     }
 
     /// What the page was answered, or "PENDING" if it is still waiting after a moment.
-    private func answer(_ page: Harness) async throws -> String? {
+    private func answer(_ page: Page) async throws -> String? {
         let script = "return await Promise.race([window.pick, new Promise(done => setTimeout(() => done('PENDING'), 1500))])"
         let value = try await page.editor.webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)
         return value as? String
     }
 
-    /// What the library resolves a link to, written on a note of its own so the library reads it as a person's would.
-    private func resolution(of link: String, in library: NoteLibrary) -> NoteReferenceResolution? {
-        let reader = Note(body: "See \(link)\n", path: "Reader of links.md", created: .now)
-        library.notes.append(reader)
-        defer { library.notes.removeAll { $0.id == reader.id } }
-        return library.connectionIndex.referencesBySource[reader.id]?.first?.resolution
+    /// What the library resolves a `[[link]]` to.
+    private func resolution(of link: String, in library: FakeItemLibrary) -> NoteReferenceResolution? {
+        guard link.hasPrefix("[["), link.hasSuffix("]]") else { return nil }
+        return library.resolveLink(NoteLink(reading: String(link.dropFirst(2).dropLast(2))), in: .mint())
     }
 
     @Test func choosingBetweenNotesWithTheSameTitleLinksToTheOneChosen() async throws {
-        let page = try await Harness()
-        let older = Note(body: "Garden\n", path: "Home/Garden.md", created: Date(timeIntervalSince1970: 1_700_000_000))
-        let newer = Note(body: "garden\n", path: "Work/garden.md", created: Date(timeIntervalSince1970: 1_800_000_000))
-        page.library.notes += [older, newer]
+        let page = try await Page()
+        let older = page.library.add("Garden\n")
+        page.library.add("garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
         page.editor.finishLinkRequest(choosing: older.id)
@@ -1849,30 +1792,28 @@ struct EditorTests {
     }
 
     @Test func aTargetRenamedWhileThePickerIsOpenIsLinkedByItsNewTitle() async throws {
-        let page = try await Harness()
-        let target = Note(body: "Garden\n", path: "Garden.md", created: .now)
-        page.library.notes.append(target)
+        let page = try await Page()
+        let target = page.library.add("Garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
-        page.library.renameNote(target.id, to: "Allotment", undoManager: nil)
+        let index = try #require(page.library.items.firstIndex { $0.id == target.id })
+        page.library.items[index].title = "Allotment"
         try #require(page.library.item(target.id)?.title == "Allotment")
         page.editor.finishLinkRequest(choosing: target.id)
         #expect(try await answer(page) == "[[Allotment]]")
     }
 
     @Test func everySuggestionAndTheLinkForAnyNoteResolvesToThatNote() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let identity = "11111111-1111-4111-8111-111111111111"
-        let chosen = Note(body: "---\ntitle: \(identity)\n---\nBody\n", path: "Chosen.md", created: .now)
-        let other = Note(body: "---\nmarfa_id: \(identity)\n---\nOther\n", path: "Other.md", created: .now)
-        let plain = Note(body: "Garden\n", path: "Garden.md", created: .now)
-        page.library.notes += [chosen, other, plain]
+        let chosen = page.library.add("\(identity)\nBody\n")
+        page.library.add("Garden\n")
         try await page.load("Intro\n")
         let library = page.library
         let index = NoteLinks.Index()
         for query in ["", "1111", "gar", "oth"] {
             for name in await library.noteNames(matching: query, using: index) {
-                let owner = try #require(library.notes.first { $0.title == name }, "\(name)")
+                let owner = try #require(library.items.first { $0.title == name }, "\(name)")
                 #expect(!name.isEmpty)
                 #expect(resolution(of: "[[\(name)]]", in: library) == .resolved(owner.id), "suggesting \(name) for \(query)")
             }
@@ -1884,34 +1825,18 @@ struct EditorTests {
     }
 
     @Test func aLinkByIdentityWithAnEscapedTitleResolvesToTheNoteThatDeclaresIt() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         let identity = "22222222-2222-4222-8222-222222222222"
-        let declared = Note(body: "---\nmarfa_id: \(identity)\n---\nWork on it\n", path: "Home/Chosen.md", created: .now)
-        page.library.notes.append(declared)
+        let declared = page.library.add("Work on it\n", id: ItemID(identity))
         for title in ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語", "line\nbreak"] {
-            let link = NoteLinks.identityLink(to: identity, titled: title, readsBrackets: false)
+            let link = NoteLinks.identityLink(to: identity, titled: title)
             #expect(resolution(of: link, in: page.library) == .resolved(declared.id), "\(link)")
         }
-        #expect(NoteLinks.identityLink(to: identity, titled: "A]B", readsBrackets: false) == "[[\(identity)]]")
-        #expect(NoteLinks.identityLink(to: identity, titled: "A|B", readsBrackets: false) == "[[\(identity)|A\\|B]]")
-    }
-
-    @Test func aNoteNoLinkCanNameAloneLeavesTheRequestOpenForAnotherChoice() async throws {
-        let page = try await Harness()
-        let first = Note(body: "Plan\n", path: "Home/Plan.md", created: .now)
-        let second = Note(body: "plan\n", path: "Home/plan.md", created: .now)
-        let other = Note(body: "Garden\n", path: "Garden.md", created: .now)
-        page.library.notes += [first, second, other]
-        try await page.load("Intro\n")
-        _ = try await pending(page)
-        #expect(!page.editor.finishLinkRequest(choosing: first.id), "no spelling names it alone")
-        #expect(page.editor.linkRequest != nil, "the request stays open")
-        #expect(page.editor.finishLinkRequest(choosing: other.id))
-        #expect(try await answer(page) == "[[Garden]]")
+        #expect(NoteLinks.identityLink(to: identity, titled: "A]B") == "[[\(identity)|A\\]B]]")
     }
 
     @Test func aLinkRequestAfterTheWindowWentIsAnsweredWithNothing() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Intro\n")
         let editor = page.editor
         editor.windowWent()
@@ -1922,8 +1847,8 @@ struct EditorTests {
     }
 
     @Test func loadingAnotherNoteAnswersAPendingLinkRequestOnce() async throws {
-        let page = try await Harness()
-        page.library.notes.append(Note(body: "Garden\n", path: "Garden.md", created: .now))
+        let page = try await Page()
+        page.library.add("Garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
         try await page.load("Another note\n")
@@ -1933,5 +1858,16 @@ struct EditorTests {
 
     private func json(_ text: String) -> String {
         String(decoding: (try? JSONEncoder().encode(text)) ?? Data("\"\"".utf8), as: UTF8.self)
+    }
+}
+
+extension EditorTests.Harness where Library == FakeItemLibrary {
+    convenience init() async throws {
+        try await self.init(library: FakeItemLibrary())
+    }
+
+    /// Adds a note holding `body` and shows it.
+    func load(_ body: String, deleted: Bool = false) async throws {
+        try await show(library.add(body, state: deleted ? .trashed : .active).id)
     }
 }

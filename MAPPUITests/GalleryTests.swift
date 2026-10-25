@@ -12,7 +12,7 @@ final class GalleryTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder", "-MAPPGallerySampleImages"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(list.waitForExistence(timeout: 5))
     }
@@ -44,7 +44,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertGreaterThan(second.frame.minX, first.frame.maxX)
         XCTAssertGreaterThan(gallery.frame.width, window.frame.width / 2)
         XCTAssertEqual(card("Garden ideas").frame.width, first.frame.width, accuracy: 2)
-        XCTAssertEqual(card("Garden ideas").frame.height, first.frame.height, accuracy: 2, "a card with an image is as tall as one without")
+        XCTAssertEqual(card("Garden ideas").frame.height, first.frame.height, accuracy: 2)
         let screenshot = XCTAttachment(screenshot: window.screenshot())
         screenshot.name = "GalleryGrid"
         screenshot.lifetime = .keepAlways

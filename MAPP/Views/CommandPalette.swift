@@ -178,7 +178,7 @@ struct CommandPalette: View {
             let body = isEmpty || inTitle ? nil : library.body(of: item.id)
             let snippet = body.flatMap { NoteText.snippet(of: $0.text, around: query) } ?? item.preview
             return Entry(
-                id: "note:\(item.id)", title: item.title, detail: folderName(of: item), snippet: snippet.isEmpty ? nil : snippet,
+                id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), snippet: snippet.isEmpty ? nil : snippet,
                 systemImage: symbol(for: item), takesFocus: true
             ) {
                 reveal(item)
@@ -230,16 +230,8 @@ struct CommandPalette: View {
                 }
             }
             add(String(localized: "New Item"), "plus", "⌘N") { browser.startNewItem(in: library, undoManager: undoManager) }
-            if library.capabilities.contains(.importFiles) {
-                add(String(localized: "Import Files…"), "square.and.arrow.down") { browser.isImportingFiles = true }
-            }
             if browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
-            }
-            if library.capabilities.contains(.folders) {
-                add(String(localized: "New Folder"), "folder.badge.plus", "⇧⌘N") {
-                    browser.newFolder(in: library, order: order, undoManager: undoManager)
-                }
             }
         }
         let search = String(localized: "Search Notes")
@@ -260,9 +252,6 @@ struct CommandPalette: View {
                 }
                 add(String(localized: "Add Attachment…"), "paperclip", "⇧⌘A") { editor.isChoosingImages = true }
             }
-            if library.canRenameFile(of: one) {
-                add(String(localized: "Rename Note…"), "pencil") { browser.renamingNote = one.id }
-            }
         }
         if !browser.selection.isEmpty {
             add(String(localized: "Open in New Window"), "macwindow", "⌘O") {
@@ -270,7 +259,7 @@ struct CommandPalette: View {
             }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
-        let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0, in: library) }, in: library)
+        let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
         if share.isAvailable {
             add(String(localized: "Share…"), "square.and.arrow.up") {
                 share.present(near: hasVisibleEditor ? editor.webView : nil)
@@ -283,14 +272,6 @@ struct CommandPalette: View {
             let allFavorites = selected.allSatisfy(\.isFavorite)
             add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
-            }
-            if library.capabilities.contains(.move) {
-                if !selected.allSatisfy({ $0.container == nil }) {
-                    add(String(localized: "Move to Inbox"), "tray") { library.move(ids, to: nil, undoManager: undoManager) }
-                }
-                for folder in library.folders where !selected.allSatisfy({ $0.container == ContainerID(folder.id) }) {
-                    add(String(localized: "Move to \(folder.name)"), "folder") { library.move(ids, to: folder.id, undoManager: undoManager) }
-                }
             }
             add(String(localized: "Delete Note"), "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager)
@@ -330,7 +311,6 @@ struct CommandPalette: View {
         items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
         // The types the sidebar shows, under the names it gives them.
         items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
-        items += library.folders.map { (.folder($0.id), "folder", nil) }
         return items.map { item, systemImage, title in
             Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
                 browser.show(item, in: library, order: order)
@@ -339,17 +319,13 @@ struct CommandPalette: View {
         }
     }
 
-    /// Items by title, most recently edited first, each shown where it is.
+    /// Items by title, most recently edited first, each with its type, or the Inbox for one waiting there.
     private var notes: [Entry] {
         library.items(in: .allNotes).sorted { $0.modified > $1.modified }.map { item in
-            Entry(id: "note:\(item.id)", title: item.title, detail: folderName(of: item), systemImage: symbol(for: item), takesFocus: true) {
+            Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), systemImage: symbol(for: item), takesFocus: true) {
                 reveal(item)
             }
         }
-    }
-
-    private func folderName(of item: Item) -> String {
-        library.folder(of: item)?.name ?? String(localized: "Inbox")
     }
 
     private func symbol(for item: Item) -> String {

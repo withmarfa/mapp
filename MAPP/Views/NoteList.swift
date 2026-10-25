@@ -86,10 +86,6 @@ struct NoteList: View {
             browser.keepSelection(from: old, to: new)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            if ids.count == 1, let id = ids.first, library.canRenameFile(of: library.item(id)) {
-                Button("Rename…", systemImage: "pencil") { browser.renamingNote = id }
-                Divider()
-            }
             NoteActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
             for id in library.idsForWindows(ids) { openWindow(value: id) }
@@ -185,7 +181,7 @@ private enum ListLine: Identifiable {
     /// of its own, never selected.
     var id: ItemID {
         switch self {
-        case .heading(let group, _): ItemID(UUID(stableFrom: "heading:\(group)").uuidString)
+        case .heading(let group, _): ItemID("heading:\(group)")
         case .item(let item, _): item.id
         }
     }

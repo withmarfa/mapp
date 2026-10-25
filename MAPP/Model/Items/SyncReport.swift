@@ -1,16 +1,5 @@
 import Foundation
 
-/// What a source has yet to send, and each write that needs the person. A source that sends nothing, such as a
-/// folder, reports nothing waiting.
-nonisolated protocol SyncReporting: AnyObject, Sendable {
-    var syncReport: SyncReport { get }
-    /// Starts with the report as it stands, then each one that differs.
-    func syncReports() -> AsyncStream<SyncReport>
-    /// False where the action is not offered for the problem, or the queue would not take it, such as a write
-    /// the server refused, which is never sent again.
-    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
-}
-
 nonisolated struct SyncReport: Hashable, Sendable {
     enum Phase: Hashable, Sendable {
         case current

@@ -3,12 +3,11 @@ import Foundation
 nonisolated struct SourceSnapshot: Hashable, Sendable {
     var items: [Item]
     var catalogue: Catalogue
-    var places: [Place]
 }
 
 nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
     enum Kind: Hashable, Sendable {
-        /// The folder or store is gone; choosing it again may help.
+        /// The store is gone.
         case missing
         /// Permission or a credential was refused.
         case denied
@@ -27,22 +26,6 @@ nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
     var errorDescription: String? { message }
 }
 
-nonisolated struct SourceCapabilities: OptionSet, Hashable, Sendable {
-    let rawValue: Int
-    static let archive = SourceCapabilities(rawValue: 1 << 0)
-    /// Marfa purges only while the server can be reached, so a source may drop this and publish it again.
-    static let purge = SourceCapabilities(rawValue: 1 << 1)
-    static let move = SourceCapabilities(rawValue: 1 << 2)
-    static let retype = SourceCapabilities(rawValue: 1 << 3)
-    static let retier = SourceCapabilities(rawValue: 1 << 4)
-    /// Rename Note gives an item's file a new name. A title is a property, which any library edits.
-    static let renameFiles = SourceCapabilities(rawValue: 1 << 5)
-    /// Folders can be made, renamed, deleted and reordered.
-    static let folders = SourceCapabilities(rawValue: 1 << 6)
-    static let importFiles = SourceCapabilities(rawValue: 1 << 7)
-    static let downloadedFiles = SourceCapabilities(rawValue: 1 << 8)
-}
-
 nonisolated enum SourceChange: Hashable, Sendable {
     /// Replaces everything held; always the first change.
     case loaded(SourceSnapshot)
@@ -51,7 +34,6 @@ nonisolated enum SourceChange: Hashable, Sendable {
     case bodyChanged(ItemID, ItemVersion)
     case answered(WriteID, WriteOutcome)
     case catalogue(Catalogue)
-    case places([Place])
     case unavailable(SourceFailure)
 }
 
@@ -67,10 +49,10 @@ nonisolated protocol EmbedResolver: Sendable {
     func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
 }
 
-/// Storage behind the library. A source applies each write to its own state at once and emits the updated item,
-/// so the library keeps no overlay of pending writes.
+/// The Marfa working copy behind the library, as the library and the host use it, so both are tested without a
+/// server. A source applies each write to its own state at once and emits the updated item, so the library keeps
+/// no overlay of pending writes.
 nonisolated protocol ItemSource: AnyObject, Sendable {
-    var capabilities: SourceCapabilities { get }
     var embeds: any EmbedResolver { get }
     func changes() -> AsyncStream<SourceChange>
     /// Never blocks; writes are made in the order submitted. False where the source is closed and takes nothing.
@@ -82,9 +64,37 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func fileURL(of item: ItemID) async throws -> URL
     /// Best match first.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
-    /// A files source renames the file to follow its first line here, so a rename is one change, not one per word.
-    func endEditing(_ item: ItemID)
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
     func queueSubmitted() async
     func close() async
+
+    // MARK: The server
+
+    var downloadedFiles: (any DownloadedFiles)? { get }
+    var connectionState: MarfaConnectionState { get }
+    func connectionStates() -> AsyncStream<MarfaConnectionState>
+    /// What the source has yet to send, and each write that needs the person.
+    var syncReport: SyncReport { get }
+    /// Starts with the report as it stands, then each one that differs.
+    func syncReports() -> AsyncStream<SyncReport>
+    /// False where the action is not offered for the problem, or the queue would not take it, such as a write
+    /// the server refused, which is never sent again.
+    func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
+
+    // MARK: What the host does with it
+
+    /// Hydrates or catches up, then sends what waits; never waited on.
+    func refresh()
+    /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
+    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck
+    /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
+    /// cannot be read.
+    func unsentWrites() async -> UnsentWrites?
+    /// Closes only if every write not sent, read in the same step, is one of `agreed` (nil agrees to whatever
+    /// the copy holds); otherwise stays open and answers what is not sent.
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome
+}
+
+nonisolated extension ItemSource {
+    var downloadedFiles: (any DownloadedFiles)? { nil }
 }

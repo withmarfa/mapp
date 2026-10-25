@@ -12,7 +12,7 @@ final class SidebarNavigationTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         XCTAssertTrue(list.waitForExistence(timeout: 5))
@@ -22,8 +22,8 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarListsTopPlacesThenFoldersAndViews() {
-        let destinations = ["Inbox", "Recents", "Items", "Sources", "Collections", "Favorites", "Folders", "Views"]
+    func testSidebarListsTopPlacesThenTypesAndViews() {
+        let destinations = ["Inbox", "Recents", "Items", "Sources", "Collections", "Favorites", "Types", "Views"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
@@ -54,19 +54,6 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testFoldersRememberTheirCollapsedStateWhenSettingsCloses() {
-        disclosure(for: "Folders").click()
-        XCTAssertTrue(sidebarText("Home").waitForNonExistence(timeout: 3))
-        app.typeKey(",", modifierFlags: .command)
-        XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
-        sidebarText("Items").click()
-        XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Folders").exists)
-        XCTAssertFalse(sidebarText("Home").exists)
-        disclosure(for: "Folders").click()
-        XCTAssertTrue(sidebarText("Home").waitForExistence(timeout: 3))
-    }
-
     func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
         instanceMenu.click()
         let settings = app.menuItems["Settings"]
@@ -93,7 +80,7 @@ final class SidebarNavigationTests: XCTestCase {
             XCTAssertTrue(note.waitForNonExistence(timeout: 3))
         }
         XCTAssertTrue(sidebarText("Favorites").exists)
-        XCTAssertTrue(sidebarText("Folders").exists)
+        XCTAssertTrue(sidebarText("Types").exists)
         sidebarText("Items").click()
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))
@@ -105,55 +92,22 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     func testAPlaceHiddenFromItsMenuIsOfferedBackInSettings() {
-        sidebarText("Folders").rightClick()
+        sidebarText("Sources").rightClick()
         window.menuItems["Hide from Sidebar"].click()
-        XCTAssertTrue(sidebarText("Folders").waitForNonExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Home").waitForNonExistence(timeout: 3), "the folders go with their section")
+        XCTAssertTrue(sidebarText("Sources").waitForNonExistence(timeout: 3))
         XCTAssertTrue(sidebarText("Favorites").exists, "the other places stay")
 
         app.typeKey(",", modifierFlags: .command)
         let page = element("SettingsPage-sidebar")
         XCTAssertTrue(page.waitForExistence(timeout: 3))
         page.click()
-        let toggle = element("SidebarSetting-folders")
+        let toggle = element("SidebarSetting-sources")
         XCTAssertTrue(toggle.waitForExistence(timeout: 3))
         XCTAssertEqual(toggle.value as? Int, 0, "Settings lists the place switched off")
         toggle.click()
-        XCTAssertTrue(sidebarText("Folders").waitForExistence(timeout: 3), "the sidebar beside Settings follows at once")
+        XCTAssertTrue(sidebarText("Sources").waitForExistence(timeout: 3), "the sidebar beside Settings follows at once")
         sidebarText("Items").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Home").exists)
-    }
-
-    func testCollapsedFoldersExpandForCreationAndKeepRenameAndDelete() {
-        disclosure(for: "Folders").click()
-        XCTAssertTrue(sidebarText("Home").waitForNonExistence(timeout: 3))
-        app.typeKey("n", modifierFlags: [.command, .shift])
-        let field = sidebar.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 3))
-        field.click()
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText("Research")
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3), "Return commits the new folder name")
-        XCTAssertTrue(sidebarText("Research").waitForExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Home").exists, "creation expands the native folder group")
-
-        sidebarText("Research").rightClick()
-        window.menuItems["Rename Folder"].click()
-        XCTAssertTrue(field.waitForExistence(timeout: 3))
-        field.click()
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText("Archive")
-        field.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(field.waitForNonExistence(timeout: 3), "Return commits the renamed folder")
-        XCTAssertTrue(sidebarText("Archive").waitForExistence(timeout: 3))
-        sidebarText("Archive").rightClick()
-        window.menuItems["Delete Folder"].click()
-        let confirm = app.sheets.buttons["Delete Folder"].firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
-        confirm.click()
-        XCTAssertTrue(sidebarText("Archive").waitForNonExistence(timeout: 3))
     }
 
     func testAnItemFiledUnderAnotherAppearsInTheCollectionsIndex() {
@@ -199,26 +153,12 @@ final class SidebarNavigationTests: XCTestCase {
         return sidebar.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title)).firstMatch
     }
 
-    private func disclosure(for title: String) -> XCUIElement {
-        sidebarText(title).hover()
-        let row: XCUIElement
-        if let identifier = groupIdentifier(for: title) {
-            row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
-        } else {
-            row = sidebar.outlineRows.containing(NSPredicate(format: "label == %@ OR value == %@", title, title)).firstMatch
-        }
-        XCTAssertTrue(row.waitForExistence(timeout: 3))
-        let disclosure = row.disclosureTriangles.element(boundBy: 0)
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 3), "\(title) has a native disclosure control")
-        return disclosure
-    }
-
     private func groupIdentifier(for title: String) -> String? {
         switch title {
         case "Favorites": "SidebarFavorites"
         case "Sources": "SidebarSources"
         case "Collections": "SidebarCollections"
-        case "Folders": "SidebarFolders"
+        case "Types": "SidebarTypes"
         default: nil
         }
     }

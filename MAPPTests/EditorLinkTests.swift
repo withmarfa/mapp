@@ -7,14 +7,14 @@ import WebKit
 
 /// Links to notes in the editor's page, running in real WebKit through the app's bridge.
 extension EditorTests {
-    private func marks(_ page: Harness) async throws -> String {
+    private func marks(_ page: Page) async throws -> String {
         try await page.editor.webView.evaluateJavaScript(
             "[...document.querySelectorAll('.inkkit-wiki-link')].map(l => l.dataset.missing === 'true' ? 'missing' : 'live').join()"
         ) as? String ?? ""
     }
 
     /// The marks of the page's links, once they read `expected` or after a few seconds.
-    private func marks(_ page: Harness, until expected: String) async throws -> String {
+    private func marks(_ page: Page, until expected: String) async throws -> String {
         var shown = ""
         for _ in 0..<100 {
             shown = try await marks(page)
@@ -25,7 +25,7 @@ extension EditorTests {
     }
 
     /// A command-click on the page's `index`th link, as the person makes it.
-    private func commandClick(_ index: Int, in page: Harness) async throws {
+    private func commandClick(_ index: Int, in page: Page) async throws {
         try await page.run("""
         document.querySelectorAll('.inkkit-wiki-link')[\(index)].dispatchEvent(
           new MouseEvent('click', { metaKey: true, button: 0, bubbles: true }))
@@ -33,55 +33,52 @@ extension EditorTests {
     }
 
     /// Gives what the page posted time to arrive. A page in no window draws no frames, so this does not wait for one.
-    private func settled(_ page: Harness) async throws {
+    private func settled(_ page: Page) async throws {
         _ = try await page.editor.webView.evaluateJavaScript("1")
         try await Task.sleep(for: .milliseconds(200))
     }
 
     @Test func aLinkToNoNoteIsMarkedMissingAndFollowsTheLibrary() async throws {
-        let plan = Note(body: "Plan\n", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan], store: RecordingStore()))
+        let page = try await Page()
+        let plan = page.library.add("Plan\n")
         try await page.load("Reader\n\nSee [[Plan]] and [[Later]].\n")
         #expect(try await marks(page, until: "live,missing") == "live,missing")
 
-        let later = Note(body: "Later\n", created: .now)
-        page.library.notes.append(later)
+        let later = page.library.add("Later\n")
         #expect(try await marks(page, until: "live,live") == "live,live", "a note made makes its link live")
 
-        page.library.renameNote(plan.id, to: "Plan v2", undoManager: nil)
+        let index = try #require(page.library.items.firstIndex { $0.id == plan.id })
+        page.library.items[index].title = "Plan v2"
         #expect(try await marks(page, until: "missing,live") == "missing,live", "a note renamed leaves its old link missing")
 
-        page.library.notes.removeAll { $0.id == later.id }
+        page.library.items.removeAll { $0.id == later.id }
         #expect(try await marks(page, until: "missing,missing") == "missing,missing", "a note deleted makes its link missing")
     }
 
     @Test func aNoteOpenedWithItsLinksResolvedAndMarkedAndThenClosedIsNotRewritten() async throws {
-        let store = RecordingStore()
-        let plan = Note(body: "Plan\n", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan], store: store))
+        let page = try await Page()
+        page.library.add("Plan\n")
         let body = "Reader\n\nSee [[Plan]], [[Plan#Soil|soil]], [[Later]] and [[22222222-2222-4222-8222-222222222222|Plan]].\n"
         try await page.load(body)
         let reader = try #require(page.editor.noteID)
-        let bytes = try #require(page.library.note(reader)).file.text
         #expect(try await marks(page, until: "live,live,missing,missing") == "live,live,missing,missing")
-        page.library.notes.append(Note(body: "Later\n", created: .now))
+        page.library.add("Later\n")
         #expect(try await marks(page, until: "live,live,live,missing") == "live,live,live,missing")
 
         #expect(try await page.markdown() == nil, "the page holds the text it was given")
         page.editor.close()
         try await page.wait { page.editor.noteID == nil }
         #expect(page.changes.isEmpty)
-        #expect(store.changes.isEmpty)
-        #expect(page.library.note(reader)?.file.text == bytes)
-        #expect(bytes.contains(body.trimmingCharacters(in: .whitespacesAndNewlines)))
+        #expect(page.library.bodyWrites.isEmpty)
+        #expect(page.library.bodies[reader] == body)
     }
 
     @Test func commandClickingALinkOpensTheNoteItNamesAndBeepsForAnyOtherLink() async throws {
         let identity = "33333333-3333-4333-8333-333333333333"
-        let plan = Note(body: "---\nmarfa_id: \(identity)\n---\nPlan\n", path: "Plan.md", created: .now)
-        let twinA = Note(body: "Twin\n", path: "A/Twin.md", created: .now)
-        let twinB = Note(body: "Twin\n", path: "B/Twin.md", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan, twinA, twinB], store: RecordingStore()))
+        let page = try await Page()
+        let plan = page.library.add("Plan\n", id: ItemID(identity))
+        page.library.add("Twin\n")
+        page.library.add("Twin\n")
         try await page.load("Reader\n\n[[Plan]] [[Plan|alias]] [[\(identity)]] [[\(identity)|Plan]] [[Gone]] [[Twin]] [[Plan#Soil]]\n")
         var opened: [ItemID] = []
         var beeps = 0
@@ -101,7 +98,7 @@ extension EditorTests {
         try await commandClick(5, in: page)
         try await page.wait { beeps == 2 }
         #expect(opened.count == 4, "a link to no note and one to two notes open nothing")
-        #expect(page.library.notes.count == 4, "no note is made for a link")
+        #expect(page.library.items.count == 4, "no note is made for a link")
 
         // A plain click only places the caret.
         try await page.run("document.querySelectorAll('.inkkit-wiki-link')[0].dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true }))")
@@ -110,8 +107,8 @@ extension EditorTests {
     }
 
     @Test func aClickInANoteThePageHasLeftOpensNothing() async throws {
-        let plan = Note(body: "Plan\n", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan], store: RecordingStore()))
+        let page = try await Page()
+        page.library.add("Plan\n")
         try await page.load("Reader\n\nSee [[Plan]].\n")
         var opened = 0, beeps = 0
         page.editor.onOpenNote = { _ in opened += 1 }
@@ -124,8 +121,8 @@ extension EditorTests {
     }
 
     @Test func aLinkWithAHeadingScrollsToItOnceTheNoteIsShown() async throws {
-        let plan = Note(body: "Plan\n\n# Soil\n\nLoam.\n\n## Light and Water\n\nSun.\n", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan], store: RecordingStore()))
+        let page = try await Page()
+        let plan = page.library.add("Plan\n\n# Soil\n\nLoam.\n\n## Light and Water\n\nSun.\n")
         try await page.load("Reader\n\nSee [[Plan#light and water]] and [[Plan#Nowhere]].\n")
         let library = page.library
         let editor = page.editor
@@ -145,8 +142,8 @@ extension EditorTests {
     }
 
     @Test func aHeadingThatIsNotThereStillOpensTheNote() async throws {
-        let plan = Note(body: "Plan\n\n# Soil\n", created: .now)
-        let page = try await Harness(library: NoteLibrary(notes: [plan], store: RecordingStore()))
+        let page = try await Page()
+        let plan = page.library.add("Plan\n\n# Soil\n")
         try await page.load("Reader\n\nSee [[Plan#Nowhere]].\n")
         var opened: [ItemID] = []
         page.editor.onOpenNote = { opened.append($0) }
@@ -157,7 +154,7 @@ extension EditorTests {
     }
 
     @Test func aLinkToAHeadingOfItsOwnNoteMovesThePageWithoutOpeningAnything() async throws {
-        let page = try await Harness()
+        let page = try await Page()
         try await page.load("Reader\n\n# Soil\n\nSee [[#soil]].\n")
         var opened = 0, beeps = 0
         page.editor.onOpenNote = { _ in opened += 1 }
@@ -179,9 +176,9 @@ extension EditorTests {
     }
 
     @Test func aLinkFollowedInANoteWindowShowsTheLinkedNoteInThatWindow() async throws {
-        let plan = Note(body: "Plan\n", created: .now)
-        let reader = Note(body: "Reader\n\nSee [[Plan]] and [[Gone]].\n", created: .now)
-        let library = NoteLibrary(notes: [plan, reader], store: RecordingStore())
+        let library = FakeItemLibrary()
+        let plan = library.add("Plan\n")
+        let reader = library.add("Reader\n\nSee [[Plan]] and [[Gone]].\n")
         let shown = ShownItem()
         shown.id = reader.id
         let editor = NoteWindow.makeEditor(

@@ -8,7 +8,6 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case favorites
     /// A shortcut to one favorite item, distinct from the collection containing every favorite.
     case favoriteItem(ItemID)
-    case folder(ItemID)
     case itemType(String)
     case collection(ItemID)
     case collections

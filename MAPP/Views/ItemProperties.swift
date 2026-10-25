@@ -292,10 +292,11 @@ nonisolated enum ItemValueText {
     }
 }
 
+#if DEBUG
 #Preview("Property Controls") {
     ScrollView {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(WorkbenchSchema.catalogue.itemTypes[TypeID("aic.ticket.task")]?.fields ?? []) { definition in
+            ForEach(SampleLibrary.catalogue.itemTypes[TypeID("core.task")]?.fields ?? []) { definition in
                 ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
             }
@@ -307,3 +308,4 @@ nonisolated enum ItemValueText {
     .interfaceTextStyle()
     .frame(width: 300, height: 440)
 }
+#endif

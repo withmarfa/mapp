@@ -28,7 +28,6 @@ struct NoteWindow: View {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-        editor.onLeave = { [library] id, _ in library.leave(id) }
         // The keyboard follows the link to the note it opened, as it does in a main window.
         editor.onOpenNote = { [weak editor] linked in
             id.wrappedValue = linked
@@ -82,7 +81,7 @@ struct NoteWindow: View {
         .onChange(of: library.isGone(id), initial: true) {
             if library.isGone(id) { dismiss() }
         }
-        // Another notes folder is another library, which does not hold this window's note.
+        // Another server is another library, which does not hold this window's note.
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.

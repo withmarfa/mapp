@@ -86,7 +86,7 @@ struct ItemBoardTests {
     @Test func readOnlyItemsAndDiagnosticLanesCannotBeMoved() {
         var archived = Self.item("Archived"); archived.state = .archived
         var trashed = Self.item("Trashed"); trashed.state = .trashed
-        var broken = Self.item("Broken"); broken.problem = ItemProblem(message: "Invalid front matter")
+        var broken = Self.item("Broken"); broken.problem = ItemProblem(message: "Unreadable properties")
         for item in [archived, trashed, broken] {
             #expect(ItemBoardLayout.move(item, key: "status", to: .option("done"), catalogue: Self.catalogue) == .refused)
         }

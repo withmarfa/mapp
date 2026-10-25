@@ -37,12 +37,6 @@ final class Browser {
     /// The page of Settings shown, and the one shown next time Settings is.
     var settingsPage = SettingsPage.appearance
     var searchText = ""
-    /// The note whose file name is being asked for.
-    var renamingNote: ItemID?
-    /// The folder whose name is being edited in the sidebar.
-    var renamingFolder: ItemID?
-    /// The folder whose deletion awaits confirmation.
-    var folderToDelete: ItemID?
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -82,11 +76,6 @@ final class Browser {
 
     /// Settings gives way to whatever the window showed, or to a place chosen in the sidebar.
     func leaveSettings() { showsSettings = false }
-
-    /// The folder the sidebar has selected, which the folder commands act on.
-    var selectedFolder: ItemID? {
-        if case .folder(let id) = item { id } else { nil }
-    }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -174,17 +163,11 @@ final class Browser {
         )
     }
 
-    /// Whether the list mixes notes from several places, so each row says where its note lives.
-    var showsFolders: Bool {
-        isSearching || item == .allNotes || showsOnlyFavorites
-    }
-
-    /// What the rows of the list say about themselves: the type where the list holds several, the place where it
-    /// mixes places, and nothing that the list itself already says.
+    /// What the rows of the list say about themselves: the type where the list holds several, and nothing that the
+    /// list itself already says.
     func metaContext(for items: [Item]) -> ItemMeta.Context {
         var context = ItemMeta.Context()
         context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
-        context.showsPlaces = showsFolders
         if !isSearching {
             if case .collection(let id) = item { context.collection = id }
             context.isInbox = item == .inbox
@@ -226,7 +209,7 @@ final class Browser {
     }
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
-    /// it selected, searched or was renaming named items the new library may not have, and the window's undo
+    /// it selected or searched named items the new library may not have, and the window's undo
     /// would act on the library left. The items New made there were left as the editors handed over, so none is
     /// followed any more.
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
@@ -246,9 +229,6 @@ final class Browser {
         sidebarItem = .allNotes
         searchText = ""
         isSearchExpanded = false
-        renamingNote = nil
-        renamingFolder = nil
-        folderToDelete = nil
         palette = nil
         fetchedFile = nil
         newItems = [:]
@@ -258,39 +238,22 @@ final class Browser {
         fetchedFile = url.map { (id, $0) }
     }
 
-    /// Where an item's file is, for sharing: the library's own answer, or the file it fetched to show.
-    func fileURL(of id: ItemID, in library: any ItemLibrary) -> URL? {
-        library.fileURL(for: id) ?? fetchedFile.flatMap { $0.id == id ? $0.url : nil }
-    }
-
-    func newFolder(in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?) {
-        guard library.capabilities.contains(.folders) else { return }
-        let folder = library.newFolder(undoManager: undoManager)
-        show(.folder(folder.id), in: library, order: order)
-        renamingFolder = folder.id
+    /// Where an item's file is, for sharing: the file the window fetched to show.
+    func fileURL(of id: ItemID) -> URL? {
+        fetchedFile.flatMap { $0.id == id ? $0.url : nil }
     }
 
     /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
     /// person confirms, since that cannot be undone, where the library can erase them.
     static func delete(_ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?) {
         let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
-        if !alreadyDeleted.isEmpty, library.capabilities.contains(.purge) { library.notesToPurge = alreadyDeleted }
+        if !alreadyDeleted.isEmpty, library.canPurge { library.notesToPurge = alreadyDeleted }
         library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
     }
 
-    /// Dropped items move into a folder or the Inbox, where the library moves items.
-    static func canDrop(on place: SidebarItem, in library: any ItemLibrary) -> Bool {
-        switch place {
-        case .inbox, .folder: library.capabilities.contains(.move)
-        case .recents, .allNotes, .favorites, .favoriteItem, .itemType, .collection, .collections, .sources, .source, .files, .recentlyDeleted: false
-        }
-    }
-
-    /// A folder that is gone, by deletion or by undoing its creation, can no longer be shown; All Notes is. So is a type that no longer holds an item.
-    func folderRemoved(in library: any ItemLibrary, order: NoteOrder) {
-        if case .folder(let id) = sidebarItem, library.folder(id) == nil {
-            show(.allNotes, in: library, order: order)
-        }
+    /// A place that is gone can no longer be shown, so the window moves to All Items: a collection no longer
+    /// active, or a type that no longer holds an item.
+    func placeRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if case .collection(let id) = sidebarItem, library.item(id)?.state != .active {
             show(.allNotes, in: library, order: order)
         }
@@ -301,12 +264,6 @@ final class Browser {
         if case .favoriteItem(let id) = sidebarItem,
            library.item(id).map({ $0.state == .active && $0.isFavorite }) != true {
             show(.favorites, in: library, order: order)
-        }
-        if let renamingFolder, library.folder(renamingFolder) == nil {
-            self.renamingFolder = nil
-        }
-        if let folderToDelete, library.folder(folderToDelete) == nil {
-            self.folderToDelete = nil
         }
     }
 
@@ -355,7 +312,6 @@ final class Browser {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
         case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
-        case .folder(let id): library.folder(id).map { _ in snapshot.place } ?? .allNotes
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
         case .inbox, .recents, .allNotes, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place

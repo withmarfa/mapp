@@ -29,7 +29,7 @@ struct GalleryTests {
     }
 
     @Test func galleryRestoresAsACollectionAndKeepsItsSelection() throws {
-        let (library, _, newer, _) = BrowserTests().makeLibrary()
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
         saved.viewMode = .gallery
         saved.selection = [newer.id]
@@ -42,7 +42,7 @@ struct GalleryTests {
     }
 
     @Test func aNewItemOpensInThePageAndReturningToGalleryOrChangingPlaceReturnsToTheGrid() {
-        let (library, _, _, _) = BrowserTests().makeLibrary()
+        let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.viewMode = .gallery
         browser.show(.allNotes, in: library, order: NoteOrder())
@@ -75,25 +75,5 @@ struct GalleryTests {
         \\![escaped](escaped.png)
         """
         #expect(GalleryImageReferences.inBody(markdown) == [.path("Photos/a b.png"), .name("Other.png"), .path("Photos/a(b).png")])
-    }
-
-    @Test func aMissingOrDamagedImageUsesTheNextReadableImage() async throws {
-        let folder = try EmbeddedFilesTests.Folder()
-        try folder.write(Data("not an image".utf8), to: "Projects/Bad.png")
-        try folder.write(EmbedFixtures.png(width: 1600, height: 1200), to: "Projects/Good.png")
-        let body = "![Missing](Missing.png) ![Bad](Bad.png) ![Good](Good.png)"
-        let item = try #require(folder.library.item(folder.note.id))
-        let image = try #require(await GalleryPreview.image(for: item, body: body, in: folder.library))
-        #expect(image.width <= 800 && image.height <= 800)
-    }
-
-    @Test func imagesOutsideTheNotesFolderAreNotRead() async throws {
-        let folder = try EmbeddedFilesTests.Folder()
-        let outside = folder.root.url.deletingLastPathComponent().appending(path: "outside-\(UUID().uuidString).png")
-        defer { try? FileManager.default.removeItem(at: outside) }
-        try EmbedFixtures.png().write(to: outside)
-        try FileManager.default.createSymbolicLink(at: folder.root.url.appending(path: "Projects/Link.png"), withDestinationURL: outside)
-        let item = try #require(folder.library.item(folder.note.id))
-        #expect(await GalleryPreview.image(for: item, body: "![](../../\(outside.lastPathComponent)) ![](Link.png)", in: folder.library) == nil)
     }
 }

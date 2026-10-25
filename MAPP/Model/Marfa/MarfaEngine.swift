@@ -45,9 +45,9 @@ actor MarfaEngine {
         case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
     }
 
-    /// A write only a files library makes, such as a move, or one the type cannot take.
+    /// A write the type cannot take.
     private nonisolated struct Unsupported: Error {
-        var message = MarfaEngine.filesOnly
+        var message: String
     }
 
     /// A write the package refused before queueing it, in the person's words.
@@ -60,10 +60,6 @@ actor MarfaEngine {
     nonisolated struct OwnText: Equatable {
         var text: String
         var on: Int64
-    }
-
-    nonisolated static var filesOnly: String {
-        String(localized: "This change can’t be made in a Marfa library.")
     }
 
     nonisolated static var notCurrent: String {
@@ -105,7 +101,6 @@ actor MarfaEngine {
     private var queue: [Marfa.QueuedWrite] = []
     private var items: [ItemID: Item] = [:]
     private var bodies: [ItemID: Int] = [:]
-    private var places: [Place] = []
     private var syncStates: [ItemID: SyncState] = [:]
     private var changedSync: Set<ItemID> = []
     /// Refusals and conflicts answered, which the queue forgets unless the write carried content, kept until a later
@@ -571,20 +566,14 @@ actor MarfaEngine {
                 upserted.append(item)
             }
         }
-        let places = MarfaMapping.places(items: items.values, catalogue: catalogue)
         if !painted {
             painted = true
-            self.places = places
             let ordered = items.values.sorted { $0.created > $1.created }
-            hub.publish(.loaded(SourceSnapshot(items: ordered, catalogue: catalogue, places: places)))
+            hub.publish(.loaded(SourceSnapshot(items: ordered, catalogue: catalogue)))
         } else {
             if !removed.isEmpty { hub.publish(.removed(removed)) }
             if !upserted.isEmpty { hub.publish(.upserted(upserted)) }
             for (id, version) in bodyChanged { hub.publish(.bodyChanged(id, version)) }
-            if places != self.places {
-                self.places = places
-                hub.publish(.places(places))
-            }
         }
         for failure in failures { hub.publish(.unavailable(failure)) }
         failures = []
@@ -889,8 +878,6 @@ actor MarfaEngine {
             }
         case .purge:
             preconditionFailure("a purge is made at the server by perform(_:as:)")
-        case .move, .place:
-            throw Unsupported()
         }
     }
 

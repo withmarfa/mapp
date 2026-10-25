@@ -1,6 +1,6 @@
 # MAPP
 
-MAPP is a native macOS markdown notes app with a sidebar, a list, and a page, in the manner of Notes and Mail. It reads a library from one of two places: a folder of markdown files the person chooses, or a Marfa server through the `marfa-swift` package's working copy. The note editor is a web page built on InkKit and hosted in a `WKWebView`.
+MAPP is a native macOS markdown notes app with a sidebar, a list, and a page, in the manner of Notes and Mail. It reads and writes a library only through a Marfa server, by the `marfa-swift` package's working copy, and names no item type of its own: what it shows of a type comes from the server's catalogue. With no server set, the window asks the person to connect. The note editor is a web page built on InkKit and hosted in a `WKWebView`.
 
 ## Instruction files
 
@@ -37,17 +37,17 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - With the gallery or the table showing, the editor stays mounted but hidden. Menu commands get no focused editor then (`MainView`), but the palette holds the editor directly, so offer an editor command there only when `hasVisibleEditor`.
 - Every user-facing string goes through the String Catalog. `MAPP/Localizable.xcstrings` is updated by building in Xcode; `xcodebuild` alone does not update it.
 - `MainView` mounts one `NavigationSplitView` at a time (the three-column list, or the two-column split the gallery and the table share), and changes the workspace's identity when it switches between them, which is also what moving from the gallery or the table to Settings does: Settings is a place in the three-column split, with its pages in the content column and the page in the detail column, so macOS releases the outgoing toolbar. Never change the column count of a split view that is already mounted. Browser, editor, undo, and column state live above that boundary.
-- App Sandbox and the hardened runtime stay on. The sandbox allows outgoing connections for two reasons: WebKit's page process needs them, and a Marfa library talks to its server. The editor page itself loads nothing from the network.
+- App Sandbox and the hardened runtime stay on. The sandbox allows outgoing connections for two reasons: WebKit's page process needs them, and the library talks to its Marfa server. The editor page itself loads nothing from the network.
 
 ## Data rules
 
-These hold across the app. The nested files say how each library keeps them.
+These hold across the app. The nested files say how the library keeps them.
 
 - Never drop or silently overwrite a person's text. A write that cannot be kept where it was meant to go is kept somewhere the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
 - Notes are held byte for byte. A note opened and left alone is never rewritten. An edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary` (`MAPP/Model/Items/ItemLibrary.swift`), read from the environment's `library` value. Never test for a concrete library type in a view.
 - Windows, selections, restoration, and drags name items by `ItemID`, never by path.
-- Tests never touch the person's data. Under unit tests hosted in the app and UI tests, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location, and a `NotesFolder` on its own defaults, never the Keychain, the saved server, or the person's notes folder. UI tests open a sample folder (`-MAPPSampleFolder`); a unit test that needs a folder makes its own and a `NotesFolder(defaults:)`.
+- Tests never touch the person's data. Under unit tests hosted in the app, previews and the sample library, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location and defaults of its own, never the Keychain or the saved server. UI tests open the sample library (`-MAPPSampleLibrary`), a library held in memory by `marfa-swift`'s fake working copy (`WorkingCopy.fake`). A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy, never a server.
 
 ## Layout
 
@@ -57,7 +57,7 @@ These hold across the app. The nested files say how each library keeps them.
 - `MAPP/Model/`: the data model, free of SwiftUI. `Items/` holds the library protocol and item types; `Marfa/` holds the Marfa library.
 - `MAPP/Views/`: windows, panes, toolbars, commands, and Settings.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
-- `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` holds items in memory for testing view models without a folder or server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
+- `MAPPTests/`: Swift Testing unit tests, hosted in the app. `FakeItemLibrary` holds items in memory for testing view models and the editor without a server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
 - `Design/`: artwork that is not built into the app.
 
@@ -71,7 +71,7 @@ These hold across the app. The nested files say how each library keeps them.
 
   The UI tests take control of the keyboard and mouse. Add `-only-testing:MAPPTests` to run the unit tests alone.
 - Replace `test` with `build` to build only. The built app is `build/Build/Products/Debug/MAPP.app`.
-- A Debug build launched with `-MAPPSampleFolder` opens a fresh folder of sample notes in the app's temporary directory and an isolated Marfa host. The UI tests use it. `-MAPPSelectItem <item id>` with it selects that item once the library holds it, for a run nobody can click.
+- A Debug build launched with `-MAPPSampleLibrary` connects an isolated Marfa host to a sample library held in memory for the length of the run. The UI tests use it. Add `-MAPPSampleUnconfigured` to start with no server set instead, as a first launch does, `-MAPPCollectionSample` for tasks and events, and `-MAPPSelectItem <item id>` to select that item once the library holds it, for a run nobody can click.
 - To point that Debug build at a test server, run its binary with `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` in the environment: the isolated host connects to that server, keeping the key in memory only.
 - The editor page has its own commands; see `editor/AGENTS.md`.
 
@@ -94,8 +94,8 @@ These hold across the app. The nested files say how each library keeps them.
 Report only a problem you can show: name the input, state, or step, and what goes wrong. Leave formatting to the tools. Nested files add rules for their own code.
 
 - **Person's text lost.** Flag any path where a write that fails, is refused, or races another change is dropped or written over newer text. Safe path: keep it as a conflicted copy, in the queue, or on the clipboard, and tell the person.
-- **Bytes rewritten.** Flag any change that rewrites a note the person did not edit, or changes front matter, a byte-order mark, line endings, or blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.
-- **Library type leaks.** Flag a view, command, or editor change that names `NoteLibrary` or `MarfaLibrary` outside a preview, or offers a write without checking `capabilities`.
+- **Bytes rewritten.** Flag any change that rewrites a note the person did not edit, or changes blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.
+- **Library type leaks.** Flag a view, command, or editor change that names `MarfaLibrary` outside a preview, offers Delete Immediately without checking `canPurge`, or names an item type other than Marfa's built-in ones (`TypeSymbol`).
 - **Platform rules.** Flag `#available` checks, compatibility shims, hard-coded user-facing strings, a committed team identifier or version, and new custom chrome where a system control exists.
-- **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a person's folder, and a UI test run without `-MAPPSampleFolder`.
+- **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a server, and a UI test run without `-MAPPSampleLibrary`.
 - **Stale instructions.** Flag a change that leaves an `AGENTS.md`, the README, or a comment untrue. Fix it in the same pull request.

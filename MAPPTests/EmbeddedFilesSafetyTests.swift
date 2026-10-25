@@ -33,9 +33,9 @@ struct EmbeddedFilesSafetyTests {
     @Test func aFileRequestStoppedAtOnceHearsNothing() async throws {
         let folder = try EmbeddedFilesTests.Folder()
         let files = EmbeddedFiles()
-        files.open = { reference, item in await folder.library.openEmbeddedFile(reference, in: item) }
+        files.open = { reference, item in await folder.open(reference, in: item) }
         let webView = WKWebView()
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note.id, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
         files.webView(webView, start: task)
         task.stopped = true
         files.webView(webView, stop: task)
@@ -56,20 +56,20 @@ struct EmbeddedFilesSafetyTests {
 
     @Test func aFolderSwappedForALinkAfterResolvingIsNotServed() async throws {
         let folder = try EmbeddedFilesTests.Folder()
-        let secret = Data("outside the notes folder".utf8)
+        let secret = Data("outside the directory".utf8)
         let outside = folder.outside.url.appending(path: "Attachments")
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
         try secret.write(to: outside.appending(path: "Photo.png"))
         let files = EmbeddedFiles()
         files.open = { reference, item in
-            guard let url = await folder.library.embeddedFile(reference, in: item) else { return nil }
+            guard let url = folder.resolve(reference, in: item) else { return nil }
             // What another writer to the folder could do between finding the file and opening it.
             let attachments = folder.root.url.appending(path: "Attachments")
             try? FileManager.default.moveItem(at: attachments, to: folder.root.url.appending(path: "Moved"))
             try? FileManager.default.createSymbolicLink(at: attachments, withDestinationURL: outside)
             return await OpenFile.open(url, inside: folder.root.url)
         }
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .path("../Attachments/Photo.png"), in: folder.note.id, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .path("../Attachments/Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
         for _ in 0..<200 where !task.finished && !task.failed { try await Task.sleep(for: .milliseconds(5)) }
         #expect(task.status == 404)
@@ -81,12 +81,12 @@ struct EmbeddedFilesSafetyTests {
         let file = folder.root.url.appending(path: "Attachments/Photo.png")
         let files = EmbeddedFiles()
         files.open = { reference, item in
-            guard let url = await folder.library.embeddedFile(reference, in: item) else { return nil }
+            guard let url = folder.resolve(reference, in: item) else { return nil }
             try? FileManager.default.removeItem(at: file)
             mkfifo(file.path, 0o644)
             return await OpenFile.open(url, inside: folder.root.url)
         }
-        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note.id, version: 1))
+        let task = StrictSchemeTask(EmbeddedFiles.url(for: .name("Photo.png"), in: folder.note, version: 1))
         files.webView(WKWebView(), start: task)
         for _ in 0..<200 where !task.finished && !task.failed && task.status == nil { try await Task.sleep(for: .milliseconds(5)) }
         let answered = task.finished || task.failed || task.status != nil
@@ -107,7 +107,7 @@ struct EmbeddedFilesSafetyTests {
         for name in refused {
             try folder.root.write(script, to: "Attachments/\(name)")
             chmod(folder.root.url.appending(path: "Attachments/\(name)").path, 0o755)
-            let url = try #require(await folder.library.embeddedFile(.name(name), in: folder.note.id))
+            let url = try #require(folder.resolve(.name(name), in: folder.note))
             #expect(!EmbeddedFiles.opens(url), "Open would hand \(name), marked executable, to an app")
             chmod(url.path, 0o644)
             #expect(!EmbeddedFiles.opens(url), "Open would hand \(name) to an app that runs or follows it, or is of no kind it can tell")
@@ -115,7 +115,7 @@ struct EmbeddedFilesSafetyTests {
         let opened = ["Photo.png", "Song.mp3", "Clip.mov", "Plan.pdf", "Table.tsv", "Sheet.csv", "Letter.docx", "Sums.xlsx", "Deck.pptx", "Essay.rtf", "Book.epub", "Report.pages"]
         for name in opened {
             try folder.write(Data("x".utf8), to: "Attachments/\(name)")
-            let url = try #require(await folder.library.embeddedFile(.path("../Attachments/\(name)"), in: folder.note.id))
+            let url = try #require(OpenFile.realPath(of: folder.root.url)).appending(path: "Attachments/\(name)")
             #expect(EmbeddedFiles.opens(url), "\(name) is a document to open")
         }
         let marked = folder.root.url.appending(path: "Attachments/Photo.png")
@@ -125,7 +125,7 @@ struct EmbeddedFilesSafetyTests {
 
     @Test func aFileIsOpenedThroughNoLinkAnywhereInItsPath() async throws {
         let folder = try EmbeddedFilesTests.Folder()
-        let real = try #require(FolderFiles.realPath(of: folder.root.url))
+        let real = try #require(OpenFile.realPath(of: folder.root.url))
         let root = folder.root.url
         #expect(await OpenFile.open(real.appending(path: "Attachments/Photo.png"), inside: root) != nil)
         // `Linked` is a link to a folder outside, which holds `secret.png`.
@@ -137,9 +137,9 @@ struct EmbeddedFilesSafetyTests {
     @Test func onlyAFileOpenedInsideTheFolderIsKept() async throws {
         let folder = try EmbeddedFilesTests.Folder()
         let root = folder.root.url
-        let outside = try #require(FolderFiles.realPath(of: folder.outside.url)).appending(path: "secret.png")
+        let outside = try #require(OpenFile.realPath(of: folder.outside.url)).appending(path: "secret.png")
         #expect(await OpenFile.open(outside, inside: root) == nil, "a file outside the folder, reached by no link")
-        let real = try #require(FolderFiles.realPath(of: root))
+        let real = try #require(OpenFile.realPath(of: root))
         #expect(await OpenFile.open(real.appending(path: ".marfa/Secret.png"), inside: root) == nil, "a hidden folder")
         #expect(await OpenFile.open(real.appending(path: "Attachments"), inside: root) == nil, "a folder")
         let opened = try #require(await OpenFile.open(real.appending(path: "Attachments/Photo.png"), inside: root))
@@ -150,12 +150,11 @@ struct EmbeddedFilesSafetyTests {
 
     @Test func aPipeIsNeverOpenedForReading() async throws {
         let folder = try EmbeddedFilesTests.Folder()
-        let real = try #require(FolderFiles.realPath(of: folder.root.url))
+        let real = try #require(OpenFile.realPath(of: folder.root.url))
         let pipe = real.appending(path: "Attachments/Pipe.png")
         try #require(mkfifo(pipe.path, 0o644) == 0)
         let started = ContinuousClock.now
         #expect(await OpenFile.open(pipe, inside: folder.root.url) == nil)
         #expect(ContinuousClock.now - started < .seconds(1))
-        #expect(await folder.library.embeddedFile(.name("Pipe.png"), in: folder.note.id) == nil)
     }
 }

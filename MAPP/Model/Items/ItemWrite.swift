@@ -8,7 +8,6 @@ nonisolated struct ItemDraft: Hashable, Sendable {
     var tags: Set<String> = []
     /// Nil leaves the tier to the source.
     var tier: Tier?
-    var container: ContainerID?
     var parent: ItemID?
 }
 
@@ -30,13 +29,6 @@ nonisolated enum BodyMerge: Hashable, Sendable {
     case following
 }
 
-nonisolated enum PlaceWrite: Hashable, Sendable {
-    case createFolder(ItemID, name: String)
-    case rename(PlaceID, to: String)
-    case delete(PlaceID)
-    case reorder([PlaceID])
-}
-
 nonisolated enum ItemWrite: Hashable, Sendable {
     /// The app mints the id, so it can name the item before the source answers.
     case create(id: ItemID, ItemDraft)
@@ -46,7 +38,6 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     case retype(ItemID, TypeID, base: ItemVersion)
     /// Marfa moves a row's tier as an update, which carries the version it read.
     case retier(ItemID, Tier, base: ItemVersion)
-    case move(ItemID, to: ContainerID?)
     case transition(ItemID, ItemState)
     /// Sent at the version the person was shown, so an item changed elsewhere since is refused rather than erased.
     case purge(ItemID, version: ItemVersion)
@@ -56,5 +47,4 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     /// Replaces one end of an edge in one write, so the end that stays never holds no edge or two. Only an edge
     /// whose staying end holds one edge of its type can move.
     case moveEdge(EdgeID, end: EdgeTypeInfo.End, to: ItemID)
-    case place(PlaceWrite)
 }

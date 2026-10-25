@@ -9,7 +9,7 @@ final class ItemToolbarTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 5))
@@ -90,7 +90,7 @@ final class ItemToolbarTests: XCTestCase {
 
     func testMoreHoldsTheItemActionsInOrder() {
         control("MoreToolbar").click()
-        let titles = ["Open in New Window", "Share…", "Add to Favorites", "Move To", "Add Attachment…", "Rename…",
+        let titles = ["Open in New Window", "Share…", "Add to Favorites", "Add Attachment…",
                       "Page Width", "Show Markdown Source", "Print…", "Export as PDF…", "Delete"]
         var previous = -CGFloat.infinity
         for title in titles {

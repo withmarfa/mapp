@@ -19,13 +19,12 @@ nonisolated final class FakeEmbeds: EmbedResolver {
 
 /// A source the test drives: it tells its one reader the changes the test sends, answers bodies and searches
 /// from what the test gives it, and keeps every write it is handed without applying any.
-nonisolated final class FakeItemSource: ConnectedItemSource {
+nonisolated final class FakeItemSource: ItemSource {
     nonisolated struct Submitted: Hashable, Sendable {
         let write: ItemWrite
         let id: WriteID
     }
 
-    let offered = Mutex<SourceCapabilities>([.archive])
     let attaching = FakeEmbeds()
     var embeds: any EmbedResolver { attaching }
     let state = Latest(MarfaConnectionState.connecting)
@@ -39,7 +38,6 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
     let queuing = Mutex(false)
     let isClosed = Mutex(false)
-    let ended = Mutex<[ItemID]>([])
     private let held = Mutex<[ItemID: ItemBody]>([:])
     private let written = Mutex<[Submitted]>([])
     private let stream: AsyncStream<SourceChange>
@@ -49,7 +47,6 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
         (stream, continuation) = AsyncStream<SourceChange>.makeStream()
     }
 
-    var capabilities: SourceCapabilities { offered.withLock { $0 } }
     var submitted: [Submitted] { written.withLock { $0 } }
     var writes: [ItemWrite] { submitted.map(\.write) }
 
@@ -103,10 +100,6 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
         return hits.withLock { $0[text] ?? [] }
     }
 
-    func endEditing(_ item: ItemID) {
-        ended.withLock { $0.append(item) }
-    }
-
     func queueSubmitted() async {
         while queuing.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
         queues.withLock { $0 += 1 }
@@ -115,5 +108,14 @@ nonisolated final class FakeItemSource: ConnectedItemSource {
     func close() async {
         isClosed.withLock { $0 = true }
         continuation.finish()
+    }
+
+    func refresh() {}
+    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck { .accepted }
+    func unsentWrites() async -> UnsentWrites? { nil }
+
+    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+        await close()
+        return .closed
     }
 }

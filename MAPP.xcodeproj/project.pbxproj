@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		331000013066ED47005D07A2 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = 331000023066ED47005D07A2 /* Yams */; };
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
+		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,8 +76,8 @@
 		3303FCF63066ED46005D07A2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
-				331000013066ED47005D07A2 /* Yams in Frameworks */,
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
+				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
 			);
 		};
 		3303FE043066ED47005D07A2 /* Frameworks */ = {
@@ -140,8 +140,8 @@
 			);
 			name = MAPP;
 			packageProductDependencies = (
-				331000023066ED47005D07A2 /* Yams */,
 				331000053066ED47005D07A2 /* Marfa */,
+				331000083066ED47005D07A2 /* MarfaTesting */,
 			);
 			productName = MAPP;
 			productReference = 3303FCF93066ED46005D07A2 /* MAPP.app */;
@@ -224,7 +224,6 @@
 			mainGroup = 3303FCF03066ED46005D07A2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				331000033066ED47005D07A2 /* XCRemoteSwiftPackageReference "Yams" */,
 				331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -584,14 +583,6 @@
 		};
 /* End XCConfigurationList section */
 /* Begin XCRemoteSwiftPackageReference section */
-		331000033066ED47005D07A2 /* XCRemoteSwiftPackageReference "Yams" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/jpsim/Yams.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 6.2.2;
-			};
-		};
 		331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
@@ -603,15 +594,15 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		331000023066ED47005D07A2 /* Yams */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 331000033066ED47005D07A2 /* XCRemoteSwiftPackageReference "Yams" */;
-			productName = Yams;
-		};
 		331000053066ED47005D07A2 /* Marfa */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = Marfa;
+		};
+		331000083066ED47005D07A2 /* MarfaTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaTesting;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

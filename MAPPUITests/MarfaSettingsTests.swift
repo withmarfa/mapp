@@ -1,7 +1,7 @@
 import XCTest
 
-/// The Marfa server section of Settings > Library. The sample folder's app has a host of its own, on a Keychain held in memory, so
-/// nothing here reaches the person's saved server or keys; the steps used need no server, since an address that
+/// The Marfa server section of Settings > Library, starting as a first launch does. The sample's app has a host of its own, on a
+/// Keychain held in memory, so nothing here reaches the person's saved server or keys; the steps used need no server, since an address that
 /// is no server is refused before anything is asked of the network.
 @MainActor
 final class MarfaSettingsTests: XCTestCase {
@@ -12,7 +12,7 @@ final class MarfaSettingsTests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleFolder"]
+        app.launchArguments += ["-ApplePersistenceIgnoreState", "YES", "-MAPPSampleLibrary", "-MAPPSampleUnconfigured"]
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
     }
@@ -70,10 +70,15 @@ final class MarfaSettingsTests: XCTestCase {
         attachScreenshot("SettingsMarfaNotAServer")
     }
 
-    func testNothingAboutTheServerShowsInTheWindowWhileTheAppReadsAFolder() {
-        XCTAssertTrue(window.outlines["Sidebar"].waitForExistence(timeout: 3))
+    func testWithNoServerTheWindowAsksToConnectAndShowsNoSync() {
+        let welcome = window.descendants(matching: .any)["Welcome"].firstMatch
+        XCTAssertTrue(welcome.waitForExistence(timeout: 3))
+        XCTAssertFalse(window.outlines["Sidebar"].exists)
         XCTAssertFalse(window.buttons["SyncStatus"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncDetails"].exists)
+        window.buttons["WelcomeConnect"].click()
+        XCTAssertTrue(address.waitForExistence(timeout: 3), "Connect opens the page that asks for the server")
+        attachScreenshot("WelcomeConnect")
     }
 
     private func attachScreenshot(_ name: String) {

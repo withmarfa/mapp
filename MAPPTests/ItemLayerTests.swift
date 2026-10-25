@@ -29,12 +29,11 @@ struct ItemLayerTests {
     }
 
     private static func item(
-        _ type: TypeID = note, state: ItemState = .active, tier: Tier = .library, container: ContainerID? = nil,
-        tags: Set<String> = []
+        _ type: TypeID = note, state: ItemState = .active, tier: Tier = .library, tags: Set<String> = []
     ) -> Item {
         Item(
             id: .mint(), type: type, title: "Title", titleRule: .firstLine, state: state, tier: tier,
-            container: container, tags: tags, version: ItemVersion(1), created: .now, modified: .now)
+            tags: tags, version: ItemVersion(1), created: .now, modified: .now)
     }
 
     // MARK: Catalogue
@@ -104,15 +103,10 @@ struct ItemLayerTests {
         #expect(!query.matches(Self.item(tags: [ItemTag.favorite]), catalogue: Self.catalogue))
     }
 
-    @Test func theInboxOfEachSourceTakesItsOwnItems() {
-        let folder = ContainerID("folder")
-        let filesInbox = ItemQuery(container: .root)
-        #expect(filesInbox.matches(Self.item(), catalogue: Self.catalogue))
-        #expect(!filesInbox.matches(Self.item(container: folder), catalogue: Self.catalogue))
-        #expect(ItemQuery(container: .container(folder)).matches(Self.item(container: folder), catalogue: Self.catalogue))
-        let marfaInbox = ItemQuery(tier: .feed)
-        #expect(marfaInbox.matches(Self.item(tier: .feed), catalogue: Self.catalogue))
-        #expect(!marfaInbox.matches(Self.item(), catalogue: Self.catalogue))
+    @Test func theInboxTakesFeedItems() {
+        let inbox = ItemQuery(tier: .feed)
+        #expect(inbox.matches(Self.item(tier: .feed), catalogue: Self.catalogue))
+        #expect(!inbox.matches(Self.item(), catalogue: Self.catalogue))
     }
 
     @Test func beneathTakesTheItemAndTheDescendantsGiven() {
@@ -135,25 +129,6 @@ struct ItemLayerTests {
         let data = try JSONEncoder().encode([id])
         #expect(String(decoding: data, as: UTF8.self) == #"["0198f2c4-7d1e-7a00-8000-000000000001"]"#)
         #expect(try JSONDecoder().decode([ItemID].self, from: data) == [id])
-    }
-
-    @Test(arguments: [
-        PlaceID.inbox, .all, .favorites, .archive, .recentlyDeleted,
-        .type(TypeID("core.note")), .folder(ItemID("folder"))
-    ])
-    func aPlaceSurvivesEncoding(place: PlaceID) throws {
-        let data = try JSONEncoder().encode(place)
-        #expect(try JSONDecoder().decode(PlaceID.self, from: data) == place)
-    }
-
-    @Test func aDropWritesOnlyWhatWouldChange() {
-        let folder = ContainerID("folder")
-        let item = Self.item(container: folder, tags: [ItemTag.favorite])
-        #expect(DropAction.move(to: folder).write(for: item) == nil)
-        #expect(DropAction.move(to: nil).write(for: item) == .move(item.id, to: nil))
-        #expect(DropAction.tag(ItemTag.favorite).write(for: item) == nil)
-        #expect(DropAction.retier(.feed).write(for: item) == .retier(item.id, .feed, base: item.version))
-        #expect(DropAction.transition(.trashed).write(for: item) == .transition(item.id, .trashed))
     }
 
     // MARK: Outcomes
