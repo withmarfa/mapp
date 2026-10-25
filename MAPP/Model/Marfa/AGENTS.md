@@ -53,6 +53,7 @@
 ## Text and versions
 
 - Every save names the version of the text it was typed on. Only the first save typed on a version is merged against it (`BodyMerge.asRead`); later saves follow the person's own (`.following`). So a person's saves never conflict with each other and never overwrite text they did not see. Do not replace this with last-writer-wins.
+- Text read on this device's own create before the server answered it is at version 0, which no server holds. Once the copy holds the answer, an edit typed on that text is sent on version 1 (`MarfaEngine.version(read:holding:)`), never on the version the copy holds, so a change another device made since is merged, not overwritten.
 - An answer counts toward that version only once the version it needs can be read; until then it stays in the queue.
 - `MarfaLibrary` holds the text the person typed until the source answers it, since a read that raced the write would be older.
 - Undo registers the writes that put back what changed, made at the version current when Undo runs.

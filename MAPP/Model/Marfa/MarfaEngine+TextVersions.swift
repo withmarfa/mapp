@@ -34,10 +34,10 @@ extension MarfaEngine {
         }
     }
 
-    /// The version text read at `read` stands at once the copy holds `held`. A page that opens a note as soon as it
-    /// is made reads this device's own create before the server answers it, at version 0, which no server holds
-    /// (`device/version-local-create`); once answered, that text is version 1 (`versions/create-version-one`), so an
-    /// edit typed on it goes on version 1, where an edit sent on 0 would be refused.
+    /// The version that text read at `read` is on, now that the copy holds `held`. A page that opens a note as soon
+    /// as it is made can read this device's own create before the server answers it, at version 0, which no server
+    /// holds (`device/version-local-create`). Once the copy holds the answer, that text is version 1
+    /// (`versions/create-version-one`), so an edit typed on it is sent on version 1; sent on 0, it would be refused.
     nonisolated static func version(read: Int64, holding held: Int64) -> Int64 {
         read == 0 && held > 0 ? 1 : read
     }
