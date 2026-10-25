@@ -52,9 +52,4 @@ nonisolated struct MarfaStoreLocation: Hashable, Sendable {
     func store(for connection: MarfaConnection) -> URL {
         directory(for: connection).appending(path: "copy.sqlite", directoryHint: .notDirectory)
     }
-
-    /// Kept beside the store, which forgets the budget when it is replaced.
-    func downloadBudget(for connection: MarfaConnection) -> DownloadBudgetRecord {
-        DownloadBudgetRecord(url: directory(for: connection).appending(path: "download-budget.json", directoryHint: .notDirectory))
-    }
 }

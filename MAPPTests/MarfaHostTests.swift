@@ -241,22 +241,34 @@ nonisolated final class TestKeyStore: KeyStore {
         let switched = "http://plain-\(UUID().uuidString.lowercased()).test"
         let host = try HostBench().host()
         try await host.connect(address: address, key: "k")
-        #expect(host.plainHTTPNotice?.origin == address)
-        host.plainHTTPNotice = nil
+        #expect(host.plainHTTPNotices.map(\.origin) == [address])
+        #expect(host.takePlainHTTPNotice()?.origin == address)
 
         try await host.changeAddress(to: switched, key: "k")
-        #expect(host.plainHTTPNotice?.origin == switched)
+        #expect(host.takePlainHTTPNotice()?.origin == switched)
 
         let again = try HostBench().host()
         try await again.connect(address: address, key: "k")
-        #expect(again.plainHTTPNotice == nil)
+        #expect(again.plainHTTPNotices.isEmpty)
+    }
+
+    @Test func aNoticeStillWaitingIsNotReplacedByTheNext() async throws {
+        let first = "http://plain-\(UUID().uuidString.lowercased()).test:8210"
+        let second = "http://plain-\(UUID().uuidString.lowercased()).test"
+        let host = try HostBench().host()
+        try await host.connect(address: first, key: "k")
+        try await host.changeAddress(to: second, key: "k")
+        #expect(host.plainHTTPNotices.map(\.origin) == [first, second])
+        #expect(host.takePlainHTTPNotice()?.origin == first)
+        #expect(host.takePlainHTTPNotice()?.origin == second)
+        #expect(host.takePlainHTTPNotice() == nil)
     }
 
     @Test func thisMachineAndHTTPSAreNotTold() async throws {
         for address in ["http://localhost:8210", "http://127.0.0.1:8210", "http://[::1]:8210", "https://\(UUID().uuidString.lowercased()).test"] {
             let host = try HostBench().host()
             try await host.connect(address: address, key: "k")
-            #expect(host.plainHTTPNotice == nil, "\(address)")
+            #expect(host.plainHTTPNotices.isEmpty, "\(address)")
         }
     }
 

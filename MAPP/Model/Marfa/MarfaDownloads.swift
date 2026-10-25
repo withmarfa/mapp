@@ -19,21 +19,6 @@ nonisolated extension DownloadBudget {
     }
 }
 
-/// The download budget the person chose, so a copy replaced for a new version of the app keeps it.
-nonisolated struct DownloadBudgetRecord: Sendable {
-    let url: URL
-
-    /// Nil where none was kept or it can't be read, which leaves the copy's default.
-    func read() -> DownloadBudget? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(DownloadBudget.self, from: data)
-    }
-
-    func write(_ budget: DownloadBudget) throws {
-        try JSONEncoder().encode(budget).write(to: url, options: .atomic)
-    }
-}
-
 nonisolated extension MissingAttachments {
     init(reason: NotHeldReason, count: UInt64) {
         self.count = count
@@ -73,11 +58,8 @@ actor MarfaDownloads: DownloadedFiles {
     func whenRemoving(_ hook: (@Sendable () async -> Void)?) { removing = hook }
     #endif
 
-    private let record: DownloadBudgetRecord?
-
-    init(copy: WorkingCopy, record: DownloadBudgetRecord? = nil) {
+    init(copy: WorkingCopy) {
         self.copy = copy
-        self.record = record
     }
 
     func read() async throws -> DownloadedFileState {
@@ -90,9 +72,6 @@ actor MarfaDownloads: DownloadedFiles {
         changing = true
         defer { finished() }
         _ = try await copy.blobs.setBudget(budget.marfa)
-        // The copy holds the budget. The record matters only when the copy is replaced, since the new one starts
-        // at Automatic.
-        try? record?.write(budget)
     }
 
     func removeDownloadedFiles() async throws {

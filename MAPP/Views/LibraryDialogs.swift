@@ -30,7 +30,8 @@ private struct PlainHTTPAlert: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: host.plainHTTPNotice, initial: true, take)
+            .onChange(of: host.plainHTTPNotices, initial: true, take)
+            .onChange(of: shown, take)
             .onChange(of: appearsActive, take)
             .alert(
                 Words.plainHTTPTitle,
@@ -43,8 +44,7 @@ private struct PlainHTTPAlert: ViewModifier {
     }
 
     private func take() {
-        guard appearsActive, let notice = host.plainHTTPNotice else { return }
-        host.plainHTTPNotice = nil
+        guard appearsActive, shown == nil, let notice = host.takePlainHTTPNotice() else { return }
         shown = notice
     }
 }

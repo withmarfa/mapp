@@ -61,10 +61,10 @@ nonisolated final class MarfaSource: ItemSource {
     let engine: MarfaEngine
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    init(copy: WorkingCopy, connection: MarfaConnection, budget: DownloadBudgetRecord? = nil,
+    init(copy: WorkingCopy, connection: MarfaConnection,
          reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil) {
         self.copy = copy
-        let downloads = MarfaDownloads(copy: copy, record: budget)
+        let downloads = MarfaDownloads(copy: copy)
         downloadedFiles = downloads
         self.connection = connection
         let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
@@ -86,10 +86,9 @@ nonisolated final class MarfaSource: ItemSource {
             throw SourceFailure(kind: .denied, message: String(localized: "There’s no key for this Marfa server."))
         }
         try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
-        let budget = location.downloadBudget(for: connection)
         let copy: WorkingCopy
         do {
-            copy = try await openCopy(connection, key: key, location: location, budget: budget)
+            copy = try await openCopy(connection, key: key, location: location)
         } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
             throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
         } catch MarfaError.readingHandle {
@@ -102,7 +101,7 @@ nonisolated final class MarfaSource: ItemSource {
             await copy.close()
             throw SourceFailure(kind: .inUse, message: Words.inUse)
         }
-        let source = MarfaSource(copy: copy, connection: connection, budget: budget)
+        let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
     }
@@ -113,16 +112,14 @@ nonisolated final class MarfaSource: ItemSource {
     /// The package refuses the replacement while another process writes the copy or a change arrives in it. With
     /// any changes, or where the count can't be read, only that version can send them, and the person is told.
     private static func openCopy(
-        _ connection: MarfaConnection, key: String, location: MarfaStoreLocation, budget: DownloadBudgetRecord
+        _ connection: MarfaConnection, key: String, location: MarfaStoreLocation
     ) async throws -> WorkingCopy {
         let store = location.store(for: connection)
         do {
             return try await WorkingCopy.open(store: store, server: connection.server(key: key))
         } catch MarfaError.wrongSchema(_, _, 0?, _) {
             do {
-                // The new copy starts with the default budget, so the person's choice is set again.
-                return try await WorkingCopy.replaceRefused(
-                    store: store, server: connection.server(key: key), fileBudget: budget.read()?.marfa)
+                return try await WorkingCopy.replaceRefused(store: store, server: connection.server(key: key))
             } catch let error as MarfaError {
                 switch error {
                 case .wrongSchema, .readingHandle: throw error

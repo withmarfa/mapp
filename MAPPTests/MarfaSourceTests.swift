@@ -212,7 +212,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// With nothing the server has not taken, a copy is only what the server holds, so it is made again. The
-    /// files it downloaded stay, and so does the download budget the person chose, which the new copy forgets.
+    /// files it downloaded stay.
     @Test(.timeLimit(.minutes(1)))
     func aCopyADifferentVersionMadeWithNothingUnsentIsMadeAgainKeepingItsFiles() async throws {
         let root = scratch()
@@ -224,7 +224,6 @@ struct MarfaSourceOfflineTests {
         let file = root.appending(path: "kept.txt")
         try Data("kept bytes".utf8).write(to: file)
         let hash = try #require(try await source.copy.blobs.put(file: file).blob)
-        try await #require(source.downloadedFiles).setBudget(.bytes(12_345))
         await source.close()
         let store = location.store(for: connection)
         // The upload is the only write, and it is dropped so the copy holds nothing unsent.
@@ -235,7 +234,6 @@ struct MarfaSourceOfflineTests {
         let reopened = try await MarfaSource.open(connection, keys: keys, location: location)
         #expect(try Self.inode(store) != before)
         #expect(try await reopened.copy.blobs.isHeld(hash))
-        #expect(try await DownloadBudget(reopened.copy.blobs.cache().setting) == .bytes(12_345))
         let log = ChangeLog(reopened)
         _ = try #require(await log.wait { $0.snapshot != nil })
         await reopened.close()
