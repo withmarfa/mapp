@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Search in a toolbar, as Mail keeps its own beside the list's buttons: a magnifying glass until it is clicked,
@@ -75,6 +76,10 @@ struct ColumnSearchField: View {
     let onDown: () -> Void
     let onEnd: () -> Void
     @FocusState private var isFocused: Bool
+    /// Kept per field, so the toolbar re-placing an open field (full screen, Customize Toolbar, overflow) does not
+    /// hand it the keyboard again.
+    @State private var hasTakenFocus = false
+    @State private var keys = SearchFieldKeys()
 
     var body: some View {
         HStack(spacing: 6) {
@@ -89,10 +94,12 @@ struct ColumnSearchField: View {
                 .tint(.secondary)
                 .accessibilityIdentifier("ColumnSearch")
                 .onSubmit(onSubmit)
-                .onKeyPress(.downArrow) { onDown(); return .handled }
-                .onKeyPress(.escape) { onEnd(); return .handled }
             if !text.isEmpty {
-                Button("Clear Search", systemImage: "xmark.circle.fill") { text = "" }
+                Button("Clear Search", systemImage: "xmark.circle.fill") {
+                    text = ""
+                    // The button took the keyboard; without it back in the field, leaving the field would not collapse it.
+                    isFocused = true
+                }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -100,12 +107,59 @@ struct ColumnSearchField: View {
             }
         }
         .padding(.horizontal, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ColumnSearchField")
         .onAppear {
+            guard !hasTakenFocus else { return }
+            hasTakenFocus = true
             // The toolbar places the field once this returns; asked any sooner, the window keeps the keyboard where it was.
             DispatchQueue.main.async { isFocused = true }
         }
         .onChange(of: focusRequests) { isFocused = true }
-        // Left empty, the field goes back to being a button.
-        .onChange(of: isFocused) { if !isFocused, text.isEmpty { onEnd() } }
+        .onChange(of: isFocused) {
+            if isFocused {
+                keys.start(onDown: onDown, onEscape: onEnd)
+            } else {
+                keys.stop()
+                // Left empty, the field goes back to being a button.
+                if text.isEmpty { onEnd() }
+            }
+        }
+        .onDisappear { keys.stop() }
     }
+}
+
+/// Down Arrow and Escape while the search field is being edited. The field editor handles both before SwiftUI's
+/// key-press handlers see them (Apple documents `onKeyPress` only as running "while the view has focus", not for a
+/// macOS text field's editor), so a local monitor takes them first. It runs only while the field has the keyboard,
+/// and leaves Escape to an input method that is composing text.
+@MainActor
+private final class SearchFieldKeys {
+    private var monitor: Any?
+
+    func start(onDown: @escaping () -> Void, onEscape: @escaping () -> Void) {
+        stop()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { received in
+            // AppKit delivers local monitors on the main thread.
+            nonisolated(unsafe) let event = received
+            let consumed = MainActor.assumeIsolated {
+                let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+                guard modifiers.isEmpty else { return false }
+                if let editor = event.window?.firstResponder as? NSTextView, editor.hasMarkedText() { return false }
+                switch event.keyCode {
+                case 125: onDown(); return true
+                case 53: onEscape(); return true
+                default: return false
+                }
+            }
+            return consumed ? nil : received
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    deinit { MainActor.assumeIsolated { stop() } }
 }
