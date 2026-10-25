@@ -57,13 +57,18 @@ struct SidebarFootRow: View {
             .accessibilityIdentifier("SidebarLibrary")
             if let dot { statusDot(dot) }
             Spacer(minLength: 0)
-            if hasConsole {
-                iconButton("Console", symbol: "person.crop.circle", id: "SidebarConsole", action: openConsole)
+            HStack(spacing: 0) {
+                if hasConsole {
+                    iconButton("Console", symbol: "person.crop.circle", id: "SidebarConsole", action: openConsole)
+                }
+                iconButton("Settings", symbol: "gearshape", id: "SidebarOpenSettings", action: openSettings)
+                iconButton("Recently Deleted", symbol: "trash", id: "SidebarRecentlyDeleted", action: openRecentlyDeleted)
             }
-            iconButton("Settings", symbol: "gearshape", id: "SidebarOpenSettings", action: openSettings)
-            iconButton("Recently Deleted", symbol: "trash", id: "SidebarRecentlyDeleted", action: openRecentlyDeleted)
         }
-        .padding(.horizontal, 20)
+        // The buttons' frames are wider than their symbols, so the trailing edge is shorter to line the last
+        // symbol up with the rows' counts.
+        .padding(.leading, 20)
+        .padding(.trailing, 14)
         .padding(.vertical, 10)
         .accessibilityElement(children: .contain)
     }
@@ -81,10 +86,12 @@ struct SidebarFootRow: View {
 
     private func iconButton(_ title: LocalizedStringKey, symbol: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
+            // The size of the sidebar rows' symbols, which a sidebar list draws large.
             Image(systemName: symbol)
-                .interfaceFont(.callout)
+                .interfaceFont(.body)
+                .imageScale(.large)
                 .foregroundStyle(.secondary)
-                .frame(width: 24, height: 24, alignment: .center)
+                .frame(width: 28, height: 24, alignment: .center)
                 .contentShape(.rect)
         }
         .buttonStyle(.borderless)
