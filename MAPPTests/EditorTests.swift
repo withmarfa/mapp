@@ -85,7 +85,13 @@ struct EditorTests {
 
     """
 
+    /// A panel that takes the keyboard without activating the app, transparent like `TestWindow`.
     private final class ReadingPanel: NSPanel {
+        override init(contentRect: NSRect, styleMask: NSWindow.StyleMask, backing: NSWindow.BackingStoreType, defer flag: Bool) {
+            super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
+            alphaValue = 0
+        }
+
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
     }

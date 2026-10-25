@@ -1,6 +1,34 @@
 import SwiftUI
 
 @main
+enum Launch {
+    static func main() {
+        #if DEBUG
+        if TestHost.isRequested {
+            TestHost.run()
+            return
+        }
+        #endif
+        MAPPApp.main()
+    }
+}
+
+#if DEBUG
+/// The app as the unit tests' host: a running `NSApplication` for the tests to use, with no scene, no library and
+/// no delegate. The scheme tests the Debug Tests configuration, whose app is background-only (`LSBackgroundOnly`),
+/// so a test run shows no Dock icon and never takes the keyboard from the person.
+enum TestHost {
+    static var isRequested: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil || environment["XCTestBundlePath"] != nil
+    }
+
+    static func run() {
+        NSApplication.shared.run()
+    }
+}
+#endif
+
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()

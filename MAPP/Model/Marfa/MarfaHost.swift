@@ -75,8 +75,8 @@ import Observation
     private static let namesKey = "MarfaInstanceNames"
 
     private let defaults: UserDefaults
-    private let keys: any KeyStore
-    private let location: MarfaStoreLocation
+    let keys: any KeyStore
+    let location: MarfaStoreLocation
     private let opener: Opener
     private let describer: Describer
 
