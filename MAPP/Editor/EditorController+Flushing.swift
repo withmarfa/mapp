@@ -76,7 +76,7 @@ extension EditorController {
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
     private func tellNotSaved(_ noteID: ItemID, reason: String) {
         let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
-        library?.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
+        library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
     }
 
     static let flushLimit = Duration.seconds(2)
@@ -91,7 +91,7 @@ extension EditorController {
     static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
-        // One refusal is told, from the window that holds it, which the library's single failure can carry.
+        // One refusal is told, from the window that holds it, since that window comes forward and only one can.
         var told = false
         for editor in editors {
             guard editor.saveTitles(tellingRefusal: leaving && !told) || !leaving else {
@@ -149,7 +149,7 @@ extension EditorController {
             let message = refused.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? String(localized: "The title for “\(refused.item)” is empty. Open the item to enter a title or discard your changes.")
                 : String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes.")
-            library.failure = (String(localized: "Couldn’t Save Title"), message)
+            library.notices.tell(String(localized: "Couldn’t Save Title"), message)
             // The draft is shown only in its own window, so that window comes forward with the item.
             webView.window?.makeKeyAndOrderFront(nil)
             onShowRefusedTitle(refused.id)

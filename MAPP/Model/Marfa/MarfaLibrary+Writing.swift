@@ -12,14 +12,14 @@ extension MarfaLibrary {
         let title = NoteName.trimmed(title)
         let cantCreate = String(localized: "Can’t Create Item")
         guard catalogue.itemTypes[type] != nil, !title.isEmpty else {
-            failure = (cantCreate, String(localized: "Choose a kind of item and give it a title."))
+            notices.tell(cantCreate, String(localized: "Choose a kind of item and give it a title."))
             return nil
         }
         let id = ItemID.mint(at: now())
         if let parentID {
             let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parentID, target: id)
             if let problem = linkProblem(draft, sourceType: item(parentID)?.type, targetType: type) {
-                failure = (cantCreate, problem)
+                notices.tell(cantCreate, problem)
                 return nil
             }
         }
@@ -29,7 +29,7 @@ extension MarfaLibrary {
         do {
             _ = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
         } catch {
-            failure = (cantCreate, error.problem.message ?? cantCreate)
+            notices.tell(cantCreate, error.problem.message ?? cantCreate)
             return nil
         }
         submitCreate(id, draft, failing: cantCreate)
@@ -44,12 +44,12 @@ extension MarfaLibrary {
 
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         // A page can hand over text for an item another device purged meanwhile, which no queue takes.
-        guard let item = item(id) else { return notKept(String(localized: "Couldn’t Save Note"), text: body, reason: Self.cantChange) }
+        guard let item = item(id) else { return notices.notKept(String(localized: "Couldn’t Save Note"), text: body, reason: Self.cantChange) }
         guard self.body(of: id)?.text != body else { return }
         let title = String(localized: "Couldn’t Save “\(item.title)”")
         // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
         // could not read, is kept nowhere, so the person gets the text back.
-        guard item.isWritable else { return notKept(title, text: body, reason: Self.cantChange) }
+        guard item.isWritable else { return notices.notKept(title, text: body, reason: Self.cantChange) }
         saveText(body, of: id, readAt: readAt, failing: title)
     }
 
@@ -73,7 +73,7 @@ extension MarfaLibrary {
         var key = key
         if key == "title" || item.titleRule == .property(key) {
             guard case .property(let field) = item.titleRule else {
-                failure = (cantEdit, String(localized: "This item’s title is the first line of its text."))
+                notices.tell(cantEdit, String(localized: "This item’s title is the first line of its text."))
                 return false
             }
             guard let title = value?.string.map(NoteName.trimmed), !title.isEmpty else { return false }
@@ -85,7 +85,7 @@ extension MarfaLibrary {
             let field = type.fields.first(where: { $0.key == key })
         else { return false }
         if let value, !field.kind.accepts(value) {
-            failure = (
+            notices.tell(
                 String(localized: "Invalid Property"), String(localized: "The value does not match this property's type.")
             )
             return false
@@ -166,7 +166,7 @@ extension MarfaLibrary {
     func deletePermanently(_ ids: Set<ItemID>) {
         notesToPurge.subtract(ids)
         guard canPurge else {
-            failure = (
+            notices.tell(
                 String(localized: "Can’t Delete Immediately"),
                 String(localized: "The Marfa server can’t be reached. The items are still in Recently Deleted."))
             return

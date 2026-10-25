@@ -109,7 +109,7 @@ extension EditorTests {
         #expect(hidden == true)
         #expect(try await page.markdown() == nil)
         // Resizing the header and the window raises nothing in the page.
-        #expect(page.library.failure == nil)
+        #expect(page.library.notices.newest == nil)
     }
 
     @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
@@ -145,7 +145,7 @@ extension EditorTests {
             try await page.frames()
         }
         #expect(page.changes.isEmpty)
-        #expect(page.library.failure == nil)
+        #expect(page.library.notices.newest == nil)
     }
 
     @Test func anUpdateForTheItemJustLeftCannotReloadIt() async throws {

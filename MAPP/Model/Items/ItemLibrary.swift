@@ -11,8 +11,8 @@ protocol ItemLibrary: AnyObject, Observable {
 
     /// Whether the items have been read, so a window restores what it showed only once there is something to find.
     var isLoaded: Bool { get }
-    /// Something the library could not do, to tell the person; the window in front takes it and clears it.
-    var failure: (title: String, message: String)? { get set }
+    /// Where the library tells the person what it could not do or keep.
+    var notices: Notices { get }
     /// Items a person has asked to erase for good, until a window asks them to confirm.
     var notesToPurge: Set<ItemID> { get set }
     var catalogue: Catalogue { get }
@@ -69,7 +69,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // MARK: Writing
 
-    /// Nil when the item cannot be made, for which `failure` says why.
+    /// Nil when the item cannot be made, and the library tells the person why.
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID?
@@ -77,8 +77,6 @@ protocol ItemLibrary: AnyObject, Observable {
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion)
-    /// Tells the person that `text` was not kept, with `reason` where there is one, and puts it on the clipboard.
-    func notKept(_ title: String, text: String?, reason: String?)
     /// Every note being written is left and every change handed over, as the app quits or the library changes:
     /// returns once each is kept on this Mac, never waiting on a server.
     func finish() async
@@ -129,7 +127,7 @@ extension ItemLibrary {
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
         guard canPurge else {
-            failure = (
+            notices.tell(
                 String(localized: "Can’t Delete Immediately"),
                 String(localized: "Notes can’t be deleted immediately right now. They’re still in Recently Deleted."))
             return

@@ -78,7 +78,7 @@ import Testing
         let (library, source) = try await loaded()
         #expect(library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.p2], undoManager: nil))
         #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)], "replacement sent as \(source.writes)")
-        #expect(library.failure == nil)
+        #expect(library.notices.newest == nil)
     }
 
     /// Choosing one item in place of another on a field that holds many adds the new link first and removes the old
@@ -89,7 +89,7 @@ import Testing
         #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
-        #expect(await eventually { library.failure != nil })
+        #expect(await eventually { library.notices.newest != nil })
         // Time for an unlink the refusal should not set off.
         try await Task.sleep(for: .milliseconds(200))
         #expect(!source.writes.contains(.unlink(EdgeID("a1"))), "sent \(source.writes)")
@@ -136,7 +136,7 @@ import Testing
         source.inner.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
         _ = library.items(matching: "body")
-        #expect(await eventually { library.failure != nil }, "a search that threw is shown as no results, and nothing says so")
+        #expect(await eventually { library.notices.newest != nil }, "a search that threw is shown as no results, and nothing says so")
         #expect(library.items(matching: "body").isEmpty)
     }
 }
@@ -332,7 +332,7 @@ extension LiveMarfaTests {
                 try await sent(library, source, id, holding: "first edit, second edit")
                 let held = try await source.body(of: id).text
                 let problems = conflicts(library, id, token)
-                Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.failure))", named: "Busy.txt")
+                Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.notices.newest))", named: "Busy.txt")
                 #expect(problems.isEmpty, "\(problems)")
                 #expect(held == "first edit, second edit")
             }
@@ -354,7 +354,7 @@ extension LiveMarfaTests {
                 try await sent(library, source, id, holding: text)
                 let held = try await source.body(of: id).text
                 let problems = conflicts(library, id, token)
-                Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.failure))", named: "Typing.txt")
+                Attachment.record("copy holds: \(held)\nproblems: \(problems)\nfailure: \(String(describing: library.notices.newest))", named: "Typing.txt")
                 #expect(problems.isEmpty, "\(problems)")
                 #expect(held == text)
                 #expect(library.body(of: id)?.text == text)
@@ -377,7 +377,7 @@ extension LiveMarfaTests {
                 // Gives the changes the catch-up brought time to reach the library before checking that the item
                 // did not leave the Inbox.
                 try await Task.sleep(for: .seconds(2))
-                Attachment.record("held: \(library.item(id) != nil), tier: \(String(describing: library.item(id)?.tier)), inbox: \(library.items(in: .inbox).count), failure: \(String(describing: library.failure))", named: "Inbox.txt")
+                Attachment.record("held: \(library.item(id) != nil), tier: \(String(describing: library.item(id)?.tier)), inbox: \(library.items(in: .inbox).count), failure: \(String(describing: library.notices.newest))", named: "Inbox.txt")
                 #expect(library.items(in: .inbox).contains { $0.id == id })
             }
         }

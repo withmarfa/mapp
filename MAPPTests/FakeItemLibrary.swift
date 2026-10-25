@@ -9,7 +9,7 @@ final class FakeItemLibrary: ItemLibrary {
     var items: [Item]
     var bodies: [ItemID: String]
     var isLoaded = true
-    var failure: (title: String, message: String)?
+    let notices = Notices()
     var notesToPurge: Set<ItemID> = []
     var catalogue = FakeItemLibrary.testCatalogue
     var canPurge = false
@@ -207,13 +207,6 @@ final class FakeItemLibrary: ItemLibrary {
         bodies[id] = body
         items[index].version = ItemVersion(items[index].version.rawValue + 1)
         items[index].modified = now()
-    }
-
-    /// Every text the library was handed and could not keep, as the person would be told it.
-    private(set) var unkept: [MarfaLibrary.NotKept] = []
-
-    func notKept(_ title: String, text: String?, reason: String?) {
-        unkept.append(MarfaLibrary.NotKept(title: title, text: text, reason: reason))
     }
 
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }

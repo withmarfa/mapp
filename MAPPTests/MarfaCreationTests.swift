@@ -29,7 +29,7 @@ struct MarfaCreationTests {
         }
         #expect(submittedID == id)
         #expect(browser.isAwaitingNewItem)
-        #expect(library.failure == nil)
+        #expect(library.notices.newest == nil)
 
         let properties = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
 
@@ -59,9 +59,9 @@ struct MarfaCreationTests {
         #expect(!undo.canUndo)
         #expect(!browser.isAwaitingNewItem)
         #expect(browser.newItems.isEmpty)
-        #expect(library.failure?.title == String(localized: "Can’t Create Item"))
-        #expect(library.failure?.message.contains("Needed") == true)
-        #expect(library.failure?.message.contains("draft") == false)
+        #expect(library.notices.newest?.title == String(localized: "Can’t Create Item"))
+        #expect(library.notices.newest?.message.contains("Needed") == true)
+        #expect(library.notices.newest?.message.contains("draft") == false)
 
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })

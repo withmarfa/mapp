@@ -41,8 +41,7 @@ struct MAPPApp: App {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
                 .interfaceTextStyle()
-                .unkeptChanges(libraries)
-                .plainHTTPNotice(libraries.host)
+                .notices(libraries.host.notices)
                 .environment(libraries)
                 .environment(libraries.host)
         }
@@ -72,8 +71,7 @@ struct MAPPApp: App {
             }
             .interfaceTextStyle()
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-            .unkeptChanges(libraries)
-            .plainHTTPNotice(libraries.host)
+            .notices(libraries.host.notices)
         }
         .defaultSize(width: 640, height: 720)
     }

@@ -202,7 +202,7 @@ struct EditorTests {
         }
         // The note is still the one being left, so leaving goes ahead.
         #expect(kept)
-        #expect(library.unkept.isEmpty)
+        #expect(library.notices.waiting.isEmpty)
         #expect(captured == ["Pending\n"])
         // Sent as typed on the version before the outside change, so the source keeps both rather than one over the other.
         #expect(library.bodyWrites.contains { $0.text == "Pending\n" && $0.readAt == note.version })
@@ -248,7 +248,7 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
         #expect(!kept)
         #expect(!left)
-        #expect(!page.library.unkept.isEmpty)
+        #expect(!page.library.notices.waiting.isEmpty)
         try await page.run("window.editor.flush = window.savedFlush")
         let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         try await page.load("Replacement\n")
@@ -276,7 +276,7 @@ struct EditorTests {
         try await page.run("window.editor.flush = () => { const end = Date.now() + 4000; while (Date.now() < end) {} }")
         let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
         #expect(!kept)
-        #expect(page.library.unkept.map(\.text) == [nil])
+        #expect(page.library.notices.waiting.map(\.text) == [nil])
         let clock = ContinuousClock()
         let start = clock.now
         let keptAgain = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
@@ -294,7 +294,7 @@ struct EditorTests {
         let replacementItem = try #require(page.library.item(replacement.id))
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         page.editor.select(replacementItem)
-        try await page.wait { !page.library.unkept.isEmpty }
+        try await page.wait { !page.library.notices.waiting.isEmpty }
         #expect(page.editor.noteID == originalID)
 
         page.editor.select(original)
@@ -318,7 +318,7 @@ struct EditorTests {
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         page.editor.close()
         #expect(!page.editor.hasNote)
-        try await page.wait { !page.library.unkept.isEmpty }
+        try await page.wait { !page.library.notices.waiting.isEmpty }
         #expect(page.editor.noteID == id)
         #expect(!page.editor.hasNote)
         let retainedID = try #require(id)
@@ -336,7 +336,7 @@ struct EditorTests {
         try await page.load("```mermaid\nnot a valid diagram [\n```\n")
         // Time for the diagram's failure to reach the app, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(300))
-        #expect(page.library.failure == nil)
+        #expect(page.library.notices.newest == nil)
         #expect(try await page.markdown() == nil)
     }
 
@@ -442,7 +442,7 @@ struct EditorTests {
         try await page.run("window.editor.flush = () => { throw new Error('composition') }")
         let laterRejected = proxy.windowShouldClose(window)
         #expect(!laterRejected)
-        #expect(await eventually { !page.library.unkept.isEmpty })
+        #expect(await eventually { !page.library.notices.waiting.isEmpty })
         proxy.detach()
         #expect(window.delegate === host)
         window.delegate = nil

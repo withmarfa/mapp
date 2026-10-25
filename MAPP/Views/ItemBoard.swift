@@ -188,16 +188,17 @@ struct ItemBoard: View {
             return (id, ItemBoardLayout.move(item, key: key, to: lane, catalogue: library.catalogue))
         }
         guard changes.count == unique.count, !changes.contains(where: { $0.1 == .refused }) else {
-            library.failure = (String(localized: "Can’t Move Items"), String(localized: "This lane isn’t available for every selected item. Check each item’s type and required fields."))
+            library.notices.tell(String(localized: "Can’t Move Items"), String(localized: "This lane isn’t available for every selected item. Check each item’s type and required fields."))
             return
         }
         undoManager?.beginUndoGrouping()
         defer { undoManager?.endUndoGrouping() }
         for (id, change) in changes {
             guard case .set(let value) = change else { continue }
+            let told = library.notices.waiting.count
             guard library.setItemProperty(id, key: key, value: value, undoManager: undoManager) else {
-                if library.failure == nil {
-                    library.failure = (String(localized: "Can’t Move Items"), String(localized: "A change couldn’t be saved. The board shows the values currently held by the library."))
+                if library.notices.waiting.count == told {
+                    library.notices.tell(String(localized: "Can’t Move Items"), String(localized: "A change couldn’t be saved. The board shows the values currently held by the library."))
                 }
                 return
             }

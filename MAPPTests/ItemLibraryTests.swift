@@ -35,9 +35,9 @@ struct ItemLibraryTests {
         let one = follow { _ = library.item(F.n1) }
         source.send(.upserted([item]))
         #expect(await eventually { list() && one() })
-        let failure = follow { _ = library.failure }
-        library.failure = ("Title", "Message")
-        #expect(failure())
+        let notice = follow { _ = library.notices.newest }
+        library.notices.tell("Title", "Message")
+        #expect(notice())
     }
 
     @Test func aReadNotTouchedByAChangeIsLeftAlone() async throws {
@@ -45,10 +45,10 @@ struct ItemLibraryTests {
         var item = try #require(library.item(F.n1))
         item.title = "Changed"
         item.version = ItemVersion(2)
-        let failure = follow { _ = library.failure }
+        let notice = follow { _ = library.notices.newest }
         source.send(.upserted([item]))
         try #require(await eventually { library.item(F.n1)?.title == "Changed" })
-        #expect(!failure())
+        #expect(!notice())
     }
 
     @Test func anEraseConfirmedAfterTheLibraryCanNoLongerEraseLeavesTheItemsAndSaysSo() {
@@ -60,12 +60,12 @@ struct ItemLibraryTests {
         library.canPurge = false
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")
-        #expect(library.failure?.title == "Can’t Delete Immediately")
-        #expect(library.failure?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
-        library.failure = nil
+        #expect(library.notices.newest?.title == "Can’t Delete Immediately")
+        #expect(library.notices.newest?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
+        library.notices.removeAll()
         library.canPurge = true
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) == nil)
-        #expect(library.failure == nil)
+        #expect(library.notices.newest == nil)
     }
 }
