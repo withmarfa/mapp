@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -37,7 +38,7 @@ import Testing
 
     /// A quit while the key and the copy are removed must not leave the address behind, or the next launch opens
     /// the server just left, with its key gone, and says the key was refused.
-    @Test(arguments: [MarfaHost.DisconnectChoice.keepCopy, .discardCopy(nil)])
+    @Test(arguments: [MarfaHost.DisconnectChoice.keepCopy, .discardNothing])
     func leavingAServerForgetsItsAddressBeforeRemovingAnything(choice: MarfaHost.DisconnectChoice) async throws {
         let bench = try HostBench()
         let host = bench.host()

@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -108,6 +109,8 @@ nonisolated final class FakeServers: Sendable {
     /// The name each address gives itself; an address with none cannot be read.
     let names = Mutex<[MarfaConnection: String]>([:])
     let reads = Mutex(0)
+    /// How many writes a new copy's store holds, unsent, as a real one does after the person wrote.
+    let storedWrites = Mutex(0)
 
     var describer: MarfaHost.Describer {
         { connection in
@@ -131,6 +134,15 @@ nonisolated final class FakeServers: Sendable {
                 throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
             }
             try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
+            let store = location.store(for: connection)
+            let stored = self.storedWrites.withLock { $0 }
+            if stored > 0, !FileManager.default.fileExists(atPath: store.path) {
+                let copy = try await WorkingCopy.open(store: store)
+                for index in 0..<stored {
+                    _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("unsent \(index)")]))
+                }
+                await copy.close()
+            }
             let source = FakeMarfaSource(connection: connection)
             self.made.withLock { $0.append(source) }
             return source
@@ -160,6 +172,21 @@ nonisolated final class TestKeyStore: KeyStore {
     }
 }
 
+nonisolated extension MarfaHost.DisconnectChoice {
+    /// A discard of a copy the person was shown nothing waiting in.
+    static var discardNothing: Self { .discardCopy(UnsentWrites(ids: [])) }
+}
+
+/// Leaves the library as a person does: asked what waits, they discard exactly that.
+@MainActor func discardEverything(_ host: MarfaHost) async throws {
+    do {
+        try await host.disconnect()
+    } catch {
+        guard case .changesWaiting(let shown?) = error else { throw error }
+        try await host.disconnect(.discardCopy(shown))
+    }
+}
+
 /// A host on its own defaults, key store and store directory, all removed when the test ends.
 @MainActor final class HostBench {
     let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -180,8 +207,10 @@ nonisolated final class TestKeyStore: KeyStore {
         try? FileManager.default.removeItem(at: root)
     }
 
-    func host(opener: MarfaHost.Opener? = nil) -> MarfaHost {
-        MarfaHost(defaults: defaults, keys: keys, location: location, opener: opener ?? servers.opener, describer: servers.describer)
+    func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
+        MarfaHost(
+            defaults: defaults, keys: keys, location: location, opener: opener ?? servers.opener, describer: servers.describer,
+            remover: remover ?? { try await WorkingCopy.remove(store: $0, unsent: $1) })
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }

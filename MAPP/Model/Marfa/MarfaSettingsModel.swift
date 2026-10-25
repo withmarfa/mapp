@@ -277,10 +277,42 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
                     title: String(localized: "Can’t Open the Library"),
                     message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again."))
             }
+        case .copyKept(let kept, let key):
+            keptNotice(kept, key: key, reached: reached)
+        case .cannotDiscard(let folder):
+            Notice(title: String(localized: "Can’t Discard This Copy"), message: Words.cannotDiscard(folder: folder))
         case .notConnected:
             Notice(title: String(localized: "Not connected"), message: String(localized: "Connect to a server first."))
         case .busy:
             Notice(title: String(localized: "Still Working"), message: String(localized: "Wait for the current step to finish, then try again."))
+        }
+    }
+
+    /// A copy the person discarded that the package would not remove, which still holds every change in it.
+    private static func keptNotice(_ kept: MarfaHost.CopyKept, key: String?, reached: Reached) -> Notice {
+        let previous = reached == .switched
+        let body: String
+        switch kept {
+        case .changed(let now):
+            body = sentences(
+                previous
+                    ? String(localized: "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw.")
+                    : String(localized: "MAPP kept the copy, because it now holds a different number of changes than you saw."),
+                Words.notSent(Int(clamping: now)) + " " + String(localized: "Connect to this server again with its key to see them."))
+        case .unreadable(let folder):
+            body = Words.cannotDiscard(folder: folder)
+        case .notMapps(let folder):
+            body = String(localized: "The copy in the folder “\(folder)” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it.")
+        }
+        let note = key == nil ? nil : String(localized: "The key is still in your Keychain. Remove it in Keychain Access.")
+        let message = note.map { sentences(body, $0) } ?? body
+        switch reached {
+        case .left:
+            return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
+        case .switched:
+            return Notice(title: String(localized: "Switched Servers, but the Copy Was Kept"), message: message)
+        case .notOpened, .newKey:
+            return Notice(title: String(localized: "Can’t Open the Library"), message: message)
         }
     }
 

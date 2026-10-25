@@ -43,7 +43,7 @@ struct MarfaHostOfflineTests {
         let log = ChangeLog(try #require(host.source as? MarfaSource))
         #expect(await log.wait { $0.item(titled: "MAPPTEST kept")?.sync == .waiting(writes: 1) } != nil)
 
-        try await host.disconnect(.discardCopy(nil))
+        try await discardEverything(host)
         #expect(!bench.hasCopy(connection))
     }
 
@@ -67,7 +67,7 @@ struct MarfaHostOfflineTests {
         #expect(bench.keys.key(for: try MarfaConnection(address: address)) == "given")
         // Hydrating again against a closed port fails at once, which shows the new key was tried.
         #expect(await eventually { if case .offline = host.state { true } else { false } }, "\(host.state)")
-        try await host.disconnect(.discardCopy(nil))
+        try await discardEverything(host)
     }
 
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
@@ -88,7 +88,7 @@ struct MarfaHostOfflineTests {
         }
         #expect(bench.hasCopy(connection))
         #expect(host.source != nil)
-        try await host.disconnect(.discardCopy(nil))
+        try await discardEverything(host)
     }
 
     /// A write that lands while the person is being asked, such as an editor's late save, is not discarded with
@@ -176,7 +176,7 @@ struct MarfaHostOfflineTests {
         #expect(refused.isEmpty, "\(refused.count) refused, such as \(String(describing: refused.first))")
         #expect(unavailable.isEmpty, "\(String(describing: unavailable.first))")
         #expect(await eventually { host.report.waiting == count }, "\(host.report.waiting)")
-        try await host.disconnect(.discardCopy(nil))
+        try await discardEverything(host)
     }
 
     @Test(.timeLimit(.minutes(1)))
