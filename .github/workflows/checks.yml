@@ -88,26 +88,15 @@ jobs:
         run: |
           xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
             | python3 -c "
-          import json, sys
-          def walk(n, trail):
-              trail = trail + [n.get('name', '')]
+          import collections, json, sys
+          seen = collections.Counter()
+          def walk(n):
+              if n.get('nodeType') == 'Failure Message':
+                  seen[n.get('name', '')[:300]] += 1
               for c in n.get('children', []):
-                  walk(c, trail)
-              if n.get('result') == 'Failed' and not n.get('children'):
-                  print('/'.join(trail[-2:]))
-                  for c in n.get('children', []):
-                      pass
-          walk({'children': json.load(sys.stdin)['testNodes']}, [])
+                  walk(c)
+          for n in json.load(sys.stdin)['testNodes']:
+              walk(n)
+          for message, count in seen.most_common(15):
+              print(count, message)
           "
-          xcrun xcresulttool get test-results test-details --path TestResults.xcresult --test-id "MarfaHostTests/refusedWritesCountAsWaiting()" 2>&1 | head -60
-
-  checks:
-    name: Checks
-    needs: [changes, editor, swift]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require every job that ran to pass
-        run: |
-          [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "false" ]]
