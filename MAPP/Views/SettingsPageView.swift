@@ -79,7 +79,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Default Column Widths")
             } footer: {
-                Text("Where each column starts in a new window. A width you drag a column to stays for that window only.")
+                Text("Where each column starts in a new window. Dragging a column to a new width changes only that window.")
             }
             Section("Notes List") {
                 OrderOptions()
