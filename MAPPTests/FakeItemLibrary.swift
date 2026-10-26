@@ -274,16 +274,32 @@ final class FakeItemLibrary: ItemLibrary {
         try await attaching?() ?? []
     }
 
+    /// Every file attached one at a time, by name, and the names whose attach throws.
+    private(set) var attachedFiles: [(name: String, data: Data, item: ItemID)] = []
+    var refusedAttachments: Set<String> = []
+
+    func attach(file: URL, to id: ItemID) async throws -> Embed {
+        let name = file.lastPathComponent
+        if refusedAttachments.contains(name) { throw SourceFailure(kind: .failed, message: "The upload failed.") }
+        attachedFiles.append((name, try Data(contentsOf: file), id))
+        return Embed(link: name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name, name: name)
+    }
+
     /// Every file added, and whether adding one is refused.
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
     var refusesFiles = false
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
-    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
         await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")
+            return nil
+        }
+        let name = file.lastPathComponent
+        guard let data = try? Data(contentsOf: file) else {
+            notices.tell("Can’t Add File", "Unreadable")
             return nil
         }
         addedFiles.append((name, data, title, parentID))

@@ -704,6 +704,37 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         }
     }
 
+    @Test func filesGoToTheSourceFromWhereTheyAre() async throws {
+        let (library, source) = try await loaded()
+        let disk = TestFiles()
+        let embed = try await library.attach(file: disk.url("plan.pdf", "pdf"), to: F.n1)
+        #expect(embed == Embed(link: "plan.pdf", name: "plan.pdf"))
+        #expect(source.attaching.attached.withLock { $0.map(\.file) } == ["plan.pdf"])
+
+        let id = await library.addFile(
+            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .inbox)
+        #expect(id != nil)
+        let added = try #require(source.attaching.added.withLock { $0.first })
+        #expect(added.file == "photo.png" && added.data == Data("png".utf8))
+        #expect(added.title == "Holiday" && added.tier == .feed && added.parent == F.p1)
+
+        source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
+        await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .allNotes) == nil)
+        #expect(library.notices.waiting.last?.message == "No room.")
+    }
+
+    /// The core chooses a file's type from the media type it is given, so the one given is the system's, which
+    /// knows more kinds than the core's own table of extensions.
+    @Test func aFileIsSentWithTheMediaTypeTheSystemGivesIt() throws {
+        let disk = TestFiles()
+        #expect(MarfaEngine.mimeType(of: disk.url("photo.png", "png")) == "image/png")
+        #expect(MarfaEngine.mimeType(of: disk.url("scan.tiff", "tiff")) == "image/tiff")
+        #expect(MarfaEngine.mimeType(of: disk.url("song.flac", "flac"))?.hasPrefix("audio/") == true)
+        #expect(MarfaEngine.mimeType(of: disk.url("clip.mov", "mov")) == "video/quicktime")
+        #expect(MarfaEngine.mimeType(of: disk.url("report.pdf", "pdf")) == "application/pdf")
+    }
+
     @Test func aRefusalTheSourceAnswersReachesThePerson() async throws {
         let (library, source) = try await loaded()
         library.setFavorite([F.n2], true, undoManager: nil)

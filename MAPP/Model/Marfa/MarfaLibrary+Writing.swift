@@ -291,17 +291,18 @@ extension MarfaLibrary {
         return try await source.embeds.attach(urls, to: id)
     }
 
-    /// The file goes to the source from a file of its own, which this removes once the source has taken it.
-    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+    func attach(file: URL, to id: ItemID) async throws -> Embed {
+        guard let embed = try await source.embeds.attach([file], to: id).first else {
+            throw SourceFailure(kind: .failed, message: String(localized: "The file couldn’t be attached."))
+        }
+        return embed
+    }
+
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
         let cantAdd = String(localized: "Can’t Add File")
-        let directory = URL.temporaryDirectory.appending(path: "MAPP-add-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: directory) }
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let url = directory.appending(path: NoteText.attachmentName(name))
-            try data.write(to: url)
             // The Inbox is the feed tier, so a file added there stays where it was added.
-            return try await source.embeds.addFile(url, title: title, tier: place == .inbox ? .feed : nil, parent: parentID)
+            return try await source.embeds.addFile(file, title: title, tier: place == .inbox ? .feed : nil, parent: parentID)
         } catch let failure as SourceFailure {
             notices.tell(cantAdd, failure.message)
         } catch {

@@ -78,9 +78,10 @@ protocol ItemLibrary: AnyObject, Observable {
         typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
         in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID?
-    /// Adds a file as an item of its own, of the file type its contents say, titled `title` or by its name, under
-    /// `parentID` where one is given. Nil when it could not be added, and the library tells the person why.
-    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID?
+    /// Adds the file at `file` as an item of its own, of the file type its media type calls for, titled `title` or by its name, under `parentID`
+    /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
+    /// library tells the person why.
+    func addFile(_ file: URL, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID?
     /// Text typed on the page, over the text `body(of:)` gave at `readAt`. An edit typed on text older than the
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
@@ -111,6 +112,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// A failure means nothing was inserted into the note, though files already stored may remain; the editor's
     /// alert says so plainly.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed]
+    /// Attaches the file at `file` to the item, read where it is while this runs, and says what the item's text
+    /// writes to show it. A failure means the file is not attached.
+    func attach(file: URL, to id: ItemID) async throws -> Embed
 }
 
 extension ItemLibrary {

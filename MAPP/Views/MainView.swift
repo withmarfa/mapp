@@ -240,6 +240,7 @@ struct MainView: View {
             editorSlot.made?.windowWent()
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
             browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed)
+            browser.giveUpNewItem(because: .windowLeft)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
@@ -273,6 +274,12 @@ struct MainView: View {
         // A new item reaches a server's library when its source says so, which the window waits for to open it.
         .onChange(of: newItemIsSettled) {
             if newItemIsSettled { browser.finishNewItem(in: library) }
+        }
+        // The files quick add attached go at the end of the new item's text, once the page shows it.
+        .onChange(of: browser.newEmbeds) {
+            guard let attached = browser.newEmbeds else { return }
+            browser.newEmbeds = nil
+            editor.append(attached.embeds, to: attached.id)
         }
         #if DEBUG
         // A sample launch can open an item without a click, as `-MAPPSelectItem <id>`, once the library holds it.

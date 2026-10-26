@@ -34,5 +34,7 @@ nonisolated enum TypeSymbol {
         TypeID("core.entity.person"): "person",
         TypeID("core.file"): "doc",
         TypeID("core.file.image"): "photo",
+        TypeID("core.file.audio"): "waveform",
+        TypeID("core.file.video"): "film",
     ]
 }

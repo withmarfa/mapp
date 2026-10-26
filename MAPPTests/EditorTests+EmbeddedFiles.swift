@@ -200,4 +200,67 @@ extension EditorTests {
         #expect(editor.noteID == second.id)
         #expect(library.notices.waiting.last == nil)
     }
+
+    @Test func filesQuickAddAttachedGoAtTheEndOfTheNewNoteOnceThePageShowsIt() async throws {
+        let shown = FakeItemLibrary.note("Plan", modified: .now)
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [shown, new])
+        library.bodies[new.id] = "Pack\n\nBook\n"
+        let editor = try await attachingEditor(library)
+        var saved: [String] = []
+        editor.onChange = { id, text, _ in if id == new.id { saved.append(text) } }
+
+        editor.append([Embed(link: "map%201.png", name: "map 1.png"), Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        #expect(try await markdown(editor) == nil, "the note on the page is another one")
+
+        editor.load(new)
+        editor.focus(new.id, caret: .after("Pack"))
+        #expect(try await eventuallyAsking { try await markdown(editor)?.contains("tickets.pdf") == true })
+        let written = try #require(try await markdown(editor))
+        #expect(written.hasPrefix("Pack\n\nBook\n"))
+        #expect(written.contains("![map 1.png](map%201.png)"))
+        #expect(written.range(of: "map%201.png")!.lowerBound < written.range(of: "tickets.pdf")!.lowerBound)
+        #expect(await eventually { editor.pendingEmbeds.isEmpty })
+        editor.flush()
+        #expect(await eventually { saved.last?.contains("tickets.pdf") == true }, "the page saves them as it does typing")
+    }
+
+    @Test func filesQuickAddAttachedWaitWhileTheNoteIsEditedAsSource() async throws {
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [new])
+        library.bodies[new.id] = "Pack\n"
+        let editor = try await attachingEditor(library)
+        editor.setSourceMode(true)
+        #expect(await eventually { editor.caret.sourceMode })
+
+        editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        _ = try await editor.webView.evaluateJavaScript("1")
+        // Gives the page's answer time to come back, so a dropped embed would show as none waiting.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(try await markdown(editor) == nil, "source editing takes none")
+        #expect(editor.pendingEmbeds[new.id]?.map(\.name) == ["tickets.pdf"], "they wait rather than go")
+        #expect(library.notices.waiting.isEmpty)
+
+        editor.setSourceMode(false)
+        #expect(try await eventuallyAsking { try await markdown(editor) == "Pack\n\n![tickets.pdf](tickets.pdf)\n" })
+        #expect(await eventually { editor.pendingEmbeds.isEmpty })
+    }
+
+    @Test func filesQuickAddAttachedThatNeverReachTheTextAreTold() async throws {
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [new])
+        let editor = try await attachingEditor(library)
+        editor.setSourceMode(true)
+        #expect(await eventually { editor.caret.sourceMode })
+        editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        // Gives the page time to answer, so a refusal told too early would show here.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(library.notices.waiting.isEmpty)
+
+        editor.windowWent()
+        #expect(editor.pendingEmbeds.isEmpty)
+        let told = try #require(library.notices.waiting.last)
+        #expect(told.message.contains("“tickets.pdf”") && told.message.contains("“Trip”"))
+    }
 }

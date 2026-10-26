@@ -8,6 +8,7 @@ import {
   caretOffset,
   isPreviewDiagnostic,
   guardedCommand,
+  appendedImages,
   splitLabels,
   type CaretState,
   type FindState,
@@ -418,6 +419,88 @@ test('images go in at the caret or at a drop point, and blur leaves the focus of
     editor.blur(1)
     expect(document.activeElement?.matches('.ProseMirror')).toBe(false)
     expect(() => editor.blur(2)).toThrow()
+  })
+})
+
+test('files attached in quick add go at the end of the text and leave the caret where it was', async () => {
+  await withEditor('Buy milk\n\nand eggs\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    editor.focusText('Buy')
+    expect(
+      editor.appendImages([
+        { src: 'a%201.pdf', alt: 'a 1.pdf' },
+        { src: 'b.png', alt: 'b.png' },
+      ]),
+    ).toBe(true)
+    const text = editor.markdown() ?? ''
+    expect(text.startsWith('Buy milk\n\nand eggs\n')).toBe(true)
+    expect(text.indexOf('![a 1.pdf](a%201.pdf)')).toBeGreaterThan(text.indexOf('and eggs'))
+    expect(text.indexOf('![b.png](b.png)')).toBeGreaterThan(text.indexOf('![a 1.pdf]'))
+    expect(engine.textSnapshot(1).selection).toMatchObject({ from: 3, to: 3 })
+    expect(() => editor.appendImages([{ src: 'c.png', alt: 'c' }], 2)).toThrow()
+  })
+  await withEditor('', (editor) => {
+    expect(editor.appendImages([{ src: 'a.png', alt: 'a' }])).toBe(true)
+    expect(editor.markdown()).toContain('![a](a.png)')
+  })
+})
+
+test('files attached in quick add go after a table that ends the text, not into its last cell', async () => {
+  const table = 'Costs\n\n| Item | Cost |\n| --- | --- |\n| Train | 40 |\n'
+  await withEditor(table, (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    editor.focusText('Cos')
+    expect(editor.appendImages([{ src: 'ticket.pdf', alt: 'ticket.pdf' }])).toBe(true)
+    expect(editor.markdown()).toBe(table + '\n![ticket.pdf](ticket.pdf)\n')
+    expect(engine.textSnapshot(1).selection).toMatchObject({ from: 3, to: 3 })
+  })
+})
+
+test('files attached in quick add go after a list that ends the text, not into its last item', async () => {
+  for (const list of ['- Pack\n- Book', '1. Pack\n2. Book\n', '- [ ] Pack\n  - Book\n\n']) {
+    await withEditor(list, (editor) => {
+      expect(editor.appendImages([{ src: 'map.png', alt: 'map' }])).toBe(true)
+      const text = editor.markdown() ?? ''
+      expect(text.startsWith(list)).toBe(true)
+      expect(text.slice(list.length).replace(/^\n+/, '')).toBe('![map](map.png)\n')
+      expect(text).toMatch(/\n\n!\[map\]/)
+    })
+  }
+})
+
+test('files attached in quick add are written so they read back as embeds', () => {
+  expect(appendedImages('```\ncode', [{ src: 'a.png', alt: 'a' }])).toBe(
+    '```\ncode\n```\n\n![a](a.png)\n',
+  )
+  expect(appendedImages('~~~~ js\n~~~\n', [{ src: 'a.png', alt: 'a' }])).toBe(
+    '~~~~ js\n~~~\n~~~~\n\n![a](a.png)\n',
+  )
+  expect(appendedImages('```\ncode\n```', [{ src: 'a.png', alt: 'a' }])).toBe(
+    '```\ncode\n```\n\n![a](a.png)\n',
+  )
+  expect(appendedImages('- a\n  ```\n  code', [{ src: 'a.png', alt: 'a' }])).toBe(
+    '- a\n  ```\n  code\n\n![a](a.png)\n',
+  )
+  expect(appendedImages('One\r\nTwo', [{ src: 'a.png', alt: 'a' }])).toBe(
+    'One\r\nTwo\r\n\r\n![a](a.png)\r\n',
+  )
+  expect(
+    appendedImages('', [
+      { src: 'a (1).png', alt: 'a [1]' },
+      { src: 'b(2).png', alt: 'b' },
+    ]),
+  ).toBe('![a \\[1\\]](<a (1).png>)\n\n![b](b\\(2\\).png)\n')
+})
+
+test('files attached in quick add wait while the note is edited as source', async () => {
+  await withEditor('Pack\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    engine.setEditingMode('source', 1)
+    expect(editor.appendImages([{ src: 'a.png', alt: 'a' }])).toBe(false)
+    expect(editor.markdown()).toBeNull()
+    engine.setEditingMode('formatted', 1)
+    expect(editor.appendImages([{ src: 'a.png', alt: 'a' }])).toBe(true)
+    expect(editor.markdown()).toBe('Pack\n\n![a](a.png)\n')
   })
 })
 

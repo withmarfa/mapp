@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import UniformTypeIdentifiers
 
 /// Attaching a file to an item and naming it so an embed names it alone.
 extension MarfaEngine {
@@ -13,7 +14,7 @@ extension MarfaEngine {
             }
             let title = attachmentTitle(for: file, on: row)
             let attached = try await Self.asking(hub) {
-                try await copy.items.attach(to: id.rawValue, file: file, Attachment(title: title))
+                try await copy.items.attach(to: id.rawValue, file: file, Attachment(mimeType: Self.mimeType(of: file), title: title))
             }
             await reread(Set([id.rawValue] + [attached.item.itemId].compactMap(\.self)))
             await sync.drain()
@@ -28,13 +29,13 @@ extension MarfaEngine {
         }
     }
 
-    /// The package queues the upload and the file's item, of the file type its contents say; the item is then put
-    /// under its parent, as a create's is.
+    /// The package queues the upload and the file's item, whose file type the core chooses from its media type;
+    /// the item is then put under its parent, as a create's is.
     func addFile(_ file: URL, title: String?, tier: Tier?, under parent: ItemID?) async -> Result<ItemID, SourceFailure> {
         do {
-            let added = try await Self.asking(hub) {
-                try await copy.items.addFile(file, Attachment(title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier)))
-            }
+            let attachment = Attachment(
+                mimeType: Self.mimeType(of: file), title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier))
+            let added = try await Self.asking(hub) { try await copy.items.addFile(file, attachment) }
             guard let raw = added.item.itemId else {
                 throw SourceFailure(kind: .failed, message: String(localized: "The file couldn’t be added."))
             }
@@ -66,6 +67,14 @@ extension MarfaEngine {
             title = Self.embeddable(ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)")
         }
         return title
+    }
+
+    /// The media type the system gives the file, which the core keeps and chooses the file's type by. The core's
+    /// own table of extensions is shorter than the system's: a TIFF or a FLAC file is still an image or a sound.
+    nonisolated static func mimeType(of file: URL) -> String? {
+        let type = (try? file.resourceValues(forKeys: [.contentTypeKey]).contentType)
+            ?? UTType(filenameExtension: file.pathExtension)
+        return type?.preferredMIMEType
     }
 
     /// An embed names its file between `![[` and `]]`, where `[`, `]`, `|`, `#` and `^` mean something else, so a

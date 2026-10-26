@@ -125,6 +125,8 @@ extension EditorController {
         requestedNoteID = nil
         cancelLinkRequest()
         titleDrafts = nil
+        for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }
+        pendingEmbeds = [:]
         Self.open.remove(self)
     }
 
