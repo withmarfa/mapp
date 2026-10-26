@@ -13,12 +13,16 @@ import {
   type FindState,
 } from '../src/editor'
 
-async function withEditor(source: string, run: (editor: NoteEditor) => void | Promise<void>) {
+async function withEditor(
+  source: string,
+  run: (editor: NoteEditor) => void | Promise<void>,
+  changed: (text: string) => void = () => {},
+) {
   const root = document.createElement('div')
   document.body.append(root)
   const editor = await NoteEditor.mount(root, {
     find() {},
-    changed() {},
+    changed,
     stateChanged() {},
     openLink() {},
     copy() {},
@@ -494,6 +498,74 @@ test('files attached in quick add are refused, with the note untouched, when the
       )
       expect(editor.snapshot().text).toBe(source)
       expect(editor.markdown()).toBeNull()
+    })
+  }
+})
+
+test('files attached in quick add never replace a note that Inkkit reads as one empty block', async () => {
+  const images = [
+    { src: 'a.png', alt: 'a' },
+    { src: 'b.png', alt: 'b' },
+  ]
+  const posted: unknown[] = []
+  window.webkit = { messageHandlers: { host: { postMessage: (message) => posted.push(message) } } }
+  for (const source of [
+    '***',
+    '---\n',
+    '___',
+    '```\n```',
+    '```\n```\n',
+    '<br>',
+    '![x](y.png)',
+    '![x](y.png)\n',
+    '[ref]: http://x.com',
+    '[ref]: http://x.com\n',
+  ]) {
+    posted.length = 0
+    const reported: string[] = []
+    await withEditor(
+      source,
+      async (editor) => {
+        expect(
+          guardedCommand(() => editor.appendImages(images)),
+          source,
+        ).toMatchObject({
+          commandError: 'preservation',
+        })
+        // The text is exactly as it was, and neither the replaced text nor the restored one reached the app.
+        expect(editor.snapshot().text).toBe(source)
+        expect(editor.markdown()).toBeNull()
+        await Promise.resolve()
+        expect(reported).toEqual([])
+        expect(posted).toMatchObject([{ type: 'error' }])
+      },
+      (text) => reported.push(text),
+    )
+  }
+})
+
+test('files attached in quick add are appended to an ordinary note and reported once', async () => {
+  const reported: string[] = []
+  await withEditor(
+    'Buy milk\n',
+    async (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toBe(true)
+      expect(editor.snapshot().text).toBe('Buy milk\n\n![a](a.png)\n')
+      await Promise.resolve()
+      expect(reported).toEqual(['Buy milk\n\n![a](a.png)\n'])
+    },
+    (text) => reported.push(text),
+  )
+})
+
+test('files attached in quick add are appended after trailing blank lines, which may collapse', async () => {
+  for (const source of ['Hello\n\n\n', 'Hello\n\n', 'Hello  \n\n\n\n', '# Title\n\ntext\n\n\n\n']) {
+    await withEditor(source, (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toBe(true)
+      const text = editor.snapshot().text
+      expect(text.startsWith(source.trimEnd())).toBe(true)
+      expect(text).toContain('![a](a.png)')
+      expect(text.replace(/\s+$/, '').endsWith('![a](a.png)')).toBe(true)
     })
   }
 })

@@ -594,11 +594,32 @@ export class NoteEditor {
   /** Puts images after everything in the text, as files quick add attached to a new note, leaving the selection
    *  and the keyboard where they were so typing goes on where the person is. False in source editing, where the page
    *  leaves them for the app to send again. A note that ends in a code fence left open refuses them (`preservation`),
-   *  and the app tells the person the files are attached but not in the text. */
+   *  and the app tells the person the files are attached but not in the text.
+   *
+   *  Inkkit replaces the whole document when it holds one block with nothing in it, which is how it reads a note
+   *  that is only a rule, an empty code fence, an image or a link definition. So the text is checked after the edit:
+   *  anything but trailing whitespace gone is taken back in the same step, before the change is reported, and
+   *  refused as `preservation`. This guard stays whatever Inkkit does about it. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
-    return this.engine.appendImages(
+    const before = this.snapshot(expected).text
+    const reportedBefore = this.pendingChanged
+    const appended = this.engine.appendImages(
       images.map((image) => ({ reference: image.src, alt: image.alt })),
       expected,
+    )
+    if (!appended) return false
+    if (this.snapshot(expected).text.startsWith(before.trimEnd())) return true
+    this.engine.undo(expected)
+    if (this.snapshot(expected).text !== before)
+      throw new InkKitError(
+        'preservation',
+        'The note could not be restored after adding the files.',
+      )
+    // Inkkit reported the lossy text and then the restored one, in this same turn. The app is told neither.
+    this.pendingChanged = reportedBefore
+    throw new InkKitError(
+      'preservation',
+      'The files could not be added to the text without changing it.',
     )
   }
   async printable(expected = this.generation) {

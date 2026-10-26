@@ -262,6 +262,20 @@ extension EditorTests {
         #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
     }
 
+    @Test func filesQuickAddAttachedToANoteThatIsOnlyARuleAreTold() async throws {
+        for body in ["***", "```\n```\n", "![x](y.png)", "[ref]: http://x.com"] {
+            let new = FakeItemLibrary.note("Trip", modified: .now)
+            let library = FakeItemLibrary(items: [new])
+            library.bodies[new.id] = body
+            let editor = try await attachingEditor(library)
+
+            editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+            #expect(await eventually { library.notices.waiting.contains { $0.message.contains("“tickets.pdf”") } })
+            #expect(try await markdown(editor) == nil, "\(body) keeps its text exactly, so there is nothing to save")
+            #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
+        }
+    }
+
     @Test func filesQuickAddAttachedThatNeverReachTheTextAreTold() async throws {
         let new = FakeItemLibrary.note("Trip", modified: .now)
         let library = FakeItemLibrary(items: [new])
