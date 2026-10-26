@@ -39,6 +39,9 @@ struct CollectionPickerSheet: View {
     let request: CollectionPickRequest
     @State private var selected: ItemID?
     @State private var filter = ""
+    @FocusState private var focus: Field?
+
+    private enum Field { case filter, list }
 
     var body: some View {
         let collections = shown
@@ -47,6 +50,14 @@ struct CollectionPickerSheet: View {
             Text(subtitle).foregroundStyle(.secondary)
             TextField("Filter", text: $filter)
                 .textFieldStyle(.roundedBorder)
+                .focused($focus, equals: .filter)
+                .onKeyPress(.downArrow) {
+                    guard !collections.isEmpty else { return .ignored }
+                    if selected == nil { selected = firstAddable(in: collections) }
+                    focus = .list
+                    return .handled
+                }
+                .onSubmit { add() }
                 .accessibilityIdentifier("CollectionPickerFilter")
             List(collections, selection: $selected) { collection in
                 HStack {
@@ -55,7 +66,19 @@ struct CollectionPickerSheet: View {
                     if holdsAll(collection.id) { Image(systemName: "checkmark").foregroundStyle(.secondary) }
                 }
                 .tag(collection.id)
+                .selectionDisabled(holdsAll(collection.id))
                 .accessibilityIdentifier("CollectionPickerOption.\(collection.id.rawValue)")
+            }
+            .listStyle(.bordered(alternatesRowBackgrounds: true))
+            .focused($focus, equals: .list)
+            // Return and a double-click both act on the row, as they do in any list.
+            .contextMenu(forSelectionType: ItemID.self) { _ in } primaryAction: { ids in
+                add(ids.first)
+            }
+            .onKeyPress(.return) {
+                guard selected != nil else { return .ignored }
+                add()
+                return .handled
             }
             .frame(height: 220)
             .overlay {
@@ -73,6 +96,9 @@ struct CollectionPickerSheet: View {
         }
         .padding(20)
         .frame(width: 360)
+        .onAppear { focus = .filter }
+        // The first collection that can be added to stays selected as the filter narrows the list, so Return adds it.
+        .onChange(of: filter) { selected = firstAddable(in: shown) }
         // Items that go or can no longer join, as when they are deleted elsewhere, leave nothing to add.
         .onChange(of: canAdd) { if !canAdd { dismiss() } }
         .accessibilityElement(children: .contain)
@@ -102,8 +128,12 @@ struct CollectionPickerSheet: View {
         request.ids.allSatisfy { library.item($0)?.collectionIDs.contains(collection) == true }
     }
 
-    private func add() {
-        guard let selected, !holdsAll(selected) else { return }
-        if library.addToCollection(request.ids, selected, undoManager: request.undoManager) { dismiss() }
+    private func firstAddable(in collections: [Item]) -> ItemID? {
+        collections.first { !holdsAll($0.id) }?.id
+    }
+
+    private func add(_ id: ItemID? = nil) {
+        guard let target = id ?? selected, !holdsAll(target) else { return }
+        if library.addToCollection(request.ids, target, undoManager: request.undoManager) { dismiss() }
     }
 }

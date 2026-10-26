@@ -292,9 +292,6 @@ private struct SavedViewSheet: View {
             switch editing {
             case .new:
                 if let form = browser.viewTitleForm { ViewTitleField(form: form) }
-                Text("A view keeps this place with its order and grouping as this layout shows them, and the table’s filters, for every app connected to your Marfa server. Its filters can’t mix “and” with “or”, and Recents and Recently Deleted can’t be saved as views.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             case .rename:
                 if let form = browser.viewTitleForm { ViewTitleField(form: form) }
             case .update, .delete:

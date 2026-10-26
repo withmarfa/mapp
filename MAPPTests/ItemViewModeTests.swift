@@ -42,4 +42,23 @@ struct ItemViewModeTests {
         browser.fallBackToListIfUnavailable(in: library)
         #expect(browser.viewMode == .table)
     }
+
+    @Test func openingAPlaceThatCannotShowTheLayoutFallsBackToTheList() {
+        let (library, older, _, _) = BrowserTests().makeFakeLibrary()
+        let home = FakeItemLibrary.collection("Home")
+        library.items.append(home)
+        let view = LibraryView(id: ItemID("v-reading"), title: "Reading")
+        library.views = [view]
+        library.viewMembers[view.id] = [older.id]
+        let places: [SidebarItem] = [.collection(home.id), .view(view.id), .source("Web"), .itemType("core.note")]
+        for place in places {
+            let browser = Browser()
+            browser.adopt(library)
+            browser.viewMode = .board
+            // The collections index has no layout of its own, so a trip through it must not lose the fallback.
+            browser.show(.collections, in: library, order: NoteOrder())
+            browser.show(place, in: library, order: NoteOrder())
+            #expect(browser.viewMode == .list, "\(place)")
+        }
+    }
 }
