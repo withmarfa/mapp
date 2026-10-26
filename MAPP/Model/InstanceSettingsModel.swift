@@ -40,8 +40,7 @@ import Observation
     /// Run after a name change is taken, so the rest of the app reads the new name.
     @ObservationIgnored var onRenamed: @MainActor () -> Void = {}
 
-    /// The configuration as the server last gave it; nil until one has been read, and again after the server
-    /// refuses the key's permission.
+    /// The configuration as the server last gave it; nil until one has been read.
     private(set) var loaded: InstanceConfig?
     /// What each field shows. It starts as the server's answer and holds what the person typed.
     var draft: [InstanceSetting: String] = [:]
@@ -64,6 +63,10 @@ import Observation
     }
 
     // MARK: Reading
+
+    /// Whether the settings can be shown and saved: they have been read, and the key may still manage them. A key
+    /// that may not shows none, rather than fields that can't be saved, but what was typed is kept for when it may.
+    var isAvailable: Bool { loaded != nil && failure != .notPermitted }
 
     /// Whether a server is set to ask at all.
     var hasServer: Bool { provider() != nil }
@@ -139,7 +142,7 @@ import Observation
     }
 
     var canSave: Bool {
-        guard loaded != nil, !isSaving, problems.isEmpty, let patch else { return false }
+        guard isAvailable, !isSaving, problems.isEmpty, let patch else { return false }
         return !patch.isEmpty
     }
 
@@ -268,8 +271,6 @@ import Observation
 
     private func fail(_ error: InstanceConfigFailure) {
         failure = error
-        // A key that may no longer manage the settings shows none, rather than fields that can't be saved.
-        if error == .notPermitted { loaded = nil }
     }
 }
 

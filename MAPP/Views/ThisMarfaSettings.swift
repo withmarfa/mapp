@@ -16,7 +16,7 @@ struct ThisMarfaSettings: View {
                     Text("Connect to a Marfa server in Library to see and change its settings here.")
                         .foregroundStyle(.secondary)
                 }
-            } else if model.loaded == nil {
+            } else if !model.isAvailable {
                 unavailable
             } else {
                 ThisMarfaFields(model: model)
@@ -35,7 +35,7 @@ struct ThisMarfaSettings: View {
         }
     }
 
-    /// Nothing has been read: still reading, or the server said why not.
+    /// Nothing can be shown: still reading, or the server said why not.
     @ViewBuilder private var unavailable: some View {
         Section {
             if let failure = model.failure {

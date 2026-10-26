@@ -206,6 +206,39 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.load()
         #expect(model.loaded == nil)
         #expect(model.failure == .notPermitted)
+        #expect(!model.isAvailable)
+    }
+
+    @Test func aKeyThatLosesPermissionHidesTheFieldsButKeepsWhatWasTyped() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        model.draft[.name] = "Home"
+        source.readFailure.withLock { $0 = .notPermitted }
+        await model.load()
+        #expect(model.failure == .notPermitted)
+        #expect(!model.isAvailable)
+        #expect(!model.canSave)
+        #expect(model.isEdited(.name))
+        #expect(model.draft[.name] == "Home")
+
+        // Once the key may manage the settings again, the next read keeps the draft and takes the rest.
+        source.readFailure.withLock { $0 = nil }
+        source.config.withLock { $0.values[.trashRetentionDays] = .number(20) }
+        await model.load()
+        #expect(model.isAvailable)
+        #expect(model.draft[.name] == "Home")
+        #expect(model.draft[.trashRetentionDays] == "20")
+        #expect(model.patch == InstanceConfigPatch(values: [.name: .text("Home")]))
+    }
+
+    @Test func aSaveThatMeetsAKeyWithoutPermissionKeepsWhatWasTyped() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        source.updateFailure.withLock { $0 = .notPermitted }
+        model.draft[.name] = "Home"
+        await model.save()
+        #expect(model.failure == .notPermitted)
+        #expect(!model.isAvailable)
+        #expect(model.draft[.name] == "Home")
+        #expect(model.isEdited(.name))
     }
 
     @Test func aServerThatCannotBeReachedKeepsTheLastAnswerAndWhatWasTyped() async {
