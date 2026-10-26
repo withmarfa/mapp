@@ -120,6 +120,7 @@ struct ProblemWordingTests {
         let wording = wording(entry(.refused, reason: SyncProblem(code: "validation_error", message: "Some values are not allowed.")))
         #expect(wording.headline == "Changes to “Plan the launch” weren’t sent")
         #expect(wording.explanation.hasPrefix("The server refused it: Some values are not allowed."))
+        #expect(wording.explanation.contains("copy it before you discard"))
         #expect(wording.actions.map(\.action) == [.discard])
         #expect(wording.actions.first?.title == "Discard")
         #expect(wording.canCopyText)
@@ -250,6 +251,7 @@ struct ConnectionStatusTests {
         #expect(some.title == "Library unavailable")
         #expect(some.isProblem)
         #expect(some.detail?.contains("3 changes") == true)
+        #expect(some.detail?.contains("previous build") == true)
         #expect(Words.otherVersion(unsent: 1).contains("1 change on this Mac hasn’t reached the server."))
 
         // The count stays unread after the previous build sends everything, and the package never removes a copy it can’t count, so the way out is to remove the copy’s folder.
