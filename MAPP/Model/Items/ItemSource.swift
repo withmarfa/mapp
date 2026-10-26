@@ -52,7 +52,8 @@ nonisolated protocol EmbedResolver: Sendable {
     /// Attaches each file to the item and says what the page writes in its text to show it. A failure means no
     /// text is to be written, though files already attached may remain.
     func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
-    /// Adds a file as an item of its own, titled `title` or by its name, under `parent` where one is given.
+    /// Adds a file as an item of its own, of the file type its media type calls for, titled `title` or by its name,
+    /// under `parent` where one is given.
     func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID
 }
 

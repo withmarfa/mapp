@@ -27,6 +27,16 @@ struct NewItem {
     /// a file.
     let caret: PageCaret?
     let isFile: Bool
+    /// Files to attach to the item once the library holds it.
+    var attachments: [QuickAdd.File] = []
+    /// Whether the item keeps text, so the page writes the attached files into it.
+    var embedsInText = false
+}
+
+/// What the page writes at the end of a new item's text for the files quick add attached to it.
+struct NewEmbeds: Equatable {
+    let id: ItemID
+    let embeds: [Embed]
 }
 
 extension Browser {
@@ -50,10 +60,13 @@ extension Browser {
     func finishNewItem(in library: any ItemLibrary) {
         guard let entry = newItem else { return }
         guard library.item(entry.id) != nil else {
-            if isRefused(entry, in: library) { newItem = nil }
+            if isRefused(entry, in: library) { giveUpNewItem(because: .refused) }
             return
         }
         newItem = nil
+        if !entry.attachments.isEmpty {
+            attachingNewItem = Task { await attachFiles(of: entry, in: library) }
+        }
         leaveSettings()
         isCollectionItemPresented = usesCollection
         searchText = ""
@@ -70,5 +83,53 @@ extension Browser {
         } else {
             focusRequest = .title
         }
+    }
+
+    /// Why the window stops waiting for the item quick add made.
+    enum NewItemDeparture {
+        /// The library refused the create.
+        case refused
+        /// The window closed, or went on to another library, before the library held the item.
+        case windowLeft
+    }
+
+    /// Stops waiting for the item quick add made. Files that were to be attached to it are named, since nothing
+    /// else keeps them.
+    func giveUpNewItem(because departure: NewItemDeparture) {
+        guard let entry = newItem else { return }
+        newItem = nil
+        guard !entry.attachments.isEmpty else { return }
+        let reason = switch departure {
+        case .refused: String(localized: "The item wasn’t added, so its files weren’t attached.")
+        case .windowLeft: String(localized: "The window closed or changed library before the item’s files were attached.")
+        }
+        entry.library.notices.tell(String(localized: "Files Not Attached"), "\(reason) \(QuickAdd.File.notAdded(entry.attachments))")
+    }
+
+    /// Attaches the files quick add held to the item it made, one at a time, so one that fails leaves the others
+    /// and the item as they are. The person is told which failed, once; what the page writes for the rest goes to
+    /// the page for the end of the item's text.
+    private func attachFiles(of entry: NewItem, in library: any ItemLibrary) async {
+        var embeds: [Embed] = []
+        var failed: [QuickAdd.File] = []
+        var reasons: [String] = []
+        for file in entry.attachments {
+            guard file.isOnDisk else {
+                failed.append(file)
+                continue
+            }
+            do {
+                embeds.append(try await library.attach(file: file.url, to: entry.id))
+            } catch {
+                failed.append(file)
+                let reason = (error as? SourceFailure)?.message ?? error.localizedDescription
+                if !reasons.contains(reason) { reasons.append(reason) }
+            }
+        }
+        if !failed.isEmpty {
+            let title = failed.count == 1 ? String(localized: "File Not Attached") : String(localized: "Files Not Attached")
+            library.notices.tell(title, ([QuickAdd.File.notAdded(failed)] + reasons).joined(separator: " "))
+        }
+        if entry.embedsInText, !embeds.isEmpty { newEmbeds = NewEmbeds(id: entry.id, embeds: embeds) }
     }
 }

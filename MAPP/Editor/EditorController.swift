@@ -52,6 +52,12 @@ final class EditorController: NSObject {
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
     /// The heading a link asked for in the note it is opening, scrolled to once that note is on the page.
     @ObservationIgnored var pendingHeading: (note: ItemID, text: String)?
+    /// What the page writes for files quick add attached to a new note, put at the end of its text once the page
+    /// shows that note (`append(_:to:)`).
+    @ObservationIgnored var pendingEmbeds: [ItemID: [Embed]] = [:]
+    /// Whether the page is writing some of them now, and whether to send what still waits once it has answered.
+    @ObservationIgnored var isAppendingEmbeds = false
+    @ObservationIgnored var appendsAgain = false
     @ObservationIgnored var isWatchingLinks = false
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
@@ -295,6 +301,7 @@ final class EditorController: NSObject {
         call(function, json(body.text), String(generation), String(isEditable))
         revealPendingHeading(in: item.id)
         if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
+        appendPendingEmbeds()
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -461,6 +468,7 @@ final class EditorController: NSObject {
                 call("load", json(markdown), String(generation), String(isEditable))
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
+            appendPendingEmbeds()
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }
@@ -468,6 +476,7 @@ final class EditorController: NSObject {
         case .state(let state):
             guard state.generation == generation else { return }
             if state != caret { caret = state }
+            if !state.sourceMode { appendPendingEmbeds() }
         case .headerScrolledAway(let away, let generation):
             guard generation == self.generation, away != isHeaderScrolledAway else { return }
             isHeaderScrolledAway = away

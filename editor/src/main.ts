@@ -47,6 +47,7 @@ declare global {
         y?: number,
         height?: number,
       ): void
+      appendImages(images: { src: string; alt: string }[], expected: number): unknown
       setKeymap(keymap: Keymap): void
       readableSnapshot(expected?: number): unknown
       snapshot(expected?: number): unknown
@@ -219,6 +220,7 @@ window.editor = {
         y == null ? y : y - Math.max(0, (height ?? window.innerHeight) - window.innerHeight),
       ),
     ),
+  appendImages: (images, expected) => guardedCommand(() => editor.appendImages(images, expected)),
   setKeymap: (keymap) => editor.setKeymap(keymap),
   readableSnapshot: (expected) => editor.readableSnapshot(expected),
   snapshot: (expected) => editor.snapshot(expected),

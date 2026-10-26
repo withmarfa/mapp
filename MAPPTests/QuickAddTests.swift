@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 extension Browser {
@@ -13,8 +14,27 @@ extension Browser {
     }
 }
 
+/// Files on disk for a test, removed when it ends.
+final class TestFiles {
+    let directory = URL.temporaryDirectory.appending(path: "MAPPTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+
+    init() { try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
+    deinit { try? FileManager.default.removeItem(at: directory) }
+
+    func url(_ name: String, _ contents: String = "bytes") -> URL {
+        let url = directory.appending(path: name)
+        try? Data(contents.utf8).write(to: url)
+        return url
+    }
+
+    func file(_ name: String, _ contents: String = "bytes") throws -> QuickAdd.File {
+        try #require(QuickAdd.File(url(name, contents)))
+    }
+}
+
 struct QuickAddTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+    let disk = TestFiles()
 
     @Test func anItemIsMadeWithItsTitleTextAndPropertiesAndOpensWithTheCaretWhereItWas() async throws {
         let library = FakeItemLibrary(now: start)
@@ -137,13 +157,162 @@ struct QuickAddTests {
         #expect(notice?.message.hasPrefix("The window changed to another library before the item was added.") == true)
     }
 
+    // MARK: Attachments
+
+    @Test func filesAreAttachedOnceTheItemIsMadeAndGoToTheEndOfItsText() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        browser.quickAdd.draft?.body = "Plans"
+        browser.quickAdd.draft?.files = [try disk.file("map 1.png", "map"), try disk.file("tickets.pdf", "pdf")]
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        await browser.attachingNewItem?.value
+
+        #expect(library.attachedFiles.map(\.name) == ["map 1.png", "tickets.pdf"])
+        #expect(library.attachedFiles.map(\.item) == [id, id])
+        #expect(library.attachedFiles.first?.data == Data("map".utf8))
+        #expect(library.bodies[id] == "Plans", "the library never writes the embeds itself; the page does")
+        #expect(browser.newEmbeds == NewEmbeds(id: id, embeds: [
+            Embed(link: "map%201.png", name: "map 1.png"), Embed(link: "tickets.pdf", name: "tickets.pdf"),
+        ]))
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    @Test func filesOfAKindWithoutTextAreAttachedWithoutEmbeds() async throws {
+        let library = FakeItemLibrary(now: start)
+        let place = TypeID("test.place")
+        library.catalogue.itemTypes[place] = ItemTypeInfo(
+            id: place, label: "Place", fields: [], titleField: "title", bodyField: nil, parent: nil)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: place.rawValue, in: library)
+        browser.quickAdd.draft?.title = "Lisbon"
+        browser.quickAdd.draft?.files = [try disk.file("brief.pdf")]
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        await browser.attachingNewItem?.value
+        #expect(library.attachedFiles.map(\.item) == [id])
+        #expect(browser.newEmbeds == nil)
+    }
+
+    @Test func anAttachThatFailsIsToldAndLeavesTheItemAndTheOtherFiles() async throws {
+        let library = FakeItemLibrary(now: start)
+        library.refusedAttachments = ["b.png"]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        browser.quickAdd.draft?.body = "Plans"
+        browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.png"), try disk.file("c.png")]
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        await browser.attachingNewItem?.value
+
+        #expect(library.attachedFiles.map(\.name) == ["a.png", "c.png"])
+        #expect(library.item(id)?.title == "Trip")
+        #expect(library.bodies[id] == "Plans")
+        #expect(browser.newEmbeds?.embeds.map(\.name) == ["a.png", "c.png"])
+        let notice = try #require(library.notices.waiting.first)
+        #expect(library.notices.waiting.count == 1)
+        #expect(notice.title == "File Not Attached")
+        #expect(notice.message.contains("“b.png” wasn’t added."))
+        #expect(notice.message.contains("The upload failed."))
+    }
+
+    @Test func aFileGoneBeforeAddIsToldAndTakenOutOfTheDraft() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        let kept = try disk.file("kept.png")
+        let gone = try disk.file("gone.png")
+        browser.quickAdd.draft?.files = [kept, gone]
+        try FileManager.default.removeItem(at: gone.url)
+
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.created.isEmpty)
+        #expect(browser.quickAdd.draft?.title == "Trip")
+        #expect(browser.quickAdd.draft?.files == [kept])
+        #expect(library.notices.waiting.first?.title == "File Not Found")
+        #expect(library.notices.waiting.first?.message.contains("“gone.png”") == true)
+
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil, "the person has been told; Add goes on")
+    }
+
+    @Test func aFileGoneAfterAddIsToldAsNotAttached() async throws {
+        let library = FakeItemLibrary(now: start)
+        library.holdsCreations = true
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        let gone = try disk.file("gone.png")
+        browser.quickAdd.draft?.files = [gone]
+        _ = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        try FileManager.default.removeItem(at: gone.url)
+        library.deliverCreated()
+        browser.finishNewItem(in: library)
+        await browser.attachingNewItem?.value
+        #expect(library.attachedFiles.isEmpty)
+        #expect(library.notices.waiting.first?.message.contains("“gone.png” wasn’t added.") == true)
+    }
+
+    @Test func filesOfACreateRefusedLaterAreNamed() async throws {
+        let library = FakeItemLibrary(now: start)
+        library.holdsCreations = true
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.pdf")]
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+        library.refusedCreations.insert(id)
+        browser.finishNewItem(in: library)
+        #expect(browser.newItem == nil)
+        #expect(library.attachedFiles.isEmpty)
+        #expect(library.notices.waiting.first?.message.contains("“a.png” and “b.pdf” weren’t added.") == true)
+    }
+
+    @Test func aDraftWithFilesNamesThemAsTheWindowCloses() throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.pdf")]
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        var clipboard: [String] = []
+        let notice = try #require(library.notices.show(in: UUID()) { clipboard.append($0) })
+        #expect(clipboard == ["Trip"])
+        #expect(notice.message.contains("“a.png” and “b.pdf” weren’t added."))
+
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.files = [try disk.file("only.png")]
+        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        let filesOnly = try #require(library.notices.waiting.last)
+        #expect(filesOnly.message.contains("“only.png” wasn’t added."), "files alone are worth telling")
+    }
+
+    @Test func escapeKeepsTheFiles() throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.files = [try disk.file("a.png")]
+        browser.putAwayQuickAdd()
+        #expect(browser.quickAdd.draft?.files.map(\.name) == ["a.png"])
+        browser.openQuickAdd(in: library)
+        #expect(browser.quickAdd.draft?.files.map(\.name) == ["a.png"])
+    }
+
+    @Test func aFolderIsNotAFile() throws {
+        #expect(QuickAdd.File(disk.directory) == nil)
+        #expect(QuickAdd.File(disk.directory.appending(path: "missing.png")) == nil)
+        let file = try disk.file("a.png", "12345")
+        #expect(file.byteCount == 5)
+        #expect(file.contentType == .png)
+    }
+
     @Test func aFileBeingAddedIsNotHandedOffAsTheWindowCloses() async throws {
         let library = FakeItemLibrary(now: start)
         let (release, released) = AsyncStream<Void>.makeStream()
         library.sendingFile = { for await _ in release { break } }
         let browser = Browser()
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
         #expect(await eventually { browser.quickAdd.isSaving })
@@ -160,7 +329,7 @@ struct QuickAddTests {
         library.sendingFile = { for await _ in release { break } }
         let browser = Browser()
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.draft?.title = "Typed meanwhile"
@@ -177,7 +346,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Holiday"
         browser.quickAdd.draft?.body = "Where we went"
         browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
-        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: Data("png".utf8))
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         let draft = try #require(browser.quickAdd.draft)
         #expect(QuickAdd.holdsTextItCannotKeep(draft, in: library.catalogue))
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
@@ -232,26 +401,48 @@ struct QuickAddTests {
             version: ItemVersion(1), created: start, modified: start)
         let library = FakeItemLibrary(items: [project], now: start)
         let browser = Browser()
+        library.parentCandidates[TypeID.file.rawValue] = [project.id]
+        browser.sidebarItem = .collection(project.id)
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        let data = Data("png".utf8)
-        browser.quickAdd.draft?.file = QuickAdd.File(name: "photo.png", data: data)
+        #expect(browser.quickAdd.draft?.parentID == project.id, "a file goes under the collection shown")
+        browser.quickAdd.draft?.files = [try disk.file("photo.png", "png")]
         browser.quickAdd.draft?.title = "Holiday"
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
 
         let added = try #require(library.addedFiles.first)
-        #expect(added.name == "photo.png" && added.data == data && added.title == "Holiday")
+        #expect(added.name == "photo.png" && added.data == Data("png".utf8) && added.title == "Holiday")
+        #expect(added.parent == project.id)
+        #expect(library.item(id)?.parentID == project.id)
         #expect(browser.selection == [id])
         #expect(browser.quickAdd.draft == nil)
     }
 
-    @Test func aRefusedFileKeepsTheDraft() async {
+    @Test func aFileDraftWithSeveralFilesWaitsForOne() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.files = [try disk.file("a.pdf"), try disk.file("b.pdf")]
+        browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
+        var draft = try #require(browser.quickAdd.draft)
+        #expect(draft.files.count == 2, "changing the kind keeps the files")
+        #expect(QuickAdd.holdsFilesItCannotKeep(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.addedFiles.isEmpty)
+
+        browser.quickAdd.draft?.files.removeLast()
+        draft = try #require(browser.quickAdd.draft)
+        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+    }
+
+    @Test func aRefusedFileKeepsTheDraft() async throws {
         let library = FakeItemLibrary(now: start)
         library.refusesFiles = true
         let browser = Browser()
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        browser.quickAdd.draft?.file = QuickAdd.File(name: "a.pdf", data: Data("pdf".utf8))
+        browser.quickAdd.draft?.files = [try disk.file("a.pdf")]
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
-        #expect(browser.quickAdd.draft?.file?.name == "a.pdf")
+        #expect(browser.quickAdd.draft?.files.map(\.name) == ["a.pdf"])
         #expect(browser.quickAdd.isPresented)
     }
 

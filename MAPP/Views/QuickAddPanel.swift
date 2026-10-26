@@ -2,9 +2,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// ⌘N, the toolbar's New Item and the palette's New commands: a panel near the top of the window for making one
-/// item. What it holds comes first (a title and text, a file, or a title alone), then its properties; the footer
-/// chooses the kind of item and where it goes. ⌘Return adds it and opens it. Escape, Cancel or a click outside
-/// puts it away, keeping what was typed for the window.
+/// item. What it holds comes first (a title and text, a file, or a title alone), then its properties and the files
+/// to attach to it; the footer attaches files and chooses the kind of item and where it goes. ⌘Return adds it and
+/// opens it. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -37,17 +37,25 @@ struct QuickAddPanel: View {
         let catalogue = library.catalogue
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
         let showsBody = QuickAdd.showsBody(draft, in: catalogue)
+        let holdsFiles = QuickAdd.holdsFilesItCannotKeep(draft, in: catalogue)
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
-                if isFile { fileArea(draft) }
+                if isFile, !holdsFiles { fileArea(draft) }
                 titleField(isFile: isFile)
                 propertyChips(draft)
                 if showsBody { bodyField(draft) }
+                if !draft.files.isEmpty, !isFile || holdsFiles { attachmentChips(draft) }
                 if QuickAdd.holdsTextItCannotKeep(draft, in: catalogue) {
                     Text("This kind of item doesn’t keep text. Remove the text, or choose another kind.")
                         .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddTextNotKept")
+                }
+                if holdsFiles {
+                    Text("A file item holds one file. Remove the others, or choose another kind.")
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddFilesNotKept")
                 }
             }
             .padding(.horizontal, 20)
@@ -61,6 +69,23 @@ struct QuickAddPanel: View {
         }
         .frame(minHeight: 300)
         .floatingPanelSurface(width: 620)
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .allowsHitTesting(false)
+            }
+        }
+        // Files dropped or pasted anywhere on the panel are the file of a file item, or attachments of any other.
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            take(providers)
+        }
+        .onPasteCommand(of: [.fileURL]) { providers in
+            _ = take(providers)
+        }
+        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.item], allowsMultipleSelection: !isFile) { result in
+            if case .success(let urls) = result { take(urls) }
+        }
         .onKeyPress(.escape) {
             putAway()
             return .handled
@@ -174,18 +199,21 @@ struct QuickAddPanel: View {
     }
 
     private func fileArea(_ draft: QuickAdd.Draft) -> some View {
-        Button {
+        let catalogue = library.catalogue
+        return Button {
             isChoosingFile = true
         } label: {
             VStack(spacing: 6) {
-                if let file = draft.file {
-                    Image(systemName: "doc")
+                if let file = draft.files.first {
+                    Image(systemName: TypeSymbol.name(for: .file, in: catalogue))
                         .font(.title)
                     Text(verbatim: file.name)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(Int64(file.data.count), format: .byteCount(style: .file))
-                        .foregroundStyle(.secondary)
+                    if let byteCount = file.byteCount {
+                        Text(byteCount, format: .byteCount(style: .file))
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Image(systemName: "arrow.down.document")
                         .font(.title)
@@ -198,44 +226,91 @@ struct QuickAddPanel: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .background(isDropTargeted ? Color.accentColor.opacity(0.12) : .clear, in: .rect(cornerRadius: 10))
         .overlay {
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(isDropTargeted ? Color.accentColor : Color(nsColor: .separatorColor),
-                              style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-        }
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-            take(providers)
-        }
-        .onPasteCommand(of: [.fileURL]) { providers in
-            _ = take(providers)
-        }
-        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.item]) { result in
-            if case .success(let url) = result { take(url) }
+                .strokeBorder(Color(nsColor: .separatorColor), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
         }
         .accessibilityIdentifier("QuickAddFile")
     }
 
+    /// The files to attach, or a file item's files while it holds more than one, each with a button to remove it.
+    private func attachmentChips(_ draft: QuickAdd.Draft) -> some View {
+        let catalogue = library.catalogue
+        return ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                ForEach(draft.files) { file in
+                    HStack(spacing: 4) {
+                        Image(systemName: TypeSymbol.name(for: .file, in: catalogue))
+                            .foregroundStyle(.secondary)
+                        Text(verbatim: file.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: 200, alignment: .leading)
+                            .fixedSize()
+                        Button {
+                            quickAdd.draft?.files.removeAll { $0 == file }
+                        } label: {
+                            Label("Remove “\(file.name)”", systemImage: "xmark.circle.fill")
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Remove")
+                    }
+                    .interfaceFont(.callout)
+                    .padding(.leading, 8)
+                    .padding(.trailing, 5)
+                    .padding(.vertical, 3)
+                    .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor)))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("QuickAddAttachment")
+                }
+            }
+        }
+        .scrollIndicators(.never)
+        .accessibilityIdentifier("QuickAddAttachments")
+    }
+
     private func take(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: URL.self) }) else { return false }
-        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-            guard let url else { return }
-            Task { @MainActor in take(url) }
+        let providers = providers.filter { $0.canLoadObject(ofClass: URL.self) }
+        guard !providers.isEmpty else { return false }
+        Task {
+            var urls: [URL] = []
+            for provider in providers {
+                if let url = await Self.url(from: provider) { urls.append(url) }
+            }
+            take(urls)
         }
         return true
     }
 
-    private func take(_ url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else {
+    private static func url(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+        }
+    }
+
+    /// Takes files given to the panel: the file of a file item, replacing the one it had, or attachments of any
+    /// other kind. Each is read only when the item is added; a folder or a file that cannot be read is told now.
+    private func take(_ urls: [URL]) {
+        guard let draft = quickAdd.draft else { return }
+        var taken: [QuickAdd.File] = []
+        var unreadable: [String] = []
+        for url in urls {
+            if let file = QuickAdd.File(url) { taken.append(file) } else { unreadable.append("“\(url.lastPathComponent)”") }
+        }
+        if !unreadable.isEmpty {
             library.notices.tell(
                 String(localized: "Can’t Add File"),
-                String(localized: "MAPP couldn’t read “\(url.lastPathComponent)”."))
-            return
+                String(localized: "MAPP can’t read \(unreadable.formatted(.list(type: .and))) as a file."))
         }
-        quickAdd.draft?.file = QuickAdd.File(name: url.lastPathComponent, data: data)
-        focus = .title
+        guard !taken.isEmpty else { return }
+        if QuickAdd.isFile(draft.typeID, in: library.catalogue) {
+            quickAdd.draft?.files = taken
+        } else {
+            quickAdd.draft?.files += taken.filter { !draft.files.contains($0) }
+        }
+        if focus == nil { focus = .title }
     }
 
     // MARK: Properties
@@ -322,8 +397,9 @@ struct QuickAddPanel: View {
     private func bottomBar(_ draft: QuickAdd.Draft, isFile: Bool) -> some View {
         let label = QuickAdd.types(in: library).first { $0.id.rawValue == draft.typeID }?.label ?? ""
         return HStack(spacing: 8) {
+            attachButton(isFile: isFile)
             typePicker(draft)
-            if !isFile { parentPicker(draft) }
+            parentPicker(draft)
             Spacer(minLength: 12)
             Button("Cancel") { putAway() }
                 .accessibilityIdentifier("QuickAddCancel")
@@ -343,6 +419,20 @@ struct QuickAddPanel: View {
             .accessibilityIdentifier("QuickAddAdd")
         }
         .controlSize(.large)
+    }
+
+    /// Chooses the file of a file item, or files to attach to any other kind.
+    private func attachButton(isFile: Bool) -> some View {
+        Button {
+            isChoosingFile = true
+        } label: {
+            Label(isFile ? "Choose File" : "Attach Files", systemImage: "paperclip")
+                .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .help(isFile ? "Choose File" : "Attach Files")
+        .accessibilityIdentifier("QuickAddAttach")
     }
 
     /// Where the item goes, as a pop-up button: no parent, or one of the items its kind can go under.

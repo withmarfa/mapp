@@ -1,13 +1,62 @@
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 /// A window's quick-add panel: the kind of item being made, what the person typed, and where it goes. The draft
 /// outlives the panel being put away, so nothing typed is lost until it is added or handed to the clipboard.
 @Observable
 final class QuickAdd {
-    struct File: Equatable {
-        var name: String
-        var data: Data
+    /// A file the person chose, dropped or pasted, read from where it is when the item is added rather than held
+    /// in memory. The app may read it for as long as any draft or new item holds it.
+    struct File: Equatable, Identifiable {
+        let url: URL
+        let byteCount: Int64?
+        let contentType: UTType?
+        private let access: FileAccess
+
+        /// Nil for a folder, a package or anything else that is not one file that can be read.
+        init?(_ url: URL) {
+            access = FileAccess(url)
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentTypeKey]),
+                  values.isRegularFile == true, FileManager.default.isReadableFile(atPath: url.path(percentEncoded: false))
+            else { return nil }
+            self.url = url
+            byteCount = values.fileSize.map(Int64.init)
+            contentType = values.contentType
+        }
+
+        var id: URL { url }
+        var name: String { url.lastPathComponent }
+        /// Whether the file is still where it was taken from, since it is read only when the item is added.
+        var isOnDisk: Bool { FileManager.default.isReadableFile(atPath: url.path(percentEncoded: false)) }
+
+        static func == (lhs: File, rhs: File) -> Bool { lhs.url == rhs.url }
+
+        /// The files' names in a sentence: “a.pdf” and “b.png”.
+        static func names(_ files: [File]) -> String {
+            files.map { "“\($0.name)”" }.formatted(.list(type: .and))
+        }
+
+        /// The sentence that tells the person these files were not added.
+        static func notAdded(_ files: [File]) -> String {
+            files.count == 1
+                ? String(localized: "\(names(files)) wasn’t added.")
+                : String(localized: "\(names(files)) weren’t added.")
+        }
+    }
+
+    /// Holds a sandbox extension to a file the person gave, so the file can be read later, and gives it up once
+    /// nothing holds the file.
+    nonisolated final class FileAccess: Sendable {
+        private let url: URL
+        private let scoped: Bool
+
+        init(_ url: URL) {
+            self.url = url
+            scoped = url.startAccessingSecurityScopedResource()
+        }
+
+        deinit { if scoped { url.stopAccessingSecurityScopedResource() } }
     }
 
     struct Draft: Equatable {
@@ -18,10 +67,11 @@ final class QuickAdd {
         var caret: Int?
         var properties: [String: PropertyValue] = [:]
         var parentID: ItemID?
-        var file: File?
+        /// For a file, the file; for any other kind, the files attached to the item once it is made.
+        var files: [File] = []
 
         /// Whether the person put anything in it worth keeping: text or a file. A property chosen alone is not.
-        var hasContent: Bool { !NoteName.trimmed(title).isEmpty || !isBlank(body) || file != nil }
+        var hasContent: Bool { !NoteName.trimmed(title).isEmpty || !isBlank(body) || !files.isEmpty }
 
         /// What the clipboard is given when the draft cannot be added: the title, then the body.
         var text: String? {
@@ -63,8 +113,9 @@ final class QuickAdd {
     }
 
     /// Gives a draft with anything in it to the clipboard through `notices`, which tells the person, as it leaves
-    /// the window, since nothing else would keep it. A file being added, and the title sent with it, are on their
-    /// way already, so only what was typed besides them is handed off.
+    /// the window, since nothing else would keep it, and names the files it held, which the clipboard cannot. A
+    /// file being added, and the title sent with it, are on their way already, so only what was typed or given
+    /// besides them is handed off.
     func handOff(to notices: Notices, because departure: Departure) {
         defer {
             draft = nil
@@ -72,14 +123,15 @@ final class QuickAdd {
         }
         guard var draft else { return }
         if let sending {
-            draft.file = nil
+            draft.files.removeAll { sending.files.contains($0) }
             if NoteName.trimmed(draft.title) == NoteName.trimmed(sending.title) { draft.title = "" }
         }
         guard draft.hasContent else { return }
-        let reason = switch departure {
+        var reason = switch departure {
         case .closed: String(localized: "Quick add closed before the item was added.")
         case .libraryChanged: String(localized: "The window changed to another library before the item was added.")
         }
+        if !draft.files.isEmpty { reason += " " + File.notAdded(draft.files) }
         notices.notKept(
             String(localized: "Item Not Added"), text: draft.text,
             reason: draft.text == nil ? String(localized: "\(reason) Add it again.") : reason)
@@ -178,11 +230,18 @@ final class QuickAdd {
             || holdsTextItCannotKeep(draft, in: catalogue)
     }
 
-    /// Whether the draft can be added: a title, or a file for a file, a value for every required field, and no
+    /// Whether a file draft holds more than the one file a file item keeps, as when a note's attachments stay
+    /// after the kind changes to File. The files stay in sight and hold the draft back until all but one are
+    /// removed or the kind changes back.
+    static func holdsFilesItCannotKeep(_ draft: Draft, in catalogue: Catalogue) -> Bool {
+        isFile(draft.typeID, in: catalogue) && draft.files.count > 1
+    }
+
+    /// Whether the draft can be added: a title, or one file for a file, a value for every required field, and no
     /// text its kind cannot keep.
     static func canSave(_ draft: Draft, in catalogue: Catalogue) -> Bool {
         if holdsTextItCannotKeep(draft, in: catalogue) { return false }
-        if isFile(draft.typeID, in: catalogue) { return draft.file != nil }
+        if isFile(draft.typeID, in: catalogue) { return draft.files.count == 1 }
         guard !NoteName.trimmed(draft.title).isEmpty else { return false }
         return fields(of: draft.typeID, in: catalogue).allSatisfy { field in
             !field.required || draft.properties[field.key].map { $0 != .null } == true
@@ -214,16 +273,15 @@ extension Browser {
         quickAdd.isPresented = true
     }
 
-    /// Changes the kind of item, keeping what was typed. A place or property the new kind cannot take is dropped.
+    /// Changes the kind of item, keeping what was typed and the files given. A place or property the new kind
+    /// cannot take is dropped.
     func chooseQuickAddType(_ typeID: String, in library: any ItemLibrary) {
         guard var draft = quickAdd.draft else { return }
         draft.typeID = typeID
         let keys = Set(QuickAdd.fields(of: typeID, in: library.catalogue).map(\.key))
         draft.properties = draft.properties.filter { keys.contains($0.key) }
-        if let parent = draft.parentID {
-            let canHold = !QuickAdd.isFile(typeID, in: library.catalogue)
-                && library.creationParentCandidates(typeID: typeID).contains { $0.id == parent }
-            if !canHold { draft.parentID = nil }
+        if let parent = draft.parentID, !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parent }) {
+            draft.parentID = nil
         }
         quickAdd.draft = draft
     }
@@ -235,20 +293,43 @@ extension Browser {
     }
 
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
-    /// panel closes and the window opens the item. Where
-    /// the library cannot make it, everything stays as typed and the library tells the person why. Nothing empty
-    /// is ever written.
+    /// panel closes and the window opens the item, and attaches the draft's files to it (`finishNewItem`). Where
+    /// the library cannot make it, everything stays as typed and the library tells the person why. A file no
+    /// longer where it was is taken out of the draft and named, and nothing is added until the person has seen
+    /// that. Nothing empty is ever written.
     @discardableResult
     func saveQuickAdd(in library: any ItemLibrary, undoManager: UndoManager?) async -> ItemID? {
         guard let draft = quickAdd.draft, !quickAdd.isSaving, QuickAdd.canSave(draft, in: library.catalogue) else { return nil }
-        let isFile = QuickAdd.isFile(draft.typeID, in: library.catalogue)
+        let missing = draft.files.filter { !$0.isOnDisk }
+        guard missing.isEmpty else {
+            quickAdd.draft?.files.removeAll { missing.contains($0) }
+            let names = QuickAdd.File.names(missing)
+            if missing.count == 1 {
+                library.notices.tell(
+                    String(localized: "File Not Found"),
+                    String(localized: "\(names) is no longer where it was, so it was taken out of the new item. Add it again, or add the item without it."))
+            } else {
+                library.notices.tell(
+                    String(localized: "Files Not Found"),
+                    String(localized: "\(names) are no longer where they were, so they were taken out of the new item. Add them again, or add the item without them."))
+            }
+            return nil
+        }
+        let catalogue = library.catalogue
+        let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
         let id: ItemID?
-        if isFile, let file = draft.file {
+        if isFile, let file = draft.files.first {
             quickAdd.saving(draft)
             let title = NoteName.trimmed(draft.title)
             id = await library.addFile(
-                named: file.name, data: file.data, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: item)
+                file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: item)
             quickAdd.saving(nil)
+            guard let id else { return nil }
+            // The person may have changed the draft while the file was sent; only the file sent is taken from it.
+            guard quickAdd.draft == draft else {
+                quickAdd.draft?.files.removeAll { $0 == file }
+                return id
+            }
         } else {
             let properties = draft.properties.filter { $0.value != .null }
             id = library.createItem(
@@ -256,15 +337,12 @@ extension Browser {
                 in: item, undoManager: undoManager)
         }
         guard let id else { return nil }
-        // The person may have changed the draft while a file was sent; only the file sent is taken from it.
-        guard quickAdd.draft == draft else {
-            quickAdd.draft?.file = nil
-            return id
-        }
         quickAdd.isPresented = false
         quickAdd.draft = nil
-        let caret = QuickAdd.hasBody(draft.typeID, in: library.catalogue) ? draft.pageCaret : nil
-        newItem = NewItem(id: id, typeID: draft.typeID, library: library, caret: caret, isFile: isFile)
+        let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
+        newItem = NewItem(
+            id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
+            attachments: isFile ? [] : draft.files, embedsInText: keepsText)
         finishNewItem(in: library)
         return id
     }
