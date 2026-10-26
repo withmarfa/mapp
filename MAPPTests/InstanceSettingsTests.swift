@@ -343,6 +343,34 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.draft[.name] == "Library")
     }
 
+    @Test func aLibraryWithNoServerSettingsSaysSoInsteadOfReadingForever() async throws {
+        // The sample library has no configurer, so the host has no source to ask.
+        let bench = try HostBench()
+        bench.defaults.set("https://marfa.test", forKey: "MarfaAddress")
+        let host = MarfaHost(defaults: bench.defaults, keys: bench.keys, location: bench.location, configurer: { _, _ in nil })
+        #expect(host.configuredConnection != nil)
+        let model = InstanceSettingsModel { host.instanceConfigTarget() }
+
+        await model.load()
+
+        #expect(model.failure == .unsupported)
+        #expect(!model.isAvailable)
+        #expect(!model.isLoading)
+    }
+
+    @Test func settingsAreReadOnceAServerCanBeAsked() async {
+        let source = FakeInstanceConfig([.name: .text("Library")])
+        var target: InstanceSettingsModel.Target?
+        let model = InstanceSettingsModel { target }
+        await model.load()
+        #expect(model.failure == .unsupported)
+
+        target = .init(id: "https://marfa.test", source: source)
+        await model.load()
+        #expect(model.failure == nil)
+        #expect(model.loaded?.name == "Library")
+    }
+
     @Test func anotherServerStartsFromNothing() async {
         let first = FakeInstanceConfig([.name: .text("One")])
         let second = FakeInstanceConfig([.name: .text("Two")])

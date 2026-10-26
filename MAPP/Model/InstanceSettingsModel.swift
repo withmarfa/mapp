@@ -71,13 +71,14 @@ import Observation
     /// that may not shows none, rather than fields that can't be saved, but what was typed is kept for when it may.
     var isAvailable: Bool { loaded != nil && failure != .notPermitted }
 
-    /// Whether a server is set to ask at all.
-    var hasServer: Bool { provider() != nil }
-
     /// Reads the settings. A draft the person has already edited is kept, and the fields they have not touched take
     /// the new answer.
     func load() async {
-        guard let target = adopt(), !isLoading, !isSaving else { return }
+        guard let target = adopt() else {
+            failure = .unsupported
+            return
+        }
+        guard !isLoading, !isSaving else { return }
         let generation = generation
         isLoading = true
         defer { if generation == self.generation { isLoading = false } }

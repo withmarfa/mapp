@@ -39,6 +39,7 @@
 "“%@” may remove items sooner than the server’s current setting." : { "extractionState" : "manual" },
 "Emptying “%@” goes back to the server’s own default, which MAPP can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : { "extractionState" : "manual" },
 "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing." : { "extractionState" : "manual" },
+"There are no server settings to show for this library." : { "extractionState" : "manual" },
 "%lld days" : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {

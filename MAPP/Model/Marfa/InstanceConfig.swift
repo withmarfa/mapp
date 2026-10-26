@@ -176,6 +176,8 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     case notPermitted
     /// Another instance answers at the address than the one the settings were read from.
     case instanceChanged
+    /// There is no server to ask for settings: none is set, or the library has none, as the sample does not.
+    case unsupported
     case keyRefused
     /// The server refused the values; the message is its reason.
     case refused(String)
@@ -189,6 +191,8 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
             String(localized: "The key MAPP uses isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
         case .instanceChanged:
             String(localized: "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing.")
+        case .unsupported:
+            String(localized: "There are no server settings to show for this library.")
         case .keyRefused:
             String(localized: "The server didn’t accept MAPP’s key. Choose a new key in Library.")
         case .refused(let reason), .failed(let reason):

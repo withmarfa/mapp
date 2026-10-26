@@ -45,7 +45,7 @@ struct ThisMarfaSettings: View {
                         Button("Open in Browser") { openURL(address) }
                             .accessibilityIdentifier("ThisMarfaOpenConsole")
                     }
-                } else {
+                } else if failure != .unsupported {
                     Button("Try Again") { Task { await model.load() } }
                         .disabled(model.isLoading)
                         .accessibilityIdentifier("ThisMarfaTryAgain")
@@ -57,7 +57,7 @@ struct ThisMarfaSettings: View {
                 }
             }
         } header: {
-            if model.failure == .notPermitted { Text("Settings unavailable") } else { Text("Settings") }
+            if model.failure == .notPermitted || model.failure == .unsupported { Text("Settings unavailable") } else { Text("Settings") }
         }
     }
 }
