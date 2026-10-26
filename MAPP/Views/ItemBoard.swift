@@ -4,6 +4,8 @@ import SwiftUI
 struct ItemBoard: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    /// The window's, for the Change Type sheet.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var cursor: ItemID?
@@ -145,6 +147,7 @@ struct ItemBoard: View {
                 }
             }
             .disabled(!item.isEditable)
+            TypeChangeButton(ids: browser.selection.contains(item.id) ? browser.selection : [item.id], details: details, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
     }
