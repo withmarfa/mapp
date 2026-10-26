@@ -67,6 +67,9 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         let (model, source) = await loaded([.versionMaxVersions: .number(50), .name: .text("Library")])
         model.draft[.versionMaxVersions] = " "
         await model.save()
+        // The default that replaces 50 is not known, so the person agrees first.
+        #expect(source.sent.isEmpty)
+        if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
         #expect(model.saved == ["Most versions kept per item: default, 500"])
@@ -100,7 +103,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         model.draft[.trashRetentionDays] = "7"
         await model.save()
         #expect(source.sent.isEmpty)
-        #expect(model.pending?.shortenings == [.init(setting: .trashRetentionDays, from: 60, to: 7)])
+        #expect(model.pending?.shortenings == [.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7))])
         model.cancelPending()
         #expect(source.sent.isEmpty)
 
@@ -115,12 +118,71 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(source.sent.count == 2)
     }
 
-    @Test func anUnsetRetentionIsComparedWithTheDefaultTheServerWouldUse() async {
-        let (model, _) = await loaded()
-        model.draft[.versionWeeklyDays] = "100"
-        model.draft[.versionMaxVersions] = "900"
+    /// What `save` would ask about for `typed` on a server that holds `held`.
+    private func asked(_ held: [InstanceSetting: InstanceValue], _ typed: [InstanceSetting: String]) async -> [InstanceSettingsModel.Shortening] {
+        let (model, _) = await loaded(held)
+        for (setting, text) in typed { model.draft[setting] = text }
         await model.save()
-        #expect(model.pending?.shortenings.map(\.setting) == [.versionWeeklyDays])
+        return model.pending?.shortenings ?? []
+    }
+
+    @Test func aValueTypedForAnUnsetRetentionAsksBecauseTheServersDefaultIsNotKnown() async {
+        // A server whose environment sets a default of 365 days of trash would lose items sooner at 100.
+        #expect(await asked([:], [.trashRetentionDays: "100"]) == [.init(setting: .trashRetentionDays, change: .mayBeShorter(to: 100))])
+        // Even a value longer than the documented default, and one equal to it.
+        #expect(await asked([:], [.trashRetentionDays: "90"]).count == 1)
+        #expect(await asked([:], [.trashRetentionDays: "60"]).count == 1)
+        #expect(await asked([:], [.versionWeeklyDays: "400"]) == [.init(setting: .versionWeeklyDays, change: .mayBeShorter(to: 400))])
+        #expect(await asked([:], [.versionMaxVersions: "900"]) == [.init(setting: .versionMaxVersions, change: .mayBeShorter(to: 900))])
+        // A zero window is empty, so it is the least a window keeps.
+        #expect(await asked([:], [.versionRecentDays: "0"]).count == 1)
+    }
+
+    @Test func aValueNothingCouldOutlastAsksNothing() async {
+        #expect(await asked([:], [.trashRetentionDays: "0"]).isEmpty)
+        #expect(await asked([:], [.trashRetentionDays: "36500"]).isEmpty)
+        #expect(await asked([:], [.versionRecentDays: "36500", .versionDailyDays: "36500", .versionWeeklyDays: "36500"]).isEmpty)
+        #expect(await asked([:], [.versionMaxVersions: "9007199254740991"]).isEmpty)
+        #expect(await asked([:], [.name: "Home"]).isEmpty)
+    }
+
+    @Test func clearingASetRetentionAsksAndNamesNoDefault() async {
+        let shortenings = await asked([.trashRetentionDays: .number(45), .versionMaxVersions: .number(50)], [.trashRetentionDays: "", .versionMaxVersions: " "])
+        #expect(shortenings == [
+            .init(setting: .trashRetentionDays, change: .toDefault(from: 45)),
+            .init(setting: .versionMaxVersions, change: .toDefault(from: 50)),
+        ])
+        let words = shortenings.map(InstanceWording.consequence)
+        #expect(words[0].contains("may remove items sooner than the server’s current setting"))
+        #expect(words[0].contains("45 days"))
+        #expect(!words[0].contains("60"))
+        #expect(!words[1].contains("500"))
+    }
+
+    @Test func clearingASettingThatCannotKeepLessAsksNothing() async {
+        #expect(await asked([.versionRecentDays: .number(0)], [.versionRecentDays: ""]).isEmpty)
+        #expect(await asked([.trashRetentionDays: .number(1)], [.trashRetentionDays: ""]).isEmpty)
+        #expect(await asked([.versionMaxVersions: .number(1)], [.versionMaxVersions: ""]).isEmpty)
+        // No limit on trash keeps the most, so any default may keep less.
+        #expect(await asked([.trashRetentionDays: .number(0)], [.trashRetentionDays: ""]).count == 1)
+    }
+
+    @Test func aSetRetentionIsComparedWithWhatTheServerHolds() async {
+        #expect(await asked([.trashRetentionDays: .number(60)], [.trashRetentionDays: "59"]) == [.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 59))])
+        #expect(await asked([.trashRetentionDays: .number(30)], [.trashRetentionDays: "60"]).isEmpty)
+        #expect(await asked([.trashRetentionDays: .number(30)], [.trashRetentionDays: "30"]).isEmpty)
+        #expect(await asked([.trashRetentionDays: .number(30)], [.trashRetentionDays: "0"]).isEmpty)
+        #expect(await asked([.trashRetentionDays: .number(0)], [.trashRetentionDays: "30"]).count == 1)
+        #expect(await asked([.versionMaxVersions: .number(100)], [.versionMaxVersions: "99"]).count == 1)
+    }
+
+    @Test func theWordsSayAnUnknownSettingMayRemoveItemsSooner() {
+        let typed = InstanceSettingsModel.Shortening(setting: .trashRetentionDays, change: .mayBeShorter(to: 100))
+        let words = InstanceWording.consequence(typed)
+        #expect(words.contains("may remove items sooner than the server’s current setting"))
+        #expect(words.contains("100 days"))
+        let known = InstanceWording.consequence(.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7)))
+        #expect(!known.contains("sooner than"))
     }
 
     @Test func aSettingChangedElsewhereIsShownAndNotOverwritten() async {

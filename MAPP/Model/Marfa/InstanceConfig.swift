@@ -26,7 +26,8 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     }
 
     /// What the server uses while the setting is unset and whoever runs it has set nothing else. A key cannot read the
-    /// server's environment, so this is the documented value, which the page says may differ.
+    /// server's environment, so this is only the documented value, which the page says may differ. It is shown, never
+    /// compared with: whether a change keeps things for less time is judged only against a value the server holds.
     var documentedDefault: Int? {
         switch self {
         case .name: nil
@@ -50,6 +51,16 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         case .versionWeeklyDays: String(localized: "One version a week kept for")
         case .versionMaxVersions: String(localized: "Most versions kept per item")
         }
+    }
+
+    /// The value that keeps things for the least time, which no other value can undercut. Zero days of trash keeps
+    /// deleted items with no age limit, so its least is a day.
+    var shortestKept: Int { self == .trashRetentionDays ? 1 : range.lowerBound }
+
+    /// Whether `value` is so long that nothing a server could be set to keeps more: no limit for trash, and the
+    /// largest the contract takes for every other setting.
+    func isUnlimited(_ value: Int) -> Bool {
+        (self == .trashRetentionDays && value == 0) || value >= range.upperBound
     }
 
     /// Whether `value` reaches further than `other` in what it keeps. Zero days of trash keeps deleted items with no
@@ -80,11 +91,6 @@ nonisolated struct InstanceConfig: Hashable, Sendable {
     var name: String? {
         if case .text(let text)? = values[.name] { return text }
         return nil
-    }
-
-    /// The number the server is using for `setting`, as far as a key can tell: the one set, else the documented default.
-    func effectiveNumber(_ setting: InstanceSetting) -> Int? {
-        number(setting) ?? setting.documentedDefault
     }
 
     /// The text a field shows for `setting`: empty where it is unset.

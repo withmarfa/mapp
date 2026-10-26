@@ -12,11 +12,20 @@ import Observation
         let source: any InstanceConfigSource
     }
 
-    /// A retention made shorter than the server shows now, which the person agrees to before it is sent.
+    /// A retention that may keep things for less time than the server does now, which the person agrees to before it
+    /// is sent.
     struct Shortening: Hashable, Sendable {
+        enum Change: Hashable, Sendable {
+            /// The server holds `from` and the person typed the shorter `to`.
+            case shorter(from: Int, to: Int)
+            /// Nothing is set, so the server uses a default that a key can't read, and `to` may be shorter than it.
+            case mayBeShorter(to: Int)
+            /// The setting is removed, so a default that a key can't read replaces `from`.
+            case toDefault(from: Int)
+        }
+
         let setting: InstanceSetting
-        let from: Int
-        let to: Int
+        let change: Change
     }
 
     struct Pending: Identifiable {
@@ -161,15 +170,28 @@ import Observation
         pending = nil
     }
 
-    /// The retentions `patch` makes shorter, against what the page shows now: the value set, else the documented default.
+    /// The retentions `patch` may make shorter. Only a value the server holds is compared with: an unset setting
+    /// uses a default whoever runs the server may have changed and a key can't read, so a value typed for it asks
+    /// unless nothing could keep more, and clearing a setting asks unless nothing could keep less.
     func shortenings(of patch: InstanceConfigPatch) -> [Shortening] {
         guard let loaded else { return [] }
         return InstanceSetting.allCases.compactMap { setting in
-            guard patch.settings.contains(setting), setting.isNumber, let from = loaded.effectiveNumber(setting) else { return nil }
-            let to: Int?
-            if case .number(let number)? = patch.values[setting] { to = number } else { to = setting.documentedDefault }
-            guard let to, setting.keepsLonger(from, than: to) else { return nil }
-            return Shortening(setting: setting, from: from, to: to)
+            guard patch.settings.contains(setting), setting.isNumber else { return nil }
+            let held = loaded.number(setting)
+            let change: Shortening.Change
+            if case .number(let to)? = patch.values[setting] {
+                if let held {
+                    guard setting.keepsLonger(held, than: to) else { return nil }
+                    change = .shorter(from: held, to: to)
+                } else {
+                    guard !setting.isUnlimited(to) else { return nil }
+                    change = .mayBeShorter(to: to)
+                }
+            } else {
+                guard let held, setting.keepsLonger(held, than: setting.shortestKept) else { return nil }
+                change = .toDefault(from: held)
+            }
+            return Shortening(setting: setting, change: change)
         }
     }
 
@@ -257,33 +279,45 @@ nonisolated enum InstanceWording {
         String(localized: "\(count) days")
     }
 
-    /// A setting's value as the server holds it, or its default where unset.
-    static func value(_ config: InstanceConfig, _ setting: InstanceSetting) -> String {
+    /// A number the server holds for a setting.
+    static func amount(_ setting: InstanceSetting, _ number: Int) -> String {
         switch setting {
-        case .name:
-            config.name ?? String(localized: "Marfa (default)")
-        case .versionMaxVersions:
-            config.number(setting).map { String($0) } ?? String(localized: "default, \(setting.documentedDefault ?? 0)")
-        case .trashRetentionDays:
-            switch config.number(setting) {
-            case 0?: String(localized: "no limit")
-            case let count?: days(count)
-            case nil: String(localized: "default, \(days(setting.documentedDefault ?? 0))")
-            }
-        default:
-            config.number(setting).map(days) ?? String(localized: "default, \(days(setting.documentedDefault ?? 0))")
+        case .versionMaxVersions: String(number)
+        case .trashRetentionDays where number == 0: String(localized: "no limit")
+        default: days(number)
         }
     }
 
-    /// What `shortening` may remove, in plain words.
+    /// A setting's value as the server holds it, or its default where unset.
+    static func value(_ config: InstanceConfig, _ setting: InstanceSetting) -> String {
+        if setting == .name { return config.name ?? String(localized: "Marfa (default)") }
+        if let number = config.number(setting) { return amount(setting, number) }
+        if setting == .versionMaxVersions { return String(localized: "default, \(setting.documentedDefault ?? 0)") }
+        return String(localized: "default, \(days(setting.documentedDefault ?? 0))")
+    }
+
+    /// What `shortening` may remove, in plain words. Where the server's current setting is not known, it says the
+    /// change may remove items sooner than that setting.
     static func consequence(_ shortening: InstanceSettingsModel.Shortening) -> String {
-        switch shortening.setting {
+        let setting = shortening.setting
+        switch shortening.change {
+        case .shorter(_, let to):
+            return removal(setting, keeping: to)
+        case .mayBeShorter(let to):
+            return String(localized: "“\(setting.title)” may remove items sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
+        case .toDefault(let from):
+            return String(localized: "Emptying “\(setting.title)” goes back to the server’s own default, which MAPP can’t read. That may remove items sooner than the server’s current setting, \(amount(setting, from)). What it removes can’t be recovered.")
+        }
+    }
+
+    private static func removal(_ setting: InstanceSetting, keeping limit: Int) -> String {
+        switch setting {
         case .trashRetentionDays:
-            String(localized: "Items deleted more than \(days(shortening.to)) ago will be removed for good, with their history, the next time the server tidies up. They can’t be recovered.")
+            String(localized: "Items deleted more than \(days(limit)) ago will be removed for good, with their history, the next time the server tidies up. They can’t be recovered.")
         case .versionMaxVersions:
-            String(localized: "An item with more than \(shortening.to) versions will lose its oldest ones for good the next time the server tidies up.")
+            String(localized: "An item with more than \(limit) versions will lose its oldest ones for good the next time the server tidies up.")
         default:
-            String(localized: "“\(shortening.setting.title)” changes to \(days(shortening.to)). Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer.")
+            String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer.")
         }
     }
 }

@@ -36,6 +36,8 @@
 "Revert" : { "extractionState" : "manual" },
 "These are the settings as the server last gave them." : { "extractionState" : "manual" },
 "Saved. The server now has:" : { "extractionState" : "manual" },
+"“%@” may remove items sooner than the server’s current setting." : { "extractionState" : "manual" },
+"Emptying “%@” goes back to the server’s own default, which MAPP can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : { "extractionState" : "manual" },
 "%lld days" : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {
