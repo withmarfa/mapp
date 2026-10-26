@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import Synchronization
 import Testing
 @testable import MAPP
@@ -12,7 +13,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     let updateFailure = Mutex<InstanceConfigFailure?>(nil)
     let patches = Mutex<[InstanceConfigPatch]>([])
     /// The instance each change said it expected.
-    let expected = Mutex<[String?]>([])
+    let expectations = Mutex<[String?]>([])
     /// Run as a change arrives, to let a test move the server under it.
     let beforeUpdate = Mutex<(@Sendable () -> Void)?>(nil)
 
@@ -27,7 +28,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
     func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig {
         patches.withLock { $0.append(patch) }
-        expected.withLock { $0.append(instanceID) }
+        expectations.withLock { $0.append(instanceID) }
         beforeUpdate.withLock { $0 }?()
         if let failure = updateFailure.withLock({ $0 }) { throw failure }
         return try config.withLock { (config) throws(InstanceConfigFailure) in
@@ -39,6 +40,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     }
 
     var sent: [InstanceConfigPatch] { patches.withLock { $0 } }
+    var expected: [String?] { expectations.withLock { $0 } }
 }
 
 @MainActor
