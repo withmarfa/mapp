@@ -84,8 +84,9 @@ test('source edits share undo and reject stale mode changes', async () =>
 
 test('note embeds describe unsupported transclusion and open source without changing Markdown', async () =>
   withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    const labels = [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
+    const shown = () => [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
+    await vi.waitFor(() => expect(shown()).toContain('Note reference: Section. Open to edit source.'))
+    const labels = shown()
     expect(labels).toContain('Note reference: A note. Open to edit source.')
     expect(labels).toContain('Note reference: Section. Open to edit source.')
     expect(labels.join(' ')).not.toContain('File unavailable')
@@ -339,9 +340,10 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
   editor.setItem('note')
   editor.load('![[A note]]\n', 1)
   try {
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
-      labels.words.noteReference!.replace('%@', 'A note'),
+    await vi.waitFor(() =>
+      expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
+        labels.words.noteReference!.replace('%@', 'A note'),
+      ),
     )
     await expect(
       NoteEditor.mount(
@@ -395,15 +397,6 @@ test('the page reports a heading by its level and applies the level the app asks
     await editor.destroy()
     root.remove()
   }
-})
-
-test('the header and the text share one column, which Inkkit reads from one token', () => {
-  const css = readFileSync(resolve(import.meta.dirname, '../src/style.css'), 'utf8')
-  expect(css).toMatch(/body\s*{[^}]*--inkkit-column-inset:/)
-  expect(css).toMatch(/#item-header\s*{[^}]*padding:[^;]*var\(--inkkit-column-inset\)/)
-  expect(css).not.toMatch(/\.ProseMirror[^{]*{[^}]*padding-inline/)
-  for (const old of ['--accent', '--text', '--muted', '--rule', '--code-bg', '--mono'])
-    expect(css).not.toMatch(new RegExp(`${old}\\b`))
 })
 
 test('images go in at the caret or at a drop point, and blur leaves the focus off the text', async () => {

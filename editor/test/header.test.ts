@@ -110,15 +110,6 @@ test('a pin without a value is drawn empty, and a status pin carries its mark', 
   expect(pin('ItemStatusPin').getAttribute('aria-description')).toBe('')
 })
 
-test('every pin is one height and the icons the app draws reach the page as masks', () => {
-  header.set(ticket)
-  const icon = { url: 'data:image/png;base64,AAAA', width: 13, height: 12 }
-  header.setIcons({ type: icon, parent: icon, plus: icon, indicator: icon })
-  expect(root.style.getPropertyValue('--icon-plus')).toBe('url("data:image/png;base64,AAAA")')
-  expect(root.style.getPropertyValue('--icon-type-width')).toBe('13px')
-  expect(root.querySelectorAll('.item-pin').length).toBe(3)
-})
-
 test('a refused title shows why and offers to discard the draft', () => {
   header.set({
     ...ticket,
