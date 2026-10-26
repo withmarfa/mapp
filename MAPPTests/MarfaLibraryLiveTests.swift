@@ -425,7 +425,9 @@ extension LiveMarfaTests {
                     try #require(await eventually { library.syncReport.waiting == 0 })
                 }
                 #expect(library.notices.waiting.isEmpty, "\(library.notices.waiting)")
-                #expect(library.syncReport.problems.isEmpty)
+                // Other runs can leave copies of their own notes on the instance, so only this note's count.
+                let copies = library.syncReport.problems.filter { $0.content.title == title }
+                #expect(copies.isEmpty, "\(copies)")
                 #expect(library.body(of: id)?.text == "Ask about the leak under the sink. Tomorrow.")
                 #expect(try await source.copy.items.get(id.rawValue)?.version == 4)
             }
