@@ -1,6 +1,39 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "“%@” couldn’t be attached. %@" : {
+      "extractionState" : "manual"
+    },
+    "“%@” is larger than %@ or can’t be read." : {
+      "extractionState" : "manual"
+    },
+    "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
+      "extractionState" : "manual"
+    },
+    "Images Weren’t Added to the Note" : {
+      "extractionState" : "manual"
+    },
+    "More than one file has this name." : {
+      "extractionState" : "manual"
+    },
+    "Some Images Weren’t Attached" : {
+      "extractionState" : "manual"
+    },
+    "The Marfa server doesn’t have this file’s contents." : {
+      "extractionState" : "manual"
+    },
+    "This file can’t be opened." : {
+      "extractionState" : "manual"
+    },
+    "This file isn’t in Marfa yet." : {
+      "extractionState" : "manual"
+    },
+    "This file isn’t on this Mac, and the Marfa server can’t be reached." : {
+      "extractionState" : "manual"
+    },
+    "This Mac doesn’t have enough space to download this file." : {
+      "extractionState" : "manual"
+    },
     "This changed while the library was being brought up to date, so the change wasn’t made." : {
       "extractionState" : "manual"
     },

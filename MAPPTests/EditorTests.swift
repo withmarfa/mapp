@@ -536,18 +536,19 @@ struct EditorTests {
         )
         let page = try await Page()
         let library = page.library
-        serveEmbeds(page.editor, from: root.url)
         let note = library.add("![a](Attachments/Photo%201.png)\n\n![b](Attachments/link.png)\n")
+        library.bindEmbed("![a](Attachments/Photo%201.png)", in: note.id, file: root.url.appending(path: "Attachments/Photo 1.png"))
+        library.bindEmbed("![b](Attachments/link.png)", in: note.id, file: root.url.appending(path: "Attachments/link.png"))
         page.editor.load(note)
         let widths = try await settle(page.editor,
             "[...document.querySelectorAll('.inkkit-image img')].map((image) => image.naturalWidth)",
             as: [Int].self) { $0 == [4] }
         #expect(widths == [4])
-        let expectedMissing = [["name": "b", "status": "File Not Found"]]
-        let absent = try await settle(page.editor,
-            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=missing]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
-            as: [[String: String]].self) { $0 == expectedMissing }
-        #expect(absent == expectedMissing)
+        let expectedRefused = [["name": "b", "status": "This file can’t be opened."]]
+        let refused = try await settle(page.editor,
+            "[...document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=error]')].map(card => ({ name: card.querySelector('.inkkit-file-label')?.textContent, status: card.querySelector('.inkkit-file-status')?.textContent }))",
+            as: [[String: String]].self) { $0 == expectedRefused }
+        #expect(refused == expectedRefused, "a file reached through a link is not opened")
         let rejected = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         #expect(rejected?["snapshotError"] == nil)
         #expect(rejected?["assetCount"] as? Int == 1)

@@ -59,6 +59,10 @@ final class EditorController: NSObject {
     @ObservationIgnored var isAppendingEmbeds = false
     @ObservationIgnored var appendsAgain = false
     @ObservationIgnored var isWatchingLinks = false
+    /// What each embed of the note on the page was last told to draw from, by its text, to tell the page which have
+    /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the note before.
+    @ObservationIgnored var embedStates: (note: ItemID, states: [String: EmbedState])?
+    @ObservationIgnored var embedWatch = 0
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
 
@@ -127,7 +131,9 @@ final class EditorController: NSObject {
         }
         Self.open.add(self)
         webView.controller = self
-        embeds.open = { [weak self] reference, item in await self?.library?.openEmbeddedFile(reference, in: item) }
+        embeds.open = { [weak self] reference, item in
+            await self?.library?.openEmbeddedFile(reference, in: item, waiting: Self.embedWait) ?? .missing
+        }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
         noteRequests.suggest = { [weak self] query, source in
             guard let self, let current = self.library else { return [] }
@@ -291,6 +297,7 @@ final class EditorController: NSObject {
         markdown = body.text
         read = body.version
         isEditable = item.isWritable
+        watchEmbeds()
         guard isReady else { return }
         embeds.version += 1
         call("setItem", json(item.id.rawValue))
@@ -321,6 +328,7 @@ final class EditorController: NSObject {
         flush { [self] kept in
             guard kept, request == loadRequest else { return }
             noteID = nil
+            watchEmbeds()
             markdown = ""
             isHeaderScrolledAway = false
             isEditingTitle = false

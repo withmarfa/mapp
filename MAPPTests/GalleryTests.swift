@@ -59,21 +59,4 @@ struct GalleryTests {
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.showsCollection)
     }
-
-    @Test func imageCandidatesIgnoreCodeAndRemoteAddresses() {
-        let markdown = """
-        # Note
-        `![inline](inline.png)`
-        ```markdown
-        ![fenced](fenced.png)
-        ```
-            ![indented](indented.png)
-        ![remote](https://example.test/private.png)
-        ![photo](<Photos/a b.png>)
-        ![[Other.png|400]]
-        ![nested](Photos/a(b).png "Caption")
-        \\![escaped](escaped.png)
-        """
-        #expect(GalleryImageReferences.inBody(markdown) == [.path("Photos/a b.png"), .name("Other.png"), .path("Photos/a(b).png")])
-    }
 }

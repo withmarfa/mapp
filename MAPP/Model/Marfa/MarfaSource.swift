@@ -6,6 +6,7 @@ import struct MarfaCore.SearchFilters
 import struct MarfaCore.SearchHit
 import enum MarfaCore.ItemState
 import Synchronization
+import UniformTypeIdentifiers
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
@@ -246,35 +247,68 @@ nonisolated final class MarfaSource: ItemSource {
         guard let hash = row.properties[MarfaMapping.blobField]?.string else {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
+        let name = Self.keptName(title: row.title, mimeType: row.properties[MarfaMapping.mimeTypeField]?.string)
         do {
             return try await MarfaEngine.asking(hub) {
-                try await copy.blobs.withFile(hash) { try Self.keptCopy(of: $0, named: hash) }
+                try await copy.blobs.withFile(hash) { try await Self.keptCopy(of: $0, hash: hash, name: name) }
             }
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            throw SourceFailure(kind: .failed, message: Self.fetchFailure(error))
         } catch {
             throw SourceFailure(kind: .failed, message: error.localizedDescription)
         }
     }
 
+    /// Why a file couldn't be had, in the person's words where the package's would only be technical.
+    static func fetchFailure(_ error: MarfaError) -> String {
+        switch error {
+        case .network, .noConnection: String(localized: "This file isn’t on this Mac, and the Marfa server can’t be reached.")
+        case .noRoom, .storageFull: String(localized: "This Mac doesn’t have enough space to download this file.")
+        case .bytesAbsent: String(localized: "The Marfa server doesn’t have this file’s contents.")
+        default: error.message
+        }
+    }
+
+    /// Where kept copies are, cleared when the library is disconnected or its downloads are removed.
+    nonisolated static let keptFiles = URL.temporaryDirectory.appending(path: "MAPP Files", directoryHint: .isDirectory)
+
+    /// The file's title as a name on disk, with the extension its type has where the title has none, since the
+    /// page, Open and the Finder all tell a file's kind by its extension.
+    static func keptName(title: String?, mimeType: String?) -> String {
+        let safe = NoteText.fileSafe(title ?? "")
+        let name = safe.isEmpty ? String(localized: "File") : safe
+        guard (name as NSString).pathExtension.isEmpty,
+              let ext = mimeType.flatMap({ UTType(mimeType: $0) })?.preferredFilenameExtension
+        else { return name }
+        return "\(name).\(ext)"
+    }
+
     /// The package keeps a fetched file from cache trimming only while `withFile` runs, and the views read the file
-    /// long after, so its bytes are copied out under their hash, which names them whole.
-    static func keptCopy(of file: URL, named hash: String) throws -> URL {
+    /// long after, so its bytes are copied out into a folder named by their hash, which names them whole.
+    @concurrent static func keptCopy(of file: URL, hash: String, name: String, in folder: URL = keptFiles) async throws -> URL {
         let manager = FileManager.default
-        let directory = URL.temporaryDirectory.appending(path: "MAPP Files", directoryHint: .isDirectory)
-        let kept = directory.appending(path: hash, directoryHint: .notDirectory)
+        let directory = folder.appending(path: hash, directoryHint: .isDirectory)
+        let kept = directory.appending(path: name, directoryHint: .notDirectory)
         if manager.fileExists(atPath: kept.path) { return kept }
         try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-        // Copied beside and moved in whole, so a copy cut short is never taken for the file.
-        let partial = directory.appending(path: "\(hash).\(UUID().uuidString).partial", directoryHint: .notDirectory)
+        // Copied beside and moved in whole, so a copy cut short is never taken for the file. The partial copy's
+        // name starts with a dot, which `OpenFile` never opens.
+        let partial = directory.appending(path: ".\(UUID().uuidString).partial", directoryHint: .notDirectory)
         try manager.copyItem(at: file, to: partial)
         do {
+            // Read-only, so an app Open hands it to offers a duplicate rather than saving over Marfa's file.
+            try manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: partial.path)
             try manager.moveItem(at: partial, to: kept)
         } catch {
             try? manager.removeItem(at: partial)
             if !manager.fileExists(atPath: kept.path) { throw error }
         }
         return kept
+    }
+
+    /// Clears every kept copy, so files fetched for a library don't outlast it on this Mac.
+    @concurrent static func removeKeptCopies(in folder: URL = keptFiles) async {
+        try? FileManager.default.removeItem(at: folder)
     }
 
     /// Read from the copy alone, so a view lists only what the copy holds, which is every item the library holds.
@@ -432,17 +466,13 @@ nonisolated final class MarfaSource: ItemSource {
 nonisolated struct MarfaEmbeds: EmbedResolver {
     let events: AsyncStream<MarfaEngine.Event>.Continuation
 
-    func attach(_ files: [URL], to item: ItemID) async throws -> [Embed] {
-        var embeds: [Embed] = []
-        for file in files {
-            let result = await withCheckedContinuation { continuation in
-                if case .terminated = events.yield(.attach(file, item, continuation)) {
-                    continuation.resume(returning: .failure(SourceFailure(kind: .missing, message: MarfaEngine.closedLibrary)))
-                }
+    func attach(_ file: URL, to item: ItemID) async throws -> Embed {
+        let result = await withCheckedContinuation { continuation in
+            if case .terminated = events.yield(.attach(file, item, continuation)) {
+                continuation.resume(returning: .failure(SourceFailure(kind: .missing, message: MarfaEngine.closedLibrary)))
             }
-            embeds.append(try result.get())
         }
-        return embeds
+        return try result.get()
     }
 
     func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID {
@@ -575,7 +605,7 @@ extension SourceSnapshot {
             items.removeAll { gone.contains($0.id) }
         case .catalogue(let catalogue): self.catalogue = catalogue
         case .views(let views): self.views = views
-        case .bodyChanged, .answered, .unavailable: break
+        case .bodyChanged, .answered, .taken, .unavailable: break
         }
     }
 }

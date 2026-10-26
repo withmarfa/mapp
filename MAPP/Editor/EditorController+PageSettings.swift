@@ -52,7 +52,6 @@ extension EditorController {
             "filePDFPreview": String(localized: "Open to view this PDF"),
             "wikiMissing": String(localized: "Link unavailable"),
             "formattedEditor": String(localized: "Note"),
-            "noteReference": String(localized: "Note reference: %@. Open to edit source."),
             "sourceEditor": String(localized: "Markdown Source"),
             "copyCode": String(localized: "Copy"),
             "codeLanguage": String(localized: "Code Language"),

@@ -29,6 +29,7 @@ declare global {
       redo(expected?: number): void
       setItem(id: string): void
       linksChanged(): void
+      embedsChanged(texts: string[]): void
       revealHeading(text: string, expected?: number): boolean
       setFinding(finding: boolean): void
       findSelect(from: number, to: number, generation?: number, snapshotId?: string): void
@@ -196,6 +197,7 @@ window.editor = {
   redo: (expected) => guardedCommand(() => editor.redo(expected)),
   setItem: (id) => editor.setItem(id),
   linksChanged: () => editor.linksChanged(),
+  embedsChanged: (texts) => editor.embedsChanged(texts),
   revealHeading: (text, expected) => {
     const result = guardedCommand(() => editor.revealHeading(text, expected))
     return result === true

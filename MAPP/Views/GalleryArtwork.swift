@@ -10,15 +10,53 @@ nonisolated struct GalleryArtwork: @unchecked Sendable {
 }
 
 /// Makes and keeps the pictures cards show. Only a visible card asks, a file is fetched only when it is small,
-/// and a picture is kept by item, version and rough width, so scrolling back or resizing a little costs nothing.
+/// and a picture is kept by what decides it (`Basis`) and rough width, so scrolling back or resizing a little costs nothing.
 enum GalleryArtworkCache {
+    /// What decides a card's picture: the item's own version, and for a note the state of each embed its picture
+    /// is chosen from (`EmbedState`: what the embed is bound to, and that file's title, state and version). A file
+    /// binned, renamed or restored changes none of the note's own facts, so it is read from the library here, and
+    /// a card whose basis changes makes its picture again.
+    nonisolated struct Basis: Hashable, Sendable {
+        let item: ItemID
+        let version: ItemVersion
+        let embeds: [EmbedState]
+    }
+
+    /// Reads the embeds' files from the library, so a view calling it follows them as it follows its item.
+    static func basis(of item: Item, in library: any ItemLibrary) -> Basis {
+        let embeds = item.boundEmbeds.prefix(GalleryPreview.embedLimit).map { library.embedState(of: $0) }
+        return Basis(item: item.id, version: item.version, embeds: embeds)
+    }
+
+    nonisolated private final class Key: NSObject {
+        let basis: Basis
+        let bucket: Int
+
+        init(_ basis: Basis, _ bucket: Int) {
+            self.basis = basis
+            self.bucket = bucket
+        }
+
+        override var hash: Int {
+            var hasher = Hasher()
+            hasher.combine(basis)
+            hasher.combine(bucket)
+            return hasher.finalize()
+        }
+
+        override func isEqual(_ object: Any?) -> Bool {
+            guard let other = object as? Key else { return false }
+            return other.basis == basis && other.bucket == bucket
+        }
+    }
+
     private final class Entry {
         let artwork: GalleryArtwork?
         init(_ artwork: GalleryArtwork?) { self.artwork = artwork }
     }
 
-    private static let storage: NSCache<NSString, Entry> = {
-        let cache = NSCache<NSString, Entry>()
+    private static let storage: NSCache<Key, Entry> = {
+        let cache = NSCache<Key, Entry>()
         cache.countLimit = 900
         return cache
     }()
@@ -28,35 +66,35 @@ enum GalleryArtworkCache {
 
     private static func bucket(_ width: CGFloat) -> CGFloat { (width / step).rounded(.up) * step }
 
-    private static func key(_ item: Item, _ bucket: CGFloat) -> NSString {
-        "\(item.id.rawValue)|\(item.version.rawValue)|\(Int(bucket))" as NSString
-    }
-
     /// What is already made, so a card scrolled back into view draws its picture in its first frame.
-    static func peek(_ item: Item, width: CGFloat) -> GalleryArtwork? {
-        storage.object(forKey: key(item, bucket(width)))?.artwork
+    static func peek(_ basis: Basis, width: CGFloat) -> GalleryArtwork? {
+        storage.object(forKey: Key(basis, Int(bucket(width))))?.artwork
     }
 
+    /// Nil when there is no picture. A picture that couldn't be made now, as when a file can't be fetched offline,
+    /// is not kept, so the card asks again when it next shows.
     static func artwork(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
         let bucket = bucket(width)
-        let key = key(item, bucket)
+        let key = Key(basis(of: item, in: library), Int(bucket))
         if let entry = storage.object(forKey: key) { return entry.artwork }
-        let artwork = await make(for: item, width: bucket, scale: scale, in: library)
-        if !Task.isCancelled { storage.setObject(Entry(artwork), forKey: key) }
-        return artwork
+        let made = await make(for: item, width: bucket, scale: scale, in: library)
+        guard let made else { return nil }
+        if !Task.isCancelled { storage.setObject(Entry(made), forKey: key) }
+        return made
     }
 
-    private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
-        switch item.content {
-        case .markdown:
-            let body = library.body(of: item.id)?.text
-            return await GalleryPreview.image(for: item, body: body, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
-        case .file(let type, _):
-            if type.conforms(to: .image) {
-                return await GalleryPreview.image(for: item, body: nil, in: library).map { GalleryArtwork(image: $0, isDocument: false) }
-            }
-            guard let url = await GalleryPreview.fileURL(of: item, in: library), !Task.isCancelled else { return nil }
-            return await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) }
+    /// Nil for a picture that couldn't be made now; `.some(nil)` for an item with none.
+    private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork?? {
+        if case .file(let type, _) = item.content, !type.conforms(to: .image) {
+            let url: URL?
+            do { url = try await GalleryPreview.fileURL(of: item, in: library) } catch { return nil }
+            guard let url, !Task.isCancelled else { return .some(nil) }
+            return .some(await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) })
+        }
+        switch await GalleryPreview.image(for: item, in: library) {
+        case .image(let image): return GalleryArtwork(image: image, isDocument: false)
+        case .none: return .some(nil)
+        case .failed: return nil
         }
     }
 

@@ -101,7 +101,8 @@ private struct GalleryThumbnail: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        let shown = artwork ?? GalleryArtworkCache.peek(item, width: width)
+        let basis = GalleryArtworkCache.basis(of: item, in: library)
+        let shown = artwork ?? GalleryArtworkCache.peek(basis, width: width)
         Color(nsColor: .textBackgroundColor)
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay { content(shown) }
@@ -115,7 +116,7 @@ private struct GalleryThumbnail: View {
                         .padding(-3)
                 }
             }
-            .task(id: item.version) {
+            .task(id: basis) {
                 artwork = nil
                 let made = await GalleryArtworkCache.artwork(for: item, width: width, scale: displayScale, in: library)
                 if !Task.isCancelled { artwork = made }

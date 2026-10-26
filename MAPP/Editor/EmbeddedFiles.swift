@@ -3,41 +3,120 @@ import Darwin
 import UniformTypeIdentifiers
 import WebKit
 
-/// An embed as a note names a file: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
-/// does. A path is as the markdown writes it, still percent-encoded and with any query or fragment.
-nonisolated enum EmbedReference: Hashable, Sendable {
-    case path(String)
-    case name(String)
+/// An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a\_b.png)`: the page names an embed
+/// this way and Marfa's core lists each one it bound this way (`BoundEmbed.text`), so the two are matched whole,
+/// kind included, and MAPP reads no name out of an embed itself.
+nonisolated struct EmbedReference: Hashable, Sendable {
+    let text: String
 
-    /// The item and embed the page names, as `{ item, path }` or `{ item, name }`.
+    /// The item and embed the page names, as `{ item, text }`.
     static func request(_ body: Any?) -> (item: ItemID, reference: EmbedReference)? {
-        guard let dict = body as? [String: Any], let item = dict["item"] as? String, !item.isEmpty else { return nil }
-        if let path = dict["path"] as? String { return (ItemID(item), .path(path)) }
-        if let name = dict["name"] as? String { return (ItemID(item), .name(name)) }
-        return nil
+        guard let dict = body as? [String: Any], let item = dict["item"] as? String, !item.isEmpty,
+              let text = dict["text"] as? String, !text.isEmpty
+        else { return nil }
+        return (ItemID(item), EmbedReference(text: text))
     }
 }
 
 // MARK: Resolving
 
-extension ItemLibrary {
-    /// The embedded file opened for reading, or nil where there is none. The one place an embed becomes a file,
-    /// which the page's scheme, its Open and the gallery's thumbnails all ask. Nothing resolves an embed yet:
-    /// that waits on the working copy's links and attachments (`links(in:)`), whose file is then opened with
-    /// `OpenFile.open(_:inside:)`.
-    func openEmbeddedFile(_ reference: EmbedReference, in item: ItemID) async -> OpenFile? {
-        nil
+/// What an embed shows: its file, opened for reading, nothing, or why its file can't be shown now.
+nonisolated enum EmbedResolution: Sendable {
+    case file(OpenFile)
+    case missing
+    case unavailable(String)
+
+    var file: OpenFile? {
+        if case .file(let file) = self { file } else { nil }
     }
 }
 
-nonisolated enum EmbedPaths {
-    /// An address, which the page never loads: a scheme, `//` or `#`.
-    static func isAddress(_ destination: String) -> Bool {
-        if destination.hasPrefix("//") || destination.hasPrefix("#") { return true }
-        guard let colon = destination.firstIndex(of: ":") else { return false }
-        let scheme = destination[..<colon]
-        return scheme.first?.isASCII == true && scheme.first?.isLetter == true
-            && scheme.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "+.-".contains($0)) }
+/// What decides how an embed is drawn, so the page draws it again when this changes.
+nonisolated struct EmbedState: Hashable, Sendable {
+    nonisolated struct File: Hashable, Sendable {
+        let title: String
+        let trashed: Bool
+        let version: ItemVersion
+    }
+
+    let binding: NoteReferenceResolution
+    /// Nil where the library does not hold the file item (yet).
+    let file: File?
+}
+
+extension ItemLibrary {
+    /// The file an item's embed shows, the one place an embed becomes a file, which the page's scheme, its Open
+    /// and the gallery all ask. Marfa's core binds each embed to its file item when the text is saved
+    /// (`Item.boundEmbeds`), and lists no embed it does not take for a file, such as one of a note. An embed is
+    /// waited on, for up to `waiting`, only while the text holding it has not been read by the copy, as one just
+    /// pasted has not; once it has, an embed the core did not bind is no file. The file is fetched if this Mac
+    /// doesn't hold it, unless `wanted` turns its item down, which answers `missing`.
+    func openEmbeddedFile(
+        _ reference: EmbedReference, in item: ItemID, waiting: Duration = .zero, if wanted: (Item) -> Bool = { _ in true }
+    ) async -> EmbedResolution {
+        let deadline = ContinuousClock.now + waiting
+        var bound = binding(of: reference, in: item)
+        while bound == nil, isUnread(reference, in: item), ContinuousClock.now < deadline, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+            bound = binding(of: reference, in: item)
+        }
+        switch bound {
+        case .resolved(let file):
+            // A file in the bin is no picture, as a note in the bin is no link's target.
+            if let held = self.item(file), held.state == .trashed || !wanted(held) { return .missing }
+            return await open(file)
+        case .ambiguous:
+            return .unavailable(String(localized: "More than one file has this name."))
+        case .refused(let reason):
+            return .unavailable(reason)
+        case .pending:
+            return .unavailable(String(localized: "This file isn’t in Marfa yet."))
+        case .missing, nil:
+            return .missing
+        }
+    }
+
+    /// What each embed of the note shows, by its text, for the editor to tell the page which pictures to draw again:
+    /// the binding the copy holds and the facts of the file it names that change what is shown. Observed as items are.
+    func embedStates(of note: ItemID) -> [String: EmbedState] {
+        var states: [String: EmbedState] = [:]
+        for embed in item(note)?.boundEmbeds ?? [] where states[embed.text] == nil {
+            states[embed.text] = embedState(of: embed)
+        }
+        return states
+    }
+
+    func embedState(of embed: BoundEmbed) -> EmbedState {
+        var file: EmbedState.File?
+        if case .resolved(let id) = embed.resolution, let held = item(id) {
+            file = EmbedState.File(title: held.title, trashed: held.state == .trashed, version: held.version)
+        }
+        return EmbedState(binding: embed.resolution, file: file)
+    }
+
+    private func binding(of reference: EmbedReference, in item: ItemID) -> NoteReferenceResolution? {
+        self.item(item)?.boundEmbeds.first { $0.text == reference.text }?.resolution
+    }
+
+    /// Whether the copy may not yet have read the text holding the embed: a save of the item is on its way, or the
+    /// page shows the embed before its text reached the library.
+    private func isUnread(_ reference: EmbedReference, in item: ItemID) -> Bool {
+        hasUnreadSave(item) || body(of: item)?.text.contains(reference.text) != true
+    }
+
+    private func open(_ file: ItemID) async -> EmbedResolution {
+        let url: URL
+        do {
+            guard let fetched = try await fileURL(of: file) else { return .missing }
+            url = fetched
+        } catch {
+            return .unavailable(error.localizedDescription)
+        }
+        // Opened by its real path, since the descriptor is opened through no link and a temporary folder is under one.
+        guard let folder = OpenFile.realPath(of: url.deletingLastPathComponent()),
+              let opened = await OpenFile.open(folder.appending(path: url.lastPathComponent), inside: folder)
+        else { return .unavailable(String(localized: "This file can’t be opened.")) }
+        return .file(opened)
     }
 }
 
@@ -52,7 +131,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     nonisolated static let piece = 1 << 20
 
     /// The file an item's embed names, opened; `ItemLibrary.openEmbeddedFile` for the editor's library.
-    var open: (EmbedReference, ItemID) async -> OpenFile? = { _, _ in nil }
+    var open: (EmbedReference, ItemID) async -> EmbedResolution = { _, _ in .missing }
     /// Changed for each note the page shows, so a file changed on disk is loaded again rather than taken from
     /// WebKit's memory of the page.
     var version = 0
@@ -71,7 +150,10 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         let version = version
         let exporting = (message.body as? [String: Any])?["export"] as? Bool == true
         Task {
-            guard let file = await open(reference, item), self.version == version else { return replyHandler(nil, nil) }
+            let resolution = await open(reference, item)
+            guard self.version == version else { return replyHandler(nil, nil) }
+            if case .unavailable(let reason) = resolution, !exporting { return replyHandler(["unavailable": reason], nil) }
+            guard let file = resolution.file else { return replyHandler(nil, nil) }
             let type = UTType(filenameExtension: file.url.pathExtension)
             if exporting {
                 // Portable exports read the checked descriptor, never the path resolved before it opened.
@@ -81,7 +163,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
                 return replyHandler(["data": data.base64EncodedString(), "mimeType": type?.preferredMIMEType ?? "application/octet-stream"], nil)
             }
             replyHandler([
-                "url": Self.url(for: reference, in: item, version: version).absoluteString,
+                "url": Self.url(for: reference, in: item, version: version, stamp: file.url.deletingLastPathComponent().lastPathComponent).absoluteString,
                 "kind": Self.kind(of: type),
                 "name": file.url.lastPathComponent,
                 "detail": Int64(file.length).formatted(.byteCount(style: .file)),
@@ -129,16 +211,14 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     /// `&`, `=` and `+` are allowed in a query but would split or change a value.
     private nonisolated static let valueAllowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+#?"))
 
-    nonisolated static func url(for reference: EmbedReference, in item: ItemID, version: Int) -> URL {
-        let (key, value) = switch reference {
-        case .path(let path): ("path", path)
-        case .name(let name): ("name", name)
-        }
+    /// `stamp` names the bytes the URL is for, so the page loads a picture again when the same embed comes to show
+    /// other bytes; serving ignores it.
+    nonisolated static func url(for reference: EmbedReference, in item: ItemID, version: Int, stamp: String = "") -> URL {
         var components = URLComponents()
         components.scheme = scheme
         components.host = "file"
         components.path = "/"
-        components.percentEncodedQueryItems = [("item", item.rawValue), (key, value), ("v", String(version))].map {
+        components.percentEncodedQueryItems = [("item", item.rawValue), ("text", reference.text), ("v", String(version)), ("f", stamp)].map {
             URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: valueAllowed))
         }
         return components.url!
@@ -161,10 +241,8 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         func value(_ name: String) -> String? {
             items.first { $0.name == name }?.value?.removingPercentEncoding
         }
-        guard let item = value("item"), !item.isEmpty else { return nil }
-        if let path = value("path") { return (ItemID(item), .path(path)) }
-        if let name = value("name") { return (ItemID(item), .name(name)) }
-        return nil
+        guard let item = value("item"), !item.isEmpty, let text = value("text"), !text.isEmpty else { return nil }
+        return (ItemID(item), EmbedReference(text: text))
     }
 
     // MARK: Ranges
@@ -239,7 +317,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     private func serve(_ task: any WKURLSchemeTask, _ id: ObjectIdentifier) async {
         guard let url = task.request.url else { return finish(task, id, failing: URLError(.badURL)) }
         if url.host == "icon" { return serveIcon(task, id, url) }
-        guard let (item, reference) = Self.request(in: url), let file = await open(reference, item) else {
+        guard let (item, reference) = Self.request(in: url), let file = await open(reference, item).file else {
             if respond(task, id, status: 404) { finish(task, id) }
             return
         }

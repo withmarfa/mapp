@@ -52,6 +52,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func idsForWindows(_ ids: some Collection<ItemID>) -> [ItemID]
     /// Nil for an item with no text, such as a file.
     func body(of id: ItemID) -> ItemBody?
+    /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
+    /// in the text (`Item.boundEmbeds`) may not cover it yet.
+    func hasUnreadSave(_ id: ItemID) -> Bool
     /// The `[[link]]` that the text of `source` can hold and the library resolves, from that note, to this item and
     /// no other, or nil when no spelling does. A name `source` already links keeps its first target, so it is not
     /// used for another item.
@@ -156,10 +159,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Not undoable, so the views confirm it first, and only where `canPurge`.
     func deletePermanently(_ ids: Set<ItemID>)
     /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
-    /// sends them elsewhere may have to wait, and may fail.
-    /// A failure means nothing was inserted into the note, though files already stored may remain; the editor's
-    /// alert says so plainly.
-    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async throws -> [Embed]
+    /// sends them elsewhere may have to wait. Each file is attached on its own, so one that fails leaves the
+    /// others attached, and the report names it.
+    func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport
     /// Attaches the file at `file` to the item, read where it is while this runs, and says what the item's text
     /// writes to show it. A failure means the file is not attached.
     func attach(file: URL, to id: ItemID) async throws -> Embed
