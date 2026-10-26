@@ -88,7 +88,6 @@ struct ItemTable: View {
         .softSelection(rows: rows.map(\.id.rawValue) + collapsed.sorted(), selection: browser.selection)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
-        .background(.windowBackground)
         .focused(pane, equals: .list)
         .accessibilityIdentifier("ItemTable")
         .contextMenu(forSelectionType: ItemID.self) { ids in

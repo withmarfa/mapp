@@ -14,7 +14,6 @@ struct NoteDetail: View {
             } description: {
                 Text("Choose a single item to read or edit it.")
             }
-            .background(.windowBackground)
             .accessibilityIdentifier("MultipleSelectionPrompt")
             .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
@@ -84,7 +83,6 @@ private struct UnselectedItemContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.windowBackground)
     }
 }
 
