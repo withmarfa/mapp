@@ -89,6 +89,42 @@ import Testing
         #expect(library.notices.waiting.isEmpty)
     }
 
+    @Test func addingToACollectionIsOneUndoStepThatUnlinksOnlyWhatJoined() async throws {
+        let (library, source) = try await loaded()
+        let undo = StepCountingUndoManager()
+        // Plain note is in Holiday already and Archive is a collection, so only the other two join.
+        #expect(library.addToCollection([F.e1, F.n2, F.n1, Self.archive], Self.holiday, undoManager: undo))
+        #expect(undo.steps == 1)
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft, _) = write { draft.source } else { nil } }
+        #expect(Set(joined) == [F.e1, F.n2])
+        // The source answers with the edges it made, which the undo then removes.
+        for id in joined {
+            var item = try #require(library.item(id))
+            item.edgesOut.append(Self.member("new-\(id.rawValue)", id, of: Self.holiday))
+            source.send(.upserted([item]))
+        }
+        #expect(await eventually { Set(library.items(in: .collection(Self.holiday)).map(\.id)).isSuperset(of: [F.e1, F.n2]) })
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.unlink(EdgeID("new-\(F.e1.rawValue)")), .unlink(EdgeID("new-\(F.n2.rawValue)"))])
+        #expect(!undo.canUndo)
+    }
+
+    @Test func removingFromACollectionIsOneUndoStepThatPutsBackOnlyWhatLeft() async throws {
+        let (library, source) = try await loaded()
+        let undo = StepCountingUndoManager()
+        #expect(library.removeFromCollection([F.n1, F.p1, F.e1], Self.holiday, undoManager: undo))
+        #expect(undo.steps == 1)
+        #expect(Set(source.writes) == [.unlink(EdgeID("m1")), .unlink(EdgeID("m2"))], "e1 is in no collection, so nothing is sent for it")
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [
+            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2), undoing: nil),
+            .link(EdgeDraft(type: "in-collection", source: F.p1, target: Self.holiday, position: 1), undoing: nil),
+        ])
+        #expect(!undo.canUndo)
+    }
+
     @Test func addingToACollectionWithNoPositionsSetsNone() async throws {
         let (library, source) = try await loaded()
         #expect(library.addToCollection([F.e1], Self.archive, undoManager: nil))

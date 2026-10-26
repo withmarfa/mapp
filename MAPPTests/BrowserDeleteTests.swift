@@ -77,7 +77,7 @@ import Testing
         #expect(states(f.library) == before)
 
         f.library.deletePermanentlyOnConfirm([f.binned.id, f.alsoBinned.id])
-        #expect(f.library.items.map(\.id).sorted { $0.rawValue < $1.rawValue } == [f.first.id, f.second.id].sorted { $0.rawValue < $1.rawValue })
+        #expect(Set(f.library.items.map(\.id)) == [f.first.id, f.second.id])
     }
 
     @Test func aSelectionOfOnlyBinnedItemsTellsWhyWhenTheLibraryCannotEraseThem() {

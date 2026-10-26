@@ -2,6 +2,18 @@ import Foundation
 import Testing
 @testable import MAPP
 
+/// An undo manager as a window has one: it groups by event and is given no group of its own, so a batch is one step
+/// only if the library registers it as one. The library names each step it registers, so the names counted are the
+/// steps.
+final class StepCountingUndoManager: UndoManager {
+    private(set) var steps = 0
+
+    override func setActionName(_ actionName: String) {
+        steps += 1
+        super.setActionName(actionName)
+    }
+}
+
 /// A command on a selection: what it writes for the items that take it, and how it tells the person about the rest.
 @MainActor
 @Suite struct MarfaBulkActionsTests {
@@ -62,17 +74,90 @@ import Testing
         #expect(library.notices.told == 0)
     }
 
-    @Test func aBatchIsOneUndoStep() async throws {
-        let (library, _) = try await loaded([Self.note(a), Self.note(b)])
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        undo.beginUndoGrouping()
-        library.changeType([a, b], to: F.task, filling: [:], undoManager: undo)
-        undo.endUndoGrouping()
+    /// The source reporting what a write did, as the server's answer does: an undo acts on what the items hold then.
+    private func applied(_ ids: [ItemID], to library: MarfaLibrary, via source: FakeItemSource, _ change: (inout Item) -> Void) async throws {
+        var changed: [Item] = []
+        for id in ids {
+            var item = try #require(library.item(id))
+            change(&item)
+            changed.append(item)
+        }
+        source.send(.upserted(changed))
+        let expected = Dictionary(uniqueKeysWithValues: changed.map { ($0.id, $0) })
+        try #require(await eventually { ids.allSatisfy { library.item($0)?.type == expected[$0]?.type && library.item($0)?.tags == expected[$0]?.tags } })
+    }
+
+    private func tagWrites(_ source: FakeItemSource) -> [ItemWrite] {
+        source.writes.filter { if case .tag = $0 { true } else { false } }
+    }
+
+    @Test func aTypeChangeIsOneUndoStep() async throws {
+        let (library, source) = try await loaded([Self.note(a), Self.note(b)])
+        let undo = StepCountingUndoManager()
+        #expect(library.changeType([a, b], to: F.task, filling: [:], undoManager: undo))
+        #expect(undo.steps == 1)
         #expect(undo.undoActionName == String(localized: "Change Type"))
+        try await applied([a, b], to: library, via: source) { $0.type = F.task }
+        source.clearWrites()
         undo.undo()
+        let retyped = source.writes.compactMap { write -> ItemID? in if case .retype(let id, F.note, _, _) = write { id } else { nil } }
+        #expect(Set(retyped) == [a, b])
+        #expect(source.writes.count == 2, "one write for each item, back to its type")
         #expect(!undo.canUndo)
         #expect(undo.canRedo)
+    }
+
+    @Test func favoritingIsOneUndoStepAndUndoLeavesWhatWasSkippedAlone() async throws {
+        let (library, source) = try await loaded([Self.note(a), Self.note(b), Self.note(binned, state: .trashed)])
+        let undo = StepCountingUndoManager()
+        library.setFavorite([a, b, binned, ghost], true, undoManager: undo)
+        #expect(undo.steps == 1, "the items skipped add no step of their own")
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.tag(a, ItemTag.favorite, on: false), .tag(b, ItemTag.favorite, on: false)])
+        #expect(!undo.canUndo)
+        source.clearWrites()
+        undo.redo()
+        #expect(Set(source.writes) == [.tag(a, ItemTag.favorite, on: true), .tag(b, ItemTag.favorite, on: true)])
+    }
+
+    @Test func addingATagIsOneUndoStepAndUndoRemovesItOnlyFromWhatTookIt() async throws {
+        let (library, source) = try await loaded([Self.note(a), Self.note(b), Self.note(binned, state: .trashed)])
+        let undo = StepCountingUndoManager()
+        #expect(library.addTag("work", to: [a, b, binned, ghost], undoManager: undo) == nil)
+        #expect(undo.steps == 1)
+        #expect(Set(tagWrites(source)) == [.tag(a, "work", on: true), .tag(b, "work", on: true)])
+        #expect(library.notices.waiting.last?.message == skips(.gone, .inBin))
+        try await applied([a, b], to: library, via: source) { $0.tags.insert("work") }
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.tag(a, "work", on: false), .tag(b, "work", on: false)])
+        #expect(!undo.canUndo)
+    }
+
+    @Test func removingATagIsOneUndoStep() async throws {
+        var tagged = Self.note(a)
+        tagged.tags = ["work"]
+        var alsoTagged = Self.note(b)
+        alsoTagged.tags = ["work"]
+        let (library, source) = try await loaded([tagged, alsoTagged])
+        let undo = StepCountingUndoManager()
+        library.removeTag("work", from: [a, b], undoManager: undo)
+        #expect(undo.steps == 1)
+        try await applied([a, b], to: library, via: source) { $0.tags.remove("work") }
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.tag(a, "work", on: true), .tag(b, "work", on: true)])
+    }
+
+    @Test func movingToTheBinIsOneUndoStepAndUndoRecoversOnlyWhatMoved() async throws {
+        let (library, source) = try await loaded([Self.note(a), Self.note(b), Self.note(binned, state: .trashed)])
+        let undo = StepCountingUndoManager()
+        library.delete([a, b, binned], undoManager: undo)
+        #expect(undo.steps == 1)
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.transition(a, .active), .transition(b, .active)])
     }
 
     @Test func favoritingLeavesItemsInTheBinAndTellsHowMany() async throws {
@@ -86,11 +171,9 @@ import Testing
     @Test func aVeryLargeSelectionQueuesOneWriteForEachItemUnderOneUndoStep() async throws {
         let items = (0..<500).map { Self.note(ItemID("n\($0)")) }
         let (library, source) = try await loaded(items)
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        undo.beginUndoGrouping()
+        let undo = StepCountingUndoManager()
         library.changeType(Set(items.map(\.id)), to: F.task, filling: [:], undoManager: undo)
-        undo.endUndoGrouping()
+        #expect(undo.steps == 1)
         #expect(await eventually { source.writes.count == 500 })
         undo.undo()
         #expect(!undo.canUndo)
