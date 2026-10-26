@@ -483,6 +483,9 @@ final class EditorController: NSObject {
             applyKeymap()
             applyStyle()
             watchLinks()
+            // A reloaded page starts at the top, and says nothing while it stays there.
+            isHeaderScrolledAway = false
+            isContentUnderToolbar = false
             isEditingTitle = false
             headerIconSize = nil
             sendHeader()

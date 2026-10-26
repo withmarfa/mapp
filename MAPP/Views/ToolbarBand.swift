@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// A soft band of glass behind the toolbar, for a page that scrolls under it. The window's toolbar draws no
-/// background of its own (`MAPPApp`), and the page's web view is not a SwiftUI scroll view, so the system's scroll
-/// edge effect never reaches the page; without this, text shows through straight under the toolbar's buttons and
-/// the scrolled-away title. It is absent while nothing is behind the toolbar, and fades in once something is.
+/// A soft band of glass behind the toolbar, for a page that scrolls under it. The window hides its toolbar's
+/// background (`MAPPApp`), and the page's web view is not a SwiftUI scroll view, so the app does not rely on the
+/// system drawing a soft edge over the page. This band is the app's own signal that content is under the toolbar:
+/// it is absent while nothing is behind the toolbar, and fades in once something is. If the system's edge is ever
+/// seen to draw over the page as well, this band is the thing to remove.
 struct ToolbarBand: View {
     /// The toolbar's height, which the band covers entirely.
     let toolbarHeight: CGFloat

@@ -145,6 +145,54 @@ extension EditorTests {
         try await page.wait { !page.editor.isContentUnderToolbar }
     }
 
+    /// Says to the app what the page would, through the page's own bridge.
+    private static func say(_ type: String, _ fields: String, in page: Page) async throws {
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: '\(type)', \(fields) })")
+    }
+
+    @Test func aReportFromAnEarlierLoadDoesNotMoveTheToolbarState() async throws {
+        let page = try await Page()
+        try await page.load("A note\n")
+        let current = page.editor.generation
+        try await Self.say("contentUnderToolbar", "under: true, generation: \(current - 1)", in: page)
+        // Messages arrive in order, so once this one has landed the stale one has been read.
+        try await Self.say("headerScrolledAway", "away: true, generation: \(current)", in: page)
+        try await page.wait { page.editor.isHeaderScrolledAway }
+        #expect(!page.editor.isContentUnderToolbar)
+
+        try await Self.say("contentUnderToolbar", "under: true, generation: \(current)", in: page)
+        try await page.wait { page.editor.isContentUnderToolbar }
+    }
+
+    @Test func aPageThatReloadsAfterItsProcessEndedStartsWithNothingUnderTheToolbar() async throws {
+        let page = try await Page()
+        try await page.load("A note\n")
+        let current = page.editor.generation
+        try await Self.say("contentUnderToolbar", "under: true, generation: \(current)", in: page)
+        try await Self.say("headerScrolledAway", "away: true, generation: \(current)", in: page)
+        try await page.wait { page.editor.isContentUnderToolbar && page.editor.isHeaderScrolledAway }
+
+        // The reloaded page is at the top and says nothing while it stays there; it only says it is ready.
+        try await Self.say("ready", "", in: page)
+        try await page.wait { !page.editor.isContentUnderToolbar && !page.editor.isHeaderScrolledAway }
+        #expect(page.editor.generation > current)
+    }
+
+    @Test func leavingTheNoteClearsWhatIsUnderTheToolbar() async throws {
+        let page = try await Page()
+        try await page.load("A note\n")
+        let current = page.editor.generation
+        try await Self.say("contentUnderToolbar", "under: true, generation: \(current)", in: page)
+        try await Self.say("headerScrolledAway", "away: true, generation: \(current)", in: page)
+        try await page.wait { page.editor.isContentUnderToolbar && page.editor.isHeaderScrolledAway }
+
+        // Several notes selected, or none, leaves the page empty.
+        page.editor.close()
+        try await page.wait { page.editor.noteID == nil }
+        #expect(!page.editor.isContentUnderToolbar)
+        #expect(!page.editor.isHeaderScrolledAway)
+    }
+
     @Test func changingItemsAfterScrollingStartsAtTheTopAndStaysThere() async throws {
         let page = try await Page()
         let container = page.editor.container

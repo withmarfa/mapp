@@ -1,9 +1,10 @@
 import WebKit
 
-/// How the app's web views sit in a window with a Liquid Glass toolbar. Apple's own SwiftUI `WebView` does both
+/// How the app's web views sit in a window with a Liquid Glass toolbar. Apple's own SwiftUI `WebView` sets both
 /// of these through WebKit settings that are not public API; they are set here the same way, only while WebKit
 /// answers to them, and each reports whether it took, so a web view without them keeps its own background and
-/// stops below the toolbar.
+/// stops below the toolbar. The second is applied and harmless, but the app does not rely on the soft edge it
+/// names: `ToolbarBand` is what shows that content is under the toolbar.
 extension WKWebView {
     /// Leaves the web view clear, so the window's own background shows through a page whose background is
     /// transparent, and the page and the toolbar above it read as one surface, as in Mail. The page is marked with
@@ -19,8 +20,9 @@ extension WKWebView {
         return true
     }
 
-    /// Lets the page run under the toolbar with the soft edge the system draws over scrolling content, rather
-    /// than the hard line WebKit draws otherwise. The part of the page the toolbar covers is then given as
+    /// Sets WebKit's automatic content inset background fill, which Apple's own `WebView` also sets. Whether the
+    /// system then draws a soft edge over the page has not been seen on a real window, and nothing relies on it.
+    /// Where it took, the page fills the container and the part the toolbar covers is given as
     /// `obscuredContentInsets`, so the page starts below the toolbar and scrolls beneath it.
     @discardableResult
     func fadesUnderToolbar() -> Bool {
@@ -30,9 +32,9 @@ extension WKWebView {
     }
 }
 
-/// Holds a web view that reaches up under the toolbar. Where WebKit can soften the toolbar's edge, the page runs
-/// under the toolbar and scrolls beneath it, told how much of it is covered; otherwise it stops below, since
-/// WebKit would draw a hard line over it. Which of the two is decided once, and the page never moves while it
+/// Holds a web view that reaches up under the toolbar. Where the setting above took, the page runs under the
+/// toolbar and scrolls beneath it, told how much of it is covered; otherwise it stops below, since WebKit would
+/// draw a hard line over it. Which of the two is decided once, and the page never moves while it
 /// scrolls: moving it changed where the text sat, and the page jumped.
 class WebViewContainer: NSView {
     let webView: WKWebView
