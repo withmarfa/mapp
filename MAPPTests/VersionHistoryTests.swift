@@ -203,9 +203,14 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         other.setBody("Typed since", of: Self.launch, version: 3)
         other.send(.upserted([Self.note(title: "Old launch", version: 3)]))
         try #require(await eventually { second.body(of: Self.launch)?.text == "Typed since" })
+        try #require(await eventually { second.item(Self.launch)?.title == "Old launch" })
         again.undo()
+        // The title is still what the restore made it, so it alone is put back; the typed text is left, and told.
+        try #require(await eventuallyAsking {
+            other.writes.dropFirst(before).contains { if case .editProperties(_, let changes, _, _) = $0 { changes["title"] == .string("Launch") } else { false } }
+        })
+        #expect(!other.writes.dropFirst(before).contains { if case .editBody = $0 { true } else { false } })
         #expect(second.notices.waiting.last?.title == String(localized: "Can’t Restore Version"))
-        #expect(other.writes.count == before)
     }
 
     @Test func aVersionTheItemAlreadyHoldsIsNotWrittenAgain() async throws {
