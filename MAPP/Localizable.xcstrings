@@ -84,6 +84,12 @@
     "Can’t Discard This Copy" : {
       "extractionState" : "manual"
     },
+    "Comfortable Cards" : {
+
+    },
+    "Compact Cards" : {
+
+    },
     "Connect to this server again with its key to see them." : {
       "extractionState" : "manual"
     },
@@ -99,6 +105,9 @@
     "Current limit: %@" : {
       "extractionState" : "manual"
     },
+    "Date Field: %@" : {
+
+    },
     "Disconnected, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
@@ -110,6 +119,12 @@
     },
     "Downloading library…" : {
       "extractionState" : "manual"
+    },
+    "Group by %@" : {
+
+    },
+    "Hide %@ Column" : {
+
     },
     "Keep All Downloads" : {
       "extractionState" : "manual"
@@ -138,6 +153,12 @@
     "Remove Downloaded Files" : {
       "extractionState" : "manual"
     },
+    "Show %@ Column" : {
+
+    },
+    "Sort %@" : {
+
+    },
     "Space Used" : {
       "extractionState" : "manual"
     },
@@ -160,6 +181,9 @@
       "extractionState" : "manual"
     },
     "Undo this change?" : {
+
+    },
+    "Ungroup" : {
 
     },
     "Updating library…" : {

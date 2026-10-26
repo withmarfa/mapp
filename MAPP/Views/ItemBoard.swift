@@ -5,8 +5,6 @@ struct ItemBoard: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Bindable var browser: Browser
-    @Binding var selectedField: String?
-    @Binding var compact: Bool
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var cursor: ItemID?
     @State private var anchor: ItemID?
@@ -14,12 +12,10 @@ struct ItemBoard: View {
     var body: some View {
         let items = browser.items(in: library)
         let fields = ItemBoardLayout.availableFields(items: items, catalogue: library.catalogue)
-        let field = ItemBoardLayout.selectedField(selectedField, available: fields)
+        let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {
             if let field {
-                controls(fields: fields, field: field)
-                Divider()
                 board(ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue), key: field.key)
             } else if items.isEmpty {
                 if browser.isSearching { EmptyState.search(browser.searchText) }
@@ -40,23 +36,8 @@ struct ItemBoard: View {
         }
     }
 
-    private func controls(fields: [ItemBoardField], field: ItemBoardField) -> some View {
-        HStack(spacing: 16) {
-            Picker("Group By", selection: Binding(get: { field.key }, set: { selectedField = $0 })) {
-                ForEach(fields) { field in Text(verbatim: field.label).tag(field.key) }
-            }
-            .fixedSize()
-            Spacer()
-            Picker("Card Density", selection: $compact) {
-                Text("Comfortable").tag(false)
-                Text("Compact").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-    }
+    /// Set from the toolbar's View Options (`ItemBoardOptions`).
+    private var compact: Bool { browser.compactBoards[browser.item, default: false] }
 
     private func board(_ lanes: [ItemBoardLane], key: String) -> some View {
         let ids = lanes.flatMap { $0.items.map(\.id) }

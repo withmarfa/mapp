@@ -94,18 +94,18 @@ struct DetailsToggle: View {
     }
 }
 
-/// The gallery's and the table's toolbar, one for the collection and the page it opens, so the order across its
-/// single column keeps New Item at the leading side when the sidebar is hidden. At the trailing side, Search and
-/// View Options precede View As, Share and More, and Details. The table brings its own View Options
-/// (`ItemTableControls`). Opened on an item, View Options and Search give way.
-struct GalleryToolbar<Options: View>: ToolbarContent {
+/// The toolbar of every view that spans the window (gallery, table, board and agenda), one for the view and the
+/// page it opens, so the order across its single column keeps New Item at the leading side when the sidebar is
+/// hidden. At the trailing side, always in this order: Search, the table's Filter and View Options
+/// (`CurrentViewOptions`), then View As, Share and More, and Details. The list has the same order across its two
+/// columns (`ListToolbar`, `NoteToolbar`). Opened on an item, Search, Filter and View Options give way.
+struct GalleryToolbar: ToolbarContent {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
     var showsCreation = true
-    @ViewBuilder let options: () -> Options
 
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
@@ -131,7 +131,8 @@ struct GalleryToolbar<Options: View>: ToolbarContent {
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }
             ) {
-                options()
+                if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
+                ViewOptionsMenu(browser: browser)
             }
             ToolbarSpacer(.fixed)
         }

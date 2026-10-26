@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// A place's items as a table, in the manner of a database view: a row for each item, a column for each field its
-/// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableControls`). Selecting a row shows it in Details, and
+/// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableFilterMenu`, `ItemTableViewOptions`). Selecting a row shows it in Details, and
 /// opening one shows its page in the table's place, as the gallery does.
 struct ItemTable: View {
     @CurrentLibrary private var library
@@ -180,6 +180,12 @@ struct ItemTableContent {
         grouping = ItemTableLayout.grouping(options, columns: columns)
         groups = grouping.map { [rows] grouping in ItemTableLayout.groups(of: rows, by: grouping) } ?? []
         collapsed = grouping.map { [groups] grouping in ItemTableLayout.collapsed(options, groups: groups, by: grouping) } ?? []
+    }
+
+    /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row
+    /// holds one.
+    var categoricalColumns: [ItemTableColumn] {
+        columns.filter { column in column.isCategorical && allRows.contains { column.category(of: $0) != nil } }
     }
 }
 

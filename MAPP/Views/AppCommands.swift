@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the list shows and
-/// orders items and moves back and forward through the items the window has shown.
+/// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the window shows its
+/// items, holds the options of the view in front, and moves back and forward through the items the window has shown.
 struct AppCommands: Commands {
     /// Nil while no library is open: before a server is set, or while a server's copy opens.
     let library: (any ItemLibrary)?
@@ -84,7 +84,16 @@ struct AppCommands: Commands {
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(details == nil || notes?.ids.count != 1)
             Divider()
-            OrderOptions()
+            // The toolbar's Filter and View Options, for the view in front.
+            Group {
+                if library != nil, let browser {
+                    if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
+                    CurrentViewOptions(browser: browser)
+                } else {
+                    CurrentViewOptions(browser: nil)
+                }
+            }
+            .environment(\.library, library)
             Divider()
             PageWidthOptions()
             Divider()

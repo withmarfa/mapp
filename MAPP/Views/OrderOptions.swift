@@ -7,28 +7,14 @@ enum OrderKey {
     static let all = [sort, groupsByDate]
 }
 
-/// The list's sort and grouping, offered alike by the View menu, the list's View Options menu and Settings.
+/// The list's sort and grouping, offered alike by the View menu, the View Options menu of the list and the gallery
+/// (`CurrentViewOptions`) and Settings.
 struct OrderOptions: View {
-    /// Sort By as a menu of its own, as the View menu and Settings have it, or as a section of the menu that holds it.
-    enum Style { case submenu, sections }
-
-    var style = Style.submenu
     @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
 
     var body: some View {
-        switch style {
-        case .submenu:
-            picker
-        case .sections:
-            // An inline picker brings a separator of its own above its choices, under the header.
-            Section("Sort By") {
-                ForEach(NoteSort.allCases, id: \.self) { choice in
-                    Toggle(isOn: Binding { sort == choice } set: { _ in sort = choice }) { Text(choice.title) }
-                }
-            }
-            Divider()
-        }
+        picker
         group
     }
 

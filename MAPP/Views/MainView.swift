@@ -149,11 +149,9 @@ struct MainView: View {
                             case .table:
                                 ItemTable(browser: browser, order: order, pane: $pane)
                             case .board:
-                                ItemBoard(browser: browser, selectedField: $browser.boardFields[browser.item], compact: Binding {
-                                    browser.compactBoards[browser.item, default: false]
-                                } set: { browser.compactBoards[browser.item] = $0 }, pane: $pane)
+                                ItemBoard(browser: browser, pane: $pane)
                             case .agenda:
-                                ItemAgenda(browser: browser, selectedField: $browser.agendaFields[browser.item], pane: $pane)
+                                ItemAgenda(browser: browser, pane: $pane)
                             case .list, .gallery:
                                 ItemGallery(browser: browser, order: order, pane: $pane)
                             }
@@ -172,13 +170,7 @@ struct MainView: View {
                         GalleryToolbar(
                             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
                             showsCreation: !isSidebarVisible
-                        ) {
-                            if browser.viewMode == .table {
-                                ItemTableControls(browser: browser)
-                            } else if browser.viewMode == .gallery {
-                                ViewOptionsMenu()
-                            }
-                        }
+                        )
                     }
                 }
             } else {

@@ -6,10 +6,10 @@ import SwiftUI
 /// `searchable` cannot do this on macOS: it always goes to the window's end, never in a column, and has no
 /// minimized form there.
 ///
-/// In a list column the field spans the column's toolbar in place of its title, up to the controls of `leading`.
-/// Elsewhere it is an item of its own, with those controls beside it as their own items, and it grows leftwards
-/// from the glass.
-struct ColumnSearch<Leading: View>: ToolbarContent {
+/// The view's own controls (`controls`) follow it, in the same glass while it is a glass. In a list column the field
+/// spans the column's toolbar in place of its title, up to those controls. Elsewhere it is an item of its own, with
+/// the controls as an item after it, and it grows leftwards from the glass.
+struct ColumnSearch<Controls: View>: ToolbarContent {
     enum Layout {
         /// Across a list column, whose width a toolbar item cannot tell, so the caller passes it.
         case column(width: CGFloat)
@@ -26,7 +26,7 @@ struct ColumnSearch<Leading: View>: ToolbarContent {
     var onSubmit: () -> Void = {}
     /// Down Arrow in the field, which hands the keyboard to the list.
     var onDown: () -> Void = {}
-    @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let controls: () -> Controls
 
     /// - Parameter trailing: The space after the clear button. In a column the options sit in the same glass
     ///   just past the field, so the field keeps less there.
@@ -51,21 +51,23 @@ struct ColumnSearch<Leading: View>: ToolbarContent {
             if isExpanded {
                 ToolbarItem(id: "listSearchField") { field(trailing: 2).frame(width: ColumnSearchMetrics.fieldWidth(inColumn: width)) }
                     .sharedBackgroundVisibility(.visible)
-                ToolbarItem(id: "listOptions") { leading() }
+                ToolbarItem(id: "listOptions") { controls() }
             } else {
                 ToolbarItemGroup {
                     button
-                    leading()
+                    controls()
                 }
             }
         case .item:
-            ToolbarItem(id: "collectionOptions") { leading() }
-            ToolbarSpacer(.fixed)
             if isExpanded {
                 ToolbarItem(id: "collectionSearchField") { field(trailing: 8).frame(width: 260) }
                     .sharedBackgroundVisibility(.visible)
+                ToolbarItem(id: "collectionOptions") { controls() }
             } else {
-                ToolbarItem(id: "collectionSearch") { button }
+                ToolbarItemGroup {
+                    button
+                    controls()
+                }
             }
         }
     }

@@ -1,27 +1,41 @@
 import SwiftUI
 
-/// The table's controls on its toolbar: Filter, then View Options, which holds Sort, Group and the columns shown.
-/// They read the table as it reads itself (`ItemTableContent`), and each choice is the place's, kept for the
-/// window; the columns shown are kept for the place (`ItemTableColumnLayouts`).
-struct ItemTableControls: View {
+/// The table's Filter, on its toolbar just after Search and in the View menu. It reads the table as the table reads
+/// itself (`ItemTableContent`), and what it keeps is the place's, for the window.
+struct ItemTableFilterMenu: View {
+    @CurrentLibrary private var library
+    @Bindable var browser: Browser
+
+    var body: some View {
+        let content = ItemTableContent(browser: browser, library: library)
+        Controls(browser: browser, content: content, customization: .constant(.init())).filterMenu
+            .menuIndicator(.hidden)
+    }
+}
+
+/// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
+/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`).
+struct ItemTableViewOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
 
     var body: some View {
         let content = ItemTableContent(browser: browser, library: library)
-        Controls(
-            options: Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 },
-            columns: content.columns, rows: content.allRows, sort: content.sort, grouping: content.grouping,
-            customization: Binding {
-                ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-            } set: {
-                storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
-            })
+        let controls = Controls(browser: browser, content: content, customization: Binding {
+            ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
+        } set: {
+            storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+        })
+        controls.sortPicker
+        Divider()
+        controls.groupPicker
+        Divider()
+        controls.columnsMenu
     }
 }
 
-private struct Controls: View {
+private struct Controls {
     @Binding var options: ItemTableOptions
     let columns: [ItemTableColumn]
     /// Every row before the filters, so a filter can offer values it is hiding.
@@ -30,32 +44,21 @@ private struct Controls: View {
     let grouping: ItemTableColumn?
     @Binding var customization: TableColumnCustomization<ItemTableRow>
 
-    /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row
-    /// holds one.
-    private var categorical: [ItemTableColumn] {
-        columns.filter { column in column.isCategorical && rows.contains { column.category(of: $0) != nil } }
+    init(browser: Browser, content: ItemTableContent, customization: Binding<TableColumnCustomization<ItemTableRow>>) {
+        _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
+        columns = content.columns
+        rows = content.allRows
+        sort = content.sort
+        grouping = content.grouping
+        categorical = content.categoricalColumns
+        _customization = customization
     }
 
-    var body: some View {
-        filterMenu
-            .menuIndicator(.hidden)
-        Menu {
-            sortPicker
-            Divider()
-            groupPicker
-            Divider()
-            columnsMenu
-        } label: {
-            Label("View Options", systemImage: "slider.horizontal.3")
-        }
-        .menuIndicator(.hidden)
-        .help("View Options")
-        .accessibilityIdentifier("ViewOptionsToolbar")
-    }
+    private let categorical: [ItemTableColumn]
 
     // MARK: Filter
 
-    private var filterMenu: some View {
+    var filterMenu: some View {
         Menu {
             ForEach(categorical) { column in
                 Menu(column.label) {
@@ -95,7 +98,7 @@ private struct Controls: View {
 
     // MARK: Sort
 
-    private var sortPicker: some View {
+    var sortPicker: some View {
         let first = sort.first
         return Group {
             Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: Binding { first?.column.id ?? "" } set: { id in
@@ -110,34 +113,16 @@ private struct Controls: View {
                 guard let first else { return }
                 options.sort = [ItemTableComparator(column: first.column, order: order)] + sort.dropFirst()
             }) {
-                Text(first.map(ascendingTitle) ?? String(localized: "Ascending")).tag(SortOrder.forward)
-                Text(first.map(descendingTitle) ?? String(localized: "Descending")).tag(SortOrder.reverse)
+                Text(first?.column.ascendingTitle ?? String(localized: "Ascending")).tag(SortOrder.forward)
+                Text(first?.column.descendingTitle ?? String(localized: "Descending")).tag(SortOrder.reverse)
             }
             .pickerStyle(.inline)
         }
     }
 
-    private func ascendingTitle(_ comparator: ItemTableComparator) -> String {
-        switch comparator.column.style {
-        case .date: String(localized: "Oldest First")
-        case .number, .duration, .priority: String(localized: "Lowest First")
-        case .status: String(localized: "In Progress First")
-        default: String(localized: "A to Z")
-        }
-    }
-
-    private func descendingTitle(_ comparator: ItemTableComparator) -> String {
-        switch comparator.column.style {
-        case .date: String(localized: "Newest First")
-        case .number, .duration, .priority: String(localized: "Highest First")
-        case .status: String(localized: "Finished First")
-        default: String(localized: "Z to A")
-        }
-    }
-
     // MARK: Group
 
-    private var groupPicker: some View {
+    var groupPicker: some View {
         Picker("Group By", systemImage: "rectangle.grid.1x2", selection: Binding { grouping?.id ?? "" } set: { id in
             options.grouping = id.isEmpty ? .none : .column(id)
             options.collapsed = nil
@@ -152,20 +137,12 @@ private struct Controls: View {
 
     // MARK: Columns
 
-    private var shownColumns: [ItemTableColumn] { columns.filter(isShown) }
+    private var shownColumns: [ItemTableColumn] { columns.filter(customization.shows) }
 
-    private func isShown(_ column: ItemTableColumn) -> Bool {
-        switch customization[visibility: column.id] {
-        case .visible: true
-        case .hidden: false
-        default: column.isShownByDefault
-        }
-    }
-
-    private var columnsMenu: some View {
+    var columnsMenu: some View {
         Menu("Columns", systemImage: "tablecells") {
             ForEach(columns.filter { $0.content != .title }) { column in
-                Toggle(column.label, isOn: Binding { isShown(column) } set: {
+                Toggle(column.label, isOn: Binding { customization.shows(column) } set: {
                     customization[visibility: column.id] = $0 ? .visible : .hidden
                 })
             }
@@ -173,5 +150,37 @@ private struct Controls: View {
             Button("Reset Columns") { customization = TableColumnCustomization() }
         }
         .accessibilityIdentifier("ItemTableColumns")
+    }
+}
+
+extension TableColumnCustomization<ItemTableRow> {
+    /// Whether the table shows a column: as the person set it, or as the column is by default.
+    func shows(_ column: ItemTableColumn) -> Bool {
+        switch self[visibility: column.id] {
+        case .visible: true
+        case .hidden: false
+        default: column.isShownByDefault
+        }
+    }
+}
+
+extension ItemTableColumn {
+    /// The name of a column's forward order, in the words its values call for.
+    var ascendingTitle: String {
+        switch style {
+        case .date: String(localized: "Oldest First")
+        case .number, .duration, .priority: String(localized: "Lowest First")
+        case .status: String(localized: "In Progress First")
+        default: String(localized: "A to Z")
+        }
+    }
+
+    var descendingTitle: String {
+        switch style {
+        case .date: String(localized: "Newest First")
+        case .number, .duration, .priority: String(localized: "Highest First")
+        case .status: String(localized: "Finished First")
+        default: String(localized: "Z to A")
+        }
     }
 }
