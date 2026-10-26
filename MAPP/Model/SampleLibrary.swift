@@ -37,7 +37,7 @@ nonisolated enum SampleLibrary {
         let fake = WorkingCopy.fake(
             items: given ?? items(now: now, tasksAndEvents: withCollections),
             edges: edges ?? (given == nil ? memberships(now: now) : []), itemTypes: itemTypes,
-            edgeTypes: edgeTypes)
+            edgeTypes: edgeTypes, views: views)
         let server = SampleServer(copy: fake.copy)
         let source = MarfaSource(copy: fake.copy, connection: connection, reading: server, refreshing: server)
         source.events.yield(.paint)
@@ -116,21 +116,24 @@ nonisolated enum SampleLibrary {
 
     // MARK: Views
 
-    /// Views as another app might have saved them, each with the query it stands for.
-    static let views: [(view: LibraryView, lists: @Sendable (Marfa.Item) -> Bool)] = [
-        (LibraryView(
-            id: ItemID("view-favorite-notes"), title: "Favorite Notes", version: 1,
-            query: LibraryViewQuery(types: [TypeID("core.note")], states: [.active], filter: #"tags contains "favorite""#),
-            sort: [LibraryViewSort(field: "updated_at", ascending: false)]), { row in
-            row.type == "core.note" && row.tags.contains(ItemTag.favorite)
-        }),
-        (LibraryView(
-            id: ItemID("view-in-progress"), title: "Tasks in Progress", version: 1,
-            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active], filter: #"properties.status eq "in_progress""#),
-            sort: [LibraryViewSort(field: "updated_at", ascending: false)],
-            group: LibraryViewGroup(field: "properties.priority")), { row in
-            row.type == "core.task" && row.properties["status"] == .string("in_progress")
-        }),
+    /// Views as another app might have saved them, held by the fake copy and read through it like a real copy's.
+    /// The fake cannot judge a query's `filter`, so each asks only for types, state, order and grouping.
+    static let views: [SavedView] = [
+        SavedView(
+            id: "view-recent-notes",
+            version: 1,
+            settings: ViewSettings(
+                title: "Recent Notes",
+                query: ViewQuery(types: ["core.note"], states: [.active]),
+                sort: [ViewSort(by: "updated_at", direction: .descending)])),
+        SavedView(
+            id: "view-tasks-by-priority",
+            version: 1,
+            settings: ViewSettings(
+                title: "Tasks by Priority",
+                query: ViewQuery(types: ["core.task"], states: [.active]),
+                sort: [ViewSort(by: "updated_at", direction: .descending)],
+                group: ViewGrouping(by: "properties.priority"))),
     ]
 
     // MARK: Items
@@ -269,14 +272,8 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
         try await MarfaRead(copy: copy).edges(ofTypes: types)
     }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(touching: id) }
-    // The fake copy holds no views, so the sample answers its own over the items the copy holds.
-    func views() async throws -> Rows<LibraryView> { Rows(SampleLibrary.views.map(\.view)) }
-    func items(inView id: String) async throws -> [Marfa.Item] {
-        guard let view = SampleLibrary.views.first(where: { $0.view.id.rawValue == id }) else {
-            throw MarfaError.notFound(code: "not_held", message: "The copy holds no view \(id).")
-        }
-        return try await copy.items.list().rows.filter { $0.state == .active && view.lists($0) }
-    }
+    func views() async throws -> Rows<LibraryView> { try await MarfaRead(copy: copy).views() }
+    func items(inView id: String) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(inView: id) }
 
     func readStatus() async throws -> Status { whole }
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
