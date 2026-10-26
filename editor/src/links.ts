@@ -29,8 +29,8 @@ export class NoteLinkStatus {
 
   constructor(
     private readonly ask: AskMissing,
-    /** Draws the links again, after answers that change how one looks. */
-    private readonly redraw: () => void,
+    /** Draws the links to these notes again, after answers that change how one looks. */
+    private readonly redraw: (targets: string[]) => void,
   ) {}
 
   /** What Inkkit draws for the link: `missing` once the app has said so, otherwise nothing. */
@@ -94,15 +94,15 @@ export class NoteLinkStatus {
 
   private take(keys: string[], answers: boolean[] | null, epoch: number): void {
     if (epoch !== this.epoch) return
-    let changed = false
+    const changed = new Set<string>()
     for (const [index, key] of keys.entries()) {
       this.asking.delete(key)
       const missing = answers?.[index]
       if (missing === undefined) continue
       // A link never answered was drawn as a live one.
-      if ((this.missing.get(key) ?? false) !== missing) changed = true
+      if ((this.missing.get(key) ?? false) !== missing) changed.add(this.links.get(key)!.target)
       this.missing.set(key, missing)
     }
-    if (changed) this.redraw()
+    if (changed.size > 0) this.redraw([...changed])
   }
 }

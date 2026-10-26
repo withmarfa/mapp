@@ -204,13 +204,6 @@ export function wikiSuggest(
   return context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId)
 }
 
-/** Draws the note's links again. Inkkit offers no call for it, so this sends the event it hears itself when
- *  something that changes how links are drawn changes, such as a load or a switch of editing mode; every
- *  link then asks the adapter again. A test mounts the real Inkkit and fails if a release stops hearing it. */
-function redrawWikiLinks(root: HTMLElement): void {
-  root.querySelector('.ProseMirror')?.dispatchEvent(new Event('inkkit-media-policy'))
-}
-
 /** A link as the app tells links apart: the alias is what the link shows beyond its name and heading. */
 function linkRef(reference: WikiLinkReference): LinkRef {
   const shown = reference.fragment ? `${reference.target}#${reference.fragment}` : reference.target
@@ -252,7 +245,7 @@ export class NoteEditor {
   ): Promise<NoteEditor> {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
-    host.links = new NoteLinkStatus(askMissing, () => redrawWikiLinks(root))
+    host.links = new NoteLinkStatus(askMissing, (targets) => host.drawLinksAgain(targets))
     host.engine = await InkKitEditor.mount(
       root,
       {
@@ -387,6 +380,15 @@ export class NoteEditor {
   /** The app's library changed: which notes the links name is asked again. */
   linksChanged() {
     this.links.refresh()
+  }
+  /** Draws the links to these notes again, after the app's answer for them changed. A page with no document yet,
+   *  or one that has ended, draws nothing, and each link it draws later is drawn from the answers held. */
+  private drawLinksAgain(targets: string[]) {
+    try {
+      this.engine.refreshReferences(targets)
+    } catch (error) {
+      if (!(error instanceof InkKitError)) throw error
+    }
   }
   /** Moves to the heading of the note on the page that has this text. Whether there was one. */
   revealHeading(text: string, expected = this.generation): boolean {
