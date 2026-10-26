@@ -3,7 +3,6 @@ import SwiftUI
 struct ItemAgenda: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
-    @Binding var selectedField: String?
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
 
@@ -11,42 +10,24 @@ struct ItemAgenda: View {
         let _ = daysSeen
         let items = browser.items(in: library)
         let fields = ItemAgendaLayout.fields(for: items, catalogue: library.catalogue)
-        let field = ItemAgendaLayout.selectedField(selectedField, fields: fields)
+        // Chosen in the toolbar's View Options (`ItemAgendaOptions`).
+        let field = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
         let groups = ItemAgendaLayout.groups(for: items, field: field, catalogue: library.catalogue)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        VStack(spacing: 0) {
-            HStack {
-                if !fields.isEmpty {
-                    Picker("Date Field", selection: Binding(get: { field }, set: { selectedField = $0 })) {
-                        ForEach(fields) { field in
-                            Text(verbatim: field.displayLabel).tag(Optional(field.key))
-                        }
-                    }
-                    .fixedSize()
-                    .accessibilityIdentifier("AgendaDateField")
+        agenda(groups)
+        .overlay {
+            if items.isEmpty {
+                if browser.isSearching {
+                    EmptyState.search(browser.searchText)
+                } else {
+                    EmptyState("No Items")
                 }
-                Spacer()
-                Text("Read Only")
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            Divider()
-            agenda(groups)
-                .overlay {
-                    if items.isEmpty {
-                        if browser.isSearching {
-                            EmptyState.search(browser.searchText)
-                        } else {
-                            EmptyState("No Items")
-                        }
-                    }
-                }
         }
         .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
+        // The agenda only shows items; it changes none of them.
+        .navigationSubtitle(Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -77,6 +58,8 @@ struct ItemAgenda: View {
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: browser.selection)
         .focused(pane, equals: .list)
         .accessibilityLabel("Agenda")
         .accessibilityIdentifier("ItemAgenda")

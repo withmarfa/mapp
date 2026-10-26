@@ -11,6 +11,7 @@ struct CommandPalette: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
+    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
@@ -290,6 +291,11 @@ struct CommandPalette: View {
             }
         }
 
+        if library.isLoaded {
+            for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
+                add(command.title, command.systemImage, action: command.action)
+            }
+        }
         if fullWidth {
             add(String(localized: "Standard Width"), "arrow.left.and.right") { fullWidth = false }
         } else {

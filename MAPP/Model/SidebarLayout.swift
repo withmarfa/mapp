@@ -16,7 +16,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case type(String)
 
     /// Every saved view's symbol: a view is a filtered list, whatever it lists.
-    static let viewSymbol = "line.3.horizontal.decrease.circle"
+    static let viewSymbol = "square.stack.3d.up"
 
     var key: String {
         switch self {

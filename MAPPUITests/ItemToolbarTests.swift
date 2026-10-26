@@ -35,6 +35,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar")
         XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX)
         XCTAssertEqual(newItem.frame.midY, details.frame.midY, accuracy: 3, "New Item shares the native toolbar row")
+        XCTAssertLessThan(viewOptions.frame.maxX, viewMode.frame.minX, "View Options comes before View As")
         XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
@@ -72,18 +73,19 @@ final class ItemToolbarTests: XCTestCase {
 
     func testViewOptionsOffersSortByAndGroupByDate() {
         control("ViewOptionsToolbar").click()
-        for title in ["Date Edited", "Date Created", "Title", "Group by Date"] {
-            XCTAssertTrue(window.menuItems[title].waitForExistence(timeout: 3), title)
-        }
+        let sortBy = window.menuItems["Sort By"].firstMatch
+        let groupByDate = window.menuItems["Group by Date"].firstMatch
+        XCTAssertTrue(sortBy.waitForExistence(timeout: 3))
+        XCTAssertTrue(groupByDate.exists)
+        XCTAssertLessThan(sortBy.frame.minY, groupByDate.frame.minY)
         XCTAssertFalse(window.menuItems["Gallery"].exists, "View As has the views now")
         XCTAssertFalse(window.menuItems["View As"].exists)
-        var previous = -CGFloat.infinity
-        for title in ["Sort By", "Date Edited", "Date Created", "Title", "Group by Date"] {
-            let item = window.menuItems[title].firstMatch
-            XCTAssertGreaterThan(item.frame.minY, previous, "\(title) follows the item before it")
-            previous = item.frame.minY
+        sortBy.hover()
+        for title in ["Date Edited", "Date Created", "Title"] {
+            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the Sort By submenu")
         }
         capture("View Options menu")
+        app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])
     }
 
@@ -158,8 +160,11 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
         XCTAssertTrue(share.exists)
         XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays in the sidebar")
-        XCTAssertLessThan(viewMode.frame.maxX, viewOptions.frame.minX)
-        XCTAssertLessThan(viewOptions.frame.maxX, share.frame.minX)
+        let search = window.toolbars.buttons["Search"].firstMatch
+        XCTAssertTrue(search.exists)
+        XCTAssertLessThan(search.frame.maxX, viewOptions.frame.minX, "Search leads the trailing controls")
+        XCTAssertLessThan(viewOptions.frame.maxX, viewMode.frame.minX)
+        XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertLessThan(more.frame.maxX, details.frame.minX, "Details is at the far right")
         // ⌘2 leaves the keyboard where it was, so the grid is given it before Escape clears the selection.
@@ -181,7 +186,10 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["NoteList"].exists, "the table spans the window")
         XCTAssertFalse(window.webViews.firstMatch.exists)
-        XCTAssertTrue(control("ItemTableFilter").exists, "Filter is on the toolbar")
+        let filter = control("ItemTableFilter")
+        XCTAssertTrue(filter.exists, "Filter is on the toolbar")
+        XCTAssertLessThan(filter.frame.maxX, control("ViewOptionsToolbar").frame.minX, "Filter sits with Search, before View Options")
+        XCTAssertLessThan(control("ViewOptionsToolbar").frame.maxX, control("ViewModeMenu").frame.minX)
         control("ViewOptionsToolbar").click()
         for title in ["Sort By", "Group By", "Columns"] {
             XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), title)

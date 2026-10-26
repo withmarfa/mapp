@@ -64,15 +64,81 @@ struct ViewModeMenu: View {
     }
 }
 
-/// How the list and the gallery are ordered and grouped, in one menu on their toolbar. The table has its own
-/// (`ItemTableControls`), which adds its columns.
+/// The options of the view a window shows, in one menu at the same place on every view's toolbar: after Search
+/// (and the table's Filter), before View As. The View menu holds the same options (`CurrentViewOptions`), since a
+/// toolbar can be hidden or customized.
 struct ViewOptionsMenu: View {
+    let browser: Browser
+
     var body: some View {
         Menu("View Options", systemImage: "slider.horizontal.3") {
-            OrderOptions(style: .sections)
+            CurrentViewOptions(browser: browser)
         }
         .menuIndicator(.hidden)
         .help("View Options")
         .accessibilityIdentifier("ViewOptionsToolbar")
+    }
+}
+
+/// What can be set about the view a window shows: the order of the list and the gallery, the table's sort,
+/// grouping and columns, the board's lanes and cards, and the agenda's dates. Each choice belongs to the place
+/// and is kept for the window, except the list's order, which is the app's.
+struct CurrentViewOptions: View {
+    /// Nil while no window is in front, when the list's order is still the app's to change.
+    let browser: Browser?
+
+    var body: some View {
+        switch browser?.viewMode {
+        case .table: if let browser { ItemTableViewOptions(browser: browser) }
+        case .board: if let browser { ItemBoardOptions(browser: browser) }
+        case .agenda: if let browser { ItemAgendaOptions(browser: browser) }
+        case .list, .gallery, nil: OrderOptions()
+        }
+    }
+}
+
+/// The lanes a board sorts its cards into, and how much each card shows.
+struct ItemBoardOptions: View {
+    @CurrentLibrary private var library
+    @Bindable var browser: Browser
+
+    var body: some View {
+        let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
+        let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
+        Picker("Group By", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
+            browser.boardFields[browser.item] = $0
+        }) {
+            ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
+        }
+        .pickerStyle(.menu)
+        .disabled(fields.isEmpty)
+        .accessibilityIdentifier("BoardGroupBy")
+        Picker("Card Density", systemImage: "rectangle.compress.vertical", selection: Binding {
+            browser.compactBoards[browser.item, default: false]
+        } set: { browser.compactBoards[browser.item] = $0 }) {
+            Text("Comfortable").tag(false)
+            Text("Compact").tag(true)
+        }
+        .pickerStyle(.menu)
+        .accessibilityIdentifier("BoardCardDensity")
+    }
+}
+
+/// The date an agenda places each item on.
+struct ItemAgendaOptions: View {
+    @CurrentLibrary private var library
+    @Bindable var browser: Browser
+
+    var body: some View {
+        let fields = ItemAgendaLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+        let field = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
+        Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
+            browser.agendaFields[browser.item] = $0
+        }) {
+            ForEach(fields) { Text(verbatim: $0.displayLabel).tag($0.key) }
+        }
+        .pickerStyle(.menu)
+        .disabled(fields.isEmpty)
+        .accessibilityIdentifier("AgendaDateField")
     }
 }

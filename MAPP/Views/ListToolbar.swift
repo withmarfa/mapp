@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// What acts on the list: Search and View Options together. View As
-/// is on the page's toolbar, at the trailing side, where the gallery and the table have it too. In the gallery and
-/// the table, which have no list column, their own toolbar holds all of it.
+/// What acts on the list: Search and View Options together. View As is on the page's toolbar, at the trailing side,
+/// so the order across the window is the one every view has (`GalleryToolbar`).
 struct ListToolbar: ToolbarContent {
     @Bindable var browser: Browser
     /// The width the search field spans when it is out.
@@ -17,7 +16,7 @@ struct ListToolbar: ToolbarContent {
             focusRequests: browser.searchFocusRequests,
             onDown: { browser.focusRequest = .list }
         ) {
-            ViewOptionsMenu()
+            ViewOptionsMenu(browser: browser)
         }
     }
 }
