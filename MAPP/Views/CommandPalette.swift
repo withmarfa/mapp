@@ -291,6 +291,18 @@ struct CommandPalette: View {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
+            if selected.allSatisfy(library.canJoinCollection) {
+                if let details, !library.collections.isEmpty {
+                    add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus") {
+                        details.collectionPick = CollectionPickRequest(ids: ids, undoManager: undoManager)
+                    }
+                }
+                for collection in library.collections(holding: ids) {
+                    add(String(localized: "Remove from “\(collection.title)”"), "rectangle.stack.badge.minus") {
+                        library.removeFromCollection(ids, collection.id, undoManager: undoManager)
+                    }
+                }
+            }
             add(String(localized: "Delete Note"), "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager)
             }
@@ -333,8 +345,7 @@ struct CommandPalette: View {
             (.favorites, "heart", nil), (.recentlyDeleted, "trash", nil),
         ]
         items += library.sourceCounts.map { (.source($0.name), "antenna.radiowaves.left.and.right", $0.name) }
-        // Match the two levels in the collection index.
-        items += library.collectionTree.flatMap { [$0] + $0.children }.map { (.collection($0.id), $0.symbol, $0.title) }
+        items += library.collections.map { (.collection($0.id), TypeSymbol.name(for: $0.type, in: library.catalogue), $0.title) }
         // The types the sidebar shows, under the names it gives them.
         items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
         items += library.views.map { (.view($0.id), SidebarPlace.viewSymbol, $0.title) }

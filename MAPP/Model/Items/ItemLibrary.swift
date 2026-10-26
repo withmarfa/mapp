@@ -67,6 +67,18 @@ protocol ItemLibrary: AnyObject, Observable {
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
     func creationParentCandidates(typeID: String) -> [Item]
 
+    // MARK: Collections
+
+    /// The active collections, by title: items whose type plays Marfa's `container` role (`Catalogue.isCollection`).
+    var collections: [Item] { get }
+    /// Files each item in the collection with one `in-collection` edge, skipping those already in it. Nothing is
+    /// written when any item can't be a member, as a collection can't, and the library tells the person why.
+    @discardableResult
+    func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool
+    /// Removes the items' `in-collection` edges to the collection; false when none of them is in it.
+    @discardableResult
+    func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool
+
     // MARK: Files
 
     /// A file item's file, fetched first; nil for an item that is not a file.
@@ -177,6 +189,18 @@ extension ItemLibrary {
 
     /// Why the library refused a title, in the person's words.
     var titleRefusal: String { String(localized: "The title could not be saved. Enter a title.") }
+
+    /// Whether the item can be filed in a collection: an active item the library can write, of a type the catalogue
+    /// lets join one. A collection can't.
+    func canJoinCollection(_ item: Item) -> Bool {
+        item.state == .active && item.problem == nil && catalogue.canJoinCollection(item.type)
+    }
+
+    /// The collections any of the items is in, by title.
+    func collections(holding ids: Set<ItemID>) -> [Item] {
+        let held = Set(ids.compactMap { item($0) }.flatMap(\.collectionIDs))
+        return collections.filter { held.contains($0.id) }
+    }
 
     /// What a flat list of items, such as the palette or the link picker, says beside a title: Inbox for an item
     /// waiting there, otherwise its type.

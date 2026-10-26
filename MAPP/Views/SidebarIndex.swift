@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Indexes navigate to existing collections and the sources of readable items, never synthetic item records.
+/// Indexes navigate to the library's collections and the sources of readable items, never synthetic item records.
 struct SidebarIndex: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -18,17 +18,18 @@ struct SidebarIndex: View {
                     }
                 }
             } else {
-                if library.collectionTree.isEmpty {
-                    EmptyState("No Collections", detail: "Items with other items filed under them appear here.")
+                let collections = library.collections
+                if collections.isEmpty {
+                    if library.catalogue.collectionTypes.isEmpty {
+                        EmptyState("No Collections", detail: "This library has no collection type.")
+                    } else {
+                        EmptyState("No Collections", detail: "Collections you make appear here.")
+                    }
                 } else {
-                    List {
-                        ForEach(library.collectionTree) { node in
-                            destination(node.title, symbol: node.symbol, count: library.count(in: .collection(node.id)), place: .collection(node.id))
-                            ForEach(node.children) { child in
-                                destination(child.title, symbol: child.symbol, count: library.count(in: .collection(child.id)), place: .collection(child.id))
-                                    .padding(.leading, 20)
-                            }
-                        }
+                    List(collections) { collection in
+                        destination(
+                            collection.title, symbol: TypeSymbol.name(for: collection.type, in: library.catalogue),
+                            count: library.count(in: .collection(collection.id)), place: .collection(collection.id))
                     }
                 }
             }

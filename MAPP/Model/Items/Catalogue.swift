@@ -225,6 +225,33 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return false
     }
 
+    /// Whether `type` is one of `types`, below one of them, or plays one of `roles`, as an edge type's end names
+    /// what it admits. An end naming neither admits any type.
+    func admits(_ type: TypeID, types: Set<TypeID>, roles: Set<String>) -> Bool {
+        (types.isEmpty && roles.isEmpty) || types.contains(type) || isSubtype(type, ofAnyOf: types)
+            || !roles.isDisjoint(with: itemTypes[type]?.roles ?? [])
+    }
+
+    // MARK: Collections
+
+    /// Whether items of `type` are collections: the type plays Marfa's `container` role.
+    func isCollection(_ type: TypeID) -> Bool {
+        itemTypes[type]?.roles.contains(MarfaMapping.containerRole) == true
+    }
+
+    /// The types whose items are collections.
+    var collectionTypes: [TypeID] {
+        itemTypes.values.filter { $0.roles.contains(MarfaMapping.containerRole) }.map(\.id)
+    }
+
+    /// Whether an item of `type` can be filed in a collection: the catalogue has `in-collection`, its source end
+    /// admits the type, and the type is not a collection itself, since collections are flat
+    /// (`edges/collection-no-nesting`).
+    func canJoinCollection(_ type: TypeID) -> Bool {
+        guard let info = edgeTypes[MarfaMapping.collectionEdge], !isCollection(type) else { return false }
+        return admits(type, types: info.sourceTypes, roles: info.sourceRoles)
+    }
+
     /// The edge type an item writes under `name`, and whether `name` is its reverse.
     func edgeType(named name: String) -> (info: EdgeTypeInfo, isReverse: Bool)? {
         if let info = edgeTypes[name] { return (info, false) }

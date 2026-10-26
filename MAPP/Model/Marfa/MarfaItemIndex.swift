@@ -10,6 +10,7 @@ nonisolated struct MarfaItemIndex {
         let source: ItemID
         let target: ItemID
         let holder: ItemID
+        var position: Double? = nil
     }
 
     private(set) var byState: [ItemState: Set<ItemID>] = [:]
@@ -59,12 +60,12 @@ nonisolated struct MarfaItemIndex {
     static func link(_ edge: Edge, catalogue: Catalogue) -> Link? {
         guard case .item(let other) = edge.target else { return nil }
         guard let (info, isReverse) = catalogue.edgeType(named: edge.type) else {
-            return Link(id: edge.id, type: edge.type, source: edge.source, target: other, holder: edge.source)
+            return Link(id: edge.id, type: edge.type, source: edge.source, target: other, holder: edge.source, position: edge.position)
         }
         let atTarget = isReverse || info.writtenAt == .target
         return Link(
             id: edge.id, type: info.id, source: atTarget ? other : edge.source, target: atTarget ? edge.source : other,
-            holder: edge.source)
+            holder: edge.source, position: edge.position)
     }
 
     func links(from id: ItemID, type: String) -> [Link] {

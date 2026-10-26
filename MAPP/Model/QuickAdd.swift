@@ -251,8 +251,8 @@ final class QuickAdd {
 
 extension Browser {
     /// Shows quick add, with `typeID` chosen where one is given. A draft put away comes back as it was left;
-    /// otherwise the kind is `remembered`, the last one added, then the place's own type, then a note, and the
-    /// item goes under the collection being shown where its kind can.
+    /// otherwise the kind is `remembered`, the last one added, then the place's own type (a collection type in the
+    /// Collections index), then a note.
     func openQuickAdd(typeID: String? = nil, remembered: String? = nil, in library: any ItemLibrary) {
         leaveSettings()
         palette = nil
@@ -261,11 +261,11 @@ extension Browser {
         if quickAdd.draft == nil {
             var placeType: String?
             if case .itemType(let id) = item { placeType = id }
+            // The Collections index offers a new collection first.
+            if item == .collections { placeType = types.first { library.catalogue.isCollection(TypeID($0)) } }
             guard let kind = offered(typeID) ?? offered(remembered) ?? offered(placeType) ?? offered("core.note") ?? types.first
             else { return }
-            var draft = QuickAdd.Draft(typeID: kind)
-            if case .collection(let id) = item { draft.parentID = id }
-            quickAdd.draft = draft
+            quickAdd.draft = QuickAdd.Draft(typeID: kind)
             chooseQuickAddType(kind, in: library)
         } else if let typeID = offered(typeID) {
             chooseQuickAddType(typeID, in: library)

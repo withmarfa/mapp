@@ -332,10 +332,47 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "Sources appear here when items identify where they came from." : {
+    "Collections you make appear here." : {
       "extractionState" : "manual"
     },
-    "Items with other items filed under them appear here." : {
+    "This library has no collection type." : {
+      "extractionState" : "manual"
+    },
+    "Add to Collection" : {
+      "extractionState" : "manual"
+    },
+    "Add to Collection…" : {
+      "extractionState" : "manual",
+      "generatesSymbol" : false
+    },
+    "Remove from Collection" : {
+      "extractionState" : "manual"
+    },
+    "Remove from “%@”" : {
+      "extractionState" : "manual"
+    },
+    "Choose a collection for “%@”." : {
+      "extractionState" : "manual"
+    },
+    "Choose a collection for %lld items." : {
+      "extractionState" : "manual"
+    },
+    "Add" : {
+      "extractionState" : "manual"
+    },
+    "Can’t Add to Collection" : {
+      "extractionState" : "manual"
+    },
+    "Can’t Remove from Collection" : {
+      "extractionState" : "manual"
+    },
+    "A collection can’t be in another collection." : {
+      "extractionState" : "manual"
+    },
+    "This collection isn’t in the library." : {
+      "extractionState" : "manual"
+    },
+    "Sources appear here when items identify where they came from." : {
       "extractionState" : "manual"
     },
     "Browse" : {
@@ -839,9 +876,6 @@
 
     },
     "Collapsed" : {
-
-    },
-    "Collection" : {
 
     },
     "Collections" : {

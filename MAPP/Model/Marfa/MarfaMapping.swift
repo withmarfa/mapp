@@ -21,6 +21,12 @@ nonisolated enum MarfaMapping {
     /// Marfa writes an embed of a file as this edge, from the file's item to the item whose body embeds it.
     static let attachmentEdge = "attached-to"
     static let parentEdge = "parent-of"
+    /// Marfa files an item in a collection with this edge, from the member to the collection.
+    static let collectionEdge = "in-collection"
+    /// The role a type plays to be a collection, which `in-collection` names at its target.
+    static let containerRole = "container"
+    /// The `in-collection` property that orders a collection's members.
+    static let positionProperty = "position"
 
     /// Marfa keeps what apps share, such as saved views, as `system.*` rows, which are no items of the library. The
     /// copy holds `system.view` so the sidebar can list the views (`MarfaSync.slice`), and only that prefix is tested.
@@ -303,7 +309,8 @@ nonisolated enum MarfaMapping {
             let name = atTarget ? info?.reverseName ?? edge.edgeType : edge.edgeType
             return Edge(
                 id: EdgeID(edge.id), type: name, source: ItemID(id), target: .item(ItemID(other)),
-                origin: edge.edgeType == bodyLinkEdge ? .body : .property(name))
+                origin: edge.edgeType == bodyLinkEdge ? .body : .property(name),
+                position: edge.properties[positionProperty]?.number)
         }
     }
 
