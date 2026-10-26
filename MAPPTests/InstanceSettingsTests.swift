@@ -11,9 +11,13 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     let readFailure = Mutex<InstanceConfigFailure?>(nil)
     let updateFailure = Mutex<InstanceConfigFailure?>(nil)
     let patches = Mutex<[InstanceConfigPatch]>([])
+    /// The instance each change said it expected.
+    let expected = Mutex<[String?]>([])
+    /// Run as a change arrives, to let a test move the server under it.
+    let beforeUpdate = Mutex<(@Sendable () -> Void)?>(nil)
 
-    init(_ values: [InstanceSetting: InstanceValue] = [:]) {
-        config = Mutex(InstanceConfig(values: values))
+    init(_ values: [InstanceSetting: InstanceValue] = [:], instanceID: String = "instance-1") {
+        config = Mutex(InstanceConfig(values: values, instanceID: instanceID))
     }
 
     func read() async throws(InstanceConfigFailure) -> InstanceConfig {
@@ -21,10 +25,13 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         return config.withLock { $0 }
     }
 
-    func update(_ patch: InstanceConfigPatch) async throws(InstanceConfigFailure) -> InstanceConfig {
+    func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig {
         patches.withLock { $0.append(patch) }
+        expected.withLock { $0.append(instanceID) }
+        beforeUpdate.withLock { $0 }?()
         if let failure = updateFailure.withLock({ $0 }) { throw failure }
-        return config.withLock { config in
+        return try config.withLock { (config) throws(InstanceConfigFailure) in
+            if let instanceID, instanceID != config.instanceID { throw .instanceChanged }
             for (setting, value) in patch.values { config.values[setting] = value }
             for setting in patch.clear { config.values[setting] = nil }
             return config
@@ -288,6 +295,54 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(!model.isSaving)
     }
 
+    @Test func aChangeIsAddressedToTheInstanceThePageWasReadFrom() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        #expect(model.loaded?.instanceID == "instance-1")
+        model.draft[.name] = "Home"
+        await model.save()
+        #expect(source.expected == ["instance-1"])
+    }
+
+    @Test func anotherInstanceAnsweringAtTheAddressRefusesTheChangeAndTheModelStartsAgain() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        model.draft[.name] = "Home"
+        // Between the read before sending and the change, another instance takes the address.
+        source.beforeUpdate.withLock { [source] in
+            $0 = { source.config.withLock { $0 = InstanceConfig(values: [.name: .text("Elsewhere")], instanceID: "instance-2") } }
+        }
+
+        await model.save()
+
+        #expect(source.expected == ["instance-1"])
+        #expect(source.config.withLock { $0.name } == "Elsewhere")
+        #expect(model.serverChanged)
+        #expect(model.failure == nil)
+        #expect(model.loaded?.instanceID == "instance-2")
+        #expect(model.draft[.name] == "Elsewhere")
+        #expect(!model.hasEdits)
+        #expect(!model.isSaving)
+        // The next save starts from the new instance.
+        source.beforeUpdate.withLock { $0 = nil }
+        model.draft[.name] = "Home"
+        await model.save()
+        #expect(!model.serverChanged)
+        #expect(source.expected.last == "instance-2")
+        #expect(source.config.withLock { $0.name } == "Home")
+    }
+
+    @Test func anInstanceThatAnsweredDifferentlyBeforeTheChangeIsNotWrittenTo() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        model.draft[.name] = "Home"
+        source.config.withLock { $0 = InstanceConfig(values: [.name: .text("Library")], instanceID: "instance-2") }
+
+        await model.save()
+
+        #expect(source.sent.isEmpty)
+        #expect(model.serverChanged)
+        #expect(model.loaded?.instanceID == "instance-2")
+        #expect(model.draft[.name] == "Library")
+    }
+
     @Test func anotherServerStartsFromNothing() async {
         let first = FakeInstanceConfig([.name: .text("One")])
         let second = FakeInstanceConfig([.name: .text("Two")])
@@ -312,6 +367,17 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(json["name"] as? String == "Home")
         #expect(json["version_max_versions"] as? Int == 200)
         #expect(json["trash_retention_days"] is NSNull)
+    }
+
+    @Test func theChangeNamesTheInstanceItExpects() {
+        let patch = InstanceConfigPatch(values: [.name: .text("Home")])
+        #expect(MarfaServerConfig.input(patch, expecting: "0197a7d6-0000-7000-8000-000000000000").headers.xMarfaInstanceId == "0197a7d6-0000-7000-8000-000000000000")
+        #expect(MarfaServerConfig.input(patch, expecting: nil).headers.xMarfaInstanceId == nil)
+    }
+
+    @Test func aRefusalForAnotherInstanceIsTold() {
+        #expect(MarfaServerConfig.failure(MarfaError.server(status: 409, code: "instance_changed", message: "other")) == .instanceChanged)
+        #expect(MarfaServerConfig.failure(MarfaError.server(status: 409, code: "version_conflict", message: "stale")) == .failed("stale"))
     }
 
     @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {

@@ -136,6 +136,10 @@ private struct ThisMarfaFields: View {
         if let elsewhere = model.elsewhereMessage {
             Text(elsewhere).fixedSize(horizontal: false, vertical: true)
         }
+        if model.serverChanged {
+            Text(InstanceConfigFailure.instanceChanged.message).fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("ThisMarfaServerChanged")
+        }
         if let failure = model.failure {
             Text(failure.message).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             if failure == .unreachable {

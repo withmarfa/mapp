@@ -21,10 +21,10 @@ nonisolated struct MarfaServerConfig: InstanceConfigSource {
         }
     }
 
-    @concurrent func update(_ patch: InstanceConfigPatch) async throws(InstanceConfigFailure) -> InstanceConfig {
+    @concurrent func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig {
         let client = try client()
         do {
-            let answer = try await client.updateConfig(body: .json(Self.payload(patch)))
+            let answer = try await client.updateConfig(Self.input(patch, expecting: instanceID))
             return Self.config(try answer.ok.body.json)
         } catch {
             throw Self.failure(error)
@@ -38,6 +38,7 @@ nonisolated struct MarfaServerConfig: InstanceConfigSource {
 
     static func config(_ answer: Components.Schemas.InstanceConfig) -> InstanceConfig {
         var config = InstanceConfig()
+        config.instanceID = answer.instanceId
         config.values[.name] = answer.name.map { .text($0) }
         config.values[.trashRetentionDays] = answer.trashRetentionDays.map { .number($0) }
         config.values[.versionRecentDays] = answer.versionRecentDays.map { .number($0) }
@@ -45,6 +46,12 @@ nonisolated struct MarfaServerConfig: InstanceConfigSource {
         config.values[.versionWeeklyDays] = answer.versionWeeklySnapshotDays.map { .number($0) }
         config.values[.versionMaxVersions] = answer.versionMaxVersions.map { .number($0) }
         return config
+    }
+
+    /// The change, with the instance it expects in `X-Marfa-Instance-Id`, so a write that reaches another instance
+    /// at the same address is refused where it lands.
+    static func input(_ patch: InstanceConfigPatch, expecting instanceID: String?) -> Operations.UpdateConfig.Input {
+        .init(headers: .init(xMarfaInstanceId: instanceID), body: .json(payload(patch)))
     }
 
     /// A body that names only the settings in `patch`: a field left out stays as it is, and `null` removes one.
@@ -81,6 +88,7 @@ nonisolated struct MarfaServerConfig: InstanceConfigSource {
         case .forbidden: return .notPermitted
         case .unauthorized, .signedOut: return .keyRefused
         case .validation(_, let message): return .refused(reason(message))
+        case .server(409, "instance_changed", _): return .instanceChanged
         default: return .failed(error.message)
         }
     }

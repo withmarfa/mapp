@@ -36,7 +36,8 @@ extension LiveMarfaTests {
             // Put back: the earlier name, or no name so the default applies.
             var restore = InstanceConfigPatch()
             if let name = before.name { restore.values[.name] = .text(name) } else { restore.clear.insert(.name) }
-            let restored = try await source.update(restore)
+            // Addressed to the instance that was read, as the app sends it.
+            let restored = try await source.update(restore, expecting: before.instanceID)
             #expect(restored.values[.name] == before.values[.name])
             try result.get()
         }

@@ -52,6 +52,9 @@ import Observation
     private(set) var elsewhere: [InstanceSetting] = []
     /// What the server answered for the settings the last save changed.
     private(set) var saved: [String] = []
+    /// Another instance was found answering at this address when a save was about to reach it. Nothing was sent, and
+    /// the page starts again from that instance's settings.
+    private(set) var serverChanged = false
     /// Set while the person is asked to agree to a shorter retention.
     var pending: Pending?
 
@@ -95,6 +98,7 @@ import Observation
         for setting in InstanceSetting.allCases { draft[setting] = loaded.text(setting) }
         elsewhere = []
         saved = []
+        serverChanged = false
         if case .refused? = failure { failure = nil }
     }
 
@@ -203,22 +207,29 @@ import Observation
         let before = generation
         guard let target = adopt(), generation == before, !isSaving else { return }
         let generation = generation
+        // The instance the person was shown, which the change is addressed to.
+        let expected = loaded?.instanceID
         isSaving = true
         failure = nil
         elsewhere = []
         saved = []
+        serverChanged = false
         defer { if generation == self.generation { isSaving = false } }
         do {
             // A setting changed elsewhere since it was read is shown, not replaced.
             let current = try await target.source.read()
             guard generation == self.generation else { return }
+            if let expected, let now = current.instanceID, now != expected {
+                await instanceChanged()
+                return
+            }
             let moved = InstanceSetting.allCases.filter { patch.settings.contains($0) && current.values[$0] != loaded?.values[$0] }
             absorb(current)
             guard moved.isEmpty else {
                 elsewhere = moved
                 return
             }
-            let answer = try await target.source.update(patch)
+            let answer = try await target.source.update(patch, expecting: expected)
             guard generation == self.generation else { return }
             absorb(answer, resetting: patch.settings)
             saved = InstanceSetting.allCases.filter(patch.settings.contains).map {
@@ -227,8 +238,15 @@ import Observation
             if patch.settings.contains(.name) { onRenamed() }
         } catch {
             guard generation == self.generation else { return }
-            fail(error)
+            if error == .instanceChanged { await instanceChanged() } else { fail(error) }
         }
+    }
+
+    /// Starts again, as for any other server, from what the instance now answering at the address holds.
+    private func instanceChanged() async {
+        reset()
+        serverChanged = true
+        await load()
     }
 
     /// What the page says about settings found changed elsewhere, with the value the server holds now.
@@ -256,6 +274,7 @@ import Observation
         failure = nil
         elsewhere = []
         saved = []
+        serverChanged = false
         pending = nil
         isLoading = false
         isSaving = false

@@ -82,6 +82,8 @@ nonisolated enum InstanceValue: Hashable, Sendable {
 /// The settings a server has set. A setting it has not set is absent, which means its default applies.
 nonisolated struct InstanceConfig: Hashable, Sendable {
     var values: [InstanceSetting: InstanceValue] = [:]
+    /// Which instance answered, as `GET /config` gives it.
+    var instanceID: String?
 
     func number(_ setting: InstanceSetting) -> Int? {
         if case .number(let number)? = values[setting] { return number }
@@ -172,6 +174,8 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     case unreachable
     /// The key MAPP uses lacks `config.manage`.
     case notPermitted
+    /// Another instance answers at the address than the one the settings were read from.
+    case instanceChanged
     case keyRefused
     /// The server refused the values; the message is its reason.
     case refused(String)
@@ -183,6 +187,8 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
             String(localized: "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected.")
         case .notPermitted:
             String(localized: "The key MAPP uses isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
+        case .instanceChanged:
+            String(localized: "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing.")
         case .keyRefused:
             String(localized: "The server didn’t accept MAPP’s key. Choose a new key in Library.")
         case .refused(let reason), .failed(let reason):
@@ -195,6 +201,8 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
 /// the library works.
 nonisolated protocol InstanceConfigSource: Sendable {
     func read() async throws(InstanceConfigFailure) -> InstanceConfig
-    /// Sends exactly `patch` and gives back the whole configuration as the server now has it.
-    func update(_ patch: InstanceConfigPatch) async throws(InstanceConfigFailure) -> InstanceConfig
+    /// Sends exactly `patch` and gives back the whole configuration as the server now has it. `instanceID` is the
+    /// instance the settings were read from: if another instance answers, the server writes nothing and the call
+    /// throws `instanceChanged`.
+    func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig
 }
