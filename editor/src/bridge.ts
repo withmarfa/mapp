@@ -1,11 +1,9 @@
 import type { CaretState, FindState } from './editor'
 import type { HeaderMenu } from './header'
 
-/** An embed as the note names it: by a path from the note, as `![](path)` does, or by name, as `![[name]]`
- *  does, for the app to resolve as Marfa's core does. */
-export type EmbedRequest = { item: string; export?: boolean } & (
-  { path: string } | { name: string }
-)
+/** An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a.png)`, which the app
+ *  matches against the embeds Marfa bound for the note. */
+export type EmbedRequest = { item: string; text: string; export?: boolean }
 
 /** A file an embed names, as the app serves it: `url` and `icon` load through the app's own scheme, and
  *  `detail` is its size in the person's words. */
@@ -17,6 +15,11 @@ export interface EmbeddedFile {
   icon: string
   /** Whether Open hands it to an app; a file that might run is only shown in the Finder. */
   opens: boolean
+}
+
+/** Why an embed's file can't be shown now, such as a file not yet downloaded while the server can't be reached. */
+export interface UnavailableFile {
+  unavailable: string
 }
 
 export type EditorMessage =
@@ -65,8 +68,11 @@ declare global {
     webkit?: {
       messageHandlers?: {
         host?: { postMessage(message: EditorMessage): void }
-        /** Answers with what the app knows of a file a note embeds, or null when it has none. */
-        embeds?: { postMessage(request: EmbedRequest): Promise<EmbeddedFile | null> }
+        /** Answers with what the app knows of a file a note embeds, why the file can't be shown now, or null
+         *  when it has none. */
+        embeds?: {
+          postMessage(request: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null>
+        }
         /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
          *  `resolve` with whether each name is missing. */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }

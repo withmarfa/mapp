@@ -85,22 +85,80 @@ test('source edits share undo and reject stale mode changes', async () =>
     expect(editor.snapshot().text).toBe('Replacement\n')
   }))
 
-test('note embeds describe unsupported transclusion and open source without changing Markdown', async () =>
-  withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
-    const shown = () =>
-      [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
-    await vi.waitFor(() =>
-      expect(shown()).toContain('Note reference: Section. Open to edit source.'),
-    )
-    const labels = shown()
-    expect(labels).toContain('Note reference: A note. Open to edit source.')
-    expect(labels).toContain('Note reference: Section. Open to edit source.')
-    expect(labels.join(' ')).not.toContain('File unavailable')
-    const button = document.querySelector<HTMLButtonElement>('.inkkit-file-control')!
-    button.click()
-    expect(document.querySelector('textarea')).not.toBeNull()
-    expect(editor.markdown()).toBeNull()
-  }))
+test('an embed asks the app by its text as written, and one the app does not answer is missing', async () => {
+  const asked: unknown[] = []
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        embeds: {
+          postMessage: async (request: unknown) => {
+            asked.push(request)
+            return null
+          },
+        },
+      },
+    },
+  })
+  try {
+    await withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
+      await vi.waitFor(() => expect(asked).toHaveLength(2))
+      expect(asked).toEqual([
+        { item: 'note', text: '![[A note]]' },
+        { item: 'note', text: '![Section](note.md#part)' },
+      ])
+      await vi.waitFor(() =>
+        expect(
+          [...document.querySelectorAll('.inkkit-file-status')].map((e) => e.textContent),
+        ).toEqual(['File unavailable', 'File unavailable']),
+      )
+      expect(editor.snapshot().text).toBe('![[A note]]\n\n![Section](note.md#part)\n')
+    })
+  } finally {
+    delete (window as { webkit?: unknown }).webkit
+  }
+})
+
+test('embeds are asked by their text as written, once each, and asked again only when the app says they changed', async () => {
+  const asked: { text: string }[] = []
+  let name = 'one.png'
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        embeds: {
+          postMessage: async (request: { text: string }) => {
+            asked.push(request)
+            return { kind: 'image', name, url: `mapp-embed:x/${name}` }
+          },
+        },
+      },
+    },
+  })
+  const source =
+    '![[pic.png|400]]\n\n![[pic.png|400]]\n\n- ![[a.png]]\n\n> ![[b.png]]\n\n| a | b |\n| --- | --- |\n| ![[q.png\\|200]] | x |\n'
+  const texts = ['![[a.png]]', '![[b.png]]', '![[pic.png|400]]', '![[q.png\\|200]]']
+  try {
+    await withEditor(source, async (editor) => {
+      await vi.waitFor(() => expect(document.querySelectorAll('.inkkit-file img').length).toBe(5))
+      expect(asked.map((r) => r.text).sort()).toEqual(texts)
+      name = 'two.png'
+      editor.embedsChanged(['![[pic.png|400]]'])
+      await vi.waitFor(() =>
+        expect(
+          [...document.querySelectorAll('.inkkit-file img')].filter(
+            (e) => e.getAttribute('src') === 'mapp-embed:x/two.png',
+          ),
+        ).toHaveLength(2),
+      )
+      expect(asked.filter((r) => r.text === '![[pic.png|400]]')).toHaveLength(2)
+      expect(asked).toHaveLength(5)
+      expect(editor.snapshot().text).toBe(source)
+    })
+  } finally {
+    delete (window as { webkit?: unknown }).webkit
+  }
+})
 
 test('cached native Find scopes reject same-note edits and ordered replacement batches stop at intervening edits', async () =>
   withEditor('one one\n', (editor) => {
@@ -329,9 +387,7 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
       'untitled',
     ].sort(),
   )
-  expect(labels.words.noteReference).toContain('%@')
   expect(labels.words.linkToNote).toBeTruthy()
-  expect(Object.keys(labels.editor)).not.toContain('noteReference')
   expect(Object.keys(labels.editor)).not.toContain('linkToNote')
   expect(Object.keys(labels.editor)).not.toContain('untitled')
 
@@ -343,14 +399,7 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
     labels.editor,
     labels.words,
   )
-  editor.setItem('note')
-  editor.load('![[A note]]\n', 1)
   try {
-    await vi.waitFor(() =>
-      expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
-        labels.words.noteReference!.replace('%@', 'A note'),
-      ),
-    )
     await expect(
       NoteEditor.mount(
         document.createElement('div'),

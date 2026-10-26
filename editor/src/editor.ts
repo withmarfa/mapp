@@ -17,6 +17,7 @@ import {
   suggestNotes,
   type EmbeddedFile,
   type EmbedRequest,
+  type UnavailableFile,
   type LinkRef,
 } from './bridge'
 import type { HeaderLabels } from './header'
@@ -31,9 +32,8 @@ export function isPreviewDiagnostic(error: Error): boolean {
 }
 
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
- *  the header's, the note reference's and the Link to Note command's are MAPP's. */
+ *  the header's and the Link to Note command's are MAPP's. */
 export interface AppWords {
-  noteReference?: string
   linkToNote?: string
 }
 export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
@@ -51,13 +51,13 @@ export function splitLabels(all: AppLabels): {
   header: Partial<HeaderLabels>
   words: AppWords
 } {
-  const { noteReference, linkToNote, ...rest } = all
+  const { linkToNote, ...rest } = all
   const header: Partial<HeaderLabels> = {}
   for (const key of headerLabelKeys) {
     if (key in rest) header[key] = rest[key]
     delete rest[key]
   }
-  return { editor: rest, header, words: { noteReference, linkToNote } }
+  return { editor: rest, header, words: { linkToNote } }
 }
 
 /**
@@ -149,10 +149,9 @@ const tables: Partial<Record<FormatCommand, TableCommand>> = {
   deleteRow: 'deleteRow',
   deleteColumn: 'deleteColumn',
 }
+/** An embed as the note's text holds it, which is how Marfa lists the embeds it bound. */
 function request(reference: FileReference, item: string): EmbedRequest {
-  return reference.kind === 'wiki'
-    ? { item, name: reference.target }
-    : { item, path: reference.reference }
+  return { item, text: reference.raw }
 }
 
 /** The names of notes to offer after `[[`, unless the person has typed past the request. */
@@ -176,12 +175,6 @@ function linkRef(reference: WikiLinkReference): LinkRef {
 /** The heading text as a link names it: compared ignoring case and the spacing around and inside it. */
 function headingKey(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
-function isNoteReference(reference: FileReference): boolean {
-  const target = reference.target.split('?')[0]!
-  const name = target.split('/').pop() ?? target
-  return /\.(md|markdown|txt)$/i.test(name) || (reference.kind === 'wiki' && !name.includes('.'))
 }
 
 /** The app bridge uses only Inkkit's public facade; native libraries retain file and save policy. */
@@ -239,17 +232,17 @@ export class NoteEditor {
         labels,
         files: {
           async resolve(reference, context) {
-            if (isNoteReference(reference))
-              return {
-                kind: 'file',
-                label:
-                  words.noteReference?.replace('%@', reference.label ?? reference.reference) ??
-                  `Note reference: ${reference.label ?? reference.reference}. Open to edit source.`,
-              }
             const embed = request(reference, context.documentId)
-            const file = await window.webkit?.messageHandlers?.embeds?.postMessage(embed)
+            host.noteTarget(embed.text, reference.target)
+            const file = await host.answer(embed)
             if (!file || context.signal.aborted)
               return { kind: 'missing', label: reference.label ?? reference.reference }
+            if ('unavailable' in file)
+              return {
+                kind: 'error',
+                label: reference.label ?? reference.reference,
+                message: file.unavailable,
+              }
             described.set(JSON.stringify(embed), file)
             if (file.kind === 'file') return { kind: 'file', label: file.name }
             if (file.kind === 'pdf')
@@ -277,11 +270,6 @@ export class NoteEditor {
             }
           },
           open(reference, context) {
-            if (isNoteReference(reference)) {
-              host.setEditingMode('source', context.generation)
-              host.focus()
-              return
-            }
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })
           },
           contextMenu(reference, _point, context) {
@@ -334,7 +322,52 @@ export class NoteEditor {
     return host
   }
   setItem(id: string) {
+    if (id !== this.item) {
+      this.answers.clear()
+      this.targets.clear()
+    }
     this.item = id
+  }
+  /** What the app answered for each embed of the note, by its text, so two embeds of one file, and one drawn
+   *  again, ask it once. Only a file is kept: an embed the app could not show is asked again. */
+  private answers = new Map<
+    string,
+    { text: string; answer: Promise<EmbeddedFile | UnavailableFile | null> }
+  >()
+  /** The file each embed text names, as Inkkit finds it, to draw just the embeds the app says changed. */
+  private targets = new Map<string, Set<string>>()
+  noteTarget(text: string, target: string) {
+    const held = this.targets.get(text)
+    if (held) held.add(target)
+    else this.targets.set(text, new Set([target]))
+  }
+  answer(embed: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null> {
+    const key = JSON.stringify(embed)
+    const held = this.answers.get(key)
+    if (held) return held.answer
+    const answer = Promise.resolve(
+      window.webkit?.messageHandlers?.embeds?.postMessage(embed) ?? null,
+    )
+    this.answers.set(key, { text: embed.text, answer })
+    const forget = () => {
+      if (this.answers.get(key)?.answer === answer) this.answers.delete(key)
+    }
+    answer.then((file) => (file && !('unavailable' in file) ? undefined : forget()), forget)
+    return answer
+  }
+  /** The app's library changed what these embeds show: they are asked and drawn again. */
+  embedsChanged(texts: string[]) {
+    const changed = new Set(texts)
+    for (const [key, held] of this.answers) if (changed.has(held.text)) this.answers.delete(key)
+    const targets = new Set<string>()
+    for (const text of changed)
+      for (const target of this.targets.get(text) ?? []) targets.add(target)
+    if (!targets.size) return
+    try {
+      this.engine.refreshReferences([...targets])
+    } catch (error) {
+      if (!(error instanceof InkKitError)) throw error
+    }
   }
   /** The app's library changed: which notes the links name is asked again. */
   linksChanged() {
