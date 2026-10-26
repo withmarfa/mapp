@@ -680,9 +680,6 @@
     "Choose a single item to read or edit it." : {
 
     },
-    "Choose an item from the list to read or edit it." : {
-
-    },
     "Choose Date" : {
       "extractionState" : "manual"
     },
@@ -1174,6 +1171,9 @@
     "Manage Connections…" : {
 
     },
+    "Manage this server in your browser." : {
+
+    },
     "MAPP can’t open or follow the copy of your library on this Mac." : {
       "extractionState" : "manual"
     },
@@ -1377,6 +1377,9 @@
     "Open a library to choose what its sidebar shows." : {
 
     },
+    "Open Console" : {
+
+    },
     "Open Copy" : {
       "extractionState" : "manual"
     },
@@ -1516,6 +1519,9 @@
 
     },
     "Restore" : {
+
+    },
+    "Restore deleted items, or delete them permanently." : {
 
     },
     "Roles" : {
