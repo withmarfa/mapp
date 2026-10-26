@@ -246,7 +246,7 @@ import Testing
         await finish(scene)
     }
 
-    @Test func anItemEditToARowTheCopyDoesNotHoldYetIsMadeOnceItArrives() async throws {
+    @Test func anItemEditToARowTheCopyDoesNotHoldYetWaitsForTheCopyToBeWhole() async throws {
         let scene = try await makeScene()
         scene.reads.missing.withLock { $0 = [scene.item.id.rawValue] }
         try await scene.retitle(to: "First", as: UndoGroup())

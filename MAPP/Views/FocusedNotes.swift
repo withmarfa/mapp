@@ -42,7 +42,12 @@ final class DetailsPresentation {
     var tagRequest: TagRequest?
     /// The items the window asks the person to confirm moving to Recently Deleted.
     var deletion: DeleteRequest?
+    /// The groups of links the person has shown in full. They stay shown while the window lives, whichever item it
+    /// shows meanwhile.
+    private(set) var expandedLinks: Set<LinkGroup> = []
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
+
+    func expandLinks(_ group: LinkGroup) { expandedLinks.insert(group) }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
         if let draft = drafts[itemID]?[key] { return draft }
