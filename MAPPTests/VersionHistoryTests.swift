@@ -80,10 +80,10 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
     }
 
     @Test func noServerOrNoPermissionIsSaidPlainlyAndCanBeTriedAgain() async {
-        let source = FakeHistory([.failure(.offline)])
+        let source = FakeHistory([.failure(.unreachable)])
         let model = await loaded(source)
-        #expect(model.phase == .failed(.offline))
-        #expect(!ItemHistoryFailure.offline.message.isEmpty)
+        #expect(model.phase == .failed(.unreachable))
+        #expect(!ItemHistoryFailure.unreachable.message.isEmpty)
 
         source.set([.failure(.notPermitted)])
         model.load()
@@ -98,9 +98,9 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
     @Test func aFailedLoadMoreKeepsTheVersionsAlreadyListed() async {
         let source = FakeHistory([page([1], next: "more")])
         let model = await loaded(source)
-        source.set([.failure(.offline)])
+        source.set([.failure(.unreachable)])
         model.loadMore()
-        #expect(await eventually { model.moreFailure == .offline })
+        #expect(await eventually { model.moreFailure == .unreachable })
         #expect(model.snapshots.count == 1)
         #expect(model.phase == .loaded)
     }

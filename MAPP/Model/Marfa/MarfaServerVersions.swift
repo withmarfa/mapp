@@ -28,7 +28,7 @@ nonisolated struct MarfaServerVersions: ItemHistorySource {
     static func failure(_ error: any Error) -> ItemHistoryFailure {
         guard let error = error as? MarfaError else { return .failed(error.localizedDescription) }
         switch error {
-        case .noConnection, .network: return .offline
+        case .noConnection, .network: return .unreachable
         case .forbidden: return .notPermitted
         case .notFound: return .unavailable
         case .unauthorized, .signedOut: return .keyRefused

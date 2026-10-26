@@ -27,7 +27,7 @@
 "Restore Version" : { "extractionState" : "manual" },
 "This item can’t be changed right now." : { "extractionState" : "manual" },
 "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : { "extractionState" : "manual" },
-"MAPP can’t reach the server. Version history comes from the server, so it needs a connection. Your notes and changes aren’t affected." : { "extractionState" : "manual" },
+"MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected." : { "extractionState" : "manual" },
 "The key MAPP uses isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : { "extractionState" : "manual" },
 "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind your key can’t read." : { "extractionState" : "manual" },
 "The server didn’t accept MAPP’s key. Choose a new key in Settings." : { "extractionState" : "manual" },

@@ -30,8 +30,9 @@ nonisolated struct ItemHistoryPage: Hashable, Sendable {
 
 /// Why an item's history could not be read, in terms the sheet can word for a person.
 nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
-    /// The server could not be reached.
-    case offline
+    /// The server could not be reached. The package reports a refused plain-http address the same way as a network
+    /// that is down, so the wording does not say which.
+    case unreachable
     /// The key MAPP uses may not read this item's history.
     case notPermitted
     /// The server holds no readable history for the item: it is deleted, of a type the key cannot read, or not sent
@@ -45,8 +46,8 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
 
     var message: String {
         switch self {
-        case .offline:
-            String(localized: "MAPP can’t reach the server. Version history comes from the server, so it needs a connection. Your notes and changes aren’t affected.")
+        case .unreachable:
+            String(localized: "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected.")
         case .notPermitted:
             String(localized: "The key MAPP uses isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
         case .unavailable:
