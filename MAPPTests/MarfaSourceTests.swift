@@ -4,6 +4,7 @@ import struct MarfaCore.BinPage
 import struct MarfaCore.Edge
 import struct MarfaCore.Edit
 import struct MarfaCore.Item
+import struct MarfaCore.KeptFetch
 import struct MarfaCore.ListFilters
 import enum MarfaCore.JsonValue
 import enum MarfaCore.Tier
@@ -73,6 +74,42 @@ nonisolated func waitForConnection(
 
 private func scratch() -> URL {
     URL.temporaryDirectory.appending(path: "MarfaSourceTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+}
+
+/// A refresh whose first fill starts and then waits until the test releases it, as a server that never answers does.
+private nonisolated final class HeldRefresh: MarfaRefreshing {
+    private struct State {
+        var filling = false
+        var released = false
+    }
+
+    private let state = Mutex(State())
+    private let held: AsyncStream<Void>
+    private let letGo: AsyncStream<Void>.Continuation
+
+    init() { (held, letGo) = AsyncStream<Void>.makeStream() }
+
+    var filling: Bool { state.withLock { $0.filling } }
+    var released: Bool { state.withLock { $0.released } }
+
+    func release() {
+        state.withLock { $0.released = true }
+        letGo.finish()
+    }
+
+    func readStatus() async throws -> Status {
+        Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .never)
+    }
+
+    func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
+        state.withLock { $0.filling = true }
+        for await _ in held { }
+        return HydrateReport(types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1,
+                             resumed: false, restarted: nil, inPlace: false, cursor: "done")
+    }
+
+    func catchUp() async throws {}
+    func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
 }
 
 /// A server that refuses every connection, so a copy made for it never hears from it.
@@ -300,23 +337,29 @@ struct MarfaSourceOfflineTests {
             connection, keys: MemoryKeyStore([connection: "unused"]), location: MarfaStoreLocation(root: root))
     }
 
-    /// An address nothing answers holds a connection open until it times out, which must not hold up a write.
-    @Test(.timeLimit(.minutes(3)))
-    func aWriteIsQueuedAtOnceWhileTheServerHangs() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root, at: "http://10.255.255.1:8210")
+    /// A refresh that waits on the server must not hold up a write: the write is queued and shown at once.
+    @Test(.timeLimit(.minutes(1)))
+    func aWriteIsQueuedAtOnceWhileARefreshIsHeld() async throws {
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        let server = HeldRefresh()
+        defer { server.release() }
+        let source = MarfaSource(copy: copy, connection: SampleLibrary.connection, refreshing: server)
         let log = ChangeLog(source)
+        source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
         source.refresh()
-        // Time for the refresh to reach the server that never answers, so the write meets it hanging.
-        try await Task.sleep(for: .milliseconds(200))
-        let clock = ContinuousClock()
-        let start = clock.now
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST hanging", body: "Queued")), as: WriteID())
-        let shown = await log.wait(for: .seconds(2)) { $0.item(titled: "MAPPTEST hanging") != nil }
-        #expect(shown != nil, "the write waited \(clock.now - start) behind the network")
-        #expect(source.connectionState == .connecting)
+        try #require(await eventually { server.filling })
+
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST held", body: "Queued")), as: WriteID())
+        await source.queueSubmitted()
+        #expect(!server.released, "the write waited for the refresh")
+        #expect(try await copy.queue.all().count == 1)
+        #expect(await log.wait { $0.item(titled: "MAPPTEST held") != nil } != nil)
+        #expect(!server.released)
+
+        server.release()
         await source.close()
     }
 

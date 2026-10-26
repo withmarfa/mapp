@@ -92,10 +92,7 @@ import Testing
             if agreeing { #expect(await source.close(agreeing: nil) == .closed) }
             else { await source.close() }
         }
-        let clock = ContinuousClock()
-        let deadline = clock.now + .seconds(5)
-        while !(await files.stopped), clock.now < deadline { await Task.yield() }
-        #expect(await files.stopped)
+        #expect(try await eventuallyAsking { await files.stopped })
         // Close has reached the download barrier, but the copy must still accept the restore.
         #expect(try await copy.blobs.cache().setting == .bytes(bytes: 0))
         await #expect(throws: MarfaError.self) { try await files.setBudget(.keepAll) }

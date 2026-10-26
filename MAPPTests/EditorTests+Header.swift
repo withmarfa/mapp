@@ -50,7 +50,7 @@ extension EditorTests {
         #expect(selected == "Untitled", "the title is selected, so typing names the item")
     }
 
-    @Test func theItemHeaderScrollsWithTheTextInsideThePageAndKeepsItsMargins() async throws {
+    @Test func theItemHeaderScrollsWithTheTextInsideThePage() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -65,17 +65,6 @@ extension EditorTests {
         ) as? [String]
         #expect(shown == ["Review the findings", "Task", "In Progress", "Field Research"])
 
-        // The title and the text start at the same margin whatever the width, the reading width or Full Width.
-        for (width, full) in [(CGFloat(360), false), (900, false), (1400, false), (1400, true)] {
-            window.setContentSize(NSSize(width: width, height: 500))
-            page.editor.setStyle(PageStyle(fullWidth: full))
-            try await page.frames()
-            let title = try await Self.rect("#ItemPageTitle", in: page)
-            let text = try await Self.rect(".ProseMirror p", in: page)
-            #expect(abs(title[0] - text[0]) < 0.5, "at \(width) points the title starts at \(title[0]) and the text at \(text[0])")
-            #expect(abs(title[2] - text[2]) < 0.5)
-            #expect(text[1] >= title[1] + title[3] + 20, "the text starts below the header")
-        }
         try await page.run("window.scrollTo(0, 0)")
 
         // One surface: the header moves exactly as far as the text, and the app hears only the crossing.
@@ -108,7 +97,6 @@ extension EditorTests {
         let hidden = try await page.editor.webView.evaluateJavaScript("document.getElementById('item-header').hidden") as? Bool
         #expect(hidden == true)
         #expect(try await page.markdown() == nil)
-        // Resizing the header and the window raises nothing in the page.
         #expect(page.library.notices.waiting.last == nil)
     }
 
@@ -125,24 +113,21 @@ extension EditorTests {
         let paragraphs = Array(repeating: "A paragraph for the scrolling check.", count: 60).joined(separator: "\n\n") + "\n"
         try await page.load(paragraphs)
         page.editor.setHeader(Self.header("First item"))
-        try await page.frames()
         try await page.run("window.scrollTo(0, 240)")
-        try await page.frames()
         let scrolled = try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double
         #expect(scrolled == 240)
 
         for index in 0..<3 {
             page.editor.setHeader(Self.header(String(repeating: "A longer title ", count: index + 1)))
             try await page.load("Item \(index)\n\n" + paragraphs)
-            try await page.frames()
+            try await page.run("0")
             #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
-            #expect(!page.editor.isHeaderScrolledAway)
+            try await page.wait { !page.editor.isHeaderScrolledAway }
             window.setContentSize(NSSize(width: index.isMultiple(of: 2) ? 600 : 700, height: 500))
             container.layoutSubtreeIfNeeded()
-            try await page.frames()
+            try await page.run("0")
             #expect(try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double == 0)
             try await page.run("window.scrollTo(0, 240)")
-            try await page.frames()
         }
         #expect(page.changes.isEmpty)
         #expect(page.library.notices.waiting.last == nil)

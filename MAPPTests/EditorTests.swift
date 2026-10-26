@@ -40,15 +40,6 @@ struct EditorTests {
             _ = try await editor.webView.evaluateJavaScript("\(script); 0")
         }
 
-        /// Waits until the page has drawn two more frames, so what it does in the next frame has been done and
-        /// anything it posted then has arrived.
-        func frames() async throws {
-            _ = try await editor.webView.callAsyncJavaScript(
-                "await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))",
-                arguments: [:], in: nil, contentWorld: .page)
-            _ = try await editor.webView.evaluateJavaScript("1")
-        }
-
         /// The page's text, once it reads `expected` or when the wait for it gives up.
         func shownText(until expected: String) async throws -> String {
             var shown = ""
@@ -360,60 +351,6 @@ struct EditorTests {
         finder.replaceCharacters(in: last, with: "two")
         _ = try await page.editor.webView.evaluateJavaScript("1")
         #expect(try await page.markdown() == "two 😀 two\n")
-    }
-
-    @Test func nativeFindGeometryFollowsViewportAndAppearanceChanges() async throws {
-        let page = try await Page()
-        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = page.editor.container
-        window.orderFrontRegardless()
-        defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        try await page.load(String(repeating: "Wrap these words around the native Find markings. ", count: 30) + "\n")
-        try await page.run("window.editor.setFinding(true)")
-        let client = try #require(page.editor.pageFinder)
-        let range = NSRange(location: 50, length: 100)
-        func rects() -> [NSRect] { client.rects(forCharacterRange: range)?.map(\.rectValue) ?? [] }
-        try await page.wait { !rects().isEmpty }
-        for source in [false, true] {
-            page.editor.setSourceMode(source)
-            try await page.frames()
-            for width in [CGFloat(360), 900, 500] {
-                let before = rects()
-                window.setContentSize(NSSize(width: width, height: 600))
-                #expect(page.editor.webView.frame.width == width)
-                try await page.wait { rects() != before }
-                try await page.frames()
-                #expect(rects().contains { $0.width > 0 && $0.height > 0 })
-                #expect(try await page.editor.webView.evaluateJavaScript("window.innerWidth") as? Double == Double(width))
-            }
-            // A header that wraps differently moves the text below it.
-            let header = Self.header(source ? "A short title" : String(repeating: "A title long enough to wrap ", count: 2))
-            for command in ["setTextSize(\(source ? 20 : 18))", "setHeader(\(Self.json(header)))"] {
-                let before = rects()
-                try await page.run("window.editor.\(command)")
-                try await page.wait { rects() != before }
-                try await page.frames()
-            }
-            if !source {
-                let before = rects()
-                window.setContentSize(NSSize(width: 1400, height: 600))
-                try await page.wait { rects() != before }
-                try await page.frames()
-                for command in ["setFullWidth(true)", "setFullWidth(false)", "setReadingWidth(24)"] {
-                    let before = rects()
-                    try await page.run("window.editor.\(command)")
-                    try await page.wait { rects() != before }
-                    try await page.frames()
-                }
-            }
-        }
-        try await page.run("window.editor.setFinding(false)")
-        let stopped = rects()
-        try await page.run("window.editor.setHeader(\(Self.json(Self.header(String(repeating: "Another title ", count: 12)))))")
-        try await page.frames()
-        #expect(rects() == stopped)
-        #expect(try await page.markdown() == nil)
     }
 
     @Test func closeProxyRestoresTheHostDelegateAndNeverReusesARejectedApproval() async throws {

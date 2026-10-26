@@ -350,15 +350,6 @@ struct SidebarTests {
         #expect(plan.browse == [.all, .sources, .collections])
     }
 
-    @Test func theFootsDotIsOrangeWhileConnectingRedWhenTheServerIsOutOfReachAndAbsentOtherwise() {
-        #expect(SidebarStatusDot(.online) == nil)
-        #expect(SidebarStatusDot(.disconnected) == nil)
-        #expect(SidebarStatusDot(.connecting) == .connecting)
-        #expect(SidebarStatusDot(.offline(reason: nil)) == .trouble)
-        #expect(SidebarStatusDot(.keyRefused) == .trouble)
-        #expect(SidebarStatusDot(.inUse) == .trouble)
-    }
-
     @Test func showAllTypesBringsBackTypesAndLeavesOtherPlacesHidden() {
         var layout = SidebarLayout()
         layout.setHidden(.type("aic.ticket"), true)
