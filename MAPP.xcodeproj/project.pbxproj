@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
+		331000093066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000A3066ED47005D07A2 /* MarfaAPI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +78,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
+				331000093066ED47005D07A2 /* MarfaAPI in Frameworks */,
 				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
 			);
 		};
@@ -141,6 +143,7 @@
 			name = MAPP;
 			packageProductDependencies = (
 				331000053066ED47005D07A2 /* Marfa */,
+				3310000A3066ED47005D07A2 /* MarfaAPI */,
 				331000083066ED47005D07A2 /* MarfaTesting */,
 			);
 			productName = MAPP;
@@ -719,6 +722,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = Marfa;
+		};
+		3310000A3066ED47005D07A2 /* MarfaAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaAPI;
 		};
 		331000083066ED47005D07A2 /* MarfaTesting */ = {
 			isa = XCSwiftPackageProductDependency;

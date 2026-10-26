@@ -15,7 +15,7 @@
 - Each server address has its own copy in the app's own storage (`MarfaStoreLocation`).
 - `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`). The key is never shown again once entered. Tests use `MemoryKeyStore` and a temporary store location.
 - `MarfaHost` makes the one `MarfaLibrary` for the copy it opens (`MarfaHost.library`). While a copy is open, how the server stands and what the copy last reported are the library's (`connection`, `syncReport`); the host reads them from it and holds its own state only while no copy is open. Never subscribe to a source's states or reports a second time to keep a copy of them.
-- An address that sends the key over plain http to another machine is told once in each run, when its copy is first attached (`Server.takePlainHTTPNotice()`), in the app's own words, through the host's `notices`. `localhost`, `127.0.0.0/8` and `::1` are not. MAPP reaches the server only through the package's core, not `URLSession`, so App Transport Security does not apply and `Info.plist` has no exception.
+- An address that sends the key over plain http to another machine is told once in each run, when its copy is first attached (`Server.takePlainHTTPNotice()`), in the app's own words, through the host's `notices`. `localhost`, `127.0.0.0/8` and `::1` are not. The copy reaches the server through the package's core, not `URLSession`, so App Transport Security does not apply to it. The one exception is Version History (`MarfaServerVersions`), which calls the package's generated client over `URLSession`; ATS applies to it, so a plain-http address ATS does not exempt (it exempts IP addresses, unqualified and `.local` names) fails there with a network error. `Info.plist` has no exception.
 - `MarfaHost` also reads the server's own name (`Server.instanceDescription()`, which sends no key) when a copy is attached and each time the connection returns online, off the main actor, and keeps the last name for each address in defaults. A failed read changes nothing. `LibraryDescription.name` shows the name, or the address's host until one has been read. Disconnecting or switching away forgets that address's name.
 
 ## Never lose a person's write
@@ -59,6 +59,12 @@
 - `MarfaLibrary` holds the text the person typed until the source answers it, since a read that raced the write would be older.
 - Undo registers the writes that put back what changed, made at the version current when Undo runs.
 - Where the server keeps its own text over the person's, the page shows the server's text and says the person's changes went to a copy.
+
+## Version history
+
+- The copy keeps no history. Version History reads `GET /items/{id}/versions` from the server through `MarfaServerVersions` (the `ItemHistorySource` seam, injected by the host's `Historian` and held by `MarfaLibrary.history`), so it fails while the server cannot be reached. It never loads a whole history: the model pages 100 at a time, oldest first because that is the only order the endpoint has, and follows an empty page that still has a cursor. Versions are told apart by number alone, since the server thins old ones and the numbers have gaps. A snapshot is the item as it stood before the write that replaced it; the current version has none.
+- A restore (`MarfaLibrary.restoreVersion`) restores only the title and the text, through the ordinary edit path: the text through `saveText` on the version the library holds, so a text another device changed is merged or kept apart, and the title through `editProperties`. What it replaces stays in the item's history. Other fields are shown to read and never written back. It is refused, with the usual notice, for an item in the bin, a file, an item the library no longer holds, and a version with no text or title the item keeps. Undo puts back what the restore replaced only while the item still holds what the restore wrote; otherwise it tells the person and writes nothing.
+- The server answers 404 for an item in the bin, so the sheet says to recover it first.
 
 ## Edges
 

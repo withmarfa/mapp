@@ -42,6 +42,9 @@ import Observation
     private var viewRevision = 0
 
     @ObservationIgnored let source: any ItemSource
+    /// Reads an item's earlier versions from the server, which the copy does not hold. Nil where there is no server
+    /// to ask, as in the sample library.
+    @ObservationIgnored let history: (any ItemHistorySource)?
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
@@ -114,8 +117,9 @@ import Observation
     /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
-    init(source: any ItemSource, notices: Notices, now: @escaping () -> Date = Date.init) {
+    init(source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil, now: @escaping () -> Date = Date.init) {
         self.source = source
+        self.history = history
         self.notices = notices
         self.now = now
         syncReport = source.syncReport
