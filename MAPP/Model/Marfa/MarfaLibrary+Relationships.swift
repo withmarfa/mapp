@@ -104,8 +104,23 @@ extension MarfaLibrary {
         end.info.label(atTarget: end.atTarget)
     }
 
+    /// A link keeps its item's ID whether or not the copy holds the item, so it can still be removed: one it does not
+    /// hold is shown as not found, and one in the bin as deleted.
     private func target(_ id: ItemID) -> ItemRelationshipTarget {
-        ItemRelationshipTarget(title: item(id)?.title ?? "", itemID: id, resolution: .resolved(id))
+        guard let item = item(id) else { return ItemRelationshipTarget(title: "", itemID: id, resolution: .missing) }
+        return ItemRelationshipTarget(
+            title: item.title, itemID: id, resolution: .resolved(id), isDeleted: item.state == .trashed)
+    }
+
+    /// By title, and by ID among equal titles, so the same links come first each time a group is drawn.
+    private static func ordered(_ targets: [ItemRelationshipTarget]) -> [ItemRelationshipTarget] {
+        targets.sorted {
+            switch $0.title.localizedStandardCompare($1.title) {
+            case .orderedAscending: true
+            case .orderedDescending: false
+            case .orderedSame: $0.id < $1.id
+            }
+        }
     }
 
     func relationships(for id: ItemID) -> [ItemRelationship] {
@@ -118,22 +133,22 @@ extension MarfaLibrary {
         }
         var results = fields.map { name, end in
             ItemRelationship(
-                field: name, label: label(end), targets: others(of: id, end).map(target),
+                field: name, label: label(end), targets: Self.ordered(others(of: id, end).map(target)),
                 isEditable: item.isEditable, allowsMultiple: end.info.cardinality == .many)
         }
         let pointing = index.links(touching: id).filter { $0.holder != id }
         for type in Set(pointing.map(\.type)) {
             guard let end = fieldEnd(Self.inversePrefix + type) else { continue }
             let holders = pointing.filter { $0.type == type }.map { $0.holder }
-            let targets = holders.filter { self.item($0) != nil }.map(target)
-                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            let targets = Self.ordered(holders.filter { self.item($0) != nil }.map(target))
             // A two-way relation reads the same from both items, so the links pointing here join the ones this item
             // holds in a single list.
             if end.info.isTwoWay, let own = fields.firstIndex(where: { !$0.end.isInverse && $0.end.info.id == type }) {
                 let held = results[own]
                 results[own] = ItemRelationship(
                     field: held.field, label: held.label,
-                    targets: held.targets + targets.filter { incoming in !held.targets.contains { $0.id == incoming.id } },
+                    targets: Self.ordered(
+                        held.targets + targets.filter { incoming in !held.targets.contains { $0.id == incoming.id } }),
                     isEditable: held.isEditable, allowsMultiple: held.allowsMultiple)
                 continue
             }
