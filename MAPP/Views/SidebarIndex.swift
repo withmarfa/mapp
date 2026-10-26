@@ -11,8 +11,7 @@ struct SidebarIndex: View {
         Group {
             if browser.item == .sources {
                 if library.sourceCounts.isEmpty {
-                    ContentUnavailableView("No Sources", systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("Sources appear here when items identify where they came from."))
+                    EmptyState("No Sources", detail: "Sources appear here when items identify where they came from.")
                 } else {
                     List(library.sourceCounts) { source in
                         destination(source.name, symbol: "antenna.radiowaves.left.and.right", count: source.count, place: .source(source.name))
@@ -20,8 +19,7 @@ struct SidebarIndex: View {
                 }
             } else {
                 if library.collectionTree.isEmpty {
-                    ContentUnavailableView("No Collections", systemImage: "square.stack",
-                        description: Text("Items with other items filed under them appear here."))
+                    EmptyState("No Collections", detail: "Items with other items filed under them appear here.")
                 } else {
                     List {
                         ForEach(library.collectionTree) { node in

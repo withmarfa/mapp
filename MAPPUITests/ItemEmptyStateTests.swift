@@ -6,7 +6,7 @@ final class ItemEmptyStateTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var prompt: XCUIElement { window.staticTexts["SelectItemPrompt"] }
+    private var prompt: XCUIElement { window.staticTexts["No Item Selected"] }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -26,7 +26,6 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
-        XCTAssertEqual(prompt.value as? String, "No Item Selected")
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         XCTAssertFalse(window.itemPageTitle.exists)
         capture("Items without selection and matching toolbar background")

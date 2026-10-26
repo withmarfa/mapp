@@ -127,7 +127,7 @@ final class SettingsTests: XCTestCase {
         row.click()
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
-        let prompt = window.staticTexts["SelectItemPrompt"]
+        let prompt = window.staticTexts["No Item Selected"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
