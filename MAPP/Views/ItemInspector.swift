@@ -61,7 +61,7 @@ struct ItemInspectorHost: View {
             return
         }
         browser.searchText = ""
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = library.item(id).map(browser.place(listing:)) ?? .allNotes
         browser.selection = [id]
         browser.focusRequest = .list
     }
@@ -93,6 +93,8 @@ struct ItemInspector: View {
     var onAddTag: (String) -> ItemTag.Refusal? = { _ in nil }
     var onRemoveTag: (String) -> Void = { _ in }
     var drafts: DetailsPresentation? = nil
+    /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
+    @State private var ownPresentation = DetailsPresentation()
     @AppStorage(InterfaceKey.inspectorDetailsOpen) private var detailsOpen = true
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
     /// The host remakes the inspector for another item, which forgets them.
@@ -130,15 +132,24 @@ struct ItemInspector: View {
                     if hasProperties { InspectorSectionDivider() }
                     InspectorHeading(title: "Relationships", topPadding: hasProperties ? InspectorMetrics.sectionGap : 2)
                     ForEach(shownRelationships) { relationship in
-                        ItemRelationshipRow(relationship: relationship, onOpen: onOpen, onEdit: { onEdit(relationship) },
-                                            onRemove: { onRemove(relationship, $0) })
+                        let group = LinkGroup(item: item.id, field: relationship.field)
+                        ItemRelationshipRow(relationship: relationship, isExpanded: presentation.expandedLinks.contains(group),
+                                            onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen,
+                                            onEdit: { onEdit(relationship) }, onRemove: { onRemove(relationship, $0) })
                     }
                     if !mentions.isEmpty {
+                        let group = LinkGroup.content(of: item.id)
                         InspectorRow(name: "Links in Content") {
                             VStack(alignment: .leading, spacing: 0) {
-                                ForEach(mentions) { target in
+                                let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
+                                ForEach(links.shown) { target in
                                     ItemTargetRow(target: target, onOpen: onOpen)
                                         .inspectorMinimumHeight()
+                                }
+                                if links.hidden > 0 {
+                                    ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
+                                        presentation.expandLinks(group)
+                                    }
                                 }
                             }
                         }
@@ -164,6 +175,8 @@ struct ItemInspector: View {
         }
         .scrollBounceBehavior(.basedOnSize)
     }
+
+    private var presentation: DetailsPresentation { drafts ?? ownPresentation }
 
     /// The properties that have a value, then any the person added or cleared since the inspector showed this item.
     private var fields: [ItemTypeInfo.Field] {

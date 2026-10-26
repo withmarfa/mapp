@@ -48,6 +48,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 ## Relationship names
 
 - Both ends of a link are named by Marfa: `EdgeType.label` on the source end and `EdgeType.reverseLabel` on the target end (`EdgeTypeInfo.label(atTarget:)`). MAPP names no relationship and shows these as they come, never as localized keys or reworded. When the two are equal the relation is two-way (`EdgeTypeInfo.isTwoWay`), and an item's outgoing and incoming links form one list.
+- A group of links in the inspector (a relationship, or the links in the item's content) draws its first `LinkLimit.limit` rows and ends with "Show N More", which shows the rest. The window keeps which groups are shown in full, for each item and group (`DetailsPresentation.expandedLinks`). A group's links are ordered by title, then ID, so the same ones come first each time. A link to an item in Recently Deleted is marked "Deleted" and still opens, in Recently Deleted (`Browser.place(listing:)`); a link to an item the library does not hold is "Item not found", keeps its ID so it can be removed, and opens nothing.
 
 ## The table
 

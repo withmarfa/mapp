@@ -141,10 +141,15 @@ final class Browser {
         focusRequest = nil
     }
 
+    /// The place that lists an item no place on screen does: a deleted item is listed by Recently Deleted alone.
+    func place(listing item: Item) -> SidebarItem {
+        item.state == .trashed ? .recentlyDeleted : .allNotes
+    }
+
     func reveal(_ item: Item, in library: any ItemLibrary, order: NoteOrder) {
         leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
-            show(.allNotes, in: library, order: order)
+            show(place(listing: item), in: library, order: order)
         }
         selection = [item.id]
         if usesCollection { openCollectionSelection() }

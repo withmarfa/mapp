@@ -2365,6 +2365,12 @@
     },
     "This item’s tags can’t be changed." : {
 
+    },
+    "Deleted" : {
+      "extractionState" : "manual"
+    },
+    "Show %lld More" : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.1"

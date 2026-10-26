@@ -4,6 +4,9 @@ import SwiftUI
 /// editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the context menu.
 struct ItemRelationshipRow: View {
     let relationship: ItemRelationship
+    /// Whether the person has shown every link of the group, and what shows them.
+    var isExpanded = false
+    var onShowAll: () -> Void = {}
     let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
     let onRemove: (ItemID) -> Bool
@@ -12,11 +15,15 @@ struct ItemRelationshipRow: View {
     var body: some View {
         InspectorRow(verbatimName: relationship.label) {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(relationship.targets) { target in
+                let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
+                ForEach(links.shown) { target in
                     ItemRelationshipTargetRow(target: target, relationship: relationship, onOpen: onOpen, onEdit: onEdit) { id in
                         rejected = !onRemove(id)
                     }
                     .inspectorMinimumHeight()
+                }
+                if links.hidden > 0 {
+                    ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
                 }
                 if rejected {
                     Text("The connection could not be removed.")
@@ -62,7 +69,7 @@ struct ItemRelationshipTargetRow: View {
     }
 
     @ViewBuilder private var menuItems: some View {
-        if let id = target.itemID {
+        if let id = target.itemID, target.isOpenable {
             Button("Open Item") { onOpen(id) }
         }
         if relationship.isEditable {
@@ -92,25 +99,50 @@ struct ItemAddRelationshipRow: View {
     }
 }
 
+/// The control that ends a group of links cut short: it shows the rest.
+struct ItemShowMoreButton: View {
+    let count: Int
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button("Show \(count) More", action: action)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .inspectorMinimumHeight()
+            .inspectorValue()
+            .accessibilityIdentifier(identifier)
+    }
+}
+
 struct ItemTargetRow: View {
     let target: ItemRelationshipTarget
     let onOpen: (ItemID) -> Void
 
     var body: some View {
-        if let id = target.itemID {
+        if let id = target.itemID, target.isOpenable {
             Button { onOpen(id) } label: {
-                Text(target.title)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(target.title)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if target.isDeleted {
+                        Label("Deleted", systemImage: "trash")
+                            .interfaceFont(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
             .inspectorValue()
             .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
         } else {
             VStack(alignment: .leading, spacing: 3) {
-                Text(target.title)
-                    .fixedSize(horizontal: false, vertical: true)
+                // A link to an item the library does not hold has no title to show.
+                if !target.title.isEmpty {
+                    Text(target.title)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Label(resolutionLabel, systemImage: "exclamationmark.triangle")
                     .interfaceFont(.caption).foregroundStyle(.secondary)
             }
