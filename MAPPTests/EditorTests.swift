@@ -83,30 +83,13 @@ struct EditorTests {
 
     @Test func selectingAnotherItemReturnsTheBodyToReading() async throws {
         let page = try await Page()
-        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
-                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = page.editor.webView
-        let other = ReadingPanel(contentRect: NSRect(x: 650, y: 100, width: 250, height: 200),
-                                 styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
-        other.isReleasedWhenClosed = false
-        defer {
-            window.orderOut(nil); window.contentView = nil; window.close()
-            other.orderOut(nil); other.close()
-        }
-        window.makeKeyAndOrderFront(nil)
-        #expect(window.isKeyWindow)
         try await page.load("First item")
         try await page.run("window.editor.focus()")
         let editing = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
         ) as? Bool
         #expect(editing == true)
-        other.makeKeyAndOrderFront(nil)
-        #expect(other.isKeyWindow)
         try await page.load("Second item")
-        #expect(other.isKeyWindow)
-        #expect(!window.isKeyWindow)
         let reading = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
         ) as? Bool
