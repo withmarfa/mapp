@@ -69,16 +69,23 @@ extension MarfaLibrary {
     /// The engine did not make a held step's writes, because what they touch changed or the copy was not brought up to
     /// date in time. An undo goes back on the undo stack, and registering outside an undo or redo empties the whole
     /// redo stack, the step it had registered included; a redo cannot go back, so the undo it registered does nothing
-    /// and says so.
-    func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?) {
-        guard !run.told else { return }
+    /// and says so. A redo's write that carried the person's text is the only copy of it, so `text` is kept where they
+    /// can get it back, as for a library that closed.
+    func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?, text: String?) {
+        let first = !run.told
         run.told = true
         run.outcome.wasMade = false
         let restoring = run.undoing && run.step.manager != nil
-        if restoring {
+        let title = title ?? run.step.name
+        let message = problem.message ?? MarfaEngine.heldChanged
+        if restoring, first {
             register(UndoStep(manager: run.step.manager!, name: run.step.name, handler: run.step.handler, counterpartOf: run.step.counterpartOf))
         }
-        let again = restoring ? " " + String(localized: "Choose Undo again to try it as things are now.") : ""
-        notices.tell(title ?? run.step.name, (problem.message ?? MarfaEngine.heldChanged) + again)
+        if !restoring, text?.isEmpty == false {
+            notices.notKept(title, text: text, reason: message)
+        } else if first {
+            let again = restoring ? " " + String(localized: "Choose Undo again to try it as things are now.") : ""
+            notices.tell(title, message + again)
+        }
     }
 }

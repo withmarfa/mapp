@@ -383,6 +383,35 @@ import Testing
         try #require(await eventually { library.notices.told == 2 })
         #expect(source.submitted.count == 3)
     }
+
+    @Test func aRedoNotMadeKeepsTheTextItCarried() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        #expect(library.setItemProperty(Self.launch, key: "title", value: .string("Renamed"), undoManager: undo))
+        undo.undo()
+        undo.redo()
+        try #require(source.submitted.count == 3)
+        refuse(try #require(source.submitted.last?.id), source)
+        try #require(await eventually { library.notices.told == 1 })
+
+        let notice = try #require(library.notices.waiting.last)
+        #expect(notice.isNotKept)
+        #expect(notice.text == "Renamed", "the text is given back, not lost")
+        #expect(notice.message.contains(MarfaEngine.heldChanged))
+    }
+
+    @Test func anUndoNotMadeIsToldAndNotGivenBackAsText() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        #expect(library.setItemProperty(Self.launch, key: "title", value: .string("Renamed"), undoManager: undo))
+        undo.undo()
+        refuse(try #require(source.submitted.last?.id), source)
+        try #require(await eventually { library.notices.told == 1 })
+
+        let notice = try #require(library.notices.waiting.last)
+        #expect(!notice.isNotKept, "the undo is on the stack to choose again, so nothing is lost")
+        #expect(undo.canUndo)
+    }
 }
 
 private extension ChangeLog.State {

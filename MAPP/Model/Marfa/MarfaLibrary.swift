@@ -397,7 +397,7 @@ import Observation
         if let item = textWrites[id], lastTyped[item]?.write == id { lastTyped[item] = nil }
         let run = undoRuns.removeValue(forKey: id)
         if case .refused(let problem) = outcome, let run, MarfaEngine.isHeldRefusal(problem.code) {
-            giveBack(run, problem, title: refusal?.title)
+            giveBack(run, problem, title: refusal?.title, text: typed ?? refusal?.text)
         } else if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
