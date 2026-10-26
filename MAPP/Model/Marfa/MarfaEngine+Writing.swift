@@ -12,6 +12,12 @@ extension MarfaEngine {
             purge(item, at: version, as: id)
             return false
         }
+        if let group, standing == nil, !held.isEmpty {
+            // The copy is still refusing an earlier undo or redo. This write waits behind it unattempted, since the
+            // package queues an item's edit at once but refuses a link's, and made first it would be made out of order.
+            await hold(write, as: id, in: group, standing: nil)
+            return true
+        }
         do {
             #if DEBUG
             if let error = refusing?(write) { throw error }

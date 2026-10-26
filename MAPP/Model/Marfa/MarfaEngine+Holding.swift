@@ -41,14 +41,18 @@ extension MarfaEngine {
         }
     }
 
+    /// Keeps the write, unattempted where the copy is already holding an earlier one, so an undo and a redo, and the
+    /// writes within a step, are made in the order they were pressed. The copy is told to catch up once for a step,
+    /// not once for each of its writes; the read that follows is queued behind the writes already submitted, so each
+    /// is judged on what the engine held when it was handled, not on a later read.
     func hold(_ write: ItemWrite, as id: WriteID, in group: UndoGroup, standing: Stand?) async {
         let first = standing == nil && !held.contains { $0.group == group }
         held.append(Held(write: write, id: id, group: group, stand: standing ?? stand(for: write)))
-        guard standing == nil else { return }
-        if first { arm(group) }
+        guard first else { return }
+        arm(group)
         await sync.refresh()
         // A copy that was made whole while the refresh ran says nothing more, so it is read once here.
-        if held.contains(where: { $0.group == group }) { await reload() }
+        _ = tell(.paint)
     }
 
     private func arm(_ group: UndoGroup) {

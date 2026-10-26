@@ -10,13 +10,17 @@ import Testing
 /// An Undo or Redo pressed while the copy is brought up to date is held by the engine and made once the copy is whole
 /// (`MarfaEngine+Holding`), and put back for the person where it can't be.
 @Suite struct MarfaHeldUndoTests {
-    /// A copy that is whole only when the test says so: edge reads and writes are refused until then, as they are
-    /// while the copy hydrates again after an item moved.
+    /// A copy that is whole only when the test says so. Until then it refuses what the package refuses while a fill is
+    /// under way: an edge write, and a write to a row it does not hold yet. A write to a row it holds is queued as usual.
     private nonisolated final class Catchup: MarfaReading {
         let read: MarfaRead
-        let whole = Mutex(false)
+        let whole = Mutex(true)
+        /// The rows the copy has not received yet.
+        let missing = Mutex<Set<String>>([])
         /// Every write the engine tried, refused or not.
         let attempts = Mutex<[ItemWrite]>([])
+        /// How many times the engine read every row.
+        let fullReads = Mutex(0)
 
         init(copy: WorkingCopy) { read = MarfaRead(copy: copy) }
 
@@ -25,6 +29,7 @@ import Testing
         }
 
         func items() async throws -> Rows<Marfa.Item> {
+            fullReads.withLock { $0 += 1 }
             let rows = try await read.items()
             return Rows(rows.rows, completeness: whole.withLock { $0 } ? .complete : .partial)
         }
@@ -43,12 +48,23 @@ import Testing
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 
         func refuseUntilWhole() throws {
-            if !whole.withLock({ $0 }) { throw MarfaError.hydrationIncomplete(message: "The copy is not whole") }
+            if !whole.withLock({ $0 }) { throw notWhole }
         }
+
+        private var notWhole: MarfaError { .hydrationIncomplete(message: "The copy is not whole") }
 
         func refusal(_ write: ItemWrite) -> MarfaError? {
             attempts.withLock { $0.append(write) }
-            return whole.withLock { $0 } ? nil : .hydrationIncomplete(message: "The copy is not whole")
+            if whole.withLock({ $0 }) { return nil }
+            switch write {
+            case .link, .unlink, .moveEdge:
+                return notWhole
+            case .editProperties(let id, _, _, _), .editBody(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _),
+                .transition(let id, _), .tag(let id, _, _):
+                return missing.withLock { $0.contains(id.rawValue) } ? notWhole : nil
+            case .create, .purge:
+                return nil
+            }
         }
     }
 
@@ -58,7 +74,10 @@ import Testing
         let reads: Catchup
         let source: MarfaSource
         let log: ChangeLog
+        /// The item an undo or redo writes to, and the item it is linked under.
         let item: MAPP.Item
+        let parent: MAPP.Item
+        let edge: EdgeID
 
         func title() async throws -> String? {
             try await copy.items.get(item.id.rawValue)?.properties["title"]?.string
@@ -69,8 +88,28 @@ import Testing
             _ = try await copy.items.update(item.id.rawValue, Edit(properties: JSONObject([("title", .string(title))]), baseVersion: version))
         }
 
-        /// What an Undo of the rename to "Second" writes, made as the library makes it.
-        func undo(to title: String = "First", as group: UndoGroup) async throws -> WriteID {
+        func links() async throws -> Int {
+            try await copy.edges.from(parent.id.rawValue).count
+        }
+
+        /// What an Undo of the link writes, made as the library makes it.
+        @discardableResult
+        func unlink(as group: UndoGroup) -> WriteID {
+            let id = WriteID()
+            source.submit(.unlink(edge), as: id, undoing: group)
+            return id
+        }
+
+        @discardableResult
+        func relink(as group: UndoGroup) -> WriteID {
+            let id = WriteID()
+            let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parent.id, target: item.id)
+            source.submit(.link(draft, undoing: nil), as: id, undoing: group)
+            return id
+        }
+
+        @discardableResult
+        func retitle(to title: String, as group: UndoGroup) async throws -> WriteID {
             let version = try #require(await copy.items.get(item.id.rawValue)?.version)
             let id = WriteID()
             source.submit(
@@ -78,8 +117,12 @@ import Testing
             return id
         }
 
+        /// The fill that follows an item's move has begun: edges can't be written until it ends.
+        func beginFill() { reads.whole.withLock { $0 = false } }
+
         func becomeWhole() {
             reads.whole.withLock { $0 = true }
+            reads.missing.withLock { $0 = [] }
             source.events.yield(.change(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil)))
         }
 
@@ -93,14 +136,25 @@ import Testing
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
-        _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Second", "body": "Text"]))
+        let child = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Second", "body": "Text"]))
+        let folder = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Folder"]))
+        let folderID = try #require(folder.itemId)
+        let childID = try #require(child.itemId)
+        _ = try await copy.edges.create(from: folderID, to: childID, type: MarfaMapping.parentEdge)
+        let edge = try #require(await copy.edges.from(folderID).first)
         let reads = Catchup(copy: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
         await source.engine.whenRefusing { reads.refusal($0) }
         let log = ChangeLog(source)
         source.events.yield(.paint)
-        let painted = try #require(await log.wait { $0.item(titled: "Second") != nil })
-        return Scene(store: store, copy: copy, reads: reads, source: source, log: log, item: try #require(painted.item(titled: "Second")))
+        let painted = try #require(await log.wait { $0.item(titled: "Second") != nil && $0.item(titled: "Folder") != nil })
+        let scene = Scene(
+            store: store, copy: copy, reads: reads, source: source, log: log, item: try #require(painted.item(titled: "Second")),
+            parent: try #require(painted.item(titled: "Folder")), edge: EdgeID(edge.id))
+        // The edges were read while the copy was whole; the fill that now begins is the one the undo meets.
+        scene.beginFill()
+        reads.attempts.withLock { $0 = [] }
+        return scene
     }
 
     private func finish(_ scene: Scene) async {
@@ -110,66 +164,152 @@ import Testing
 
     @Test func anUndoDuringACatchUpIsMadeOnceTheCopyIsWhole() async throws {
         let scene = try await makeScene()
-        let id = try await scene.undo(as: UndoGroup())
+        let id = scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
-        #expect(try await scene.title() == "Second")
+        #expect(try await scene.links() == 1)
 
         scene.becomeWhole()
-        try #require(try await eventuallyAsking { try await scene.title() == "First" })
+        try #require(try await eventuallyAsking { try await scene.links() == 0 })
         #expect(await scene.held() == 0)
         #expect(scene.log.current.answer(to: id) == nil)
 
         // Time for a second reading to make the write again, which it must not.
         scene.becomeWhole()
         try await Task.sleep(for: .milliseconds(300))
-        #expect(scene.reads.attempts.withLock { $0.count } == 2, "refused once, made once")
+        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge), .unlink(scene.edge)], "refused once, made once")
         await finish(scene)
     }
 
     @Test func anUndoOfAnItemThatChangedMeanwhileIsNotMadeAndIsAnswered() async throws {
         let scene = try await makeScene()
-        let id = try await scene.undo(as: UndoGroup())
+        let id = scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
 
-        // Another device changes the title while the copy catches up.
-        try await scene.rename(to: "Elsewhere")
+        // Another device trashes the item the link is under while the copy catches up.
+        _ = try await scene.copy.items.delete(scene.parent.id.rawValue)
         scene.becomeWhole()
         let state = try #require(await scene.log.wait { $0.answer(to: id) != nil })
         let problem = try #require(state.refusal(to: id))
         #expect(problem.code == MarfaEngine.heldChangedCode)
-        #expect(try await scene.title() == "Elsewhere", "newer text is never overwritten")
+        #expect(try await scene.links() == 1, "newer state is never overwritten")
         #expect(scene.reads.attempts.withLock { $0.count } == 1, "never made")
+        await finish(scene)
+    }
+
+    @Test func aStepWithALinkAndAnEditIsMadeInOrderAndOnce() async throws {
+        let scene = try await makeScene()
+        let group = UndoGroup()
+        let unlink = scene.unlink(as: group)
+        let edit = try await scene.retitle(to: "First", as: group)
+        try #require(try await eventuallyAsking { await scene.held() == 2 })
+        // The package would queue the edit at once, which would leave the step made in part and out of order.
+        #expect(try await scene.title() == "Second")
+        #expect(try await scene.links() == 1)
+        #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge)], "the edit waits unattempted behind the link")
+
+        scene.becomeWhole()
+        try #require(try await eventuallyAsking { await scene.held() == 0 })
+        #expect(try await scene.title() == "First")
+        #expect(try await scene.links() == 0)
+        scene.becomeWhole()
+        try await Task.sleep(for: .milliseconds(300))
+        let attempts = scene.reads.attempts.withLock { $0 }
+        #expect(attempts.count == 3, "each made once: \(attempts)")
+        #expect(attempts.first == .unlink(scene.edge) && attempts.dropFirst().first == .unlink(scene.edge))
+        if case .editProperties(let id, _, _, _)? = attempts.last { #expect(id == scene.item.id) } else { Issue.record("\(attempts)") }
+        #expect(scene.log.current.answer(to: unlink) == nil && scene.log.current.answer(to: edit) == nil)
+        await finish(scene)
+    }
+
+    @Test func aStepWhoseLaterWriteTouchesAnItemThatChangedIsMadeInNoPart() async throws {
+        let scene = try await makeScene()
+        let group = UndoGroup()
+        let unlink = scene.unlink(as: group)
+        let edit = try await scene.retitle(to: "First", as: group)
+        try #require(try await eventuallyAsking { await scene.held() == 2 })
+
+        try await scene.rename(to: "Elsewhere")
+        scene.becomeWhole()
+        let state = try #require(await scene.log.wait { $0.answer(to: unlink) != nil && $0.answer(to: edit) != nil })
+        #expect(state.refusal(to: unlink)?.code == MarfaEngine.heldChangedCode)
+        #expect(state.refusal(to: edit)?.code == MarfaEngine.heldChangedCode)
+        #expect(try await scene.links() == 1, "the link is not removed either")
+        #expect(try await scene.title() == "Elsewhere")
+        await finish(scene)
+    }
+
+    @Test func anItemEditToARowTheCopyHoldsIsNotHeld() async throws {
+        let scene = try await makeScene()
+        try await scene.retitle(to: "First", as: UndoGroup())
+        try #require(try await eventuallyAsking { try await scene.title() == "First" })
+        #expect(await scene.held() == 0)
+        await finish(scene)
+    }
+
+    @Test func anItemEditToARowTheCopyDoesNotHoldYetIsMadeOnceItArrives() async throws {
+        let scene = try await makeScene()
+        scene.reads.missing.withLock { $0 = [scene.item.id.rawValue] }
+        try await scene.retitle(to: "First", as: UndoGroup())
+        try #require(try await eventuallyAsking { await scene.held() == 1 })
+        #expect(try await scene.title() == "Second")
+
+        scene.becomeWhole()
+        try #require(try await eventuallyAsking { try await scene.title() == "First" })
         await finish(scene)
     }
 
     @Test func anUndoThenARedoHeldTogetherAreMadeInOrder() async throws {
         let scene = try await makeScene()
-        _ = try await scene.undo(to: "First", as: UndoGroup())
-        _ = try await scene.undo(to: "Second", as: UndoGroup())
+        scene.unlink(as: UndoGroup())
+        // The redo is another group, and a link the package would refuse if it were tried.
+        scene.relink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 2 })
+        #expect(scene.reads.attempts.withLock { $0.count } == 1, "the redo waits behind the undo")
 
         scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
-        #expect(try await scene.title() == "Second")
-        #expect(scene.reads.attempts.withLock { $0.count } == 4)
+        #expect(try await scene.links() == 1, "unlinked, then linked again")
+        #expect(scene.reads.attempts.withLock { $0.count } == 3)
+        await finish(scene)
+    }
+
+    @Test func anEditAfterAHeldUndoWaitsBehindIt() async throws {
+        let scene = try await makeScene()
+        scene.unlink(as: UndoGroup())
+        try await scene.retitle(to: "First", as: UndoGroup())
+        try #require(try await eventuallyAsking { await scene.held() == 2 })
+        #expect(try await scene.title() == "Second", "made after the undo it follows, not before")
+        await finish(scene)
+    }
+
+    @Test func aStepOfManyWritesAsksTheCopyToCatchUpOnce() async throws {
+        let scene = try await makeScene()
+        let reads = scene.reads.fullReads.withLock { $0 }
+        let group = UndoGroup()
+        for _ in 0..<200 { scene.unlink(as: group) }
+        try #require(try await eventuallyAsking { await scene.held() == 200 })
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(scene.reads.attempts.withLock { $0.count } == 1, "only the first is tried")
+        let made = scene.reads.fullReads.withLock { $0 } - reads
+        #expect(made < 10, "\(made) full reads for 200 held writes")
         await finish(scene)
     }
 
     @Test func aCatchUpThatNeverEndsGivesTheUndoBack() async throws {
         let scene = try await makeScene()
         await scene.source.engine.setHoldLimit(.milliseconds(200))
-        let id = try await scene.undo(as: UndoGroup())
+        let id = scene.unlink(as: UndoGroup())
         let state = try #require(await scene.log.wait { $0.answer(to: id) != nil })
         let problem = try #require(state.refusal(to: id))
         #expect(problem.code == MarfaEngine.heldTimeoutCode)
         #expect(await scene.held() == 0)
-        #expect(try await scene.title() == "Second")
+        #expect(try await scene.links() == 1)
         await finish(scene)
     }
 
     @Test func aLibraryThatClosesGivesBackWhatItHeld() async throws {
         let scene = try await makeScene()
-        let id = try await scene.undo(as: UndoGroup())
+        let id = scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
         await scene.source.close()
         let state = try #require(await scene.log.wait { $0.answer(to: id) != nil })
