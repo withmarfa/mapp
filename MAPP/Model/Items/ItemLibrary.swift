@@ -95,6 +95,12 @@ protocol ItemLibrary: AnyObject, Observable {
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool
+    /// Moves each item to `type`, its title and text to the new type's keys in the same edit, with `filling` for
+    /// the required fields an item lacks (`TypeChange`). Fields the new type does not use stay on the item. A set
+    /// any of whose items cannot become `type` is refused whole, and the library tells the person why. Undo moves
+    /// them back. False where the set is refused before anything is sent.
+    @discardableResult
+    func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)

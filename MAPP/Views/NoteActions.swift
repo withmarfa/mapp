@@ -30,9 +30,11 @@ private struct NoteActionContext {
     var isEmpty: Bool { notes.isEmpty && !keepsPlace }
 }
 
-/// Favorites for notes, or Recover for deleted ones.
+/// Favorites and Change Type for notes, or Recover for deleted ones.
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
+    /// The window's, for the Change Type sheet; the menu bar passes the front window's in.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let ids: Set<ItemID>
     let undoManager: UndoManager?
     /// The menu bar names what its items act on, since nothing has been clicked to say so.
@@ -53,6 +55,7 @@ struct NoteOrganizeActions: View {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
             .disabled(notes.isEmpty)
+            TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
         }
     }
 }

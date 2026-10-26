@@ -114,6 +114,103 @@ extension MarfaLibrary {
         }
     }
 
+    // MARK: Types
+
+    /// Each item moves in one edit, its title and text going to the new type's keys (`TypeChange`). The views
+    /// offer only the types every item can become, so a set that cannot is refused whole, before anything is sent.
+    @discardableResult
+    func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool {
+        guard let planned = plannedTypeChange(ids, to: type, filling: filling) else { return false }
+        let undos = TypeUndos()
+        undos.items = sendTypeChange(planned, to: type)
+        registerTypeChangeUndo(undos, ids: ids, to: type, filling: filling, undoManager: undoManager)
+        return true
+    }
+
+    private static var cantChangeType: String { String(localized: "Can’t Change Type") }
+
+    /// Nil, and the person told why, where any item cannot become `type` as things stand.
+    private func plannedTypeChange(
+        _ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue]
+    ) -> [(item: Item, plan: TypeChange, values: [String: PropertyValue])]? {
+        var planned: [(item: Item, plan: TypeChange, values: [String: PropertyValue])] = []
+        let changing = ids.filter { item($0).map { $0.type != type } ?? true }
+        for id in changing.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let item = item(id), let values = typeChangeValues(of: id),
+                  let plan = typeChange(of: id, to: type, filling: filling)
+            else {
+                notices.tell(Self.cantChangeType, String(localized: "One or more of these items can’t become this type."))
+                return nil
+            }
+            guard plan.missing.isEmpty else {
+                let fields = plan.missing.map(\.displayLabel).joined(separator: ", ")
+                notices.tell(Self.cantChangeType, String(localized: "Enter a value for: \(fields)."))
+                return nil
+            }
+            planned.append((item, plan, values))
+        }
+        return planned
+    }
+
+    private func sendTypeChange(
+        _ planned: [(item: Item, plan: TypeChange, values: [String: PropertyValue])], to type: TypeID
+    ) -> [TypeUndo] {
+        planned.map { item, plan, values in
+            submit(.retype(item.id, type, plan.changes, base: item.version), failing: Self.cantChangeType)
+            return TypeUndo(
+                id: item.id, from: item.type, to: type,
+                before: Dictionary(uniqueKeysWithValues: plan.changes.keys.map { ($0, values[$0]) }), after: plan.changes)
+        }
+    }
+
+    /// Undo and redo each register their opposite at once, while the undo manager is undoing or redoing, and make
+    /// their writes only once the open pages have handed over their last edit, as the change itself does. So the
+    /// redo's own undo is filled in when its writes are made.
+    private func registerTypeChangeUndo(
+        _ undos: TypeUndos, ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?
+    ) {
+        registerUndo(undoManager, name: String(localized: "Change Type")) { [weak undoManager] library in
+            library.registerUndo(undoManager, name: String(localized: "Change Type")) { [weak undoManager] library in
+                let redone = TypeUndos()
+                library.registerTypeChangeUndo(redone, ids: ids, to: type, filling: filling, undoManager: undoManager)
+                library.afterHandingOverEdits {
+                    guard let planned = library.plannedTypeChange(ids, to: type, filling: filling) else { return }
+                    redone.items = library.sendTypeChange(planned, to: type)
+                }
+            }
+            library.afterHandingOverEdits { library.undoTypeChange(undos.items) }
+        }
+    }
+
+    private func afterHandingOverEdits(_ action: @escaping () -> Void) {
+        handOverEdits { [weak self] kept in
+            guard let self else { return }
+            guard kept else {
+                return notices.tell(Self.cantChangeType, String(localized: "Finish editing the current note, then try again."))
+            }
+            action()
+        }
+    }
+
+    /// An item untouched since the change gets back exactly the values it had. One changed since, as by typing in
+    /// its text or changing its type again, is moved back from what it is now like any change of type, so what was
+    /// typed is kept and no text is left under a key the old type does not read.
+    private func undoTypeChange(_ undos: [TypeUndo]) {
+        for undo in undos {
+            guard let item = item(undo.id), item.type != undo.from, let values = typeChangeValues(of: undo.id) else { continue }
+            let untouched = item.type == undo.to && undo.after.allSatisfy { key, value in
+                values[key] == value || values[key] == undo.before[key] ?? nil
+            }
+            if untouched {
+                submit(.retype(undo.id, undo.from, undo.before, base: item.version), failing: Self.cantChangeType)
+            } else if let plan = typeChange(of: undo.id, to: undo.from), plan.missing.isEmpty {
+                submit(.retype(undo.id, undo.from, plan.changes, base: item.version), failing: Self.cantChangeType)
+            } else {
+                notices.tell(Self.cantChangeType, String(localized: "“\(item.title)” has changed since, and can’t go back to its type."))
+            }
+        }
+    }
+
     // MARK: Favorites and the bin
 
     /// Items in the bin keep their tags, since Recently Deleted shows no favorites.
@@ -220,4 +317,18 @@ extension MarfaLibrary {
         undoManager.registerUndo(withTarget: self, handler: handler)
         undoManager.setActionName(name)
     }
+}
+
+/// What a change of type wrote, filled in when its writes are made.
+private final class TypeUndos {
+    var items: [TypeUndo] = []
+}
+
+/// What a change of type wrote to one item, for its undo. A nil value is a key the item did not hold.
+private struct TypeUndo {
+    let id: ItemID
+    let from: TypeID
+    let to: TypeID
+    let before: [String: PropertyValue?]
+    let after: [String: PropertyValue?]
 }

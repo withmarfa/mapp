@@ -32,6 +32,8 @@ private struct FocusedEditorKey: FocusedValueKey {
 @Observable
 final class DetailsPresentation {
     var isPresented = false
+    /// The items the window's Change Type sheet is open for.
+    var typeChange: TypeChangeRequest?
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
@@ -56,6 +58,14 @@ final class DetailsPresentation {
         if !draft.rejected { draft.isDirty = false }
         return !draft.rejected
     }
+}
+
+/// What the Change Type sheet changes, with the undo manager of the window it was asked for in, since the sheet
+/// has its own.
+struct TypeChangeRequest: Identifiable {
+    let id = UUID()
+    let ids: Set<ItemID>
+    let undoManager: UndoManager?
 }
 
 /// A rejected input belongs to its window and item, rather than to the lifetime of a row.

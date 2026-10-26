@@ -126,7 +126,7 @@ nonisolated enum MarfaMapping {
             title = row.properties[titleField]?.string ?? ""
             titleRule = .property(titleField)
         } else {
-            title = firstLine(of: body)
+            title = NoteName.firstLine(of: body)
             titleRule = .firstLine
         }
         let bodyField = bodyField(of: info)
@@ -308,10 +308,6 @@ nonisolated enum MarfaMapping {
         // bytes. Anything else, or none, is no size.
         let size = row.properties[sizeField]?.integer
         return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: size ?? 0)
-    }
-
-    private static func firstLine(of body: String) -> String {
-        body.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
     }
 
     static func date(_ text: String) -> Date {

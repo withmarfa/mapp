@@ -35,7 +35,9 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     /// A nil value removes the property. `undoing` names the write whose side effects an undo puts back.
     case editProperties(ItemID, [String: PropertyValue?], base: ItemVersion, undoing: WriteID?)
     case editBody(ItemID, String, base: ItemVersion, merge: BodyMerge)
-    case retype(ItemID, TypeID, base: ItemVersion)
+    /// Moves the item to another type, with the property changes the move makes in the same edit (`TypeChange`). A
+    /// nil value removes the property.
+    case retype(ItemID, TypeID, [String: PropertyValue?], base: ItemVersion)
     /// Marfa moves a row's tier as an update, which carries the version it read.
     case retier(ItemID, Tier, base: ItemVersion)
     case transition(ItemID, ItemState)

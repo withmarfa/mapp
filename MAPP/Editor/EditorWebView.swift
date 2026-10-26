@@ -158,6 +158,21 @@ final class EditorWebView: WKWebView {
         controller?.openEmbed(embed.reference, in: embed.item, revealing: true)
     }
 
+    @objc private func changeType(_ sender: NSMenuItem) {
+        guard let controller, let id = controller.noteID else { return }
+        controller.titleDrafts?.typeChange = TypeChangeRequest(ids: [id], undoManager: windowUndoManager)
+    }
+
+    /// Change Type, for the note on the page, from the window the editor belongs to.
+    private var changeTypeItem: NSMenuItem? {
+        guard let controller, let id = controller.noteID, controller.titleDrafts != nil, let library = controller.library,
+              !library.typeChangeOptions(for: [id]).isEmpty
+        else { return nil }
+        let item = NSMenuItem(title: String(localized: "Change Type…"), action: #selector(changeType(_:)), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
     /// WebKit's own items that mean nothing in a note: page navigation, and opening or saving what links and
     /// images point at, which the page never does (a link opens with Command-click). WebKit names them only in
     /// a private header, so were it to rename one, that item would simply stay.
@@ -199,6 +214,10 @@ final class EditorWebView: WKWebView {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")
             let isRichText = item.submenu?.items.contains { $0.action.map(Self.richTextActions.contains) ?? false } ?? false
             if isUnwanted || isRichText { menu.removeItem(item) }
+        }
+        if !isEditingTitle, let changeType = changeTypeItem {
+            menu.addItem(.separator())
+            menu.addItem(changeType)
         }
         // Removing items can leave two separators together, or one at an end.
         while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
