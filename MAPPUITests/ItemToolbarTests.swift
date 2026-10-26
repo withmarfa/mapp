@@ -159,7 +159,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
         XCTAssertTrue(share.exists)
-        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays in the sidebar")
+        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays at the sidebar's foot")
         let search = window.toolbars.buttons["Search"].firstMatch
         XCTAssertTrue(search.exists)
         XCTAssertLessThan(search.frame.maxX, viewOptions.frame.minX, "Search leads the trailing controls")

@@ -33,7 +33,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(element("NewItemToolbar").exists, "the foot holds the New Item button")
         XCTAssertFalse(element("SidebarSearch").exists, "Search is the palette's, not the foot's")
         XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is in the instance menu")
-        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in Settings > Library")
+        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in the instance menu")
         for identifier in ["SidebarSources", "SidebarCollections"] {
             let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -67,15 +67,15 @@ final class SidebarNavigationTests: XCTestCase {
     func testTheInstanceMenuListsConsoleSettingsAndRecentlyDeleted() {
         instanceName.click()
         for title in ["Console", "Settings", "Recently Deleted"] {
-            XCTAssertTrue(app.menuItems[title].waitForExistence(timeout: 3), "\(title) is in the instance menu")
+            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the instance menu")
         }
         app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(app.menuItems["Recently Deleted"].waitForNonExistence(timeout: 2))
+        XCTAssertTrue(window.menuItems["Recently Deleted"].firstMatch.waitForNonExistence(timeout: 2))
     }
 
     func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
         instanceName.click()
-        app.menuItems["Settings"].click()
+        window.menuItems["Settings"].firstMatch.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists, "the pages take the list's column")
         XCTAssertTrue(sidebar.exists, "the sidebar stays")

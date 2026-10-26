@@ -6,7 +6,7 @@ import SwiftUI
 struct SidebarFoot: View {
     @Environment(Libraries.self) private var libraries
     @Environment(MarfaHost.self) private var host: MarfaHost?
-    @Environment(\.library) private var library
+    @CurrentLibrary private var library
     @Environment(\.openURL) private var openURL
     @StoredOrder private var order
     let browser: Browser
@@ -28,12 +28,12 @@ struct SidebarFoot: View {
             name: name, dot: dot, status: status, browser: browser,
             openConsole: address.map { address in { openURL(address) } },
             openSettings: { browser.showSettings() },
-            showRecentlyDeleted: library.map { library in { browser.show(.recentlyDeleted, in: library, order: order) } })
+            showRecentlyDeleted: { browser.show(.recentlyDeleted, in: library, order: order) })
     }
 }
 
-/// The foot's row, given what it shows and what its menu does. An action that is nil is dimmed in the menu: the
-/// Console has no address until a server is set, and Recently Deleted has no library until one is open.
+/// The foot's row, given what it shows and what its menu does. The Console is dimmed in the menu while it has no
+/// address, which is until a server is set.
 struct SidebarFootRow: View {
     let name: String
     let dot: SidebarStatusDot?
@@ -41,7 +41,7 @@ struct SidebarFootRow: View {
     let browser: Browser?
     let openConsole: (() -> Void)?
     let openSettings: () -> Void
-    let showRecentlyDeleted: (() -> Void)?
+    let showRecentlyDeleted: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
@@ -50,8 +50,7 @@ struct SidebarFootRow: View {
                 Button("Console") { openConsole?() }
                     .disabled(openConsole == nil)
                 Button("Settings", action: openSettings)
-                Button("Recently Deleted") { showRecentlyDeleted?() }
-                    .disabled(showRecentlyDeleted == nil)
+                Button("Recently Deleted", action: showRecentlyDeleted)
             } label: {
                 HStack(spacing: 4) {
                     Text(name)

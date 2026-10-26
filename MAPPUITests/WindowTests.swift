@@ -121,7 +121,7 @@ final class WindowTests: XCTestCase {
         let instanceName = window.descendants(matching: .any).matching(identifier: "SidebarLibrary").element(boundBy: 0)
         XCTAssertTrue(instanceName.waitForExistence(timeout: 3))
         instanceName.click()
-        let recentlyDeleted = app.menuItems["Recently Deleted"]
+        let recentlyDeleted = window.menuItems["Recently Deleted"].firstMatch
         XCTAssertTrue(recentlyDeleted.waitForExistence(timeout: 3))
         recentlyDeleted.click()
         let deleted = row(titled: "Old packing list")

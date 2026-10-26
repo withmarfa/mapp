@@ -7,8 +7,10 @@ import SwiftUI
 /// A row that opens a list of its own (`isButton`) has this as a button of its own, since a click on the row selects.
 /// A row that only folds is one button already, and this is its picture.
 struct SidebarDisclosure: View {
-    /// The width a row without a chevron keeps, so counts line up.
-    static let width: CGFloat = 20
+    /// The width of the chevron, which a row without one keeps so counts line up. It follows the base text size.
+    static func width(forTextSize textSize: Int) -> CGFloat {
+        20 * InterfaceStyle.scale(for: textSize)
+    }
 
     @Environment(\.interfaceTextSize) private var textSize
     let title: String
@@ -34,7 +36,7 @@ struct SidebarDisclosure: View {
             .interfaceFont(.caption.weight(.semibold))
             .foregroundStyle(.tertiary)
             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-            .frame(width: Self.width * InterfaceStyle.scale(for: textSize), height: 22 * InterfaceStyle.scale(for: textSize))
+            .frame(width: Self.width(forTextSize: textSize), height: 22 * InterfaceStyle.scale(for: textSize))
             .contentShape(.rect)
     }
 }
