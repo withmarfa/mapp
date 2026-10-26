@@ -252,6 +252,8 @@ final class Browser {
         tableOptions = [:]
         viewSeeds = [:]
         viewEditing = nil
+        viewTitleForm?.handOff(because: .libraryChanged)
+        viewTitleForm = nil
         boardFields = [:]
         compactBoards = [:]
         agendaFields = [:]
@@ -317,6 +319,10 @@ final class Browser {
 
     var viewEditing: ViewEditing?
 
+    /// The title the view sheet holds until the server takes it, kept here so a window that closes or changes
+    /// library can give it back.
+    var viewTitleForm: ViewTitleForm?
+
     /// The order and grouping a view opened with, and the version of the view they came from, which an update of
     /// them is based on.
     struct ViewSeed: Hashable {
@@ -348,18 +354,28 @@ final class Browser {
     /// Whether the window's order, grouping or filters differ from those of the view it shows.
     var hasViewChanges: Bool {
         guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
-        return ViewDraft.differs(tableOptions[item], from: seed.options, countingFilters: viewMode == .table)
+        // Only the table shows a view's order, grouping and filters, so only the table offers to update it.
+        return viewMode == .table && ViewDraft.differs(tableOptions[item], from: seed.options)
     }
 
     /// The change that saves the window's choices to the view it shows, the version it is based on, and what of
     /// the window it leaves out.
-    func viewUpdate(_ window: ViewDraft.Window, in library: any ItemLibrary)
-        -> (view: LibraryView, change: LibraryViewChange, baseVersion: Int64, unkept: [ViewDraft.Unkept])? {
+    func viewUpdate(_ window: ViewDraft.Window, in library: any ItemLibrary) -> ViewUpdate? {
         guard case .view(let id) = item, let seed = viewSeeds[id], let view = library.views.first(where: { $0.id == id }) else {
             return nil
         }
         let update = ViewDraft.change(window, options: tableOptions[item], seed: seed.options, view: view)
-        return (view, update.change, seed.version, update.unkept)
+        return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept, unchanged: update.unchanged)
+    }
+
+    struct ViewUpdate {
+        let view: LibraryView
+        let change: LibraryViewChange
+        let baseVersion: Int64
+        /// What of the window the view will not keep.
+        let unkept: [ViewDraft.Unkept]
+        /// The conditions of the view's filter the window cannot show, which the update leaves as they are.
+        let unchanged: [String]
     }
 
     /// After an update the view holds the window's choices, so its filters are the view's own.

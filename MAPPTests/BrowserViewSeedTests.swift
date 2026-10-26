@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// A window opens a saved view with the view's own order and grouping, and offers Update View only when the person
-/// has changed them since.
+/// A window opens a saved view with the view's own order, grouping and filters, and offers Update View only when the
+/// person has changed them in the table since.
 @MainActor
 struct BrowserViewSeedTests {
     private static func view(version: Int64 = 1, group: String = "properties.status") -> LibraryView {
@@ -19,6 +19,7 @@ struct BrowserViewSeedTests {
         let browser = Browser()
         browser.adopt(library)
         browser.sidebarItem = .view(view.id)
+        browser.viewMode = .table
         browser.followView(in: library)
         return (browser, library)
     }
@@ -83,7 +84,7 @@ struct BrowserViewSeedTests {
     @Test func anUpdateNamesOnlyWhatChangedAtTheVersionRead() throws {
         let (browser, library) = Self.opened()
         browser.tableOptions[browser.item]?.grouping = .none
-        let window = ViewDraft.Window(place: browser.item, columns: [], sort: [], grouping: nil)
+        let window = ViewDraft.Window(place: browser.item, columns: [], sort: [], grouping: nil, filters: [:])
         let update = try #require(browser.viewUpdate(window, in: library))
         #expect(update.baseVersion == 1)
         #expect(update.change.group == .clear)
@@ -100,5 +101,15 @@ struct BrowserViewSeedTests {
         withExtendedLifetime(first) {}
         #expect(browser.viewSeeds.isEmpty)
         #expect(browser.viewEditing == nil)
+    }
+
+    @Test func onlyTheTableOffersAnUpdate() {
+        // The other layouts show neither the table's order nor its grouping, so a change to them is not offered.
+        let (browser, _) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        browser.viewMode = .list
+        #expect(!browser.hasViewChanges)
+        browser.viewMode = .table
+        #expect(browser.hasViewChanges)
     }
 }

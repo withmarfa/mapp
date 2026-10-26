@@ -26,11 +26,33 @@ enum SavedViews {
             filters: browser.viewMode == .table ? options.filters : [:], search: search.isEmpty ? nil : search)
     }
 
-    /// Updates the view the window shows with the window's choices, asking first only when it would leave some out.
+    /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
+    /// view keeps what the person sees.
+    static func window(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> ViewDraft.Window {
+        var window = window(browser, in: library)
+        switch browser.viewMode {
+        case .table:
+            window.layout = .table
+        case .list, .gallery:
+            window.layout = .list(order)
+        case .board:
+            let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
+            let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
+            window.layout = .board(key: field?.key, label: field?.label ?? "")
+        case .agenda:
+            let fields = ItemAgendaLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+            let key = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
+            window.layout = .agenda(key: key, label: fields.first { $0.key == key }?.displayLabel ?? "")
+        }
+        return window
+    }
+
+    /// Updates the view the window shows with the table's choices, asking first when it would leave some of the
+    /// window out, or leave conditions of the view's filter the table cannot show as they are.
     static func update(_ browser: Browser, in library: any ItemLibrary) {
         guard let shown = shown(browser, in: library),
               let update = browser.viewUpdate(window(browser, in: library), in: library) else { return }
-        guard update.unkept.isEmpty else {
+        guard update.unkept.isEmpty, update.change.query == nil || update.unchanged.isEmpty else {
             browser.viewEditing = .update(shown.id)
             return
         }
@@ -40,10 +62,11 @@ enum SavedViews {
     /// Saves the window's choices to the view at the version they were made on. A view changed elsewhere since is
     /// not overwritten: the window goes back to the view as it is.
     static func save(
-        _ update: (view: LibraryView, change: LibraryViewChange, baseVersion: Int64, unkept: [ViewDraft.Unkept]),
+        _ update: Browser.ViewUpdate,
         of id: ItemID, browser: Browser, library: any ItemLibrary
     ) async {
-        guard !update.change.isEmpty else { return }
+        // The window's filters may differ only in ones the view never held, so the window goes back to the view.
+        guard !update.change.isEmpty else { return browser.viewUpdated(update.view) }
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view): browser.viewUpdated(view)
         case .failure(let failure) where failure.kind == .conflict: browser.viewRefused(id, in: library)
@@ -59,6 +82,7 @@ enum SavedViews {
         case .tooManyFilters: String(localized: "Filters beyond the 10 conditions a view can hold")
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
+        case .dateSections: String(localized: "The list’s sections by date")
         }
     }
 }
@@ -249,7 +273,8 @@ private struct SavedViewDialogs: ViewModifier {
     }
 }
 
-/// Asks for a new view's title, a view's new name, or whether to update a view with what it will not keep.
+/// Asks for a new view's title, a view's new name, or whether to update a view with what it will not keep. A title
+/// stays in the sheet until the server takes it (`ViewTitleForm`).
 private struct SavedViewSheet: View {
     let editing: Browser.ViewEditing
     let browser: Browser
@@ -258,8 +283,7 @@ private struct SavedViewSheet: View {
     /// Keeps the window's layout for a view it saved.
     let created: (ItemID, ItemViewMode) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var draft: ViewDraft.Draft?
+    @State private var update: Browser.ViewUpdate?
     @State private var unkept: [ViewDraft.Unkept] = []
 
     var body: some View {
@@ -267,12 +291,12 @@ private struct SavedViewSheet: View {
             Text(heading).font(.headline)
             switch editing {
             case .new:
-                TextField("Title", text: $title)
-                Text("A view keeps this place with its filters, order and grouping, for every app connected to your Marfa server. Its filters can’t mix “and” with “or”, and Recents and Recently Deleted can’t be saved as views.")
+                if let form = browser.viewTitleForm { ViewTitleField(form: form) }
+                Text("A view keeps this place with its order and grouping as this layout shows them, and the table’s filters, for every app connected to your Marfa server. Its filters can’t mix “and” with “or”, and Recents and Recently Deleted can’t be saved as views.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             case .rename:
-                TextField("Title", text: $title)
+                if let form = browser.viewTitleForm { ViewTitleField(form: form) }
             case .update, .delete:
                 Text("The view is updated for every app connected to your Marfa server.")
                     .foregroundStyle(.secondary)
@@ -284,9 +308,17 @@ private struct SavedViewSheet: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
+            if let update, update.change.query != nil, !update.unchanged.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("The table can’t show these conditions of the view’s filter, so they stay as they are:")
+                    ForEach(update.unchanged, id: \.self) { Text(verbatim: "• \($0)").monospaced() }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
+                if browser.viewTitleForm?.isSaving == true { ProgressView().controlSize(.small) }
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Cancel", role: .cancel) { close() }
                     .keyboardShortcut(.cancelAction)
                 Button(action) { save() }
                     .keyboardShortcut(.defaultAction)
@@ -315,53 +347,66 @@ private struct SavedViewSheet: View {
         }
     }
 
-    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
-
     private var canSave: Bool {
-        guard library.canEditViews else { return false }
         switch editing {
-        case .new: return draft != nil && !trimmedTitle.isEmpty
-        case .rename: return !trimmedTitle.isEmpty
-        case .update, .delete: return true
+        case .new, .rename: browser.viewTitleForm?.canSubmit == true
+        case .update, .delete: library.canEditViews
         }
     }
 
     private func read() {
         switch editing {
         case .new:
-            draft = ViewDraft.draft(SavedViews.window(browser, in: library), catalogue: library.catalogue, views: library.views)
-            unkept = draft?.unkept ?? []
-            title = library.name(of: browser.item)
+            let window = SavedViews.window(browser, in: library, order: order)
+            guard let draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return }
+            unkept = draft.unkept
+            browser.viewTitleForm = ViewTitleForm(
+                new: draft, layout: browser.viewMode, title: library.name(of: browser.item), library: library)
         case .rename(let id):
-            title = library.views.first { $0.id == id }?.title ?? ""
+            guard let view = library.views.first(where: { $0.id == id }) else { return }
+            browser.viewTitleForm = ViewTitleForm(renaming: view, library: library)
         case .update:
-            unkept = browser.viewUpdate(SavedViews.window(browser, in: library), in: library)?.unkept ?? []
+            update = browser.viewUpdate(SavedViews.window(browser, in: library), in: library)
+            unkept = update?.unkept ?? []
         case .delete:
             break
         }
     }
 
-    private func save() {
-        let title = trimmedTitle
+    private func close() {
+        browser.viewTitleForm = nil
+        browser.viewEditing = nil
         dismiss()
+    }
+
+    private func save() {
         switch editing {
-        case .new:
-            guard let draft else { return }
-            let mode = browser.viewMode
-            let settings = LibraryViewSettings(title: title, query: draft.query, sort: draft.sort, group: draft.group)
+        case .new, .rename:
+            guard let form = browser.viewTitleForm else { return }
             Task { [browser, library, order, created] in
-                guard let view = await library.createView(settings) else { return }
-                created(view.id, mode)
-                browser.show(.view(view.id), in: library, order: order)
+                guard case .done(let view) = await form.submit(), browser.viewTitleForm === form else { return }
+                close()
+                if case .new(_, let mode) = form.purpose, let view {
+                    created(view.id, mode)
+                    browser.show(.view(view.id), in: library, order: order)
+                }
             }
-        case .rename(let id):
-            guard let view = library.views.first(where: { $0.id == id }), view.title != title else { return }
-            Task { [library] in _ = await library.changeView(id, LibraryViewChange(title: title), baseVersion: view.version) }
         case .update(let id):
-            guard let update = browser.viewUpdate(SavedViews.window(browser, in: library), in: library) else { return }
+            dismiss()
+            guard let update else { return }
             Task { [browser, library] in await SavedViews.save(update, of: id, browser: browser, library: library) }
         case .delete:
             break
         }
+    }
+}
+
+/// The title a view sheet holds, which stays as typed until the server takes it.
+private struct ViewTitleField: View {
+    @Bindable var form: ViewTitleForm
+
+    var body: some View {
+        TextField("Title", text: $form.title)
+            .disabled(form.isSaving)
     }
 }

@@ -20,9 +20,9 @@ struct ViewDraftTests {
 
     private static func window(
         _ place: SidebarItem, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
-        filters: [String: Set<String>] = [:], search: String? = nil
+        filters: [String: Set<String>] = [:], search: String? = nil, layout: ViewDraft.Layout = .table
     ) -> ViewDraft.Window {
-        ViewDraft.Window(place: place, columns: columns, sort: sort, grouping: grouping, filters: filters, search: search)
+        ViewDraft.Window(place: place, columns: columns, sort: sort, grouping: grouping, filters: filters, search: search, layout: layout)
     }
 
     private static func draft(_ window: ViewDraft.Window, views: [LibraryView] = []) -> ViewDraft.Draft? {
@@ -132,6 +132,34 @@ struct ViewDraftTests {
         #expect(ViewDraft.columnID(of: "edge[blocks]") == nil)
     }
 
+    @Test func eachLayoutSavesTheOrderAndGroupingItShows() throws {
+        // The table's own choices, which the other layouts do not show.
+        let sort = [ItemTableComparator(column: Self.statusColumn, order: .forward)]
+        func draft(_ layout: ViewDraft.Layout) throws -> ViewDraft.Draft {
+            try #require(Self.draft(Self.window(.allNotes, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
+        }
+        let byTitle = try draft(.list(NoteOrder(sort: .title, groupsByDate: true)))
+        #expect(byTitle.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(byTitle.group == nil)
+        #expect(byTitle.query.filter == nil)
+        #expect(byTitle.unkept.isEmpty)
+
+        let byEdit = try draft(.list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
+        #expect(byEdit.sort == [LibraryViewSort(field: "updated_at", ascending: false)])
+        #expect(byEdit.unkept == [.dateSections])
+        #expect(try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: false))).sort
+            == [LibraryViewSort(field: "created_at", ascending: false)])
+
+        let board = try draft(.board(key: "status", label: "Status"))
+        #expect(board.group == LibraryViewGroup(field: "properties.status"))
+        #expect(board.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(try draft(.board(key: "due-date", label: "Due")).unkept == [.group(column: "Due")])
+
+        let agenda = try draft(.agenda(key: "due_at", label: "Due"))
+        #expect(agenda.group == LibraryViewGroup(field: "properties.due_at", bucket: .day))
+        #expect(agenda.sort == [LibraryViewSort(field: "properties.due_at", ascending: true)])
+    }
+
     // MARK: Filters
 
     @Test func filtersJoinAColumnsValuesByOrAndColumnsByAnd() {
@@ -231,5 +259,63 @@ struct ViewDraftTests {
         resorted.sort = [ItemTableComparator(column: .title)]
         let sort = ViewDraft.change(Self.window(.view(view.id), sort: [ItemTableComparator(column: .title)]), options: resorted, seed: seed, view: view)
         #expect(sort.change == LibraryViewChange(sort: [LibraryViewSort(field: "title", ascending: true)]))
+    }
+
+    @Test func aViewOpensWithTheFiltersTheTableCanShow() {
+        func filters(_ filter: String) -> [String: Set<String>] {
+            ViewDraft.options(for: LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(filter: filter))).filters
+        }
+        #expect(filters(#"properties.status eq "todo" AND properties.done eq false AND tags contains "x""#)
+            == ["field.status": ["todo"], "field.done": ["false"]])
+        #expect(filters(#"properties.status not_exists AND backref[parent-of] eq "p1""#) == ["field.status": [""], "parent": ["p1"]])
+        #expect(filters(#"properties.status eq "say \"hi\"""#) == ["field.status": [#"say "hi""#]])
+        // One column's values joined by OR is what the table shows; ORs across columns it cannot show.
+        #expect(filters(#"properties.status eq "a" OR properties.status eq "b""#) == ["field.status": ["a", "b"]])
+        #expect(filters(#"properties.status eq "a" OR properties.done eq true"#).isEmpty)
+        // The table joins a column's values by OR, so two that must both hold are not shown.
+        #expect(filters(#"properties.status eq "a" AND properties.status eq "b""#).isEmpty)
+        #expect(filters(#"properties.status neq "a""#).isEmpty)
+    }
+
+    @Test func anUpdateReplacesTheFiltersTheWindowShows() throws {
+        let view = LibraryView(
+            id: ItemID("v"), title: "V", version: 2,
+            query: LibraryViewQuery(types: [Self.task], filter: #"tags contains "x" AND properties.status eq "todo""#))
+        let seed = ViewDraft.options(for: view)
+        #expect(seed.filters == ["field.status": ["todo"]])
+        func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept], unchanged: [String]) {
+            var options = seed
+            options.filters = filters
+            return ViewDraft.change(Self.window(.view(view.id), filters: filters), options: options, seed: seed, view: view)
+        }
+
+        // Removing the filter in the window removes it from the view; what the window cannot show stays.
+        let removed = update([:])
+        #expect(removed.change.query?.filter == #"tags contains "x""#)
+        #expect(removed.unchanged == [#"tags contains "x""#])
+
+        let changed = update(["field.status": ["done"]])
+        #expect(changed.change.query?.filter == #"tags contains "x" AND properties.status eq "done""#)
+
+        // A window filter the view cannot hold leaves the view's filter whole, rather than dropping what it showed.
+        let mixed = update(["field.status": ["todo", "done"]])
+        #expect(mixed.change.query == nil)
+        #expect(mixed.unkept == [.mixedFilters])
+
+        // An unchanged window sends no filter.
+        #expect(update(seed.filters).change.query == nil)
+    }
+
+    @Test func aFilterOnAColumnTheTableLacksStaysAsItIs() {
+        let view = LibraryView(
+            id: ItemID("v"), title: "V",
+            query: LibraryViewQuery(filter: #"properties.owner eq "ann" AND properties.status eq "todo""#))
+        let seed = ViewDraft.options(for: view)
+        var options = seed
+        options.filters = [:]
+        let window = ViewDraft.Window(place: .view(view.id), columns: Self.columns, sort: [], grouping: nil, filters: [:])
+        let update = ViewDraft.change(window, options: options, seed: seed, view: view)
+        #expect(update.change.query?.filter == #"properties.owner eq "ann""#)
+        #expect(update.unchanged == [#"properties.owner eq "ann""#])
     }
 }

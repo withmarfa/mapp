@@ -241,6 +241,7 @@ struct MainView: View {
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
             browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed)
             browser.giveUpNewItem(because: .windowLeft)
+            browser.viewTitleForm?.handOff(because: changed ? .libraryChanged : .closed)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
