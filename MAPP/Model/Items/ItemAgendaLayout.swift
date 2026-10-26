@@ -30,7 +30,7 @@ nonisolated enum ItemAgendaLayout {
     static func fields(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemTypeInfo.Field] {
         var fields: [String: ItemTypeInfo.Field] = [:]
         for type in types.sorted(by: { $0.rawValue < $1.rawValue }) {
-            for field in catalogue.itemTypes[type]?.fields ?? [] where field.kind == .date {
+            for field in catalogue.itemTypes[type]?.fields ?? [] where field.kind.isDate {
                 if fields[field.key] == nil { fields[field.key] = field }
             }
         }
@@ -71,37 +71,13 @@ nonisolated enum ItemAgendaLayout {
     static func value(
         of item: Item, field: String?, catalogue: Catalogue, calendar: Calendar = .current
     ) -> ItemAgendaRow.Value {
-        guard let field, catalogue.itemTypes[item.type]?.fields.contains(where: { $0.key == field && $0.kind == .date }) == true
+        guard let field, catalogue.itemTypes[item.type]?.fields.contains(where: { $0.key == field && $0.kind.isDate }) == true
         else { return .notApplicable }
         guard let value = item.value(of: field), value != .null, value != .string("") else { return .missing }
-        guard let text = value.string, let parsed = date(text, calendar: calendar) else {
+        guard let text = value.string, let parsed = ItemDate.parse(text, calendar: calendar) else {
             return .invalid(ItemValueText.string(value))
         }
-        return .dated(parsed, dateOnly: text.count == 10, raw: text)
-    }
-
-    /// Foundation can normalize impossible components, so validate the written day before parsing a timestamp.
-    static func date(_ text: String, calendar: Calendar = .current) -> Date? {
-        guard text.count >= 10 else { return nil }
-        let day = String(text.prefix(10))
-        guard day.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}/) != nil else { return nil }
-        let parts = day.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3, parts[0] > 0 else { return nil }
-        var gregorian = Calendar(identifier: .gregorian)
-        gregorian.timeZone = text.count == 10 ? calendar.timeZone : TimeZone(secondsFromGMT: 0)!
-        let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
-        guard let date = gregorian.date(from: components) else { return nil }
-        let actual = gregorian.dateComponents([.year, .month, .day], from: date)
-        guard actual.year == parts[0], actual.month == parts[1], actual.day == parts[2] else { return nil }
-        if text.count == 10 { return date }
-        guard text.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})/) != nil else { return nil }
-        let clock = text.dropFirst(11).prefix(8).split(separator: ":").compactMap { Int($0) }
-        guard clock.count == 3, clock[0] < 24, clock[1] < 60, clock[2] < 60 else { return nil }
-        if text.last != "Z", text.last != "z" {
-            let offset = text.suffix(5).split(separator: ":").compactMap { Int($0) }
-            guard offset.count == 2, offset[0] < 24, offset[1] < 60 else { return nil }
-        }
-        return ItemTableValue.date(text.uppercased())
+        return .dated(parsed.date, dateOnly: !parsed.hasTime, raw: text)
     }
 
     private static func precedes(_ lhs: ItemAgendaRow, _ rhs: ItemAgendaRow) -> Bool {

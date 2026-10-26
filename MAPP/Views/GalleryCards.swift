@@ -33,16 +33,9 @@ enum GalleryKind {
             keys = ["start", "starts_at", "start_at", "start_date", "date"]
         }
         for key in keys {
-            if let string = item.value(of: key)?.string, let date = parse(string) { return date }
+            if let string = item.value(of: key)?.string, let date = ItemDate.parse(string)?.date { return date }
         }
         return nil
-    }
-
-    private static func parse(_ string: String) -> Date? {
-        let plain = ISO8601DateFormatter()
-        if let date = plain.date(from: string) { return date }
-        plain.formatOptions.insert(.withFractionalSeconds)
-        return plain.date(from: string) ?? DateFormatter.itemDay.date(from: string)
     }
 }
 

@@ -23,32 +23,19 @@ struct SettingsPageList: View {
                         .accessibilityHidden(true)
                 }
                 ForEach(pages) { page in
-                    Label {
-                        Text(page.title).interfaceFont(.body)
-                    } icon: {
-                        Image(systemName: page.symbol).interfaceFont(.body)
-                    }
-                    .labelStyle(SettingsPageLabelStyle())
-                    .frame(minHeight: 30)
-                    .tag(page)
-                    .listRowSeparator(.hidden)
-                    .accessibilityIdentifier("SettingsPage-\(page.rawValue)")
+                    Text(page.title)
+                        .interfaceFont(.body)
+                        .frame(minHeight: 30)
+                        .tag(page)
+                        .listRowSeparator(.hidden)
+                        .accessibilityIdentifier("SettingsPage-\(page.rawValue)")
                 }
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
         .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsPageList")
-    }
-}
-
-/// A symbol in a column of its own, so the labels of the rows line up whichever symbol is wider.
-private struct SettingsPageLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 10) {
-            configuration.icon.frame(width: 22)
-            configuration.title
-        }
     }
 }
 
@@ -62,7 +49,7 @@ struct SettingsWorkspace: View {
             SettingsPageList(browser: browser)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
-            SettingsPageView(page: browser.settingsPage)
+            SettingsPageView(page: browser.settingsPage, browser: browser)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { browser.leaveSettings() }

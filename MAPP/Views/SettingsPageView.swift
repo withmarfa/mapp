@@ -5,6 +5,7 @@ import SwiftUI
 /// stays readable however wide the window is. The whole page scrolls as one.
 struct SettingsPageView: View {
     let page: SettingsPage
+    let browser: Browser
 
     private static let contentWidth: CGFloat = 620
 
@@ -22,7 +23,6 @@ struct SettingsPageView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
         .navigationTitle(page.title)
         .id(page)
         .accessibilityElement(children: .contain)
@@ -53,7 +53,7 @@ struct SettingsPageView: View {
         case .appearance: AppearanceSettings()
         case .editor: EditorSettings()
         case .sidebar: SidebarSettings()
-        case .library: LibrarySettings()
+        case .library: LibrarySettings(browser: browser)
         case .about: AboutSettings()
         }
     }

@@ -1,34 +1,29 @@
 import SwiftUI
 
 /// The instance at the foot of the sidebar, below its places, types and views: its name, a dot where the server is
-/// not reached, and the buttons for the Console, Settings and Recently Deleted. A click on the name opens the page of
-/// Settings that holds the server's connection.
+/// not reached, and the buttons for Search and Settings. A click on the name opens the page of Settings that holds
+/// the server's connection, where the Console and Recently Deleted are too.
 struct SidebarFoot: View {
-    @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @Environment(MarfaHost.self) private var host: MarfaHost?
-    @Environment(\.openURL) private var openURL
-    @StoredOrder private var order
     let browser: Browser
 
     var body: some View {
         let name = LibraryDescription.name(libraries)
-        let address = libraries.host.connection?.address
         if let host, host.source != nil {
             SyncStatusReading(host: host) { status in
-                row(name, address, dot: SidebarStatusDot(host.state), status: status)
+                row(name, dot: SidebarStatusDot(host.state), status: status)
             }
         } else {
-            row(name, address, dot: nil, status: nil)
+            row(name, dot: nil, status: nil)
         }
     }
 
-    private func row(_ name: String, _ address: URL?, dot: SidebarStatusDot?, status: SyncStatus?) -> some View {
+    private func row(_ name: String, dot: SidebarStatusDot?, status: SyncStatus?) -> some View {
         SidebarFootRow(
-            name: name, dot: dot, status: status, hasConsole: address != nil,
+            name: name, dot: dot, status: status,
             openConnection: { browser.showSettings(.library) },
-            openConsole: { if let address { openURL(address) } },
-            openRecentlyDeleted: { browser.show(.recentlyDeleted, in: library, order: order) },
+            search: { browser.palette = .search },
             openSettings: { browser.showSettings() })
     }
 }
@@ -38,10 +33,8 @@ struct SidebarFootRow: View {
     let name: String
     let dot: SidebarStatusDot?
     let status: SyncStatus?
-    let hasConsole: Bool
     let openConnection: () -> Void
-    let openConsole: () -> Void
-    let openRecentlyDeleted: () -> Void
+    let search: () -> Void
     let openSettings: () -> Void
 
     var body: some View {
@@ -58,11 +51,8 @@ struct SidebarFootRow: View {
             if let dot { statusDot(dot) }
             Spacer(minLength: 0)
             HStack(spacing: 0) {
-                if hasConsole {
-                    iconButton("Console", symbol: "person.crop.circle", id: "SidebarConsole", action: openConsole)
-                }
+                iconButton("Search", symbol: "magnifyingglass", id: "SidebarSearch", action: search)
                 iconButton("Settings", symbol: "gearshape", id: "SidebarOpenSettings", action: openSettings)
-                iconButton("Recently Deleted", symbol: "trash", id: "SidebarRecentlyDeleted", action: openRecentlyDeleted)
             }
         }
         // The buttons' frames are wider than their symbols, so the trailing edge is shorter to line the last

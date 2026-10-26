@@ -93,7 +93,6 @@ struct ItemGallery: View {
             }
             .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
-        .background(.windowBackground)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             if size.width.isFinite, size.width > 0 { width = size.width }
             if size.height.isFinite, size.height > 0 { height = size.height }

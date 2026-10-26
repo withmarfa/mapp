@@ -41,6 +41,12 @@ struct MAPPApp: App {
         WindowGroup(id: "main") {
             RootView(settingsRequest: settingsRequest)
                 .interfaceTextStyle()
+                // The page's web view is backed by this color, which, unlike the window's default background, is
+                // not tinted by the desktop. Making it the window's background gives the list, Settings and the
+                // page one color, reaching up under the toolbar, which then draws no band of its own, even while
+                // the window is inactive. The sidebar's material stays above it.
+                .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .notices(libraries.host.notices)
                 .environment(libraries)
                 .environment(libraries.host)

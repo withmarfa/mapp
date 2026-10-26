@@ -31,7 +31,6 @@ struct PlainTextFilePage: View {
                 .padding(.bottom, 48)
             }
         }
-        .background(.windowBackground)
         .accessibilityIdentifier("PlainTextFilePage")
     }
 }

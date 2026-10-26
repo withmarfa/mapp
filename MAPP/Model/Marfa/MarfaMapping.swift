@@ -91,7 +91,8 @@ nonisolated enum MarfaMapping {
         case "string", "url", "email": .text
         case "number", "integer": .number
         case "boolean": .boolean
-        case "date", "datetime": .date
+        case "date": .date(includesTime: false)
+        case "datetime": .date(includesTime: true)
         case "enum":
             if case .array(let values) = field.definition["enum_values"] {
                 .choice(values.compactMap(\.string))
@@ -313,11 +314,8 @@ nonisolated enum MarfaMapping {
         body.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
     }
 
-    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
-    private static let whole = Date.ISO8601FormatStyle()
-
     static func date(_ text: String) -> Date {
-        (try? fractional.parse(text)) ?? (try? whole.parse(text)) ?? .distantPast
+        ItemDate.parse(text)?.date ?? .distantPast
     }
 
     // MARK: Verdicts and sync

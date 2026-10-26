@@ -203,11 +203,15 @@ struct CommandPalette: View {
             if browser.canSearchList {
                 add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F") { browser.focusRequest = .search }
             }
-            add(String(localized: "View as List"), "list.bullet", "⌘1") { browser.viewMode = .list }
-            add(String(localized: "View as Gallery"), "square.grid.2x2", "⌘2") { browser.viewMode = .gallery }
-            add(String(localized: "View as Table"), "tablecells", "⌘3") { browser.viewMode = .table }
-            add(String(localized: "View as Board"), "rectangle.split.3x1", "⌘4") { browser.viewMode = .board }
-            add(String(localized: "View as Agenda"), "calendar", "⌘5") { browser.viewMode = .agenda }
+            let modes = browser.availableViewModes(in: library)
+            func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ shortcut: String) {
+                if modes.contains(mode) { add(title, systemImage, shortcut) { browser.viewMode = mode } }
+            }
+            addLayout(.list, String(localized: "View as List"), "list.bullet", "⌘1")
+            addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", "⌘2")
+            addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
+            addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
+            addLayout(.agenda, String(localized: "View as Agenda"), "calendar", "⌘5")
             for choice in NoteSort.allCases where choice != sort && (browser.viewMode == .list || browser.viewMode == .gallery) {
                 add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
             }

@@ -110,7 +110,7 @@ struct MarfaMappingTests {
         #expect(ticket.fields.map(\.key) == ["assignee", "body", "title"])
         #expect(ticket.fields.map(\.declaredBy) == [TypeID("aic.ticket"), TypeID("core.task"), TypeID("core.task")])
         let task = try #require(Self.catalogue.itemTypes[TypeID("core.task")])
-        #expect(task.fields.map(\.kind) == [.text, .date, .choice(["open", "done"]), .text])
+        #expect(task.fields.map(\.kind) == [.text, .date(includesTime: true), .choice(["open", "done"]), .text])
         #expect(task.fields.map(\.label) == ["Body", "Due at", "Status", "Title"])
     }
 
@@ -169,7 +169,7 @@ struct MarfaMappingTests {
         // One source per target, many targets per source, written at the target: the target holds one.
         #expect(knows.cardinality == .one && knows.reverseCardinality == .many)
         #expect(knows.cascadeOnDelete == .block)
-        #expect(knows.properties.map(\.key) == ["since"] && knows.properties.first?.kind == .date)
+        #expect(knows.properties.map(\.key) == ["since"] && knows.properties.first?.kind == .date(includesTime: false))
         let owns = try #require(catalogue.edgeTypes["owns"])
         #expect(owns.cardinality == .one && owns.reverseCardinality == .many && owns.cascadeOnDelete == .cascade)
         #expect(catalogue.edgeTypes["next"]?.cascadeOnDelete == .orphan)

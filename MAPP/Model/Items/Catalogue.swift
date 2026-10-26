@@ -3,7 +3,9 @@ import Foundation
 nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     struct Field: Identifiable, Hashable, Sendable {
         enum Kind: Hashable, Sendable {
-            case text, number, boolean, date
+            case text, number, boolean
+            /// A Marfa `date`, a day, or a `datetime`, which may also name a time.
+            case date(includesTime: Bool)
             case choice([String])
             /// A shape the app shows but does not edit, such as a list or an object.
             case other

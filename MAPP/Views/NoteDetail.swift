@@ -9,14 +9,10 @@ struct NoteDetail: View {
 
     var body: some View {
         if browser.selection.count > 1 {
-            ContentUnavailableView {
-                Label("^[\(browser.selection.count) item](inflect: true) selected", systemImage: PlaceSymbol.name(of: browser.item, in: library.catalogue))
-            } description: {
-                Text("Choose a single item to read or edit it.")
-            }
-            .background(.windowBackground)
-            .accessibilityIdentifier("MultipleSelectionPrompt")
-            .onAppear { editor.close() }
+            EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"),
+                       detail: Text("Choose a single item to read or edit it."), actions: { EmptyView() })
+                .accessibilityIdentifier("MultipleSelectionPrompt")
+                .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if item.isFile {
                 ItemFileView(id: id) { browser.fileFetched(id, at: $0) }
@@ -27,7 +23,7 @@ struct NoteDetail: View {
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }
         } else {
-            UnselectedItemContent(symbol: PlaceSymbol.name(of: browser.item, in: library.catalogue), hasItems: !browser.items(in: library).isEmpty)
+            UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
                 // The page no longer shows the note it had, so that note is left.
                 .onAppear { editor.close() }
         }
@@ -43,58 +39,27 @@ struct NoteDetail: View {
     }
 }
 
-/// The symbol of the place the list shows, for the quiet states of the detail column. Sidebar places and types
-/// keep their own symbols; this only names the place a person is in.
-private enum PlaceSymbol {
-    static func name(of place: SidebarItem, in catalogue: Catalogue) -> String {
-        switch place {
-        case .inbox: "tray"
-        case .recents: "clock"
-        case .allNotes: "note.text"
-        case .favorites, .favoriteItem: "heart"
-        case .sources, .source: "antenna.radiowaves.left.and.right"
-        case .collections: "square.stack"
-        case .collection: "square.stack"
-        case .itemType(let id): TypeSymbol.name(for: TypeID(id), in: catalogue)
-        case .files: "doc"
-        case .view: SidebarPlace.viewSymbol
-        case .recentlyDeleted: "trash"
-        }
-    }
-}
-
-/// What the page says when no item is chosen: quiet, with the place's symbol, and nothing at all while the place
-/// holds nothing to choose, since the list says that.
+/// What the page says when no item is chosen: a short title, as the other empty views say, and nothing at all while
+/// the place holds nothing to choose, since the list says that.
 private struct UnselectedItemContent: View {
-    let symbol: String
     let hasItems: Bool
 
     var body: some View {
-        VStack {
-            if hasItems {
-                ContentUnavailableView {
-                    Label {
-                        Text("No Item Selected").accessibilityIdentifier("SelectItemPrompt")
-                    } icon: {
-                        Image(systemName: symbol)
-                    }
-                } description: {
-                    Text("Choose an item from the list to read or edit it.")
-                }
-            }
+        if hasItems {
+            EmptyState("No Item Selected")
+        } else {
+            Color.clear
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.windowBackground)
     }
 }
 
 #Preview("Items with no selection") {
-    UnselectedItemContent(symbol: "checkmark.circle", hasItems: true)
+    UnselectedItemContent(hasItems: true)
         .frame(width: 600, height: 500)
 }
 
 #Preview("Empty item collection") {
-    UnselectedItemContent(symbol: "tray", hasItems: false)
+    UnselectedItemContent(hasItems: false)
         .frame(width: 600, height: 500)
 }
 
