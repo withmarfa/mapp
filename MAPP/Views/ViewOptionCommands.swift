@@ -24,8 +24,14 @@ struct ViewOptionCommand {
         let layout = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []
+        if browser.isSearching, !browser.ordersByRelevance {
+            commands.append(.init(title: String(localized: "Sort by Relevance"), systemImage: "arrow.up.arrow.down") {
+                browser.orderSearch(byRelevance: true)
+            })
+        }
         for column in content.columns where layout.shows(column) && column.id != first?.column.id {
             commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down") {
+                browser.orderSearch(byRelevance: false)
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: column, order: column.firstOrder)]
             })
         }

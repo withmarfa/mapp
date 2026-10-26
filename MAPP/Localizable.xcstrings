@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Relevance" : { "extractionState" : "manual" },
+"Sort by Relevance" : { "extractionState" : "manual" },
+"Everywhere" : { "extractionState" : "manual" },
+"Search Scope" : { "extractionState" : "manual" },
+"Showing the first %lld results." : { "extractionState" : "manual" },
+"Still loading your items, so these results may be incomplete." : { "extractionState" : "manual" },
+"Still Looking" : { "extractionState" : "manual" },
+"Your items are still loading, so nothing has matched “%@” yet." : { "extractionState" : "manual" },
+"Search or “exact phrase”" : { "extractionState" : "manual" },
 "This Marfa" : { "extractionState" : "manual" },
 "Deleted items kept for" : { "extractionState" : "manual" },
 "All versions kept for" : { "extractionState" : "manual" },

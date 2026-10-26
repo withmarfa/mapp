@@ -19,6 +19,7 @@ struct NoteList: View {
         let sections = browser.sections(in: library, order: order, now: now)
         let ids = sections.flatMap { $0.items.map(\.id) }
         let context = browser.metaContext(for: sections.flatMap(\.items))
+        let excerpts = browser.searchResults(in: library)?.excerpts ?? [:]
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
@@ -39,7 +40,8 @@ struct NoteList: View {
                         item: item,
                         dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
                         meta: ItemMeta.make(for: item, in: library, context: context),
-                        previewLines: previewLines
+                        previewLines: previewLines,
+                        excerpt: excerpts[item.id]
                     )
                     .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
                     // A file has no markdown to carry, so only a note is dragged.
@@ -74,6 +76,7 @@ struct NoteList: View {
             browser.focusRequest = .page
             return .handled
         }
+        .searchStatus(browser)
         .toolbar { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
@@ -95,7 +98,7 @@ struct NoteList: View {
         .overlay {
             if ids.isEmpty {
                 if browser.isSearching {
-                    EmptyState.search(browser.searchText)
+                    SearchEmptyState(browser: browser)
                 } else {
                     EmptyState(browser.item == .files ? "No Files" : "No Items")
                 }
@@ -127,13 +130,27 @@ struct ItemRow: View {
     let dateLabel: String
     let meta: ItemMeta
     let previewLines: Int
+    /// The words a search found in the item, in place of its preview.
+    var excerpt: SearchExcerpt?
+
+    /// A match in the title is shown in the title itself, since the excerpt would only say it again.
+    private var titleExcerpt: SearchExcerpt? {
+        guard let excerpt, !item.title.isEmpty, excerpt.plainText.trimmingCharacters(in: .whitespaces) == item.title else { return nil }
+        return excerpt
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(item.title.isEmpty ? String(localized: "Untitled") : item.title)
-                    .interfaceFont(.body.weight(.semibold))
-                    .lineLimit(1)
+                Group {
+                    if let titleExcerpt {
+                        Text(titleExcerpt.attributed())
+                    } else {
+                        Text(item.title.isEmpty ? String(localized: "Untitled") : item.title)
+                    }
+                }
+                .interfaceFont(.body.weight(.semibold))
+                .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(dateLabel)
                     .interfaceFont(.subheadline)
@@ -141,7 +158,13 @@ struct ItemRow: View {
                     .lineLimit(1)
                     .layoutPriority(1)
             }
-            if previewLines > 0, !item.preview.isEmpty {
+            if let excerpt, titleExcerpt == nil {
+                // The match is what the person looked for, so it shows even where previews are off.
+                Text(excerpt.attributed())
+                    .interfaceFont(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(max(previewLines, 2))
+            } else if previewLines > 0, !item.preview.isEmpty {
                 Text(item.preview)
                     .interfaceFont(.subheadline)
                     .foregroundStyle(.secondary)

@@ -1,20 +1,7 @@
 import Foundation
 
-/// Reads an item's words out of its markdown, as they read on screen: the lines a preview and a search snippet
-/// are made of.
+/// Reads an item's words out of its markdown, as they read on screen: the lines a preview is made of.
 nonisolated enum NoteText {
-    /// The note's text around the first place a search finds, as one line, to show why a note was found.
-    static func snippet(of body: String, around query: String, reach: Int = 48) -> String? {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = readableLines(of: body).joined(separator: " ")
-        guard !query.isEmpty, let found = text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive])
-        else { return nil }
-        let start = text.index(found.lowerBound, offsetBy: -reach, limitedBy: text.startIndex) ?? text.startIndex
-        let end = text.index(found.upperBound, offsetBy: reach, limitedBy: text.endIndex) ?? text.endIndex
-        let stretch = text[start..<end].trimmingCharacters(in: .whitespaces)
-        return (start > text.startIndex ? "…" : "") + stretch + (end < text.endIndex ? "…" : "")
-    }
-
     /// A name as a file can take it: characters no file name can hold replaced, leading dots dropped, which
     /// would hide the file, and short enough for any file system. The one place a name is made safe, for a file
     /// the person saves or attaches.

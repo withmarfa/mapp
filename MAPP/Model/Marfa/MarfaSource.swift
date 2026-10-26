@@ -323,30 +323,45 @@ nonisolated final class MarfaSource: ItemSource {
         return view
     }
 
-    /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
-    /// a time.
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
-        var filters = SearchFilters(tags: query.tags.sorted(), beneath: query.beneath?.rawValue)
-        if query.types.count == 1, query.includesSubtypes { filters.type = query.types.first?.rawValue }
-        if query.states.count == 1, let state = query.states.first {
-            filters.state = MarfaMapping.marfaState(state)
-        } else {
-            filters.allStates = true
-        }
-        let hits: [SearchHit]
+    /// Narrowed to `target` by the copy, which matches and ranks as the server does and cuts each hit's excerpt.
+    /// The package filters one type at a time and one state at a time, so the rest is narrowed by what the copy
+    /// holds.
+    func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
+        let limit = SearchResults.limit
+        let found: Rows<SearchHit>
+        var query: ItemQuery?
         do {
-            hits = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: 500).rows }
-        } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            switch target {
+            case .items(let itemQuery, let filter):
+                var filters = SearchFilters(
+                    tier: itemQuery.tier.map(MarfaMapping.marfaTier), tags: itemQuery.tags.sorted(), filter: filter,
+                    beneath: itemQuery.beneath?.rawValue)
+                if itemQuery.types.count == 1, itemQuery.includesSubtypes { filters.type = itemQuery.types.first?.rawValue }
+                if itemQuery.states.count == 1, let state = itemQuery.states.first {
+                    filters.state = MarfaMapping.marfaState(state)
+                } else {
+                    filters.allStates = true
+                }
+                query = itemQuery
+                found = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: limit) }
+            case .view(let view):
+                found = try await MarfaEngine.asking(hub) { try await copy.search(text, inView: view.rawValue, limit: limit) }
+            }
+        } catch {
+            throw MarfaEngine.failure(error)
         }
         let (items, catalogue) = hub.itemsAndCatalogue
         // The copy already kept only what is beneath the root, so each hit counts as beneath it here.
-        let beneath = Set(hits.map { ItemID($0.item.id) })
-        return hits.compactMap { hit in
+        let beneath = Set(found.rows.map { ItemID($0.item.id) })
+        var result = SourceSearch(isIncomplete: found.completeness != .complete, isCapped: found.rows.count >= limit)
+        for hit in found.rows {
             let id = ItemID(hit.item.id)
-            guard let item = items[id], query.matches(item, catalogue: catalogue, descendants: beneath) else { return nil }
-            return id
+            guard let item = items[id], query?.matches(item, catalogue: catalogue, descendants: beneath) ?? true else { continue }
+            result.hits.append(id)
+            result.excerpts[id] = SearchExcerpt(
+                html: hit.snippet, version: ItemVersion(hit.item.version), modified: MarfaMapping.date(hit.item.updatedAt))
         }
+        return result
     }
 
     /// Returns once every write submitted before it has been queued and the queue drained where the server can

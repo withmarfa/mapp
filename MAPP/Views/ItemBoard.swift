@@ -20,10 +20,11 @@ struct ItemBoard: View {
             if let field {
                 board(ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue), key: field.key)
             } else if items.isEmpty {
-                if browser.isSearching { EmptyState.search(browser.searchText) }
+                if browser.isSearching { SearchEmptyState(browser: browser) }
                 else { EmptyState("No Items") }
             }
         }
+        .searchStatus(browser)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)

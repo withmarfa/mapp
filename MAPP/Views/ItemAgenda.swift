@@ -16,10 +16,11 @@ struct ItemAgenda: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         agenda(groups)
+        .searchStatus(browser)
         .overlay {
             if items.isEmpty {
                 if browser.isSearching {
-                    EmptyState.search(browser.searchText)
+                    SearchEmptyState(browser: browser)
                 } else {
                     EmptyState("No Items")
                 }

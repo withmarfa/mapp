@@ -51,10 +51,13 @@ private struct Controls {
         sort = content.sort
         grouping = content.grouping
         categorical = content.categoricalColumns
+        relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil
         _customization = customization
     }
 
     private let categorical: [ItemTableColumn]
+    /// Whether the rows are in search order, where the window searches; nil where it does not.
+    private let relevance: Binding<Bool>?
 
     // MARK: Filter
 
@@ -102,9 +105,18 @@ private struct Controls {
         let first = sort.first
         return Group {
             Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: Binding { first?.column.id ?? "" } set: { id in
-                guard let column = columns.first(where: { $0.id == id }) else { return }
+                guard let column = columns.first(where: { $0.id == id }) else {
+                    // Relevance has no column, so its tag is empty.
+                    if id.isEmpty { relevance?.wrappedValue = true }
+                    return
+                }
+                relevance?.wrappedValue = false
                 options.sort = [ItemTableComparator(column: column, order: column.firstOrder)]
             }) {
+                if relevance != nil {
+                    Text("Relevance").tag("")
+                    Divider()
+                }
                 ForEach(shownColumns) { Text($0.label).tag($0.id) }
             }
             .pickerStyle(.menu)
@@ -117,6 +129,7 @@ private struct Controls {
                 Text(first?.column.descendingTitle ?? String(localized: "Descending")).tag(SortOrder.reverse)
             }
             .pickerStyle(.inline)
+            .disabled(first == nil)
         }
     }
 
