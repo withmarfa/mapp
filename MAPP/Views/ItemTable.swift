@@ -23,10 +23,11 @@ struct ItemTable: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         table(columns: content.columns, rows: rows, groups: content.groups, grouping: content.grouping, collapsed: content.collapsed)
+            .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
                     if browser.isSearching {
-                        EmptyState.search(browser.searchText)
+                        SearchEmptyState(browser: browser)
                     } else {
                         EmptyState("No Items")
                     }
