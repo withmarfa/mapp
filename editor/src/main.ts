@@ -136,8 +136,28 @@ function checkHeaderScrolledAway(): void {
   headerScrolledAway = away
   postToHost({ type: 'headerScrolledAway', away, generation: editor.loadedGeneration })
 }
-window.addEventListener('scroll', checkHeaderScrolledAway, { passive: true })
-window.addEventListener('resize', checkHeaderScrolledAway)
+// The toolbar draws a glass band over the page only while some of it is under the toolbar, which is whenever the
+// page has scrolled at all: the page starts below the toolbar, so at the top nothing is behind it. A rounded-up
+// offset keeps a trackpad's sub-pixel settling from flickering the band, and the app hears only when it changes.
+let contentUnderToolbar = false
+function checkContentUnderToolbar(): void {
+  const under = window.scrollY > 1
+  if (under === contentUnderToolbar) return
+  contentUnderToolbar = under
+  postToHost({ type: 'contentUnderToolbar', under, generation: editor.loadedGeneration })
+}
+window.addEventListener(
+  'scroll',
+  () => {
+    checkHeaderScrolledAway()
+    checkContentUnderToolbar()
+  },
+  { passive: true },
+)
+window.addEventListener('resize', () => {
+  checkHeaderScrolledAway()
+  checkContentUnderToolbar()
+})
 // The note's text fills the rest of the window below the header, so a click anywhere below it places the caret
 // and a short note does not scroll. The text's height changes in the next frame: changed while the browser
 // reports sizes, it would be reported late, which WebKit raises as an error.
@@ -168,6 +188,8 @@ window.editor = {
     editor.load(markdown, nextGeneration, editable)
     headerScrolledAway = false
     checkHeaderScrolledAway()
+    contentUnderToolbar = false
+    checkContentUnderToolbar()
   },
   reload: (markdown, nextGeneration, editable) => {
     generation = nextGeneration

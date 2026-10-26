@@ -20,6 +20,9 @@ final class EditorController: NSObject {
     var isFocused = false
     /// Whether the item's header in the page has gone under the toolbar, which then shows the title.
     private(set) var isHeaderScrolledAway = false
+    /// Whether the page has scrolled far enough for its text to pass under the toolbar, which then gets a band of
+    /// glass to read against. At the top, and on a page too short to scroll, nothing is behind the toolbar.
+    private(set) var isContentUnderToolbar = false
     /// Whether the item's title in the page has the keyboard rather than the note's text.
     private(set) var isEditingTitle = false
     @ObservationIgnored private var header: PageHeader?
@@ -205,6 +208,7 @@ final class EditorController: NSObject {
         let present = { [self] in
             guard request == loadRequest else { return }
             isHeaderScrolledAway = false
+            isContentUnderToolbar = false
             show(item, as: "load")
         }
         if noteID != nil, noteID != item.id {
@@ -331,6 +335,7 @@ final class EditorController: NSObject {
             watchEmbeds()
             markdown = ""
             isHeaderScrolledAway = false
+            isContentUnderToolbar = false
             isEditingTitle = false
             clearPage()
         }
@@ -478,6 +483,9 @@ final class EditorController: NSObject {
             applyKeymap()
             applyStyle()
             watchLinks()
+            // A reloaded page starts at the top, and says nothing while it stays there.
+            isHeaderScrolledAway = false
+            isContentUnderToolbar = false
             isEditingTitle = false
             headerIconSize = nil
             sendHeader()
@@ -501,6 +509,9 @@ final class EditorController: NSObject {
         case .headerScrolledAway(let away, let generation):
             guard generation == self.generation, away != isHeaderScrolledAway else { return }
             isHeaderScrolledAway = away
+        case .contentUnderToolbar(let under, let generation):
+            guard generation == self.generation, under != isContentUnderToolbar else { return }
+            isContentUnderToolbar = under
         case .titleFocus(let focused):
             isEditingTitle = focused
             if focused { webView.beginEditingTitle() }

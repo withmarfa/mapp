@@ -28,6 +28,7 @@ export type EditorMessage =
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
   | { type: 'headerScrolledAway'; away: boolean; generation: number }
+  | { type: 'contentUnderToolbar'; under: boolean; generation: number }
   | { type: 'titleFocus'; focused: boolean }
   | { type: 'titleInput'; item: string; text: string }
   | { type: 'titleCommit'; item: string; text: string; startWriting: boolean }
