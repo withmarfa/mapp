@@ -191,6 +191,7 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.detailsPresentation, details)
+        .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
         .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
@@ -214,6 +215,8 @@ struct MainView: View {
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
+        // Last, so the toolbars, the context menus and the palette above the workspace all read it.
+        .environment(details)
     }
 
     private var lifecycleWindow: some View {

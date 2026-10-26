@@ -46,6 +46,7 @@ struct AppCommands: Commands {
             if let library {
                 NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
                     .environment(\.library, library)
+                    .environment(details)
             }
         }
 

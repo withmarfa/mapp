@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Change Type" : { "extractionState" : "manual" },
+"Change Type…" : { "extractionState" : "manual", "generatesSymbol" : false },
+"Can’t Change Type" : { "extractionState" : "manual" },
+"One or more of these items can’t become this type." : { "extractionState" : "manual" },
+"Enter a value for: %@." : { "extractionState" : "manual" },
+"“%@” has changed since, and can’t go back to its type." : { "extractionState" : "manual" },
+"Choose a new type for “%@”." : { "extractionState" : "manual" },
+"Choose a new type for %lld items." : { "extractionState" : "manual" },
+"%@ needs these values:" : { "extractionState" : "manual" },
+"%@ doesn’t use %@. They stay on the item, and show again if you change it back." : { "extractionState" : "manual" },
+"No Other Types" : { "extractionState" : "manual" },
 "Add %@" : { "extractionState" : "manual" },
 "Add Text" : { "extractionState" : "manual" },
 "Always Show" : { "extractionState" : "manual" },
