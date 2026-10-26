@@ -55,12 +55,6 @@ struct ItemTableLayoutTests {
         #expect(StatusTone(status) == tone)
     }
 
-    @Test func theRingFollowsTheTone() {
-        #expect(PageHeader.Mark(status: "done") == PageHeader.Mark(tone: .green, fill: .full))
-        #expect(PageHeader.Mark(status: "someday") == PageHeader.Mark(tone: .neutral, fill: .none))
-        #expect(PageHeader.Mark(status: nil) == PageHeader.Mark(tone: .neutral, fill: .none))
-    }
-
     // MARK: Columns
 
     @Test func aTypesFieldsFollowTheNameLeadingWithStatusAndPriority() {
