@@ -110,13 +110,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     }
 
     mutating func move<Place>(_ places: [Place], by key: (Place) -> String, fromOffsets source: IndexSet, toOffset destination: Int) {
-        var list = ordered(places, by: key)
-        let moved = source.sorted().map { list[$0] }
-        let target = destination - source.filter { $0 < destination }.count
-        for index in source.sorted().reversed() { list.remove(at: index) }
-        list.insert(contentsOf: moved, at: min(target, list.count))
-        let keys = list.map(key)
-        order = order.filter { !keys.contains($0) } + keys
+        move(places, shown: places, by: key, fromOffsets: source, toOffset: destination)
     }
 }
 
