@@ -202,6 +202,14 @@ extension MarfaLibrary {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    func canHaveParent(typeID: String) -> Bool {
+        guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
+            admits(TypeID(typeID), constraint(of: info, atTarget: true))
+        else { return false }
+        let parents = constraint(of: info, atTarget: false)
+        return index.ids(in: .active).contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
+    }
+
     // MARK: Writing
 
     /// What one change to a field does to the edges, each as one write.

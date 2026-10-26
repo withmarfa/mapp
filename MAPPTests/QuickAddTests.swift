@@ -173,7 +173,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Idea"
         browser.quickAdd.draft?.body = "More of it"
         browser.putAwayQuickAdd()
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(browser.quickAdd.draft == nil)
         var clipboard: [String] = []
         let notice = library.notices.show(in: UUID()) { clipboard.append($0) }
@@ -186,7 +186,7 @@ struct QuickAddTests {
         let browser = Browser()
         browser.openQuickAdd(in: library)
         browser.quickAdd.draft?.title = "Idea"
-        browser.quickAdd.handOff(to: library.notices, because: .libraryChanged)
+        browser.quickAdd.handOff(to: library.notices, because: .libraryChanged, in: library)
         #expect(browser.quickAdd.draft == nil)
         let notice = library.notices.show(in: UUID()) { _ in }
         #expect(notice?.text == "Idea")
@@ -310,7 +310,7 @@ struct QuickAddTests {
         browser.openQuickAdd(typeID: "core.note", in: library)
         browser.quickAdd.draft?.title = "Trip"
         browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.pdf")]
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         var clipboard: [String] = []
         let notice = try #require(library.notices.show(in: UUID()) { clipboard.append($0) })
         #expect(clipboard == ["Trip"])
@@ -318,7 +318,7 @@ struct QuickAddTests {
 
         browser.openQuickAdd(typeID: "core.note", in: library)
         browser.quickAdd.draft?.files = [try disk.file("only.png")]
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         let filesOnly = try #require(library.notices.waiting.last)
         #expect(filesOnly.message.contains("“only.png” wasn’t added."), "files alone are worth telling")
     }
@@ -352,7 +352,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
         #expect(await eventually { browser.quickAdd.isSaving })
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(library.notices.waiting.isEmpty, "the file and its title are being added")
         released.yield()
         #expect(await saving.value != nil)
@@ -369,7 +369,7 @@ struct QuickAddTests {
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
         #expect(await eventually { browser.quickAdd.isSaving })
         browser.quickAdd.draft?.title = "Typed meanwhile"
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(library.notices.waiting.map(\.text) == ["Typed meanwhile"])
         released.yield()
         _ = await saving.value
@@ -386,7 +386,7 @@ struct QuickAddTests {
         let draft = try #require(browser.quickAdd.draft)
         #expect(QuickAdd.holdsTextItCannotKeep(draft, in: library.catalogue))
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
-        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library))
 
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
         #expect(library.addedFiles.isEmpty)
@@ -408,26 +408,26 @@ struct QuickAddTests {
         browser.chooseQuickAddType(place.rawValue, in: library)
         var draft = try #require(browser.quickAdd.draft)
         #expect(!QuickAdd.showsBody(draft, in: library.catalogue), "no text, so no field for it")
-        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(QuickAdd.canSave(draft, in: library))
 
         browser.quickAdd.draft?.body = "Typed as a note"
         draft = try #require(browser.quickAdd.draft)
         #expect(QuickAdd.showsBody(draft, in: library.catalogue))
-        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library))
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
         #expect(library.created.isEmpty)
 
         browser.chooseQuickAddType("core.note", in: library)
         draft = try #require(browser.quickAdd.draft)
         #expect(!QuickAdd.holdsTextItCannotKeep(draft, in: library.catalogue))
-        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(QuickAdd.canSave(draft, in: library))
     }
 
     @Test func anEmptyDraftTellsNothingAsTheWindowCloses() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
         browser.openQuickAdd(in: library)
-        browser.quickAdd.handOff(to: library.notices, because: .closed)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
         #expect(library.notices.waiting.isEmpty)
     }
 
@@ -461,13 +461,13 @@ struct QuickAddTests {
         var draft = try #require(browser.quickAdd.draft)
         #expect(draft.files.count == 2, "changing the kind keeps the files")
         #expect(QuickAdd.holdsFilesItCannotKeep(draft, in: library.catalogue))
-        #expect(!QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(!QuickAdd.canSave(draft, in: library))
         #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
         #expect(library.addedFiles.isEmpty)
 
         browser.quickAdd.draft?.files.removeLast()
         draft = try #require(browser.quickAdd.draft)
-        #expect(QuickAdd.canSave(draft, in: library.catalogue))
+        #expect(QuickAdd.canSave(draft, in: library))
     }
 
     @Test func aRefusedFileKeepsTheDraft() async throws {
@@ -527,14 +527,292 @@ struct QuickAddTests {
         #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
     }
 
-    @Test func pinnedFieldsAreKeptForEachLibraryAndKind() {
-        var pins = QuickAdd.pinning("priority", true, typeID: "core.task", library: "a", in: [:])
-        pins = QuickAdd.pinning("due_at", true, typeID: "core.task", library: "a", in: pins)
-        pins = QuickAdd.pinning("priority", true, typeID: "core.task", library: "b", in: pins)
-        let read = QuickAdd.pins(from: QuickAdd.text(of: pins))
-        #expect(read["a"]?["core.task"] == ["priority", "due_at"])
-        #expect(QuickAdd.pinning("priority", false, typeID: "core.task", library: "b", in: read)["b"] == nil)
-        #expect(QuickAdd.pins(from: "").isEmpty)
+    // MARK: Chips
+
+    /// A kind with a required field, a field that is not, and one the panel never offers.
+    private static let chipCatalogue: Catalogue = {
+        let type = TypeID("test.ticket")
+        return Catalogue(
+            itemTypes: [
+                ItemTypeInfo(
+                    id: type, label: "Ticket",
+                    fields: [
+                        .init(key: "title", label: "Title", kind: .text, declaredBy: type, required: true),
+                        .init(key: "reference", label: "Reference", kind: .text, declaredBy: type, required: true),
+                        .init(key: "priority", label: "Priority", kind: .choice(["high", "low"]), declaredBy: type),
+                        .init(key: "due_at", label: "Due At", kind: .date(includesTime: false), declaredBy: type),
+                        .init(key: "labels", label: "Labels", kind: .other, declaredBy: type),
+                    ],
+                    titleField: "title", bodyField: "body", parent: nil),
+                ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: "title", bodyField: "body", parent: nil),
+            ],
+            edgeTypes: [])
+    }()
+
+    @Test func aRequiredFieldIsAlwaysAChipAndOthersAppearOnlyOnceAdded() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference")])
+        draft.add(.field("due_at"))
+        draft.add(.field("priority"))
+        draft.add(.field("due_at"))
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference"), .field("due_at"), .field("priority")])
+    }
+
+    @Test func thePlusOffersTheParentAndEveryFieldNotYetAChip() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        #expect(
+            QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true)
+                == [.parent, .field("priority"), .field("due_at")])
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false) == [.field("priority"), .field("due_at")])
+
+        draft.add(.field("priority"))
+        draft.setParent(ItemID.mint())
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.field("due_at")])
+    }
+
+    @Test func aKindWithNoFieldsOffersOnlyTheParent() {
+        let draft = QuickAdd.Draft(typeID: "core.note")
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.parent])
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false).isEmpty)
+    }
+
+    @Test func aRequiredChipCannotBeRemovedAndAnotherTakesItsValueWithIt() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.properties = ["reference": .string("T-1"), "priority": .string("high")]
+        draft.add(.field("priority"))
+        draft.remove(.field("reference"), in: Self.chipCatalogue)
+        #expect(draft.properties["reference"] == .string("T-1"))
+        #expect(!QuickAdd.isRemovable(.field("reference"), typeID: "test.ticket", in: Self.chipCatalogue))
+
+        draft.remove(.field("priority"), in: Self.chipCatalogue)
+        #expect(draft.properties["priority"] == nil)
+        #expect(!QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.field("priority")))
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false).contains(.field("priority")))
+    }
+
+    @Test func removingTheParentChipTakesTheParentAway() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.setParent(ItemID.mint())
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.parent))
+        draft.remove(.parent, in: Self.chipCatalogue)
+        #expect(draft.parentID == nil)
+        #expect(!QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.parent))
+    }
+
+    @Test func aValueTheDraftHoldsShowsAsAChipEvenIfNoneWasAdded() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.properties = ["due_at": .string("2026-10-26")]
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference"), .field("due_at")])
+    }
+
+    @Test func chipsSurviveThePanelBeingPutAwayAndComeBackWithTheDraft() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.title = "Kept"
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.add(.field("assignee"))
+        browser.putAwayQuickAdd()
+        browser.openQuickAdd(in: library)
+        #expect(browser.quickAdd.draft?.chips == [.field("priority"), .field("assignee")])
+        #expect(QuickAdd.shownChips(browser.quickAdd.draft!, in: library.catalogue) == [.field("priority"), .field("assignee")])
+    }
+
+    @Test func changingTheKindDropsTheChipsTheNewKindCannotShow() {
+        let library = FakeItemLibrary(now: start)
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        library.items.append(project)
+        library.parentCandidates["core.task"] = [project.id]
+        library.parentCandidates["test.project"] = [project.id]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.setParent(project.id)
+
+        browser.chooseQuickAddType("test.project", in: library)
+        #expect(browser.quickAdd.draft?.chips == [.parent])
+        #expect(browser.quickAdd.draft?.parentID == project.id)
+
+        browser.chooseQuickAddType("core.note", in: library)
+        #expect(browser.quickAdd.draft?.chips.isEmpty == true)
+        #expect(browser.quickAdd.draft?.parentID == nil)
+    }
+
+    @Test func anItemIsMadeWithTheValuesAndParentOfItsChips() async throws {
+        let library = FakeItemLibrary(now: start)
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        library.items.append(project)
+        library.parentCandidates["core.task"] = [project.id]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.title = "Plan"
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.properties["priority"] = .string("low")
+        browser.quickAdd.draft?.add(.field("assignee"))
+        browser.quickAdd.draft?.setParent(project.id)
+        browser.quickAdd.draft?.remove(.field("assignee"), in: library.catalogue)
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+
+        let item = try #require(library.item(id))
+        #expect(item.value(of: "priority") == .string("low"))
+        #expect(item.value(of: "assignee") == nil)
+        #expect(item.parentID == project.id)
+    }
+
+    // MARK: What a draft holds
+
+    private func project(in library: FakeItemLibrary) -> Item {
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        library.items.append(project)
+        return project
+    }
+
+    @Test func aDraftHoldsContentOnceItHasAParentAValueOrAChip() {
+        #expect(!QuickAdd.Draft(typeID: "core.task").hasContent)
+        var parent = QuickAdd.Draft(typeID: "core.task")
+        parent.setParent(ItemID.mint())
+        #expect(parent.hasContent)
+        var value = QuickAdd.Draft(typeID: "core.task")
+        value.properties = ["priority": .string("high")]
+        #expect(value.hasContent)
+        var chip = QuickAdd.Draft(typeID: "core.task")
+        chip.add(.field("priority"))
+        #expect(chip.hasContent)
+        var cleared = QuickAdd.Draft(typeID: "core.task")
+        cleared.properties = ["priority": .null]
+        #expect(!cleared.hasContent, "a null is no value")
+    }
+
+    @Test func puttingThePanelAwayKeepsADraftThatHoldsOnlyAParentOrAValue() {
+        let library = FakeItemLibrary(now: start)
+        let project = project(in: library)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.setParent(project.id)
+        browser.putAwayQuickAdd()
+        #expect(browser.quickAdd.draft?.parentID == project.id)
+
+        browser.quickAdd.draft?.remove(.parent, in: library.catalogue)
+        browser.quickAdd.draft?.properties = ["priority": .string("low")]
+        browser.putAwayQuickAdd()
+        #expect(browser.quickAdd.draft?.properties["priority"] == .string("low"))
+
+        browser.quickAdd.draft?.properties = [:]
+        browser.putAwayQuickAdd()
+        #expect(browser.quickAdd.draft == nil, "nothing is left to keep")
+    }
+
+    @Test func aDraftOfOnlyValuesAndAParentIsHandedOffWithThemNamed() {
+        let library = FakeItemLibrary(now: start)
+        let project = project(in: library)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.properties = ["priority": .string("high")]
+        browser.quickAdd.draft?.setParent(project.id)
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
+        let text = library.notices.waiting.last?.text
+        #expect(text?.contains("Priority: ") == true)
+        #expect(text?.hasSuffix("Parent: Launch") == true)
+        #expect(browser.quickAdd.draft == nil)
+    }
+
+    @Test func aDraftOfOnlyEmptyChipsIsHandedOffWithNothingToPaste() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
+        let notice = library.notices.waiting.last
+        #expect(notice?.isNotKept == true)
+        #expect(notice?.text == nil)
+        #expect(notice?.message.hasSuffix("Add it again.") == true)
+    }
+
+    @Test func aParentTheLibraryNoLongerHoldsShowsAsMissingAndHoldsTheDraftBack() async throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.title = "Plan"
+        browser.quickAdd.draft?.setParent(ItemID.mint())
+        let draft = try #require(browser.quickAdd.draft)
+        #expect(QuickAdd.holdsMissingParent(draft, in: library))
+        #expect(!QuickAdd.canSave(draft, in: library))
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.created.isEmpty)
+        #expect(QuickAdd.shownChips(draft, in: library.catalogue).contains(.parent), "so it can be removed")
+
+        browser.quickAdd.draft?.remove(.parent, in: library.catalogue)
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) != nil)
+    }
+
+    // MARK: A file takes a parent and no field
+
+    private static let fileCatalogue: Catalogue = {
+        let file = TypeID.file
+        return Catalogue(
+            itemTypes: [
+                ItemTypeInfo(
+                    id: file, label: "File",
+                    fields: [
+                        .init(key: "reference", label: "Reference", kind: .text, declaredBy: file, required: true),
+                        .init(key: "priority", label: "Priority", kind: .choice(["high", "low"]), declaredBy: file),
+                    ],
+                    titleField: nil, bodyField: nil, parent: nil)
+            ],
+            edgeTypes: [])
+    }()
+
+    @Test func aFileOffersAndShowsNoFieldsNotEvenARequiredOne() {
+        var draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
+        draft.properties = ["reference": .string("R-1"), "priority": .string("high")]
+        draft.add(.field("priority"))
+        draft.setParent(ItemID.mint())
+        #expect(QuickAdd.fields(of: draft.typeID, in: Self.fileCatalogue).isEmpty)
+        #expect(QuickAdd.shownChips(draft, in: Self.fileCatalogue) == [.parent])
+        draft.remove(.parent, in: Self.fileCatalogue)
+        #expect(QuickAdd.shownChips(draft, in: Self.fileCatalogue).isEmpty)
+        #expect(QuickAdd.offeredChips(draft, in: Self.fileCatalogue, canHaveParent: true) == [.parent])
+    }
+
+    @Test func changingTheKindToFileDropsTheFieldsAndKeepsTheParent() {
+        let library = FakeItemLibrary(now: start)
+        let project = project(in: library)
+        library.parentCandidates["core.task"] = [project.id]
+        library.parentCandidates[TypeID.file.rawValue] = [project.id]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.properties["priority"] = .string("high")
+        browser.quickAdd.draft?.setParent(project.id)
+
+        browser.chooseQuickAddType(TypeID.file.rawValue, in: library)
+        #expect(browser.quickAdd.draft?.properties.isEmpty == true)
+        #expect(browser.quickAdd.draft?.chips == [.parent])
+        #expect(browser.quickAdd.draft?.parentID == project.id)
+    }
+
+    @Test func aParentBeingSentWithAFileIsNotHandedOffAsTheWindowCloses() async throws {
+        let library = FakeItemLibrary(now: start)
+        let project = project(in: library)
+        let (release, released) = AsyncStream<Void>.makeStream()
+        library.sendingFile = { for await _ in release { break } }
+        let browser = Browser()
+        browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        browser.quickAdd.draft?.setParent(project.id)
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
+        #expect(library.notices.waiting.isEmpty, "the file and its parent are being added")
+        released.yield()
+        #expect(await saving.value != nil)
+        #expect(library.addedFiles.first?.parent == project.id)
     }
 
     // MARK: Waiting for the library
