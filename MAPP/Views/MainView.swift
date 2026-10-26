@@ -297,6 +297,7 @@ struct MainView: View {
     private var dialogsWindow: some View {
         presentedWindow
         .libraryDialogs()
+        .savedViewDialogs(browser: browser, order: order)
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }

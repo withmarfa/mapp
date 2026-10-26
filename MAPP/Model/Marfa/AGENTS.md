@@ -72,6 +72,7 @@
 ## Server-only actions
 
 - Delete Permanently is `purge`, which is never queued. Offer it only while the server can be reached. It runs after the writes submitted before it have been sent, at the version the person was shown, and the server's answer is its verdict.
+- Saved views (`system.view`) are written through the package's `createView`, `changeView` and `deleteView`, never queued and never as items. Each write carries an idempotency key, reused only to retry a write that never reached the server. A change names only the settings it replaces and is based on the version the window read, so a setting changed elsewhere since is refused (`version_conflict`), nothing is overwritten, and the library reads the server again (`MarfaLibrary.changeView`). The copy announces each written view (`.viewWritten`), and the engine reads the views again.
 - The bin is the server's. The engine keeps a deleted item's last row for Recently Deleted until `MarfaSync` reads the bin.
 - A Marfa folder (`system.folder`) holds a device's sync settings and places no item. MAPP syncs no folders: do not use the package's folder calls, and show a folder only as a fact on an item.
 

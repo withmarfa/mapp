@@ -91,7 +91,7 @@ struct Sidebar: View {
     /// A view lists what the copy holds of its items, read on its own, so its row has no count. The person can
     /// drag a row to a new place among the others.
     private func viewsSection(_ plan: SidebarPlan) -> some View {
-        Section("Views") {
+        Section {
             ForEach(plan.shownViews) { view in
                 row(.view(view.id), symbol: SidebarPlace.viewSymbol, title: view.title, hiding: .view(view.id), counted: false)
                     .accessibilityIdentifier("SidebarView-\(view.id.rawValue)")
@@ -101,6 +101,8 @@ struct Sidebar: View {
                     $0.move(plan.views, shown: plan.shownViews, by: { SidebarPlace.view($0.id).key }, fromOffsets: source, toOffset: destination)
                 }
             }
+        } header: {
+            ViewsHeading(browser: browser)
         }
         .accessibilityIdentifier("SidebarViews")
     }
@@ -166,6 +168,10 @@ struct Sidebar: View {
             .badge(counted ? count(in: item) : nil)
             .tag(item)
             .contextMenu {
+                if case .view(let id) = item {
+                    SavedViewRowMenu(view: id, browser: browser)
+                    Divider()
+                }
                 if let place { hideButton(place) }
             }
     }

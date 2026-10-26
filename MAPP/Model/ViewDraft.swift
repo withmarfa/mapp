@@ -263,9 +263,10 @@ nonisolated enum ViewDraft {
     }
 
     /// Whether the window's choices differ from those the view opened with: its order, grouping or any filter.
-    static func differs(_ options: ItemTableOptions?, from seed: ItemTableOptions) -> Bool {
+    /// - Parameter countingFilters: False where the window's layout applies no filters, as only the table does.
+    static func differs(_ options: ItemTableOptions?, from seed: ItemTableOptions, countingFilters: Bool = true) -> Bool {
         let options = options ?? ItemTableOptions()
-        return !options.filters.isEmpty || options.grouping != seed.grouping || sortKeys(options.sort) != sortKeys(seed.sort)
+        return (countingFilters && !options.filters.isEmpty) || options.grouping != seed.grouping || sortKeys(options.sort) != sortKeys(seed.sort)
     }
 
     private static func sortKeys(_ sort: [ItemTableComparator]?) -> [String]? {

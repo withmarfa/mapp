@@ -103,10 +103,17 @@ nonisolated enum SampleLibrary {
 
     /// Views as another app might have saved them, each with the query it stands for.
     static let views: [(view: LibraryView, lists: @Sendable (Marfa.Item) -> Bool)] = [
-        (LibraryView(id: ItemID("view-favorite-notes"), title: "Favorite Notes"), { row in
+        (LibraryView(
+            id: ItemID("view-favorite-notes"), title: "Favorite Notes", version: 1,
+            query: LibraryViewQuery(types: [TypeID("core.note")], states: [.active], filter: #"tags contains "favorite""#),
+            sort: [LibraryViewSort(field: "updated_at", ascending: false)]), { row in
             row.type == "core.note" && row.tags.contains(ItemTag.favorite)
         }),
-        (LibraryView(id: ItemID("view-in-progress"), title: "Tasks in Progress"), { row in
+        (LibraryView(
+            id: ItemID("view-in-progress"), title: "Tasks in Progress", version: 1,
+            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active], filter: #"properties.status eq "in_progress""#),
+            sort: [LibraryViewSort(field: "updated_at", ascending: false)],
+            group: LibraryViewGroup(field: "properties.priority")), { row in
             row.type == "core.task" && row.properties["status"] == .string("in_progress")
         }),
     ]

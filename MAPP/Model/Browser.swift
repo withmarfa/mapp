@@ -250,6 +250,8 @@ final class Browser {
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         tableOptions = [:]
+        viewSeeds = [:]
+        viewEditing = nil
         boardFields = [:]
         compactBoards = [:]
         agendaFields = [:]
@@ -300,6 +302,76 @@ final class Browser {
            library.item(id).map({ $0.state == .active && $0.isFavorite }) != true {
             show(.favorites, in: library, order: order)
         }
+    }
+
+    // MARK: Saved views
+
+    /// A saved view the window is about to save, rename, update or delete, which asks the person first.
+    nonisolated enum ViewEditing: Hashable, Identifiable {
+        case new
+        case rename(ItemID)
+        case update(ItemID)
+        case delete(ItemID)
+        var id: Self { self }
+    }
+
+    var viewEditing: ViewEditing?
+
+    /// The order and grouping a view opened with, and the version of the view they came from, which an update of
+    /// them is based on.
+    struct ViewSeed: Hashable {
+        let version: Int64
+        let options: ItemTableOptions
+    }
+
+    private(set) var viewSeeds: [ItemID: ViewSeed] = [:]
+
+    /// Shows a view's own order and grouping the first time the window opens it, and again when the view changes,
+    /// unless the person has changed them since: those stay, and an update of them is based on what they changed.
+    func followView(in library: any ItemLibrary) {
+        guard case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) else { return }
+        if let seed = viewSeeds[id] {
+            guard seed.version != view.version, !ViewDraft.differs(tableOptions[item], from: seed.options) else { return }
+        }
+        seed(view)
+    }
+
+    private func seed(_ view: LibraryView) {
+        let place = SidebarItem.view(view.id)
+        var options = ViewDraft.options(for: view)
+        let collapsed = tableOptions[place]?.collapsed
+        viewSeeds[view.id] = ViewSeed(version: view.version, options: options)
+        options.collapsed = collapsed
+        tableOptions[place] = options
+    }
+
+    /// Whether the window's order, grouping or filters differ from those of the view it shows.
+    var hasViewChanges: Bool {
+        guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
+        return ViewDraft.differs(tableOptions[item], from: seed.options, countingFilters: viewMode == .table)
+    }
+
+    /// The change that saves the window's choices to the view it shows, the version it is based on, and what of
+    /// the window it leaves out.
+    func viewUpdate(_ window: ViewDraft.Window, in library: any ItemLibrary)
+        -> (view: LibraryView, change: LibraryViewChange, baseVersion: Int64, unkept: [ViewDraft.Unkept])? {
+        guard case .view(let id) = item, let seed = viewSeeds[id], let view = library.views.first(where: { $0.id == id }) else {
+            return nil
+        }
+        let update = ViewDraft.change(window, options: tableOptions[item], seed: seed.options, view: view)
+        return (view, update.change, seed.version, update.unkept)
+    }
+
+    /// After an update the view holds the window's choices, so its filters are the view's own.
+    func viewUpdated(_ view: LibraryView) {
+        seed(view)
+    }
+
+    /// An update refused because the view changed elsewhere puts the window back to the view as the library holds
+    /// it, and to its next version when that arrives.
+    func viewRefused(_ id: ItemID, in library: any ItemLibrary) {
+        viewSeeds[id] = nil
+        followView(in: library)
     }
 
     // MARK: Keeping the selection in the list
