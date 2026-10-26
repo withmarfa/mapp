@@ -114,6 +114,64 @@ extension MarfaLibrary {
         }
     }
 
+    // MARK: Types
+
+    /// Each item moves in one edit, its title and text going to the new type's keys (`TypeChange`). The views
+    /// offer only the types every item can become, so a set that cannot is refused whole, before anything is sent.
+    func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) {
+        let cantChange = String(localized: "Can’t Change Type")
+        let changing = ids.filter { item($0).map { $0.type != type } ?? true }
+        guard !changing.isEmpty else { return }
+        var planned: [(item: Item, plan: TypeChange, values: [String: PropertyValue])] = []
+        for id in changing.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let item = item(id), let values = typeChangeValues(of: id),
+                  let plan = typeChange(of: id, to: type, filling: filling)
+            else {
+                return notices.tell(cantChange, String(localized: "One or more of these items can’t become this type."))
+            }
+            guard plan.missing.isEmpty else {
+                let fields = plan.missing.map(\.displayLabel).joined(separator: ", ")
+                return notices.tell(cantChange, String(localized: "Enter a value for: \(fields)."))
+            }
+            planned.append((item, plan, values))
+        }
+        var undos: [TypeUndo] = []
+        for (item, plan, values) in planned {
+            submit(.retype(item.id, type, plan.changes, base: item.version), failing: cantChange)
+            undos.append(TypeUndo(
+                id: item.id, from: item.type, to: type,
+                before: Dictionary(uniqueKeysWithValues: plan.changes.keys.map { ($0, values[$0]) }), after: plan.changes))
+        }
+        let name = String(localized: "Change Type")
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.undoTypeChange(undos, filling: filling, undoManager: undoManager)
+        }
+    }
+
+    /// An item untouched since the change gets back exactly the values it had. One changed since, as by typing in
+    /// its text, is moved back like any change of type, so what was typed is kept.
+    private func undoTypeChange(_ undos: [TypeUndo], filling: [String: PropertyValue], undoManager: UndoManager?) {
+        let cantChange = String(localized: "Can’t Change Type")
+        for undo in undos {
+            guard let item = item(undo.id), let values = typeChangeValues(of: undo.id) else { continue }
+            let untouched = undo.after.allSatisfy { key, value in
+                values[key] == value || values[key] == undo.before[key] ?? nil
+            }
+            if untouched {
+                submit(.retype(undo.id, undo.from, undo.before, base: item.version), failing: cantChange)
+            } else if let plan = typeChange(of: undo.id, to: undo.from), plan.missing.isEmpty {
+                submit(.retype(undo.id, undo.from, plan.changes, base: item.version), failing: cantChange)
+            } else {
+                notices.tell(cantChange, String(localized: "“\(item.title)” has changed since, and can’t go back to its type."))
+            }
+        }
+        guard let type = undos.first?.to else { return }
+        let ids = Set(undos.map(\.id))
+        registerUndo(undoManager, name: String(localized: "Change Type")) { [weak undoManager] library in
+            library.changeType(ids, to: type, filling: filling, undoManager: undoManager)
+        }
+    }
+
     // MARK: Favorites and the bin
 
     /// Items in the bin keep their tags, since Recently Deleted shows no favorites.
@@ -220,4 +278,13 @@ extension MarfaLibrary {
         undoManager.registerUndo(withTarget: self, handler: handler)
         undoManager.setActionName(name)
     }
+}
+
+/// What a change of type wrote to one item, for its undo. A nil value is a key the item did not hold.
+private struct TypeUndo {
+    let id: ItemID
+    let from: TypeID
+    let to: TypeID
+    let before: [String: PropertyValue?]
+    let after: [String: PropertyValue?]
 }

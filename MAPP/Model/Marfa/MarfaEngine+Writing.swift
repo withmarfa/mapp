@@ -128,8 +128,9 @@ extension MarfaEngine {
         case .editProperties(let id, let changes, let base, _):
             let (properties, replacing) = try Self.propertyEdit(changes, of: rows[id.rawValue])
             return [try await send(id, properties, replacing: replacing) { base.rawValue }]
-        case .retype(let id, let type, let base):
-            return [try await send(id, JSONObject(), type: type.rawValue) { base.rawValue }]
+        case .retype(let id, let type, let changes, let base):
+            let (properties, replacing) = try Self.propertyEdit(changes, of: rows[id.rawValue])
+            return [try await send(id, properties, replacing: replacing, type: type.rawValue) { base.rawValue }]
         case .retier(let id, let tier, let base):
             return [try await send(id, JSONObject(), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
         case .tag(let id, let tag, let on):

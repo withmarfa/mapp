@@ -96,6 +96,19 @@ nonisolated enum NoteName {
               let last = scalars.lastIndex(where: { !$0.properties.isWhitespace }) else { return "" }
         return String(String.UnicodeScalarView(scalars[first...last]))
     }
+
+    /// The title of an item titled by its text: the first line that is not empty, trimmed of spaces.
+    static func firstLine(of text: String) -> String {
+        text.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
+    }
+
+    /// The text without the line `firstLine(of:)` reads, or the blank lines that follow it, so the title moved out
+    /// of it is not left behind. Everything after is kept byte for byte.
+    static func removingFirstLine(of text: String) -> String {
+        guard let start = text.firstIndex(where: { !$0.isNewline }) else { return text }
+        let end = text[start...].firstIndex(where: \.isNewline) ?? text.endIndex
+        return String(text[end...].drop(while: \.isNewline))
+    }
 }
 
 nonisolated enum NoteReferenceResolution: Hashable, Sendable {
