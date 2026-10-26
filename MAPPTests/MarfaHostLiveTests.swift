@@ -75,7 +75,7 @@ extension LiveMarfaTests {
                 let edit = WriteID(), behind = WriteID()
                 source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
                 source.submit(.tag(id, ItemTag.favorite, on: true), as: behind)
-                #expect(await eventually { source.syncReport.waiting == 2 })
+                #expect(await eventually { source.syncReport.waiting == 2 }, "\(source.syncReport.waiting) waiting, \(source.connectionState), \(source.syncReport.problems)")
                 source.refresh()
                 // Each write names an item the server no longer holds, so each is refused on its own.
                 #expect(await eventually { source.syncReport.problems.count { $0.itemID == id } == 2 }, "\(source.syncReport.problems)")
