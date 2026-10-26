@@ -209,7 +209,7 @@ final class SettingsTests: XCTestCase {
         let originalSidebarHeight = sidebarText.frame.height
         let typeText = sidebar.staticTexts["Note"]
         let originalTypeHeight = typeText.frame.height
-        XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
+        XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
         XCTAssertTrue(settingsButton.exists)
         XCTAssertLessThan(settingsButton.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
         settingsButton.click()

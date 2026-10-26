@@ -126,7 +126,7 @@ struct GalleryToolbar: ToolbarContent {
             ColumnSearch(
                 isExpanded: $browser.isSearchExpanded,
                 text: $browser.searchText,
-                prompt: String(localized: "Search or “exact phrase”"),
+                prompt: String(localized: "Search"),
                 layout: .item,
                 focusRequests: browser.searchFocusRequests,
                 onDown: { browser.focusRequest = .list }

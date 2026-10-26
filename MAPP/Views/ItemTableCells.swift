@@ -13,14 +13,28 @@ struct ItemTableCell: View {
     let column: ItemTableColumn
     let browser: Browser
     let order: NoteOrder
+    /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
+    let hover: ItemTableHover
     @State private var isHovering = false
 
     var body: some View {
         content
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 5)
-            .onHover { isHovering = $0 }
+            .padding(.vertical, 3)
+            .onHover { setHovering($0) }
+            .onDisappear { setHovering(false) }
+            // A cell may be reused for another row while the pointer is over it; the old row must not keep its arrow.
+            .onChange(of: row.id) { old, _ in
+                if isHovering { hover.exit(old) }
+                isHovering = false
+            }
+    }
+
+    private func setHovering(_ inside: Bool) {
+        guard inside != isHovering else { return }
+        isHovering = inside
+        if inside { hover.enter(row.id) } else { hover.exit(row.id) }
     }
 
     @ViewBuilder private var content: some View {
@@ -61,24 +75,34 @@ struct ItemTableCell: View {
                     .foregroundStyle(.yellow)
                     .accessibilityLabel("Favorite")
             }
-            Spacer(minLength: 8)
-            // Notion's Open: a click opens the page, where selecting the row would only show it in Details.
-            Button {
-                browser.selection = [row.id]
-                browser.openCollectionSelection()
-            } label: {
-                Label("Open", systemImage: "arrow.up.right")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption.weight(.medium))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(.background, in: .capsule)
-                    .overlay { Capsule().strokeBorder(.separator) }
-            }
-            .buttonStyle(.plain)
-            .opacity(isHovering ? 1 : 0)
-            .accessibilityHidden(!isHovering)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) { openButton }
+    }
+
+    /// Notion's Open, laid over the end of the name: a click opens the page, where selecting the row would only show
+    /// it in Details. It shows on the row under the pointer and on the one selected row, and is there for
+    /// assistive technology and clicks only then.
+    private var openButton: some View {
+        let isShown = hover.row == row.id || (browser.selection.count == 1 && browser.selection.contains(row.id))
+        return Button {
+            browser.selection = [row.id]
+            browser.openCollectionSelection()
+        } label: {
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .background(.thinMaterial, in: .rect(cornerRadius: 6, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(.separator) }
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Open"))
+        .help(Text("Open"))
+        .opacity(isShown ? 1 : 0)
+        .allowsHitTesting(isShown)
+        .animation(.easeOut(duration: 0.1), value: isShown)
     }
 
     // MARK: Values
@@ -304,6 +328,37 @@ nonisolated enum ItemTableDate {
             var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated)
             if !sameYear { style = style.year() }
             return date.formatted(style)
+        }
+    }
+}
+
+/// Which table row the pointer is on. Every cell of a row reports when the pointer enters or leaves it, and a pointer
+/// crossing from one cell to the next is on the row throughout, so the row is let go of only after a moment with no
+/// cell of it hovered.
+@MainActor @Observable
+final class ItemTableHover {
+    private(set) var row: ItemID?
+    private var cells: [ItemID: Int] = [:]
+    private var release: Task<Void, Never>?
+    private let grace: Duration
+
+    init(grace: Duration = .milliseconds(60)) { self.grace = grace }
+
+    func enter(_ id: ItemID) {
+        cells[id, default: 0] += 1
+        release?.cancel()
+        row = id
+    }
+
+    func exit(_ id: ItemID) {
+        let remaining = (cells[id] ?? 1) - 1
+        cells[id] = remaining > 0 ? remaining : nil
+        guard remaining <= 0, row == id else { return }
+        release?.cancel()
+        release = Task { [grace] in
+            try? await Task.sleep(for: grace)
+            guard !Task.isCancelled, cells[id] == nil, row == id else { return }
+            row = nil
         }
     }
 }
