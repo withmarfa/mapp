@@ -1711,6 +1711,9 @@
     "The copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
     },
+    "The date couldn’t be saved." : {
+      "extractionState" : "manual"
+    },
     "The file may be damaged or unavailable. Try opening it in another app." : {
 
     },

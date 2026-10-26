@@ -46,7 +46,7 @@ struct ItemDateTests {
     }
 
     @Test(arguments: [
-        "2026-02-30", "2025-02-29", "2026-13-01", "2026-00-02", "2026-10-00", "2026-10-32", "0000-01-01",
+        "2026-02-30", "2025-02-29", "2026-13-01", "2026-00-02", "2026-10-00", "2026-10-32", "1900-02-29", "0001-02-29",
         "2026-02-30T12:30:00Z", "2026-10-24T24:00:00Z", "2026-10-24T12:60:00Z", "2026-10-24T12:30:60Z",
         "2026-10-24T12:30:00+24:00", "2026-10-24T12:30:00+00:60", "2026-10-24T12:30:00+0100",
         "2026-10-24T12:30:00", "2026-10-24T12Z", "2026-10-24T12:30:00.Z", "2026-10-24 12:30:00Z",
@@ -54,6 +54,24 @@ struct ItemDateTests {
     ])
     func whatTheContractRefusesIsNotADate(text: String) {
         #expect(ItemDate.parse(text) == nil)
+    }
+
+    @Test(arguments: [
+        ("0000-01-01", false), ("0000-02-29", false), ("0000-02-29T00:00-23:59", true),
+        ("2000-02-29", false), ("1600-02-29", false), ("9999-12-31", false),
+    ])
+    func theContractsWholeYearRangeIsAccepted(text: String, hasTime: Bool) throws {
+        let parsed = try #require(ItemDate.parse(text, calendar: Self.calendar("UTC")))
+        #expect(parsed.hasTime == hasTime)
+    }
+
+    @Test func yearZeroIsTheProlepticGregorianYearBeforeOne() throws {
+        let leapDay = try #require(ItemDate.parse("0000-02-29", calendar: Self.calendar("UTC")))
+        #expect(leapDay.date.timeIntervalSince1970 == -62_162_121_600)
+        let shifted = try #require(ItemDate.parse("0000-02-29T00:00-23:59"))
+        #expect(shifted.date.timeIntervalSince1970 == -62_162_121_600 + 23 * 3600 + 59 * 60)
+        let reformGap = try #require(ItemDate.parse("1582-10-10", calendar: Self.calendar("UTC")))
+        #expect(reformGap.date.timeIntervalSince1970 == -12_219_292_800 - 5 * 86_400)
     }
 
     @Test func aDayFieldTakesNoTime() {

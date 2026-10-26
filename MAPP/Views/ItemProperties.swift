@@ -37,14 +37,23 @@ struct ItemPropertyRow: View {
                     Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
                 if input.rejected {
-                    Text("The value could not be saved. Your input has been kept.")
-                        .interfaceFont(.caption)
-                        .foregroundStyle(.red)
-                    Button("Discard Changes") {
-                        input.isDirty = false
-                        seed(value)
+                    // A picked date is never held back as input, so only the other rows have anything kept.
+                    Group {
+                        if definition.kind.isDate {
+                            Text("The date couldn’t be saved.")
+                        } else {
+                            Text("The value could not be saved. Your input has been kept.")
+                        }
                     }
                     .interfaceFont(.caption)
+                    .foregroundStyle(.red)
+                    if !definition.kind.isDate {
+                        Button("Discard Changes") {
+                            input.isDirty = false
+                            seed(value)
+                        }
+                        .interfaceFont(.caption)
+                    }
                 }
             }
         }
