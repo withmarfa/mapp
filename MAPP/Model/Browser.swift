@@ -36,7 +36,8 @@ final class Browser {
         return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
     }
 
-    /// A window left on a layout its place cannot show goes back to the list without saying so.
+    /// A window left on a layout its place cannot show goes back to the list without saying so. The indexes of
+    /// collections and sources have no layout, so they leave it as it is for the place that follows to judge.
     func fallBackToListIfUnavailable(in library: any ItemLibrary) {
         guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
         viewMode = .list
@@ -227,6 +228,7 @@ final class Browser {
         searchText = ""
         isSearchExpanded = false
         sidebarItem = item
+        fallBackToListIfUnavailable(in: library)
         selectFirstNote(in: library, order: order)
     }
 

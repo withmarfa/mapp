@@ -262,6 +262,8 @@ struct MainView: View {
         // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
         .onChange(of: browser.availableViewModes(in: library), initial: true) { browser.fallBackToListIfUnavailable(in: library) }
         .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
+        // A place whose layouts match the last one's raises no change above, so a move to it is checked here.
+        .onChange(of: browser.item) { browser.fallBackToListIfUnavailable(in: library) }
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
