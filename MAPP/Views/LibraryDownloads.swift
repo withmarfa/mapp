@@ -12,11 +12,11 @@ struct LibraryDownloads: View {
     var body: some View {
         Section {
             if let state {
-                LabeledContent("Space Used") {
+                LabeledContent("Space used") {
                     if let bytes = state.bytes { Text(Self.size(bytes)) }
                     else { Text("Unavailable") }
                 }
-                Picker("Download Limit", selection: Binding(
+                Picker("Download limit", selection: Binding(
                     get: { state.budget },
                     set: { budget in change { try await files.setBudget(budget) } }
                 )) {
@@ -27,25 +27,23 @@ struct LibraryDownloads: View {
                     if case .bytes(let bytes) = state.budget, !Self.sizes.contains(bytes) {
                         Text(Self.size(bytes)).tag(state.budget)
                     }
-                    Text("Keep All Downloads").tag(DownloadBudget.keepAll)
+                    Text("Keep all downloads").tag(DownloadBudget.keepAll)
                 }
                 .disabled(working)
                 if state.budget == .automatic, let limit = state.limit {
-                    Text("Current limit: \(Self.size(limit))")
-                        .foregroundStyle(.secondary)
+                    LabeledContent("Current limit", value: Self.size(limit))
                 }
                 if let attachments = state.attachments {
-                    Text("^[\(attachments.held) attachment](inflect: true) kept offline")
+                    LabeledContent("Attachments kept offline") { Text(attachments.held, format: .number) }
                     if attachments.missing > 0 {
-                        Text("^[\(attachments.missing) attachment](inflect: true) not yet offline")
-                            .foregroundStyle(.secondary)
+                        LabeledContent("Attachments not yet offline") { Text(attachments.missing, format: .number) }
                         ForEach(attachments.reasons, id: \.reason) { missing in
                             Text(DownloadWording.reason(missing))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 } else {
-                    Text("Attachment counts are unavailable.")
+                    Text("Attachment counts aren’t available.")
                         .foregroundStyle(.secondary)
                 }
                 Button("Remove Downloaded Files") {
@@ -64,9 +62,9 @@ struct LibraryDownloads: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Downloaded Files")
+            Text("Downloaded files")
         } footer: {
-            Text("Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files waiting to upload.")
+            Text("Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files that are waiting to upload.")
         }
         .accessibilityIdentifier("LibraryDownloads")
         .task {

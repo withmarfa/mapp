@@ -70,14 +70,23 @@
     "%llu waiting to download" : {
       "extractionState" : "manual"
     },
+    "A notes app for your Marfa server." : {
+
+    },
     "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
 
     },
-    "Attachment counts are unavailable." : {
-      "extractionState" : "manual"
+    "Attachment counts aren’t available." : {
+
     },
-    "Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files waiting to upload." : {
-      "extractionState" : "manual"
+    "Attachments kept offline" : {
+
+    },
+    "Attachments not yet offline" : {
+
+    },
+    "Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files that are waiting to upload." : {
+
     },
     "Automatic" : {
       "extractionState" : "manual"
@@ -103,8 +112,8 @@
     "Couldn’t read downloaded files. MAPP will try again." : {
       "extractionState" : "manual"
     },
-    "Current limit: %@" : {
-      "extractionState" : "manual"
+    "Current limit" : {
+
     },
     "Date Field: %@" : {
 
@@ -112,11 +121,14 @@
     "Disconnected, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
-    "Download Limit" : {
-      "extractionState" : "manual"
+    "Disconnect…" : {
+
     },
-    "Downloaded Files" : {
-      "extractionState" : "manual"
+    "Download limit" : {
+
+    },
+    "Downloaded files" : {
+
     },
     "Downloading library…" : {
       "extractionState" : "manual"
@@ -127,11 +139,17 @@
     "Hide %@ Column" : {
 
     },
-    "Keep All Downloads" : {
-      "extractionState" : "manual"
+    "Keep all downloads" : {
+
     },
     "Keep the copy and the changes stay on this Mac." : {
       "extractionState" : "manual"
+    },
+    "Key not accepted" : {
+
+    },
+    "License" : {
+
     },
     "Listing items…" : {
       "extractionState" : "manual"
@@ -148,11 +166,23 @@
     "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },
+    "New key" : {
+
+    },
+    "Open in Browser" : {
+
+    },
     "Reading downloaded files…" : {
       "extractionState" : "manual"
     },
+    "Recently deleted" : {
+
+    },
     "Remove Downloaded Files" : {
       "extractionState" : "manual"
+    },
+    "Server" : {
+
     },
     "Show %@ Column" : {
 
@@ -160,8 +190,11 @@
     "Sort %@" : {
 
     },
-    "Space Used" : {
-      "extractionState" : "manual"
+    "Source" : {
+
+    },
+    "Space used" : {
+
     },
     "Switched Servers, but the Copy Was Kept" : {
       "extractionState" : "manual"
@@ -173,6 +206,9 @@
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
+
+    },
+    "The server doesn’t accept your key. Your changes stay on this Mac until a key works." : {
 
     },
     "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
@@ -187,16 +223,19 @@
     "Ungroup" : {
 
     },
+    "Unsent changes" : {
+
+    },
+    "Until you decide, these changes stay on this Mac." : {
+
+    },
     "Updating library…" : {
       "extractionState" : "manual"
     },
+    "Use a different server" : {
+
+    },
     "Wait for the current download change to finish." : {
-      "extractionState" : "manual"
-    },
-    "^[%llu attachment](inflect: true) kept offline" : {
-      "extractionState" : "manual"
-    },
-    "^[%llu attachment](inflect: true) not yet offline" : {
       "extractionState" : "manual"
     },
     "Items listed: %llu" : {
@@ -469,9 +508,6 @@
     },
     "A new item wasn’t created" : {
       "extractionState" : "manual"
-    },
-    "A notes app for Marfa." : {
-
     },
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
@@ -1035,12 +1071,6 @@
     "Highest First" : {
 
     },
-    "How a page looks while you write." : {
-
-    },
-    "How text and lists look." : {
-
-    },
     "https://marfa.example.com" : {
       "extractionState" : "manual"
     },
@@ -1196,9 +1226,6 @@
     "Manage Connections…" : {
 
     },
-    "Manage this server in your browser." : {
-
-    },
     "MAPP can’t open or follow the copy of your library on this Mac." : {
       "extractionState" : "manual"
     },
@@ -1250,9 +1277,6 @@
     "Marfa" : {
       "extractionState" : "manual"
     },
-    "Marfa Server" : {
-      "extractionState" : "manual"
-    },
     "Markdown Source" : {
 
     },
@@ -1289,9 +1313,6 @@
     "New Item" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
-    },
-    "New Key" : {
-      "extractionState" : "manual"
     },
     "New types appear here automatically." : {
 
@@ -1400,9 +1421,6 @@
 
     },
     "Open a library to choose what its sidebar shows." : {
-
-    },
-    "Open Console" : {
 
     },
     "Open Copy" : {
@@ -1544,9 +1562,6 @@
 
     },
     "Restore" : {
-
-    },
-    "Restore deleted items, or delete them permanently." : {
 
     },
     "Roles" : {
@@ -1727,9 +1742,6 @@
     "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://." : {
       "extractionState" : "manual"
     },
-    "The app, and the library it’s reading." : {
-
-    },
     "The connection could not be removed." : {
 
     },
@@ -1805,9 +1817,6 @@
     "The server doesn’t accept the key. Enter a new one below." : {
       "extractionState" : "manual"
     },
-    "The server doesn’t accept your key. Changes you make are kept on this Mac and sent once a key works." : {
-      "extractionState" : "manual"
-    },
     "The server doesn’t accept your key. Enter a new one in Settings." : {
       "extractionState" : "manual"
     },
@@ -1843,9 +1852,6 @@
     },
     "There’s no key for this Marfa server." : {
       "extractionState" : "manual"
-    },
-    "These changes need you. Until you decide, they stay on this Mac." : {
-
     },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
       "extractionState" : "manual"
@@ -1950,9 +1956,6 @@
     "Untitled" : {
 
     },
-    "Use a Different Server" : {
-      "extractionState" : "manual"
-    },
     "Use New Key" : {
       "extractionState" : "manual"
     },
@@ -1986,20 +1989,11 @@
     "Wait for the current step to finish, then try again." : {
       "extractionState" : "manual"
     },
-    "Waiting to Send" : {
-      "extractionState" : "manual"
-    },
     "Warning" : {
-
-    },
-    "What the sidebar shows, and in what order." : {
 
     },
     "What you wrote is lost unless you copy it first." : {
       "extractionState" : "manual"
-    },
-    "Where your notes are kept." : {
-
     },
     "Wide" : {
 

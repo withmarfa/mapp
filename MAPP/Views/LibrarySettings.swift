@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The Library page of Settings: the library in use and how it stands, the server's web console and Recently
-/// Deleted, then the connection to a Marfa server, then each change that needs the person.
+/// The Library page of Settings, as plain grouped rows: the server in use and how it stands, each change that needs
+/// the person, the key and the other server, the downloaded files, then the server's web console and Recently
+/// Deleted.
 struct LibrarySettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
@@ -13,13 +14,7 @@ struct LibrarySettings: View {
 
     var body: some View {
         Form {
-            Section { LibrarySummary() }
-            places
-            MarfaSettingsView(model: libraries.marfaSettings)
-            if let library, let files = library.downloadedFiles {
-                LibraryDownloads(files: files)
-                    .id(ObjectIdentifier(library))
-            }
+            if host.configuredConnection != nil { LibraryServer() }
             if library != nil, !host.report.problems.isEmpty {
                 Section {
                     ForEach(host.report.problems) { problem in
@@ -28,9 +23,15 @@ struct LibrarySettings: View {
                 } header: {
                     Text("Problems")
                 } footer: {
-                    Text("These changes need you. Until you decide, they stay on this Mac.")
+                    Text("Until you decide, these changes stay on this Mac.")
                 }
             }
+            MarfaSettingsView(model: libraries.marfaSettings)
+            if let library, let files = library.downloadedFiles {
+                LibraryDownloads(files: files)
+                    .id(ObjectIdentifier(library))
+            }
+            places
         }
         .settingsForm()
         .accessibilityIdentifier("LibrarySettings")
@@ -57,21 +58,15 @@ extension LibrarySettings {
         if address != nil || library != nil {
             Section {
                 if let address {
-                    LabeledContent {
-                        Button("Open Console") { openURL(address) }
+                    LabeledContent("Console") {
+                        Button("Open in Browser") { openURL(address) }
                             .accessibilityIdentifier("LibraryOpenConsole")
-                    } label: {
-                        Text("Console")
-                        Text("Manage this server in your browser.")
                     }
                 }
                 if let library {
-                    LabeledContent {
+                    LabeledContent("Recently deleted") {
                         Button("Show") { browser.show(.recentlyDeleted, in: library, order: order) }
                             .accessibilityIdentifier("LibraryShowRecentlyDeleted")
-                    } label: {
-                        Text("Recently Deleted")
-                        Text("Restore deleted items, or delete them permanently.")
                     }
                 }
             }
@@ -79,96 +74,68 @@ extension LibrarySettings {
     }
 }
 
-/// The top of the Library page: the library in use as a hero row, with its symbol, name, address, how it stands
-/// (a dot and a few words) and how many items it holds. A server's row ends in the button that disconnects from it.
-private struct LibrarySummary: View {
+/// The server in use as rows: its name, address, how it stands (a dot and a few words), how many items the library
+/// holds and what waits to be sent, then the button that disconnects from it.
+private struct LibraryServer: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
 
     private var host: MarfaHost { libraries.host }
-    private var isServer: Bool { host.configuredConnection != nil }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            symbol
-            VStack(alignment: .leading, spacing: 3) {
-                Text(LibraryDescription.name(libraries))
-                    .interfaceFont(.title3.weight(.semibold))
-                    .lineLimit(1)
-                    .textSelection(.enabled)
-                if let address {
+        Section("Server") {
+            LabeledContent("Name") { Text(LibraryDescription.name(libraries)).textSelection(.enabled) }
+            if let address = host.configuredConnection?.address.absoluteString {
+                LabeledContent("Address") {
                     Text(address)
-                        .interfaceFont(.callout)
-                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
                 }
-                SyncStatusReading(host: host) { status in
-                    standing(status)
-                }
-                .padding(.top, 2)
-                .accessibilityIdentifier("LibraryStanding")
             }
-            Spacer(minLength: 12)
-            if isServer { disconnect }
+            SyncStatusReading(host: host) { status in
+                standing(status)
+            }
+            if let library {
+                LabeledContent("Items") {
+                    Text(library.count(in: .allNotes), format: .number).monospacedDigit()
+                }
+            }
+            if let waiting = host.waitingChanges, waiting > 0 {
+                LabeledContent("Unsent changes") { Text(Words.changes(waiting)) }
+            }
+            disconnect
         }
-        .padding(.vertical, 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("LibrarySummary")
     }
 
-    /// A server is its symbol in a rounded square tinted with the accent, fainter while none is set.
-    private var symbol: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.accentColor.opacity(isServer ? 0.14 : 0.08))
-            Image(systemName: "server.rack")
-                .font(.system(size: 26, weight: .regular))
-                .foregroundStyle(Color.accentColor)
-        }
-        .frame(width: 56, height: 56)
-        .accessibilityHidden(true)
-    }
-
-    /// The full address of the server.
-    private var address: String? {
-        host.configuredConnection?.address.absoluteString
-    }
-
     private var disconnect: some View {
         HStack(spacing: 8) {
-            if libraries.marfaSettings.isWorking { ProgressView().controlSize(.small) }
-            Button("Disconnect") { libraries.marfaSettings.requestDisconnect() }
-                .buttonStyle(.bordered)
+            Button("Disconnect…") { libraries.marfaSettings.requestDisconnect() }
                 .disabled(libraries.marfaSettings.isWorking)
                 .accessibilityIdentifier("MarfaDisconnect")
+            if libraries.marfaSettings.isWorking { ProgressView().controlSize(.small) }
         }
     }
 
     @ViewBuilder private func standing(_ status: SyncStatus) -> some View {
         let words = self.words(status)
-        VStack(alignment: .leading, spacing: 2) {
+        LabeledContent("Status") {
             HStack(spacing: 6) {
-                Circle().fill(words.color).frame(width: 7, height: 7)
-                Text(words.line).foregroundStyle(.secondary)
-                if let library {
-                    Text("^[\(library.count(in: .allNotes)) item](inflect: true)")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .padding(.leading, 10)
-                }
+                Circle().fill(words.color).frame(width: 7, height: 7).accessibilityHidden(true)
+                Text(words.line)
             }
-            if let detail = words.detail {
-                Text(detail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let fill = library?.syncReport.fill, fill.state != .complete {
-                Text(fill.state == .updating ? "Updating library…" : "Downloading library…")
-                    .foregroundStyle(.secondary)
+        }
+        .accessibilityIdentifier("LibraryStanding")
+        if let detail = words.detail {
+            Text(detail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if let fill = library?.syncReport.fill, fill.state != .complete {
+            LabeledContent(fill.state == .updating ? "Updating library…" : "Downloading library…") {
                 Text(FillWording.line(fill))
-                    .foregroundStyle(.secondary)
                     .monospacedDigit()
                     .accessibilityIdentifier("LibraryFillProgress")
             }
@@ -176,7 +143,6 @@ private struct LibrarySummary: View {
     }
 
     private func words(_ status: SyncStatus) -> (line: String, detail: String?, color: Color) {
-        guard isServer else { return (String(localized: "Not connected"), nil, .secondary) }
         let connection = ConnectionStatus(host.state)
         if let note = status.primary {
             return (note.line, connection.detail ?? note.detail, note.dotColor)
