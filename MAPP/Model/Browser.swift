@@ -52,7 +52,13 @@ final class Browser {
     private(set) var showsSettings = false
     /// The page of Settings shown, and the one shown next time Settings is.
     var settingsPage = SettingsPage.appearance
-    var searchText = ""
+    var searchText = "" {
+        didSet { if !isSearching { relevanceChoice = nil } }
+    }
+    /// What the person chose for the order of the search under way: relevance, or one of the sorts. Nil leaves the
+    /// layout's own start (`ordersByRelevance`). It is forgotten when the search ends, so the next one starts again
+    /// and the person's own sort, which relevance never touches, is the order once more.
+    var relevanceChoice: Bool?
     /// Whether the search covers only the place shown rather than everything. It applies wherever the place can be
     /// searched alone (`SearchScope.narrows`) and means everything elsewhere.
     var searchesPlace = false
@@ -108,6 +114,17 @@ final class Browser {
     func leaveSettings() { showsSettings = false }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// Whether the search lists its results as the library ranked them rather than by a sort. The list starts on
+    /// relevance; the gallery and the table start on their own sorts and use relevance only once it is picked there.
+    var ordersByRelevance: Bool {
+        isSearching && (relevanceChoice ?? (viewMode == .list))
+    }
+
+    /// Picks relevance or one of the sorts for the search under way. Outside a search there is nothing to pick.
+    func orderSearch(byRelevance: Bool) {
+        if isSearching { relevanceChoice = byRelevance }
+    }
 
     /// Whether the window shows the gallery or the table, which span it, rather than the list beside the page.
     var usesCollection: Bool { viewMode.spansWindow }
@@ -200,9 +217,10 @@ final class Browser {
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// note is one, nor in search results. A place that keeps its own order is one section, in that order.
+    /// note is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
+    /// one section, in the order given.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
-        if keepsPlaceOrder {
+        if keepsPlaceOrder || ordersByRelevance {
             let items = items(in: library)
             return items.isEmpty ? [] : [NoteSection(group: nil, items: items)]
         }

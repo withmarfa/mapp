@@ -1,6 +1,8 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Relevance" : { "extractionState" : "manual" },
+"Sort by Relevance" : { "extractionState" : "manual" },
 "Everywhere" : { "extractionState" : "manual" },
 "Search Scope" : { "extractionState" : "manual" },
 "Showing the first %lld results." : { "extractionState" : "manual" },

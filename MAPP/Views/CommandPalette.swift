@@ -169,12 +169,21 @@ struct CommandPalette: View {
         return commands + places + (query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : notes)
     }
 
-    /// Items whose text or title has what was typed, or the most recently edited before anything is.
+    /// The most a search lists.
+    static let searchLimit = 50
+
+    /// What a search lists: the best matches, in the order the library ranked them. Sorting them by date would
+    /// push a strong old match out past the limit.
+    static func listed(_ results: SearchResults) -> [Item] {
+        Array(results.items.prefix(searchLimit))
+    }
+
+    /// Items whose text or title has what was typed, best match first, or the most recently edited before anything is.
     private var found: [Entry] {
         let isEmpty = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let results = isEmpty ? nil : library.search(query, in: .everywhere)
-        let items = results?.items ?? library.items(in: .allNotes)
-        return items.sorted { $0.modified > $1.modified }.prefix(isEmpty ? 12 : 50).map { item in
+        let items = results.map(Self.listed) ?? Array(library.items(in: .allNotes).sorted { $0.modified > $1.modified }.prefix(12))
+        return items.map { item in
             // An excerpt that is the title says nothing the title does not, so the preview stands.
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.title ? nil : $0 }
             return Entry(
@@ -214,10 +223,17 @@ struct CommandPalette: View {
             addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
             addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
             addLayout(.agenda, String(localized: "View as Agenda"), "calendar", "⌘5")
-            for choice in NoteSort.allCases where choice != sort && (browser.viewMode == .list || browser.viewMode == .gallery) {
-                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") { sort = choice }
+            let ordersList = browser.viewMode == .list || browser.viewMode == .gallery
+            if ordersList && browser.isSearching && !browser.ordersByRelevance {
+                add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down") { browser.orderSearch(byRelevance: true) }
             }
-            if sort != .title && (browser.viewMode == .list || browser.viewMode == .gallery) {
+            for choice in NoteSort.allCases where (choice != sort || browser.ordersByRelevance) && ordersList {
+                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") {
+                    sort = choice
+                    browser.orderSearch(byRelevance: false)
+                }
+            }
+            if sort != .title && !browser.ordersByRelevance && ordersList {
                 add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
                     groupsByDate.toggle()
                 }
