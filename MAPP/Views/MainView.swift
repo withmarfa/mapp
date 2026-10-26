@@ -13,7 +13,7 @@ struct MainView: View {
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
     @State private var sidebarWidth: CGFloat = 230
-    @State private var listWidth: CGFloat = 350
+    @State private var listWidth = ListColumn.defaultWidth
     @State private var measuredWidths = ColumnWidths()
     private let restoresWindow: Bool
 
@@ -346,7 +346,13 @@ private enum WorkspacePresentation: Hashable {
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.
 private final class ColumnWidths {
     var sidebar: CGFloat = 230
-    var list: CGFloat = 350
+    var list = ListColumn.defaultWidth
+}
+
+enum ListColumn {
+    /// The width a window's list column starts at, the column's ideal width. A width the person has dragged it to is
+    /// kept instead, and the column never goes narrower than 280.
+    static let defaultWidth: CGFloat = 340
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
