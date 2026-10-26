@@ -24,6 +24,10 @@ import Observation
     /// forgotten when Settings is put away and opened again.
     let marfaSettings: MarfaSettingsModel
 
+    /// The server's own settings that This Marfa edits, kept with the connection so a draft survives putting Settings
+    /// away.
+    let instanceSettings: InstanceSettingsModel
+
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
@@ -31,6 +35,8 @@ import Observation
         self.host = host
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
+        instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
+        instanceSettings.onRenamed = { [host] in host.refreshName() }
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
     }
@@ -161,7 +167,7 @@ import Observation
                 defaults: defaults, keys: MemoryKeyStore([sample: "sample"]), location: location(root: root),
                 opener: { connection, _, _ in SampleLibrary.open(connection) },
                 describer: { _ in SampleLibrary.name },
-                historian: { _, _ in nil })
+                historian: { _, _ in nil }, configurer: { _, _ in nil })
             host.presetTestServer(sample)
             return Libraries(host: host, defaults: defaults)
         }

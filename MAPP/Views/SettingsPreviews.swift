@@ -18,5 +18,6 @@ private struct SettingsPreviewWindow: View {
 #Preview("Settings: Editor") { SettingsPreviewWindow(page: .editor) }
 #Preview("Settings: Sidebar") { SettingsPreviewWindow(page: .sidebar) }
 #Preview("Settings: Library") { SettingsPreviewWindow(page: .library) }
+#Preview("Settings: This Marfa") { SettingsPreviewWindow(page: .thisMarfa) }
 #Preview("Settings: About") { SettingsPreviewWindow(page: .about) }
 #endif

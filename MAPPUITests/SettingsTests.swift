@@ -69,7 +69,7 @@ final class SettingsTests: XCTestCase {
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
         let pages = [("editor", "Editor"), ("sidebar", "Sidebar"), ("library", "Library"),
-                     ("about", "About"), ("appearance", "Appearance")]
+                     ("thisMarfa", "This Marfa"), ("about", "About"), ("appearance", "Appearance")]
         XCTAssertFalse(element("SettingsPage-recentlyDeleted").exists, "Recently Deleted is a workspace destination")
         for (page, title) in pages {
             let row = element("SettingsPage-\(page)")
