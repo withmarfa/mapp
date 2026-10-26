@@ -118,13 +118,6 @@ struct MainView: View {
             if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
         }
         .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
-        .toolbar {
-            if isSidebarVisible {
-                ToolbarItem(id: "sidebarNewItem") {
-                    NewItemButton(browser: browser)
-                }
-            }
-        }
     }
 
     private var itemPage: some View {

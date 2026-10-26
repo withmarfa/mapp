@@ -7,7 +7,6 @@ final class SidebarNavigationTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
     private var instanceName: XCUIElement { element("SidebarLibrary") }
-    private var settingsButton: XCUIElement { element("SidebarOpenSettings") }
     private var settingsPages: XCUIElement { element("SettingsPageList") }
 
     override func setUp() async throws {
@@ -31,9 +30,10 @@ final class SidebarNavigationTests: XCTestCase {
             XCTAssertFalse(sidebarText(title).exists, "\(title) is not in the sidebar")
         }
         XCTAssertTrue(instanceName.exists)
-        XCTAssertTrue(settingsButton.exists)
-        XCTAssertTrue(element("SidebarSearch").exists)
-        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in Settings > Library")
+        XCTAssertTrue(element("NewItemToolbar").exists, "the foot holds the New Item button")
+        XCTAssertFalse(element("SidebarSearch").exists, "Search is the palette's, not the foot's")
+        XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is in the instance menu")
+        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in the instance menu")
         for identifier in ["SidebarSources", "SidebarCollections"] {
             let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -57,23 +57,39 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testTheFootsSearchButtonOpensSearch() {
-        element("SidebarSearch").click()
+    func testSearchOpensFromTheKeyboardWithNoSearchButtonAtTheFoot() {
+        app.typeKey("p", modifierFlags: [.command, .shift])
         XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(element("CommandPaletteField").waitForNonExistence(timeout: 2))
     }
 
-    func testTheFootsSettingsButtonOpensSettingsInTheWindowAndAPlaceLeavesIt() {
-        settingsButton.click()
+    func testTheInstanceMenuListsConsoleSettingsAndRecentlyDeleted() {
+        instanceName.click()
+        for title in ["Console", "Settings", "Recently Deleted"] {
+            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the instance menu")
+        }
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(window.menuItems["Recently Deleted"].firstMatch.waitForNonExistence(timeout: 2))
+    }
+
+    func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
+        instanceName.click()
+        window.menuItems["Settings"].firstMatch.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists, "the pages take the list's column")
         XCTAssertTrue(sidebar.exists, "the sidebar stays")
         XCTAssertEqual(app.windows.count, 1)
-        attachScreenshot("SettingsFromSidebarFoot")
+        attachScreenshot("SettingsFromInstanceMenu")
         sidebarText("Inbox").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertFalse(settingsPages.exists)
+    }
+
+    func testTheFootsNewItemButtonOpensQuickAdd() {
+        element("NewItemToolbar").click()
+        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
     }
 
     func testFavoritesRemainsAvailableAfterTheLastItemIsRemoved() {

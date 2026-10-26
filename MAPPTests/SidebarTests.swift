@@ -371,6 +371,84 @@ struct SidebarTests {
         #expect(!SidebarPlan(library, layout: layout).shownTypes.contains { $0.id == "aic.ticket" })
     }
 
+    @Test func typeRowsListASubtypeUnderItsParentUntilTheParentIsFoldedShut() async throws {
+        let library = try await marfaLibrary()
+        var layout = SidebarLayout()
+        let open = SidebarPlan(library, layout: layout).typeRows
+        #expect(open.map(\.id) == ["core.note", "aic.project", "aic.ticket", "aic.ticket.bug", "aic.ticket.task", "core.entity"])
+        #expect(open.map(\.depth) == [0, 0, 0, 1, 1, 0])
+        #expect(open.filter(\.isExpandable).map(\.id) == ["aic.ticket"])
+
+        layout.setCollapsed(.type("aic.ticket"), true)
+        let shut = SidebarPlan(library, layout: layout).typeRows
+        #expect(shut.map(\.id) == ["core.note", "aic.project", "aic.ticket", "core.entity"])
+        #expect(shut.first { $0.id == "aic.ticket" }?.isExpanded == false)
+
+        // A hidden subtype is not listed, and its parent keeps the rest.
+        layout.setCollapsed(.type("aic.ticket"), false)
+        layout.setHidden(.type(LibraryFixture.bug.rawValue), true)
+        #expect(SidebarPlan(library, layout: layout).typeRows.map(\.id) == ["core.note", "aic.project", "aic.ticket", "aic.ticket.task", "core.entity"])
+    }
+
+    /// The fixture's library with a ticket of its own, so that "Ticket" opens a list as well as folding its subtypes.
+    func libraryWithATicket() async throws -> MarfaLibrary {
+        let ticket = LibraryFixture.item(ItemID("k1"), LibraryFixture.ticket, "A ticket", age: 10)
+        return try await marfaLibrary(LibraryFixture.items + [ticket])
+    }
+
+    @Test func arrowKeysFoldAndWalkTheSelectedTypeAsTheSystemOutlineDoes() async throws {
+        let library = try await libraryWithATicket()
+        let ticket = SidebarItem.itemType(LibraryFixture.ticket.rawValue)
+        let note = SidebarItem.itemType("core.note")
+        var layout = SidebarLayout()
+        func outcome(_ arrow: SidebarPlan.Arrow, _ selected: SidebarItem?) -> SidebarPlan.ArrowOutcome? {
+            SidebarPlan(library, layout: layout).outcome(of: arrow, selected: selected)
+        }
+        let rows = SidebarPlan(library, layout: layout).typeRows
+        try #require(rows.first { $0.id == "aic.ticket" }?.node.opens == true)
+        let first = try #require(rows.first { $0.depth == 1 })
+        let child = SidebarItem.itemType(try #require(first.node.type).rawValue)
+
+        // An open parent folds on Left, and Right goes to its first subtype.
+        #expect(outcome(.left, ticket) == .fold("aic.ticket", collapsed: true))
+        #expect(outcome(.right, ticket) == .select(child))
+        // A subtype goes to its parent on Left, and has nothing to open on Right.
+        #expect(outcome(.left, child) == .select(ticket))
+        #expect(outcome(.right, child) == nil)
+
+        // A folded parent selects its own parent on Left, and has none here. Right opens it.
+        layout.setCollapsed(.type("aic.ticket"), true)
+        #expect(outcome(.right, ticket) == .fold("aic.ticket", collapsed: false))
+        #expect(outcome(.left, ticket) == nil)
+
+        // A row with no subtypes, a place that is no type and no selection do nothing.
+        #expect(outcome(.left, note) == nil)
+        #expect(outcome(.right, note) == nil)
+        #expect(outcome(.left, nil) == nil)
+        #expect(outcome(.right, .allNotes) == nil)
+    }
+
+    @Test func foldingAParentThatHoldsTheSelectionSelectsTheParent() async throws {
+        let library = try await libraryWithATicket()
+        let ticket = SidebarItem.itemType(LibraryFixture.ticket.rawValue)
+        let bug = SidebarItem.itemType(LibraryFixture.bug.rawValue)
+        let plan = SidebarPlan(library, layout: SidebarLayout())
+        #expect(plan.selectionAfterFolding("aic.ticket", selected: bug) == ticket)
+        // Nothing moves when the parent itself, another row or no row is selected.
+        #expect(plan.selectionAfterFolding("aic.ticket", selected: ticket) == nil)
+        #expect(plan.selectionAfterFolding("aic.ticket", selected: .itemType("core.note")) == nil)
+        #expect(plan.selectionAfterFolding("aic.ticket", selected: nil) == nil)
+        #expect(plan.selectionAfterFolding("core.note", selected: bug) == nil)
+    }
+
+    @Test func aParentThatOnlyFoldsHasNoListToSelectWhenItsSubtypeIsLeft() async throws {
+        let library = try await marfaLibrary()
+        let bug = SidebarItem.itemType(LibraryFixture.bug.rawValue)
+        let plan = SidebarPlan(library, layout: SidebarLayout())
+        #expect(plan.outcome(of: .left, selected: bug) == nil)
+        #expect(plan.selectionAfterFolding("aic.ticket", selected: bug) == nil)
+    }
+
     @Test func movingPlacesReordersThemWithinTheirGroup() {
         var layout = SidebarLayout()
         layout.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)

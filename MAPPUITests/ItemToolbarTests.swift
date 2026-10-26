@@ -17,7 +17,7 @@ final class ItemToolbarTests: XCTestCase {
 
     override func tearDown() async throws { app.terminate() }
 
-    func testTheSidebarOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
+    func testTheSidebarFootOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
         let viewMode = control("ViewModeMenu")
         let viewOptions = control("ViewOptionsToolbar")
         let newItem = control("NewItemToolbar")
@@ -32,9 +32,9 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("ShareToolbar"), 1, "The closed inspector adds no second Share")
         XCTAssertFalse(control("FormatToolbar").exists, "Format is out of the default toolbar")
         let page = window.itemPageTitle.frame
-        XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar")
+        XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar's foot")
         XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX)
-        XCTAssertEqual(newItem.frame.midY, details.frame.midY, accuracy: 3, "New Item shares the native toolbar row")
+        XCTAssertGreaterThan(newItem.frame.minY, details.frame.maxY, "New Item sits at the sidebar's foot, below the toolbar row")
         XCTAssertLessThan(viewOptions.frame.maxX, viewMode.frame.minX, "View Options comes before View As")
         XCTAssertLessThan(viewMode.frame.maxX, share.frame.minX)
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
@@ -159,7 +159,7 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
         XCTAssertTrue(share.exists)
-        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays in the sidebar")
+        XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays at the sidebar's foot")
         let search = window.toolbars.buttons["Search"].firstMatch
         XCTAssertTrue(search.exists)
         XCTAssertLessThan(search.frame.maxX, viewOptions.frame.minX, "Search leads the trailing controls")

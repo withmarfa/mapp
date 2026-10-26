@@ -153,6 +153,83 @@ struct SidebarPlan {
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
 
+    /// A shown type row as the list draws it: one line, with how deep it sits and whether it is folded open.
+    struct TypeRow: Identifiable {
+        let node: TypeNode
+        let depth: Int
+        let isExpanded: Bool
+
+        var id: String { node.id }
+        var isExpandable: Bool { !node.children.isEmpty }
+    }
+
+    /// The shown types as the rows the list draws, in order: a row, then, where it is folded open, the rows under
+    /// it, one level deeper. Rows folded shut leave their subtypes out.
+    var typeRows: [TypeRow] { Self.rows(shownTypes, depth: 0, layout: layout) }
+
+    /// An arrow key on the selected type row.
+    enum Arrow { case left, right }
+
+    /// What an arrow key does.
+    enum ArrowOutcome: Equatable {
+        /// Fold the row of this identifier shut (`collapsed`) or open.
+        case fold(String, collapsed: Bool)
+        /// Select this row.
+        case select(SidebarItem)
+    }
+
+    /// What the system's outline does with an arrow key, for the selected type row, or nil where it does nothing.
+    /// Left folds a row that is open, and otherwise selects the row's parent. Right opens a row that is folded, and
+    /// otherwise selects the first row under it that opens a list. A group has no list to select, so a parent that
+    /// is one is passed over for the nearest above it that has.
+    func outcome(of arrow: Arrow, selected: SidebarItem?) -> ArrowOutcome? {
+        let path = path(to: selected)
+        guard let node = path.last else { return nil }
+        let isExpanded = !layout.isCollapsed(.type(node.id))
+        switch arrow {
+        case .left:
+            if !node.children.isEmpty, isExpanded { return .fold(node.id, collapsed: true) }
+            return path.dropLast().last(where: \.opens).flatMap(Self.item).map { .select($0) }
+        case .right:
+            guard !node.children.isEmpty else { return nil }
+            if !isExpanded { return .fold(node.id, collapsed: false) }
+            return node.children.first(where: \.opens).flatMap(Self.item).map { .select($0) }
+        }
+    }
+
+    /// The row to select as `id` folds shut, when the selected type is somewhere under it: the nearest row that
+    /// opens a list, from that row upward. Nil where the selection stays as it is.
+    func selectionAfterFolding(_ id: String, selected: SidebarItem?) -> SidebarItem? {
+        let path = path(to: selected)
+        guard let index = path.firstIndex(where: { $0.id == id }), index < path.count - 1 else { return nil }
+        return path[...index].last(where: \.opens).flatMap(Self.item)
+    }
+
+    private static func item(_ node: TypeNode) -> SidebarItem? {
+        node.type.map { .itemType($0.rawValue) }
+    }
+
+    /// The shown rows from the top of the tree down to the one `selected` names, or none where it names no shown row.
+    private func path(to selected: SidebarItem?) -> [TypeNode] {
+        guard let selected else { return [] }
+        func search(_ nodes: [TypeNode]) -> [TypeNode]? {
+            for node in nodes {
+                if Self.item(node) == selected { return [node] }
+                if let found = search(node.children) { return [node] + found }
+            }
+            return nil
+        }
+        return search(shownTypes) ?? []
+    }
+
+    private static func rows(_ nodes: [TypeNode], depth: Int, layout: SidebarLayout) -> [TypeRow] {
+        nodes.flatMap { node in
+            let isExpanded = !layout.isCollapsed(.type(node.id))
+            return [TypeRow(node: node, depth: depth, isExpanded: isExpanded)]
+                + (isExpanded ? rows(node.children, depth: depth + 1, layout: layout) : [])
+        }
+    }
+
     private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {
         nodes.filter { plan.isShown(.type($0.id)) }.map { node in
             TypeNode(id: node.id, type: node.type, label: node.label, symbol: node.symbol, count: node.count, total: node.total,
