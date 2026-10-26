@@ -1,9 +1,14 @@
 name: Checks
 
 # Each job runs only when its files changed, so a docs-only change finishes in seconds.
+# - A draft pull request runs no Swift job; marking it ready runs them once. Builders test locally first.
+# - A change that touches only views, the String Catalog, assets or UI tests compiles everything
+#   but does not run the unit tests, which cover logic, not styling.
+# - The release build runs beside the unit tests, not after them.
 # The final job, "Checks", always runs; make it the one required check.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: checks-${{ github.event.pull_request.number }}
@@ -20,6 +25,7 @@ jobs:
     outputs:
       editor: ${{ steps.filter.outputs.editor }}
       swift: ${{ steps.filter.outputs.swift }}
+      logic: ${{ steps.filter.outputs.logic }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,8 +39,14 @@ jobs:
           if echo "$files" | grep -qE '^(editor/|MAPP/Editor/Page/editor\.html$|\.github/workflows/checks\.yml$)'; then
             echo "editor=true" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$files" | grep -vE '\.md$' | grep -qE '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$)'; then
+          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$)' || true)
+          if [ -n "$app" ]; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Anything outside views, the String Catalog, assets and UI tests may change logic.
+          logic=$(echo "$app" | grep -vE '^(MAPP/Views/|MAPP/Localizable\.xcstrings$|MAPP/Assets\.xcassets/|MAPPUITests/)' || true)
+          if [ -n "$logic" ]; then
+            echo "logic=true" >> "$GITHUB_OUTPUT"
           fi
 
   editor:
@@ -70,7 +82,7 @@ jobs:
   swift:
     name: Unit tests
     needs: changes
-    if: needs.changes.outputs.swift == 'true'
+    if: needs.changes.outputs.swift == 'true' && github.event.pull_request.draft == false
     # The hosted image with Xcode 27 (a public preview at the time of writing).
     runs-on: xcode-27
     timeout-minutes: 30
@@ -80,20 +92,21 @@ jobs:
           persist-credentials: false
       - run: sudo xcode-select -s /Applications/Xcode_27.1.app
       - name: Run the unit tests
+        if: needs.changes.outputs.logic == 'true'
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
           -derivedDataPath build -resultBundlePath TestResults.xcresult test
+      - name: Build the app and unit tests without running them
+        if: needs.changes.outputs.logic != 'true'
+        run: >
+          xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
+          -derivedDataPath build build-for-testing
       # The UI tests take over the keyboard and mouse, so they run locally before a merge; here they
       # are only built, so a change that breaks them is seen.
       - name: Build the UI tests
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
-      # A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
-      - name: Build the release configuration
-        run: >
-          xcodebuild -project MAPP.xcodeproj -scheme MAPP -configuration Release -destination 'generic/platform=macOS'
-          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
       - name: Show failures
         if: failure() && hashFiles('TestResults.xcresult/**') != ''
         run: |
@@ -112,9 +125,26 @@ jobs:
               print('::warning::%dx %s' % (count, message))
           "
 
+  release:
+    name: Release build
+    needs: changes
+    if: needs.changes.outputs.swift == 'true' && github.event.pull_request.draft == false
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_27.1.app
+      # A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
+      - name: Build the release configuration
+        run: >
+          xcodebuild -project MAPP.xcodeproj -scheme MAPP -configuration Release -destination 'generic/platform=macOS'
+          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
+
   checks:
     name: Checks
-    needs: [changes, editor, swift]
+    needs: [changes, editor, swift, release]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
