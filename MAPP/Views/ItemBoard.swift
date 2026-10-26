@@ -108,7 +108,7 @@ struct ItemBoard: View {
         }
         .frame(width: compact ? 244 : 292)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 12))
+        .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(lane.title)
         .dropDestination(for: BoardItemReference.self, isEnabled: isDestination(lane.id)) { references, _ in

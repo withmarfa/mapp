@@ -58,6 +58,8 @@ struct ItemAgenda: View {
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: browser.selection)
         .focused(pane, equals: .list)
         .accessibilityLabel("Agenda")
         .accessibilityIdentifier("ItemAgenda")
