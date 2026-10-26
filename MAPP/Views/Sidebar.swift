@@ -63,7 +63,7 @@ struct Sidebar: View {
             ForEach(plan.shownLibrary, id: \.key) { section in
                 switch section {
                 case .types: typesSection(plan)
-                case .views: viewsSection
+                case .views: viewsSection(plan)
                 default: EmptyView()
                 }
             }
@@ -88,12 +88,18 @@ struct Sidebar: View {
             + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue)
     }
 
-    /// A view lists what the copy holds of its items, read on its own, so its row has no count.
-    private var viewsSection: some View {
+    /// A view lists what the copy holds of its items, read on its own, so its row has no count. The person can
+    /// drag a row to a new place among the others.
+    private func viewsSection(_ plan: SidebarPlan) -> some View {
         Section("Views") {
-            ForEach(library.views) { view in
-                row(.view(view.id), symbol: SidebarPlace.viewSymbol, title: view.title, hiding: .views, counted: false)
+            ForEach(plan.shownViews) { view in
+                row(.view(view.id), symbol: SidebarPlace.viewSymbol, title: view.title, hiding: .view(view.id), counted: false)
                     .accessibilityIdentifier("SidebarView-\(view.id.rawValue)")
+            }
+            .onMove { source, destination in
+                libraries.updateSidebarLayout {
+                    $0.move(plan.views, shown: plan.shownViews, by: { SidebarPlace.view($0.id).key }, fromOffsets: source, toOffset: destination)
+                }
             }
         }
         .accessibilityIdentifier("SidebarViews")
@@ -145,13 +151,11 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    /// A view's row hides the whole Views section, which its title says, since the layout keeps no view of its own.
+    /// A view's row hides that view alone, and offers the whole Views section as well.
     @ViewBuilder private func hideButton(_ place: SidebarPlace) -> some View {
-        let hide = { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
-        if place == .views {
-            Button("Hide Views from Sidebar", action: hide)
-        } else {
-            Button("Hide from Sidebar", action: hide)
+        Button("Hide from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
+        if case .view = place {
+            Button("Hide Views from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(.views, true) } }
         }
     }
 
