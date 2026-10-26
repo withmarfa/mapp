@@ -64,8 +64,11 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     var embeds: any EmbedResolver { get }
     func changes() -> AsyncStream<SourceChange>
     /// Never blocks; writes are made in the order submitted. False where the source is closed and takes nothing.
+    /// A write that belongs to an undo or a redo names it in `undoing`: where the copy refuses it for being brought up
+    /// to date, the source holds it and makes it once the copy is whole, if what it touches is as it was, and
+    /// otherwise answers it as refused, so the undo is never lost to a catch-up.
     @discardableResult
-    func submit(_ write: ItemWrite, as id: WriteID) -> Bool
+    func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool
     func body(of item: ItemID) async throws -> ItemBody
     /// The text of each item named that has any, read together, since a library reads every body as it loads.
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
@@ -118,4 +121,14 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 
 nonisolated extension ItemSource {
     var downloadedFiles: (any DownloadedFiles)? { nil }
+
+    @discardableResult
+    func submit(_ write: ItemWrite, as id: WriteID) -> Bool {
+        submit(write, as: id, undoing: nil)
+    }
+}
+
+/// The writes of one run of an undo or a redo, which a source holds or drops together.
+nonisolated struct UndoGroup: Hashable, Sendable {
+    private let rawValue = UUID()
 }

@@ -17,8 +17,9 @@ extension MarfaEngine {
         let rows: [String: Marfa.Item]
         let edges: [Marfa.Edge]
         let catalogue: Catalogue
+        let whole: Bool
         do {
-            (catalogue, rows, edges) = try await Self.asking(hub) {
+            (catalogue, rows, edges, whole) = try await Self.asking(hub) {
                 let catalogue = try await MarfaMapping.catalogue(
                     itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
                 var rows: [String: Marfa.Item] = [:]
@@ -26,14 +27,17 @@ extension MarfaEngine {
                 let listed = try await reading.items()
                 for row in listed where MarfaMapping.isLibraryItem(row) { rows[row.id] = row }
                 let status = try await reading.status()
-                hub.report.update { $0.fill = LibraryFill(status, completeness: listed.completeness) }
+                let fill = LibraryFill(status, completeness: listed.completeness)
+                hub.report.update { $0.fill = fill }
+                var whole = fill.state == .complete
                 do {
                     edges = try await reading.edges(ofTypes: Array(catalogue.edgeTypes.keys))
                 } catch MarfaError.hydrationIncomplete {
                     // The rows can be read before their relationships. Keep known links through a refill.
                     edges = self.edges.all
+                    whole = false
                 }
-                return (catalogue, rows, edges)
+                return (catalogue, rows, edges, whole)
             }
         } catch {
             readFailed(error)
@@ -55,6 +59,8 @@ extension MarfaEngine {
         await readQueue()
         await readViews()
         publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
+        // Held undos are judged on what this read found, so they wait until it found the copy whole.
+        if whole { await releaseHeld() }
     }
 
     /// Reads the views the copy holds, and tells readers once they differ. One view this build cannot read refuses

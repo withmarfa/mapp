@@ -3,12 +3,25 @@ import Marfa
 
 /// Making the app's writes in the copy's queue.
 extension MarfaEngine {
-    func perform(_ write: ItemWrite, as id: WriteID) async {
+    /// True where the write belongs to an undo or a redo (`group`) and the copy refused it for being brought up to
+    /// date, so it is held (`MarfaEngine+Holding`) and has no answer yet. `standing` is how the held write found what it
+    /// touches when it was first made, which a later try keeps.
+    @discardableResult
+    func perform(_ write: ItemWrite, as id: WriteID, holding group: UndoGroup? = nil, standing: Stand? = nil) async -> Bool {
         if case .purge(let item, let version) = write {
             purge(item, at: version, as: id)
-            return
+            return false
+        }
+        if let group, standing == nil, !held.isEmpty {
+            // The copy is still refusing an earlier undo or redo. This write waits behind it unattempted, since the
+            // package queues an item's edit at once but refuses a link's, and made first it would be made out of order.
+            await hold(write, as: id, in: group, standing: nil)
+            return true
         }
         do {
+            #if DEBUG
+            if let error = refusing?(write) { throw error }
+            #endif
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
                 let created = try await Self.asking(hub) { try await create(itemID, draft) }
@@ -44,6 +57,10 @@ extension MarfaEngine {
             problem.notQueued = true
             hub.publish(.answered(id, .refused(problem)))
         } catch let error as MarfaError {
+            if let group, Self.isBeingBroughtUpToDate(error) {
+                await hold(write, as: id, in: group, standing: standing)
+                return true
+            }
             // Refused before it was queued, such as a property the type does not allow: nothing is waiting.
             var problem = Self.problem(for: error)
             problem.notQueued = true
@@ -55,6 +72,7 @@ extension MarfaEngine {
         } catch {
             hub.publish(.answered(id, .refused(SyncProblem(code: "failed", message: error.localizedDescription, notQueued: true))))
         }
+        return false
     }
 
     /// An unavailable row or an edge write can need a complete copy. The app keeps any text it tried to save.

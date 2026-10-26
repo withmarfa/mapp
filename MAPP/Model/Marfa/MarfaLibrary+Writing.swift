@@ -176,12 +176,14 @@ extension MarfaLibrary {
     }
 
     private func afterHandingOverEdits(failing title: String = MarfaLibrary.cantChangeType, _ action: @escaping () -> Void) {
+        let run = undoRun
         handOverEdits { [weak self] kept in
             guard let self else { return }
             guard kept else {
                 return notices.tell(title, String(localized: "Finish editing the current note, then try again."))
             }
-            action()
+            // The writes belong to the undo or redo that waited for the pages, so the copy may hold them too.
+            within(run, action)
         }
     }
 
@@ -416,13 +418,6 @@ extension MarfaLibrary {
         return nil
     }
 
-    // MARK: Undo
-
-    func registerUndo(_ undoManager: UndoManager?, name: String, _ handler: @escaping (MarfaLibrary) -> Void) {
-        guard let undoManager else { return }
-        undoManager.registerUndo(withTarget: self, handler: handler)
-        undoManager.setActionName(name)
-    }
 }
 
 /// What a change of type wrote, filled in when its writes are made.

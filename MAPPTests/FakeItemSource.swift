@@ -32,6 +32,8 @@ nonisolated final class FakeItemSource: ItemSource {
     nonisolated struct Submitted: Hashable, Sendable {
         let write: ItemWrite
         let id: WriteID
+        /// The undo or redo the write belongs to, if any.
+        var undoing: UndoGroup?
     }
 
     let attaching = FakeEmbeds()
@@ -93,9 +95,9 @@ nonisolated final class FakeItemSource: ItemSource {
     func changes() -> AsyncStream<SourceChange> { stream }
 
     @discardableResult
-    func submit(_ write: ItemWrite, as id: WriteID) -> Bool {
+    func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool {
         guard !isClosed.withLock({ $0 }) else { return false }
-        written.withLock { $0.append(Submitted(write: write, id: id)) }
+        written.withLock { $0.append(Submitted(write: write, id: id, undoing: undoing)) }
         return true
     }
 

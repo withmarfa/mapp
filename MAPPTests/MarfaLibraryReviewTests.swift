@@ -188,7 +188,7 @@ nonisolated final class FailingSearchSource: ItemSource {
     func syncReports() -> AsyncStream<SyncReport> { inner.syncReports() }
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool { false }
     func changes() -> AsyncStream<SourceChange> { inner.changes() }
-    func submit(_ write: ItemWrite, as id: WriteID) -> Bool { inner.submit(write, as: id) }
+    func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool { inner.submit(write, as: id, undoing: undoing) }
     func body(of item: ItemID) async throws -> ItemBody { try await inner.body(of: item) }
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { try await inner.bodies(of: items) }
     func fileURL(of item: ItemID) async throws -> URL { try await inner.fileURL(of: item) }

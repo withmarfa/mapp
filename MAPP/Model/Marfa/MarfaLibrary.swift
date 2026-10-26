@@ -70,6 +70,10 @@ import Observation
     /// Links removed only once the source has taken the links added in their place, by the link writes awaited.
     @ObservationIgnored private var replacements: [UUID: Replacement] = [:]
     @ObservationIgnored private var replacing: [WriteID: UUID] = [:]
+    /// The undo or redo whose handler is making writes now, and the one each write that may be held belongs to
+    /// (`MarfaLibrary+Undoing`).
+    @ObservationIgnored var undoRun: UndoRun?
+    @ObservationIgnored private var undoRuns: [WriteID: UndoRun] = [:]
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
@@ -391,7 +395,10 @@ import Observation
         let refusal = refusals.removeValue(forKey: id)
         let typed = textWrites[id].flatMap { item in lastTyped[item].flatMap { $0.write == id ? $0.text : nil } }
         if let item = textWrites[id], lastTyped[item]?.write == id { lastTyped[item] = nil }
-        if case .refused(let problem) = outcome, let refusal {
+        let run = undoRuns.removeValue(forKey: id)
+        if case .refused(let problem) = outcome, let run, MarfaEngine.isHeldRefusal(problem.code) {
+            giveBack(run, problem, title: refusal?.title, text: typed ?? refusal?.text)
+        } else if case .refused(let problem) = outcome, let refusal {
             let message = problem.message ?? String(localized: "The Marfa server refused this change.")
             if problem.code == MarfaEngine.closedCode {
                 notices.notKept(refusal.title, text: typed ?? refusal.text)
@@ -452,8 +459,10 @@ import Observation
         let unqueued = Self.unqueuedText(write)
         let refusal = Refusal(title: title, text: unqueued ?? Self.createdText(write), unqueuedText: unqueued)
         refusals[id] = refusal
-        if !source.submit(write, as: id) {
+        if let run = undoRun { undoRuns[id] = run }
+        if !source.submit(write, as: id, undoing: undoRun?.group) {
             refusals[id] = nil
+            undoRuns[id] = nil
             notices.notKept(title, text: refusal.text)
         }
         return id

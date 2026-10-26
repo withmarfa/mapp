@@ -147,8 +147,9 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     @discardableResult
-    func submit(_ write: ItemWrite, as id: WriteID) -> Bool {
-        if case .terminated = events.yield(.write(write, id)) { return false }
+    func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool {
+        let event: MarfaEngine.Event = undoing.map { .undo(write, id, $0) } ?? .write(write, id)
+        if case .terminated = events.yield(event) { return false }
         return true
     }
 

@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "This changed while the library was being brought up to date, so the change wasn’t made." : {
+      "extractionState" : "manual"
+    },
+    "The library is still being brought up to date, so the change wasn’t made." : {
+      "extractionState" : "manual"
+    },
+    "Choose Undo again to try it as things are now." : {
+      "extractionState" : "manual"
+    },
+    "That change wasn’t made, so there is nothing to undo here." : {
+      "extractionState" : "manual"
+    },
 "Open %lld windows?" : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {
