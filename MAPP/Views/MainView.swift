@@ -143,8 +143,8 @@ struct MainView: View {
                                 ItemTable(browser: browser, order: order, pane: $pane)
                             case .board:
                                 ItemBoard(browser: browser, pane: $pane)
-                            case .agenda:
-                                ItemAgenda(browser: browser, pane: $pane)
+                            case .timeline:
+                                ItemTimeline(browser: browser, pane: $pane)
                             case .list, .gallery:
                                 ItemGallery(browser: browser, order: order, pane: $pane)
                             }

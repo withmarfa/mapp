@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-struct ItemAgendaTests {
+struct ItemTimelineTests {
     private static let event = TypeID("example.event")
     private static let note = TypeID("example.note")
     private static let catalogue = Catalogue(itemTypes: [
@@ -33,7 +33,7 @@ struct ItemAgendaTests {
     @Test func timestampGroupsByItsLocalDayAndKeepsItsTime() throws {
         let calendar = Self.calendar()
         let raw = "2026-10-24T01:30:45.125Z"
-        let groups = ItemAgendaLayout.groups(for: [Self.item("event", date: .string(raw))], field: "due_at", catalogue: Self.catalogue, calendar: calendar)
+        let groups = ItemTimelineLayout.groups(for: [Self.item("event", date: .string(raw))], field: "due_at", catalogue: Self.catalogue, calendar: calendar)
         let group = try #require(groups.first)
         guard case .day(let day) = group.id,
               case .dated(let instant, let dateOnly, let kept) = group.rows[0].value else {
@@ -56,8 +56,8 @@ struct ItemAgendaTests {
     ])
     func invalidValuesRemainVisible(raw: String) {
         let item = Self.item("invalid", date: .string(raw))
-        #expect(ItemAgendaLayout.value(of: item, field: "due_at", catalogue: Self.catalogue) == .invalid(raw))
-        let groups = ItemAgendaLayout.groups(for: [item], field: "due_at", catalogue: Self.catalogue)
+        #expect(ItemTimelineLayout.value(of: item, field: "due_at", catalogue: Self.catalogue) == .invalid(raw))
+        let groups = ItemTimelineLayout.groups(for: [item], field: "due_at", catalogue: Self.catalogue)
         #expect(groups.map(\.id) == [.invalid])
         #expect(groups.flatMap(\.rows).map(\.id) == [item.id])
     }
@@ -67,7 +67,7 @@ struct ItemAgendaTests {
             Self.item("missing"), Self.item("null", date: .null), Self.item("empty", date: .string("")),
             Self.item("wrong-shape", date: .number(42)), Self.item("not-date-field", type: Self.note, date: .string("2026-10-24")),
         ]
-        let groups = ItemAgendaLayout.groups(for: items, field: "due_at", catalogue: Self.catalogue)
+        let groups = ItemTimelineLayout.groups(for: items, field: "due_at", catalogue: Self.catalogue)
         #expect(groups.map(\.id) == [.missing, .invalid, .notApplicable])
         #expect(groups[0].rows.count == 3)
         #expect(groups[1].rows.first?.value == .invalid("42"))
@@ -77,21 +77,21 @@ struct ItemAgendaTests {
 
     @Test func fieldsComeFromPresentTypesAndRespectKinds() {
         let notes = [Self.item("note", type: Self.note)]
-        #expect(ItemAgendaLayout.fields(for: notes, catalogue: Self.catalogue).isEmpty)
-        let fields = ItemAgendaLayout.fields(for: notes + [Self.item("event")], catalogue: Self.catalogue)
+        #expect(ItemTimelineLayout.fields(for: notes, catalogue: Self.catalogue).isEmpty)
+        let fields = ItemTimelineLayout.fields(for: notes + [Self.item("event")], catalogue: Self.catalogue)
         #expect(Set(fields.map(\.key)) == ["due_at", "starts_at", "published_at"])
-        #expect(ItemAgendaLayout.selectedField(nil, fields: fields) == "due_at")
-        #expect(ItemAgendaLayout.selectedField("published_at", fields: fields) == "published_at")
-        #expect(ItemAgendaLayout.selectedField("removed", fields: fields) == "due_at")
-        #expect(ItemAgendaLayout.selectedField(nil, fields: fields.filter { $0.key != "due_at" }) == "starts_at")
+        #expect(ItemTimelineLayout.selectedField(nil, fields: fields) == "due_at")
+        #expect(ItemTimelineLayout.selectedField("published_at", fields: fields) == "published_at")
+        #expect(ItemTimelineLayout.selectedField("removed", fields: fields) == "due_at")
+        #expect(ItemTimelineLayout.selectedField(nil, fields: fields.filter { $0.key != "due_at" }) == "starts_at")
     }
 
     @Test func noAvailableFieldStillShowsEveryItem() {
         let items = [Self.item("one", type: Self.note), Self.item("two", type: Self.note)]
-        let groups = ItemAgendaLayout.groups(for: items, field: nil, catalogue: Self.catalogue)
+        let groups = ItemTimelineLayout.groups(for: items, field: nil, catalogue: Self.catalogue)
         #expect(groups.map(\.id) == [.notApplicable])
         #expect(groups.flatMap(\.rows).count == 2)
-        #expect(ItemAgendaLayout.groups(for: [], field: nil, catalogue: Self.catalogue).isEmpty)
+        #expect(ItemTimelineLayout.groups(for: [], field: nil, catalogue: Self.catalogue).isEmpty)
     }
 
     @Test func orderingIsChronologicalThenTitleThenIdentity() {
@@ -104,7 +104,7 @@ struct ItemAgendaTests {
         ]
         let expected = ["previous", "morning", "title", "a", "z"]
         for input in [items, Array(items.reversed())] {
-            let groups = ItemAgendaLayout.groups(for: input, field: "due_at", catalogue: Self.catalogue, calendar: Self.calendar())
+            let groups = ItemTimelineLayout.groups(for: input, field: "due_at", catalogue: Self.catalogue, calendar: Self.calendar())
             #expect(groups.flatMap(\.rows).map(\.id.rawValue) == expected)
         }
     }

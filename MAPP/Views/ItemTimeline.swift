@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ItemAgenda: View {
+struct ItemTimeline: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
@@ -9,13 +9,13 @@ struct ItemAgenda: View {
     var body: some View {
         let _ = daysSeen
         let items = browser.items(in: library)
-        let fields = ItemAgendaLayout.fields(for: items, catalogue: library.catalogue)
-        // Chosen in the toolbar's View Options (`ItemAgendaOptions`).
-        let field = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
-        let groups = ItemAgendaLayout.groups(for: items, field: field, catalogue: library.catalogue)
+        let fields = ItemTimelineLayout.fields(for: items, catalogue: library.catalogue)
+        // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
+        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+        let groups = ItemTimelineLayout.groups(for: items, field: field, catalogue: library.catalogue)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        agenda(groups)
+        timeline(groups)
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {
@@ -27,7 +27,7 @@ struct ItemAgenda: View {
             }
         }
         .navigationTitle(title)
-        // The agenda only shows items; it changes none of them.
+        // The timeline only shows items; it changes none of them.
         .navigationSubtitle(Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
@@ -38,7 +38,7 @@ struct ItemAgenda: View {
         }
     }
 
-    private func agenda(_ groups: [ItemAgendaGroup]) -> some View {
+    private func timeline(_ groups: [ItemTimelineGroup]) -> some View {
         List(selection: $browser.selection) {
             ForEach(groups) { group in
                 ForEach(group.rows) { row in
@@ -47,13 +47,13 @@ struct ItemAgenda: View {
                             .opacity(row.id == group.rows.first?.id ? 1 : 0)
                             .accessibilityHidden(row.id != group.rows.first?.id)
                             .frame(width: 112, alignment: .leading)
-                        ItemAgendaEntry(row: row, catalogue: library.catalogue)
+                        ItemTimelineEntry(row: row, catalogue: library.catalogue)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, 10)
                     .tag(row.id)
                     .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("AgendaItem-\(row.id.rawValue)")
+                    .accessibilityIdentifier("TimelineItem-\(row.id.rawValue)")
                     .accessibilityAction(named: Text("Open")) { open([row.id]) }
                 }
             }
@@ -62,8 +62,8 @@ struct ItemAgenda: View {
         .scrollContentBackground(.hidden)
         .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: browser.selection)
         .focused(pane, equals: .list)
-        .accessibilityLabel("Agenda")
-        .accessibilityIdentifier("ItemAgenda")
+        .accessibilityLabel("Timeline")
+        .accessibilityIdentifier("ItemTimeline")
         .contextMenu(forSelectionType: ItemID.self) { ids in
             if ids.count == 1 {
                 Button("Open") { open(ids) }
@@ -78,7 +78,7 @@ struct ItemAgenda: View {
         }
     }
 
-    @ViewBuilder private func dayRail(_ id: ItemAgendaGroup.ID) -> some View {
+    @ViewBuilder private func dayRail(_ id: ItemTimelineGroup.ID) -> some View {
         switch id {
         case .day(let date):
             let calendar = Calendar.current
@@ -120,8 +120,8 @@ struct ItemAgenda: View {
     }
 }
 
-private struct ItemAgendaEntry: View {
-    let row: ItemAgendaRow
+private struct ItemTimelineEntry: View {
+    let row: ItemTimelineRow
     let catalogue: Catalogue
 
     var body: some View {

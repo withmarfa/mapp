@@ -24,8 +24,8 @@ nonisolated enum ViewDraft {
         case list(NoteOrder)
         /// Lanes by a choice field, or none where the board has no field.
         case board(key: String?, label: String)
-        /// Days by a date field, or none where the agenda has no field.
-        case agenda(key: String?, label: String)
+        /// Days by a date field, or none where the timeline has no field.
+        case timeline(key: String?, label: String)
     }
 
     /// A choice of the window's that the view will not keep.
@@ -119,7 +119,7 @@ nonisolated enum ViewDraft {
             guard let key else { return (byTitle, nil, []) }
             guard isPropertyName(key) else { return (byTitle, nil, [.group(column: label)]) }
             return (byTitle, LibraryViewGroup(field: "properties." + key), [])
-        case .agenda(let key, let label):
+        case .timeline(let key, let label):
             guard let key else { return ([], nil, []) }
             guard isPropertyName(key) else { return ([], nil, [.group(column: label)]) }
             let field = "properties." + key

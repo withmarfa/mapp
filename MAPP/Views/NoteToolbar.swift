@@ -94,7 +94,7 @@ struct DetailsToggle: View {
     }
 }
 
-/// The toolbar of every view that spans the window (gallery, table, board and agenda), one for the view and the
+/// The toolbar of every view that spans the window (gallery, table, board and timeline), one for the view and the
 /// page it opens, so the order across its single column keeps New Item at the leading side when the sidebar is
 /// hidden. At the trailing side, always in this order: Search, the table's Filter and View Options
 /// (`CurrentViewOptions`), then View As, Share and More, and Details. The list has the same order across its two

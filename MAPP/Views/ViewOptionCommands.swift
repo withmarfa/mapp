@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The View Options of the table, the board and the agenda as the command palette lists them: each choice not
+/// The View Options of the table, the board and the timeline as the command palette lists them: each choice not
 /// already made. The list's and the gallery's order are the palette's own Sort and Group entries.
 struct ViewOptionCommand {
     let title: String
@@ -13,7 +13,7 @@ struct ViewOptionCommand {
         switch browser.viewMode {
         case .table: return table(browser, library, storedColumns)
         case .board: return board(browser, library)
-        case .agenda: return agenda(browser, library)
+        case .timeline: return timeline(browser, library)
         case .list, .gallery: return []
         }
     }
@@ -93,13 +93,13 @@ struct ViewOptionCommand {
         return commands
     }
 
-    private static func agenda(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
+    private static func timeline(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
-        let fields = ItemAgendaLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
-        let field = ItemAgendaLayout.selectedField(browser.agendaFields[place], fields: fields)
+        let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+        let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         return fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.displayLabel)"), systemImage: "calendar") {
-                browser.agendaFields[place] = field.key
+                browser.timelineFields[place] = field.key
             }
         }
     }

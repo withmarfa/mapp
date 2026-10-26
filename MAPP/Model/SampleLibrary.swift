@@ -16,7 +16,7 @@ nonisolated enum SampleLibrary {
     /// the person's saved server and Keychain.
     static var startsUnconfigured: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPSampleUnconfigured") }
 
-    /// Also asks for the tasks and events a board and an agenda show.
+    /// Also asks for the tasks and events a board and a timeline show.
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") }
 
     /// The address the sample answers at. Nothing is ever sent to it.
@@ -295,11 +295,11 @@ nonisolated private let tasks: [(title: String, status: String, priority: String
 ]
 
 nonisolated private let sessions: [(title: String, day: Int?, hour: Int, body: String)] = [
-    ("Morning review", 0, 9, "A sample planning session. Open this page from the agenda and return without losing your place."),
-    ("Reader layout workshop", 0, 11, "A sample planning session. Open this page from the agenda and return without losing your place."),
-    ("Collection planning", 1, 10, "A sample planning session. Open this page from the agenda and return without losing your place."),
-    ("Board interaction review", 2, 14, "A sample planning session. Open this page from the agenda and return without losing your place."),
-    ("Look back at the week", -1, 16, "A sample planning session. Open this page from the agenda and return without losing your place."),
+    ("Morning review", 0, 9, "A sample planning session. Open this page from the timeline and return without losing your place."),
+    ("Reader layout workshop", 0, 11, "A sample planning session. Open this page from the timeline and return without losing your place."),
+    ("Collection planning", 1, 10, "A sample planning session. Open this page from the timeline and return without losing your place."),
+    ("Board interaction review", 2, 14, "A sample planning session. Open this page from the timeline and return without losing your place."),
+    ("Look back at the week", -1, 16, "A sample planning session. Open this page from the timeline and return without losing your place."),
     ("Schedule the next comparison", nil, 9, "This session has no date yet. It remains visible below the dated sessions."),
 ]
 

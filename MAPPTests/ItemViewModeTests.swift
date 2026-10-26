@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MAPP
 
@@ -17,14 +18,14 @@ struct ItemViewModeTests {
         ], titleField: "title", bodyField: "body", parent: nil),
     ])
 
-    @Test func placesWithoutGroupingFieldsOfferNeitherBoardNorAgenda() {
+    @Test func placesWithoutGroupingFieldsOfferNeitherBoardNorTimeline() {
         #expect(ItemViewMode.available(forTypes: [Self.plain], catalogue: Self.catalogue) == [.list, .gallery, .table])
         #expect(ItemViewMode.available(forTypes: [], catalogue: Self.catalogue) == [.list, .gallery, .table])
     }
 
     @Test func eachGroupingLayoutNeedsItsOwnKindOfField() {
         #expect(ItemViewMode.available(forTypes: [Self.task], catalogue: Self.catalogue) == [.list, .gallery, .table, .board])
-        #expect(ItemViewMode.available(forTypes: [Self.event], catalogue: Self.catalogue) == [.list, .gallery, .table, .agenda])
+        #expect(ItemViewMode.available(forTypes: [Self.event], catalogue: Self.catalogue) == [.list, .gallery, .table, .timeline])
     }
 
     @Test func mixedPlacesOfferEverythingAnyTypeCanShow() {
@@ -60,5 +61,27 @@ struct ItemViewModeTests {
             browser.show(place, in: library, order: NoteOrder())
             #expect(browser.viewMode == .list, "\(place)")
         }
+    }
+
+    @Test func aStoredLayoutThisVersionDoesNotHaveReadsAsTheList() throws {
+        let decoder = JSONDecoder()
+        #expect(try decoder.decode(ItemViewMode.self, from: Data(#""agenda""#.utf8)) == .list)
+        #expect(try decoder.decode(ItemViewMode.self, from: Data(#""timeline""#.utf8)) == .timeline)
+        let kept = try decoder.decode([String: ItemViewMode].self, from: Data(#"{"a":"agenda","b":"table"}"#.utf8))
+        #expect(kept == ["a": .list, "b": .table])
+    }
+
+    @Test func aWindowKeptOnTheOldLayoutNameOpensInTheListAtItsPlace() throws {
+        let (library, _, _, favorite) = BrowserTests().makeFakeLibrary()
+        let kept = Browser.Snapshot(place: .allNotes, selection: [favorite.id], viewMode: .table)
+        let json = try #require(String(data: JSONEncoder().encode(kept), encoding: .utf8))
+        let oldName = json.replacingOccurrences(of: #""viewMode":"table""#, with: #""viewMode":"agenda""#)
+        try #require(oldName != json)
+        let saved = Data(oldName.utf8)
+        let browser = Browser()
+        browser.restore(from: saved, in: library, order: NoteOrder())
+        #expect(browser.viewMode == .list)
+        #expect(browser.item == .allNotes)
+        #expect(browser.selection == [favorite.id])
     }
 }

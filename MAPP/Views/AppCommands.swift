@@ -90,7 +90,7 @@ struct AppCommands: Commands {
             // The toolbar's Filter and View Options, for the view in front.
             Group {
                 if library != nil, let browser {
-                    // A table, board or agenda with an item page open has no view options to offer.
+                    // A table, board or timeline with an item page open has no view options to offer.
                     if browser.offersViewOptions {
                         if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
                         CurrentViewOptions(browser: browser)

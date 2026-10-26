@@ -2,7 +2,13 @@ import Foundation
 
 /// The list keeps the page beside it; collection layouts span the window and open an item in their place.
 nonisolated enum ItemViewMode: String, Codable, CaseIterable {
-    case list, gallery, table, board, agenda
+    case list, gallery, table, board, timeline
+
+    /// A stored layout this version does not have, such as one a window or a view kept under an earlier name, reads
+    /// as the list, so the window opens instead of losing the rest of what it kept.
+    init(from decoder: any Decoder) throws {
+        self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .list
+    }
 
     /// The SF Symbol for the view, in its menu and on the button that opens it.
     var symbol: String {
@@ -11,16 +17,16 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .gallery: "square.grid.2x2"
         case .table: "tablecells"
         case .board: "rectangle.split.3x1"
-        case .agenda: "calendar"
+        case .timeline: "calendar"
         }
     }
 
-    /// The layouts that can show items of these types. Board needs a choice field and Agenda a date field to group
+    /// The layouts that can show items of these types. Board needs a choice field and Timeline a date field to group
     /// by; a place without one never offers that layout, instead of offering an empty one.
     static func available(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemViewMode] {
         var modes: [ItemViewMode] = [.list, .gallery, .table]
         if types.contains(where: { !ItemBoardLayout.eligibleFields(of: $0, catalogue: catalogue).isEmpty }) { modes.append(.board) }
-        if !ItemAgendaLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes.append(.agenda) }
+        if !ItemTimelineLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes.append(.timeline) }
         return modes
     }
 
@@ -34,7 +40,7 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .gallery: "Back to Gallery"
         case .table: "Back to Table"
         case .board: "Back to Board"
-        case .agenda: "Back to Agenda"
+        case .timeline: "Back to Timeline"
         }
     }
 }

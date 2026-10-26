@@ -3,7 +3,7 @@ import Testing
 @testable import MAPP
 
 struct BrowserTests {
-    @Test(arguments: [ItemViewMode.board, .agenda])
+    @Test(arguments: [ItemViewMode.board, .timeline])
     func collectionStudiesOpenAndReturnWithoutLosingSelection(_ mode: ItemViewMode) {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
@@ -24,11 +24,11 @@ struct BrowserTests {
         let browser = Browser()
         browser.adopt(first)
         browser.boardFields[.allNotes] = "status"
-        browser.agendaFields[.allNotes] = "starts_at"
+        browser.timelineFields[.allNotes] = "starts_at"
         browser.compactBoards[.allNotes] = true
         browser.adopt(second)
         #expect(browser.boardFields.isEmpty)
-        #expect(browser.agendaFields.isEmpty)
+        #expect(browser.timelineFields.isEmpty)
         #expect(browser.compactBoards.isEmpty)
     }
 

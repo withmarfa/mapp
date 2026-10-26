@@ -39,10 +39,10 @@ enum SavedViews {
             let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
             let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
             window.layout = .board(key: field?.key, label: field?.label ?? "")
-        case .agenda:
-            let fields = ItemAgendaLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
-            let key = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
-            window.layout = .agenda(key: key, label: fields.first { $0.key == key }?.displayLabel ?? "")
+        case .timeline:
+            let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+            window.layout = .timeline(key: key, label: fields.first { $0.key == key }?.displayLabel ?? "")
         }
         return window
     }

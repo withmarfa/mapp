@@ -161,9 +161,9 @@ struct ViewDraftTests {
         #expect(board.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(try draft(.board(key: "due-date", label: "Due")).unkept == [.group(column: "Due")])
 
-        let agenda = try draft(.agenda(key: "due_at", label: "Due"))
-        #expect(agenda.group == LibraryViewGroup(field: "properties.due_at", bucket: .day))
-        #expect(agenda.sort == [LibraryViewSort(field: "properties.due_at", ascending: true)])
+        let timeline = try draft(.timeline(key: "due_at", label: "Due"))
+        #expect(timeline.group == LibraryViewGroup(field: "properties.due_at", bucket: .day))
+        #expect(timeline.sort == [LibraryViewSort(field: "properties.due_at", ascending: true)])
     }
 
     // MARK: Filters
