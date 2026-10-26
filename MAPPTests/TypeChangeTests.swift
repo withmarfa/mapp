@@ -99,6 +99,18 @@ nonisolated enum TypeChangeFixture {
         #expect(highlight == .failure(.cannotFill(F.info(F.highlight).fields[2])))
     }
 
+    @Test func aTitleNeverReplacesADifferentValueUnderTheNewTitleKey() throws {
+        // The entity's `title`, left by another app, becomes the note's title, and its name stays where it was.
+        let plan = try F.plan(["name": .string("Ada"), "title": .string("Research notes")], F.entity, F.note).get()
+        #expect(plan.changes.isEmpty)
+        #expect(plan.unused == ["name"])
+
+        // The same title under both keys is held once.
+        let same = try F.plan(["name": .string("Ada"), "title": .string("Ada")], F.entity, F.note).get()
+        #expect(same.changes == ["name": F.gone])
+        #expect(same.unused.isEmpty)
+    }
+
     @Test func aTitleGoesIntoTheTextOfATypeTitledByItsFirstLine() throws {
         let plan = try F.plan(
             ["title": .string("Hello"), "body": .string("Body text")], F.note, F.message, filling: ["from": .string("Ada")]

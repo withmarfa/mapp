@@ -22,6 +22,9 @@ import Observation
     private(set) var isLoaded = false
     /// Where the library tells the person what it could not do or keep: the host's, for every library it opens.
     @ObservationIgnored let notices: Notices
+    /// Has every open page hand over its last edit, then says whether all of them did, so a change that moves an
+    /// item's text moves what the person sees.
+    @ObservationIgnored var handOverEdits: (@escaping (Bool) -> Void) -> Void = { EditorController.flushAll(leaving: false, then: $0) }
     var notesToPurge: Set<ItemID> = []
     private(set) var catalogue = Catalogue()
     private(set) var views: [LibraryView] = []
@@ -353,14 +356,14 @@ import Observation
 
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
     /// a body, a create's title, body and text values, since the person typed them in quick add, and the text values
-    /// of a property edit, a title among them.
+    /// of a property edit, a title among them, or of a change of type, the values typed in its sheet among them.
     private static func unqueuedText(_ write: ItemWrite) -> String? {
         switch write {
         case .editBody(_, let text, _, _):
             return text
         case .create:
             return createdText(write)
-        case .editProperties(_, let changes, _, _):
+        case .editProperties(_, let changes, _, _), .retype(_, _, let changes, _):
             let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value?.string }
             return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
         default:

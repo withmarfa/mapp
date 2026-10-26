@@ -107,8 +107,10 @@ struct TypeChangeSheet: View {
 
     private func change() {
         guard let selected, canChange(library.typeChangePreview(for: request.ids, to: selected)) else { return }
-        library.changeTypeAfterSaving(request.ids, to: selected, filling: filling, undoManager: request.undoManager)
-        dismiss()
+        // A change refused before anything is sent leaves the sheet open with what was typed.
+        library.changeTypeAfterSaving(request.ids, to: selected, filling: filling, undoManager: request.undoManager) { sent in
+            if sent { dismiss() }
+        }
     }
 }
 
@@ -129,10 +131,17 @@ struct TypeChangeButton: View {
 
 extension ItemLibrary {
     /// Changes the items' type once every open page has handed over what was just typed, so the change moves the
-    /// text the person sees, and the page then reads it from the new type's key.
-    func changeTypeAfterSaving(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) {
+    /// text the person sees, and the page then reads it from the new type's key. `done` says whether it was sent.
+    func changeTypeAfterSaving(
+        _ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?,
+        then done: @escaping (Bool) -> Void
+    ) {
         EditorController.flushAll(leaving: false) { [self] kept in
-            if kept { changeType(ids, to: type, filling: filling, undoManager: undoManager) }
+            guard kept else {
+                notices.tell(String(localized: "Can’t Change Type"), String(localized: "Finish editing the current note, then try again."))
+                return done(false)
+            }
+            done(changeType(ids, to: type, filling: filling, undoManager: undoManager))
         }
     }
 }

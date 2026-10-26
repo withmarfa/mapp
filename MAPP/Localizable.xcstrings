@@ -6,6 +6,7 @@
 "Can’t Change Type" : { "extractionState" : "manual" },
 "One or more of these items can’t become this type." : { "extractionState" : "manual" },
 "Enter a value for: %@." : { "extractionState" : "manual" },
+"Finish editing the current note, then try again." : { "extractionState" : "manual" },
 "“%@” has changed since, and can’t go back to its type." : { "extractionState" : "manual" },
 "Choose a new type for “%@”." : { "extractionState" : "manual" },
 "Choose a new type for %lld items." : { "extractionState" : "manual" },

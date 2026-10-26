@@ -239,9 +239,10 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every change of type asked for.
     private(set) var typeChanges: [(ids: Set<ItemID>, type: TypeID, filling: [String: PropertyValue])] = []
 
-    func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) {
+    func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool {
         typeChanges.append((ids, type, filling))
         change(ids) { $0.type = type }
+        return true
     }
 
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?) {

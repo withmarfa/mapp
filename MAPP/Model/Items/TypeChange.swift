@@ -38,8 +38,13 @@ nonisolated struct TypeChange: Hashable, Sendable {
 
         switch (oldTitleKey, new.titleKey) {
         case let (from?, to?) where from != to:
-            if let value = values[from] {
-                set[to] = value
+            // A different title already under the new key, as another app may leave, is the one the new type reads,
+            // and the old one stays under its own key, so neither is lost.
+            let held = values[to]
+            let free = held == nil || held == .null || held?.string.map({ NoteName.trimmed($0).isEmpty }) == true
+            if let value = values[from],
+               free || held?.string.map(NoteName.trimmed) == value.string.map(NoteName.trimmed) {
+                if free { set[to] = value }
                 removed.insert(from)
             }
         case (let from?, nil):

@@ -24,6 +24,8 @@ import Testing
         let source = FakeItemSource()
         for (id, text) in bodies { source.setBody(text, of: id) }
         let library = MarfaLibrary(source: source, notices: Notices())
+        // Pages other suites leave open are not this test's to wait on.
+        library.handOverEdits = { $0(true) }
         source.send(.loaded(SourceSnapshot(items: items, catalogue: F.catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
@@ -100,6 +102,67 @@ import Testing
             Self.launch, F.note, ["description": F.gone, "body": .string("Agenda, edited")], base: ItemVersion(3)))
     }
 
+    @Test func undoAfterALaterChangeOfTypeMovesBackFromTheTypeItIsNow() async throws {
+        let (library, source) = try await loaded([Self.note(Self.launch, title: "Launch")], bodies: [Self.launch: "Agenda"])
+        let undo = UndoManager()
+        library.changeType([Self.launch], to: F.event, filling: ["starts_at": start], undoManager: undo)
+
+        // Another device makes it a highlight, which keeps its title in `text` and its text in `note`.
+        source.setBody("Agenda, edited", of: Self.launch, version: 3)
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        source.send(.upserted([MAPP.Item(
+            id: Self.launch, type: F.highlight, title: "Launch", titleRule: .property("text"),
+            properties: [Property(key: "text", value: .string("Launch")), Property(key: "starts_at", value: start)],
+            version: ItemVersion(3), created: date, modified: date)]))
+        #expect(await eventually { library.item(Self.launch)?.type == F.highlight })
+        try #require(await eventually { library.body(of: Self.launch)?.text == "Agenda, edited" })
+
+        undo.undo()
+        #expect(await eventually { source.writes.count == 2 })
+        #expect(source.writes.last == .retype(
+            Self.launch, F.note, ["text": F.gone, "title": .string("Launch"), "note": F.gone, "body": .string("Agenda, edited")],
+            base: ItemVersion(3)))
+    }
+
+    @Test func valuesTypedForAChangeRefusedBeforeQueueingAreGivenBack() async throws {
+        let (library, source) = try await loaded([Self.note(Self.launch, title: "Launch")], bodies: [Self.launch: ""])
+        #expect(library.changeType([Self.launch], to: F.message, filling: ["from": .string("Ada Lovelace")], undoManager: nil))
+        let write = try #require(source.submitted.last?.id)
+        let problem = SyncProblem(code: "hydration_incomplete", message: "Try again in a moment.", notQueued: true)
+        source.send(.answered(write, .refused(problem)))
+        #expect(await eventually { !library.notices.waiting.isEmpty })
+        #expect(library.notices.waiting.last?.text?.contains("Ada Lovelace") == true)
+
+        // A change refused before anything is sent says so, so the sheet stays open with what was typed.
+        #expect(!library.changeType([Self.launch], to: F.event, filling: [:], undoManager: nil))
+    }
+
+    @Test func undoWaitsForTheOpenPagesToHandOverTheirLastEdit() async throws {
+        let (library, source) = try await loaded([Self.note(Self.launch, title: "Launch")], bodies: [Self.launch: "Agenda"])
+        var handingOver: [(Bool) -> Void] = []
+        library.handOverEdits = { handingOver.append($0) }
+        let undo = UndoManager()
+        library.changeType([Self.launch], to: F.task, filling: [:], undoManager: undo)
+        source.send(.upserted([Self.note(Self.launch, title: "Launch", version: 2, type: F.task)]))
+        #expect(await eventually { library.item(Self.launch)?.type == F.task })
+
+        undo.undo()
+        #expect(source.writes.count == 1)
+        #expect(undo.canRedo)
+        try #require(handingOver.count == 1)
+        handingOver[0](true)
+        #expect(source.writes.last == .retype(Self.launch, F.note, [:], base: ItemVersion(2)))
+
+        // A page that cannot hand over its edit stops the redo, and says so.
+        source.send(.upserted([Self.note(Self.launch, title: "Launch", version: 3)]))
+        #expect(await eventually { library.item(Self.launch)?.type == F.note })
+        undo.redo()
+        try #require(handingOver.count == 2)
+        handingOver[1](false)
+        #expect(source.writes.count == 2)
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Change Type"))
+    }
+
     @Test func severalItemsChangeTogetherAndUndoAsOne() async throws {
         let other = ItemID("other")
         let (library, source) = try await loaded(
@@ -110,9 +173,11 @@ import Testing
         library.changeType([Self.launch, other], to: F.task, filling: [:], undoManager: undo)
         // The task already is one.
         #expect(source.writes == [.retype(Self.launch, F.task, [:], base: ItemVersion(1))])
+        source.send(.upserted([Self.note(Self.launch, title: "Launch", version: 2, type: F.task)]))
+        #expect(await eventually { library.item(Self.launch)?.type == F.task })
         undo.undo()
         #expect(source.writes.count == 2)
-        #expect(source.writes.last == .retype(Self.launch, F.note, [:], base: ItemVersion(1)))
+        #expect(source.writes.last == .retype(Self.launch, F.note, [:], base: ItemVersion(2)))
     }
 }
 
@@ -154,6 +219,7 @@ import Testing
         let (fake, source) = Self.open()
         fake.verdict = { _ in nil }
         let library = MarfaLibrary(source: source, notices: Notices())
+        library.handOverEdits = { $0(true) }
         try #require(await eventually { library.body(of: Self.n1)?.text == "Agenda\n\n- [ ] book a room" })
         let undo = UndoManager()
 
