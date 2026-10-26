@@ -60,7 +60,7 @@ nonisolated enum LibraryFixture {
                 id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", reverseName: nil, cardinality: .one, writtenAt: .source,
                 sourceTypes: [ticket], targetTypes: [ticket], reverseCardinality: .one),
             EdgeTypeInfo(
-                id: "in-collection", label: "In collection", reverseLabel: "Collection of", reverseName: nil, cardinality: .many, writtenAt: .source,
+                id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: [], targetRoles: ["container"]),
             EdgeTypeInfo(
                 id: "references", label: "References", reverseLabel: "Referenced by", reverseName: nil, cardinality: .many, writtenAt: .source,
@@ -160,8 +160,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.items(in: .itemType("aic.ticket")).isEmpty)
         #expect(ids(library.items(in: .itemType("aic.ticket.task"))) == [F.e1])
         #expect(ids(library.items(in: .itemType("aic.ticket.bug"))) == [F.t1])
-        #expect(ids(library.items(in: .collection(F.p1))) == [F.e1, F.t1])
-        #expect(library.items(in: .collection(F.p2)).isEmpty)
+        // Only `in-collection` edges make members: the items filed under Alpha are its children, not its contents.
+        #expect(library.items(in: .collection(F.p1)).isEmpty)
         #expect(ids(library.items(in: .files)) == [F.f1])
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
         for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
@@ -199,7 +199,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([added]))
         #expect(await eventually { library.item(added.id) != nil })
         #expect(library.body(of: added.id)?.text == "Fresh")
-        #expect(ids(library.items(in: .collection(F.p2))) == [added.id])
         #expect(library.count(in: .itemType("aic.ticket.task")) == 2)
 
         source.send(.removed([F.n1]))

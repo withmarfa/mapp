@@ -134,55 +134,27 @@ struct ItemMetaTests {
         return item
     }
 
-    @Test func aMixedListNamesTheTypeAndTheProject() {
+    @Test func aMixedListNamesTheTypeAndNotWhereTheItemIsFiled() {
         let project = item("Field Research", type: "test.project")
         let notes = item("Interviews", parent: project)
         let task = item("Book rooms", type: "core.task", parent: notes)
         let library = FakeItemLibrary(items: [project, notes, task])
         let meta = ItemMeta.make(for: task, in: library, context: .init(mixesTypes: true))
-        // The project is the top of the chain, so the task is in the collection just below it: the note it is filed under.
-        #expect(meta.pieces.map(\.label) == ["Task", "Interviews"])
-        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle", "doc.text"])
+        #expect(meta.pieces.map(\.label) == ["Task"])
+        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle"])
     }
 
     @Test func aListOfOneTypeLeavesTheTypeOut() {
         let project = item("Field Research", type: "aic.project")
         let task = item("Book rooms", type: "aic.ticket.task", parent: project)
         let library = FakeItemLibrary(items: [project, task])
-        #expect(ItemMeta.make(for: task, in: library, context: .init()).pieces.map(\.label) == ["Field Research"])
-    }
-
-    @Test func aCollectionsOwnListDoesNotNameTheCollection() {
-        let project = item("Field Research", type: "aic.project")
-        let task = item("Book rooms", type: "aic.ticket.task", parent: project)
-        let library = FakeItemLibrary(items: [project, task])
-        #expect(ItemMeta.make(for: task, in: library, context: .init(collection: project.id)).isEmpty)
+        #expect(ItemMeta.make(for: task, in: library, context: .init()).isEmpty)
     }
 
     @Test func anItemWithNoProjectAndNothingToSayHasNoLine() {
         let note = item("Loose note")
         let library = FakeItemLibrary(items: [note])
         #expect(ItemMeta.make(for: note, in: library, context: .init()).isEmpty)
-    }
-
-    @Test func theCollectionIsJustBelowTheTop() {
-        let root = item("WithMarfa", type: "aic.project")
-        let project = item("Marfa", type: "aic.project", parent: root)
-        let epic = item("Interviews", type: "aic.epic", parent: project)
-        let task = item("Book rooms", type: "aic.ticket.task", parent: epic)
-        let library = FakeItemLibrary(items: [root, project, epic, task])
-        #expect(library.collection(of: task)?.id == project.id)
-        #expect(library.collection(of: project)?.id == root.id)
-        #expect(library.collection(of: root) == nil)
-    }
-
-    @Test func aParentCycleEnds() {
-        var one = item("One")
-        var two = item("Two", parent: one)
-        one.edgesOut = [Edge(id: EdgeID("loop"), type: "child-of", source: one.id, target: .item(two.id), origin: .property("child-of"))]
-        two.edgesOut = [Edge(id: EdgeID("loop2"), type: "child-of", source: two.id, target: .item(one.id), origin: .property("child-of"))]
-        let library = FakeItemLibrary(items: [one, two])
-        #expect(library.collection(of: one)?.id == two.id)
     }
 
     @Test func aFeedItemNamesTheInboxAnywhereButTheInbox() {

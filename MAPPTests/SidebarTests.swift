@@ -128,51 +128,23 @@ struct SidebarTests {
 
     // MARK: Collections
 
-    func filed(_ title: String, under parent: Item? = nil, state: ItemState = .active) -> Item {
-        var item = FakeItemLibrary.note(title, modified: start, state: state)
-        item.tier = .library
-        if let parent {
-            item.edgesOut = [Edge(id: EdgeID(title), type: "child-of", source: item.id, target: .item(parent.id), origin: .property("child-of"))]
-        }
-        return item
+    @Test func theCollectionsIndexListsContainerItemsByTitle() {
+        let project = FakeItemLibrary.note("Project", modified: start)
+        var child = FakeItemLibrary.note("Child", modified: start)
+        child.edgesOut = [Edge(id: EdgeID("c"), type: "child-of", source: child.id, target: .item(project.id), origin: .property("child-of"))]
+        let library = FakeItemLibrary(items: [
+            project, child, FakeItemLibrary.collection("Reading"), FakeItemLibrary.collection("Home"),
+            FakeItemLibrary.collection("Gone", state: .trashed),
+        ])
+        // An item other items are filed under is no collection; only a container type's items are.
+        #expect(library.collections.map(\.title) == ["Home", "Reading"])
     }
 
-    @Test func aCollectionIsAnythingOtherItemsAreFiledUnder() async throws {
+    @Test func aMarfaLibraryWithoutAContainerHasNoCollections() async throws {
         let library = try await marfaLibrary()
-        let tree = library.collectionTree
-        // Alpha holds Epic task, which holds Bug one. Beta, with nothing filed under it, is no collection.
-        #expect(tree.map(\.title) == ["Alpha"])
-        #expect(tree.first?.symbol == "doc.text")
-        #expect(tree.first?.children.map(\.title) == ["Epic task"])
-        #expect(tree.first?.children.first?.symbol == "doc.text")
+        // Alpha holds Epic task through `child-of`, which once made it a collection.
+        #expect(library.collections.isEmpty)
         #expect(SidebarPlan(library, layout: SidebarLayout()).library == [.types])
-    }
-
-    @Test func theCollectionsIndexShowsTwoLevelsByTitle() {
-        let root = filed("Root")
-        let b = filed("B", under: root), a = filed("A", under: root)
-        let deep = filed("Deep", under: a)
-        let leaf = filed("Leaf", under: deep)
-        let loose = filed("Loose")
-        let library = FakeItemLibrary(items: [root, b, a, deep, leaf, loose, filed("Under B", under: b)])
-        let tree = library.collectionTree
-        #expect(tree.map(\.title) == ["Root"])
-        #expect(tree.first?.children.map(\.title) == ["A", "B"])
-        // Deep holds an item, but sits a third level down, which the collection's own list reaches.
-        #expect(tree.first?.children.allSatisfy(\.children.isEmpty) == true)
-    }
-
-    @Test func aCollectionFiledUnderOneInTheBinStandsAtTheTop() {
-        let gone = filed("Gone", state: .trashed)
-        let kept = filed("Kept", under: gone)
-        let library = FakeItemLibrary(items: [gone, kept, filed("Child", under: kept)])
-        #expect(library.collectionTree.map(\.title) == ["Kept"])
-    }
-
-    @Test func anItemFiledUnderItselfIsNoCollection() {
-        var item = filed("Self")
-        item.edgesOut = [Edge(id: EdgeID("loop"), type: "child-of", source: item.id, target: .item(item.id), origin: .property("child-of"))]
-        #expect(FakeItemLibrary(items: [item]).collectionTree.isEmpty)
     }
 
     @Test func aTypeWhoseLastItemGoesLeavesTheListAndTheWindowMovesToAllItems() async throws {

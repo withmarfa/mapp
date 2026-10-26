@@ -59,7 +59,8 @@ final class FakeItemLibrary: ItemLibrary {
         return item
     }
 
-    /// Notes, tasks with a status, projects that hold them, and files, as a server's catalogue might have them.
+    /// Notes, tasks with a status, projects that hold them, collections, and files, as a server's catalogue might
+    /// have them.
     static let testCatalogue: Catalogue = {
         let task = TypeID("core.task")
         let project = TypeID("test.project")
@@ -75,6 +76,9 @@ final class FakeItemLibrary: ItemLibrary {
                 id: project, label: "Project",
                 fields: [ItemTypeInfo.Field(key: "description", label: "Description", kind: .text, declaredBy: project)],
                 titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(
+                id: collectionType, label: "Collection", fields: [], titleField: "title", bodyField: "description",
+                parent: nil, roles: ["container"]),
             ItemTypeInfo(id: .file, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil),
             ItemTypeInfo(id: TypeID("core.file.image"), label: "Image", fields: [], titleField: nil, bodyField: nil, parent: .file),
         ]
@@ -82,23 +86,24 @@ final class FakeItemLibrary: ItemLibrary {
         let parent = EdgeTypeInfo(
             id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
             sourceTypes: [], targetTypes: [])
-        return Catalogue(itemTypes: types, edgeTypes: [parent])
+        let collection = EdgeTypeInfo(
+            id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
+            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"])
+        return Catalogue(itemTypes: types, edgeTypes: [parent, collection])
     }()
+
+    static let collectionType = TypeID("test.collection")
+
+    /// An active collection, of the catalogue's container type.
+    static func collection(_ title: String, id: ItemID = .mint(), state: ItemState = .active) -> Item {
+        Item(
+            id: id, type: collectionType, title: title, titleRule: .property("title"), state: state,
+            version: ItemVersion(1), created: .distantPast, modified: .distantPast)
+    }
 
     // MARK: Reading
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
-
-    private func isBelow(_ item: Item, _ ancestor: ItemID) -> Bool {
-        var visited: Set<ItemID> = [item.id]
-        var current = item
-        while let parent = current.parentID, visited.insert(parent).inserted {
-            if parent == ancestor { return true }
-            guard let next = self.item(parent) else { return false }
-            current = next
-        }
-        return false
-    }
 
     func items(in place: SidebarItem) -> [Item] {
         if place == .recents { return Self.recent(items) }
@@ -112,7 +117,7 @@ final class FakeItemLibrary: ItemLibrary {
             case .favorites: item.state == .active && item.isFavorite
             case .favoriteItem(let id): item.id == id && item.state == .active && item.isFavorite
             case .itemType(let type): item.state == .active && item.type == TypeID(type)
-            case .collection(let id): item.state == .active && isBelow(item, id)
+            case .collection(let id): item.state == .active && item.collectionIDs.contains(id)
             case .files: item.state == .active && item.isFile
             case .view(let id): item.state == .active && viewMembers[id]?.contains(item.id) == true
             case .recentlyDeleted: item.state == .trashed
@@ -351,6 +356,39 @@ final class FakeItemLibrary: ItemLibrary {
             id: id, type: .file, title: title ?? name, titleRule: .property("title"), content: .file(.data, byteCount: Int64(data.count)),
             version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? []))
         return id
+    }
+
+    // MARK: Collections
+
+    var collections: [Item] {
+        items.filter { $0.state == .active && catalogue.isCollection($0.type) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
+        guard collections.contains(where: { $0.id == collection }),
+              ids.allSatisfy({ id in item(id).map(canJoinCollection) == true })
+        else {
+            notices.tell("Can’t Add to Collection", "Refused")
+            return false
+        }
+        for index in items.indices where ids.contains(items[index].id) && !items[index].collectionIDs.contains(collection) {
+            let id = items[index].id
+            items[index].edgesOut.append(Edge(
+                id: EdgeID("in-collection-\(id.rawValue)-\(collection.rawValue)"), type: MarfaMapping.collectionEdge,
+                source: id, target: .item(collection), origin: .property(MarfaMapping.collectionEdge)))
+        }
+        return true
+    }
+
+    func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
+        var removed = false
+        for index in items.indices where ids.contains(items[index].id) {
+            let before = items[index].edgesOut.count
+            items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.target == .item(collection) }
+            removed = removed || items[index].edgesOut.count != before
+        }
+        return removed
     }
 
     private func change(_ ids: Set<ItemID>, _ body: (inout Item) -> Void) {

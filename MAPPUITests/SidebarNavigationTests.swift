@@ -116,33 +116,24 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 3))
     }
 
-    func testAnItemFiledUnderAnotherAppearsInTheCollectionsIndex() {
-        create(type: "Project", title: "Field research")
-        XCTAssertTrue(sidebarText("Collections").exists, "the collections index stays available when empty")
-        XCTAssertFalse(sidebarText("Field research").exists, "a project with nothing under it is no collection")
-        create(type: "Task", title: "Survey the site", parent: "Field research")
+    func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
         XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY)
-        XCTAssertFalse(sidebarText("Field research").exists, "Collection entries belong in the index")
+        XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         sidebarText("Collections").click()
         let index = element("SidebarIndex")
         XCTAssertTrue(index.waitForExistence(timeout: 3))
-        let collection = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Field research")).firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 3))
-        collection.click()
-        XCTAssertTrue(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Survey the site")).firstMatch.waitForExistence(timeout: 3))
-        XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch.exists)
-    }
-
-    private func create(type: String, title: String, parent: String? = nil) {
-        window.quickAdd(type: type, title: title)
-        XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
-        app.typeKey(.return, modifierFlags: [])
-        if let parent {
-            window.itemParentPin.click()
-            window.menuItems[parent].click()
-        }
+        let home = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Home")).firstMatch
+        let reading = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Reading")).firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 3))
+        XCTAssertLessThan(home.frame.maxY, reading.frame.minY, "collections go by title")
+        home.click()
+        let boiler = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Boiler")).firstMatch
+        let moving = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Moving checklist")).firstMatch
+        XCTAssertTrue(boiler.waitForExistence(timeout: 3))
+        XCTAssertLessThan(boiler.frame.maxY, moving.frame.minY, "members keep the collection's order")
+        XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch.exists)
     }
 
     private func element(_ identifier: String) -> XCUIElement {

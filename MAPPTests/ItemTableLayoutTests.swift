@@ -28,7 +28,7 @@ struct ItemTableLayoutTests {
 
     private static func row(
         _ title: String, type: String = "aic.ticket.task", status: String? = nil, priority: String? = nil,
-        notes: String? = nil, parent: String? = nil, collection: String? = nil, modified: Date = .now
+        notes: String? = nil, parent: String? = nil, modified: Date = .now
     ) -> ItemTableRow {
         var properties: [Property] = [Property(key: "title", value: .string(title))]
         if let status { properties.append(Property(key: "status", value: .string(status))) }
@@ -38,11 +38,11 @@ struct ItemTableLayoutTests {
             id: ItemID(title), type: TypeID(type), title: title, titleRule: .property("title"), properties: properties,
             version: ItemVersion(1), created: modified, modified: modified)
         func link(_ title: String?) -> ItemTableRow.Link? { title.map { .init(id: ItemID($0), title: $0, symbol: "folder") } }
-        return ItemTableRow(item: item, typeLabel: type, typeSymbol: "doc", parent: link(parent), collection: link(collection))
+        return ItemTableRow(item: item, typeLabel: type, typeSymbol: "doc", parent: link(parent))
     }
 
-    private static func columns(_ rows: [ItemTableRow], place: SidebarItem = .allNotes) -> [ItemTableColumn] {
-        ItemTableLayout.columns(for: rows, catalogue: catalogue, place: place, hidden: [])
+    private static func columns(_ rows: [ItemTableRow]) -> [ItemTableColumn] {
+        ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
     }
 
     // MARK: Statuses
@@ -64,9 +64,9 @@ struct ItemTableLayoutTests {
     // MARK: Columns
 
     @Test func aTypesFieldsFollowTheNameLeadingWithStatusAndPriority() {
-        let rows = [Self.row("A", status: "pending", priority: "low", collection: "P")]
+        let rows = [Self.row("A", status: "pending", priority: "low", parent: "P")]
         let ids = Self.columns(rows).map(\.id)
-        #expect(ids == ["title", "field.status", "field.priority", "parent", "collection", "field.notes", "field.description", "edited", "created"])
+        #expect(ids == ["title", "field.status", "field.priority", "parent", "field.notes", "field.description", "edited", "created"])
     }
 
     @Test func aTableOfSeveralTypesNamesEachRowsType() {
@@ -83,16 +83,12 @@ struct ItemTableLayoutTests {
         #expect(shown["created"] == false)
     }
 
-    @Test func aParentThatIsTheCollectionStartsHidden() {
-        let filed = Self.columns([Self.row("A", parent: "P", collection: "P")])
-        #expect(filed.first { $0.id == "parent" }?.isShownByDefault == false)
-        let underEpic = Self.columns([Self.row("A", parent: "Epic", collection: "P")])
-        #expect(underEpic.first { $0.id == "parent" }?.isShownByDefault == true)
-    }
-
-    @Test func aCollectionsTableHasNoCollectionColumn() {
-        let ids = Self.columns([Self.row("A", collection: "P")], place: .collection(ItemID("P"))).map(\.id)
-        #expect(!ids.contains("collection"))
+    @Test func theParentColumnShowsWhereItemsAreFiled() {
+        let filed = Self.columns([Self.row("A", parent: "Epic")])
+        #expect(filed.first { $0.id == "parent" }?.isShownByDefault == true)
+        let loose = Self.columns([Self.row("A")])
+        #expect(loose.first { $0.id == "parent" }?.isShownByDefault == false)
+        #expect(!Self.columns([Self.row("A", parent: "Epic")]).contains { $0.id == "collection" })
     }
 
     // MARK: Sorting
@@ -111,6 +107,17 @@ struct ItemTableLayoutTests {
         let sort = ItemTableLayout.sort(ItemTableOptions(), columns: Self.columns(rows))
         #expect(sort.map(\.column.id) == ["field.priority", "edited"])
         #expect(sort.map(\.order) == [.reverse, .reverse])
+    }
+
+    @Test func aPlaceThatKeepsItsOrderStartsUnsorted() throws {
+        let rows = [Self.row("B", priority: "low"), Self.row("A", priority: "urgent")]
+        let columns = Self.columns(rows)
+        #expect(ItemTableLayout.sort(ItemTableOptions(), columns: columns, keepsGivenOrder: true).isEmpty)
+        #expect(ItemTableLayout.sorted(rows, by: []).map(\.item.title) == ["B", "A"])
+        // A sort the person chooses still applies.
+        var options = ItemTableOptions()
+        options.sort = [ItemTableComparator(column: try #require(columns.first { $0.id == "title" }))]
+        #expect(ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: true).map(\.column.id) == ["title"])
     }
 
     @Test func aStoredSortOnAColumnThePlaceLacksIsDropped() {

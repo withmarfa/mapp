@@ -91,15 +91,16 @@ struct SidebarNavigationTests {
         #expect(browser.selection.isEmpty)
     }
 
-    @Test func aProjectFavoriteAndItsProjectCollectionHaveDistinctDestinations() throws {
+    @Test func aFavoriteCollectionAndTheCollectionHaveDistinctDestinations() throws {
         let library = FakeItemLibrary(now: date)
-        let project = try #require(library.createItem(typeID: "test.project", title: "Field research", body: "", parentID: nil, in: .allNotes, undoManager: nil).flatMap { library.item($0) })
-        let child = try #require(library.createItem(typeID: "core.task", title: "Read the findings", body: "", parentID: project.id, in: .allNotes, undoManager: nil).flatMap { library.item($0) })
-        library.setFavorite([project.id], true, undoManager: nil)
-        #expect(SidebarItem.collection(project.id) != .favoriteItem(project.id))
-        #expect(library.items(in: .collection(project.id)).map(\.id) == [child.id])
-        #expect(library.items(in: .favoriteItem(project.id)).map(\.id) == [project.id])
-        #expect(library.items(in: .itemType("test.project")).map(\.id) == [project.id])
-        #expect(library.name(of: .itemType("test.project")) == "Project")
+        let collection = try #require(library.createItem(typeID: FakeItemLibrary.collectionType.rawValue, title: "Field research", body: "", parentID: nil, in: .allNotes, undoManager: nil).flatMap { library.item($0) })
+        let member = try #require(library.createItem(typeID: "core.task", title: "Read the findings", body: "", parentID: nil, in: .allNotes, undoManager: nil))
+        #expect(library.addToCollection([member], collection.id, undoManager: nil))
+        library.setFavorite([collection.id], true, undoManager: nil)
+        #expect(SidebarItem.collection(collection.id) != .favoriteItem(collection.id))
+        #expect(library.items(in: .collection(collection.id)).map(\.id) == [member])
+        #expect(library.items(in: .favoriteItem(collection.id)).map(\.id) == [collection.id])
+        #expect(library.items(in: .itemType(FakeItemLibrary.collectionType.rawValue)).map(\.id) == [collection.id])
+        #expect(library.name(of: .itemType(FakeItemLibrary.collectionType.rawValue)) == "Collection")
     }
 }

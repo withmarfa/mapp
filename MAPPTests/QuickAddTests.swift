@@ -77,7 +77,8 @@ struct QuickAddTests {
         #expect(browser.focusCaret == nil)
     }
 
-    @Test func anItemGoesUnderTheCollectionShown() async throws {
+    /// A collection's members are filed with `in-collection`, not `child-of`, so the place shown sets no parent.
+    @Test func theCollectionShownSetsNoParent() async throws {
         let project = Item(
             id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
@@ -86,7 +87,7 @@ struct QuickAddTests {
         let browser = Browser()
         browser.sidebarItem = .collection(project.id)
         let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
-        #expect(library.item(id)?.parentID == project.id)
+        #expect(library.item(id)?.parentID == nil)
         #expect(!browser.quickAdd.isPresented)
     }
 
@@ -402,9 +403,8 @@ struct QuickAddTests {
         let library = FakeItemLibrary(items: [project], now: start)
         let browser = Browser()
         library.parentCandidates[TypeID.file.rawValue] = [project.id]
-        browser.sidebarItem = .collection(project.id)
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        #expect(browser.quickAdd.draft?.parentID == project.id, "a file goes under the collection shown")
+        browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.files = [try disk.file("photo.png", "png")]
         browser.quickAdd.draft?.title = "Holiday"
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
@@ -488,7 +488,7 @@ struct QuickAddTests {
         let types = QuickAdd.types(in: library)
         let (first, rest) = QuickAdd.kindMenu(types, shown: [TypeID("core.task"), TypeID("core.note")], chosen: "test.project")
         #expect(first.map(\.id.rawValue) == ["core.task", "core.note", TypeID.file.rawValue, "test.project"])
-        #expect(rest.isEmpty)
+        #expect(rest.map(\.id) == [FakeItemLibrary.collectionType])
         #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
     }
 

@@ -59,4 +59,19 @@ import Testing
         #expect(try await source.body(of: id).text == typed)
         #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
     }
+
+    /// The sample declares a container type, so it shows collections and offers to make one.
+    @Test func theSampleHasCollectionsInTheirOrder() async throws {
+        let (library, _) = try await Self.loaded()
+        #expect(library.collections.map(\.title) == ["Home", "Reading"])
+        // Home orders its members by position; Reading gives none, so it lists them by title.
+        #expect(library.items(in: .collection(ItemID("collection-home"))).map(\.title) == ["Boiler", "Bike service", "Moving checklist"])
+        let reading = library.items(in: .collection(ItemID("collection-reading"))).map(\.title)
+        #expect(reading == reading.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+        #expect(reading.count == 3)
+        let collectionTypes = Set(library.catalogue.collectionTypes)
+        #expect(QuickAdd.types(in: library).contains { collectionTypes.contains($0.id) })
+        let members = library.relationships(for: ItemID("collection-home")).first { $0.field == "inverse:in-collection" }
+        #expect(members?.label == "Contents")
+    }
 }

@@ -246,6 +246,23 @@ struct BrowserTests {
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.items.first?.id == newer.id)
     }
 
+    @Test func aCollectionKeepsItsOwnOrderUntilASearch() {
+        let (library, older, newer, favorite) = makeFakeLibrary()
+        let collection = FakeItemLibrary.collection("Reading")
+        library.items.append(collection)
+        // The fake lists members in the library's order: older before newer, whatever the list's sort.
+        #expect(library.addToCollection([older.id, newer.id, favorite.id], collection.id, undoManager: nil))
+        let browser = Browser()
+        browser.show(.collection(collection.id), in: library, order: NoteOrder())
+        #expect(browser.keepsPlaceOrder)
+        let sections = browser.sections(in: library, order: NoteOrder(sort: .dateEdited, groupsByDate: true), now: start)
+        #expect(sections.count == 1)
+        #expect(sections.first?.group == nil)
+        #expect(sections.first?.items.map(\.id) == [older.id, newer.id, favorite.id])
+        browser.searchText = "e"
+        #expect(!browser.keepsPlaceOrder)
+    }
+
     @Test func aLibraryThatCannotPurgeIsNeverAskedToEraseWhatIsDeleted() {
         let (library, older, newer, _) = makeFakeLibrary()
         library.canPurge = false
