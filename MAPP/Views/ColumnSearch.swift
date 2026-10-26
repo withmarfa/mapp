@@ -60,7 +60,7 @@ struct ColumnSearch<Controls: View>: ToolbarContent {
             }
         case .item:
             if isExpanded {
-                ToolbarItem(id: "collectionSearchField") { field(trailing: 8).frame(width: 260) }
+                ToolbarItem(id: "collectionSearchField") { field(trailing: 8).frame(width: ColumnSearchMetrics.itemFieldWidth) }
                     .sharedBackgroundVisibility(.visible)
                 ToolbarItem(id: "collectionOptions") { controls() }
             } else {
@@ -76,10 +76,18 @@ struct ColumnSearch<Controls: View>: ToolbarContent {
 enum ColumnSearchMetrics {
     /// What a column's toolbar keeps beside an open field: its margins, the options item and the gap before it.
     static let columnChrome: CGFloat = 54
+    /// What the field takes of the room it could fill. One factor for every layout, so they narrow together.
+    static let share: CGFloat = 0.85
+    /// The room a field could fill as an item of its own, before `share` narrows it.
+    private static let itemRoom: CGFloat = 260
+    private static let minimum: CGFloat = 120
 
+    /// In a list column, the field ends before the options item, with the rest of the column's room left over.
     static func fieldWidth(inColumn width: CGFloat) -> CGFloat {
-        max(120, width - columnChrome)
+        max(minimum, ((width - columnChrome) * share).rounded())
     }
+
+    static var itemFieldWidth: CGFloat { (itemRoom * share).rounded() }
 }
 
 /// A rounded search field for a toolbar's glass: a magnifier, the prompt, and a clear button once there is text.
@@ -138,6 +146,7 @@ private struct ToolbarSearchText: NSViewRepresentable {
         let field = ToolbarSearchTextField()
         field.delegate = context.coordinator
         field.setAccessibilityIdentifier("ColumnSearch")
+        field.onClickElsewhere = { [weak coordinator = context.coordinator] in coordinator?.parent.onEnd() }
         update(field)
         return field
     }
@@ -194,6 +203,11 @@ private final class ToolbarSearchTextField: NSTextField {
     /// Set until the field has had the keyboard once. The toolbar moves its items between windows (full screen,
     /// Customize Toolbar, overflow), and an open field should not take the keyboard from the page each time.
     private var isAwaitingKeyboard = true
+    /// Called once a click has finished that landed outside the field and the toolbar items beside it while the
+    /// field was open and empty.
+    var onClickElsewhere: () -> Void = {}
+    private var monitor: Any?
+    private var isClickElsewhere = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -215,8 +229,13 @@ private final class ToolbarSearchTextField: NSTextField {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    isolated deinit { removeMonitor() }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        removeMonitor()
+        guard window != nil else { return }
+        addMonitor()
         if isAwaitingKeyboard { takeKeyboard() }
     }
 
@@ -228,6 +247,61 @@ private final class ToolbarSearchTextField: NSTextField {
             guard let self, let window = self.window, self.isAwaitingKeyboard else { return }
             if window.makeFirstResponder(self) { self.isAwaitingKeyboard = false }
         }
+    }
+
+    // MARK: Clicks elsewhere
+
+    // The field editor keeps the keyboard through a click on anything that cannot take it, such as the page's
+    // background, the toolbar or the title bar, so the field never hears that the person has moved on. The click
+    // is left alone and acts as it would, and the field closes once the mouse button is up, since the items
+    // beside it move when it does.
+
+    private func addMonitor() {
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp, .rightMouseUp, .otherMouseUp]
+        monitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
+            MainActor.assumeIsolated { self?.watch(event) }
+            return event
+        }
+    }
+
+    private func removeMonitor() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        isClickElsewhere = false
+    }
+
+    private func watch(_ event: NSEvent) {
+        guard event.window != nil, event.window === window else { return }
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            isClickElsewhere = isOpenAndEmpty && !isOverOwnItems(event)
+        case .leftMouseUp, .rightMouseUp, .otherMouseUp:
+            guard isClickElsewhere else { return }
+            isClickElsewhere = false
+            // After the click's own action, which may run as the event is delivered.
+            DispatchQueue.main.async { [weak self] in
+                if let self, self.isOpenAndEmpty { self.onClickElsewhere() }
+            }
+        default: break
+        }
+    }
+
+    /// Whether the field has the keyboard and holds no text. A field that has handed the keyboard on has already
+    /// closed itself (`controlTextDidEndEditing`).
+    private var isOpenAndEmpty: Bool {
+        guard let editor = currentEditor() as? NSTextView else { return false }
+        return editor.string.isEmpty
+    }
+
+    /// Whether a click is on the field, its clear button, or the item after it in the toolbar, which holds the
+    /// view's own controls: a click there is the person using the search, not leaving it.
+    private func isOverOwnItems(_ event: NSEvent) -> Bool {
+        guard let frame = window?.contentView?.superview else { return false }
+        guard let hit = frame.hitTest(frame.convert(event.locationInWindow, from: nil)) else { return false }
+        if hit.isDescendant(of: self) { return true }
+        let items = window?.toolbar?.items ?? []
+        guard let own = items.firstIndex(where: { $0.view.map(isDescendant(of:)) ?? false }) else { return false }
+        return items[own...].prefix(2).contains { $0.view.map(hit.isDescendant(of:)) ?? false }
     }
 }
 
