@@ -10,7 +10,7 @@ struct ItemViewModeTests {
             .init(key: "status", label: "Status", kind: .choice(["todo", "done"]), declaredBy: task),
         ], titleField: "title", bodyField: "body", parent: nil),
         ItemTypeInfo(id: event, label: "Event", fields: [
-            .init(key: "starts_at", label: "Starts at", kind: .date, declaredBy: event),
+            .init(key: "starts_at", label: "Starts at", kind: .date(includesTime: true), declaredBy: event),
         ], titleField: "title", bodyField: "body", parent: nil),
         ItemTypeInfo(id: plain, label: "Plain", fields: [
             .init(key: "notes", label: "Notes", kind: .text, declaredBy: plain),
