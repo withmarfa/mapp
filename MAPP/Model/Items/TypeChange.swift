@@ -156,28 +156,62 @@ extension ItemLibrary {
         return try? TypeChange.plan(values, from: catalogue.itemTypes[item.type], to: new, filling: filling).get()
     }
 
-    /// The items among `ids` whose type can be changed.
-    func typeChangeItems(_ ids: Set<ItemID>) -> [Item] {
-        ids.compactMap { id in typeChangeValues(of: id) != nil ? item(id) : nil }
+    /// Whether the item's type can be changed now: an item `typeChangeValues` reads.
+    func canChangeType(_ id: ItemID) -> Bool {
+        guard let item = item(id), item.isEditable else { return false }
+        return catalogue.itemTypes[item.type]?.bodyKey == nil || body(of: id) != nil
     }
 
-    /// The types every one of `ids` can become, by label: those a new item can be, except the type all of them
-    /// already are. Empty where any of them cannot change type.
+    /// The types at least one of `ids` can become, by label: those a new item can be, except the type the item
+    /// already is. Empty where none of them can change type. A short selection is read type by type, and each type
+    /// stops at the first item that can become it, so a long one costs little to ask.
     func typeChangeOptions(for ids: Set<ItemID>) -> [ItemTypeOption] {
-        let items = typeChangeItems(ids)
-        guard !items.isEmpty, items.count == ids.count else { return [] }
+        let candidates = ids.filter(canChangeType)
+        guard !candidates.isEmpty else { return [] }
         return creatableTypes.filter { option in
-            let changing = items.filter { $0.type != option.id }
-            return !changing.isEmpty && changing.allSatisfy { typeChange(of: $0.id, to: option.id) != nil }
+            candidates.contains { id in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
         }
+    }
+
+    /// What changing `ids` to `type` writes for each item that can become it, and the items it leaves out with the
+    /// reason. An item already of `type` is neither. `missing` is the required fields some item still lacks, once
+    /// each: the change is not made until they are given.
+    func typeChangePlan(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue] = [:]) -> TypeChangePlan {
+        var result = TypeChangePlan()
+        let new = catalogue.itemTypes[type]
+        for id in ids.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let item = item(id) else {
+                result.skips.skip(.gone)
+                continue
+            }
+            guard item.type != type else { continue }
+            if let reason = item.writeObstacle {
+                result.skips.skip(reason)
+            } else if item.isFile {
+                result.skips.skip(.file)
+            } else if let new, !catalogue.isFileType(type), let values = typeChangeValues(of: id),
+                      case .success(let plan) = TypeChange.plan(
+                        values, from: catalogue.itemTypes[item.type], to: new, filling: filling) {
+                if plan.missing.isEmpty {
+                    result.items.append(TypeChangePlan.Entry(item: item, plan: plan, values: values))
+                } else {
+                    for field in plan.missing where !result.missing.contains(where: { $0.key == field.key }) {
+                        result.missing.append(field)
+                    }
+                }
+            } else {
+                result.skips.skip(typeChangeValues(of: id) == nil ? .cantChange : .cantBecomeType)
+            }
+        }
+        return result
     }
 
     /// What changing `ids` to `type` asks for and leaves unused, across all of them.
     func typeChangePreview(for ids: Set<ItemID>, to type: TypeID) -> TypeChangePreview {
         var missing: [ItemTypeInfo.Field] = []
         var unused: [String] = []
-        for item in typeChangeItems(ids).sorted(by: { $0.id.rawValue < $1.id.rawValue }) {
-            guard let plan = typeChange(of: item.id, to: type) else { continue }
+        for id in ids.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let item = item(id), let plan = typeChange(of: id, to: type) else { continue }
             for field in plan.missing where !missing.contains(where: { $0.key == field.key }) { missing.append(field) }
             for key in plan.unused {
                 let label = ItemTypeInfo.Field.displayLabel(catalogue.label(ofField: key, for: item.type) ?? key)
@@ -188,4 +222,18 @@ extension ItemLibrary {
         missing.sort { (order.firstIndex(of: $0.key) ?? .max) < (order.firstIndex(of: $1.key) ?? .max) }
         return TypeChangePreview(missing: missing, unused: unused.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
     }
+}
+
+/// What a change of type writes for each item that takes it (`ItemLibrary.typeChangePlan`).
+struct TypeChangePlan {
+    struct Entry {
+        let item: Item
+        let plan: TypeChange
+        /// The item's values as the plan read them, for the undo.
+        let values: [String: PropertyValue]
+    }
+
+    var items: [Entry] = []
+    var skips = BatchSkips()
+    var missing: [ItemTypeInfo.Field] = []
 }

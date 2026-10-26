@@ -119,15 +119,19 @@ import Testing
         #expect(!library.canJoinCollection(try #require(library.item(Self.archive))))
         #expect(library.canJoinCollection(try #require(library.item(F.e1))))
         #expect(library.canJoinCollection(try #require(library.item(F.f1))))
-        #expect(!library.addToCollection([F.e1, Self.archive], Self.holiday, undoManager: nil))
-        #expect(source.writes.isEmpty)
+        // A collection among the items is skipped and told; the rest are filed.
+        #expect(library.addToCollection([F.e1, Self.archive], Self.holiday, undoManager: nil))
+        #expect(source.writes.count == 1)
+        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
+        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.cantJoinCollection, count: 1))
+        #expect(!library.addToCollection([Self.archive], Self.holiday, undoManager: nil))
+        #expect(source.writes.count == 1)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Add to Collection"))
-        #expect(library.notices.waiting.last?.message == String(localized: "A collection can’t be in another collection."))
         // Nor is one offered as a collection for another, or written through the item's own relationship.
         #expect(library.relationshipCandidates(for: Self.archive, field: "in-collection").isEmpty)
         #expect(!library.relationships(for: Self.archive).contains { $0.field == "in-collection" && $0.isEditable })
         #expect(!library.setItemRelationship(Self.archive, field: "in-collection", targetIDs: [Self.holiday], undoManager: nil))
-        #expect(source.writes.isEmpty)
+        #expect(source.writes.count == 1)
     }
 
     @Test func onlyACollectionInTheLibraryTakesMembers() async throws {

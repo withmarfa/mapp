@@ -168,7 +168,8 @@ import Testing
         let (library, source) = try await loaded(
             [Self.note(Self.launch, title: "Launch"), Self.note(other, title: "Other", type: F.task)],
             bodies: [Self.launch: "Agenda", other: ""])
-        #expect(Set(library.typeChangeOptions(for: [Self.launch, other]).map(\.id)) == [F.event, F.message, F.note, F.task])
+        // The empty task could become an entity, which the note with text could not, so the entity is offered and the note skipped.
+        #expect(Set(library.typeChangeOptions(for: [Self.launch, other]).map(\.id)) == [F.entity, F.event, F.message, F.note, F.task])
         let undo = UndoManager()
         library.changeType([Self.launch, other], to: F.task, filling: [:], undoManager: undo)
         // The task already is one.

@@ -189,14 +189,15 @@ nonisolated enum TypeChangeFixture {
         return library
     }
 
-    @Test func offersOnlyTheTypesEveryItemCanBecome() throws {
+    @Test func offersTheTypesAnyItemCanBecome() throws {
         let library = library()
         let note = library.add("Ada\n\nNotes about her")
         let empty = library.add("")
         // Text goes nowhere in an entity, and a file is made only by adding one.
         #expect(Set(library.typeChangeOptions(for: [note.id]).map(\.id)) == [F.event, F.message, F.task])
         #expect(library.typeChangeOptions(for: [empty.id]).map(\.id).contains(F.entity))
-        #expect(!library.typeChangeOptions(for: [note.id, empty.id]).map(\.id).contains(F.entity))
+        // An item that can't become a type is skipped, so the type is still offered for the rest.
+        #expect(library.typeChangeOptions(for: [note.id, empty.id]).map(\.id).contains(F.entity))
         #expect(!library.typeChangeOptions(for: [note.id]).map(\.id).contains(MarfaMapping.fileType))
     }
 }
