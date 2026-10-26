@@ -158,28 +158,30 @@ struct ItemTable: View {
     }
 }
 
-/// What a place's table shows, worked out alike by the table and its toolbar's controls.
-struct ItemTableContent {
+/// What a place's table shows, worked out alike by the table and its toolbar's controls. The columns, the sort and
+/// the grouping come from the items alone; the rows the filters keep, their groups and what is folded away are
+/// worked out when first read, so the controls and the command palette, which need only the columns, never sort.
+@MainActor
+final class ItemTableContent {
     /// Every row before the filters.
     let allRows: [ItemTableRow]
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
-    /// The rows the filters keep, in order.
-    let rows: [ItemTableRow]
     let grouping: ItemTableColumn?
-    let groups: [ItemTableGroup]
-    let collapsed: Set<String>
+    private let options: ItemTableOptions
+
+    /// The rows the filters keep, in order.
+    lazy var rows: [ItemTableRow] = ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
+    lazy var groups: [ItemTableGroup] = grouping.map { ItemTableLayout.groups(of: rows, by: $0) } ?? []
+    lazy var collapsed: Set<String> = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0) } ?? []
 
     init(browser: Browser, library: any ItemLibrary) {
         allRows = ItemTableRow.rows(of: browser.items(in: library), in: library)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, place: browser.item, hidden: hidden)
-        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         sort = ItemTableLayout.sort(options, columns: columns)
-        rows = ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
         grouping = ItemTableLayout.grouping(options, columns: columns)
-        groups = grouping.map { [rows] grouping in ItemTableLayout.groups(of: rows, by: grouping) } ?? []
-        collapsed = grouping.map { [groups] grouping in ItemTableLayout.collapsed(options, groups: groups, by: grouping) } ?? []
     }
 
     /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row

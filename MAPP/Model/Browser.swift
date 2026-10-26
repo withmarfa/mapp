@@ -104,6 +104,10 @@ final class Browser {
     var usesCollection: Bool { viewMode.spansWindow }
     var showsCollection: Bool { usesCollection && !isCollectionItemPresented }
 
+    /// Whether the view's options are on offer: the list and the gallery always, the table, board and agenda only
+    /// while they are showing, not an item page opened from them, which hides their controls.
+    var offersViewOptions: Bool { !usesCollection || showsCollection }
+
     func openCollectionSelection() {
         leaveSettings()
         guard usesCollection, selection.count == 1 else { return }

@@ -26,7 +26,8 @@ struct ItemAgenda: View {
             }
         }
         .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
+        // The agenda only shows items; it changes none of them.
+        .navigationSubtitle(Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }

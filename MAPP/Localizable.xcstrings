@@ -39,6 +39,7 @@
 "No Value" : { "extractionState" : "manual" },
 "Not Applicable" : { "extractionState" : "manual" },
 "Read Only" : { "extractionState" : "manual" },
+"%@, Read Only" : { "extractionState" : "manual" },
 "This lane isn’t available for every selected item. Check each item’s type and required fields." : { "extractionState" : "manual" },
 "View as Agenda" : { "extractionState" : "manual" },
 "View as Board" : { "extractionState" : "manual" },
