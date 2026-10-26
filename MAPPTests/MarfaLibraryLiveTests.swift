@@ -179,10 +179,14 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually { library.item(child)?.title == title })
 
+                // The count comes first because the report is read after it: the copy marks itself as catching up
+                // before it counts a hydration, so a report read before the count can still be the old, whole one
+                // while the hydration has begun. The source's own report is read, since the library's follows it
+                // a moment later.
                 @MainActor func rehydrated(after before: Int) async throws -> Bool {
                     try await eventuallyAsking {
-                        guard LiveMarfa.isWhole(library.syncReport) else { return false }
-                        return await source.engine.sync.hydrations > before
+                        guard await source.engine.sync.hydrations > before else { return false }
+                        return LiveMarfa.isWhole(source.syncReport)
                     }
                 }
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
