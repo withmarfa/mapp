@@ -16,6 +16,7 @@ struct ItemTable: View {
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @State private var columnCustomization = TableColumnCustomization<ItemTableRow>()
     @State private var daysSeen = 0
+    @State private var hover = ItemTableHover()
 
     var body: some View {
         let _ = daysSeen
@@ -62,7 +63,7 @@ struct ItemTable: View {
         Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: $columnCustomization) {
             TableColumnForEach(columns) { column in
                 TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
-                    ItemTableCell(library: library, row: row, column: column, browser: browser, order: order)
+                    ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, hover: hover)
                 }
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)
