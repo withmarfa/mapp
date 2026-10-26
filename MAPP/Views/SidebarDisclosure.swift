@@ -1,17 +1,11 @@
 import SwiftUI
 
-/// The chevron at the trailing end of a sidebar row that folds rows under it: pointing right when they are hidden,
-/// down when they show, turning as they come and go. The system's own disclosure sits at the leading edge and
-/// cannot move, so a row that folds draws this one instead.
+/// The chevron of a sidebar row that folds rows under it: pointing right when they are hidden, down when they show,
+/// turning as they come and go. It fills one slot of a fixed width, so every row's chevron lands in one place.
 ///
 /// A row that opens a list of its own (`isButton`) has this as a button of its own, since a click on the row selects.
 /// A row that only folds is one button already, and this is its picture.
 struct SidebarDisclosure: View {
-    /// The width of the chevron, which a row without one keeps so counts line up. It follows the base text size.
-    static func width(forTextSize textSize: Int) -> CGFloat {
-        20 * InterfaceStyle.scale(for: textSize)
-    }
-
     @Environment(\.interfaceTextSize) private var textSize
     let title: String
     let id: String
@@ -34,9 +28,9 @@ struct SidebarDisclosure: View {
     private var chevron: some View {
         Image(systemName: "chevron.right")
             .interfaceFont(.caption.weight(.semibold))
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
             .rotationEffect(.degrees(isExpanded ? 90 : 0))
-            .frame(width: Self.width(forTextSize: textSize), height: 22 * InterfaceStyle.scale(for: textSize))
+            .frame(width: 16 * InterfaceStyle.scale(for: textSize), height: 22 * InterfaceStyle.scale(for: textSize))
             .contentShape(.rect)
     }
 }

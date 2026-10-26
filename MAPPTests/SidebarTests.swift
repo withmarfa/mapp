@@ -390,6 +390,21 @@ struct SidebarTests {
         #expect(SidebarPlan(library, layout: layout).typeRows.map(\.id) == ["core.note", "aic.project", "aic.ticket", "aic.ticket.task", "core.entity"])
     }
 
+    @Test func aGuideCarriesOnPastEveryRowThatHasASiblingAfterIt() {
+        func node(_ id: String, _ children: [TypeNode] = []) -> TypeNode {
+            TypeNode(id: id, type: nil, label: id, symbol: "doc", count: 0, total: 0, children: children)
+        }
+        func rows(_ nodes: [TypeNode], depth: Int = 0) -> [SidebarPlan.TypeRow] {
+            nodes.flatMap { [SidebarPlan.TypeRow(node: $0, depth: depth, isExpanded: true)] + rows($0.children, depth: depth + 1) }
+        }
+        // a, b (b1, b2 (b2x, b2y), b3), c
+        let tree = [node("a"), node("b", [node("b1"), node("b2", [node("b2x"), node("b2y")]), node("b3")]), node("c")]
+        let listed = rows(tree)
+        #expect(listed.map(\.id) == ["a", "b", "b1", "b2", "b2x", "b2y", "b3", "c"])
+        #expect(SidebarTypeRow.guides(for: listed) == [[], [], [true], [true], [true, true], [true, false], [false], []])
+        #expect(SidebarTypeRow.guides(for: []).isEmpty)
+    }
+
     /// The fixture's library with a ticket of its own, so that "Ticket" opens a list as well as folding its subtypes.
     func libraryWithATicket() async throws -> MarfaLibrary {
         let ticket = LibraryFixture.item(ItemID("k1"), LibraryFixture.ticket, "A ticket", age: 10)
