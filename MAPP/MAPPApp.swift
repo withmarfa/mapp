@@ -117,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // A draft in quick add, or a view's title not yet saved, has no other home once its window goes, so it
             // is told with the rest.
             if kept {
-                QuickAdd.handOffAll(to: libraries.host.notices)
+                QuickAdd.handOffAll(to: libraries.host.notices, in: libraries.current)
                 ViewTitleForm.handOffAll()
             }
             let told = kept && libraries.host.notices.tellBeforeQuitting(copying: Notices.copyToClipboard) { notice in

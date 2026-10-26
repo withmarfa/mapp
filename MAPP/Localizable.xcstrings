@@ -246,6 +246,7 @@
 "Drop a File, Paste One, or Click to Choose" : { "extractionState" : "manual" },
 "Kind of Item" : { "extractionState" : "manual" },
 "Parent" : { "extractionState" : "manual" },
+"Choose Parent…" : { "extractionState" : "manual" },
 "Item Not Added" : { "extractionState" : "manual" },
 "%@ wasn’t added." : { "extractionState" : "manual" },
 "%@ weren’t added." : { "extractionState" : "manual" },

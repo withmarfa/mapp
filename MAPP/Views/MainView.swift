@@ -235,7 +235,7 @@ struct MainView: View {
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
-            browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed)
+            browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
             browser.giveUpNewItem(because: .windowLeft)
             browser.viewTitleForm?.handOff(because: changed ? .libraryChanged : .closed)
         }

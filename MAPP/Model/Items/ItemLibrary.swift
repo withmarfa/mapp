@@ -71,6 +71,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
     func creationParentCandidates(typeID: String) -> [Item]
+    /// Whether `creationParentCandidates` would list anything: a cheap check that sorts and builds nothing, for a
+    /// view that is evaluated at every keystroke.
+    func canHaveParent(typeID: String) -> Bool
 
     // MARK: History
 

@@ -168,6 +168,7 @@ final class FakeItemLibrary: ItemLibrary {
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]
     func creationParentCandidates(typeID: String) -> [Item] { (parentCandidates[typeID] ?? []).compactMap { item($0) } }
+    func canHaveParent(typeID: String) -> Bool { !creationParentCandidates(typeID: typeID).isEmpty }
 
     // MARK: Files
 

@@ -15,7 +15,7 @@ struct QuickAddPanel: View {
     let editor: EditorController
     @FocusState private var focus: Field?
     @State private var bodySelection: TextSelection?
-    /// The field whose popover is open.
+    /// The field, or the parent (`parentEditingKey`), whose popover is open.
     @State private var editing: String?
     @State private var isChoosingFile = false
     @State private var isDropTargeted = false
@@ -324,7 +324,7 @@ struct QuickAddPanel: View {
 
     /// A chip's capsule, with its remove button inside the trailing end unless `remove` is nil. It is drawn here,
     /// not by a bordered button, since a system button cannot hold a second button; its fill and edge are the
-    /// system's.
+    /// system's. It is as wide as what it says, up to `chipMaxWidth` and the row, and cuts the text to that.
     private func chipShell<Main: View>(
         remove: (label: String, identifier: String, action: () -> Void)?, @ViewBuilder main: () -> Main
     ) -> some View {
@@ -338,7 +338,6 @@ struct QuickAddPanel: View {
         .background(.fill.quaternary, in: .capsule)
         .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor).opacity(0.6)))
         .frame(maxWidth: Self.chipMaxWidth)
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// What a chip says, with the room its capsule needs around it; the whole of it takes the click.
@@ -370,7 +369,7 @@ struct QuickAddPanel: View {
     private func propertyChip(_ field: ItemTypeInfo.Field, value: PropertyValue?, typeID: String) -> some View {
         let isRemovable = QuickAdd.isRemovable(.field(field.key), typeID: typeID, in: library.catalogue)
         let hasValue = value.map { $0 != .null } ?? false
-        let shownValue = value.flatMap { hasValue ? Self.text(of: $0, in: field) : nil }
+        let shownValue = value.flatMap { hasValue ? QuickAdd.valueText($0, in: field) : nil }
         let name = field.displayLabel
         let remove: () -> Void = {
             if editing == field.key { editing = nil }
@@ -407,55 +406,29 @@ struct QuickAddPanel: View {
         }
     }
 
-    /// The parent as a chip: a menu of the items the kind can go under, so the person can change it.
     /// What `editing` holds while the parent's list is open; no field key can be this, since keys have no spaces.
     private static let parentEditingKey = "the parent"
 
+    /// The parent as a chip: a popover list of the items the kind can go under.
     private func parentChip(_ draft: QuickAdd.Draft) -> some View {
-        let candidates = parentCandidates(draft)
-        let title = candidates.first { $0.id == draft.parentID }?.title
+        let title = draft.parentID.flatMap { library.item($0)?.title } ?? String(localized: "Item not found")
         let name = String(localized: "Parent")
-        let remove: () -> Void = { quickAdd.draft?.remove(.parent, in: library.catalogue) }
+        let remove: () -> Void = {
+            if editing == Self.parentEditingKey { editing = nil }
+            quickAdd.draft?.remove(.parent, in: library.catalogue)
+        }
         return chipShell(remove: (String(localized: "Remove \(name)"), "QuickAddRemoveParent", remove)) {
             Button {
                 editing = Self.parentEditingKey
             } label: {
                 chipFace(hasRemove: true) {
-                    Text(verbatim: "\(name): \(title ?? "")")
+                    Text(verbatim: "\(name): \(title)")
                 }
             }
             .buttonStyle(.plain)
-            .popover(isPresented: Binding { editing == Self.parentEditingKey } set: { if !$0, editing == Self.parentEditingKey { editing = nil } }, arrowEdge: .top) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(candidates) { candidate in
-                            Button {
-                                quickAdd.draft?.setParent(candidate.id)
-                                editing = nil
-                            } label: {
-                                HStack {
-                                    Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
-                                        .lineLimit(1)
-                                    Spacer(minLength: 8)
-                                    if candidate.id == draft.parentID {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                                .padding(.horizontal, 10)
-                                .frame(minHeight: Self.chipHeight)
-                                .contentShape(.rect)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(6)
-                }
-                .interfaceFont(.body)
-                .frame(width: 320)
-                .frame(maxHeight: 320)
-            }
+            .popover(isPresented: parentPopover(isOpen: { true }), arrowEdge: .top) { parentList(draft) }
             .accessibilityLabel(name)
-            .accessibilityValue(title ?? String(localized: "Not Set"))
+            .accessibilityValue(title)
             .accessibilityIdentifier("QuickAddParent")
         }
         .contextMenu {
@@ -463,11 +436,42 @@ struct QuickAddPanel: View {
         }
     }
 
-    /// A value as its chip shows it: a choice by its label, a Boolean as Yes or No, anything else as written.
-    private static func text(of value: PropertyValue, in field: ItemTypeInfo.Field) -> String {
-        if field.kind == .boolean, case .bool(let flag) = value { return flag ? String(localized: "Yes") : String(localized: "No") }
-        if field.isPicked, let option = value.string { return String(localized: String.LocalizationValue(ItemTypeInfo.Field.label(ofOption: option))) }
-        return ItemValueText.string(value)
+    /// Whether the parent's list is open, while `isOpen` allows it.
+    private func parentPopover(isOpen: @escaping () -> Bool) -> Binding<Bool> {
+        Binding { editing == Self.parentEditingKey && isOpen() } set: { if !$0, editing == Self.parentEditingKey { editing = nil } }
+    }
+
+    /// The items the draft's kind can go under, and a tick beside the one chosen. The list is built only when the
+    /// popover opens, since finding the items reads the whole library.
+    private func parentList(_ draft: QuickAdd.Draft) -> some View {
+        let candidates = parentCandidates(draft)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(candidates) { candidate in
+                    Button {
+                        quickAdd.draft?.setParent(candidate.id)
+                        editing = nil
+                    } label: {
+                        HStack {
+                            Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            if candidate.id == draft.parentID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: Self.chipHeight)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(6)
+        }
+        .interfaceFont(.body)
+        .frame(width: 320)
+        .frame(maxHeight: 320)
     }
 
     // MARK: Place and adding
@@ -492,18 +496,18 @@ struct QuickAddPanel: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!QuickAdd.canSave(draft, in: library.catalogue) || quickAdd.isSaving)
+            .disabled(!QuickAdd.canSave(draft, in: library) || quickAdd.isSaving)
             .accessibilityIdentifier("QuickAddAdd")
         }
         .controlSize(.large)
     }
 
     /// The plus beside the kind: attaches a file (or chooses a file item's file), puts the item under a parent, or
-    /// shows a field of the kind as a chip. What is already a chip is not listed again.
+    /// shows a field of the kind as a chip. What is already a chip is not listed again. A file item takes no field.
+    /// The parent is chosen from a popover on the plus, so the items are looked up only once it opens.
     private func moreMenu(_ draft: QuickAdd.Draft, isFile: Bool) -> some View {
         let catalogue = library.catalogue
-        let candidates = parentCandidates(draft)
-        let offered = QuickAdd.offeredChips(draft, in: catalogue, canHaveParent: !candidates.isEmpty)
+        let offered = QuickAdd.offeredChips(draft, in: catalogue, canHaveParent: library.canHaveParent(typeID: draft.typeID))
         let fields = QuickAdd.fields(of: draft.typeID, in: catalogue)
         return Menu {
             Button(isFile ? "Choose File…" : "Attach File…", systemImage: "paperclip") { isChoosingFile = true }
@@ -512,19 +516,13 @@ struct QuickAddPanel: View {
             ForEach(offered, id: \.self) { chip in
                 switch chip {
                 case .parent:
-                    Menu("Parent", systemImage: "arrow.turn.left.up") {
-                        ForEach(candidates) { candidate in
-                            Button(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: catalogue)) {
-                                quickAdd.draft?.setParent(candidate.id)
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("QuickAddMoreParent")
+                    Button("Choose Parent…", systemImage: "arrow.turn.left.up") { open(Self.parentEditingKey) }
+                        .accessibilityIdentifier("QuickAddMoreParent")
                 case .field(let key):
                     if let field = fields.first(where: { $0.key == key }) {
                         Button(field.displayLabel) {
                             quickAdd.draft?.add(.field(key))
-                            editing = key
+                            open(key)
                         }
                         .accessibilityIdentifier("QuickAddMore.\(key)")
                     }
@@ -539,9 +537,16 @@ struct QuickAddPanel: View {
         .buttonStyle(.bordered)
         .buttonBorderShape(.circle)
         .fixedSize()
+        .popover(isPresented: parentPopover(isOpen: { quickAdd.draft?.parentID == nil }), arrowEdge: .top) { parentList(draft) }
         .help("Add File or Property")
         .accessibilityLabel("Add File or Property")
         .accessibilityIdentifier("QuickAddMore")
+    }
+
+    /// Opens a popover once the menu that chose it has closed and a chip it belongs to is in the view, since a
+    /// popover asked for in the same update has nothing to attach to yet.
+    private func open(_ key: String) {
+        Task { editing = key }
     }
 
     /// The items the draft's kind can go under, with the one already chosen first if the kind no longer lists it.
