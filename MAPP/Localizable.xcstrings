@@ -2426,6 +2426,15 @@
     },
     "Opens the Console, Settings and Recently Deleted" : {
       "extractionState" : "manual"
+    },
+    "Default Column Widths" : {
+      "extractionState" : "manual"
+    },
+    "Reset Widths" : {
+      "extractionState" : "manual"
+    },
+    "Where each column starts in a new window. A width you drag a column to stays for that window only." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.1"

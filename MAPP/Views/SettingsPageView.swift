@@ -74,6 +74,13 @@ private struct AppearanceSettings: View {
             } footer: {
                 Text("Changes text in the sidebar, lists, and controls. Note text size is set in Editor.")
             }
+            Section {
+                ColumnWidthOptions()
+            } header: {
+                Text("Default Column Widths")
+            } footer: {
+                Text("Where each column starts in a new window. A width you drag a column to stays for that window only.")
+            }
             Section("Notes List") {
                 OrderOptions()
                 ListPreviewOptions()

@@ -12,8 +12,9 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
-    @State private var sidebarWidth: CGFloat = 230
-    @State private var listWidth = ListColumn.defaultWidth
+    @State private var sidebarWidth = ColumnWidth.sidebar.stored()
+    @State private var listWidth = ColumnWidth.list.stored()
+    @State private var settingsWidth = ColumnWidth.settings.stored()
     @State private var measuredWidths = ColumnWidths()
     private let restoresWindow: Bool
 
@@ -52,6 +53,7 @@ struct MainView: View {
         .onChange(of: workspacePresentation) {
             sidebarWidth = measuredWidths.sidebar
             listWidth = measuredWidths.list
+            settingsWidth = measuredWidths.settings
             editor.flush()
         }
         .onChange(of: browser.showsCollection) {
@@ -88,12 +90,17 @@ struct MainView: View {
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                if $0.isFinite, $0 >= 280, !browser.showsSettings { measuredWidths.list = $0 }
+                guard $0.isFinite else { return }
+                if browser.showsSettings {
+                    if $0 >= ColumnWidth.settings.range.lowerBound { measuredWidths.settings = $0 }
+                } else if $0 >= ColumnWidth.list.range.lowerBound {
+                    measuredWidths.list = $0
+                }
             }
-            // The page list is about as wide as the sidebar; the list's own width is kept for the list.
+            // The page list is about as wide as the sidebar; each keeps its own width.
             .navigationSplitViewColumnWidth(
-                min: browser.showsSettings ? 200 : 280, ideal: browser.showsSettings ? 240 : listWidth,
-                max: browser.showsSettings ? 340 : 480)
+                min: activeListColumn.range.lowerBound, ideal: browser.showsSettings ? settingsWidth : listWidth,
+                max: activeListColumn.range.upperBound)
         } detail: {
             if browser.showsSettings {
                 SettingsPageView(page: browser.settingsPage, browser: browser)
@@ -108,6 +115,8 @@ struct MainView: View {
         }
     }
 
+    private var activeListColumn: ColumnWidth { browser.showsSettings ? .settings : .list }
+
     private var sidebarColumn: some View {
         VStack(spacing: 0) {
             Sidebar(browser: browser, order: order)
@@ -115,9 +124,10 @@ struct MainView: View {
                 .focused($pane, equals: .sidebar)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-            if $0.isFinite, $0 >= 200 { measuredWidths.sidebar = $0 }
+            if $0.isFinite, $0 >= ColumnWidth.sidebar.range.lowerBound { measuredWidths.sidebar = $0 }
         }
-        .navigationSplitViewColumnWidth(min: 200, ideal: sidebarWidth, max: 340)
+        .navigationSplitViewColumnWidth(
+            min: ColumnWidth.sidebar.range.lowerBound, ideal: sidebarWidth, max: ColumnWidth.sidebar.range.upperBound)
     }
 
     private var itemPage: some View {
@@ -337,15 +347,11 @@ private enum WorkspacePresentation: Hashable {
 }
 
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.
+// Each starts at the width set in Settings; a width dragged in this window replaces it for the window's life.
 private final class ColumnWidths {
-    var sidebar: CGFloat = 230
-    var list = ListColumn.defaultWidth
-}
-
-enum ListColumn {
-    /// The width a window's list column starts at, the column's ideal width. A width the person has dragged it to is
-    /// kept instead, and the column never goes narrower than 280.
-    static let defaultWidth: CGFloat = 340
+    var sidebar = ColumnWidth.sidebar.stored()
+    var list = ColumnWidth.list.stored()
+    var settings = ColumnWidth.settings.stored()
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

@@ -5,7 +5,7 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// Whether the inspector's Details section is open, kept across items and launches.
     static let inspectorDetailsOpen = "inspectorDetailsOpen"
-    static let all = [textSize, inspectorDetailsOpen]
+    static let all = [textSize, inspectorDetailsOpen] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {
