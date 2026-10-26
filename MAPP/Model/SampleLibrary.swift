@@ -30,12 +30,13 @@ nonisolated enum SampleLibrary {
 
     static let name = "Sample Library"
 
-    /// Opens the sample in place of a server's copy: its own items, or those given, as for a preview.
+    /// Opens the sample in place of a server's copy: its own items and edges, or those given, as for a preview.
     static func open(
-        _ connection: MarfaConnection, items given: [Marfa.Item]? = nil, edges: [Marfa.Edge] = [], now: Date = .now
+        _ connection: MarfaConnection, items given: [Marfa.Item]? = nil, edges: [Marfa.Edge]? = nil, now: Date = .now
     ) -> MarfaSource {
         let fake = WorkingCopy.fake(
-            items: given ?? items(now: now, collections: withCollections), edges: edges, itemTypes: itemTypes,
+            items: given ?? items(now: now, tasksAndEvents: withCollections),
+            edges: edges ?? (given == nil ? memberships(now: now) : []), itemTypes: itemTypes,
             edgeTypes: edgeTypes)
         let server = SampleServer(copy: fake.copy)
         let source = MarfaSource(copy: fake.copy, connection: connection, reading: server, refreshing: server)
@@ -80,6 +81,14 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
                 TypeField(name: "description", type: "string", declaredBy: "sample.project"),
             ], titleField: "title", bodyField: "body"),
+        ItemType(
+            id: "core.collection", label: "Collection",
+            description: "Items of any type that you gather together. Members join it through the in-collection edge, and it can hold any item but another container.",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, description: "Name of the collection", declaredBy: "core.collection"),
+                TypeField(
+                    name: "description", type: "string", description: "What the collection gathers", declaredBy: "core.collection"),
+            ], titleField: "title", bodyField: "description", roles: ["container"]),
     ]
 
     static let edgeTypes: [Marfa.EdgeType] = [
@@ -93,6 +102,12 @@ nonisolated enum SampleLibrary {
             id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", cardinality: "one-to-one", shipped: true),
         EdgeType(
             id: "attached-to", label: "Attached to", reverseLabel: "Attachments", cardinality: "many-to-one", reverseName: "has-attachment",
+            shipped: true),
+        EdgeType(
+            id: "in-collection", label: "In collection", reverseLabel: "Contents",
+            description: "Source item is a member of the target container.", cardinality: "many-to-many",
+            targetTypeConstraints: ["role:container"],
+            properties: [TypeField(name: "position", type: "number", description: "Ordering within the collection (1-based).", declaredBy: "in-collection")],
             shipped: true),
     ]
 
@@ -120,7 +135,7 @@ nonisolated enum SampleLibrary {
 
     // MARK: Items
 
-    static func items(now: Date, collections: Bool) -> [Marfa.Item] {
+    static func items(now: Date, tasksAndEvents: Bool) -> [Marfa.Item] {
         let calendar = Calendar.current
         /// Never later than now, so a note written "this morning" is not in the future before breakfast.
         func date(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
@@ -166,8 +181,15 @@ nonisolated enum SampleLibrary {
         note("moving-checklist", movingChecklist, daysAgo: 420, hour: 10)
         note("old-packing-list", oldPackingList, daysAgo: 30, hour: 9, trashed: true)
         note("draft-agenda", draftAgenda, daysAgo: 15, hour: 17, trashed: true)
+        for collection in collections {
+            let created = date(daysAgo: collection.daysAgo, hour: 9)
+            rows.append(row(
+                collection.id, type: "core.collection",
+                properties: ["title": .string(collection.title), "description": .string(collection.description)],
+                created: created, edited: created))
+        }
 
-        guard collections else { return rows }
+        guard tasksAndEvents else { return rows }
         for (index, task) in tasks.enumerated() {
             var properties: JSONObject = [
                 "title": .string(task.title), "body": .string(task.body), "priority": .string(task.priority),
@@ -187,6 +209,25 @@ nonisolated enum SampleLibrary {
             rows.append(row("event-\(index + 1)", type: "core.event", properties: properties, created: created, edited: created))
         }
         return rows
+    }
+
+    /// The sample's collections. Home orders its members by position; Reading gives none, so it lists them by title.
+    static let collections: [(id: String, title: String, description: String, daysAgo: Int, members: [String], positioned: Bool)] = [
+        ("collection-home", "Home", "Looking after the flat.", 30, ["boiler", "bike-service", "moving-checklist"], true),
+        ("collection-reading", "Reading", "Books and ideas worth keeping.", 60,
+         ["reading-list", "pattern-language", "design-of-everyday-things"], false),
+    ]
+
+    /// Each sample collection's members, through `in-collection`.
+    static func memberships(now: Date) -> [Marfa.Edge] {
+        collections.flatMap { collection in
+            collection.members.enumerated().map { index, member in
+                Marfa.Edge(
+                    id: "\(collection.id)-\(member)", sourceId: member, targetId: collection.id, edgeType: "in-collection",
+                    properties: collection.positioned ? ["position": .number(Double(index + 1))] : [:], version: 1,
+                    createdAt: stamp(now), updatedAt: stamp(now))
+            }
+        }
     }
 
     /// A note's heading is its title, and the text below it its body. A note with no heading has no title.

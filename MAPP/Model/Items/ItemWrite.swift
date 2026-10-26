@@ -16,6 +16,8 @@ nonisolated struct EdgeDraft: Hashable, Sendable {
     var type: String
     var source: ItemID
     var target: ItemID
+    /// The edge's `position` property, so an undone removal puts a collection member back where it was.
+    var position: Double? = nil
 }
 
 nonisolated enum BodyMerge: Hashable, Sendable {

@@ -11,9 +11,8 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     let item: Item
     let typeLabel: String
     let typeSymbol: String
-    /// The item the row's item is filed under, which may be its collection.
+    /// The item the row's item is filed under (`child-of`).
     let parent: Link?
-    let collection: Link?
     var id: ItemID { item.id }
 }
 
@@ -23,13 +22,11 @@ extension ItemTableRow {
         let catalogue = library.catalogue
         return items.map { item in
             let parent = item.parentID.flatMap { library.item($0) }
-            let collection = library.collection(of: item)
             return ItemTableRow(
                 item: item,
                 typeLabel: TypeSymbol.label(for: item.type, in: catalogue),
                 typeSymbol: TypeSymbol.name(for: item.type, in: catalogue),
-                parent: parent.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) },
-                collection: collection.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) })
+                parent: parent.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) })
         }
     }
 }
@@ -60,7 +57,7 @@ nonisolated enum StatusTone: Int, Hashable, Sendable, CaseIterable, Comparable {
 /// A column of the table: which part of an item it shows, and how.
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
-        case title, type, parent, collection, created, edited
+        case title, type, parent, created, edited
         /// The time between two date fields, as a session's start and end.
         case duration(start: String, end: String)
         case field(ItemTypeInfo.Field)
@@ -92,7 +89,6 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     static let title = ItemTableColumn(id: "title", label: String(localized: "Name"), content: .title, style: .title)
     static let type = ItemTableColumn(id: "type", label: String(localized: "Type"), content: .type, style: .text)
     static let parent = ItemTableColumn(id: "parent", label: "", content: .parent, style: .link)
-    static let collection = ItemTableColumn(id: "collection", label: String(localized: "Collection"), content: .collection, style: .link)
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
     static let created = ItemTableColumn(
         id: "created", label: String(localized: "Created"), content: .created, style: .date, isShownByDefault: false)
@@ -148,7 +144,6 @@ nonisolated extension ItemTableColumn {
         switch content {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
-        case .collection: return row.collection?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
         case .title, .created, .edited, .duration: return nil
         }
@@ -159,7 +154,6 @@ nonisolated extension ItemTableColumn {
         switch content {
         case .type: return rows.first { $0.item.type.rawValue == value }?.typeLabel ?? value
         case .parent: return rows.lazy.compactMap(\.parent).first { $0.id.rawValue == value }?.title ?? value
-        case .collection: return rows.lazy.compactMap(\.collection).first { $0.id.rawValue == value }?.title ?? value
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
@@ -172,7 +166,6 @@ nonisolated extension ItemTableColumn {
         case .title: return .text(row.item.title)
         case .type: return .text(row.typeLabel)
         case .parent: return row.parent.map { .text($0.title) }
-        case .collection: return row.collection.map { .text($0.title) }
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
         case .duration(let start, let end): return ItemTableValue.duration(row, start: start, end: end).map { .number(Decimal($0)) }
@@ -262,7 +255,7 @@ nonisolated enum ItemTableLayout {
     /// The table's columns for these rows: the name, then the type where the rows mix types, then status, priority
     /// and assignee, then where each item is filed, then the other fields their types have, and when it was edited.
     /// A field few of the rows fill starts hidden, as do the quiet ones; the person can show any of them.
-    static func columns(for rows: [ItemTableRow], catalogue: Catalogue, place: SidebarItem, hidden: Set<String>) -> [ItemTableColumn] {
+    static func columns(for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>) -> [ItemTableColumn] {
         var columns: [ItemTableColumn] = [.title]
         let types = Set(rows.map(\.item.type))
         if types.count > 1 { columns.append(.type) }
@@ -294,14 +287,12 @@ nonisolated enum ItemTableLayout {
         let (people, rest) = (sorted.filter(Self.firstFields.contains), sorted.filter { !Self.firstFields.contains($0) })
         for key in people { columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold)) }
 
-        // The parent is worth a column where it is something other than the collection, such as a ticket's epic.
-        let isCollection: Bool = if case .collection = place { true } else { false }
+        // The parent is worth showing where enough rows have one, such as a ticket's epic.
         var parent = ItemTableColumn.parent
         // The column is headed with Marfa's name for the child end of the parent link.
         if let name = catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel { parent.label = name }
-        parent.isShownByDefault = rows.count(where: { $0.parent != nil && $0.parent?.id != $0.collection?.id }) >= threshold
+        parent.isShownByDefault = rows.count(where: { $0.parent != nil }) >= threshold
         columns.append(parent)
-        if !isCollection, rows.contains(where: { $0.collection != nil }) { columns.append(.collection) }
 
         for key in rest {
             columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold))
@@ -352,8 +343,9 @@ nonisolated enum ItemTableLayout {
         }
     }
 
-    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit.
-    static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn]) -> [ItemTableComparator] {
+    /// The order a place starts with: the most pressing first where items have a priority, else the latest edit. A
+    /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
+    static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
         if let sort = options.sort {
             // A column the place no longer has is dropped; its stored copy may also be out of date.
             let fresh = sort.compactMap { comparator in
@@ -361,6 +353,7 @@ nonisolated enum ItemTableLayout {
             }
             if !fresh.isEmpty { return fresh }
         }
+        if keepsGivenOrder { return [] }
         var sort: [ItemTableComparator] = []
         if let priority = columns.first(where: { $0.style == .priority }) {
             sort.append(ItemTableComparator(column: priority, order: .reverse))
@@ -377,7 +370,8 @@ nonisolated enum ItemTableLayout {
     }
 
     static func sorted(_ rows: [ItemTableRow], by sort: [ItemTableComparator]) -> [ItemTableRow] {
-        rows.sorted { a, b in
+        guard !sort.isEmpty else { return rows }
+        return rows.sorted { a, b in
             for comparator in sort {
                 switch comparator.compare(a, b) {
                 case .orderedAscending: return true

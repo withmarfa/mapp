@@ -156,7 +156,8 @@ extension MarfaEngine {
         case .link(let draft, _):
             return [
                 try await copy.edges.create(
-                    from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+                    from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type,
+                    properties: draft.position.map { [MarfaMapping.positionProperty: .number($0)] } ?? [:])
             ]
         case .unlink(let edgeID):
             return [try await copy.edges.delete(edgeID.rawValue)]

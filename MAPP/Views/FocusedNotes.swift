@@ -34,6 +34,8 @@ final class DetailsPresentation {
     var isPresented = false
     /// The items the window's Change Type sheet is open for.
     var typeChange: TypeChangeRequest?
+    /// The items the window's Add to Collection sheet is open for.
+    var collectionPick: CollectionPickRequest?
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
@@ -63,6 +65,14 @@ final class DetailsPresentation {
 /// What the Change Type sheet changes, with the undo manager of the window it was asked for in, since the sheet
 /// has its own.
 struct TypeChangeRequest: Identifiable {
+    let id = UUID()
+    let ids: Set<ItemID>
+    let undoManager: UndoManager?
+}
+
+/// The items the Add to Collection sheet files, with the undo manager of the window it was asked for in, since the
+/// sheet has its own.
+struct CollectionPickRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>
     let undoManager: UndoManager?

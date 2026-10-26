@@ -251,8 +251,8 @@ final class QuickAdd {
 
 extension Browser {
     /// Shows quick add, with `typeID` chosen where one is given. A draft put away comes back as it was left;
-    /// otherwise the kind is `remembered`, the last one added, then the place's own type, then a note, and the
-    /// item goes under the collection being shown where its kind can.
+    /// otherwise the kind is `remembered`, the last one added, then the place's own type (a collection type in the
+    /// Collections index), then a note.
     func openQuickAdd(typeID: String? = nil, remembered: String? = nil, in library: any ItemLibrary) {
         leaveSettings()
         palette = nil
@@ -261,11 +261,11 @@ extension Browser {
         if quickAdd.draft == nil {
             var placeType: String?
             if case .itemType(let id) = item { placeType = id }
+            // The Collections index offers a new collection first.
+            if item == .collections { placeType = types.first { library.catalogue.isCollection(TypeID($0)) } }
             guard let kind = offered(typeID) ?? offered(remembered) ?? offered(placeType) ?? offered("core.note") ?? types.first
             else { return }
-            var draft = QuickAdd.Draft(typeID: kind)
-            if case .collection(let id) = item { draft.parentID = id }
-            quickAdd.draft = draft
+            quickAdd.draft = QuickAdd.Draft(typeID: kind)
             chooseQuickAddType(kind, in: library)
         } else if let typeID = offered(typeID) {
             chooseQuickAddType(typeID, in: library)
@@ -293,7 +293,8 @@ extension Browser {
     }
 
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
-    /// panel closes and the window opens the item, and attaches the draft's files to it (`finishNewItem`). Where
+    /// panel closes and the window opens the item, adds it to the collection being shown, and attaches the draft's
+    /// files to it (`finishNewItem`). Where
     /// the library cannot make it, everything stays as typed and the library tells the person why. A file no
     /// longer where it was is taken out of the draft and named, and nothing is added until the person has seen
     /// that. Nothing empty is ever written.
@@ -340,9 +341,11 @@ extension Browser {
         quickAdd.isPresented = false
         quickAdd.draft = nil
         let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
+        var collection: ItemID?
+        if case .collection(let id) = item { collection = id }
         newItem = NewItem(
             id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
-            attachments: isFile ? [] : draft.files, embedsInText: keepsText)
+            attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection, undoManager: undoManager)
         finishNewItem(in: library)
         return id
     }

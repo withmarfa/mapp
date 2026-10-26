@@ -4,6 +4,8 @@ import SwiftUI
 /// what removes it. The More menu places the same two parts apart, with other commands between them.
 struct NoteActions: View {
     @CurrentLibrary private var library
+    /// The window's, for the Add to Collection sheet; the menu bar passes the front window's in.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let ids: Set<ItemID>
     /// Passed in, since the menu bar has no window of its own to read one from.
     let undoManager: UndoManager?
@@ -12,6 +14,7 @@ struct NoteActions: View {
 
     var body: some View {
         NoteOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
+        CollectionActions(selection: ids, details: details, undoManager: undoManager)
         if inMenuBar || !NoteActionContext(library: library, ids: ids, keepsPlace: false).notes.isEmpty { Divider() }
         NoteRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
     }
@@ -30,7 +33,8 @@ private struct NoteActionContext {
     var isEmpty: Bool { notes.isEmpty && !keepsPlace }
 }
 
-/// Favorites and Change Type for notes, or Recover for deleted ones.
+/// Favorites and Change Type for notes, or Recover for deleted ones. The collection actions sit beside these
+/// (`CollectionActions`), since they take files too.
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Change Type sheet; the menu bar passes the front window's in.

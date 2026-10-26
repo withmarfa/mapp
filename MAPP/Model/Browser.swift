@@ -181,10 +181,21 @@ final class Browser {
         selection.compactMap { library.item($0) }
     }
 
+    /// Whether the list shows its place's own order rather than the chosen sort: a collection lists its members in
+    /// the order Marfa keeps for them, until a search lists results instead.
+    var keepsPlaceOrder: Bool {
+        guard !isSearching, case .collection = item else { return false }
+        return true
+    }
+
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// note is one, nor in search results.
+    /// note is one, nor in search results. A place that keeps its own order is one section, in that order.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
-        NoteGroup.sections(
+        if keepsPlaceOrder {
+            let items = items(in: library)
+            return items.isEmpty ? [] : [NoteSection(group: nil, items: items)]
+        }
+        return NoteGroup.sections(
             of: items(in: library),
             sort: order.sort,
             favoritesFirst: !isSearching && !showsOnlyFavorites,
@@ -199,7 +210,6 @@ final class Browser {
         var context = ItemMeta.Context()
         context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
         if !isSearching {
-            if case .collection(let id) = item { context.collection = id }
             context.isInbox = item == .inbox
         }
         return context

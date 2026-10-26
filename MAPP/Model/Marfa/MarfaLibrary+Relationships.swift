@@ -43,8 +43,6 @@ extension MarfaLibrary {
         let types: Set<TypeID>
         let roles: Set<String>
 
-        var allowsAny: Bool { types.isEmpty && roles.isEmpty }
-
         /// Only the server's own bookkeeping, such as its folders, which the copy never holds.
         var isServers: Bool { roles.isEmpty && !types.isEmpty && types.allSatisfy { $0.rawValue.hasPrefix("system.") } }
     }
@@ -56,8 +54,14 @@ extension MarfaLibrary {
     }
 
     private func admits(_ type: TypeID, _ end: EndConstraint) -> Bool {
-        end.allowsAny || end.types.contains(type) || catalogue.isSubtype(type, ofAnyOf: end.types)
-            || !end.roles.isDisjoint(with: catalogue.itemTypes[type]?.roles ?? [])
+        catalogue.admits(type, types: end.types, roles: end.roles)
+    }
+
+    /// Whether an item of `type` may hold the end `atTarget` names of the edge type `info`. Collections are flat, so
+    /// a collection is never a member of another (`edges/collection-no-nesting`), whatever the source end admits.
+    private func admits(_ type: TypeID, _ info: EdgeTypeInfo, atTarget: Bool) -> Bool {
+        if info.id == MarfaMapping.collectionEdge, !atTarget, catalogue.isCollection(type) { return false }
+        return admits(type, constraint(of: info, atTarget: atTarget))
     }
 
     /// Nil where the server would take the edge as far as the copy can tell; otherwise why not, in the person's
@@ -66,6 +70,9 @@ extension MarfaLibrary {
         guard draft.source != draft.target else { return String(localized: "An item can’t be linked to itself.") }
         guard let sourceType, let targetType else { return String(localized: "This item isn’t in the library.") }
         guard let info = catalogue.edgeTypes[draft.type] else { return nil }
+        if info.id == MarfaMapping.collectionEdge, catalogue.isCollection(sourceType) {
+            return String(localized: "A collection can’t be in another collection.")
+        }
         guard admits(sourceType, constraint(of: info, atTarget: false)), admits(targetType, constraint(of: info, atTarget: true))
         else {
             return String(localized: "This kind of item can’t be linked here.")
@@ -85,7 +92,7 @@ extension MarfaLibrary {
             guard info.id != MarfaMapping.bodyLinkEdge else { return nil }
             let atTarget = info.writtenAt == .target
             let far = constraint(of: info, atTarget: !atTarget)
-            guard admits(type, constraint(of: info, atTarget: atTarget)), !far.isServers else { return nil }
+            guard admits(type, info, atTarget: atTarget), !far.isServers else { return nil }
             let name = atTarget ? info.reverseName ?? info.id : info.id
             return (name, FieldEnd(info: info, atTarget: atTarget, isInverse: false))
         }
@@ -146,13 +153,12 @@ extension MarfaLibrary {
     /// Active items the field could link to: of a type its far end allows, and none that would close a cycle.
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
-        let far = constraint(of: end.info, atTarget: !end.atTarget)
-        guard admits(item.type, constraint(of: end.info, atTarget: end.atTarget)) else { return [] }
+        guard admits(item.type, end.info, atTarget: end.atTarget) else { return [] }
         let loops: Set<ItemID> = Self.acyclicEdges.contains(end.info.id)
             ? (end.atTarget ? index.reachable(from: id, type: end.info.id) : index.reaching(id, type: end.info.id))
             : []
         return heldItems(index.ids(in: .active))
-            .filter { $0.id != id && !loops.contains($0.id) && admits($0.type, far) }
+            .filter { $0.id != id && !loops.contains($0.id) && admits($0.type, end.info, atTarget: !end.atTarget) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -302,22 +308,23 @@ extension MarfaLibrary {
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
     /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
     /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
-    private func relink(_ change: RelationshipChange, name: String, undoManager: UndoManager?) {
-        let title = String(localized: "Can’t Change This Relationship")
+    func relink(
+        _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
+        undoManager: UndoManager?
+    ) {
         var links = change.adding.map { submit(.link($0, undoing: nil), failing: title) }
         links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
         if links.isEmpty {
-            unlink(change.removing)
+            unlink(change.removing, failing: title)
         } else if !change.removing.isEmpty {
             awaitLinks(Set(links), thenUnlink: change.removing)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.relink(change.reversed, name: name, undoManager: undoManager)
+            library.relink(change.reversed, name: name, failing: title, undoManager: undoManager)
         }
     }
 
-    func unlink(_ drafts: [EdgeDraft]) {
-        let title = String(localized: "Can’t Change This Relationship")
+    func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) {
         for draft in drafts {
             if let link = index.link(type: draft.type, source: draft.source, target: draft.target) {
                 submit(.unlink(link.id), failing: title)

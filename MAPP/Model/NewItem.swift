@@ -31,6 +31,10 @@ struct NewItem {
     var attachments: [QuickAdd.File] = []
     /// Whether the item keeps text, so the page writes the attached files into it.
     var embedsInText = false
+    /// The collection whose place the item was added in, which it joins once the library holds it.
+    var collection: ItemID?
+    /// The window's, so the item's joining the collection is undone there.
+    weak var undoManager: UndoManager?
 }
 
 /// What the page writes at the end of a new item's text for the files quick add attached to it.
@@ -64,6 +68,7 @@ extension Browser {
             return
         }
         newItem = nil
+        let joined = join(entry, in: library)
         if !entry.attachments.isEmpty {
             attachingNewItem = Task { await attachFiles(of: entry, in: library) }
         }
@@ -71,7 +76,9 @@ extension Browser {
         isCollectionItemPresented = usesCollection
         searchText = ""
         isSearchExpanded = false
-        if !library.items(in: item).contains(where: { $0.id == entry.id }) {
+        // The edge is queued, so the collection's list may not hold the item yet; it soon will.
+        let joinedShown = joined && entry.collection.map { item == .collection($0) } == true
+        if !joinedShown, !library.items(in: item).contains(where: { $0.id == entry.id }) {
             sidebarItem = entry.isFile ? .files : .itemType(entry.typeID)
         }
         selection = [entry.id]
@@ -83,6 +90,15 @@ extension Browser {
         } else {
             focusRequest = .title
         }
+    }
+
+    /// Files the new item in the collection whose place it was added in, through the edge queue as any link is
+    /// added, and says whether it did. An item whose type can't be in a collection, such as another collection, is
+    /// left out of it; one the library refuses stays where it is, and the library tells the person why.
+    private func join(_ entry: NewItem, in library: any ItemLibrary) -> Bool {
+        guard let collection = entry.collection, let held = library.item(entry.id), library.canJoinCollection(held)
+        else { return false }
+        return library.addToCollection([entry.id], collection, undoManager: entry.undoManager)
     }
 
     /// Why the window stops waiting for the item quick add made.

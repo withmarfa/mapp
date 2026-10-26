@@ -129,9 +129,27 @@ nonisolated struct Edge: Identifiable, Hashable, Sendable {
     let source: ItemID
     let target: EdgeTarget
     let origin: EdgeOrigin
+    /// The edge's `position` property, where it has one, as an `in-collection` edge orders a collection's members.
+    var position: Double? = nil
 }
 
 nonisolated extension Item {
+    /// The item this one is filed under: the target of its `child-of` edge.
+    var parentID: ItemID? {
+        edgesOut.lazy.compactMap { edge -> ItemID? in
+            guard edge.type == "child-of", case .item(let id) = edge.target else { return nil }
+            return id
+        }.first
+    }
+
+    /// The collections this item is in: the targets of its `in-collection` edges, in the order it holds them.
+    var collectionIDs: [ItemID] {
+        edgesOut.compactMap { edge -> ItemID? in
+            guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.target else { return nil }
+            return id
+        }
+    }
+
     /// Whether its properties and relationships can be changed. A file, a deleted item or one with a problem is read
     /// only.
     var isEditable: Bool { state == .active && problem == nil && !isFile }

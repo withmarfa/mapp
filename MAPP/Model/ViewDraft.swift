@@ -54,8 +54,9 @@ nonisolated enum ViewDraft {
     static let maxFilterLength = 2048
 
     /// The query a place stands for, or nil where a view cannot stand for it: Recents, which is a count of the
-    /// latest edits, Recently Deleted, an index, a single favorite, and a collection. A view lists active items,
-    /// as MAPP's places do.
+    /// latest edits, Recently Deleted, an index, and a single favorite. A view lists active items, as MAPP's places
+    /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
+    /// edge's position.
     static func query(for place: SidebarItem, catalogue: Catalogue, views: [LibraryView]) -> LibraryViewQuery? {
         let active: Set<ItemState> = [.active]
         switch place {
@@ -71,7 +72,9 @@ nonisolated enum ViewDraft {
         case .files: return LibraryViewQuery(types: [TypeID.file], states: active)
         case .source(let name): return LibraryViewQuery(states: active, filter: condition("source", "eq", quoted(name)))
         case .view(let id): return views.first { $0.id == id }?.query
-        case .recents, .recentlyDeleted, .sources, .collections, .favoriteItem, .collection: return nil
+        case .collection(let id):
+            return LibraryViewQuery(states: active, filter: condition("edge[\(MarfaMapping.collectionEdge)]", "eq", quoted(id.rawValue)))
+        case .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: return nil
         }
     }
 
@@ -134,7 +137,7 @@ nonisolated enum ViewDraft {
         case .created: "created_at"
         case .edited: "updated_at"
         case .field(let field): isPropertyName(field.key) ? "properties." + field.key : nil
-        case .parent, .collection, .duration: nil
+        case .parent, .duration: nil
         }
     }
 
@@ -229,7 +232,7 @@ nonisolated enum ViewDraft {
             if value.isEmpty { return condition(path, "not_exists", nil) }
             if column.style == .boolean { return value == "true" || value == "false" ? condition(path, "eq", value) : nil }
             return quotedIfPlain(value).map { condition(path, "eq", $0) }
-        case .title, .collection, .created, .edited, .duration:
+        case .title, .created, .edited, .duration:
             return nil
         }
     }

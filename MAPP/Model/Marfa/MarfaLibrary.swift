@@ -500,11 +500,11 @@ import Observation
         let content = contentRevision
         let membership = membershipRevision
         if let held = listed[place], held.content == content { return held.items }
-        // Which items are recent, and in what order, changes with any edit, not only with membership.
-        var listing = listed[place].flatMap { $0.membership == membership && place != .recents ? $0 : nil }
-            ?? Listing(membership: membership, ids: place == .recents
-                ? Self.recent(index.ids(in: .active).compactMap { records[$0]?.item }).map(\.id)
-                : Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id))
+        // Which items are recent, and in what order, changes with any edit, not only with membership; so does a
+        // collection's order, which falls back on titles.
+        let isCollection: Bool = if case .collection = place { true } else { false }
+        var listing = listed[place].flatMap { $0.membership == membership && place != .recents && !isCollection ? $0 : nil }
+            ?? Listing(membership: membership, ids: listingOrder(of: place))
         listing.content = content
         listing.items = listing.ids.compactMap { records[$0]?.item }
         listed[place] = listing
@@ -519,6 +519,14 @@ import Observation
         let count = members(of: place).count
         counted[place] = (revision, count)
         return count
+    }
+
+    private func listingOrder(of place: SidebarItem) -> [ItemID] {
+        switch place {
+        case .recents: Self.recent(index.ids(in: .active).compactMap { records[$0]?.item }).map(\.id)
+        case .collection(let id): membersInOrder(of: id, among: members(of: place).compactMap { records[$0]?.item })
+        default: Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id)
+        }
     }
 
     /// Newest first, as the source paints them; the views sort as the person chose.
@@ -542,10 +550,9 @@ import Observation
         case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
         case .itemType(let type): return index.activeByType[TypeID(type)] ?? []
         case .files: return active(withSubtypesOf: MarfaMapping.fileType)
-        // What is filed under the item, at any depth; the item itself is the place, not one of its members.
+        // The active items filed in the collection through `in-collection`.
         case .collection(let id):
-            let active = index.ids(in: .active)
-            return index.reachable(from: id, type: MarfaMapping.parentEdge).subtracting([id]).intersection(active)
+            return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.source)).intersection(index.ids(in: .active))
         case .recentlyDeleted: return index.ids(in: .trashed)
         }
     }

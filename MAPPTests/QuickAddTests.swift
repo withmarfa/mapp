@@ -77,17 +77,53 @@ struct QuickAddTests {
         #expect(browser.focusCaret == nil)
     }
 
-    @Test func anItemGoesUnderTheCollectionShown() async throws {
-        let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
-            version: ItemVersion(1), created: start, modified: start)
-        let library = FakeItemLibrary(items: [project], now: start)
-        library.parentCandidates["core.task"] = [project.id]
+    /// A collection's members are filed with `in-collection`, not `child-of`, so the place shown sets no parent; the
+    /// new item joins the collection instead, and the window stays on it.
+    @Test func anItemAddedInACollectionJoinsIt() async throws {
+        let holiday = FakeItemLibrary.collection("Holiday")
+        let library = FakeItemLibrary(items: [holiday], now: start)
         let browser = Browser()
-        browser.sidebarItem = .collection(project.id)
+        browser.sidebarItem = .collection(holiday.id)
         let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
-        #expect(library.item(id)?.parentID == project.id)
+        let item = try #require(library.item(id))
+        #expect(item.parentID == nil)
+        #expect(item.collectionIDs == [holiday.id])
+        #expect(browser.sidebarItem == .collection(holiday.id))
+        #expect(browser.selection == [id])
         #expect(!browser.quickAdd.isPresented)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    /// Collections are flat, so a new collection made in a collection's place stays out of it.
+    @Test func aCollectionAddedInACollectionDoesNotJoinIt() async throws {
+        let holiday = FakeItemLibrary.collection("Holiday")
+        let library = FakeItemLibrary(items: [holiday], now: start)
+        let browser = Browser()
+        browser.sidebarItem = .collection(holiday.id)
+        let id = try #require(await browser.quickAdded("Trips", typeID: FakeItemLibrary.collectionType.rawValue, in: library))
+        #expect(library.item(id)?.collectionIDs.isEmpty == true)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    /// The item is made first and joins once the library holds it, so a collection gone meanwhile is told and the
+    /// item is kept and opened.
+    @Test func aRefusedJoinIsToldAndLeavesTheItem() async throws {
+        let holiday = FakeItemLibrary.collection("Holiday")
+        let library = FakeItemLibrary(items: [holiday], now: start)
+        library.holdsCreations = true
+        let browser = Browser()
+        browser.sidebarItem = .collection(holiday.id)
+        let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
+        let index = try #require(library.items.firstIndex { $0.id == holiday.id })
+        library.items[index].state = .trashed
+        library.deliverCreated()
+        browser.finishNewItem(in: library)
+
+        let item = try #require(library.item(id))
+        #expect(item.collectionIDs.isEmpty)
+        #expect(item.state == .active)
+        #expect(browser.selection == [id])
+        #expect(library.notices.waiting.count == 1)
     }
 
     @Test func aRefusedCreateKeepsEverythingAsTyped() async throws {
@@ -402,9 +438,8 @@ struct QuickAddTests {
         let library = FakeItemLibrary(items: [project], now: start)
         let browser = Browser()
         library.parentCandidates[TypeID.file.rawValue] = [project.id]
-        browser.sidebarItem = .collection(project.id)
         browser.openQuickAdd(typeID: TypeID.file.rawValue, in: library)
-        #expect(browser.quickAdd.draft?.parentID == project.id, "a file goes under the collection shown")
+        browser.quickAdd.draft?.parentID = project.id
         browser.quickAdd.draft?.files = [try disk.file("photo.png", "png")]
         browser.quickAdd.draft?.title = "Holiday"
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
@@ -488,7 +523,7 @@ struct QuickAddTests {
         let types = QuickAdd.types(in: library)
         let (first, rest) = QuickAdd.kindMenu(types, shown: [TypeID("core.task"), TypeID("core.note")], chosen: "test.project")
         #expect(first.map(\.id.rawValue) == ["core.task", "core.note", TypeID.file.rawValue, "test.project"])
-        #expect(rest.isEmpty)
+        #expect(rest.map(\.id) == [FakeItemLibrary.collectionType])
         #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
     }
 

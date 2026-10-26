@@ -76,6 +76,7 @@ struct NoteWindow: View {
         .focusedSceneValue(\.detailsPresentation, details)
         .environment(details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
+        .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
         .onAppear {
             details.isPresented = storedDetailsPresented

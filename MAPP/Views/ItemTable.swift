@@ -142,7 +142,8 @@ struct ItemTable: View {
     /// The header's sort: a click puts its column first, and only the last few columns clicked are kept.
     private func sortBinding(_ columns: [ItemTableColumn]) -> Binding<[ItemTableComparator]> {
         Binding {
-            ItemTableLayout.sort(browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns)
+            ItemTableLayout.sort(
+                browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         } set: { sort in
             browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(3))
         }
@@ -178,9 +179,9 @@ final class ItemTableContent {
     init(browser: Browser, library: any ItemLibrary) {
         allRows = ItemTableRow.rows(of: browser.items(in: library), in: library)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
-        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, place: browser.item, hidden: hidden)
+        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden)
         options = browser.tableOptions[browser.item] ?? ItemTableOptions()
-        sort = ItemTableLayout.sort(options, columns: columns)
+        sort = ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         grouping = ItemTableLayout.grouping(options, columns: columns)
     }
 

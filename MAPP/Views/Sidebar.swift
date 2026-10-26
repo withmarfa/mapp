@@ -236,7 +236,7 @@ private struct TypesHeading: View {
     let rows = (1...100).flatMap { index in
         [
             SampleLibrary.row(
-                "collection-\(index)", type: "sample.project",
+                "collection-\(index)", type: "core.collection",
                 properties: ["title": .string("Research collection \(index) with a longer title")], created: date, edited: date),
             SampleLibrary.row(
                 "child-\(index)", type: "core.note", properties: ["title": .string("Field note \(index)")], created: date,
@@ -245,7 +245,7 @@ private struct TypesHeading: View {
     }
     let edges = (1...100).map { index in
         Marfa.Edge(
-            id: "edge-\(index)", sourceId: "collection-\(index)", targetId: "child-\(index)", edgeType: "parent-of",
+            id: "edge-\(index)", sourceId: "child-\(index)", targetId: "collection-\(index)", edgeType: "in-collection",
             properties: [:], version: 1, createdAt: SampleLibrary.stamp(date), updatedAt: SampleLibrary.stamp(date))
     }
     let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())

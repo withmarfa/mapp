@@ -80,11 +80,10 @@ extension LiveMarfaTests {
                 #expect(!inbox.contains { $0.id == project })
                 #expect(Set(inbox.map(\.id)).isSubset(of: Set(library.items(in: .allNotes).map(\.id))))
 
-                // A collection lists everything below it, not itself; each child holds it as `child-of`.
+                // Each child holds its parent as `child-of`, which makes the parent no collection.
                 let below = try #require(library.relationships(for: project).first { $0.field == "inverse:parent-of" })
                 #expect(below.label == "Children")
-                let beneath = Set(library.items(in: .collection(project)).map(\.id))
-                #expect(beneath == Set(children))
+                #expect(library.items(in: .collection(project)).isEmpty)
                 for child in children {
                     let parent = library.relationships(for: child).first { $0.field == "child-of" }
                     #expect(parent?.targets.map(\.itemID) == [project])
@@ -93,6 +92,46 @@ extension LiveMarfaTests {
                 #expect(library.body(of: project)?.text == "Made by the MAPP tests.")
                 #expect(!library.relationshipCandidates(for: project, field: "about").isEmpty)
                 #expect(await eventually { library.items(matching: token).contains { $0.id == project } })
+            }
+        }
+
+        @Test(.timeLimit(.minutes(2)))
+        func filesItemsInACollectionAndTakesThemOut() async throws {
+            try await withLibrary { library, source, made in
+                let token = "zc" + UUID().uuidString.prefix(8).lowercased()
+                // Whatever type the instance gives the `container` role, as MAPP never names one.
+                let type = try #require(library.catalogue.collectionTypes.map(\.rawValue).sorted().first)
+                @MainActor func make(_ title: String, type: String) throws -> ItemID {
+                    let id = library.createItem(
+                        typeID: type, title: "MAPPTEST \(title) \(token)", body: "", properties: [:], parentID: nil,
+                        in: .allNotes, undoManager: nil)
+                    if let id { made.add(id) }
+                    return try #require(id)
+                }
+                let collection = try make("collection", type: type)
+                let other = try make("other collection", type: type)
+                let first = try make("first member", type: "core.note")
+                let second = try make("second member", type: "core.note")
+                await source.flush()
+                try #require(await eventually {
+                    library.collections.contains { $0.id == collection } && library.item(first) != nil && library.item(second) != nil
+                })
+
+                #expect(library.addToCollection([first, second], collection, undoManager: nil))
+                await source.flush()
+                #expect(await eventually { Set(library.items(in: .collection(collection)).map(\.id)) == [first, second] })
+                let membership = library.relationships(for: first).first { $0.field == "in-collection" }
+                #expect(membership?.label == "In collection")
+                #expect(membership?.targets.map(\.itemID) == [collection])
+                #expect(library.relationships(for: collection).first { $0.field == "inverse:in-collection" }?.label == "Contents")
+
+                // The server refuses nesting, and MAPP never sends it.
+                #expect(!library.addToCollection([other], collection, undoManager: nil))
+
+                #expect(library.removeFromCollection([first], collection, undoManager: nil))
+                await source.flush()
+                #expect(await eventually { library.items(in: .collection(collection)).map(\.id) == [second] })
+                #expect(library.item(first)?.collectionIDs.isEmpty == true)
             }
         }
 
@@ -124,7 +163,6 @@ extension LiveMarfaTests {
                 })
                 #expect(library.relationships(for: parent).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child])
                 #expect(library.body(of: child)?.text == "Made by the MAPP tests.")
-                #expect(Set(library.items(in: .collection(parent)).map(\.id)) == [child])
 
                 // Text: held at once, and the copy's own once the server has answered.
                 library.updateBody(of: child, to: "Edited \(token) text.")
