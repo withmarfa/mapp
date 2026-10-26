@@ -159,7 +159,7 @@ import Testing
         #expect(library.addToCollection([F.e1, Self.archive], Self.holiday, undoManager: nil))
         #expect(source.writes.count == 1)
         #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
-        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.cantJoinCollection, count: 1))
+        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.isCollection, count: 1))
         #expect(!library.addToCollection([Self.archive], Self.holiday, undoManager: nil))
         #expect(source.writes.count == 1)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Add to Collection"))

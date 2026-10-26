@@ -14,9 +14,15 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         /// A file, which keeps its type.
         case file
         case cantBecomeType
+        /// A collection, which collections are flat and can't join.
+        case isCollection
         case cantJoinCollection
         case fullOfTags
         case cantMoveToLane
+        /// A file, which has no lane to move to.
+        case fileHasNoLane
+        /// Selected, but not on the board now, as when a search or filter has hidden it since.
+        case notShown
     }
 
     private(set) var counts: [Reason: Int] = [:]
@@ -41,9 +47,12 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .cantChange: String(localized: "\(count) items can’t be changed right now.")
         case .file: String(localized: "\(count) items are files, which keep their type.")
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
+        case .isCollection: String(localized: "\(count) items are collections, which can’t be in another collection.")
         case .cantJoinCollection: String(localized: "\(count) items can’t be filed in a collection.")
         case .fullOfTags: String(localized: "\(count) items already have the most tags an item can have.")
         case .cantMoveToLane: String(localized: "\(count) items can’t go in this lane.")
+        case .fileHasNoLane: String(localized: "\(count) items are files, which can’t be moved between lanes.")
+        case .notShown: String(localized: "\(count) items aren’t on this board.")
         }
     }
 }
@@ -104,6 +113,8 @@ extension ItemLibrary {
             if let collection, item.collectionIDs.contains(collection) { continue }
             if let reason = item.writeObstacle {
                 skips.skip(reason)
+            } else if catalogue.isCollection(item.type) {
+                skips.skip(.isCollection)
             } else if !catalogue.canJoinCollection(item.type) {
                 skips.skip(.cantJoinCollection)
             } else {

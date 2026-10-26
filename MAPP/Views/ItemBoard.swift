@@ -164,27 +164,15 @@ struct ItemBoard: View {
     }
 
     private func move(_ ids: [ItemID], to lane: ItemBoardLane.ID, key: String) {
-        let visible = Set(browser.items(in: library).map(\.id))
-        let unique = Array(Set(ids)).sorted { $0.rawValue < $1.rawValue }
-        guard !unique.isEmpty else { return }
+        guard !ids.isEmpty else { return }
         // An item the lane doesn't suit is left where it is and counted, so the rest still move.
-        var skips = BatchSkips()
-        var changes: [(id: ItemID, value: PropertyValue?)] = []
-        for id in unique {
-            guard visible.contains(id), let item = library.item(id) else {
-                skips.skip(.gone)
-                continue
-            }
-            switch ItemBoardLayout.move(item, key: key, to: lane, catalogue: library.catalogue) {
-            case .set(let value): changes.append((id, value))
-            case .unchanged: break
-            case .refused: skips.skip(.cantMoveToLane)
-            }
-        }
+        let plan = ItemBoardLayout.movePlan(
+            ids, key: key, to: lane, shown: Set(browser.items(in: library).map(\.id)), in: library)
+        var skips = plan.skips
         // One undo step for the whole move.
         undoManager?.beginUndoGrouping()
         var moved = 0
-        for change in changes {
+        for change in plan.changes {
             let told = library.notices.told
             if library.setItemProperty(change.id, key: key, value: change.value, undoManager: undoManager) {
                 moved += 1

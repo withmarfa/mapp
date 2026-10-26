@@ -1,6 +1,27 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"%lld items are collections, which can’t be in another collection." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a collection, which can’t be in another collection." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are collections, which can’t be in another collection." } }
+  } } } }
+},
+"%lld items are files, which can’t be moved between lanes." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a file, which can’t be moved between lanes." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are files, which can’t be moved between lanes." } }
+  } } } }
+},
+"%lld items aren’t on this board." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item isn’t on this board." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items aren’t on this board." } }
+  } } } }
+},
 "^[Delete %lld item](inflect: true) immediately?" : { "extractionState" : "manual" },
 "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : { "extractionState" : "manual" },
 "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : { "extractionState" : "manual" },

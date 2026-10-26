@@ -117,4 +117,34 @@ nonisolated enum ItemBoardLayout {
         if item.value(of: key) == value { return .unchanged }
         return .set(value)
     }
+
+    /// What moving a selection to a lane changes, and why each item left out stays: gone from the library, not on
+    /// the board now, in the bin or unable to be changed, a file, or a type that doesn't take the lane. An item
+    /// already in the lane is no skip.
+    struct MovePlan {
+        var changes: [(id: ItemID, value: PropertyValue?)] = []
+        var skips = BatchSkips()
+    }
+
+    @MainActor static func movePlan(
+        _ ids: some Collection<ItemID>, key: String, to lane: ItemBoardLane.ID, shown: Set<ItemID>, in library: any ItemLibrary
+    ) -> MovePlan {
+        var plan = MovePlan()
+        for id in Set(ids).sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let item = library.item(id) else {
+                plan.skips.skip(.gone)
+                continue
+            }
+            guard shown.contains(id) else {
+                plan.skips.skip(.notShown)
+                continue
+            }
+            switch move(item, key: key, to: lane, catalogue: library.catalogue) {
+            case .set(let value): plan.changes.append((id, value))
+            case .unchanged: break
+            case .refused: plan.skips.skip(item.writeObstacle ?? (item.isFile ? .fileHasNoLane : .cantMoveToLane))
+            }
+        }
+        return plan
+    }
 }
