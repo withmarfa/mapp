@@ -281,7 +281,7 @@ final class EditorController: NSObject {
     }
 
     /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
-    /// note. The note shown before is left, so nothing on the page acts for one out of sight.
+    /// note. The note shown before is left and the page emptied, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
         // The request was typed into the text now being replaced, which the page would refuse an answer for.
         cancelLinkRequest()
@@ -321,9 +321,22 @@ final class EditorController: NSObject {
         flush { [self] kept in
             guard kept, request == loadRequest else { return }
             noteID = nil
+            markdown = ""
             isHeaderScrolledAway = false
             isEditingTitle = false
+            clearPage()
         }
+    }
+
+    /// Empties the page and makes it read-only under a generation no note owns, so the text of the note just left
+    /// is not shown under another item's header and nothing typed there is saved to any note.
+    private func clearPage() {
+        guard isReady else { return }
+        embeds.version += 1
+        call("setItem", json(""))
+        generation += 1
+        shown = shown.filter { $0.key >= generation - 8 }
+        call("load", json(""), String(generation), "false")
     }
 
 

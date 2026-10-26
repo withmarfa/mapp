@@ -541,6 +541,14 @@ struct EditorTests {
         #expect(page.editor.noteID != item.id)
         page.editor.noteChanged(item)
         #expect(page.editor.noteID != item.id)
+        // Nor does the page keep the note it showed before, which typing would then change out of sight.
+        #expect(try await page.shownText(until: "") == "")
+        try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'X')")
+        page.editor.flush()
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        // Gives a report from the page, had it taken the typing, time to arrive.
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(page.changes.isEmpty)
     }
 
     /// The page reports a heading's availability by its level, so the Format menu offers Title, Heading, and

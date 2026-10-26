@@ -257,7 +257,7 @@ import Testing
 }
 
 /// A copy that is always whole, so the library reads it without a fill.
-private nonisolated struct Whole: MarfaRefreshing {
+nonisolated struct Whole: MarfaRefreshing {
     let copy: WorkingCopy
     func readStatus() async throws -> Status {
         Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)

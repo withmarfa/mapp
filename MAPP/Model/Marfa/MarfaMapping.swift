@@ -290,8 +290,12 @@ nonisolated enum MarfaMapping {
         type?.bodyKey
     }
 
+    /// An item of a type with text that holds no text property, as one made from a title alone, has empty text. A row
+    /// the copy could not read, or a text property that is not a string, has none that can be shown.
     static func body(of row: Marfa.Item, catalogue: Catalogue) -> String? {
-        bodyField(of: catalogue.itemTypes[TypeID(row.type)]).flatMap { row.properties[$0]?.string }
+        guard row.unreadableProperties == nil, let field = bodyField(of: catalogue.itemTypes[TypeID(row.type)]) else { return nil }
+        guard let value = row.properties[field], value != .null else { return "" }
+        return value.string
     }
 
     /// Each edge sits with the item at the end its type is written at, named as that end writes it: a `parent-of`
