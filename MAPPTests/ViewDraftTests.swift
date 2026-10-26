@@ -16,7 +16,11 @@ struct ViewDraftTests {
     ])
     private static let statusColumn = ItemTableColumn(id: "field.status", label: "Status", content: .field(status), style: .status)
     private static let doneColumn = ItemTableColumn(id: "field.done", label: "Done", content: .field(done), style: .boolean)
-    private static let columns = [ItemTableColumn.title, statusColumn, doneColumn, .parent, .type, .collection, .edited]
+    /// A field Marfa cannot name, so a view cannot sort, group or filter by it.
+    private static let dueColumn = ItemTableColumn(
+        id: "field.due-date", label: "Due", content: .field(ItemTypeInfo.Field(key: "due-date", label: "Due", kind: .text, declaredBy: task)),
+        style: .text)
+    private static let columns = [ItemTableColumn.title, statusColumn, doneColumn, .parent, .type, dueColumn, .edited]
 
     private static func window(
         _ place: SidebarItem, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
@@ -44,10 +48,12 @@ struct ViewDraftTests {
         // A type's place holds its own items, and Marfa takes a type with its subtypes, so a type with any is narrowed.
         #expect(query(.itemType("core.task")) == LibraryViewQuery(types: [Self.task], states: active))
         #expect(query(.itemType("aic.ticket")) == LibraryViewQuery(types: [Self.ticket], states: active, filter: #"type eq "aic.ticket""#))
+        // A collection's members are the items with an `in-collection` edge to it, written at the member.
+        #expect(query(.collection(ItemID("c1"))) == LibraryViewQuery(states: active, filter: #"edge[in-collection] eq "c1""#))
     }
 
     @Test func placesNoViewCanStandForOfferNone() {
-        for place: SidebarItem in [.recents, .recentlyDeleted, .sources, .collections, .favoriteItem(ItemID("a")), .collection(ItemID("a"))] {
+        for place: SidebarItem in [.recents, .recentlyDeleted, .sources, .collections, .favoriteItem(ItemID("a"))] {
             #expect(ViewDraft.query(for: place, catalogue: Self.catalogue, views: []) == nil)
             #expect(Self.draft(Self.window(place)) == nil)
         }
@@ -70,7 +76,7 @@ struct ViewDraftTests {
             .allNotes,
             sort: [
                 ItemTableComparator(column: Self.statusColumn, order: .forward),
-                ItemTableComparator(column: .collection, order: .forward),
+                ItemTableComparator(column: Self.dueColumn, order: .forward),
                 ItemTableComparator(column: .edited, order: .reverse),
             ],
             grouping: Self.statusColumn, search: "plans")
@@ -80,12 +86,12 @@ struct ViewDraftTests {
             LibraryViewSort(field: "updated_at", ascending: false),
         ])
         #expect(draft.group == LibraryViewGroup(field: "properties.status"))
-        #expect(draft.unkept == [.search("plans"), .sort(column: "Collection")])
+        #expect(draft.unkept == [.search("plans"), .sort(column: "Due")])
     }
 
-    @Test func groupingByParentIsKeptAndByCollectionIsNot() {
+    @Test func groupingByParentIsKeptAndByAnUnnamedFieldIsNot() {
         #expect(ViewDraft.group(.parent).group == LibraryViewGroup(field: "backref[parent-of]"))
-        #expect(ViewDraft.group(.collection) == (nil, [.group(column: "Collection")]))
+        #expect(ViewDraft.group(Self.dueColumn) == (nil, [.group(column: "Due")]))
         #expect(ViewDraft.group(nil) == (nil, []))
     }
 
@@ -199,8 +205,8 @@ struct ViewDraftTests {
             == #"properties.status eq "say \"hi\"""#)
         let slash = ViewDraft.filter(nil, adding: ["field.status": [#"a\"#]], columns: Self.columns)
         #expect(slash == (nil, [.filter(column: "Status")]))
-        // A collection has no condition Marfa can express.
-        #expect(ViewDraft.filter(nil, adding: ["collection": ["c"]], columns: Self.columns).unkept == [.filter(column: "Collection")])
+        // A field Marfa cannot name has no condition it can express.
+        #expect(ViewDraft.filter(nil, adding: ["field.due-date": ["c"]], columns: Self.columns).unkept == [.filter(column: "Due")])
     }
 
     @Test func moreThanTenConditionsAreNotKept() {
