@@ -135,20 +135,25 @@ struct ItemBoard: View {
         .accessibilityAction(named: Text("Open")) { open(item.id) }
         .contextMenu {
             Button("Open") { open(item.id) }
+            // A card inside the selection acts for all of it, as in the other layouts.
+            let acting = browser.selection.contains(item.id) ? browser.selection : [item.id]
             Menu("Move To") {
                 ForEach(lanes.filter { isDestination($0.id) }) { target in
                     Button {
-                        move([item.id], to: target.id, key: key)
+                        move(Array(acting), to: target.id, key: key)
                     } label: {
-                        if target.id == lane.id { Label(target.title, systemImage: "checkmark") }
+                        if acting.count == 1, target.id == lane.id { Label(target.title, systemImage: "checkmark") }
                         else { Text(verbatim: target.title) }
                     }
-                    .disabled(ItemBoardLayout.move(item, key: key, to: target.id, catalogue: library.catalogue) == .refused || target.id == lane.id)
+                    .disabled(!acting.contains { id in
+                        guard let moving = library.item(id) else { return false }
+                        if case .set = ItemBoardLayout.move(moving, key: key, to: target.id, catalogue: library.catalogue) { return true }
+                        return false
+                    })
                 }
             }
-            .disabled(!item.isEditable)
-            AddTagButton(ids: browser.selection.contains(item.id) ? browser.selection : [item.id], details: details, undoManager: undoManager)
-            TypeChangeButton(ids: browser.selection.contains(item.id) ? browser.selection : [item.id], details: details, undoManager: undoManager)
+            AddTagButton(ids: acting, details: details, undoManager: undoManager)
+            TypeChangeButton(ids: acting, details: details, undoManager: undoManager)
             VersionHistoryButton(ids: [item.id], details: details, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
@@ -162,26 +167,33 @@ struct ItemBoard: View {
         let visible = Set(browser.items(in: library).map(\.id))
         let unique = Array(Set(ids)).sorted { $0.rawValue < $1.rawValue }
         guard !unique.isEmpty else { return }
-        let changes = unique.compactMap { id -> (ItemID, ItemBoardLayout.Move)? in
-            guard visible.contains(id), let item = library.item(id) else { return nil }
-            return (id, ItemBoardLayout.move(item, key: key, to: lane, catalogue: library.catalogue))
-        }
-        guard changes.count == unique.count, !changes.contains(where: { $0.1 == .refused }) else {
-            library.notices.tell(String(localized: "Can’t Move Items"), String(localized: "This lane isn’t available for every selected item. Check each item’s type and required fields."))
-            return
-        }
-        undoManager?.beginUndoGrouping()
-        defer { undoManager?.endUndoGrouping() }
-        for (id, change) in changes {
-            guard case .set(let value) = change else { continue }
-            let told = library.notices.told
-            guard library.setItemProperty(id, key: key, value: value, undoManager: undoManager) else {
-                if library.notices.told == told {
-                    library.notices.tell(String(localized: "Can’t Move Items"), String(localized: "A change couldn’t be saved. The board shows the values currently held by the library."))
-                }
-                return
+        // An item the lane doesn't suit is left where it is and counted, so the rest still move.
+        var skips = BatchSkips()
+        var changes: [(id: ItemID, value: PropertyValue?)] = []
+        for id in unique {
+            guard visible.contains(id), let item = library.item(id) else {
+                skips.skip(.gone)
+                continue
+            }
+            switch ItemBoardLayout.move(item, key: key, to: lane, catalogue: library.catalogue) {
+            case .set(let value): changes.append((id, value))
+            case .unchanged: break
+            case .refused: skips.skip(.cantMoveToLane)
             }
         }
+        // One undo step for the whole move.
+        undoManager?.beginUndoGrouping()
+        var moved = 0
+        for change in changes {
+            let told = library.notices.told
+            if library.setItemProperty(change.id, key: key, value: change.value, undoManager: undoManager) {
+                moved += 1
+            } else if library.notices.told == told {
+                skips.skip(.cantChange)
+            }
+        }
+        undoManager?.endUndoGrouping()
+        library.tellSkipped(skips, didChange: moved > 0, failing: String(localized: "Can’t Move Items"))
     }
 
     private func open(_ id: ItemID) { browser.selection = [id]; browser.openCollectionSelection() }

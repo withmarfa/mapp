@@ -4,6 +4,7 @@ import SwiftUI
 struct ItemGallery: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Environment(\.interfaceTextSize) private var textSize
     @Bindable var browser: Browser
@@ -208,9 +209,6 @@ struct ItemGallery: View {
 
     private func deleteSelection() {
         let ids = browser.selection
-        EditorController.flushAll(leaving: false) { [library, undoManager] kept in
-            guard kept else { return }
-            Browser.delete(ids, in: library, undoManager: undoManager)
-        }
+        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }

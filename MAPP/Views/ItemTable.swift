@@ -7,6 +7,7 @@ import SwiftUI
 struct ItemTable: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
     let order: NoteOrder
@@ -114,10 +115,7 @@ struct ItemTable: View {
         }
         .onDeleteCommand {
             let ids = browser.selection
-            EditorController.flushAll(leaving: false) { [library, undoManager] kept in
-                guard kept else { return }
-                Browser.delete(ids, in: library, undoManager: undoManager)
-            }
+            library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
         }
     }
 

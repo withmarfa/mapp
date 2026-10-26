@@ -8,6 +8,11 @@ extension View {
         modifier(LibraryDialogs())
     }
 
+    /// Asks the person to confirm moving several items to Recently Deleted, for the window whose presentation it is given.
+    func deleteConfirmation(for details: DetailsPresentation) -> some View {
+        modifier(DeleteConfirmation(details: details))
+    }
+
     /// Tells the person, in one window in front, each notice in the order it was told: something a library could
     /// not do, a change it could not keep, or an address that sends the key unencrypted. A notice carrying text the
     /// person typed puts it on the clipboard as they are first told, so it outlives the alert.
@@ -57,6 +62,25 @@ extension Notices {
     static func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+private struct DeleteConfirmation: ViewModifier {
+    @CurrentLibrary private var library
+    let details: DetailsPresentation
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            "^[Move \(details.deletion?.ids.count ?? 0) item](inflect: true) to Recently Deleted?",
+            isPresented: Binding { details.deletion != nil } set: { if !$0 { details.deletion = nil } },
+            presenting: details.deletion
+        ) { request in
+            Button("Move to Recently Deleted", role: .destructive) {
+                library.delete(request.ids, undoManager: request.undoManager)
+            }
+        } message: { _ in
+            Text("You can bring them back from Recently Deleted.")
+        }
     }
 }
 

@@ -291,12 +291,21 @@ final class Browser {
         fetchedFile.flatMap { $0.id == id ? $0.url : nil }
     }
 
-    /// Notes in the list go to Recently Deleted, which undoes. Notes already there are erased for good once the
-    /// person confirms, since that cannot be undone, where the library can erase them.
-    static func delete(_ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?) {
+    /// Items in the list go to Recently Deleted, which undoes. Items already there are erased for good once the
+    /// person confirms, since that cannot be undone, where the library can erase them. More than one item to move
+    /// is handed to `confirm` where there is one, which asks the person first and then moves them.
+    static func delete(
+        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?,
+        asking confirm: ((Set<ItemID>) -> Void)? = nil
+    ) {
         let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
         if !alreadyDeleted.isEmpty, library.canPurge { library.notesToPurge = alreadyDeleted }
-        library.delete(ids.subtracting(alreadyDeleted), undoManager: undoManager)
+        let moving = ids.subtracting(alreadyDeleted)
+        if moving.count > 1, let confirm {
+            confirm(moving)
+        } else {
+            library.delete(moving, undoManager: undoManager)
+        }
     }
 
     /// A place that is gone can no longer be shown, so the window moves to All Items: a collection no longer

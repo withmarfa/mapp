@@ -188,8 +188,8 @@ struct CommandPalette: View {
 
     private var commands: [Entry] {
         // The note commands act on notes; a file selected takes none of them.
-        let selected = browser.selectedItems(in: library).filter { !$0.isFile }
-        let ids = Set(selected.map(\.id))
+        let everything = browser.selectedItems(in: library)
+        let selected = everything.filter { !$0.isFile }
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         let hasVisibleEditor = !browser.showsCollection && !browser.showsSidebarIndex && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
@@ -284,12 +284,17 @@ struct CommandPalette: View {
                 details.history = VersionHistoryRequest(item: only.id, undoManager: undoManager)
             }
         }
-        if !selected.isEmpty, selected.allSatisfy({ $0.state == .trashed }) {
+        // These act on the whole selection, files too; what an item can't take is left alone and the person is told.
+        let ids = Set(everything.map(\.id))
+        let active = everything.filter { $0.state == .active }
+        if !everything.isEmpty, everything.allSatisfy({ $0.state == .trashed }) {
             add(String(localized: "Recover"), "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-        } else if !selected.isEmpty, !selected.contains(where: { $0.state == .trashed }) {
-            let allFavorites = selected.allSatisfy(\.isFavorite)
-            add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
-                library.setFavorite(ids, !allFavorites, undoManager: undoManager)
+        } else if !everything.isEmpty {
+            let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
+            if !active.isEmpty {
+                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
+                    library.setFavorite(ids, !allFavorites, undoManager: undoManager)
+                }
             }
             if let details, library.canTag(ids) {
                 add(String(localized: "Add Tag…"), "tag") {
@@ -302,20 +307,19 @@ struct CommandPalette: View {
                 }
             }
             add(String(localized: "Delete Note"), "trash") {
-                library.deleteAfterSaving(ids, undoManager: undoManager)
+                library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
         }
-        // The collection commands take files too, so they look at the whole selection.
         let members = library.collectionMembers(browser.selection)
         if !members.isEmpty {
             if let details, !library.collections.isEmpty {
                 add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus") {
-                    details.collectionPick = CollectionPickRequest(ids: members, undoManager: undoManager)
+                    details.collectionPick = CollectionPickRequest(ids: browser.selection, undoManager: undoManager)
                 }
             }
             for collection in library.collections(holding: members) {
                 add(String(localized: "Remove from “\(collection.title)”"), "rectangle.stack.badge.minus") {
-                    library.removeFromCollection(members, collection.id, undoManager: undoManager)
+                    library.removeFromCollection(browser.selection, collection.id, undoManager: undoManager)
                 }
             }
         }

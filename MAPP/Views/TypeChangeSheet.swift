@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Changes the type of the items a window asked for: the types they can all become, a value for each required field
-/// they lack, and the fields the new type does not use, which stay on the items.
+/// Changes the type of the items a window asked for: the types any of them can become, a value for each required field
+/// they lack, and the fields the new type does not use, which stay on the items. Items that can't become the type are
+/// named and left as they are.
 struct TypeChangeSheet: View {
     @CurrentLibrary private var library
     @Environment(\.dismiss) private var dismiss
@@ -45,6 +46,13 @@ struct TypeChangeSheet: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("TypeChangeUnused")
+                }
+                if let skipped = library.typeChangePlan(request.ids, to: selected, filling: filling).skips.message {
+                    Text(skipped)
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("TypeChangeSkipped")
                 }
             }
             HStack {
@@ -99,10 +107,8 @@ struct TypeChangeSheet: View {
 
     private func canChange(_ preview: TypeChangePreview?) -> Bool {
         guard let selected, preview != nil else { return false }
-        let filling = filling
-        return request.ids.allSatisfy { id in
-            library.item(id)?.type == selected || library.typeChange(of: id, to: selected, filling: filling)?.missing.isEmpty == true
-        }
+        let plan = library.typeChangePlan(request.ids, to: selected, filling: filling)
+        return plan.missing.isEmpty && !plan.items.isEmpty
     }
 
     private func change() {

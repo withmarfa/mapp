@@ -40,6 +40,8 @@ final class DetailsPresentation {
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag sheet is open for.
     var tagRequest: TagRequest?
+    /// The items the window asks the person to confirm moving to Recently Deleted.
+    var deletion: DeleteRequest?
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
@@ -77,6 +79,14 @@ struct TypeChangeRequest: Identifiable {
 /// The items the Add to Collection sheet files, with the undo manager of the window it was asked for in, since the
 /// sheet has its own.
 struct CollectionPickRequest: Identifiable {
+    let id = UUID()
+    let ids: Set<ItemID>
+    let undoManager: UndoManager?
+}
+
+/// Several items waiting for the person to confirm moving them to Recently Deleted, with the undo manager of the
+/// window they were asked for in.
+struct DeleteRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>
     let undoManager: UndoManager?

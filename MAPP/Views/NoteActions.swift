@@ -15,7 +15,7 @@ struct NoteActions: View {
     var body: some View {
         NoteOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
         CollectionActions(selection: ids, details: details, undoManager: undoManager)
-        if inMenuBar || !NoteActionContext(library: library, ids: ids, keepsPlace: false).notes.isEmpty { Divider() }
+        if inMenuBar || !NoteActionContext(library: library, ids: ids, keepsPlace: false).items.isEmpty { Divider() }
         NoteRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
     }
 }
@@ -26,11 +26,11 @@ private struct NoteActionContext {
     let ids: Set<ItemID>
     let keepsPlace: Bool
 
-    /// Deleting and favoring act on notes, so a file selected takes none of these.
-    var notes: [Item] { ids.compactMap { library.item($0) }.filter { !$0.isFile } }
-    var allDeleted: Bool { !notes.isEmpty && notes.allSatisfy { $0.state == .trashed } }
+    /// Every selected item, files too: a command that suits only some of them leaves the rest alone and says so.
+    var items: [Item] { ids.compactMap { library.item($0) } }
+    var allDeleted: Bool { !items.isEmpty && items.allSatisfy { $0.state == .trashed } }
     /// Nothing to act on and nowhere to keep the items in place, as the context menu has none.
-    var isEmpty: Bool { notes.isEmpty && !keepsPlace }
+    var isEmpty: Bool { items.isEmpty && !keepsPlace }
 }
 
 /// Favorites, Change Type and Version History for notes, or Recover for deleted ones. The collection actions sit beside these
@@ -48,18 +48,19 @@ struct NoteOrganizeActions: View {
 
     var body: some View {
         let context = NoteActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
-        let notes = context.notes
         if context.isEmpty {
             EmptyView()
         } else if context.allDeleted {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
         } else {
-            let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
+            // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
+            let active = context.items.filter { $0.state == .active }
+            let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
             Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
-            .disabled(notes.isEmpty)
+            .disabled(active.isEmpty)
             AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
             VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
@@ -70,6 +71,8 @@ struct NoteOrganizeActions: View {
 /// Delete for notes, or Delete Immediately for notes already deleted.
 struct NoteRemoveActions: View {
     @CurrentLibrary private var library
+    /// The window's, to ask before moving several items; the menu bar passes the front window's in.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let ids: Set<ItemID>
     let undoManager: UndoManager?
     var inMenuBar = false
@@ -86,17 +89,23 @@ struct NoteRemoveActions: View {
             .disabled(!library.canPurge)
         } else {
             Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
-                library.deleteAfterSaving(ids, undoManager: undoManager)
+                library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
-            .disabled(context.notes.isEmpty)
+            .disabled(context.items.isEmpty)
         }
     }
 }
 
 extension ItemLibrary {
-    /// Moves notes to Recently Deleted once every open page has handed over what was just typed, since a deleted
-    /// note takes no edit. Every way of deleting a note comes through here.
-    func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?) {
-        EditorController.flushAll(leaving: false) { [self] kept in if kept { delete(ids, undoManager: undoManager) } }
+    /// Moves items to Recently Deleted once every open page has handed over what was just typed, since a deleted
+    /// note takes no edit. Every way of deleting comes through here. More than one item asks the person first, in
+    /// the window whose presentation it is given.
+    func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?, asking details: DetailsPresentation?) {
+        EditorController.flushAll(leaving: false) { [self] kept in
+            guard kept else { return }
+            Browser.delete(ids, in: self, undoManager: undoManager, asking: details.map { details in
+                { details.deletion = DeleteRequest(ids: $0, undoManager: undoManager) }
+            })
+        }
     }
 }

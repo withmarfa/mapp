@@ -1,6 +1,66 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"%lld items are no longer in the library." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is no longer in the library." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are no longer in the library." } }
+  } } } }
+},
+"%lld items are in Recently Deleted." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is in Recently Deleted." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are in Recently Deleted." } }
+  } } } }
+},
+"%lld items can’t be changed right now." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t be changed right now." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be changed right now." } }
+  } } } }
+},
+"%lld items are files, which keep their type." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a file, which keeps its type." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are files, which keep their type." } }
+  } } } }
+},
+"%lld items can’t become this type." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t become this type." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t become this type." } }
+  } } } }
+},
+"%lld items can’t be filed in a collection." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t be filed in a collection." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be filed in a collection." } }
+  } } } }
+},
+"%lld items already have the most tags an item can have." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item already has the most tags an item can have." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items already have the most tags an item can have." } }
+  } } } }
+},
+"%lld items can’t go in this lane." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t go in this lane." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t go in this lane." } }
+  } } } }
+},
+"Some Items Were Skipped" : { "extractionState" : "manual" },
+"^[Move %lld item](inflect: true) to Recently Deleted?" : { "extractionState" : "manual" },
+"Move to Recently Deleted" : { "extractionState" : "manual" },
+"You can bring them back from Recently Deleted." : { "extractionState" : "manual" },
 "This Marfa" : { "extractionState" : "manual" },
 "Deleted items kept for" : { "extractionState" : "manual" },
 "All versions kept for" : { "extractionState" : "manual" },
@@ -134,7 +194,6 @@
 "as List" : { "extractionState" : "manual" },
 "as Table" : { "extractionState" : "manual" },
 "Nothing matches “%@”." : { "extractionState" : "manual" },
-"A change couldn’t be saved. The board shows the values currently held by the library." : { "extractionState" : "manual" },
 "Agenda" : { "extractionState" : "manual" },
 "Back to Agenda" : { "extractionState" : "manual" },
 "Back to Board" : { "extractionState" : "manual" },
@@ -151,7 +210,6 @@
 "Not Applicable" : { "extractionState" : "manual" },
 "Read Only" : { "extractionState" : "manual" },
 "%@, Read Only" : { "extractionState" : "manual" },
-"This lane isn’t available for every selected item. Check each item’s type and required fields." : { "extractionState" : "manual" },
 "View as Agenda" : { "extractionState" : "manual" },
 "View as Board" : { "extractionState" : "manual" },
 "Can’t Save View" : { "extractionState" : "manual" },
