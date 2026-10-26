@@ -216,6 +216,16 @@ import Observation
     /// The server keeps the bin, and its own rules for how long.
     var trashDays: Int? { nil }
 
+    /// The favorite tag, which the Favorite command owns, and the tag the server puts on a conflicted copy, which
+    /// stays until the person keeps or bins the copy.
+    var reservedTags: Set<String> { [ItemTag.favorite, MarfaProblems.conflictedCopyTag] }
+
+    var knownTags: [String] {
+        index.tagCounts.filter { !reservedTags.contains($0.key) }
+            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .map(\.key)
+    }
+
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool {
         try await source.resolve(problem, by: action)
     }
@@ -422,7 +432,7 @@ import Observation
     }
 
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
-    /// a body, a create's title, body and text values, since the person typed them in quick add, and the text values
+    /// a body, a create's title, body and text values, since the person typed them in quick add, a tag, and the text values
     /// of a property edit, a title among them, or of a change of type, the values typed in its sheet among them.
     private static func unqueuedText(_ write: ItemWrite) -> String? {
         switch write {
@@ -433,6 +443,8 @@ import Observation
         case .editProperties(_, let changes, _, _), .retype(_, _, let changes, _):
             let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value?.string }
             return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+        case .tag(_, let tag, on: true) where tag != ItemTag.favorite:
+            return tag
         default:
             return nil
         }

@@ -286,6 +286,11 @@ struct CommandPalette: View {
             add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
+            if let details, library.canTag(ids) {
+                add(String(localized: "Add Tag…"), "tag") {
+                    details.tagRequest = TagRequest(ids: ids, undoManager: undoManager)
+                }
+            }
             if let details, !library.typeChangeOptions(for: ids).isEmpty {
                 add(String(localized: "Change Type…"), "square.on.square") {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)

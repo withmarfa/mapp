@@ -117,6 +117,20 @@ protocol ItemLibrary: AnyObject, Observable {
     @discardableResult
     func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
+    /// The tags the library sets itself, which the person neither adds nor removes by hand: the favorite tag, which
+    /// the Favorite command owns, and any a library keeps for its own use.
+    var reservedTags: Set<String> { get }
+    /// Every tag the active items carry, reserved ones left out, the most used first and then by name, for
+    /// suggesting a tag the person has used.
+    var knownTags: [String] { get }
+    /// Tags `tag` to each of the items that can take it and do not hold it, in one undoable change, and answers nil.
+    /// Nothing is sent, and the refusal is given back, where `tag` is not a tag Marfa takes, is reserved, is held
+    /// by every item, or would leave an item with too many (`checkedTag`). The caller keeps what the person typed.
+    @discardableResult
+    func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal?
+    /// Removes `tag` from each of the items that hold it. An item that no longer holds it, as when another device
+    /// removed it first, is left alone.
+    func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?)
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// Not undoable, so the views confirm it first, and only where `canPurge`.
@@ -189,6 +203,37 @@ extension ItemLibrary {
 
     /// Why the library refused a title, in the person's words.
     var titleRefusal: String { String(localized: "The title could not be saved. Enter a title.") }
+
+    var reservedTags: Set<String> { [ItemTag.favorite] }
+
+    /// The item's tags the person manages, by name as the Finder sorts.
+    func tags(of item: Item) -> [String] {
+        item.tags.subtracting(reservedTags).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// The tags `knownTags` offers that start or contain what was typed, less those the item already holds.
+    func tagSuggestions(matching typed: String, excluding held: [String]) -> [String] {
+        let typed = ItemTag.normalized(typed)
+        return knownTags.filter { tag in
+            !held.contains(tag) && (typed.isEmpty || tag.localizedStandardContains(typed)) && tag != typed
+        }
+    }
+
+    /// The tag as it would be kept and the items it would be added to, or why it can't be added: what Marfa
+    /// refuses (`items/tag-text`, `items/tag-dot-segment`, `items/tags-count`), a tag the library sets itself, and
+    /// items that can't be changed. A set where some item can't hold one more tag is refused whole.
+    func checkedTag(_ text: String, adding ids: Set<ItemID>) -> Result<(tag: String, ids: Set<ItemID>), ItemTag.Refusal> {
+        let tag = ItemTag.normalized(text)
+        if let refusal = ItemTag.refusal(of: tag) { return .failure(refusal) }
+        if tag == ItemTag.favorite { return .failure(.favorite) }
+        if reservedTags.contains(tag) { return .failure(.reserved) }
+        let editable = ids.compactMap { item($0) }.filter(\.canEditTags)
+        guard !editable.isEmpty else { return .failure(.cantEdit) }
+        let lacking = editable.filter { !$0.tags.contains(tag) }
+        guard !lacking.isEmpty else { return .failure(.alreadyHas) }
+        guard lacking.allSatisfy({ $0.tags.count < ItemTag.maxPerItem }) else { return .failure(.full) }
+        return .success((tag, Set(lacking.map(\.id))))
+    }
 
     /// Whether the item can be filed in a collection: an active item the library can write, of a type the catalogue
     /// lets join one. A collection can't.

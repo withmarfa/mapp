@@ -36,6 +36,8 @@ final class DetailsPresentation {
     var typeChange: TypeChangeRequest?
     /// The items the window's Add to Collection sheet is open for.
     var collectionPick: CollectionPickRequest?
+    /// The items the window's Add Tag sheet is open for.
+    var tagRequest: TagRequest?
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {

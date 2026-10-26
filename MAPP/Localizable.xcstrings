@@ -2133,6 +2133,57 @@
     },
     "Zoom Out" : {
 
+    },
+    "A tag can be at most %lld characters." : {
+
+    },
+    "A tag can’t be “.” or “..”." : {
+
+    },
+    "Add Tag" : {
+
+    },
+    "Add Tag…" : {
+
+    },
+    "Add a tag to %lld items." : {
+
+    },
+    "Add a tag to “%@”." : {
+
+    },
+    "Already tagged." : {
+
+    },
+    "An item can have at most %lld tags." : {
+
+    },
+    "Can’t Add Tag" : {
+
+    },
+    "Can’t Remove Tag" : {
+
+    },
+    "Enter a tag." : {
+
+    },
+    "Favorites are set with Add to Favorites." : {
+
+    },
+    "Remove Tag" : {
+
+    },
+    "Remove Tag %@" : {
+
+    },
+    "Tags" : {
+
+    },
+    "The library sets this tag itself." : {
+
+    },
+    "This item’s tags can’t be changed." : {
+
     }
   },
   "version" : "1.1"

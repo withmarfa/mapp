@@ -16,6 +16,8 @@ nonisolated struct MarfaItemIndex {
     private(set) var byState: [ItemState: Set<ItemID>] = [:]
     private(set) var activeByType: [TypeID: Set<ItemID>] = [:]
     private(set) var favorites: Set<ItemID> = []
+    /// How many active items carry each tag.
+    private(set) var tagCounts: [String: Int] = [:]
     /// Active items in the feed tier, which the Inbox shows.
     private(set) var feed: Set<ItemID> = []
     private(set) var links: [EdgeID: Link] = [:]
@@ -30,6 +32,7 @@ nonisolated struct MarfaItemIndex {
         if item.state == .active {
             activeByType[item.type, default: []].insert(item.id)
             if item.isFavorite { favorites.insert(item.id) }
+            for tag in item.tags { tagCounts[tag, default: 0] += 1 }
             if item.tier == .feed { feed.insert(item.id) }
         }
         var holding: [EdgeID] = []
@@ -44,6 +47,11 @@ nonisolated struct MarfaItemIndex {
     }
 
     mutating func remove(_ item: Item) {
+        if item.state == .active {
+            for tag in item.tags {
+                if tagCounts[tag] == 1 { tagCounts[tag] = nil } else { tagCounts[tag]? -= 1 }
+            }
+        }
         byState[item.state]?.remove(item.id)
         activeByType[item.type]?.remove(item.id)
         favorites.remove(item.id)
