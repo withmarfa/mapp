@@ -42,7 +42,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists)
     }
 
-    func testSearchFillsItsColumn() {
+    func testSearchFieldStartsAtTheColumnAndEndsBeforeTheOptions() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
         let list = app.outlines["NoteList"]
         app.typeKey("f", modifierFlags: [.command, .option])
@@ -51,9 +51,10 @@ final class ItemLayoutTests: XCTestCase {
         let search = field.textFields["ColumnSearch"]
         XCTAssertTrue(search.waitForExistence(timeout: 3))
         capture("Full width column search")
-        // The glass field, not the text inside it, spans the column.
+        // The glass field, not the text inside it, starts at the column's edge and leaves room for the options.
         XCTAssertLessThan(abs(field.frame.minX - list.frame.minX), 20)
-        XCTAssertLessThan(abs(list.frame.maxX - field.frame.maxX), 20)
+        XCTAssertLessThan(field.frame.maxX, list.frame.maxX)
+        XCTAssertGreaterThan(field.frame.width, list.frame.width * 0.5)
         search.typeText("tomatoes")
         XCTAssertEqual(search.value as? String, "tomatoes")
         search.typeKey(.escape, modifierFlags: [])

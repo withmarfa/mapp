@@ -24,6 +24,11 @@ struct ItemTableCell: View {
             .padding(.vertical, 3)
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
+            // A cell may be reused for another row while the pointer is over it; the old row must not keep its arrow.
+            .onChange(of: row.id) { old, _ in
+                if isHovering { hover.exit(old) }
+                isHovering = false
+            }
     }
 
     private func setHovering(_ inside: Bool) {
