@@ -339,6 +339,11 @@ struct MarfaMappingTests {
             BoundLink(link: NoteLink(name: "Banned"), resolution: .refused("forbidden"))
         ])
         #expect(item.establishedLinks == [NoteLinks.nameKey("Plan"): ItemID("plan")])
+        // Each embed is kept, as written, with the file item the package bound it to, which is what the page shows.
+        #expect(item.boundEmbeds == [
+            BoundEmbed(text: "![[cat.png]]", resolution: .resolved(ItemID("file"))),
+            BoundEmbed(text: "![[dog.png]]", resolution: .missing)
+        ])
     }
 
     @Test func aChildHoldsItsParentUnderTheReverseName() {
