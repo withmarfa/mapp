@@ -46,7 +46,7 @@ nonisolated struct ItemDate: Equatable, Sendable {
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
-    /// The value for a moment the person picked, in UTC and to the second, as Marfa answers one.
+    /// The value for a moment the person picked, in UTC and to the second.
     static func moment(_ date: Date) -> String {
         date.formatted(Date.ISO8601FormatStyle())
     }
