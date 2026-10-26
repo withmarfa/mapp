@@ -14,5 +14,7 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case sources
     case source(String)
     case files
+    /// A view saved on the server, listing what the copy holds of its items.
+    case view(ItemID)
     case recentlyDeleted
 }

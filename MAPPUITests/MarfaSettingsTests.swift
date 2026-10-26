@@ -73,7 +73,7 @@ final class MarfaSettingsTests: XCTestCase {
         let welcome = window.descendants(matching: .any)["Welcome"].firstMatch
         XCTAssertTrue(welcome.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["Sidebar"].exists)
-        XCTAssertFalse(window.buttons["SyncStatus"].exists)
+        XCTAssertFalse(window.descendants(matching: .any)["SyncStatus"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncDetails"].exists)
         window.buttons["WelcomeConnect"].click()
         XCTAssertTrue(address.waitForExistence(timeout: 3), "Connect opens the page that asks for the server")

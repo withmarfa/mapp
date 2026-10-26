@@ -12,10 +12,15 @@ actor MarfaSync {
 
     /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
     private static let tier = SliceTier.all
-    nonisolated static let slice = ["*"]
+    /// `*` leaves out every `system.*` type, so the saved views are named beside it. The engine keeps them out of
+    /// the items it shows.
+    nonisolated static let slice = ["*", "system.view"]
+    /// Held whole so a view that lists what is `beneath` an item can be answered from the copy.
+    nonisolated static let sliceEdgeTypes = ["parent-of"]
 
     nonisolated static func needsFill(_ status: Status) -> Bool {
-        status.hydration != .complete || status.sliceTier != .all || status.sliceTypes != slice
+        status.hydration != .complete || status.sliceTier != .all || Set(status.sliceTypes) != Set(slice)
+            || Set(status.sliceEdgeTypes) != Set(sliceEdgeTypes)
     }
 
     private let copy: WorkingCopy
@@ -454,7 +459,7 @@ actor MarfaSync {
             }
         }
         defer { progress.cancel() }
-        lastHydration = try await refreshing.hydrate(types: Self.slice, tier: Self.tier)
+        lastHydration = try await refreshing.hydrate(types: Self.slice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
         rehydration.finished()
     }
 

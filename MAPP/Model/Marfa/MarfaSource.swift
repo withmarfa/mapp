@@ -276,6 +276,16 @@ nonisolated final class MarfaSource: ItemSource {
         return kept
     }
 
+    /// Read from the copy alone, so a view lists only what the copy holds, which is every item the library holds.
+    func items(inView view: ItemID) async throws -> [ItemID] {
+        do {
+            return try await MarfaEngine.asking(hub) { try await engine.reading.items(inView: view.rawValue) }
+                .filter(MarfaMapping.isLibraryItem).map { ItemID($0.id) }
+        } catch {
+            throw MarfaEngine.failure(error)
+        }
+    }
+
     /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
     /// a time.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
@@ -502,6 +512,7 @@ extension SourceSnapshot {
             let gone = Set(ids)
             items.removeAll { gone.contains($0.id) }
         case .catalogue(let catalogue): self.catalogue = catalogue
+        case .views(let views): self.views = views
         case .bodyChanged, .answered, .unavailable: break
         }
     }

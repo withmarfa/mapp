@@ -18,7 +18,8 @@ private actor FillServer: MarfaRefreshing {
     private(set) var fetchedAttachments: [String] = []
 
     init(_ hydration: Hydration) {
-        status = Status(sliceTypes: ["*"], sliceTier: .all, hydration: hydration)
+        status = Status(
+            sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: hydration)
     }
 
     func configure(interrupt: Bool = false, expire: Bool = false, restarted: String? = nil) {
@@ -29,9 +30,10 @@ private actor FillServer: MarfaRefreshing {
 
     func readStatus() -> Status { status }
     func observeAttachments(in copy: WorkingCopy) { attachmentCopy = copy }
-    func hydrate(types: [String], tier: SliceTier) throws -> HydrateReport {
-        #expect(types == ["*"])
+    func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) throws -> HydrateReport {
+        #expect(types == MarfaSync.slice)
         #expect(tier == .all)
+        #expect(edgeTypes == MarfaSync.sliceEdgeTypes)
         calls.append("fill")
         let inPlace = status.hydration == .stale
         if interrupt {
@@ -40,7 +42,7 @@ private actor FillServer: MarfaRefreshing {
             throw MarfaError.network(message: "interrupted")
         }
         status.hydration = .complete
-        return HydrateReport(types: types, tier: tier, edgeTypes: [], items: 10, edges: 0,
+        return HydrateReport(types: types, tier: tier, edgeTypes: edgeTypes, items: 10, edges: 0,
                              pages: 1, pagesTotal: resumed ? 2 : 1, resumed: resumed && restarted == nil,
                              restarted: restarted, inPlace: inPlace, cursor: "done")
     }

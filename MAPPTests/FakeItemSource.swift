@@ -33,6 +33,10 @@ nonisolated final class FakeItemSource: ItemSource {
     let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
     let searchFails = Mutex(false)
+    /// What `items(inView:)` answers for each view; any other lists nothing.
+    let viewMembers = Mutex<[ItemID: [ItemID]]>([:])
+    let viewReads = Mutex(0)
+    let viewFails = Mutex(false)
     let resolved = Mutex<[SyncAction]>([])
     let queues = Mutex(0)
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
@@ -98,6 +102,12 @@ nonisolated final class FakeItemSource: ItemSource {
         searches.withLock { $0 += 1 }
         if searchFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The search could not be read.") }
         return hits.withLock { $0[text] ?? [] }
+    }
+
+    func items(inView view: ItemID) async throws -> [ItemID] {
+        viewReads.withLock { $0 += 1 }
+        if viewFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The view asks for a type the copy does not hold.") }
+        return viewMembers.withLock { $0[view] ?? [] }
     }
 
     func queueSubmitted() async {

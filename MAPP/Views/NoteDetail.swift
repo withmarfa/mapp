@@ -55,6 +55,7 @@ private enum PlaceSymbol {
         case .collection: "square.stack"
         case .itemType(let id): TypeSymbol.name(for: TypeID(id), in: catalogue)
         case .files: "doc"
+        case .view: SidebarPlace.viewSymbol
         case .recentlyDeleted: "trash"
         }
     }

@@ -35,64 +35,75 @@ struct Sidebar: View {
                         case .inbox: row(.inbox, symbol: "tray", hiding: .inbox)
                         // Always the same number, so it says nothing.
                         case .recents: row(.recents, symbol: "clock", hiding: .recents, counted: false)
+                        default:
+                            row(.favorites, symbol: "heart", hiding: .favorites)
+                                .accessibilityIdentifier("SidebarFavorites")
+                        }
+                    }
+                }
+            }
+
+            if !plan.shownBrowse.isEmpty {
+                Section("Browse") {
+                    ForEach(plan.shownBrowse, id: \.key) { place in
+                        switch place {
                         case .sources:
                             row(.sources, symbol: "antenna.radiowaves.left.and.right", hiding: .sources, counted: false)
                                 .accessibilityIdentifier("SidebarSources")
                         case .collections:
                             row(.collections, symbol: "square.stack", hiding: .collections, counted: false)
                                 .accessibilityIdentifier("SidebarCollections")
-                        case .favorites:
-                            row(.favorites, symbol: "heart", hiding: .favorites)
-                                .accessibilityIdentifier("SidebarFavorites")
                         default: row(.allNotes, symbol: "note.text", hiding: .all)
                         }
                     }
                 }
+                .accessibilityIdentifier("SidebarBrowse")
             }
 
             ForEach(plan.shownLibrary, id: \.key) { section in
                 switch section {
                 case .types: typesSection(plan)
+                case .views: viewsSection
                 default: EmptyView()
                 }
             }
 
-            Section("Views") {
-                Text("Not connected yet")
-                    .foregroundStyle(.secondary)
-                    .selectionDisabled()
-            }
         }
         .listStyle(.sidebar)
+        // The system's scroll edge shows the foot over a material only while rows pass beneath it.
+        .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
         .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         .onChange(of: favorites.map(\.id)) {
             browser.placeRemoved(in: library, order: order)
         }
+        .onChange(of: library.views.map(\.id)) {
+            browser.placeRemoved(in: library, order: order)
+        }
     }
 
     private func selectionRows(_ plan: SidebarPlan) -> [String] {
-        plan.shownTop.map(\.key) + plan.shownLibrary.map(\.key)
+        plan.shownTop.map(\.key) + plan.shownBrowse.map(\.key) + plan.shownLibrary.map(\.key)
             + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
-            + library.itemTypeCounts.map { $0.id.rawValue }
+            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue)
+    }
+
+    /// A view lists what the copy holds of its items, read on its own, so its row has no count.
+    private var viewsSection: some View {
+        Section("Views") {
+            ForEach(library.views) { view in
+                row(.view(view.id), symbol: SidebarPlace.viewSymbol, title: view.title, hiding: .views, counted: false)
+                    .accessibilityIdentifier("SidebarView-\(view.id.rawValue)")
+            }
+        }
+        .accessibilityIdentifier("SidebarViews")
     }
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
         Section {
             ForEach(plan.shownTypes) { typeRow($0) }
         } header: {
-            HStack {
-                Text("Types")
-                Spacer()
-                Button("Edit") { editsTypes = true }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $editsTypes) {
-                        SidebarTypePicker()
-                    }
-                    .accessibilityIdentifier("EditSidebarTypes")
-            }
-            .padding(.trailing, 12)
-            .accessibilityIdentifier("SidebarTypes")
+            TypesHeading(editsTypes: $editsTypes)
         }
     }
 
@@ -134,9 +145,13 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private func hideButton(_ place: SidebarPlace) -> some View {
-        Button("Hide from Sidebar") {
-            libraries.updateSidebarLayout { $0.setHidden(place, true) }
+    /// A view's row hides the whole Views section, which its title says, since the layout keeps no view of its own.
+    @ViewBuilder private func hideButton(_ place: SidebarPlace) -> some View {
+        let hide = { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
+        if place == .views {
+            Button("Hide Views from Sidebar", action: hide)
+        } else {
+            Button("Hide from Sidebar", action: hide)
         }
     }
 
@@ -163,6 +178,31 @@ struct Sidebar: View {
         } icon: {
             Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// The Types heading. Edit shows only while the pointer is over the heading, or its picker is open, as the control
+/// of a sidebar's section heading does.
+private struct TypesHeading: View {
+    @Binding var editsTypes: Bool
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack {
+            Text("Types")
+            Spacer()
+            Button("Edit") { editsTypes = true }
+                .buttonStyle(.plain)
+                .opacity(isHovering || editsTypes ? 1 : 0)
+                .popover(isPresented: $editsTypes) {
+                    SidebarTypePicker()
+                }
+                .accessibilityIdentifier("EditSidebarTypes")
+        }
+        .padding(.trailing, 12)
+        .contentShape(.rect)
+        .onHover { isHovering = $0 }
+        .accessibilityIdentifier("SidebarTypes")
     }
 }
 
@@ -201,11 +241,7 @@ struct Sidebar: View {
     let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())
     let browser = Browser()
     NavigationSplitView {
-        VStack(spacing: 0) {
-            SidebarHeader(browser: browser)
-            Sidebar(browser: browser, order: NoteOrder())
-            SidebarFoot(browser: browser)
-        }
+        Sidebar(browser: browser, order: NoteOrder())
         .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 340)
         .toolbar {
             ToolbarItem { NewItemButton(browser: browser) }

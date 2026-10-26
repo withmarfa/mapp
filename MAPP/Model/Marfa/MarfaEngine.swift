@@ -89,7 +89,10 @@ actor MarfaEngine {
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
     var catalogue = Catalogue()
+    /// The library's rows: every row the copy holds but the `system.*` ones (`MarfaMapping.isLibraryItem`).
     var rows: [String: Marfa.Item] = [:]
+    /// The views saved on the server, as the copy last held them.
+    var views: [LibraryView] = []
     /// Rows the server holds in its bin that the copy does not: Recently Deleted's items once their delete is
     /// answered, which the copy lets go of. Read from the server, kept as it last said and as the copy last held.
     var binned: [String: Marfa.Item] = [:]

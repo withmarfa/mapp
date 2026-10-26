@@ -36,11 +36,20 @@ import Testing
     }
 
     @Test func everyTypeIsOneStableSlice() {
-        #expect(MarfaSync.slice == ["*"])
+        #expect(MarfaSync.slice == ["*", "system.view"])
+        #expect(MarfaSync.sliceEdgeTypes == ["parent-of"])
+        func status(_ types: [String], edges: [String] = ["parent-of"], _ hydration: Hydration) -> Status {
+            Status(sliceTypes: types, sliceTier: .all, sliceEdgeTypes: edges, hydration: hydration)
+        }
         #expect(MarfaSync.needsFill(Status(hydration: .never)))
-        #expect(MarfaSync.needsFill(Status(sliceTypes: ["*"], sliceTier: .all, hydration: .inProgress)))
-        #expect(MarfaSync.needsFill(Status(sliceTypes: ["*"], sliceTier: .all, hydration: .stale)))
-        #expect(!MarfaSync.needsFill(Status(sliceTypes: ["*"], sliceTier: .all, hydration: .complete)))
+        #expect(MarfaSync.needsFill(status(["*", "system.view"], .inProgress)))
+        #expect(MarfaSync.needsFill(status(["*", "system.view"], .stale)))
+        #expect(!MarfaSync.needsFill(status(["*", "system.view"], .complete)))
+        // The server may report the slice in another order.
+        #expect(!MarfaSync.needsFill(status(["system.view", "*"], .complete)))
+        // A copy hydrated before the views joined the slice fills again, once.
+        #expect(MarfaSync.needsFill(status(["*"], edges: [], .complete)))
+        #expect(MarfaSync.needsFill(status(["*", "system.view"], edges: [], .complete)))
     }
 
     @Test func progressUsesListedRowsAndKeepsUnknownTotalsUnknown() {
@@ -153,6 +162,8 @@ private nonisolated final class FillingReads: MarfaReading {
         edgeReads.withLock { $0 += 1 }
         throw MarfaError.hydrationIncomplete(message: "Edges are not ready")
     }
+    func views() async throws -> Rows<LibraryView> { Rows([]) }
+    func items(inView id: String) async throws -> [Marfa.Item] { [] }
 }
 
 /// Reads the copy as it is, except while `hydrating`, when it refuses edge reads as a copy hydrating again does.
@@ -176,4 +187,6 @@ private nonisolated final class HydratingReads: MarfaReading {
         try refuseWhileHydrating()
         return try await read.edges(touching: id)
     }
+    func views() async throws -> Rows<LibraryView> { try await read.views() }
+    func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 }

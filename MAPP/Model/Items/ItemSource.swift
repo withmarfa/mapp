@@ -3,6 +3,8 @@ import Foundation
 nonisolated struct SourceSnapshot: Hashable, Sendable {
     var items: [Item]
     var catalogue: Catalogue
+    /// The views saved on the server, which are no items of the library.
+    var views: [LibraryView] = []
 }
 
 nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
@@ -34,6 +36,8 @@ nonisolated enum SourceChange: Hashable, Sendable {
     case bodyChanged(ItemID, ItemVersion)
     case answered(WriteID, WriteOutcome)
     case catalogue(Catalogue)
+    /// Every view the copy holds, whenever one comes, goes or is renamed.
+    case views([LibraryView])
     case unavailable(SourceFailure)
 }
 
@@ -62,6 +66,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// The text of each item named that has any, read together, since a library reads every body as it loads.
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
     func fileURL(of item: ItemID) async throws -> URL
+    /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
+    /// view, such as one whose filter needs links the copy does not hold whole.
+    func items(inView view: ItemID) async throws -> [ItemID]
     /// Best match first.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.

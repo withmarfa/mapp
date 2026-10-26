@@ -188,7 +188,16 @@
     "Items with other items filed under them appear here." : {
       "extractionState" : "manual"
     },
-    "Views" : {
+    "Browse" : {
+      "extractionState" : "manual"
+    },
+    "Show All" : {
+      "extractionState" : "manual"
+    },
+    "Connection Settings" : {
+      "extractionState" : "manual"
+    },
+    "Connecting to the server." : {
       "extractionState" : "manual"
     },
     "Edit" : {
@@ -604,6 +613,9 @@
     "Can’t Search" : {
       "extractionState" : "manual"
     },
+    "Can’t Show This View" : {
+      "extractionState" : "manual"
+    },
     "Can’t Use the New Key" : {
       "extractionState" : "manual"
     },
@@ -971,6 +983,9 @@
       "extractionState" : "manual"
     },
     "Hide from Sidebar" : {
+
+    },
+    "Hide Views from Sidebar" : {
 
     },
     "Hides the group’s items" : {
@@ -1581,6 +1596,9 @@
     "Show Types" : {
 
     },
+    "Show Views" : {
+
+    },
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
@@ -1910,6 +1928,9 @@
 
     },
     "View Options" : {
+
+    },
+    "Views" : {
 
     },
     "Wait for the current step to finish, then try again." : {

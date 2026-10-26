@@ -179,20 +179,22 @@ struct SoftSelection: NSViewRepresentable {
                 let mark = CALayer()
                 mark.frame = Self.rect(ofRow: row, in: table)
                 mark.backgroundColor = color
-                mark.cornerRadius = 6
+                mark.cornerRadius = 8
                 mark.cornerCurve = .continuous
                 layer.addSublayer(mark)
             }
             CATransaction.commit()
         }
 
-        /// Where the system would have drawn the row's selection: the row view's frame where one is made, which an
-        /// inset table already insets, otherwise the row inset as the inset style insets it.
+        /// Where the system draws a selection: a shape inset from both edges, as Finder's sidebar has it. A source
+        /// list's row view spans the whole column, so it is inset here as the system inset does.
         private static func rect(ofRow row: Int, in table: NSTableView) -> NSRect {
-            if let view = table.rowView(atRow: row, makeIfNecessary: false) {
-                return view.frame.insetBy(dx: table.style == .inset ? 10 : 0, dy: 0)
+            let frame = table.rowView(atRow: row, makeIfNecessary: false)?.frame ?? table.rect(ofRow: row)
+            switch table.style {
+            case .sourceList: return frame.insetBy(dx: 10, dy: 1)
+            case .inset: return frame.insetBy(dx: 10, dy: 0)
+            default: return frame
             }
-            return table.rect(ofRow: row).insetBy(dx: table.style == .inset ? 10 : 0, dy: 0)
         }
     }
 }

@@ -351,5 +351,50 @@ extension LiveMarfaTests {
                 #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
             }
         }
+
+        /// A view saved on the server reaches the sidebar through the copy's slice, lists the items the copy holds
+        /// of it, and never shows as an item, in a count or in search.
+        @Test(.timeLimit(.minutes(2)))
+        func savedViewsListTheirItemsAndStayOutOfTheItems() async throws {
+            try await withLibrary { library, source, made in
+                let status = try await source.copy.status()
+                #expect(Set(status.sliceTypes) == Set(MarfaSync.slice))
+                #expect(Set(status.sliceEdgeTypes) == Set(MarfaSync.sliceEdgeTypes))
+
+                let token = "zv" + UUID().uuidString.prefix(8).lowercased()
+                let title = "MAPPTEST view note \(token)"
+                let id = try #require(library.createItem(
+                    typeID: "core.note", title: title, body: "Made by the MAPP tests.", parentID: nil, in: .allNotes,
+                    undoManager: nil))
+                made.add(id)
+                await source.flush()
+                let query = ViewQuery(types: ["core.note"], filter: "properties.title eq \"\(title)\"")
+                let view = try await source.copy.createView(ViewSettings(title: "MAPPTEST view \(token)", query: query))
+                func deleteView() async { try? await source.copy.deleteView(view.id) }
+                do {
+                    let place = SidebarItem.view(ItemID(view.id))
+                    try #require(await eventually { library.views.contains { $0.id.rawValue == view.id } })
+                    #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views))
+                    #expect(library.name(of: place) == "MAPPTEST view \(token)")
+                    #expect(await eventually { library.items(in: place).map(\.id) == [id] })
+
+                    #expect(library.item(ItemID(view.id)) == nil)
+                    #expect(!library.items(in: .allNotes).contains { $0.id.rawValue == view.id })
+                    #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
+                    // The view's title holds the token too, so only an item reaches the results.
+                    #expect(await eventually { library.items(matching: token).map(\.id) == [id] })
+
+                    let browser = Browser()
+                    browser.show(place, in: library, order: NoteOrder())
+                    await deleteView()
+                    try #require(await eventually { !library.views.contains { $0.id.rawValue == view.id } })
+                    browser.placeRemoved(in: library, order: NoteOrder())
+                    #expect(browser.sidebarItem == .allNotes)
+                } catch {
+                    await deleteView()
+                    throw error
+                }
+            }
+        }
     }
 }

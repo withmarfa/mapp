@@ -9,9 +9,14 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case collections
     /// The section that holds the library's types.
     case types
+    /// The section that lists the views saved on the server.
+    case views
     case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
+
+    /// Every saved view's symbol: a view is a filtered list, whatever it lists.
+    static let viewSymbol = "line.3.horizontal.decrease.circle"
 
     var key: String {
         switch self {
@@ -22,6 +27,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .sources: "sources"
         case .collections: "collections"
         case .types: "types"
+        case .views: "views"
         case .files: "files"
         case .type(let id): "type:" + id
         }
@@ -60,6 +66,16 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         if isHidden { hidden.insert(place.key) } else { hidden.remove(place.key) }
     }
 
+    /// Whether any type's row is hidden, at any level.
+    var hidesTypes: Bool { hidden.contains { $0.hasPrefix(Self.typePrefix) } }
+
+    /// Shows every type again, leaving the other places as they were.
+    mutating func showAllTypes() {
+        hidden = hidden.filter { !$0.hasPrefix(Self.typePrefix) }
+    }
+
+    private static let typePrefix = SidebarPlace.type("").key
+
     /// `places` as the person ordered them; the ones never placed follow, in the order given.
     func ordered<Place>(_ places: [Place], by key: (Place) -> String) -> [Place] {
         let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
@@ -89,9 +105,13 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// Main destinations; Files are included in Items.
+    /// The places above the first heading: Inbox, Recents and Favorites.
     let top: [SidebarPlace]
-    /// The Types section, where the library holds any types.
+    /// The Browse section: every item, the sources they came from, and the collections they are filed under. Files
+    /// are included in Items.
+    let browse: [SidebarPlace]
+    /// The Types section, where the library holds any types, then the Views section, where the server has saved any
+    /// views the library can read.
     let library: [SidebarPlace]
     /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
     /// of their items.
@@ -100,14 +120,16 @@ struct SidebarPlan {
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
-        top = layout.ordered([.inbox, .recents, .all, .sources, .collections, .favorites])
+        top = layout.ordered([.inbox, .recents, .favorites])
+        browse = layout.ordered([.all, .sources, .collections])
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
-        self.library = types.isEmpty ? [] : [.types]
+        self.library = (types.isEmpty ? [] : [.types]) + (library.views.isEmpty ? [] : [.views])
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
 
     var shownTop: [SidebarPlace] { top.filter(isShown) }
+    var shownBrowse: [SidebarPlace] { browse.filter(isShown) }
     var shownLibrary: [SidebarPlace] { library.filter(isShown) }
 
     /// The type rows not hidden, at every level; hiding a row hides what is under it.

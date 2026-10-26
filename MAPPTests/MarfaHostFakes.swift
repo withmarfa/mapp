@@ -74,6 +74,7 @@ nonisolated final class FakeMarfaSource: ItemSource {
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] { [] }
+    func items(inView view: ItemID) async throws -> [ItemID] { [] }
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
     let queuing = Mutex(false)
     let queued = Mutex(0)
