@@ -84,8 +84,11 @@ test('source edits share undo and reject stale mode changes', async () =>
 
 test('note embeds describe unsupported transclusion and open source without changing Markdown', async () =>
   withEditor('![[A note]]\n\n![Section](note.md#part)\n', async (editor) => {
-    const shown = () => [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
-    await vi.waitFor(() => expect(shown()).toContain('Note reference: Section. Open to edit source.'))
+    const shown = () =>
+      [...document.querySelectorAll('.inkkit-file-label')].map((e) => e.textContent)
+    await vi.waitFor(() =>
+      expect(shown()).toContain('Note reference: Section. Open to edit source.'),
+    )
     const labels = shown()
     expect(labels).toContain('Note reference: A note. Open to edit source.')
     expect(labels).toContain('Note reference: Section. Open to edit source.')
