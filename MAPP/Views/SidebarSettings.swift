@@ -47,6 +47,14 @@ struct SidebarSettings: View {
             if plan.library.contains(.views) {
                 Section("Views") {
                     row(.views, title: String(localized: "Show Views"), in: library, plan: plan, among: [])
+                    let places = plan.views.map { SidebarPlace.view($0.id) }
+                    ForEach(plan.views) { view in
+                        row(.view(view.id), in: library, plan: plan, among: places)
+                            .disabled(plan.layout.isHidden(.views))
+                    }
+                    .onMove { source, destination in
+                        libraries.updateSidebarLayout { $0.move(places, fromOffsets: source, toOffset: destination) }
+                    }
                 }
             }
         }
@@ -122,6 +130,7 @@ struct SidebarSettings: View {
         case .views: String(localized: "Views")
         case .files: library.name(of: .files)
         case .type(let id): Self.typeNode(id, in: plan.types)?.label ?? id
+        case .view(let id): plan.views.first { $0.id == id }?.title ?? id.rawValue
         }
     }
 
@@ -137,6 +146,7 @@ struct SidebarSettings: View {
         case .views: SidebarPlace.viewSymbol
         case .files: "doc"
         case .type(let id): Self.typeNode(id, in: plan.types)?.symbol ?? TypeSymbol.fallback
+        case .view: SidebarPlace.viewSymbol
         }
     }
 

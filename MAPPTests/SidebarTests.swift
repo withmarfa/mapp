@@ -254,6 +254,88 @@ struct SidebarTests {
         #expect(after.shownTypes.count == before.count)
     }
 
+    // MARK: Views
+
+    private func viewsLibrary(_ titles: [String]) -> FakeItemLibrary {
+        let library = FakeItemLibrary(items: [])
+        library.views = LibraryView.ordered(titles.map { LibraryView(id: ItemID("v-" + $0), title: $0) })
+        return library
+    }
+
+    private func titles(_ views: [LibraryView]) -> [String] { views.map(\.title) }
+    private let viewKey: (LibraryView) -> String = { SidebarPlace.view($0.id).key }
+
+    @Test func viewsStayInTitleOrderUntilThePersonMovesOne() {
+        let library = viewsLibrary(["Cats", "Apples", "Bears"])
+        #expect(titles(SidebarPlan(library, layout: SidebarLayout()).views) == ["Apples", "Bears", "Cats"])
+    }
+
+    @Test func aMovedViewKeepsItsPlaceAndANewViewFollowsThePlacedOnes() {
+        let library = viewsLibrary(["Apples", "Bears", "Cats"])
+        var layout = SidebarLayout()
+        let plan = SidebarPlan(library, layout: layout)
+        layout.move(plan.views, shown: plan.shownViews, by: viewKey, fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        #expect(titles(SidebarPlan(library, layout: layout).views) == ["Cats", "Apples", "Bears"])
+        library.views = LibraryView.ordered(library.views + [LibraryView(id: ItemID("v-Aardvarks"), title: "Aardvarks")])
+        #expect(titles(SidebarPlan(library, layout: layout).views) == ["Cats", "Apples", "Bears", "Aardvarks"])
+    }
+
+    @Test func hidingOneViewLeavesTheOthersAndTheSectionShown() {
+        let library = viewsLibrary(["Apples", "Bears"])
+        var layout = SidebarLayout()
+        layout.setHidden(.view(ItemID("v-Apples")), true)
+        let plan = SidebarPlan(library, layout: layout)
+        #expect(titles(plan.shownViews) == ["Bears"])
+        #expect(titles(plan.views) == ["Apples", "Bears"])
+        #expect(plan.shownLibrary == [.views])
+        layout.setHidden(.view(ItemID("v-Apples")), false)
+        #expect(titles(SidebarPlan(library, layout: layout).shownViews) == ["Apples", "Bears"])
+    }
+
+    @Test func theSectionGoesWhenEveryViewIsHiddenOrTheSectionIsHidden() {
+        let library = viewsLibrary(["Apples", "Bears"])
+        var layout = SidebarLayout()
+        layout.setHidden(.view(ItemID("v-Apples")), true)
+        layout.setHidden(.view(ItemID("v-Bears")), true)
+        #expect(SidebarPlan(library, layout: layout).shownLibrary.isEmpty)
+        #expect(SidebarPlan(library, layout: layout).library == [.views])
+        var section = SidebarLayout()
+        section.setHidden(.views, true)
+        #expect(SidebarPlan(library, layout: section).shownLibrary.isEmpty)
+    }
+
+    @Test func aViewDeletedOnTheServerDropsOut() {
+        let library = viewsLibrary(["Apples", "Bears", "Cats"])
+        var layout = SidebarLayout()
+        let plan = SidebarPlan(library, layout: layout)
+        layout.move(plan.views, shown: plan.shownViews, by: viewKey, fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        layout.setHidden(.view(ItemID("v-Bears")), true)
+        library.views.removeAll { $0.title == "Cats" || $0.title == "Bears" }
+        let after = SidebarPlan(library, layout: layout)
+        #expect(titles(after.views) == ["Apples"])
+        #expect(titles(after.shownViews) == ["Apples"])
+    }
+
+    @Test func movingAmongTheShownViewsKeepsAHiddenOneInItsSlot() {
+        let library = viewsLibrary(["Apples", "Bears", "Cats", "Dogs"])
+        var layout = SidebarLayout()
+        layout.setHidden(.view(ItemID("v-Bears")), true)
+        let plan = SidebarPlan(library, layout: layout)
+        // Shown: Apples, Cats, Dogs. Dogs moves to the top.
+        layout.move(plan.views, shown: plan.shownViews, by: viewKey, fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        let after = SidebarPlan(library, layout: layout)
+        #expect(titles(after.shownViews) == ["Dogs", "Apples", "Cats"])
+        #expect(titles(after.views) == ["Dogs", "Bears", "Apples", "Cats"])
+    }
+
+    @Test func aViewsPlaceSurvivesRelaunch() {
+        let defaults = UserDefaults(suiteName: "SidebarTests.views")!
+        defaults.removePersistentDomain(forName: "SidebarTests.views")
+        SidebarLayouts(defaults: defaults).update("marfa:one") { $0.setHidden(.view(ItemID("v-Apples")), true) }
+        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.view(ItemID("v-Apples"))))
+        #expect(!SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.view(ItemID("v-Bears"))))
+    }
+
     // MARK: Layout
 
     @Test func aSectionCollapsedForOneLibraryStaysCollapsedForThatLibraryOnly() {

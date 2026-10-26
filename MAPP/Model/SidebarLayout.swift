@@ -9,11 +9,13 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case collections
     /// The section that holds the library's types.
     case types
-    /// The section that lists the views saved on the server.
+    /// The section that lists the views saved on the server; hiding it hides every view.
     case views
     case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
+    /// One saved view's row, by its item ID.
+    case view(ItemID)
 
     /// Every saved view's symbol: a view is a filtered list, whatever it lists.
     static let viewSymbol = "square.stack.3d.up"
@@ -30,6 +32,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .views: "views"
         case .files: "files"
         case .type(let id): "type:" + id
+        case .view(let id): "view:" + id.rawValue
         }
     }
 }
@@ -74,6 +77,22 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         hidden = hidden.filter { !$0.hasPrefix(Self.typePrefix) }
     }
 
+    /// `places` with the ones in `shown` moved as a list showing only those would move them. The hidden ones keep
+    /// their slots, so showing one again puts it back where it was.
+    mutating func move<Place>(
+        _ places: [Place], shown: [Place], by key: (Place) -> String, fromOffsets source: IndexSet, toOffset destination: Int
+    ) {
+        let shownKeys = Set(shown.map(key))
+        var visible = ordered(shown, by: key).map(key)
+        let moved = source.sorted().map { visible[$0] }
+        let target = destination - source.filter { $0 < destination }.count
+        for index in source.sorted().reversed() { visible.remove(at: index) }
+        visible.insert(contentsOf: moved, at: min(target, visible.count))
+        var next = visible.makeIterator()
+        let keys = ordered(places, by: key).map(key).map { shownKeys.contains($0) ? next.next()! : $0 }
+        order = order.filter { !keys.contains($0) } + keys
+    }
+
     private static let typePrefix = SidebarPlace.type("").key
 
     /// `places` as the person ordered them; the ones never placed follow, in the order given.
@@ -91,13 +110,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     }
 
     mutating func move<Place>(_ places: [Place], by key: (Place) -> String, fromOffsets source: IndexSet, toOffset destination: Int) {
-        var list = ordered(places, by: key)
-        let moved = source.sorted().map { list[$0] }
-        let target = destination - source.filter { $0 < destination }.count
-        for index in source.sorted().reversed() { list.remove(at: index) }
-        list.insert(contentsOf: moved, at: min(target, list.count))
-        let keys = list.map(key)
-        order = order.filter { !keys.contains($0) } + keys
+        move(places, shown: places, by: key, fromOffsets: source, toOffset: destination)
     }
 }
 
@@ -116,12 +129,15 @@ struct SidebarPlan {
     /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
     /// of their items.
     let types: [TypeNode]
+    /// The saved views, in the person's order, hidden ones included. Views the person never placed follow by title.
+    let views: [LibraryView]
     let layout: SidebarLayout
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
         top = layout.ordered([.inbox, .recents, .favorites])
         browse = layout.ordered([.all, .sources, .collections])
+        views = layout.ordered(library.views, by: { SidebarPlace.view($0.id).key })
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
         self.library = (types.isEmpty ? [] : [.types]) + (library.views.isEmpty ? [] : [.views])
     }
@@ -130,7 +146,9 @@ struct SidebarPlan {
 
     var shownTop: [SidebarPlace] { top.filter(isShown) }
     var shownBrowse: [SidebarPlace] { browse.filter(isShown) }
-    var shownLibrary: [SidebarPlace] { library.filter(isShown) }
+    /// The Views section is absent once every view in it is hidden, as it is when there are none.
+    var shownLibrary: [SidebarPlace] { library.filter { isShown($0) && ($0 != .views || !shownViews.isEmpty) } }
+    var shownViews: [LibraryView] { views.filter { isShown(.view($0.id)) } }
 
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
