@@ -74,11 +74,7 @@ nonisolated struct SearchExcerpt: Hashable, Sendable {
             }
         }
         flush()
-        // White space at either end is no part of an excerpt.
-        if let first = runs.first, first.text.hasPrefix(" ") {
-            runs[0].text.removeFirst()
-            if runs[0].text.isEmpty { runs.removeFirst() }
-        }
+        // No space opens an excerpt, so only the end can hold one.
         if let last = runs.last, last.text.hasSuffix(" ") {
             runs[runs.count - 1].text.removeLast()
             if runs[runs.count - 1].text.isEmpty { runs.removeLast() }
