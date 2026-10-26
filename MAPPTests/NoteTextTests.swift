@@ -95,13 +95,4 @@ struct NoteTextTests {
     @Test func aPreviewReadsAsWrittenWhateverTheEditorEscaped() {
         #expect(preview("R\\&D: plan\n\nsnake\\_case", title: "R&D: plan") == "snake_case")
     }
-
-    @Test func aSnippetShowsTheTextAroundWhatWasFound() {
-        let body = "# Recipes\n\nA proper **ragù** takes three hours on a low heat, stirred now and then."
-        #expect(NoteText.snippet(of: body, around: "RAGU", reach: 10) == "…A proper ragù takes thr…")
-        #expect(NoteText.snippet(of: body, around: "Recipes", reach: 8) == "Recipes A prope…")
-        #expect(NoteText.snippet(of: body, around: "missing") == nil)
-        #expect(NoteText.snippet(of: body, around: "  ") == nil)
-    }
-
 }

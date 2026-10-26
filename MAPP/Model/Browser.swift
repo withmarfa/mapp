@@ -53,6 +53,9 @@ final class Browser {
     /// The page of Settings shown, and the one shown next time Settings is.
     var settingsPage = SettingsPage.appearance
     var searchText = ""
+    /// Whether the search covers only the place shown rather than everything. It applies wherever the place can be
+    /// searched alone (`SearchScope.narrows`) and means everything elsewhere.
+    var searchesPlace = false
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -172,9 +175,16 @@ final class Browser {
         focusRequest = .list
     }
 
+    var searchScope: SearchScope { searchesPlace && SearchScope.narrows(item) ? .place(item) : .everywhere }
+
+    /// What the search finds, or nil while the window is not searching.
+    func searchResults(in library: any ItemLibrary) -> SearchResults? {
+        isSearching ? library.search(searchText, in: searchScope) : nil
+    }
+
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
-        isSearching ? library.items(matching: searchText) : library.items(in: item)
+        searchResults(in: library)?.items ?? library.items(in: item)
     }
 
     /// The selected items that still exist.
@@ -274,6 +284,7 @@ final class Browser {
         isCollectionItemPresented = false
         sidebarItem = .allNotes
         searchText = ""
+        searchesPlace = false
         isSearchExpanded = false
         palette = nil
         fetchedFile = nil

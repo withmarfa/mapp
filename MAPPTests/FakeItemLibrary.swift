@@ -125,13 +125,14 @@ final class FakeItemLibrary: ItemLibrary {
         }
     }
 
-    func items(matching query: String) -> [Item] {
+    func search(_ query: String, in scope: SearchScope) -> SearchResults {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        return items.filter {
-            $0.state == .active && ($0.title.localizedCaseInsensitiveContains(query)
+        guard !query.isEmpty else { return .none }
+        let place = if case .place(let place) = scope { Set(items(in: place).map(\.id)) } else { nil as Set<ItemID>? }
+        return SearchResults(items: items.filter {
+            $0.state == .active && place?.contains($0.id) != false && ($0.title.localizedCaseInsensitiveContains(query)
                 || bodies[$0.id]?.localizedCaseInsensitiveContains(query) == true)
-        }
+        })
     }
 
     func count(in place: SidebarItem) -> Int { items(in: place).count }

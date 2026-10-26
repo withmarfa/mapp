@@ -36,8 +36,10 @@ protocol ItemLibrary: AnyObject, Observable {
 
     func item(_ id: ItemID) -> Item?
     func items(in place: SidebarItem) -> [Item]
-    /// Every item not deleted whose title or text has the query.
-    func items(matching query: String) -> [Item]
+    /// What the library's own search finds for `query` in `scope`, best match first: the items not deleted, the
+    /// excerpt of each that has one, and whether the search may be missing items because the copy is still filling.
+    /// Nothing is found for a query with no words.
+    func search(_ query: String, in scope: SearchScope) -> SearchResults
     func count(in place: SidebarItem) -> Int
     /// The catalogue's types that hold items, with their labels and counts, for a sidebar that lists them. The
     /// default is built from `catalogue` and `count(in:)`, so a library answers it without a view asking what kind

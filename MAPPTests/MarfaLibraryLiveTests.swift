@@ -91,7 +91,7 @@ extension LiveMarfaTests {
                 }
                 #expect(library.body(of: project)?.text == "Made by the MAPP tests.")
                 #expect(!library.relationshipCandidates(for: project, field: "about").isEmpty)
-                #expect(await eventually { library.items(matching: token).contains { $0.id == project } })
+                #expect(await eventually { library.search(token, in: .everywhere).items.contains { $0.id == project } })
             }
         }
 
@@ -170,7 +170,7 @@ extension LiveMarfaTests {
                 await source.flush()
                 #expect(try await source.body(of: child).text == "Edited \(token) text.")
                 #expect(await eventually { library.body(of: child)?.text == "Edited \(token) text." })
-                #expect(await eventually { library.items(matching: token).contains { $0.id == child } })
+                #expect(await eventually { library.search(token, in: .everywhere).items.contains { $0.id == child } })
 
                 // A title, and its undo.
                 let title = try #require(library.item(child)?.title)
@@ -420,7 +420,7 @@ extension LiveMarfaTests {
                     #expect(!library.items(in: .allNotes).contains { $0.id.rawValue == view.id })
                     #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
                     // The view's title holds the token too, so only an item reaches the results.
-                    #expect(await eventually { library.items(matching: token).map(\.id) == [id] })
+                    #expect(await eventually { library.search(token, in: .everywhere).items.map(\.id) == [id] })
 
                     let browser = Browser()
                     browser.show(place, in: library, order: NoteOrder())

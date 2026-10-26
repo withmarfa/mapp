@@ -166,9 +166,9 @@ import Testing
         let library = MarfaLibrary(source: source, notices: Notices())
         source.inner.send(.loaded(F.snapshot))
         try #require(await eventually { library.isLoaded })
-        _ = library.items(matching: "body")
+        _ = library.search("body", in: .everywhere).items
         #expect(await eventually { library.notices.waiting.last != nil }, "a search that threw is shown as no results, and nothing says so")
-        #expect(library.items(matching: "body").isEmpty)
+        #expect(library.search("body", in: .everywhere).items.isEmpty)
     }
 }
 
@@ -192,7 +192,7 @@ nonisolated final class FailingSearchSource: ItemSource {
     func body(of item: ItemID) async throws -> ItemBody { try await inner.body(of: item) }
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { try await inner.bodies(of: items) }
     func fileURL(of item: ItemID) async throws -> URL { try await inner.fileURL(of: item) }
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
+    func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")
     }
     func items(inView view: ItemID) async throws -> [ItemID] { try await inner.items(inView: view) }
@@ -430,7 +430,7 @@ extension LiveMarfaTests {
             try await withLibrary { library, source, _ in
                 var thrown: [String] = []
                 for query in ["\"", "foo\"", "(", "a)", "*", "-x", "a:b", "NOT", "AND", "^", "it's", "c++", "near/3", "{x}", "100%"] {
-                    do { _ = try await source.search(query, in: MarfaLibrary.searchScope) } catch { thrown.append("\(query) -> \(error)") }
+                    do { _ = try await source.search(query, in: .items(MarfaLibrary.searchScope)) } catch { thrown.append("\(query) -> \(error)") }
                 }
                 Attachment.record(thrown.joined(separator: "\n"), named: "Search.txt")
                 #expect(thrown.isEmpty, "\(thrown)")

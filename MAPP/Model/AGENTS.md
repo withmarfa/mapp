@@ -31,6 +31,14 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - Types nest by their identifiers below the vendor segment (`TypeNode.tree`): `aic.ticket.task` under Ticket, `aic.agent.session` under a group named Agent. A group of one gives way to its row; a nested row drops the words it repeats ("Session"). Siblings go by their branch's items, then label. A group, or a type with no items of its own, only folds open. Flat lists, such as the command palette and quick add's kinds (`ItemLibrary.creatableTypes`), tell two types with one label apart by their parent's, "Task (Ticket)" (`Catalogue.displayLabels`). A type whose last item goes has no row, a collection no longer active has no place, and a view deleted on the server has neither, so `Browser.placeRemoved` moves a window on any of them to All Items.
 - `SidebarLayouts` keeps what the person hid, collapsed or moved, one `SidebarLayout` for each server (`Libraries.sidebarLayoutKey`). A place a layout does not mention, such as a new type, is shown after the placed ones. `SidebarPlan` is what the sidebar and Settings > Sidebar both read.
 
+## Search
+
+- Search runs in the working copy and never calls the server, so it works offline. `ItemLibrary.search(_:in:)` takes a `SearchScope` (everywhere, or the open place where `SearchScope.narrows` allows) and answers `SearchResults`; `Browser.searchesPlace` is the person's choice. A place is searched by the copy's own filters (`SearchFilters`, or `search(inView:)` for a saved view), so the app matches nothing itself. The most listed is `SearchResults.limit`, and `isCapped` says more was found.
+- Each hit's excerpt is the copy's own (`SearchExcerpt`, read from its `<mark>` HTML). It is stamped with the version and modified date it was cut from and shown only while `describes` still holds, so an item edited after the search never shows old text.
+- A copy that is filling or behind the server answers `.partial` or `.stale`. Both read as `isIncomplete`: the list says so, and an empty list says it is still looking, never that nothing matches. The search runs again once the copy is whole.
+- A failed search keeps the earlier results and tells the person. `isPending` marks a search not yet answered, so an empty list then says nothing.
+- The list's chosen sort, not relevance, orders the results. The fake copy has no search, so the sample library lists nothing for a query; tests drive `MarfaLibrary` through `FakeItemSource`.
+
 ## Relationship names
 
 - Both ends of a link are named by Marfa: `EdgeType.label` on the source end and `EdgeType.reverseLabel` on the target end (`EdgeTypeInfo.label(atTarget:)`). MAPP names no relationship and shows these as they come, never as localized keys or reworded. When the two are equal the relation is two-way (`EdgeTypeInfo.isTwoWay`), and an item's outgoing and incoming links form one list.
