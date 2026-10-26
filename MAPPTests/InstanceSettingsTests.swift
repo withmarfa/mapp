@@ -275,11 +275,11 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.load()
         model.draft[.trashRetentionDays] = "7"
         await model.save()
-        let pending = try? #require(model.pending)
+        guard let pending = model.pending else { Issue.record("a shorter retention should ask first"); return }
 
         // The dialog is open when the connection moves to another server.
         current = (id: "two", source: second)
-        if let pending { await model.confirm(pending) }
+        await model.confirm(pending)
 
         #expect(first.sent.isEmpty)
         #expect(second.sent.isEmpty)
