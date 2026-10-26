@@ -74,6 +74,9 @@ struct Sidebar: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
         .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
+        // The right and left arrows open and close the selected type, as the system's outline does for its own rows.
+        .onKeyPress(.rightArrow) { foldSelectedType(open: true) }
+        .onKeyPress(.leftArrow) { foldSelectedType(open: false) }
         .onChange(of: favorites.map(\.id)) {
             browser.placeRemoved(in: library, order: order)
         }
@@ -108,43 +111,77 @@ struct Sidebar: View {
     }
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
-        Section {
-            ForEach(plan.shownTypes) { typeRow($0) }
+        let rows = plan.typeRows
+        // Every row keeps the chevron's width once any row can fold, so the counts line up in one column.
+        let reservesChevron = rows.contains(where: \.isExpandable)
+        return Section {
+            ForEach(rows) { typeRow($0, reservesChevron: reservesChevron) }
         } header: {
             TypesHeading(editsTypes: $editsTypes)
         }
     }
 
-    /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. Erased, since
-    /// a row holds rows of its own kind.
-    private func typeRow(_ node: TypeNode) -> AnyView {
-        guard !node.children.isEmpty else { return AnyView(typeLabel(node)) }
-        return AnyView(DisclosureGroup(isExpanded: expansion(.type(node.id))) {
-            ForEach(node.children) { typeRow($0) }
-        } label: {
-            typeLabel(node)
-        })
-    }
-
-    @ViewBuilder private func typeLabel(_ node: TypeNode) -> some View {
+    /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. The rows are
+    /// one flat list, a subtype's drawn indented under its parent, because the system's disclosure puts its chevron
+    /// at the leading edge and cannot be moved. `SidebarDisclosure` draws the chevron at the trailing edge instead.
+    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, reservesChevron: Bool) -> some View {
+        let node = row.node
         if node.opens, let type = node.type {
-            row(.itemType(type.rawValue), symbol: node.symbol, title: node.label, hiding: .type(node.id))
+            let item = SidebarItem.itemType(type.rawValue)
+            typeContent(row, count: library.count(in: item), reservesChevron: reservesChevron)
+                .tag(item)
+                .contextMenu { hideButton(.type(node.id)) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
-            sidebarLabel(node.label, symbol: node.symbol)
-                .selectionDisabled()
-                .contextMenu { hideButton(.type(node.id)) }
-                .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
+            // A group only folds, so a click anywhere on its row does.
+            Button { toggle(row) } label: {
+                typeContent(row, count: 0, reservesChevron: reservesChevron)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .selectionDisabled()
+            .contextMenu { hideButton(.type(node.id)) }
+            .accessibilityLabel(Text(node.label))
+            .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
+            .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
         }
     }
 
-    /// A section's or a row's disclosure, kept in the library's sidebar layout so it is remembered for each library.
-    /// Everything starts open.
-    private func expansion(_ section: SidebarPlace) -> Binding<Bool> {
-        Binding {
-            !libraries.sidebarLayout.isCollapsed(section)
-        } set: { isExpanded in
-            libraries.updateSidebarLayout { $0.setCollapsed(section, !isExpanded) }
+    /// The row's mark and name, then its count and chevron at the trailing end.
+    private func typeContent(_ row: SidebarPlan.TypeRow, count: Int, reservesChevron: Bool) -> some View {
+        HStack(spacing: 4) {
+            sidebarLabel(row.node.label, symbol: row.node.symbol)
+                .padding(.leading, CGFloat(row.depth) * 14)
+            Spacer(minLength: 8)
+            if count > 0 {
+                Text(count, format: .number)
+                    .monospacedDigit()
+                    // The size of the system's own count on the rows above, which does not follow the base text size.
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            if row.isExpandable {
+                SidebarDisclosure(title: row.node.label, id: row.node.id, isExpanded: row.isExpanded, isButton: row.node.opens) {
+                    toggle(row)
+                }
+            } else if reservesChevron {
+                Color.clear.frame(width: SidebarDisclosure.width)
+            }
+        }
+    }
+
+    private func foldSelectedType(open: Bool) -> KeyPress.Result {
+        let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
+        guard let row = plan.typeRows.first(where: { row in
+            row.isExpandable && row.isExpanded != open && row.node.type.map { .itemType($0.rawValue) } == browser.sidebarItem
+        }) else { return .ignored }
+        toggle(row)
+        return .handled
+    }
+
+    private func toggle(_ row: SidebarPlan.TypeRow) {
+        withAnimation(.snappy(duration: 0.2)) {
+            libraries.updateSidebarLayout { $0.setCollapsed(.type(row.node.id), row.isExpanded) }
         }
     }
 
@@ -253,9 +290,6 @@ private struct TypesHeading: View {
     NavigationSplitView {
         Sidebar(browser: browser, order: NoteOrder())
         .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 340)
-        .toolbar {
-            ToolbarItem { NewItemButton(browser: browser) }
-        }
     } detail: {
         Color.clear
     }

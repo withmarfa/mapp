@@ -371,6 +371,25 @@ struct SidebarTests {
         #expect(!SidebarPlan(library, layout: layout).shownTypes.contains { $0.id == "aic.ticket" })
     }
 
+    @Test func typeRowsListASubtypeUnderItsParentUntilTheParentIsFoldedShut() async throws {
+        let library = try await marfaLibrary()
+        var layout = SidebarLayout()
+        let open = SidebarPlan(library, layout: layout).typeRows
+        #expect(open.map(\.id) == ["core.note", "aic.project", "aic.ticket", "aic.ticket.bug", "aic.ticket.task", "core.entity"])
+        #expect(open.map(\.depth) == [0, 0, 0, 1, 1, 0])
+        #expect(open.filter(\.isExpandable).map(\.id) == ["aic.ticket"])
+
+        layout.setCollapsed(.type("aic.ticket"), true)
+        let shut = SidebarPlan(library, layout: layout).typeRows
+        #expect(shut.map(\.id) == ["core.note", "aic.project", "aic.ticket", "core.entity"])
+        #expect(shut.first { $0.id == "aic.ticket" }?.isExpanded == false)
+
+        // A hidden subtype is not listed, and its parent keeps the rest.
+        layout.setCollapsed(.type("aic.ticket"), false)
+        layout.setHidden(.type(LibraryFixture.bug.rawValue), true)
+        #expect(SidebarPlan(library, layout: layout).typeRows.map(\.id) == ["core.note", "aic.project", "aic.ticket", "aic.ticket.task", "core.entity"])
+    }
+
     @Test func movingPlacesReordersThemWithinTheirGroup() {
         var layout = SidebarLayout()
         layout.move([.inbox, .all], fromOffsets: IndexSet(integer: 1), toOffset: 0)

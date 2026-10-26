@@ -153,6 +153,28 @@ struct SidebarPlan {
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
 
+    /// A shown type row as the list draws it: one line, with how deep it sits and whether it is folded open.
+    struct TypeRow: Identifiable {
+        let node: TypeNode
+        let depth: Int
+        let isExpanded: Bool
+
+        var id: String { node.id }
+        var isExpandable: Bool { !node.children.isEmpty }
+    }
+
+    /// The shown types as the rows the list draws, in order: a row, then, where it is folded open, the rows under
+    /// it, one level deeper. Rows folded shut leave their subtypes out.
+    var typeRows: [TypeRow] { Self.rows(shownTypes, depth: 0, layout: layout) }
+
+    private static func rows(_ nodes: [TypeNode], depth: Int, layout: SidebarLayout) -> [TypeRow] {
+        nodes.flatMap { node in
+            let isExpanded = !layout.isCollapsed(.type(node.id))
+            return [TypeRow(node: node, depth: depth, isExpanded: isExpanded)]
+                + (isExpanded ? rows(node.children, depth: depth + 1, layout: layout) : [])
+        }
+    }
+
     private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {
         nodes.filter { plan.isShown(.type($0.id)) }.map { node in
             TypeNode(id: node.id, type: node.type, label: node.label, symbol: node.symbol, count: node.count, total: node.total,

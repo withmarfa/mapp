@@ -605,9 +605,6 @@
     "Show All" : {
       "extractionState" : "manual"
     },
-    "Connection Settings" : {
-      "extractionState" : "manual"
-    },
     "Connecting to the server." : {
       "extractionState" : "manual"
     },
@@ -2414,6 +2411,18 @@
       "extractionState" : "manual"
     },
     "Show %lld More" : {
+      "extractionState" : "manual"
+    },
+    "Collapse %@" : {
+      "extractionState" : "manual"
+    },
+    "Expand %@" : {
+      "extractionState" : "manual"
+    },
+    "Instance Menu" : {
+      "extractionState" : "manual"
+    },
+    "Opens the Console, Settings and Recently Deleted" : {
       "extractionState" : "manual"
     }
   },
