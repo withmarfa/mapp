@@ -49,6 +49,7 @@ extension MarfaEngine {
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
             }
             await reread(touched)
+            hub.publish(.taken(id))
             await sync.drain()
         } catch let error as Unsupported {
             hub.publish(.answered(id, .refused(SyncProblem(code: "unsupported", message: error.message, notQueued: true))))

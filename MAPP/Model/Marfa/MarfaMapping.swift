@@ -241,6 +241,7 @@ nonisolated enum MarfaMapping {
         let bound = (bodyLinks?.links ?? []).map { name in
             BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
         }
+        let embeds = (bodyLinks?.embeds ?? []).map { BoundEmbed(text: $0.text, resolution: resolution(of: $0.target)) }
         let content = content(of: row, catalogue: catalogue)
         let preview: String
         if case .file(let fileType, let byteCount) = content {
@@ -254,7 +255,7 @@ nonisolated enum MarfaMapping {
             tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
-            source: row.source.isEmpty ? nil : row.source)
+            boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
     }
 
     /// The text between the brackets of a link as the package renders it, `[[text]]`.

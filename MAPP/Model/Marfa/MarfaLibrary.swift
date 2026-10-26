@@ -64,6 +64,8 @@ import Observation
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
+    /// Text writes the copy has not yet taken and read back, by item, so what it bound in the text may be older.
+    @ObservationIgnored private var unreadText: [ItemID: Set<WriteID>] = [:]
     /// The version of the text the person's last save of each item was typed on. Only the first save typed on a
     /// version is merged against it; the rest follow the person's own.
     @ObservationIgnored private var savedOn: [ItemID: ItemVersion] = [:]
@@ -278,7 +280,10 @@ import Observation
         case .bodyChanged(let id, _):
             hold(await readBodies([id]))
         case .answered(let id, let outcome):
+            read(id)
             await answered(id, outcome)
+        case .taken(let id):
+            read(id)
         case .catalogue(let catalogue):
             self.catalogue = catalogue
             reindex()
@@ -515,6 +520,7 @@ import Observation
         let merge: BodyMerge = saved == readAt ? .following : .asRead
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         unsettledText[id, default: []].insert(write)
+        unreadText[id, default: []].insert(write)
         textWrites[write] = id
         lastTyped[id] = (write, text)
         guard readAt == held else { return }
@@ -523,6 +529,17 @@ import Observation
     }
 
     // MARK: Reading
+
+    func hasUnreadSave(_ id: ItemID) -> Bool {
+        unreadText[id] != nil
+    }
+
+    /// A write answered before the copy took it, as one refused, is read too: nothing more will come of it.
+    private func read(_ write: WriteID) {
+        guard let item = textWrites[write], unreadText[item]?.remove(write) != nil, unreadText[item]?.isEmpty == true
+        else { return }
+        unreadText[item] = nil
+    }
 
     func item(_ id: ItemID) -> Item? {
         guard let record = records[id] else {

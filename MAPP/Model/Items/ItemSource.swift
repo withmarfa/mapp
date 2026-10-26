@@ -35,6 +35,8 @@ nonisolated enum SourceChange: Hashable, Sendable {
     case removed([ItemID])
     case bodyChanged(ItemID, ItemVersion)
     case answered(WriteID, WriteOutcome)
+    /// The write is in the copy, and every item it changed has been read again and sent before this.
+    case taken(WriteID)
     case catalogue(Catalogue)
     /// Every view the copy holds, whenever one comes, goes or is renamed.
     case views([LibraryView])
@@ -49,12 +51,19 @@ nonisolated struct Embed: Hashable, Sendable {
 
 /// Where files go to the source: attached to an item, or added as items of their own.
 nonisolated protocol EmbedResolver: Sendable {
-    /// Attaches each file to the item and says what the page writes in its text to show it. A failure means no
-    /// text is to be written, though files already attached may remain.
-    func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
+    /// Attaches the file to the item and says what the page writes in its text to show it. A failure means the
+    /// file was not attached.
+    func attach(_ file: URL, to item: ItemID) async throws -> Embed
     /// Adds a file as an item of its own, of the file type its media type calls for, titled `title` or by its name,
     /// under `parent` where one is given.
     func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID
+}
+
+/// What attaching files gave: the text to write for each file attached, in order, and the name of each that
+/// wasn't, with why.
+nonisolated struct AttachReport: Sendable {
+    var embeds: [Embed] = []
+    var failed: [(name: String, reason: String)] = []
 }
 
 /// The Marfa working copy behind the library, as the library and the host use it, so both are tested without a

@@ -30,19 +30,22 @@ enum PastedImages {
         return [.data(name: name(extension: "png"), png)]
     }
 
-    /// The images' names and bytes, read away from the main thread, since a file can be large. A file chosen in
-    /// an open panel is read under its security scope.
-    @concurrent nonisolated static func read(_ sources: [Source]) async -> [(name: String, data: Data)] {
-        sources.compactMap { source in
+    /// The images' names and bytes, read away from the main thread, since a file can be large, and the name of each
+    /// file that was too large or couldn't be read. A file chosen in an open panel is read under its security scope.
+    @concurrent nonisolated static func read(_ sources: [Source]) async -> (images: [(name: String, data: Data)], skipped: [String]) {
+        var images: [(name: String, data: Data)] = []
+        var skipped: [String] = []
+        for source in sources {
             switch source {
             case .data(let name, let data):
-                return (name, data)
+                images.append((name, data))
             case .file(let url):
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                return readImage(url).map { (url.lastPathComponent, $0) }
+                if let data = readImage(url) { images.append((url.lastPathComponent, data)) } else { skipped.append(url.lastPathComponent) }
             }
         }
+        return (images, skipped)
     }
 
     /// An ordinary file's bytes, when it is no larger than an image is taken in at.

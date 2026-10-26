@@ -92,6 +92,7 @@ actor MarfaDownloads: DownloadedFiles {
             throw error
         }
         _ = try await copy.blobs.setBudget(setting)
+        await MarfaSource.removeKeptCopies()
     }
 
     /// Replacing the key also drops the core, so it cannot interrupt a budget restore.
