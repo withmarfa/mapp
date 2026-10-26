@@ -31,7 +31,7 @@ struct AppCommands: Commands {
         // The note commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
             let ids: Set<ItemID> = notes?.ids ?? []
-            // The note commands act on notes; a file selected has only its share and its window.
+            // Sharing a note reads one note; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
             Button("Open in New Window", systemImage: "macwindow") {

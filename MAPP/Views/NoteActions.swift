@@ -33,8 +33,8 @@ private struct NoteActionContext {
     var isEmpty: Bool { items.isEmpty && !keepsPlace }
 }
 
-/// Favorites, Change Type and Version History for notes, or Recover for deleted ones. The collection actions sit beside these
-/// (`CollectionActions`), since they take files too.
+/// Favorites, Add Tag, Change Type and Version History for the selection, or Recover for deleted items. The
+/// collection actions sit beside these (`CollectionActions`).
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Change Type sheet; the menu bar passes the front window's in.
@@ -68,7 +68,7 @@ struct NoteOrganizeActions: View {
     }
 }
 
-/// Delete for notes, or Delete Immediately for notes already deleted.
+/// Delete for items, or Delete Immediately for items already deleted.
 struct NoteRemoveActions: View {
     @CurrentLibrary private var library
     /// The window's, to ask before moving several items; the menu bar passes the front window's in.

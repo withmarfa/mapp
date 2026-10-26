@@ -187,7 +187,7 @@ struct CommandPalette: View {
     }
 
     private var commands: [Entry] {
-        // The note commands act on notes; a file selected takes none of them.
+        // Writing and Version History act on notes; a file selected takes neither.
         let everything = browser.selectedItems(in: library)
         let selected = everything.filter { !$0.isFile }
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
