@@ -291,20 +291,22 @@ struct CommandPalette: View {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
-            if selected.allSatisfy(library.canJoinCollection) {
-                if let details, !library.collections.isEmpty {
-                    add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus") {
-                        details.collectionPick = CollectionPickRequest(ids: ids, undoManager: undoManager)
-                    }
-                }
-                for collection in library.collections(holding: ids) {
-                    add(String(localized: "Remove from “\(collection.title)”"), "rectangle.stack.badge.minus") {
-                        library.removeFromCollection(ids, collection.id, undoManager: undoManager)
-                    }
-                }
-            }
             add(String(localized: "Delete Note"), "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager)
+            }
+        }
+        // The collection commands take files too, so they look at the whole selection.
+        let members = library.collectionMembers(browser.selection)
+        if !members.isEmpty {
+            if let details, !library.collections.isEmpty {
+                add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus") {
+                    details.collectionPick = CollectionPickRequest(ids: members, undoManager: undoManager)
+                }
+            }
+            for collection in library.collections(holding: members) {
+                add(String(localized: "Remove from “\(collection.title)”"), "rectangle.stack.badge.minus") {
+                    library.removeFromCollection(members, collection.id, undoManager: undoManager)
+                }
             }
         }
 

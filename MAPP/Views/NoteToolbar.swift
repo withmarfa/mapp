@@ -238,7 +238,8 @@ private struct MoreMenu: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
-    /// Everything selected, files too; the windows it opens and the share it makes take them all.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+    /// Everything selected, files too; the windows it opens, the share it makes and the collection actions take them all.
     let ids: Set<ItemID>
     let notes: [Item]
     let fileURL: URL?
@@ -262,6 +263,7 @@ private struct MoreMenu: View {
             NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
             NoteOrganizeActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
+            CollectionActions(selection: ids, details: details, undoManager: undoManager)
             Divider()
             Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
                 .keyboardShortcut("a", modifiers: [.command, .shift])

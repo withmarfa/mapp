@@ -196,6 +196,12 @@ extension ItemLibrary {
         item.state == .active && item.problem == nil && catalogue.canJoinCollection(item.type)
     }
 
+    /// What Add to Collection and Remove from Collection act on: the whole selection, files too, less the items that
+    /// can't be filed in a collection. They never take only the notes, as the note commands do.
+    func collectionMembers(_ ids: Set<ItemID>) -> Set<ItemID> {
+        Set(ids.compactMap { item($0) }.filter(canJoinCollection).map(\.id))
+    }
+
     /// The collections any of the items is in, by title.
     func collections(holding ids: Set<ItemID>) -> [Item] {
         let held = Set(ids.compactMap { item($0) }.flatMap(\.collectionIDs))

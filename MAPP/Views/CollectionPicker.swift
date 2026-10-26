@@ -1,15 +1,17 @@
 import SwiftUI
 
-/// Add to Collection and Remove from Collection, offered only where every item can be a member of a collection.
+/// Add to Collection and Remove from Collection for the selected items that can be members of a collection, files
+/// among them, offered apart from the note commands.
 struct CollectionActions: View {
     @CurrentLibrary private var library
-    let ids: Set<ItemID>
+    /// Everything selected; the actions take those of them that can be in a collection.
+    let selection: Set<ItemID>
     let details: DetailsPresentation?
     let undoManager: UndoManager?
 
     var body: some View {
-        let items = ids.compactMap { library.item($0) }
-        if !items.isEmpty, items.allSatisfy(library.canJoinCollection) {
+        let ids = library.collectionMembers(selection)
+        if !ids.isEmpty {
             Button("Add to Collection…", systemImage: "rectangle.stack.badge.plus") {
                 details?.collectionPick = CollectionPickRequest(ids: ids, undoManager: undoManager)
             }

@@ -145,6 +145,18 @@ import Testing
         #expect(library.collections(holding: [F.e1]).isEmpty)
     }
 
+    /// The collection commands take the whole selection, files too, never only its notes, and leave out what
+    /// can't be a member.
+    @Test func theCollectionCommandsTakeFilesAndLeaveOutCollections() async throws {
+        let (library, source) = try await loaded()
+        #expect(library.collectionMembers([F.f1]) == [F.f1])
+        #expect(library.collectionMembers([F.n1, F.f1]) == [F.n1, F.f1])
+        #expect(library.collectionMembers([F.n1, Self.holiday]) == [F.n1])
+        #expect(library.collectionMembers([Self.archive, Self.oldAlbum]).isEmpty)
+        #expect(library.addToCollection(library.collectionMembers([F.f1, Self.archive]), Self.holiday, undoManager: nil))
+        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", source: F.f1, target: Self.holiday, position: 3), undoing: nil)])
+    }
+
     @Test func noCatalogueContainerMeansNoCollections() async throws {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source, notices: Notices())
