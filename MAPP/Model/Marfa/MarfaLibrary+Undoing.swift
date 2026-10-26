@@ -67,8 +67,9 @@ extension MarfaLibrary {
     }
 
     /// The engine did not make a held step's writes, because what they touch changed or the copy was not brought up to
-    /// date in time. An undo goes back on the undo stack, which empties the redo stack of the step it had registered;
-    /// a redo cannot go back, so the undo it registered does nothing and says so.
+    /// date in time. An undo goes back on the undo stack, and registering outside an undo or redo empties the whole
+    /// redo stack, the step it had registered included; a redo cannot go back, so the undo it registered does nothing
+    /// and says so.
     func giveBack(_ run: UndoRun, _ problem: SyncProblem, title: String?) {
         guard !run.told else { return }
         run.told = true
