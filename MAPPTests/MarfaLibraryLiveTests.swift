@@ -397,8 +397,9 @@ extension LiveMarfaTests {
             }
         }
 
-        /// Text typed into a note the page opened before its create was answered, saved after each answer as the page
-        /// saves while the person types, is kept, as `SampleLibraryTests` checks over the fake copy.
+        /// Text typed into a note the page opened before its create was answered, saved once before the answer and then
+        /// after each answer as the page saves while the person types, is kept without a conflicted copy, as
+        /// `SampleLibraryTests` and `MarfaLibraryReviewFakeTests` check without a server.
         @Test(.timeLimit(.minutes(2)))
         func textTypedOnANoteJustMadeIsKeptSaveAfterSave() async throws {
             try await withLibrary { library, source, made in
@@ -410,11 +411,14 @@ extension LiveMarfaTests {
                 // The page opens the note as soon as it is made, so it reads the text of the create before the server
                 // answers it, at version 0.
                 let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
+                // The first save comes before the create is answered; the next follow it once both answers land.
+                var text = read.text + " T"
+                library.saveText(text, of: id, readAt: read.version, failing: title)
+                await source.flush()
                 try #require(await eventually {
-                    library.body(of: id)?.version == ItemVersion(1) && library.syncReport.waiting == 0
+                    library.body(of: id)?.version == ItemVersion(2) && library.syncReport.waiting == 0
                 })
-                var text = read.text
-                for typed in [" T", "omorrow", "."] {
+                for typed in ["omorrow", "."] {
                     text += typed
                     library.saveText(text, of: id, readAt: read.version, failing: title)
                     await source.flush()

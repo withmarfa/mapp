@@ -391,7 +391,9 @@ import Observation
     func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String) {
         let held = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
         let readAt = ItemVersion(MarfaEngine.version(read: readAt.rawValue, holding: held.rawValue))
-        let merge: BodyMerge = savedOn[id] == readAt ? .following : .asRead
+        // A save held on a local create's version 0 is on version 1 once the answer lands, as `readAt` now is.
+        let saved = savedOn[id].map { ItemVersion(MarfaEngine.version(read: $0.rawValue, holding: held.rawValue)) }
+        let merge: BodyMerge = saved == readAt ? .following : .asRead
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         unsettledText[id, default: []].insert(write)
         textWrites[write] = id

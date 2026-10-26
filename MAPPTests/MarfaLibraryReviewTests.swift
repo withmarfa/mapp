@@ -129,6 +129,37 @@ import Testing
         #expect(library.body(of: F.n1)?.text == "Theirs")
     }
 
+    /// Text read on a note just made, at version 0, is saved once before the create is answered and again after both
+    /// answers land. The second save follows the first, which was typed on the same text, so the server never makes a
+    /// conflicted copy of the person's own text.
+    @Test func aSaveReadOnALocalCreateFollowsTheSaveBeforeTheAnswers() async throws {
+        let (library, source) = try await loaded()
+        let id = try #require(library.createItem(
+            typeID: F.note.rawValue, title: "Call the plumber", body: "Leak", parentID: nil, in: .allNotes,
+            undoManager: nil))
+        let create = try #require(source.submitted.last?.id)
+        var made = F.item(id, F.note, "Call the plumber", age: 0)
+        made.version = ItemVersion(0)
+        source.setBody("Leak", of: id, version: 0)
+        source.send(.upserted([made]))
+        #expect(await eventually { library.body(of: id)?.version == ItemVersion(0) })
+
+        library.updateBody(of: id, to: "Leak T", readAt: ItemVersion(0))
+        #expect(source.writes.last == .editBody(id, "Leak T", base: ItemVersion(0), merge: .asRead))
+        let edit = try #require(source.submitted.last?.id)
+
+        for (answer, version) in [(create, Int64(1)), (edit, 2)] {
+            made.version = ItemVersion(version)
+            source.setBody(version == 1 ? "Leak" : "Leak T", of: id, version: version)
+            source.send(.answered(answer, .accepted))
+            source.send(.upserted([made]))
+        }
+        #expect(await eventually { library.body(of: id)?.version == ItemVersion(2) })
+
+        library.updateBody(of: id, to: "Leak Tomorrow", readAt: ItemVersion(0))
+        #expect(source.writes.last == .editBody(id, "Leak Tomorrow", base: ItemVersion(1), merge: .following))
+    }
+
     /// A search that fails is not shown as a search that found nothing.
     @Test func aSearchThatFailsIsNotNothingFound() async throws {
         let source = FailingSearchSource()
