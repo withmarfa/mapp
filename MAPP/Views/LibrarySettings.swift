@@ -1,16 +1,20 @@
 import SwiftUI
 
-/// The Library page of Settings: the library in use and how it stands, then the connection to a Marfa server,
-/// then each change that needs the person.
+/// The Library page of Settings: the library in use and how it stands, the server's web console and Recently
+/// Deleted, then the connection to a Marfa server, then each change that needs the person.
 struct LibrarySettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
+    @Environment(\.openURL) private var openURL
+    @StoredOrder private var order
+    let browser: Browser
 
     private var host: MarfaHost { libraries.host }
 
     var body: some View {
         Form {
             Section { LibrarySummary() }
+            places
             MarfaSettingsView(model: libraries.marfaSettings)
             if let library, let files = library.downloadedFiles {
                 LibraryDownloads(files: files)
@@ -41,6 +45,36 @@ struct LibrarySettings: View {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
         } message: {
             Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes.")
+        }
+    }
+}
+
+extension LibrarySettings {
+    /// What the library holds beyond the window: the server's own console in the browser, and the items deleted
+    /// from it.
+    @ViewBuilder private var places: some View {
+        let address = host.connection?.address
+        if address != nil || library != nil {
+            Section {
+                if let address {
+                    LabeledContent {
+                        Button("Open Console") { openURL(address) }
+                            .accessibilityIdentifier("LibraryOpenConsole")
+                    } label: {
+                        Text("Console")
+                        Text("Manage this server in your browser.")
+                    }
+                }
+                if let library {
+                    LabeledContent {
+                        Button("Show") { browser.show(.recentlyDeleted, in: library, order: order) }
+                            .accessibilityIdentifier("LibraryShowRecentlyDeleted")
+                    } label: {
+                        Text("Recently Deleted")
+                        Text("Restore deleted items, or delete them permanently.")
+                    }
+                }
+            }
         }
     }
 }

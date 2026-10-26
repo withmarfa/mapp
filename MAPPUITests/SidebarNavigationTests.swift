@@ -32,7 +32,8 @@ final class SidebarNavigationTests: XCTestCase {
         }
         XCTAssertTrue(instanceName.exists)
         XCTAssertTrue(settingsButton.exists)
-        XCTAssertTrue(element("SidebarRecentlyDeleted").exists)
+        XCTAssertTrue(element("SidebarSearch").exists)
+        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in Settings > Library")
         for identifier in ["SidebarSources", "SidebarCollections"] {
             let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -54,6 +55,13 @@ final class SidebarNavigationTests: XCTestCase {
             wait(for: [selected], timeout: 3)
         }
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
+    }
+
+    func testTheFootsSearchButtonOpensSearch() {
+        element("SidebarSearch").click()
+        XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(element("CommandPaletteField").waitForNonExistence(timeout: 2))
     }
 
     func testTheFootsSettingsButtonOpensSettingsInTheWindowAndAPlaceLeavesIt() {

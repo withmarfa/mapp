@@ -96,7 +96,7 @@ struct MainView: View {
                 max: browser.showsSettings ? 340 : 480)
         } detail: {
             if browser.showsSettings {
-                SettingsPageView(page: browser.settingsPage)
+                SettingsPageView(page: browser.settingsPage, browser: browser)
             } else {
                 itemPage
                     .modifier(itemInspector)

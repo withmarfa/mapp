@@ -34,7 +34,6 @@ struct SettingsPageList: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .background(.windowBackground)
         .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsPageList")
     }
@@ -50,7 +49,7 @@ struct SettingsWorkspace: View {
             SettingsPageList(browser: browser)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
-            SettingsPageView(page: browser.settingsPage)
+            SettingsPageView(page: browser.settingsPage, browser: browser)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { browser.leaveSettings() }
