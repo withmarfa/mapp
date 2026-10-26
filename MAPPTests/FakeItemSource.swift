@@ -42,6 +42,11 @@ nonisolated final class FakeItemSource: ItemSource {
     let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
     let searchFails = Mutex(false)
+    /// What a search answers beside its hits, and where it was asked to look.
+    let excerpts = Mutex<[String: [ItemID: SearchExcerpt]]>([:])
+    let searchIncomplete = Mutex(false)
+    let searchCapped = Mutex(false)
+    let targets = Mutex<[SearchTarget]>([])
     /// What `items(inView:)` answers for each view; any other lists nothing.
     let viewMembers = Mutex<[ItemID: [ItemID]]>([:])
     let viewReads = Mutex(0)
@@ -107,10 +112,13 @@ nonisolated final class FakeItemSource: ItemSource {
         URL(filePath: "/dev/null")
     }
 
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {
+    func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
         searches.withLock { $0 += 1 }
+        targets.withLock { $0.append(target) }
         if searchFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The search could not be read.") }
-        return hits.withLock { $0[text] ?? [] }
+        return SourceSearch(
+            hits: hits.withLock { $0[text] ?? [] }, excerpts: excerpts.withLock { $0[text] ?? [:] },
+            isIncomplete: searchIncomplete.withLock { $0 }, isCapped: searchCapped.withLock { $0 })
     }
 
     /// The views the fake server holds. A change based on another version than the one held is refused as a

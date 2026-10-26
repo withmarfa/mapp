@@ -961,9 +961,9 @@ extension LiveMarfaTests {
             #expect(parentItem.properties.allSatisfy { $0.key != "body" })
 
             #expect(await LiveMarfa.until {
-                (try? await source.search("\(token)", in: ItemQuery(types: [Self.note])))?.contains(parent) == true
+                (try? await source.search("\(token)", in: .items(ItemQuery(types: [Self.note]))))?.hits.contains(parent) == true
             })
-            let found = try await source.search(token, in: ItemQuery(types: [Self.note]))
+            let found = try await source.search(token, in: .items(ItemQuery(types: [Self.note]))).hits
             #expect(found.allSatisfy { id in snapshot.items.first { $0.id == id }?.type == Self.note })
             let count = try #require(log.current.snapshot?.items.count)
             await source.close()

@@ -33,6 +33,7 @@ struct ItemGallery: View {
         let ids = sections.flatMap { $0.items.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         keyboardCollection(sections, ids: ids)
+        .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -44,7 +45,7 @@ struct ItemGallery: View {
         .overlay {
             if ids.isEmpty {
                 if browser.isSearching {
-                    EmptyState.search(browser.searchText)
+                    SearchEmptyState(browser: browser)
                         .accessibilityIdentifier("GalleryEmptySearch")
                 } else { EmptyState(browser.item == .files ? "No Files" : "No Items") }
             }

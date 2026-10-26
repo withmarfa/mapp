@@ -93,7 +93,7 @@ struct CurrentViewOptions: View {
         case .board: if let browser { ItemBoardOptions(browser: browser) }
         case .agenda: if let browser { ItemAgendaOptions(browser: browser) }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
-        case .list, .gallery, nil: OrderOptions().disabled(browser?.keepsPlaceOrder == true)
+        case .list, .gallery, nil: OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
         }
     }
 }

@@ -73,8 +73,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.
     func items(inView view: ItemID) async throws -> [ItemID]
-    /// Best match first.
-    func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
+    /// What the copy's own search finds in `target`, best match first, at most `SearchResults.limit`.
+    func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch
 
     // MARK: Views, written to the server at once and never queued
 

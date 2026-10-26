@@ -49,9 +49,10 @@ import Observation
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
     @ObservationIgnored private var counted: [SidebarItem: (revision: Int, count: Int)] = [:]
-    @ObservationIgnored private var searches: [String: Search] = [:]
-    @ObservationIgnored private var searchOrder: [String] = []
-    /// What the last search to finish found, shown while the next one runs so the list does not empty per key.
+    @ObservationIgnored private var searches: [SearchKey: SearchRun] = [:]
+    @ObservationIgnored private var searchOrder: [SearchKey] = []
+    /// What the last search to finish found, shown while the next one runs so the list does not empty per key. Its
+    /// excerpts are left out, since they quote another search's words.
     @ObservationIgnored private var lastFound: [ItemID] = []
     /// What each view last listed, read from the copy beside the views as a search is.
     @ObservationIgnored private var viewed: [ItemID: Search] = [:]
@@ -112,6 +113,27 @@ import Observation
         var revision: Int
         var hits: [ItemID]
         var running: Bool
+    }
+
+    private nonisolated struct SearchKey: Hashable {
+        var query: String
+        var scope: SearchScope
+
+        var isOfView: Bool {
+            if case .place(.view) = scope { true } else { false }
+        }
+    }
+
+    private nonisolated struct SearchRun {
+        var revision: Int
+        var found = SourceSearch()
+        var running: Bool
+        /// Whether the copy has answered this search yet.
+        var answered = false
+        /// How the copy was filling when the search was asked. A search that found the copy incomplete is asked
+        /// again when this has changed, since the copy may be whole now, and not before, since a copy that stays
+        /// stale (offline, say) would otherwise be searched again and again.
+        var fill: LibraryFill?
     }
 
     /// Searches keep the items not in the bin.
@@ -345,6 +367,8 @@ import Observation
         let current = Set(views)
         viewed = viewed.filter { id, _ in self.views.contains { $0.id == id && current.contains($0) } }
             .mapValues { Search(revision: -1, hits: $0.hits, running: false) }
+        // A search of a view lists what the view held, which may have changed.
+        for key in searches.keys where key.isOfView { searches[key]?.revision = -1 }
         if self.views != views { self.views = views }
         viewsGeneration += 1
         viewsFailing.formIntersection(views.map(\.id))
@@ -636,40 +660,73 @@ import Observation
     // MARK: Search
 
     /// Answers from the copy's own search, which runs beside the views: until it returns, the last results stand,
-    /// and the views are told when the new ones arrive. A change to the items runs the search again.
-    func items(matching query: String) -> [Item] {
+    /// and the views are told when the new ones arrive. A change to the items runs the search again, and so does
+    /// a change in how the copy is filling after a search that found it incomplete, so the notice follows the
+    /// latest answer.
+    func search(_ query: String, in scope: SearchScope) -> SearchResults {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
+        guard !query.isEmpty else { return .none }
         _ = searchRevision
+        let key = SearchKey(query: query, scope: scope)
         let revision = contentRevision
-        let held = searches[query]
-        if held.map({ $0.revision != revision && !$0.running }) ?? true { startSearch(query, at: revision) }
-        return (held?.hits ?? lastFound).compactMap { id in
-            records[id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
+        let fill = syncReport.fill
+        let held = searches[key]
+        let outdated = held.map { run in
+            !run.running && (run.revision != revision || (run.found.isIncomplete && run.fill != fill))
+        } ?? true
+        if outdated { startSearch(key, at: revision, fill: fill) }
+        let answered = held?.answered ?? false
+        let ids = answered ? held?.found.hits ?? [] : lastFound
+        var results = SearchResults(isIncomplete: held?.found.isIncomplete ?? false, isCapped: held?.found.isCapped ?? false)
+        results.isPending = !answered
+        for id in ids {
+            guard let record = records[id], record.isHeld, record.item.state != .trashed else { continue }
+            results.items.append(record.item)
+            // An excerpt quotes the item as it was searched, so one for an item since edited would show text that
+            // is no longer there.
+            if answered, let excerpt = held?.found.excerpts[id], excerpt.describes(record.item) { results.excerpts[id] = excerpt }
         }
+        return results
     }
 
-    /// A search that fails keeps the results already shown and says why, rather than showing that nothing was
-    /// found; it is not asked again until the items change.
-    private func startSearch(_ query: String, at revision: Int) {
-        searches[query, default: Search(revision: revision, hits: [], running: true)].running = true
-        searchOrder.removeAll { $0 == query }
-        searchOrder.append(query)
+    /// The copy's way of narrowing to a place or a view, or nil where the place stands for no query: the search
+    /// then covers everything, as `SearchScope.narrows` says.
+    private func target(for scope: SearchScope) -> SearchTarget {
+        guard case .place(let place) = scope, SearchScope.narrows(place) else { return .items(Self.searchScope) }
+        if case .view(let id) = place, views.contains(where: { $0.id == id }) { return .view(id) }
+        guard let query = ViewDraft.query(for: place, catalogue: catalogue, views: views) else { return .items(Self.searchScope) }
+        let narrowed = ItemQuery(
+            types: Set(query.types), beneath: query.beneath, states: query.states ?? [], tier: query.tier)
+        return .items(narrowed, filter: query.filter)
+    }
+
+    /// A search that fails keeps the results already shown for the same words and place and says why, rather than
+    /// showing that nothing was found, and shows nothing where it has none; it is not asked again until the items
+    /// change.
+    private func startSearch(_ key: SearchKey, at revision: Int, fill: LibraryFill?) {
+        searches[key, default: SearchRun(revision: revision, running: true, fill: fill)].running = true
+        searchOrder.removeAll { $0 == key }
+        searchOrder.append(key)
         while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
+        let target = target(for: key.scope)
         Task { [weak self, source] in
-            let found: Result<[ItemID], any Error>
+            let found: Result<SourceSearch, any Error>
             do {
-                found = .success(try await source.search(query, in: Self.searchScope))
+                found = .success(try await source.search(key.query, in: target))
             } catch {
                 found = .failure(error)
             }
             guard let self else { return }
             switch found {
-            case .success(let hits):
-                searches[query] = Search(revision: revision, hits: hits, running: false)
-                lastFound = hits
+            case .success(let result):
+                searches[key] = SearchRun(revision: revision, found: result, running: false, answered: true, fill: fill)
+                lastFound = result.hits
             case .failure(let error):
-                searches[query] = Search(revision: revision, hits: searches[query]?.hits ?? lastFound, running: false)
+                // Only this search's own earlier answer is kept; another's hits would be shown as this one's. A failure
+                // says nothing of completeness, so the notice follows how the copy stands now.
+                var kept = searches[key].flatMap { $0.answered ? $0.found : nil } ?? SourceSearch()
+                kept.isIncomplete = syncReport.fill.map { $0.state != .complete } ?? false
+                searches[key] = SearchRun(revision: revision, found: kept, running: false, answered: true, fill: fill)
                 notices.tell(String(localized: "Can’t Search"), error.localizedDescription)
             }
             searchRevision += 1

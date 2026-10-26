@@ -10,6 +10,9 @@ enum OrderKey {
 /// The list's sort and grouping, offered alike by the View menu, the View Options menu of the list and the gallery
 /// (`CurrentViewOptions`) and Settings.
 struct OrderOptions: View {
+    /// The window whose search the order applies to, which adds Relevance while it searches. Nil in Settings and
+    /// while no window is in front.
+    var browser: Browser?
     @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
 
@@ -19,9 +22,20 @@ struct OrderOptions: View {
     }
 
     private var picker: some View {
-        Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: $sort) {
+        Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: Binding<NoteSort?> {
+            browser?.ordersByRelevance == true ? nil : sort
+        } set: { choice in
+            if let choice { sort = choice }
+            browser?.orderSearch(byRelevance: choice == nil)
+        }) {
+            // Relevance is the search's own order, so it is offered only while the window searches. It leaves the
+            // stored sort alone, which comes back when the search ends.
+            if browser?.isSearching == true {
+                Text("Relevance").tag(NoteSort?.none)
+                Divider()
+            }
             ForEach(NoteSort.allCases, id: \.self) { sort in
-                Text(sort.title)
+                Text(sort.title).tag(Optional(sort))
             }
         }
         .accessibilityLabel("Sort By")
@@ -29,11 +43,11 @@ struct OrderOptions: View {
     }
 
     private var group: some View {
-        // Title order has no dates to group by.
+        // Title order has no dates to group by, and relevance lists one section.
         Toggle("Group by Date", systemImage: "calendar", isOn: $groupsByDate)
             .accessibilityLabel("Group by Date")
             .accessibilityIdentifier("GroupByDate")
-            .disabled(sort == .title)
+            .disabled(sort == .title || browser?.ordersByRelevance == true)
     }
 }
 

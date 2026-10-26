@@ -225,10 +225,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func searchAsksTheCopyAndLeavesOutTheBin() async throws {
         let (library, source) = try await loaded()
         source.hits.withLock { $0["body"] = [F.n1, F.n3, F.p1] }
-        #expect(library.items(matching: "  ").isEmpty)
-        #expect(await eventually { library.items(matching: "body").map(\.id) == [F.n1, F.p1] })
+        #expect(library.search("  ", in: .everywhere).items.isEmpty)
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
         let searches = source.searches.withLock { $0 }
-        _ = library.items(matching: "body")
+        _ = library.search("body", in: .everywhere).items
         #expect(source.searches.withLock { $0 } == searches)
 
         // A change to the items asks again, and the last results stand meanwhile.
@@ -236,24 +236,24 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Other"
         source.send(.upserted([renamed]))
-        #expect(await eventually { library.items(matching: "body").map(\.id) == [F.p1] })
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
     }
 
     @Test func aSearchThatFailsKeepsWhatWasFoundAndSaysWhy() async throws {
         let (library, source) = try await loaded()
         source.hits.withLock { $0["body"] = [F.n1] }
-        #expect(await eventually { library.items(matching: "body").map(\.id) == [F.n1] })
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1] })
         source.searchFails.withLock { $0 = true }
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Other"
         source.send(.upserted([renamed]))
         // The list reads the search again as it redraws for the change.
         #expect(await eventually {
-            _ = library.items(matching: "body")
+            _ = library.search("body", in: .everywhere).items
             return library.notices.waiting.last != nil
         })
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Search"))
-        #expect(library.items(matching: "body").map(\.id) == [F.n1])
+        #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
     }
 
     @Test func relationshipsReadBothWaysUnderTheirNames() async throws {
@@ -844,7 +844,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([F.item(ItemID("later"), F.note, "Later", age: 0)]))
         #expect(await eventually { missing.isSet })
 
-        let search = observes { _ = library.items(matching: "x") }
+        let search = observes { _ = library.search("x", in: .everywhere).items }
         source.hits.withLock { $0["x"] = [F.n1] }
         #expect(await eventually { search.isSet })
     }

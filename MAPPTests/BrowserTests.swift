@@ -243,7 +243,10 @@ struct BrowserTests {
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.group == .favorites)
         browser.searchText = "e"
-        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.items.first?.id == newer.id)
+        browser.orderSearch(byRelevance: false)
+        let results = browser.sections(in: library, order: NoteOrder(), now: start)
+        #expect(results.first?.group != .favorites)
+        #expect(results.first?.items.first?.id == newer.id)
     }
 
     @Test func aCollectionKeepsItsOwnOrderUntilASearch() {

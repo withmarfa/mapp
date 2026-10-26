@@ -91,7 +91,7 @@ extension LiveMarfaTests {
                 }
                 #expect(library.body(of: project)?.text == "Made by the MAPP tests.")
                 #expect(!library.relationshipCandidates(for: project, field: "about").isEmpty)
-                #expect(await eventually { library.items(matching: token).contains { $0.id == project } })
+                #expect(await eventually { library.search(token, in: .everywhere).items.contains { $0.id == project } })
             }
         }
 
@@ -170,7 +170,7 @@ extension LiveMarfaTests {
                 await source.flush()
                 #expect(try await source.body(of: child).text == "Edited \(token) text.")
                 #expect(await eventually { library.body(of: child)?.text == "Edited \(token) text." })
-                #expect(await eventually { library.items(matching: token).contains { $0.id == child } })
+                #expect(await eventually { library.search(token, in: .everywhere).items.contains { $0.id == child } })
 
                 // A title, and its undo.
                 let title = try #require(library.item(child)?.title)
@@ -179,10 +179,14 @@ extension LiveMarfaTests {
                 undo.undo()
                 #expect(await eventually { library.item(child)?.title == title })
 
+                // The count comes first because the report is read after it: the copy marks itself as catching up
+                // before it counts a hydration, so a report read before the count can still be the old, whole one
+                // while the hydration has begun. The source's own report is read, since the library's follows it
+                // a moment later.
                 @MainActor func rehydrated(after before: Int) async throws -> Bool {
                     try await eventuallyAsking {
-                        guard LiveMarfa.isWhole(library.syncReport) else { return false }
-                        return await source.engine.sync.hydrations > before
+                        guard await source.engine.sync.hydrations > before else { return false }
+                        return LiveMarfa.isWhole(source.syncReport)
                     }
                 }
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
@@ -420,7 +424,7 @@ extension LiveMarfaTests {
                     #expect(!library.items(in: .allNotes).contains { $0.id.rawValue == view.id })
                     #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
                     // The view's title holds the token too, so only an item reaches the results.
-                    #expect(await eventually { library.items(matching: token).map(\.id) == [id] })
+                    #expect(await eventually { library.search(token, in: .everywhere).items.map(\.id) == [id] })
 
                     let browser = Browser()
                     browser.show(place, in: library, order: NoteOrder())

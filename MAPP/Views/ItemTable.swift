@@ -24,10 +24,11 @@ struct ItemTable: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         table(columns: content.columns, rows: rows, groups: content.groups, grouping: content.grouping, collapsed: content.collapsed)
+            .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
                     if browser.isSearching {
-                        EmptyState.search(browser.searchText)
+                        SearchEmptyState(browser: browser)
                     } else {
                         EmptyState("No Items")
                     }
@@ -140,9 +141,10 @@ struct ItemTable: View {
     /// The header's sort: a click puts its column first, and only the last few columns clicked are kept.
     private func sortBinding(_ columns: [ItemTableColumn]) -> Binding<[ItemTableComparator]> {
         Binding {
-            ItemTableLayout.sort(
+            browser.ordersByRelevance ? [] : ItemTableLayout.sort(
                 browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         } set: { sort in
+            if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
             browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(3))
         }
     }
@@ -179,7 +181,8 @@ final class ItemTableContent {
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden)
         options = browser.tableOptions[browser.item] ?? ItemTableOptions()
-        sort = ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
+        // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
+        sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         grouping = ItemTableLayout.grouping(options, columns: columns)
     }
 
