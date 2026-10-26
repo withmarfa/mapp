@@ -291,20 +291,25 @@ final class Browser {
         fetchedFile.flatMap { $0.id == id ? $0.url : nil }
     }
 
-    /// Items in the list go to Recently Deleted, which undoes. Items already there are erased for good once the
-    /// person confirms, since that cannot be undone, where the library can erase them. More than one item to move
-    /// is handed to `confirm` where there is one, which asks the person first and then moves them.
+    /// Moves the live items among `ids` to Recently Deleted, which undoes; more than one is handed to `confirm`
+    /// where there is one, which asks the person first and then moves them. A selection with a live item in it never
+    /// erases anything: the items already in Recently Deleted stay there, since erasing cannot be undone and a
+    /// command that also moves other items must not do it. Only a selection made entirely of items already there
+    /// asks to erase them for good, and only where the library can; otherwise the person is told why not.
     static func delete(
         _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?,
         asking confirm: ((Set<ItemID>) -> Void)? = nil
     ) {
-        let alreadyDeleted = Set(ids.compactMap { library.item($0) }.filter { $0.state == .trashed }.map(\.id))
-        if !alreadyDeleted.isEmpty, library.canPurge { library.notesToPurge = alreadyDeleted }
-        let moving = ids.subtracting(alreadyDeleted)
-        if moving.count > 1, let confirm {
-            confirm(moving)
-        } else {
-            library.delete(moving, undoManager: undoManager)
+        let binned = Set(ids.filter { library.item($0)?.state == .trashed })
+        let moving = ids.subtracting(binned)
+        if !moving.isEmpty {
+            if moving.count > 1, let confirm {
+                confirm(moving)
+            } else {
+                library.delete(moving, undoManager: undoManager)
+            }
+        } else if !binned.isEmpty {
+            if library.canPurge { library.notesToPurge = binned } else { library.tellCannotPurge() }
         }
     }
 

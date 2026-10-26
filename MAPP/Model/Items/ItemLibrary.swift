@@ -204,12 +204,17 @@ extension ItemLibrary {
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
         guard canPurge else {
-            notices.tell(
-                String(localized: "Can’t Delete Immediately"),
-                String(localized: "Notes can’t be deleted immediately right now. They’re still in Recently Deleted."))
+            tellCannotPurge()
             return
         }
         deletePermanently(ids)
+    }
+
+    /// Says why items in Recently Deleted can't be erased now, which is the one reason `canPurge` is false.
+    func tellCannotPurge() {
+        notices.tell(
+            String(localized: "Can’t Delete Immediately"),
+            String(localized: "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted."))
     }
 
     /// Whether the person can give the item a title. A title is kept only as a property, so an item titled by its

@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"^[Delete %lld item](inflect: true) immediately?" : { "extractionState" : "manual" },
+"They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : { "extractionState" : "manual" },
+"Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : { "extractionState" : "manual" },
 "%lld items are no longer in the library." : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {

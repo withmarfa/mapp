@@ -94,12 +94,12 @@ private struct LibraryDialogs: ViewModifier {
             .onChange(of: library.notesToPurge, initial: true, take)
             .onChange(of: appearsActive, take)
             .confirmationDialog(
-                "^[Delete \(purging.count) note](inflect: true) immediately?",
+                "^[Delete \(purging.count) item](inflect: true) immediately?",
                 isPresented: Binding { !purging.isEmpty } set: { if !$0 { purging = [] } }
             ) {
                 Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
             } message: {
-                Text("You can’t undo this action.")
+                Text("They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it.")
             }
     }
 
@@ -107,8 +107,8 @@ private struct LibraryDialogs: ViewModifier {
     private func take() {
         guard appearsActive else { return }
         if !library.notesToPurge.isEmpty {
-            // A library that cannot erase is never asked to.
-            if library.canPurge { purging = library.notesToPurge }
+            // The server may have gone out of reach since the person asked.
+            if library.canPurge { purging = library.notesToPurge } else { library.tellCannotPurge() }
             library.notesToPurge = []
         }
     }
