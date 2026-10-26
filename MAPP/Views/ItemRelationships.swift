@@ -215,6 +215,7 @@ struct ItemRelationshipPicker: View {
     }
 }
 
+#if DEBUG
 #Preview("Wrapping Connections") {
     let id = ItemID("10000000-0000-0000-0000-000000000001")
     let names = SampleLibrary.catalogue.edgeTypes
@@ -237,3 +238,4 @@ struct ItemRelationshipPicker: View {
     .interfaceTextStyle()
     .frame(width: 300)
 }
+#endif

@@ -89,6 +89,11 @@ jobs:
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
+      # A tag build archives Release, which leaves out code that only Debug builds hold; see v0.0.21 to v0.0.24-rc1.
+      - name: Build the release configuration
+        run: >
+          xcodebuild -project MAPP.xcodeproj -scheme MAPP -configuration Release -destination 'generic/platform=macOS'
+          -derivedDataPath build-release CODE_SIGNING_ALLOWED=NO build
       - name: Show failures
         if: failure() && hashFiles('TestResults.xcresult/**') != ''
         run: |
