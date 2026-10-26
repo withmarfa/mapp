@@ -89,47 +89,6 @@ function shownText(source: string): string {
     .replace(/!?\[([^\]]*?)(?:\|\d+)?\](?:\([^)]*(?:\)|$)|\[[^\]]*(?:\]|$))/g, '$1')
 }
 
-/** `text` with images after its last block, each a paragraph of its own after a blank line, which ends any table,
- *  list or quote the text ends with. A fenced code block left open at the end is closed first, or the images would
- *  be code. */
-export function appendedImages(text: string, images: { src: string; alt: string }[]): string {
-  const eol = text.includes('\r\n') ? '\r\n' : '\n'
-  let result = text
-  const fence = openFence(text)
-  if (fence) result += (/\n[ \t]*$/.test(result) ? '' : eol) + fence + eol
-  const lines = result.split(/\r?\n/)
-  const blank = (line: string | undefined) => line !== undefined && line.trim() === ''
-  if (result !== '') {
-    if (!blank(lines.at(-1))) result += eol + eol
-    else if (!blank(lines.at(-2))) result += eol
-  }
-  return result + images.map(imageMarkdown).join(eol + eol) + eol
-}
-
-/** The fence that would close a fenced code block the text leaves open at the top level, or null. */
-function openFence(text: string): string | null {
-  let open: string | null = null
-  for (const line of text.split(/\r?\n/)) {
-    if (open === null) {
-      // Only a fence at the start of a line is surely outside a list item, which a blank line already ends.
-      const [, run, info = ''] = /^(`{3,}|~{3,})(.*)$/.exec(line) ?? []
-      if (run && !(run.startsWith('`') && info.includes('`'))) open = run
-    } else {
-      const [, run] = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line) ?? []
-      if (run && run[0] === open[0] && run.length >= open.length) open = null
-    }
-  }
-  return open
-}
-
-function imageMarkdown(image: { src: string; alt: string }) {
-  const alt = image.alt.replace(/[\\[\]]/g, '\\$&').replace(/\s*[\r\n]+\s*/g, ' ')
-  const src = /[\s<>]/.test(image.src)
-    ? `<${image.src.replace(/[\\<>]/g, '\\$&')}>`
-    : image.src.replace(/[\\()]/g, '\\$&')
-  return `![${alt}](${src})`
-}
-
 export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
   try {
     return action()
@@ -633,19 +592,14 @@ export class NoteEditor {
     )
   }
   /** Puts images after everything in the text, as files quick add attached to a new note, leaving the selection
-   *  where it was so typing goes on where the person is. Inkkit places an image at the selection, which at the end
-   *  of the text is inside a table, list or quote that ends it, so the images are written into the source after its
-   *  last block instead. False in source editing, where the page leaves them for the app to send again. */
+   *  and the keyboard where they were so typing goes on where the person is. False in source editing, where the page
+   *  leaves them for the app to send again. A note that ends in a code fence left open refuses them (`preservation`),
+   *  and the app tells the person the files are attached but not in the text. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
-    if (this.engine.editingMode === 'source') return false
-    const before = this.engine.textSnapshot(expected)
-    const text = this.engine.snapshot(expected).text
-    if (!this.engine.replaceSource(appendedImages(text, images), expected)) return false
-    const after = this.engine.textSnapshot(expected)
-    // The images went in after all the text there was, so the old selection's offsets still name the same text.
-    const { from, to } = before.selection
-    this.engine.selectTextRange(this.range(from, to, after), { focus: false, reveal: false })
-    return true
+    return this.engine.appendImages(
+      images.map((image) => ({ reference: image.src, alt: image.alt })),
+      expected,
+    )
   }
   async printable(expected = this.generation) {
     const result = await this.engine.printableSnapshot(expected)

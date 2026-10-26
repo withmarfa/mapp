@@ -8,7 +8,6 @@ import {
   caretOffset,
   isPreviewDiagnostic,
   guardedCommand,
-  appendedImages,
   splitLabels,
   type CaretState,
   type FindState,
@@ -464,28 +463,50 @@ test('files attached in quick add go after a list that ends the text, not into i
   }
 })
 
-test('files attached in quick add are written so they read back as embeds', () => {
-  expect(appendedImages('```\ncode', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '```\ncode\n```\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('~~~~ js\n~~~\n', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '~~~~ js\n~~~\n~~~~\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('```\ncode\n```', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '```\ncode\n```\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('- a\n  ```\n  code', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '- a\n  ```\n  code\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('One\r\nTwo', [{ src: 'a.png', alt: 'a' }])).toBe(
-    'One\r\nTwo\r\n\r\n![a](a.png)\r\n',
-  )
-  expect(
-    appendedImages('', [
-      { src: 'a (1).png', alt: 'a [1]' },
-      { src: 'b(2).png', alt: 'b' },
-    ]),
-  ).toBe('![a \\[1\\]](<a (1).png>)\n\n![b](b\\(2\\).png)\n')
+test("files attached in quick add are written so they read back as embeds, in the note's own line endings", async () => {
+  const images = [
+    { src: 'a (1).png', alt: 'a [1]' },
+    { src: 'b%201.png', alt: 'b' },
+  ]
+  const written = '![a \\[1\\]](<a (1).png>)'
+  for (const [source, expected] of [
+    ['```\ncode\n```', '```\ncode\n```\n\n' + written + '\n\n![b](b%201.png)\n'],
+    ['- a\n  ```\n  code', '- a\n  ```\n  code\n\n' + written + '\n\n![b](b%201.png)\n'],
+    ['One\r\nTwo', 'One\r\nTwo\r\n\r\n' + written + '\r\n\r\n![b](b%201.png)\r\n'],
+    ['', written + '\n\n![b](b%201.png)\n'],
+  ] as const) {
+    await withEditor(source, (editor) => {
+      expect(editor.appendImages(images)).toBe(true)
+      expect(editor.snapshot().text).toBe(expected)
+      editor.undo()
+      expect(editor.snapshot().text).toBe(source)
+    })
+  }
+})
+
+test('files attached in quick add are refused, with the note untouched, when the text ends in an open code fence', async () => {
+  for (const source of ['```\ncode', '```\ncode\n', '~~~~ js\n~~~\n']) {
+    await withEditor(source, (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toMatchObject(
+        {
+          commandError: 'preservation',
+        },
+      )
+      expect(editor.snapshot().text).toBe(source)
+      expect(editor.markdown()).toBeNull()
+    })
+  }
+})
+
+test('appended files are taken in formatted editing only, and an empty list changes nothing', async () => {
+  await withEditor('Pack\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    expect(engine.commandState().commands.appendImages).toBe(true)
+    engine.setEditingMode('source', 1)
+    expect(engine.commandState().commands.appendImages).toBe(false)
+    expect(editor.appendImages([{ src: 'a.png', alt: 'a' }])).toBe(false)
+    expect(editor.appendImages([])).toBe(false)
+  })
 })
 
 test('files attached in quick add wait while the note is edited as source', async () => {
