@@ -10,7 +10,7 @@ struct NoteList: View {
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
-    @State private var width = ListColumn.defaultWidth
+    @State private var width = ColumnWidth.list.defaultWidth
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
 
     var body: some View {

@@ -43,11 +43,13 @@ struct SettingsPageList: View {
 /// page in a split view of their own, and a button back to the window as it was.
 struct SettingsWorkspace: View {
     @Bindable var browser: Browser
+    @State private var listWidth = ColumnWidth.settings.stored()
 
     var body: some View {
         NavigationSplitView {
             SettingsPageList(browser: browser)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+                .navigationSplitViewColumnWidth(
+                    min: ColumnWidth.settings.range.lowerBound, ideal: listWidth, max: ColumnWidth.settings.range.upperBound)
         } detail: {
             SettingsPageView(page: browser.settingsPage, browser: browser)
                 .toolbar {
