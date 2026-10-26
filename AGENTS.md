@@ -99,10 +99,12 @@ These hold across the app. The nested files say how the library keeps them.
 
 ## Versions and releases
 
-- A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Every version is `0.0.x` until the first public release, and each release is the latest tag plus `0.0.1`.
+- A version exists only as a git tag: `v` followed by the version, such as `v0.0.5`. Every version is `0.0.x` until the first public release, and each release is the latest release tag plus `0.0.1`.
+- A **release candidate** is a tag with `-rc` and a number after the version it is a candidate for, such as `v0.0.25-rc1`, then `-rc2`. It builds as version 0.0.25 with the next build number, so TestFlight shows one version with several builds and the version number grows only when a release is cut. A candidate is never counted as the latest release tag.
+- **Tag soon after any merge to `main` that changes what a person sees or does**, within reason. Take the next candidate of the next version by default. Cut the release itself (`v0.0.25`) when a candidate has been tried, when a logical set of work is complete, or when the brief says so. Merges that change only tests, CI, docs or notes are not tagged. A tag build only archives, and the team's Xcode Cloud allowance is far from used, so do not hold work back to save version numbers.
 - Never write a version into a file. `MARKETING_VERSION` stays `0.0.0` in the repository.
-- To release when a release is called, tag the merged commit on `main` with the next version and push the tag. A tag beginning with `v` starts the Xcode Cloud workflow, which archives the app and gives it to internal TestFlight testers. There is no other distribution, so no Sparkle and no notarization.
-- In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secret `MAPP_DEVELOPMENT_TEAM` and sets `MARKETING_VERSION` from the tag. A tag build stops if the team secret is unset or the version was not written. Xcode Cloud numbers the builds.
+- To release or make a candidate, tag the merged commit on `main` and push the tag. A tag beginning with `v` starts the Xcode Cloud workflow, which archives the app and gives it to internal TestFlight testers. There is no other distribution, so no Sparkle and no notarization.
+- In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secret `MAPP_DEVELOPMENT_TEAM` and sets `MARKETING_VERSION` from the tag, without a `-rc` suffix. A tag build stops if the team secret is unset or the version was not written. Xcode Cloud numbers the builds.
 - Agents cannot see Xcode Cloud. Check a release in App Store Connect: the build for the tag's version appears under TestFlight.
 
 ## Code Review Rules

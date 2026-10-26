@@ -19,11 +19,12 @@ if [[ -n "${CI_TAG:-}" ]]; then
     print -u2 -- 'MAPP_DEVELOPMENT_TEAM is not set, so the tag build cannot be signed.'
     exit 1
   }
-  version="${CI_TAG#v}"
-  [[ "$version" =~ '^[0-9]+(\.[0-9]+){0,2}$' ]] || {
-    print -u2 -- "The tag $CI_TAG is not a version such as 1.2.3."
+  # A release candidate, such as v0.0.25-rc1, builds the version it is a candidate for.
+  [[ "$CI_TAG" =~ '^v[0-9]+(\.[0-9]+){0,2}(-rc[0-9]+)?$' ]] || {
+    print -u2 -- "The tag $CI_TAG is not a version such as v1.2.3 or a candidate such as v1.2.3-rc1."
     exit 1
   }
+  version="${${CI_TAG#v}%%-rc*}"
   [[ "$version" =~ '^0+(\.0+){0,2}$' ]] && {
     print -u2 -- "The tag $CI_TAG would build version 0.0.0."
     exit 1
