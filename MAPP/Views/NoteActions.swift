@@ -59,6 +59,7 @@ struct NoteOrganizeActions: View {
                 library.setFavorite(ids, !allFavorites, undoManager: undoManager)
             }
             .disabled(notes.isEmpty)
+            AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
         }
     }

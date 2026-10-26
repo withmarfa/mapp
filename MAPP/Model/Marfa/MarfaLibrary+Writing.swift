@@ -229,6 +229,37 @@ extension MarfaLibrary {
         }
     }
 
+    // MARK: Tags
+
+    @discardableResult
+    func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal? {
+        switch checkedTag(tag, adding: ids) {
+        case .failure(let refusal): return refusal
+        case .success(let (tag, changing)):
+            setTag(tag, on: true, changing, undoManager: undoManager)
+            return nil
+        }
+    }
+
+    func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?) {
+        guard !reservedTags.contains(tag) else { return }
+        setTag(tag, on: false, ids, undoManager: undoManager)
+    }
+
+    /// Each item that can take the change and does not already show it. An item that lost the tag on another device
+    /// meanwhile is not sent a remove for it, which the server would answer as it answers any change that changes
+    /// nothing. Undo and redo run this again, so they act on what the items hold then.
+    private func setTag(_ tag: String, on: Bool, _ ids: Set<ItemID>, undoManager: UndoManager?) {
+        let changing = Set(ids.filter { id in item(id).map { $0.canEditTags && $0.tags.contains(tag) != on } ?? false })
+        guard !changing.isEmpty else { return }
+        let name = on ? String(localized: "Add Tag") : String(localized: "Remove Tag")
+        let title = on ? String(localized: "Can’t Add Tag") : String(localized: "Can’t Remove Tag")
+        for id in changing { submit(.tag(id, tag, on: on), failing: title) }
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.setTag(tag, on: !on, changing, undoManager: undoManager)
+        }
+    }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
         for id in ids { if let item = item(id), item.state != .trashed { changes[id] = (item.state, .trashed) } }

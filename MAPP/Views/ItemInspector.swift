@@ -33,6 +33,9 @@ struct ItemInspectorHost: View {
                         library.setItemRelationship(id, field: relationship.field,
                             targetIDs: relationship.targets.compactMap(\.itemID).filter { $0 != target }, undoManager: undoManager)
                     },
+                    tags: library.tags(of: item),
+                    onAddTag: { library.addTag($0, to: [id], undoManager: undoManager) },
+                    onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
                     drafts: details
                 )
                 .id(id)
@@ -84,6 +87,11 @@ struct ItemInspector: View {
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) -> Bool
+    /// The tags the person manages, which exclude the favorite tag, and what adds and removes one. A tag is added
+    /// by its text, which the library refuses with the reason.
+    var tags: [String] = []
+    var onAddTag: (String) -> ItemTag.Refusal? = { _ in nil }
+    var onRemoveTag: (String) -> Void = { _ in }
     var drafts: DetailsPresentation? = nil
     @AppStorage(InterfaceKey.inspectorDetailsOpen) private var detailsOpen = true
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
@@ -139,7 +147,13 @@ struct ItemInspector: View {
                         ItemAddRelationshipRow(options: addable, onEdit: onEdit)
                     }
                 }
-                if hasProperties || hasRelationships { InspectorSectionDivider() }
+                if hasTags {
+                    if hasProperties || hasRelationships { InspectorSectionDivider() }
+                    InspectorHeading(title: "Tags", topPadding: hasProperties || hasRelationships ? InspectorMetrics.sectionGap : 2)
+                    ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
+                                    onAdd: onAddTag, onRemove: onRemoveTag)
+                }
+                if hasProperties || hasRelationships || hasTags { InspectorSectionDivider() }
                 detailsHeading
                 if detailsOpen { details }
             }
@@ -163,6 +177,9 @@ struct ItemInspector: View {
     private var hasProperties: Bool { !fields.isEmpty || !emptyFields.isEmpty }
 
     private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty }
+
+    /// An item that can take a tag shows the section for adding one; one that can't shows it only if it has tags.
+    private var hasTags: Bool { item.canEditTags || !tags.isEmpty }
 
     private func add(_ field: ItemTypeInfo.Field) {
         withAnimation(.snappy(duration: 0.2)) {
@@ -198,7 +215,7 @@ struct ItemInspector: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .padding(.top, hasProperties || hasRelationships ? InspectorMetrics.sectionGap : 2)
+        .padding(.top, hasProperties || hasRelationships || hasTags ? InspectorMetrics.sectionGap : 2)
         .padding(.bottom, 6)
         .accessibilityAddTraits(.isHeader)
         .accessibilityValue(detailsOpen ? Text("Expanded") : Text("Collapsed"))
@@ -248,15 +265,10 @@ struct ItemInspector: View {
         return LocalizedStringKey(ItemTypeInfo.Field.displayLabel(words))
     }
 
-    /// Every property the type does not name or show elsewhere, in the order the item holds them. A source that
-    /// keeps no tags field still shows the item's tags among them.
+    /// Every property the type does not name or show elsewhere, in the order the item holds them.
     private var otherProperties: [Property] {
         var shown = InspectorFields.accountedFor(type: type, hidden: hiddenKeys)
         shown.formUnion(relationships.map(\.field))
-        var properties = item.properties.filter { !shown.contains($0.key) }
-        if !item.tags.isEmpty && item.value(of: "tags") == nil {
-            properties.append(Property(key: "tags", value: .array(item.tags.sorted().map(PropertyValue.string))))
-        }
-        return properties
+        return item.properties.filter { !shown.contains($0.key) }
     }
 }

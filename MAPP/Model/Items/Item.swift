@@ -32,6 +32,44 @@ nonisolated struct Property: Identifiable, Hashable, Sendable {
 // Not `Tag`, which would shadow Testing.Tag.
 nonisolated enum ItemTag {
     static let favorite = "favorite"
+    /// What Marfa allows a tag, in UTF-16 code units, and how many an item holds (`items/tag-text`, `items/tags-count`).
+    static let maxLength = 128
+    static let maxPerItem = 100
+
+    /// Why a tag was not added, in the words the person is told. Nothing was sent.
+    enum Refusal: Error, Hashable, Sendable {
+        case empty, tooLong, dotSegment
+        /// The Favorite command's tag, or one the library sets itself.
+        case favorite, reserved
+        case alreadyHas, full, cantEdit
+
+        var message: String {
+            switch self {
+            case .empty: String(localized: "Enter a tag.")
+            case .tooLong: String(localized: "A tag can be at most \(ItemTag.maxLength) characters.")
+            case .dotSegment: String(localized: "A tag can’t be “.” or “..”.")
+            case .favorite: String(localized: "Favorites are set with Add to Favorites.")
+            case .reserved: String(localized: "The library sets this tag itself.")
+            case .alreadyHas: String(localized: "Already tagged.")
+            case .full: String(localized: "An item can have at most \(ItemTag.maxPerItem) tags.")
+            case .cantEdit: String(localized: "This item’s tags can’t be changed.")
+            }
+        }
+    }
+
+    /// The tag as it is kept: Marfa holds a tag as written, so only the spaces around it, which a paste brings, go.
+    /// Case is kept, since `Work` and `work` are two tags.
+    static func normalized(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The refusal the rules of a tag's text give, before any item is looked at.
+    static func refusal(of tag: String) -> Refusal? {
+        if tag.isEmpty { return .empty }
+        if tag.utf16.count > maxLength { return .tooLong }
+        if tag == "." || tag == ".." { return .dotSegment }
+        return nil
+    }
 }
 
 /// Something about an item as read that keeps it from being edited, such as properties the library could not read.
@@ -157,6 +195,9 @@ nonisolated extension Item {
     /// Whether its text can be written in: text the library could not read is not shown, so nothing typed over the
     /// empty page is written.
     var isWritable: Bool { state == .active && !isFile && problem?.withholdsText != true }
+
+    /// Whether its tags can be changed: a file can be tagged, a deleted item or one with a problem cannot.
+    var canEditTags: Bool { state == .active && problem == nil }
 
     var isFile: Bool {
         if case .file = content { true } else { false }

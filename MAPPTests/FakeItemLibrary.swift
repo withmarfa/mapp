@@ -259,6 +259,37 @@ final class FakeItemLibrary: ItemLibrary {
         }
     }
 
+    /// What the fake reserves besides the favorite tag.
+    var extraReservedTags: Set<String> = []
+    var reservedTags: Set<String> { extraReservedTags.union([ItemTag.favorite]) }
+
+    var knownTags: [String] {
+        let counts = items.filter { $0.state == .active }.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return counts.keys.filter { !reservedTags.contains($0) }
+            .sorted { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0 < $1 }
+    }
+
+    /// The tag writes the fake was asked for, in order.
+    var tagWrites: [(tag: String, on: Bool, ids: Set<ItemID>)] = []
+
+    @discardableResult
+    func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal? {
+        switch checkedTag(tag, adding: ids) {
+        case .failure(let refusal): return refusal
+        case .success(let (tag, changing)):
+            tagWrites.append((tag, true, changing))
+            change(changing) { $0.tags.insert(tag) }
+            return nil
+        }
+    }
+
+    func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?) {
+        let changing = Set(ids.filter { item($0).map { $0.canEditTags && $0.tags.contains(tag) } ?? false })
+        guard !reservedTags.contains(tag), !changing.isEmpty else { return }
+        tagWrites.append((tag, false, changing))
+        change(changing) { $0.tags.remove(tag) }
+    }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         change(ids) { item in
             item.state = .trashed
