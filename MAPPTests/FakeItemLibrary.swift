@@ -253,6 +253,26 @@ final class FakeItemLibrary: ItemLibrary {
         return true
     }
 
+    /// Where `history` reads versions from; nil keeps none, as a library without a server does.
+    var history: (any ItemHistorySource)?
+    /// The versions restored, in order.
+    private(set) var restored: [(snapshot: ItemSnapshot, id: ItemID)] = []
+
+    func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool {
+        switch restoreCheck(of: snapshot, for: id) {
+        case .unchanged:
+            return true
+        case .unavailable(let reason):
+            notices.tell("Can’t Restore Version", reason)
+            return false
+        case .ready(let plan):
+            restored.append((snapshot, id))
+            if let text = plan.text, let held = body(of: id) { updateBody(of: id, to: text, readAt: held.version) }
+            if let title = plan.title { change([id]) { $0.title = title } }
+            return true
+        }
+    }
+
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?) {
         change(ids) { item in
             if isFavorite { item.tags.insert(ItemTag.favorite) } else { item.tags.remove(ItemTag.favorite) }

@@ -149,6 +149,7 @@ struct ItemBoard: View {
             .disabled(!item.isEditable)
             AddTagButton(ids: browser.selection.contains(item.id) ? browser.selection : [item.id], details: details, undoManager: undoManager)
             TypeChangeButton(ids: browser.selection.contains(item.id) ? browser.selection : [item.id], details: details, undoManager: undoManager)
+            VersionHistoryButton(ids: [item.id], details: details, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
     }

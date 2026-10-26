@@ -67,6 +67,12 @@ protocol ItemLibrary: AnyObject, Observable {
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
     func creationParentCandidates(typeID: String) -> [Item]
 
+    // MARK: History
+
+    /// Where an item's earlier versions are read, or nil where the library keeps none. Reading them can fail while
+    /// the rest of the library works, as when the server is out of reach.
+    var history: (any ItemHistorySource)? { get }
+
     // MARK: Collections
 
     /// The active collections, by title: items whose type plays Marfa's `container` role (`Catalogue.isCollection`).
@@ -116,6 +122,12 @@ protocol ItemLibrary: AnyObject, Observable {
     /// them back. False where the set is refused before anything is sent.
     @discardableResult
     func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool
+    /// Puts the text and title of an earlier version (`restoreCheck`) on the item as a new edit, made on the version
+    /// the library holds now, so what it replaces stays in the item's history. Undo puts back what it replaced, if the
+    /// item still holds what the restore wrote. False where nothing is sent, and the library tells the person why
+    /// unless there was nothing to change.
+    @discardableResult
+    func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
     /// The tags the library sets itself, which the person neither adds nor removes by hand: the favorite tag, which
     /// the Favorite command owns, and any a library keeps for its own use.
@@ -157,6 +169,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
+    var history: (any ItemHistorySource)? { nil }
 
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?

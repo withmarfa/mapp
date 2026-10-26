@@ -12,6 +12,8 @@ import Observation
     /// Removes the copy at a store, agreed to hold this many unsent changes. Tests stand in for the package's
     /// answers that a real copy can't be made to give.
     typealias Remover = @Sendable (URL, UInt64) async throws -> Void
+    /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
+    typealias Historian = @Sendable (MarfaConnection, any KeyStore) -> (any ItemHistorySource)?
 
     nonisolated enum State: Hashable, Sendable {
         case disconnected
@@ -102,6 +104,7 @@ import Observation
     private let opener: Opener
     private let describer: Describer
     private let remover: Remover
+    private let historian: Historian
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
@@ -129,7 +132,8 @@ import Observation
         defaults: UserDefaults, keys: any KeyStore, location: MarfaStoreLocation,
         opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
-        remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) }
+        remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) },
+        historian: @escaping Historian = { MarfaServerVersions(connection: $0, keys: $1) }
     ) {
         self.defaults = defaults
         self.keys = keys
@@ -137,6 +141,7 @@ import Observation
         self.opener = opener
         self.describer = describer
         self.remover = remover
+        self.historian = historian
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
 
@@ -435,7 +440,7 @@ import Observation
 
     private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
-        let library = MarfaLibrary(source: source, notices: notices)
+        let library = MarfaLibrary(source: source, notices: notices, history: historian(connection, keys))
         self.library = library
         if let notice = connection.server(key: "").takePlainHTTPNotice() {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))

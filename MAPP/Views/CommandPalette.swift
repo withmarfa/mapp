@@ -279,6 +279,11 @@ struct CommandPalette: View {
             }
         }
 
+        if let details, selected.count == 1, let only = selected.first {
+            add(String(localized: "Version History…"), "clock.arrow.circlepath") {
+                details.history = VersionHistoryRequest(item: only.id, undoManager: undoManager)
+            }
+        }
         if !selected.isEmpty, selected.allSatisfy({ $0.state == .trashed }) {
             add(String(localized: "Recover"), "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
         } else if !selected.isEmpty, !selected.contains(where: { $0.state == .trashed }) {

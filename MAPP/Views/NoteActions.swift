@@ -33,7 +33,7 @@ private struct NoteActionContext {
     var isEmpty: Bool { notes.isEmpty && !keepsPlace }
 }
 
-/// Favorites and Change Type for notes, or Recover for deleted ones. The collection actions sit beside these
+/// Favorites, Change Type and Version History for notes, or Recover for deleted ones. The collection actions sit beside these
 /// (`CollectionActions`), since they take files too.
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
@@ -53,6 +53,7 @@ struct NoteOrganizeActions: View {
             EmptyView()
         } else if context.allDeleted {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
+            VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
         } else {
             let allFavorites = !notes.isEmpty && notes.allSatisfy(\.isFavorite)
             Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
@@ -61,6 +62,7 @@ struct NoteOrganizeActions: View {
             .disabled(notes.isEmpty)
             AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
+            VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
         }
     }
 }

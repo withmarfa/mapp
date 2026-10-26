@@ -160,7 +160,8 @@ import Observation
             let host = MarfaHost(
                 defaults: defaults, keys: MemoryKeyStore([sample: "sample"]), location: location(root: root),
                 opener: { connection, _, _ in SampleLibrary.open(connection) },
-                describer: { _ in SampleLibrary.name })
+                describer: { _ in SampleLibrary.name },
+                historian: { _, _ in nil })
             host.presetTestServer(sample)
             return Libraries(host: host, defaults: defaults)
         }

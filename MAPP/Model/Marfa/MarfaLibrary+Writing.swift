@@ -182,11 +182,11 @@ extension MarfaLibrary {
         }
     }
 
-    private func afterHandingOverEdits(_ action: @escaping () -> Void) {
+    private func afterHandingOverEdits(failing title: String = MarfaLibrary.cantChangeType, _ action: @escaping () -> Void) {
         handOverEdits { [weak self] kept in
             guard let self else { return }
             guard kept else {
-                return notices.tell(Self.cantChangeType, String(localized: "Finish editing the current note, then try again."))
+                return notices.tell(title, String(localized: "Finish editing the current note, then try again."))
             }
             action()
         }
@@ -207,6 +207,83 @@ extension MarfaLibrary {
                 submit(.retype(undo.id, undo.from, plan.changes, base: item.version), failing: Self.cantChangeType)
             } else {
                 notices.tell(Self.cantChangeType, String(localized: "“\(item.title)” has changed since, and can’t go back to its type."))
+            }
+        }
+    }
+
+    // MARK: Versions
+
+    private static var cantRestore: String { String(localized: "Can’t Restore Version") }
+
+    /// The text and title of an earlier version go on the item as new edits, the text through the same save as typing,
+    /// so it is made on the version the library holds and a text another device has changed since is merged or kept
+    /// apart, never overwritten. What it replaces stays in the item's history. Undo and Redo register their opposite
+    /// at once and make their writes once the open pages have handed over their last edit, as a change of type does.
+    @discardableResult
+    func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool {
+        switch restoreCheck(of: snapshot, for: id) {
+        case .unchanged:
+            return true
+        case .unavailable(let reason):
+            notices.tell(Self.cantRestore, reason)
+            return false
+        case .ready(let plan):
+            guard let item = item(id) else { return false }
+            let before = RestorePlan(text: plan.text == nil ? nil : body(of: id)?.text, title: plan.title == nil ? nil : item.title)
+            let change = RestoreChange(from: before, to: plan)
+            guard writeRestore(change, of: id) else { return false }
+            registerRestoreUndo(change, of: id, undoManager: undoManager)
+            return true
+        }
+    }
+
+    /// A restore's two ends: what the item holds before it and what it holds after.
+    private struct RestoreChange {
+        var from: RestorePlan
+        var to: RestorePlan
+        var reversed: RestoreChange { RestoreChange(from: to, to: from) }
+    }
+
+    /// Writes `change.to` over an item that still holds `change.from`; a part the item no longer holds is left alone
+    /// and told, since writing over it would replace what was typed after. False where nothing was written.
+    private func writeRestore(_ change: RestoreChange, of id: ItemID) -> Bool {
+        guard let item = item(id), item.isWritable else {
+            notices.tell(Self.cantRestore, String(localized: "This item can’t be changed right now."))
+            return false
+        }
+        var wrote = false
+        var changedSince = false
+        if let text = change.to.text {
+            if let body = body(of: id), body.text == change.from.text {
+                saveText(text, of: id, readAt: body.version, failing: Self.cantRestore)
+                wrote = true
+            } else {
+                changedSince = true
+            }
+        }
+        if let title = change.to.title, case .property(let key) = item.titleRule {
+            if item.title == change.from.title {
+                submit(.editProperties(id, [key: .string(title)], base: item.version, undoing: nil), failing: Self.cantRestore)
+                wrote = true
+            } else {
+                changedSince = true
+            }
+        }
+        if changedSince {
+            notices.tell(
+                Self.cantRestore,
+                String(localized: "“\(item.title)” has changed since, so that can’t be put back here. Earlier versions are in Version History."))
+        }
+        return wrote
+    }
+
+    private func registerRestoreUndo(_ change: RestoreChange, of id: ItemID, undoManager: UndoManager?) {
+        let name = String(localized: "Restore Version")
+        registerUndo(undoManager, name: name) { [weak undoManager] library in
+            library.registerRestoreUndo(change.reversed, of: id, undoManager: undoManager)
+            library.afterHandingOverEdits(failing: Self.cantRestore) {
+                // The page has handed over what was typed, so the item is judged as it now is.
+                _ = library.writeRestore(change.reversed, of: id)
             }
         }
     }
