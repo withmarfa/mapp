@@ -36,6 +36,8 @@ nonisolated enum EditorMessage: Sendable {
     case state(CaretState)
     /// The item's header has gone under the toolbar, or come back; said only when it changes.
     case headerScrolledAway(Bool, generation: Int)
+    /// The page has scrolled, so some of it is under the toolbar; said only when it changes.
+    case contentUnderToolbar(Bool, generation: Int)
     /// The item's title took or lost the keyboard.
     case titleFocus(Bool)
     case titleInput(ItemID, String)
@@ -87,6 +89,9 @@ nonisolated enum EditorMessage: Sendable {
         case "headerScrolledAway":
             guard let away = dict["away"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
             self = .headerScrolledAway(away, generation: generation)
+        case "contentUnderToolbar":
+            guard let under = dict["under"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
+            self = .contentUnderToolbar(under, generation: generation)
         case "titleFocus":
             guard let focused = dict["focused"] as? Bool else { return nil }
             self = .titleFocus(focused)
