@@ -5,7 +5,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
     nonisolated(unsafe) private weak var previous: (any NSWindowDelegate)?
     private weak var editor: EditorController?
     private(set) weak var window: NSWindow?
-    private var awaiting = false
+    private(set) var awaiting = false
     private var approved = false
 
     init(editor: EditorController, window: NSWindow) {
@@ -33,7 +33,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
         guard let editor, editor.hasNote else { return true }
         guard !awaiting else { return false }
         awaiting = true
-        editor.flush(closing: true) { [weak self, weak sender] kept in
+        editor.flush { [weak self, weak sender] kept in
             guard let self else { return }
             self.awaiting = false
             guard kept, let sender else { return }

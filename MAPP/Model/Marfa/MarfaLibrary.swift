@@ -68,9 +68,6 @@ import Observation
     @ObservationIgnored private var following: [Task<Void, Never>] = []
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
-    /// Items this library has written to, or connected another item to, other than by creating them. The copy shows
-    /// a title, tags or a link only when the source reports them, so what it shows may not yet hold a write.
-    @ObservationIgnored var written: Set<ItemID> = []
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
     /// so the window has no item to open and gives the New up.
     private(set) var refusedCreations: Set<ItemID> = []
@@ -344,7 +341,6 @@ import Observation
     @discardableResult
     func submit(_ write: ItemWrite, failing title: String) -> WriteID {
         let id = WriteID()
-        recordWritten(write)
         let unqueued = Self.unqueuedText(write)
         let refusal = Refusal(title: title, text: unqueued ?? Self.createdText(write), unqueuedText: unqueued)
         refusals[id] = refusal
@@ -355,38 +351,15 @@ import Observation
         return id
     }
 
-    /// The items a write is made to or connects, so `wasTouched` knows them before the source reports the write. A
-    /// create touches only the item it files under; the item it makes is not yet written to.
-    private func recordWritten(_ write: ItemWrite) {
-        switch write {
-        case .create(_, let draft):
-            if let parent = draft.parent { written.insert(parent) }
-        case .editProperties(let id, _, _, _), .editBody(let id, _, _, _), .retype(let id, _, _), .retier(let id, _, _),
-            .transition(let id, _), .purge(let id, _), .tag(let id, _, _):
-            written.insert(id)
-        case .link(let draft, _):
-            written.formUnion([draft.source, draft.target])
-        case .unlink(let edge):
-            if let link = index.links[edge] { written.formUnion([link.source, link.target]) }
-        case .moveEdge(let edge, _, let target):
-            written.insert(target)
-            if let link = index.links[edge] { written.formUnion([link.source, link.target]) }
-        }
-    }
-
-    func wasTouched(_ id: ItemID) -> Bool {
-        written.contains(id) || index.links(touching: id).contains { $0.holder != id }
-    }
-
     /// The text the person typed into a write, which nothing else holds once the package refuses it before queueing:
-    /// a body, a create's title and body (a create with a title alone, such as New's, gives nothing back), and the
-    /// text values of a property edit, a title among them.
+    /// a body, a create's title, body and text values, since the person typed them in quick add, and the text values
+    /// of a property edit, a title among them.
     private static func unqueuedText(_ write: ItemWrite) -> String? {
         switch write {
         case .editBody(_, let text, _, _):
             return text
-        case .create(_, let draft):
-            return draft.body.isEmpty ? nil : createdText(write)
+        case .create:
+            return createdText(write)
         case .editProperties(_, let changes, _, _):
             let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value?.string }
             return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
@@ -395,10 +368,12 @@ import Observation
         }
     }
 
-    /// The text a create holds, which a source that closes before it answers gives back to the person.
+    /// The text a create holds, its title, body and text values, which a source that closes before it answers
+    /// gives back to the person.
     private static func createdText(_ write: ItemWrite) -> String? {
         guard case .create(_, let draft) = write else { return nil }
-        return draft.body.isEmpty ? draft.title : draft.title + "\n\n" + draft.body
+        let values = draft.properties.sorted { $0.key < $1.key }.compactMap { $0.value.string }
+        return ([draft.title, draft.body] + values).filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
 
     /// A create is followed to its answer, so one refused before the source holds the item is told to the window that made it.
@@ -415,7 +390,10 @@ import Observation
     /// what the person never saw, and the library goes on holding the newer text.
     func saveText(_ text: String, of id: ItemID, readAt: ItemVersion, failing title: String) {
         let held = records[id]?.body?.version ?? records[id]?.item.version ?? ItemVersion(0)
-        let merge: BodyMerge = savedOn[id] == readAt ? .following : .asRead
+        let readAt = ItemVersion(MarfaEngine.version(read: readAt.rawValue, holding: held.rawValue))
+        // A save held on a local create's version 0 is on version 1 once the answer lands, as `readAt` now is.
+        let saved = savedOn[id].map { ItemVersion(MarfaEngine.version(read: $0.rawValue, holding: held.rawValue)) }
+        let merge: BodyMerge = saved == readAt ? .following : .asRead
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         unsettledText[id, default: []].insert(write)
         textWrites[write] = id

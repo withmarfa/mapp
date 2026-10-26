@@ -7,58 +7,11 @@ import Testing
 struct LibraryChangeTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    @Test func aLibraryThatHoldsTheItemAtOnceOpensItAtOnce() throws {
-        let library = FakeItemLibrary(now: start)
-        let browser = Browser()
-        let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(browser.selection == [id])
-        #expect(!browser.isAwaitingNewItem)
-        #expect(browser.focusRequest == .title)
-        #expect(library.item(id)?.title == String(localized: "Untitled"))
-        #expect(library.bodies[id] == "", "a note that needs a body is sent an empty one")
-    }
-
-    @Test func aLibraryThatShowsTheItemLaterOpensItWhenItArrives() throws {
+    @Test func aRefusedItemEndsTheWaitAndOpensNothing() async throws {
         let library = FakeItemLibrary(now: start)
         library.holdsCreations = true
         let browser = Browser()
-        let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-
-        #expect(browser.isAwaitingNewItem)
-        #expect(browser.selection.isEmpty)
-        #expect(library.item(id) == nil)
-
-        library.deliverCreated()
-        browser.finishNewItem(in: library)
-        #expect(browser.selection == [id])
-        #expect(!browser.isAwaitingNewItem)
-        #expect(browser.focusRequest == .title)
-    }
-
-    @Test func handingOverBeforeTheItemArrivesChangesNothing() throws {
-        let library = FakeItemLibrary(now: start)
-        library.holdsCreations = true
-        let browser = Browser()
-        _ = try #require(browser.startNewItem(in: library, undoManager: nil))
-        browser.finishNewItem(in: library)
-        #expect(browser.isAwaitingNewItem)
-        #expect(browser.selection.isEmpty)
-    }
-
-    @Test func anItemStillAwaitedIsNotEmptiedAwayBeforeItIsShown() throws {
-        let library = FakeItemLibrary(now: start)
-        library.holdsCreations = true
-        let browser = Browser()
-        let id = try #require(browser.startNewItem(in: library, undoManager: nil))
-        #expect(!browser.leaveNewItem(id, closing: true, undoManager: nil), "nothing is known of it yet")
-        #expect(browser.isAwaitingNewItem)
-    }
-
-    @Test func aRefusedItemEndsTheWaitAndOpensNothing() throws {
-        let library = FakeItemLibrary(now: start)
-        library.holdsCreations = true
-        let browser = Browser()
-        let id = try #require(browser.startNewItem(in: library, undoManager: nil))
+        let id = try #require(await browser.quickAdded("Untitled", in: library))
         library.syncReport = SyncReport(
             problems: [
                 SyncProblemEntry(
@@ -67,7 +20,7 @@ struct LibraryChangeTests {
             ], queueRead: true)
 
         browser.finishNewItem(in: library)
-        #expect(!browser.isAwaitingNewItem)
+        #expect(browser.newItem == nil)
         #expect(browser.selection.isEmpty)
     }
 
@@ -97,20 +50,6 @@ struct LibraryChangeTests {
         browser.adopt(library)
         #expect(browser.selection == [library.items[0].id])
         #expect(browser.sidebarItem == .favorites)
-    }
-
-    /// A new item is followed only in the library it was made in, which the window leaves with the page's last
-    /// hand-over, so the next library is never asked about it.
-    @Test func aNewItemIsNotFollowedIntoTheNextLibrary() throws {
-        let old = FakeItemLibrary(now: start)
-        let browser = Browser()
-        browser.adopt(old)
-        let id = try #require(browser.startNewItem(in: old, undoManager: nil))
-        #expect(browser.newItems[id] != nil)
-
-        browser.adopt(FakeItemLibrary(now: start))
-        #expect(browser.newItems.isEmpty)
-        #expect(!browser.isAwaitingNewItem)
     }
 
     /// The window's undo acts on the library it was registered with, so it goes when the window shows another.

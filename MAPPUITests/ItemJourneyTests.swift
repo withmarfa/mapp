@@ -65,11 +65,9 @@ final class ItemJourneyTests: XCTestCase {
     }
 
     func testANewItemOpensInThePageAndHeaderEditsSurviveReopening() {
-        app.buttons["NewItemToolbar"].click()
-        app.menuItems["Task"].click()
+        app.quickAdd(type: "Task", title: "Body Focus Draft")
         let pageTitle = app.itemPageTitle
         XCTAssertTrue(pageTitle.waitForExistence(timeout: 3))
-        app.typeText("Body Focus Draft")
         app.typeKey(.return, modifierFlags: [])
         let editor = app.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
@@ -120,10 +118,8 @@ final class ItemJourneyTests: XCTestCase {
     }
 
     private func create(type: String, title: String) {
-        app.buttons["NewItemToolbar"].click()
-        app.menuItems[type].click()
+        app.quickAdd(type: type, title: title)
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
-        app.typeText(title)
         app.typeKey(.return, modifierFlags: [])
     }
 }

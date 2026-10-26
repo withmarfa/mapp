@@ -47,10 +47,13 @@ nonisolated struct Embed: Hashable, Sendable {
     let name: String
 }
 
+/// Where files go to the source: attached to an item, or added as items of their own.
 nonisolated protocol EmbedResolver: Sendable {
     /// Attaches each file to the item and says what the page writes in its text to show it. A failure means no
     /// text is to be written, though files already attached may remain.
     func attach(_ files: [URL], to item: ItemID) async throws -> [Embed]
+    /// Adds a file as an item of its own, titled `title` or by its name, under `parent` where one is given.
+    func addFile(_ file: URL, title: String?, tier: Tier?, parent: ItemID?) async throws -> ItemID
 }
 
 /// The Marfa working copy behind the library, as the library and the host use it, so both are tested without a

@@ -128,10 +128,8 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func create(type: String, title: String, parent: String? = nil) {
-        window.buttons["NewItemToolbar"].click()
-        window.menuItems[type].click()
+        window.quickAdd(type: type, title: title)
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
-        app.typeText(title)
         app.typeKey(.return, modifierFlags: [])
         if let parent {
             window.itemParentPin.click()

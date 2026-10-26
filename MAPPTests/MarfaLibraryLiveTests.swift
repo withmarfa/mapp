@@ -396,5 +396,41 @@ extension LiveMarfaTests {
                 }
             }
         }
+
+        /// Text typed into a note the page opened before its create was answered, saved once before the answer and then
+        /// after each answer as the page saves while the person types, is kept without a conflicted copy, as
+        /// `SampleLibraryTests` and `MarfaLibraryReviewFakeTests` check without a server.
+        @Test(.timeLimit(.minutes(2)))
+        func textTypedOnANoteJustMadeIsKeptSaveAfterSave() async throws {
+            try await withLibrary { library, source, made in
+                let title = "MAPPTEST typed after quick add " + UUID().uuidString.prefix(8).lowercased()
+                let id = try #require(library.createItem(
+                    typeID: "core.note", title: title, body: "Ask about the leak under the sink.", parentID: nil,
+                    in: .allNotes, undoManager: nil))
+                made.add(id)
+                // The page opens the note as soon as it is made, so it reads the text of the create before the server
+                // answers it, at version 0.
+                let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
+                // The first save comes before the create is answered; the next follow it once both answers land.
+                var text = read.text + " T"
+                library.saveText(text, of: id, readAt: read.version, failing: title)
+                await source.flush()
+                try #require(await eventually {
+                    library.body(of: id)?.version == ItemVersion(2) && library.syncReport.waiting == 0
+                })
+                for typed in ["omorrow", "."] {
+                    text += typed
+                    library.saveText(text, of: id, readAt: read.version, failing: title)
+                    await source.flush()
+                    try #require(await eventually { library.syncReport.waiting == 0 })
+                }
+                #expect(library.notices.waiting.isEmpty, "\(library.notices.waiting)")
+                // Other runs can leave copies of their own notes on the instance, so only this note's count.
+                let copies = library.syncReport.problems.filter { $0.content.title == title }
+                #expect(copies.isEmpty, "\(copies)")
+                #expect(library.body(of: id)?.text == "Ask about the leak under the sink. Tomorrow.")
+                #expect(try await source.copy.items.get(id.rawValue)?.version == 4)
+            }
+        }
     }
 }

@@ -22,18 +22,18 @@ struct MarfaCreationTests {
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
         browser.adopt(library)
-        let id = try #require(browser.startNewItem(typeID: typeID, in: library, undoManager: nil))
+        let id = try #require(await browser.quickAdded("Untitled", typeID: typeID, in: library))
         guard case .create(let submittedID, let draft) = try #require(source.writes.last) else {
             Issue.record("Expected a create")
             return
         }
         #expect(submittedID == id)
-        #expect(browser.isAwaitingNewItem)
+        #expect(browser.newItem?.id == id)
         #expect(library.notices.waiting.last == nil)
 
         let properties = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
 
-        #expect(properties[titleKey] == .string(String(localized: "Untitled")))
+        #expect(properties[titleKey] == .string("Untitled"))
         #expect(properties[bodyKey] == .string(""))
     }
 
@@ -50,23 +50,20 @@ struct MarfaCreationTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: [], catalogue: Catalogue(itemTypes: [type], edgeTypes: []))))
         try #require(await eventually { library.isLoaded })
-        let browser = Browser()
-        browser.adopt(library)
         let undo = UndoManager()
 
-        #expect(browser.startNewItem(typeID: type.id.rawValue, in: library, undoManager: undo) == nil)
+        #expect(library.createItem(typeID: type.id.rawValue, title: "Untitled", body: "", parentID: nil, in: .allNotes, undoManager: undo) == nil)
         #expect(source.writes.isEmpty)
         #expect(!undo.canUndo)
-        #expect(!browser.isAwaitingNewItem)
-        #expect(browser.newItems.isEmpty)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
         #expect(library.notices.waiting.last?.message.contains("Needed") == true)
         #expect(library.notices.waiting.last?.message.contains("draft") == false)
 
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })
-        let id = try #require(browser.startNewItem(typeID: Self.type.rawValue, in: library, undoManager: undo))
-        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: String(localized: "Untitled"), body: ""))])
+        let id = try #require(library.createItem(
+            typeID: Self.type.rawValue, title: "Untitled", body: "", parentID: nil, in: .allNotes, undoManager: undo))
+        #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Untitled", body: ""))])
     }
 
     @Test(arguments: [ItemTypeInfo.Field.Kind.number, .boolean, .date, .choice(["open"]), .other])

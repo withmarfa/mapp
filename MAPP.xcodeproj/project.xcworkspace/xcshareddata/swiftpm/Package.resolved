@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/withmarfa/marfa-swift",
       "state" : {
-        "revision" : "60ff6acd07ea08cf3fa2747143e3387561ff2309",
-        "version" : "0.0.34"
+        "revision" : "134551167fb470526d39557427c330b015e4eeac",
+        "version" : "0.0.35"
       }
     },
     {

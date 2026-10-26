@@ -191,7 +191,7 @@ extension MarfaEngine {
 
     /// The create is already queued and answered on its own, so a parent that cannot be linked is told apart and
     /// trying the create again makes no second item.
-    private func place(_ child: ItemID, under parent: ItemID) async {
+    func place(_ child: ItemID, under parent: ItemID) async {
         do {
             _ = try await Self.asking(hub) {
                 try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)

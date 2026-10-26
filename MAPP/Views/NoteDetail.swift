@@ -37,7 +37,9 @@ struct NoteDetail: View {
     private func grantFocusRequest() {
         guard let request = browser.focusRequest, request == .page || request == .title else { return }
         browser.focusRequest = nil
-        editor.focus(browser.selection.first, onTitle: request == .title)
+        let caret = request == .page ? browser.focusCaret : nil
+        browser.focusCaret = nil
+        editor.focus(browser.selection.first, onTitle: request == .title, caret: caret)
     }
 }
 

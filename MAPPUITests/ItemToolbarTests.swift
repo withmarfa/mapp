@@ -105,10 +105,7 @@ final class ItemToolbarTests: XCTestCase {
     }
 
     func testANewItemHasTheItemActionsOfAnyOther() {
-        control("NewItemToolbar").click()
-        let noteType = app.menuItems["Note"]
-        XCTAssertTrue(noteType.waitForExistence(timeout: 3))
-        noteType.click()
+        window.quickAdd(type: "Note", title: "Toolbar item")
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCTAssertTrue(control("DetailsToggle").isEnabled)
         XCTAssertTrue(control("ShareToolbar").isEnabled)

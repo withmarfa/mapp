@@ -37,9 +37,6 @@ final class EditorController: NSObject {
 
     /// An edit to a note, with the markdown the note now holds and the version of the text it was typed on.
     @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }
-    /// A note the page has moved on from, once any edit to it has been handed over. `closing` is true where the
-    /// window or the app is going, so the note will not be shown again by this window.
-    @ObservationIgnored var onLeave: (_ id: ItemID, _ closing: Bool) -> Void = { _, _ in }
     /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
     /// so no note is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
@@ -93,10 +90,11 @@ final class EditorController: NSObject {
     }
     @ObservationIgnored private var loadRequest = 0
     @ObservationIgnored private var closeDelegate: EditorCloseDelegate?
-    /// Where the keyboard goes once the page shows the item: its text, or its title.
+    /// Where the keyboard goes once the page shows the item: its text, after `caret` where given, or its title.
     private struct FocusWish: Equatable {
         let id: ItemID
         let onTitle: Bool
+        let caret: PageCaret?
     }
     @ObservationIgnored private var wantsFocus: FocusWish?
     @ObservationIgnored var style = PageStyle()
@@ -296,7 +294,7 @@ final class EditorController: NSObject {
         shown[generation] = Shown(id: item.id, read: body.version)
         call(function, json(body.text), String(generation), String(isEditable))
         revealPendingHeading(in: item.id)
-        if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
+        if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
     }
 
     /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
@@ -324,16 +322,26 @@ final class EditorController: NSObject {
 
     /// Gives the page the keyboard, in the item's text or, with `onTitle`, in its title with the title selected:
     /// now if the page is ready and in a window, otherwise once it is, as when the page comes back after the
-    /// gallery. One request, never repeated.
-    func focus(_ itemID: ItemID? = nil, onTitle: Bool = false) {
+    /// gallery. One request, never repeated. With `caret`, from quick add, the caret goes after the same text in the
+    /// page, or to its end.
+    func focus(_ itemID: ItemID? = nil, onTitle: Bool = false, caret: PageCaret? = nil) {
         guard let requested = itemID ?? noteID else { return }
         guard requested == noteID, isReady, let window = webView.window else {
-            wantsFocus = FocusWish(id: requested, onTitle: onTitle)
+            wantsFocus = FocusWish(id: requested, onTitle: onTitle, caret: caret)
             return
         }
         wantsFocus = nil
         window.makeFirstResponder(webView)
-        if onTitle { call("focusTitle", json(requested.rawValue)) } else { call("focus") }
+        if onTitle {
+            call("focusTitle", json(requested.rawValue))
+        } else if let caret {
+            switch caret {
+            case .after(let prefix): call("focusText", json(prefix))
+            case .end: call("focusText", "null")
+            }
+        } else {
+            call("focus")
+        }
     }
 
     func releaseFocus() {
@@ -351,7 +359,7 @@ final class EditorController: NSObject {
                 closeDelegate?.detach()
                 closeDelegate = EditorCloseDelegate(editor: self, window: window)
             }
-            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
+            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
         }
     }
 
@@ -452,7 +460,7 @@ final class EditorController: NSObject {
                 shown[generation] = Shown(id: noteID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
-            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle) }
+            if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }

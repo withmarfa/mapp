@@ -28,6 +28,28 @@ extension MarfaEngine {
         }
     }
 
+    /// The package queues the upload and the file's item, of the file type its contents say; the item is then put
+    /// under its parent, as a create's is.
+    func addFile(_ file: URL, title: String?, tier: Tier?, under parent: ItemID?) async -> Result<ItemID, SourceFailure> {
+        do {
+            let added = try await Self.asking(hub) {
+                try await copy.items.addFile(file, Attachment(title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier)))
+            }
+            guard let raw = added.item.itemId else {
+                throw SourceFailure(kind: .failed, message: String(localized: "The file couldn’t be added."))
+            }
+            let id = ItemID(raw)
+            if let parent { await place(id, under: parent) }
+            await reread(Set([raw] + [parent?.rawValue].compactMap(\.self)))
+            await sync.drain()
+            return .success(id)
+        } catch let error as SourceFailure {
+            return .failure(error)
+        } catch {
+            return .failure(Self.failure(error))
+        }
+    }
+
     /// The file's name, or that name with a number when another attachment of the item already has it.
     private func attachmentTitle(for file: URL, on host: Marfa.Item) -> String {
         let taken = Set(

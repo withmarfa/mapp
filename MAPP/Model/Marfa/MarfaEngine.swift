@@ -43,6 +43,8 @@ actor MarfaEngine {
         case answer(WriteID, WriteOutcome)
         /// Attaches a file, which the package queues as an upload, a file item and an edge.
         case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
+        /// Adds a file as an item of its own, which the package queues as an upload and a file item.
+        case addFile(URL, title: String?, tier: Tier?, parent: ItemID?, CheckedContinuation<Result<ItemID, SourceFailure>, Never>)
     }
 
     /// A write the type cannot take.
@@ -197,6 +199,9 @@ actor MarfaEngine {
                 if case .attach(_, _, let done) = event {
                     done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
                 }
+                if case .addFile(_, _, _, _, let done) = event {
+                    done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
+                }
                 continue
             }
             switch event {
@@ -220,6 +225,8 @@ actor MarfaEngine {
             case .binned(let found, let complete): take(bin: found, complete: complete)
             case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
             case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
+            case .addFile(let file, let title, let tier, let parent, let done):
+                done.resume(returning: await addFile(file, title: title, tier: tier, under: parent))
             case .drained(let report, let taken):
                 await answer(report)
                 taken.resume()

@@ -235,8 +235,6 @@ struct EditorTests {
     @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
         let page = try await Page()
         try await page.load("Original\n")
-        var left = false
-        page.editor.onLeave = { _, _ in left = true }
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
         let originalID = page.editor.noteID
         let replacement = page.library.add("Replacement\n")
@@ -247,7 +245,6 @@ struct EditorTests {
         #expect(page.editor.noteID == originalID)
         #expect(page.changes.isEmpty)
         #expect(!kept)
-        #expect(!left)
         #expect(!page.library.notices.waiting.isEmpty)
         try await page.run("window.editor.flush = window.savedFlush")
         let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
@@ -431,12 +428,10 @@ struct EditorTests {
         let host = HostDelegate()
         window.delegate = host
         let proxy = EditorCloseDelegate(editor: page.editor, window: window)
-        var left = false
-        page.editor.onLeave = { _, _ in left = true }
         let rejected = proxy.windowShouldClose(window)
         #expect(!rejected)
         host.permitsClose = false
-        try await page.wait { left }
+        try await page.wait { !proxy.awaiting }
         try await page.run("0")
         host.permitsClose = true
         try await page.run("window.editor.flush = () => { throw new Error('composition') }")

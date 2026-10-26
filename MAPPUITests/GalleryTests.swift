@@ -223,11 +223,9 @@ final class GalleryTests: XCTestCase {
 
     func testANewItemMadeInTheGalleryOpensInThePageAndAppearsAsACardOnReturning() {
         choose("Gallery")
-        window.buttons["NewItemToolbar"].click()
-        window.menuItems["Note"].click()
+        window.quickAdd(type: "Note", title: "Gallery item")
         let title = window.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        app.typeText("Gallery item")
         app.typeKey(.return, modifierFlags: [])
         let editor = window.webViews.firstMatch.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3))

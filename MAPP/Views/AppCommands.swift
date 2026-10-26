@@ -11,13 +11,14 @@ struct AppCommands: Commands {
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
         SidebarCommands()
 
         CommandGroup(replacing: .newItem) {
             Button("New Item", systemImage: "plus") {
-                if let library { browser?.startNewItem(in: library, undoManager: notes?.undoManager) }
+                if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
             }
                 .keyboardShortcut("n")
                 .disabled(browser == nil || library?.isLoaded != true)

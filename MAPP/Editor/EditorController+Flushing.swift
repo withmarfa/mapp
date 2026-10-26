@@ -3,26 +3,21 @@ import WebKit
 
 /// Handing over the page's last edit before a note, a window or the library goes.
 extension EditorController {
-    /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown,
-    /// and then leaves the note, unless the page stays on it. The page answers in order, so this lands before
-    /// anything asked of it later. The reply keeps this controller alive until it arrives.
+    /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown.
+    /// The page answers in order, so this lands before anything asked of it later. The reply keeps this controller alive until it arrives.
     ///
     /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told, and the next
     /// flush goes ahead without it, so a stuck page never holds the window or the app for good. What the page
     /// last reported is already saved; only what it never reported is lost.
     ///
-    /// Outside text reloading the note mid-flush leaves the note the one being left, so leaving goes ahead. A flush
-    /// whose note was replaced on the page stops, and the person is told why.
-    func flush(leaving: Bool = true, closing: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
+    /// Outside text reloading the note mid-flush leaves the note the one being flushed, so the flush goes ahead. A
+    /// flush whose note was replaced on the page stops, and the person is told why.
+    func flush(then done: @escaping (Bool) -> Void = { _ in }) {
         guard let noteID else { return done(true) }
         let generation = generation
-        func leave() -> Bool {
-            if leaving { onLeave(noteID, closing) }
-            return true
-        }
         // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
         // process ended comes back with the text it last reported.
-        guard isReady, generation != abandonedGeneration else { return done(leave()) }
+        guard isReady, generation != abandonedGeneration else { return done(true) }
         var finished = false
         var watchdog: Task<Void, Never>?
         func finish(_ kept: Bool) {
@@ -34,7 +29,7 @@ extension EditorController {
         func capture() {
             guard !finished else { return }
             guard self.noteID == noteID else { return replaced() }
-            guard isReady else { return finish(leave()) }
+            guard isReady else { return finish(true) }
             // Asked for the generation the flush began on even after outside text reloaded the note: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
             // has moved past it reported that text as it moved, and answers nil.
@@ -47,7 +42,7 @@ extension EditorController {
                     return
                 }
                 guard self.noteID == noteID else { return replaced() }
-                finish(leave())
+                finish(true)
             }
         }
         func replaced() {
@@ -99,7 +94,7 @@ extension EditorController {
                 gate.arrive(false)
                 continue
             }
-            editor.flush(leaving: leaving, closing: leaving, then: gate.arrive)
+            editor.flush(then: gate.arrive)
         }
     }
 

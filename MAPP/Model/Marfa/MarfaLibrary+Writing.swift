@@ -6,7 +6,8 @@ extension MarfaLibrary {
     // MARK: Creating
 
     func createItem(
-        typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
+        typeID: String, title: String, body: String, properties: [String: PropertyValue], parentID: ItemID?,
+        in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID? {
         let type = TypeID(typeID)
         let title = NoteName.trimmed(title)
@@ -25,7 +26,8 @@ extension MarfaLibrary {
         }
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
         // The Inbox is the feed tier, so an item made there stays where it was made.
-        let draft = ItemDraft(type: type, title: title, body: text, tier: place == .inbox ? .feed : nil, parent: parentID)
+        let draft = ItemDraft(
+            type: type, title: title, body: text, properties: properties, tier: place == .inbox ? .feed : nil, parent: parentID)
         do {
             _ = try MarfaEngine.creationProperties(draft, catalogue: catalogue)
         } catch {
@@ -189,8 +191,26 @@ extension MarfaLibrary {
             try file.data.write(to: url)
             urls.append(url)
         }
-        written.insert(id)
         return try await source.embeds.attach(urls, to: id)
+    }
+
+    /// The file goes to the source from a file of its own, which this removes once the source has taken it.
+    func addFile(named name: String, data: Data, title: String?, parentID: ItemID?, in place: SidebarItem) async -> ItemID? {
+        let cantAdd = String(localized: "Can’t Add File")
+        let directory = URL.temporaryDirectory.appending(path: "MAPP-add-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let url = directory.appending(path: NoteText.attachmentName(name))
+            try data.write(to: url)
+            // The Inbox is the feed tier, so a file added there stays where it was added.
+            return try await source.embeds.addFile(url, title: title, tier: place == .inbox ? .feed : nil, parent: parentID)
+        } catch let failure as SourceFailure {
+            notices.tell(cantAdd, failure.message)
+        } catch {
+            notices.tell(cantAdd, error.localizedDescription)
+        }
+        return nil
     }
 
     // MARK: Undo
