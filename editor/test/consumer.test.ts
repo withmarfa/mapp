@@ -552,6 +552,33 @@ test('a refused edit stays out of the note and reaches the host, from a command 
   }
 })
 
+test('a Link to Note the app fails to answer reports an error to the host and leaves the line as typed', async () => {
+  const posted: unknown[] = []
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        host: { postMessage: (message: unknown) => posted.push(message) },
+        notes: { postMessage: () => Promise.reject(new Error('The app went away.')) },
+      },
+    },
+  })
+  try {
+    await withEditor('', async (editor) => {
+      const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor })
+        .engine
+      engine.insertText('/', 1)
+      engine.insertText('link to', 1)
+      expect(engine.keyDown({ key: 'Enter' }, 1)).toBe(true)
+      await new Promise((done) => setTimeout(done, 0))
+      expect(posted).toMatchObject([{ type: 'error' }])
+      expect(editor.snapshot().text).toBe('/link to\n')
+    })
+  } finally {
+    delete window.webkit
+  }
+})
+
 test('load takes the focus off the text and focus after it restores it, with CRLF kept', async () =>
   withEditor('One\r\nTwo\r\n', (editor) => {
     editor.focus()
