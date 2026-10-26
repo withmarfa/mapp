@@ -146,6 +146,73 @@ import Observation
     /// Purge needs the server, so it is offered only while the server can be reached.
     var canPurge: Bool { connection == .online }
 
+    /// A view is written through the server at once, so it can be only while the server can be reached.
+    var canEditViews: Bool { connection == .online }
+
+    func createView(_ settings: LibraryViewSettings) async -> LibraryView? {
+        let result = await writingView(.create(settings), failing: String(localized: "Can’t Save View")) { [source] key in
+            try await source.createView(settings, idempotencyKey: key)
+        }
+        guard case .success(let view) = result else { return nil }
+        hold(view)
+        return view
+    }
+
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure> {
+        let renames = change.title != nil && change.query == nil && change.sort == nil && change.group == nil
+        let title = renames ? String(localized: "Can’t Rename View") : String(localized: "Can’t Update View")
+        let result = await writingView(.change(view, change, baseVersion), failing: title) { [source] key in
+            try await source.changeView(view, change, baseVersion: baseVersion, idempotencyKey: key)
+        }
+        switch result {
+        case .success(let changed): hold(changed)
+        // The copy keeps what it held, so the server is asked again for what changed.
+        case .failure(let failure) where failure.kind == .conflict: source.refresh()
+        case .failure: break
+        }
+        return result
+    }
+
+    func deleteView(_ view: ItemID) async -> Bool {
+        let result = await writingView(.delete(view), failing: String(localized: "Can’t Delete View")) { [source] key in
+            try await source.deleteView(view, idempotencyKey: key)
+        }
+        guard case .success = result else { return false }
+        take(views.filter { $0.id != view })
+        return true
+    }
+
+    /// What the server answered is shown at once, before the copy's own word arrives.
+    private func hold(_ view: LibraryView) {
+        take(LibraryView.ordered(views.filter { $0.id != view.id } + [view]))
+    }
+
+    /// The idempotency key of each write that failed for want of the server, so trying it again cannot make it twice
+    /// where the server took it before the answer was lost.
+    @ObservationIgnored private var viewWriteKeys: [ViewWrite: String] = [:]
+
+    private enum ViewWrite: Hashable {
+        case create(LibraryViewSettings)
+        case change(ItemID, LibraryViewChange, Int64)
+        case delete(ItemID)
+    }
+
+    private func writingView<Value>(
+        _ write: ViewWrite, failing title: String, _ send: (String) async throws -> Value
+    ) async -> Result<Value, ViewWriteFailure> {
+        let key = viewWriteKeys[write] ?? UUID().uuidString
+        do {
+            let value = try await send(key)
+            viewWriteKeys[write] = nil
+            return .success(value)
+        } catch {
+            let failure = error as? ViewWriteFailure ?? ViewWriteFailure(kind: .refused, message: error.localizedDescription)
+            viewWriteKeys[write] = failure.kind == .offline ? key : nil
+            notices.tell(title, failure.message)
+            return .failure(failure)
+        }
+    }
+
     /// The server keeps the bin, and its own rules for how long.
     var trashDays: Int? { nil }
 

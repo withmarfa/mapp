@@ -286,6 +286,43 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
+        try await writingView {
+            try await copy.createView(MarfaMapping.viewSettings(settings), idempotencyKey: idempotencyKey)
+        }
+    }
+
+    func changeView(
+        _ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String
+    ) async throws -> LibraryView {
+        try await writingView {
+            try await copy.changeView(
+                view.rawValue, MarfaMapping.viewChange(change), baseVersion: baseVersion, idempotencyKey: idempotencyKey)
+        }
+    }
+
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
+        do {
+            try await MarfaEngine.asking(hub) { try await copy.deleteView(view.rawValue, idempotencyKey: idempotencyKey) }
+        } catch {
+            throw MarfaMapping.viewFailure(error)
+        }
+    }
+
+    /// The copy announces the write, which the engine reads into the views it publishes.
+    private func writingView(_ write: () async throws -> SavedView) async throws -> LibraryView {
+        let saved: SavedView
+        do {
+            saved = try await MarfaEngine.asking(hub, write)
+        } catch {
+            throw MarfaMapping.viewFailure(error)
+        }
+        guard let view = MarfaMapping.view(saved) else {
+            throw ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
+        }
+        return view
+    }
+
     /// Narrowed to `query` by what the copy holds, since the package filters one type at a time and one state at
     /// a time.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] {

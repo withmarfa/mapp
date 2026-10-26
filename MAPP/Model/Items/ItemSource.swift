@@ -75,6 +75,16 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func items(inView view: ItemID) async throws -> [ItemID]
     /// Best match first.
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID]
+
+    // MARK: Views, written to the server at once and never queued
+
+    /// Each throws `ViewWriteFailure`. A write that failed for want of the server is sent again with the same
+    /// `idempotencyKey`, so a request the server took before the answer was lost is not made twice.
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView
+    /// Replaces the settings `change` names, based on the version of the view that was read.
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView
+    /// Deletes the view for good, for every app; a view has no bin.
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
     func queueSubmitted() async
     func close() async

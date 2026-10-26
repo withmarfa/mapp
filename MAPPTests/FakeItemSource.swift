@@ -113,6 +113,65 @@ nonisolated final class FakeItemSource: ItemSource {
         return hits.withLock { $0[text] ?? [] }
     }
 
+    /// The views the fake server holds. A change based on another version than the one held is refused as a
+    /// conflict, as the server refuses one to a setting changed since.
+    let savedViews = Mutex<[ItemID: LibraryView]>([:])
+    /// What every view write throws while set, as a server that cannot be reached would.
+    let viewFailure = Mutex<ViewWriteFailure?>(nil)
+    /// The idempotency key of each view write, in order.
+    let viewKeys = Mutex<[String]>([])
+
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
+        try viewWrite(idempotencyKey)
+        let view = LibraryView(
+            id: ItemID.mint(), title: settings.title, version: 1, query: settings.query, sort: settings.sort, group: settings.group)
+        heldViews { $0[view.id] = view }
+        return view
+    }
+
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView {
+        try viewWrite(idempotencyKey)
+        guard var held = savedViews.withLock({ $0[view] }) else {
+            throw ViewWriteFailure(kind: .gone, message: "The server has no such view.")
+        }
+        guard held.version == baseVersion else {
+            throw ViewWriteFailure(kind: .conflict, message: "The view changed since.")
+        }
+        if let title = change.title { held.title = title }
+        if let query = change.query { held.query = query }
+        if let sort = change.sort { held.sort = sort }
+        switch change.group {
+        case .set(let group): held.group = group
+        case .clear: held.group = nil
+        case nil: break
+        }
+        held.version += 1
+        heldViews { $0[view] = held }
+        return held
+    }
+
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
+        try viewWrite(idempotencyKey)
+        guard savedViews.withLock({ $0[view] }) != nil else {
+            throw ViewWriteFailure(kind: .gone, message: "The server has no such view.")
+        }
+        heldViews { $0[view] = nil }
+    }
+
+    private func viewWrite(_ key: String) throws {
+        viewKeys.withLock { $0.append(key) }
+        if let failure = viewFailure.withLock({ $0 }) { throw failure }
+    }
+
+    /// Tells the reader the views, as the copy's own word on a write does.
+    private func heldViews(_ change: (inout [ItemID: LibraryView]) -> Void) {
+        let views = savedViews.withLock { views in
+            change(&views)
+            return LibraryView.ordered(Array(views.values))
+        }
+        send(.views(views))
+    }
+
     func items(inView view: ItemID) async throws -> [ItemID] {
         viewReads.withLock { $0 += 1 }
         if viewFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The view asks for a type the copy does not hold.") }
@@ -129,7 +188,8 @@ nonisolated final class FakeItemSource: ItemSource {
         continuation.finish()
     }
 
-    func refresh() {}
+    let refreshes = Mutex(0)
+    func refresh() { refreshes.withLock { $0 += 1 } }
     func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck { .accepted }
     func unsentWrites() async -> UnsentWrites? { nil }
 

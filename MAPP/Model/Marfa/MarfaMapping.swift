@@ -28,7 +28,99 @@ nonisolated enum MarfaMapping {
 
     /// A view still in use, as the sidebar lists it.
     static func view(_ view: SavedView) -> LibraryView? {
-        view.state == .revoked ? nil : LibraryView(id: ItemID(view.id), title: view.settings.title, version: view.version)
+        guard view.state != .revoked else { return nil }
+        let settings = view.settings
+        let query = settings.query
+        return LibraryView(
+            id: ItemID(view.id), title: settings.title, version: view.version,
+            query: LibraryViewQuery(
+                types: query.types.map { TypeID($0) },
+                tier: query.tier.flatMap(viewTier),
+                states: query.states.map { Set($0.map(state)) },
+                filter: query.filter, beneath: query.beneath.map { ItemID($0) }),
+            sort: settings.sort.map { LibraryViewSort(field: $0.by, ascending: $0.direction == .ascending) },
+            group: settings.group.map { LibraryViewGroup(field: $0.by, bucket: $0.bucket.map(bucket)) })
+    }
+
+    /// Nil where a view lists both tiers.
+    private static func viewTier(_ tier: SliceTier) -> Tier? {
+        switch tier {
+        case .library: .library
+        case .feed: .feed
+        case .all: nil
+        }
+    }
+
+    private static func bucket(_ bucket: ViewGrouping.Bucket) -> LibraryViewGroup.Bucket {
+        switch bucket {
+        case .day: .day
+        case .week: .week
+        case .month: .month
+        case .year: .year
+        }
+    }
+
+    private static func marfaBucket(_ bucket: LibraryViewGroup.Bucket) -> ViewGrouping.Bucket {
+        switch bucket {
+        case .day: .day
+        case .week: .week
+        case .month: .month
+        case .year: .year
+        }
+    }
+
+    static func viewSettings(_ settings: LibraryViewSettings) -> ViewSettings {
+        ViewSettings(
+            title: settings.title, query: viewQuery(settings.query), sort: settings.sort.map(viewSort),
+            group: settings.group.map(viewGrouping))
+    }
+
+    static func viewChange(_ change: LibraryViewChange) -> ViewSettingsChange {
+        ViewSettingsChange(
+            title: change.title, query: change.query.map(viewQuery), sort: change.sort.map { $0.map(viewSort) },
+            group: change.group.map { grouping in
+                switch grouping {
+                case .set(let group): .set(viewGrouping(group))
+                case .clear: .clear
+                }
+            })
+    }
+
+    private static func viewQuery(_ query: LibraryViewQuery) -> ViewQuery {
+        ViewQuery(
+            types: query.types.map(\.rawValue),
+            tier: query.tier.map { $0 == .feed ? SliceTier.feed : .library },
+            // Ordered, so one query is always sent alike.
+            states: query.states.map { states in [ItemState.active, .archived, .trashed].filter(states.contains).map(marfaState) },
+            filter: query.filter, beneath: query.beneath?.rawValue)
+    }
+
+    private static func viewSort(_ sort: LibraryViewSort) -> ViewSort {
+        ViewSort(by: sort.field, direction: sort.ascending ? .ascending : .descending)
+    }
+
+    private static func viewGrouping(_ group: LibraryViewGroup) -> ViewGrouping {
+        ViewGrouping(by: group.field, bucket: group.bucket.map(marfaBucket))
+    }
+
+    /// The server's refusal of a view write, in words for the person. A view is written at once, so a server that
+    /// cannot be reached saved nothing.
+    static func viewFailure(_ error: any Error) -> ViewWriteFailure {
+        guard let error = error as? MarfaError else {
+            return ViewWriteFailure(kind: .refused, message: error.localizedDescription)
+        }
+        switch error {
+        case .noServer, .network:
+            return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
+        case .server(409, "version_conflict", _):
+            return ViewWriteFailure(kind: .conflict, message: String(localized: "This view was changed elsewhere since this window read it, so nothing was saved. The window now shows the view as it is; make your changes again."))
+        case .notFound:
+            return ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
+        case .forbidden:
+            return ViewWriteFailure(kind: .notPermitted, message: String(localized: "The key MAPP uses can’t change views on your Marfa server."))
+        default:
+            return ViewWriteFailure(kind: .refused, message: error.message)
+        }
     }
 
     // MARK: Catalogue
