@@ -29,6 +29,7 @@ struct ItemTableHoverTests {
         hover.enter(a)
         hover.exit(a)
         hover.enter(b)
+        // Gives the first row's release time to run, to show it does not clear the row now hovered.
         try? await Task.sleep(for: .milliseconds(80))
         #expect(hover.row == b)
     }
