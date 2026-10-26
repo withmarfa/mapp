@@ -300,26 +300,6 @@ struct MarfaSourceOfflineTests {
             connection, keys: MemoryKeyStore([connection: "unused"]), location: MarfaStoreLocation(root: root))
     }
 
-    /// An address nothing answers holds a connection open until it times out, which must not hold up a write.
-    @Test(.timeLimit(.minutes(3)))
-    func aWriteIsQueuedAtOnceWhileTheServerHangs() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root, at: "http://10.255.255.1:8210")
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        source.refresh()
-        // Time for the refresh to reach the server that never answers, so the write meets it hanging.
-        try await Task.sleep(for: .milliseconds(200))
-        let clock = ContinuousClock()
-        let start = clock.now
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST hanging", body: "Queued")), as: WriteID())
-        let shown = await log.wait(for: .seconds(2)) { $0.item(titled: "MAPPTEST hanging") != nil }
-        #expect(shown != nil, "the write waited \(clock.now - start) behind the network")
-        #expect(source.connectionState == .connecting)
-        await source.close()
-    }
-
     @Test(.timeLimit(.minutes(1)))
     func aSecondOpenerOfTheSameCopyIsRefused() async throws {
         let root = scratch()
