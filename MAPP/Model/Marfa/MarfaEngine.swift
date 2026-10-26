@@ -18,6 +18,10 @@ actor MarfaEngine {
         /// The copy's changes have a new stream after the last one ended, so what changed between them was not heard.
         case resumed
         case write(ItemWrite, WriteID)
+        /// A write of an undo or a redo, held where the copy refuses it for being brought up to date (`MarfaEngine+Holding`).
+        case undo(ItemWrite, WriteID, UndoGroup)
+        /// The time a held undo may wait has passed.
+        case holdExpired(UndoGroup)
         case change(Marfa.Change)
         /// Resumed once the answers are taken and forgotten.
         case drained(DrainReport, CheckedContinuation<Void, Never>)
@@ -66,6 +70,22 @@ actor MarfaEngine {
 
     nonisolated static var notCurrent: String {
         String(localized: "This library is being brought up to date. Try again in a moment.")
+    }
+
+    /// The codes of an undo or a redo that was held while the copy was brought up to date and then not made.
+    nonisolated static let heldChangedCode = "undo_changed"
+    nonisolated static let heldTimeoutCode = "undo_timeout"
+
+    nonisolated static func isHeldRefusal(_ code: String) -> Bool {
+        code == heldChangedCode || code == heldTimeoutCode
+    }
+
+    nonisolated static var heldChanged: String {
+        String(localized: "This changed while the library was being brought up to date, so the change wasn’t made.")
+    }
+
+    nonisolated static var heldTimedOut: String {
+        String(localized: "The library is still being brought up to date, so the change wasn’t made.")
     }
 
     nonisolated static var closedLibrary: String {
@@ -141,6 +161,11 @@ actor MarfaEngine {
     /// drain the copy runs itself may have recorded others since, which their own report brings here. Only a verdict
     /// the copy can forget is kept here; a blocked or dead write stays in the queue to be released, and keeps its id.
     var takenAnswers: Set<String> = []
+    /// Writes of an undo or a redo that the copy refused while it was brought up to date, in the order they were
+    /// made, until the copy is whole.
+    var held: [Held] = []
+    /// How long a held undo waits for a copy that is not catching up before it is given back.
+    var holdLimit = Duration.seconds(30)
 
     nonisolated static func canForget(_ verdict: Marfa.Verdict) -> Bool {
         switch verdict {
@@ -165,6 +190,17 @@ actor MarfaEngine {
     /// Run after the queue was last read and before the answers are forgotten, for the tests.
     var forgetting: (@Sendable () async -> Void)?
 
+    /// Chooses the error the copy refuses a write with, for the tests, since a copy made for them is never brought up to date.
+    var refusing: (@Sendable (ItemWrite) -> MarfaError?)?
+
+    func whenRefusing(_ hook: (@Sendable (ItemWrite) -> MarfaError?)?) {
+        refusing = hook
+    }
+
+    func setHoldLimit(_ limit: Duration) {
+        holdLimit = limit
+    }
+
     func whenForgetting(_ hook: (@Sendable () async -> Void)?) {
         forgetting = hook
     }
@@ -185,6 +221,9 @@ actor MarfaEngine {
         for await event in events {
             if closed {
                 if case .write(_, let id) = event {
+                    hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
+                }
+                if case .undo(_, let id, _) = event {
                     hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
                 }
                 if case .flush(let done) = event { done.resume() }
@@ -221,6 +260,8 @@ actor MarfaEngine {
                 // sets the library right again after a fault.
                 await sync.refresh()
             case .write(let write, let id): await perform(write, as: id)
+            case .undo(let write, let id, let group): await perform(write, as: id, holding: group)
+            case .holdExpired(let group): expire(group)
             case .change(let change): await handle(change)
             case .binned(let found, let complete): take(bin: found, complete: complete)
             case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
@@ -273,6 +314,10 @@ actor MarfaEngine {
 
     private func shutDown() async {
         closed = true
+        for entry in held {
+            hub.publish(.answered(entry.id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
+        }
+        held = []
         following?.cancel()
         await sync.stop()
         await downloads.stop()

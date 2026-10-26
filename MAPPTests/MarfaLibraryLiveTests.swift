@@ -208,7 +208,8 @@ extension LiveMarfaTests {
                         && library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
                 #expect(await eventually { library.syncReport.waiting == 0 })
-                // A relationship written while the copy hydrates again is refused until it is whole.
+                // The copy refuses a relationship written while it hydrates again, so the engine holds the Undo and makes
+                // it once, when the copy is whole.
                 try #require(try await rehydrated(after: moving))
                 let undoing = await source.engine.sync.hydrations
                 undo.undo()
