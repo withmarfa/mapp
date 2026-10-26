@@ -50,7 +50,7 @@ struct NoteWindow: View {
     var body: some View {
         Group {
             if let item, !item.isFile {
-                NotePage(item: item, editor: editor, headerDrafts: details)
+                NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .navigationTitle(item.title)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)

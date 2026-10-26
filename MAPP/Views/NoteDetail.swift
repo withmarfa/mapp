@@ -71,6 +71,9 @@ struct NotePage: View {
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
     let headerDrafts: DetailsPresentation
+    /// Whether the page backs the toolbar with glass while text is under it. A window whose toolbar draws its own
+    /// background has no need.
+    var backsToolbar = true
     @State private var bannerHeight: CGFloat = 0
 
     var body: some View {
@@ -80,7 +83,7 @@ struct NotePage: View {
                 NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
                     .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts, containerTop: proxy.safeAreaInsets.top))
-                ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: editor.isContentUnderToolbar)
+                ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: backsToolbar && editor.isContentUnderToolbar)
                 VStack(spacing: 0) {
                     if item.state == .trashed {
                         DeletedNoteBanner(id: item.id)
