@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// The sample library the UI tests and screenshots use, over the package's fake working copy, which answers every
-/// write as soon as it is queued.
+/// The sample library the UI tests and screenshots use, over the package's fake working copy, which answers the
+/// writes it holds when it is flushed.
 @MainActor
 @Suite struct SampleLibraryTests {
     private static func loaded() async throws -> (MarfaLibrary, MarfaSource) {
@@ -22,6 +22,7 @@ import Testing
             typeID: "core.note", title: "Call the plumber", body: "Ask about the leak under the sink.", parentID: nil,
             in: .allNotes, undoManager: nil))
         let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
+        await source.flush()
         try #require(await eventually {
             library.body(of: id)?.version == ItemVersion(1) && library.syncReport.waiting == 0
         })
