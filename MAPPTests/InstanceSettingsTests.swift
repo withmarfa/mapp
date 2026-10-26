@@ -267,6 +267,27 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.canSave)
     }
 
+    @Test func aChangeAgreedToForOneServerIsNotSentToAnotherThatReplacedIt() async {
+        let first = FakeInstanceConfig([.trashRetentionDays: .number(60)])
+        let second = FakeInstanceConfig([.trashRetentionDays: .number(60)])
+        var current = (id: "one", source: first)
+        let model = InstanceSettingsModel { .init(id: current.id, source: current.source) }
+        await model.load()
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        let pending = try? #require(model.pending)
+
+        // The dialog is open when the connection moves to another server.
+        current = (id: "two", source: second)
+        if let pending { await model.confirm(pending) }
+
+        #expect(first.sent.isEmpty)
+        #expect(second.sent.isEmpty)
+        #expect(model.loaded == nil)
+        #expect(model.draft.isEmpty)
+        #expect(!model.isSaving)
+    }
+
     @Test func anotherServerStartsFromNothing() async {
         let first = FakeInstanceConfig([.name: .text("One")])
         let second = FakeInstanceConfig([.name: .text("Two")])

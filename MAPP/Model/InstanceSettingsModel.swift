@@ -199,7 +199,9 @@ import Observation
     }
 
     private func send(_ patch: InstanceConfigPatch) async {
-        guard let target = adopt(), !isSaving else { return }
+        // A patch made for the server the page was reading is never sent to another one that has replaced it.
+        let before = generation
+        guard let target = adopt(), generation == before, !isSaving else { return }
         let generation = generation
         isSaving = true
         failure = nil
