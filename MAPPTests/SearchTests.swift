@@ -136,6 +136,81 @@ import Testing
         #expect(await eventually { library.search("body", in: .everywhere).isCapped })
     }
 
+    @Test func aCapNoticeCountsTheRowsShownNotTheLimit() async throws {
+        let (library, source) = try await loaded()
+        // The copy cuts its list at the limit before the bin's items are dropped from it, so fewer rows can show.
+        source.hits.withLock { $0["body"] = [F.n1, F.n3, F.p1] }
+        source.searchCapped.withLock { $0 = true }
+        #expect(await eventually { library.search("body", in: .everywhere).cappedCount != nil })
+        let found = library.search("body", in: .everywhere)
+        #expect(found.items.map(\.id) == [F.n1, F.p1])
+        #expect(found.cappedCount == found.items.count)
+
+        source.searchCapped.withLock { $0 = false }
+        var renamed = try #require(library.item(F.n2))
+        renamed.title = "Other"
+        source.send(.upserted([renamed]))
+        #expect(await eventually { library.search("body", in: .everywhere).cappedCount == nil })
+    }
+
+    @Test func aSearchThatBeganWholeButFoundTheCopyStaleIsAskedAgainWhenItsFillChanges() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["body"] = [F.n1] }
+        source.searchIncomplete.withLock { $0 = true }
+        #expect(await eventually { library.search("body", in: .everywhere).isIncomplete })
+
+        // A copy that stays stale is not searched again and again.
+        let asked = source.searches.withLock { $0 }
+        for _ in 0..<5 {
+            _ = library.search("body", in: .everywhere)
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(source.searches.withLock { $0 } == asked, "gives the running search time to be asked again")
+
+        source.searchIncomplete.withLock { $0 = false }
+        source.report.update { $0.fill = LibraryFill(state: .updating, listed: 9, expected: 9) }
+        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
+        #expect(await eventually {
+            let found = library.search("body", in: .everywhere)
+            return !found.isIncomplete && !found.isPending
+        })
+    }
+
+    @Test func aRerunThatFailsFollowsHowTheCopyStandsNotTheOldAnswer() async throws {
+        let (library, source) = try await loaded(filling: true)
+        source.hits.withLock { $0["body"] = [F.n1] }
+        source.searchIncomplete.withLock { $0 = true }
+        #expect(await eventually { library.search("body", in: .everywhere).isIncomplete })
+
+        source.searchFails.withLock { $0 = true }
+        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
+        #expect(await eventually {
+            let found = library.search("body", in: .everywhere)
+            return !found.isIncomplete && library.notices.waiting.last?.title == String(localized: "Can’t Search")
+        })
+        #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
+    }
+
+    @Test func aFailedSearchNeverShowsAnotherQuerysOrScopesHits() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["body"] = [F.n1] }
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1] })
+
+        source.searchFails.withLock { $0 = true }
+        // Another query, which the list shows the earlier hits for only while it waits.
+        #expect(await eventually {
+            let found = library.search("other", in: .everywhere)
+            return !found.isPending
+        })
+        #expect(library.search("other", in: .everywhere).items.isEmpty)
+        // The same query in another scope.
+        #expect(await eventually { !library.search("body", in: .place(.inbox)).isPending })
+        #expect(library.search("body", in: .place(.inbox)).items.isEmpty)
+        #expect(library.notices.waiting.last?.title == String(localized: "Can’t Search"))
+        // Its own earlier answer stands.
+        #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])
+    }
+
     @Test func aPlaceIsSearchedByTheQueryItStandsFor() async throws {
         let (library, source) = try await loaded()
         _ = library.search("body", in: .place(.inbox))

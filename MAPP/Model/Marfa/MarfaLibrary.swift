@@ -130,16 +130,14 @@ import Observation
         var running: Bool
         /// Whether the copy has answered this search yet.
         var answered = false
-        /// Whether the copy was whole when the search began, so one that began while it filled and found it
-        /// incomplete is asked again once it is whole, and one that began whole is never asked again for that.
-        var beganWhole: Bool
+        /// How the copy was filling when the search was asked. A search that found the copy incomplete is asked
+        /// again when this has changed, since the copy may be whole now, and not before, since a copy that stays
+        /// stale (offline, say) would otherwise be searched again and again.
+        var fill: LibraryFill?
     }
 
     /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
-
-    /// Whether the copy is not filling or catching up, so a search of it misses nothing it will hold.
-    private var copyIsWhole: Bool { syncReport.fill.map { $0.state == .complete } ?? true }
 
     init(source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil, now: @escaping () -> Date = Date.init) {
         self.source = source
@@ -663,19 +661,20 @@ import Observation
 
     /// Answers from the copy's own search, which runs beside the views: until it returns, the last results stand,
     /// and the views are told when the new ones arrive. A change to the items runs the search again, and so does
-    /// the copy becoming whole after a search that found it incomplete.
+    /// a change in how the copy is filling after a search that found it incomplete, so the notice follows the
+    /// latest answer.
     func search(_ query: String, in scope: SearchScope) -> SearchResults {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return .none }
         _ = searchRevision
         let key = SearchKey(query: query, scope: scope)
         let revision = contentRevision
-        let whole = copyIsWhole
+        let fill = syncReport.fill
         let held = searches[key]
         let outdated = held.map { run in
-            !run.running && (run.revision != revision || (run.found.isIncomplete && !run.beganWhole && whole))
+            !run.running && (run.revision != revision || (run.found.isIncomplete && run.fill != fill))
         } ?? true
-        if outdated { startSearch(key, at: revision, whole: whole) }
+        if outdated { startSearch(key, at: revision, fill: fill) }
         let answered = held?.answered ?? false
         let ids = answered ? held?.found.hits ?? [] : lastFound
         var results = SearchResults(isIncomplete: held?.found.isIncomplete ?? false, isCapped: held?.found.isCapped ?? false)
@@ -701,10 +700,11 @@ import Observation
         return .items(narrowed, filter: query.filter)
     }
 
-    /// A search that fails keeps the results already shown and says why, rather than showing that nothing was
-    /// found; it is not asked again until the items change.
-    private func startSearch(_ key: SearchKey, at revision: Int, whole: Bool) {
-        searches[key, default: SearchRun(revision: revision, running: true, beganWhole: whole)].running = true
+    /// A search that fails keeps the results already shown for the same words and place and says why, rather than
+    /// showing that nothing was found, and shows nothing where it has none; it is not asked again until the items
+    /// change.
+    private func startSearch(_ key: SearchKey, at revision: Int, fill: LibraryFill?) {
+        searches[key, default: SearchRun(revision: revision, running: true, fill: fill)].running = true
         searchOrder.removeAll { $0 == key }
         searchOrder.append(key)
         while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
@@ -719,13 +719,14 @@ import Observation
             guard let self else { return }
             switch found {
             case .success(let result):
-                searches[key] = SearchRun(revision: revision, found: result, running: false, answered: true, beganWhole: whole)
+                searches[key] = SearchRun(revision: revision, found: result, running: false, answered: true, fill: fill)
                 lastFound = result.hits
             case .failure(let error):
-                let held = searches[key]
-                searches[key] = SearchRun(
-                    revision: revision, found: held?.answered == true ? held?.found ?? SourceSearch() : SourceSearch(hits: lastFound),
-                    running: false, answered: true, beganWhole: whole)
+                // Only this search's own earlier answer is kept; another's hits would be shown as this one's. A failure
+                // says nothing of completeness, so the notice follows how the copy stands now.
+                var kept = searches[key].flatMap { $0.answered ? $0.found : nil } ?? SourceSearch()
+                kept.isIncomplete = syncReport.fill.map { $0.state != .complete } ?? false
+                searches[key] = SearchRun(revision: revision, found: kept, running: false, answered: true, fill: fill)
                 notices.tell(String(localized: "Can’t Search"), error.localizedDescription)
             }
             searchRevision += 1

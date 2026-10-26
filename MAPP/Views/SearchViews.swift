@@ -26,7 +26,7 @@ struct SearchStatusBar: View {
     var body: some View {
         let results = browser.searchResults(in: library)
         let offersScope = SearchScope.narrows(browser.item)
-        if offersScope || results?.isIncomplete == true || results?.isCapped == true {
+        if offersScope || results?.isIncomplete == true || results?.cappedCount != nil {
             VStack(alignment: .leading, spacing: 6) {
                 if offersScope {
                     Picker("Search Scope", selection: $browser.searchesPlace) {
@@ -41,8 +41,8 @@ struct SearchStatusBar: View {
                     Text("Still loading your items, so these results may be incomplete.")
                         .accessibilityIdentifier("SearchIncomplete")
                 }
-                if results?.isCapped == true {
-                    Text("Showing the first \(SearchResults.limit) results.")
+                if let shown = results?.cappedCount {
+                    Text("Showing the first \(shown) results.")
                         .accessibilityIdentifier("SearchCapped")
                 }
             }

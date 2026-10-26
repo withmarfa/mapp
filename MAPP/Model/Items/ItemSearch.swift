@@ -172,8 +172,14 @@ nonisolated struct SearchResults: Sendable {
     /// The excerpt of each item that has one still true of it.
     var excerpts: [ItemID: SearchExcerpt] = [:]
     var isIncomplete = false
+    /// The copy found more than it listed.
     var isCapped = false
     /// This search has not been answered yet, so what is listed is what an earlier one found and an empty list
     /// says nothing.
     var isPending = false
+
+    /// How many results the list shows where the copy found more than it listed, for the notice that says so. The
+    /// copy cuts its list before the items in the bin are dropped from it, so this counts what is shown, not the
+    /// most the copy lists.
+    var cappedCount: Int? { isCapped && !items.isEmpty ? items.count : nil }
 }
