@@ -1,6 +1,14 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Open %lld windows?" : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "Open %lld window?" } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "Open %lld windows?" } }
+  } } } }
+},
+"Each item opens in a window of its own." : { "extractionState" : "manual" },
 "%lld items are collections, which can’t be in another collection." : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {

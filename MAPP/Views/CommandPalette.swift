@@ -268,7 +268,7 @@ struct CommandPalette: View {
         }
         if !browser.selection.isEmpty {
             add(String(localized: "Open in New Window"), "macwindow", "⌘O") {
-                for id in library.idsForWindows(browser.selection) { openWindow(value: id) }
+                ItemWindows.open(library.idsForWindows(browser.selection)) { openWindow(value: $0) }
             }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil

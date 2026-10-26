@@ -254,7 +254,7 @@ private struct MoreMenu: View {
         Menu("More", systemImage: "ellipsis") {
             if browser != nil {
                 Button("Open in New Window", systemImage: "macwindow") {
-                    for id in library.idsForWindows(ids) { openWindow(value: id) }
+                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
                 }
                 .keyboardShortcut("o")
                 .disabled(ids.isEmpty)

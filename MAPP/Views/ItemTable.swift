@@ -96,7 +96,7 @@ struct ItemTable: View {
                 Button("Open") { open(ids) }
                     .disabled(ids.count != 1)
                 Button("Open in New Window", systemImage: "macwindow") {
-                    for id in library.idsForWindows(ids) { openWindow(value: id) }
+                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
                 }
                 Divider()
                 NoteActions(ids: ids, undoManager: undoManager)

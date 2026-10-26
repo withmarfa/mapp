@@ -91,7 +91,7 @@ struct NoteList: View {
         .contextMenu(forSelectionType: ItemID.self) { ids in
             NoteActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            for id in library.idsForWindows(ids) { openWindow(value: id) }
+            ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
         }
         .overlay {
             if ids.isEmpty {

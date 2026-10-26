@@ -35,7 +35,7 @@ struct AppCommands: Commands {
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
             Button("Open in New Window", systemImage: "macwindow") {
-                for id in library?.idsForWindows(ids) ?? [] { openWindow(value: id) }
+                ItemWindows.open(library?.idsForWindows(ids) ?? []) { openWindow(value: $0) }
             }
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)

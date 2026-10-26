@@ -192,7 +192,7 @@ struct ItemGallery: View {
             let selected = browser.selection.contains(item.id) ? browser.selection : [item.id]
             Button("Open") { browser.selection = [item.id]; browser.openCollectionSelection() }
             Button("Open in New Window", systemImage: "macwindow") {
-                for id in library.idsForWindows(selected) { openWindow(value: id) }
+                ItemWindows.open(library.idsForWindows(selected)) { openWindow(value: $0) }
             }
             Divider()
             NoteActions(ids: selected, undoManager: undoManager)
