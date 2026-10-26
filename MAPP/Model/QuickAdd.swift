@@ -59,6 +59,12 @@ final class QuickAdd {
         deinit { if scoped { url.stopAccessingSecurityScopedResource() } }
     }
 
+    /// A detail of the item the panel shows as a chip under its text: its parent, or one of its kind's fields.
+    enum Chip: Hashable {
+        case parent
+        case field(String)
+    }
+
     struct Draft: Equatable {
         var typeID: String
         var title = ""
@@ -67,6 +73,9 @@ final class QuickAdd {
         var caret: Int?
         var properties: [String: PropertyValue] = [:]
         var parentID: ItemID?
+        /// The chips the person added, in the order they were added, whether or not they hold a value yet. A
+        /// required field is always shown, so it is not listed here.
+        var chips: [Chip] = []
         /// For a file, the file; for any other kind, the files attached to the item once it is made.
         var files: [File] = []
 
@@ -85,6 +94,28 @@ final class QuickAdd {
         }
 
         private func isBlank(_ text: String) -> Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+        /// Shows a chip, after the ones already shown.
+        mutating func add(_ chip: Chip) {
+            if !chips.contains(chip) { chips.append(chip) }
+        }
+
+        /// Puts the item under `parent` and shows the chip for it.
+        mutating func setParent(_ parent: ItemID) {
+            parentID = parent
+            add(.parent)
+        }
+
+        /// Takes a chip away with the value it holds. A required field stays, since the item cannot be added
+        /// without it.
+        mutating func remove(_ chip: Chip, in catalogue: Catalogue) {
+            guard QuickAdd.isRemovable(chip, typeID: typeID, in: catalogue) else { return }
+            chips.removeAll { $0 == chip }
+            switch chip {
+            case .parent: parentID = nil
+            case .field(let key): properties[key] = nil
+            }
+        }
     }
 
     var draft: Draft?
@@ -143,30 +174,6 @@ final class QuickAdd {
 
     /// The defaults key for the kind last added, which a new draft starts with.
     static let lastTypeKey = "quickAddLastType"
-    /// The defaults key for the fields kept showing in the panel, for each library and kind.
-    static let pinsKey = "quickAddPinnedFields"
-
-    /// The fields kept showing, by library then kind, as the defaults hold them.
-    typealias Pins = [String: [String: [String]]]
-
-    static func pins(from text: String) -> Pins {
-        (try? JSONDecoder().decode(Pins.self, from: Data(text.utf8))) ?? [:]
-    }
-
-    static func text(of pins: Pins) -> String {
-        (try? JSONEncoder().encode(pins)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    }
-
-    /// The pins with `key` kept showing, or no longer, for `typeID` in `library`.
-    static func pinning(_ key: String, _ pinned: Bool, typeID: String, library: String, in pins: Pins) -> Pins {
-        var pins = pins
-        var keys = pins[library]?[typeID] ?? []
-        keys.removeAll { $0 == key }
-        if pinned { keys.append(key) }
-        pins[library, default: [:]][typeID] = keys.isEmpty ? nil : keys
-        if pins[library]?.isEmpty == true { pins[library] = nil }
-        return pins
-    }
 
     /// The sidebar's types in its order, groups opened.
     static func typeIDs(of nodes: [TypeNode]) -> [TypeID] {
@@ -204,6 +211,44 @@ final class QuickAdd {
             guard field.key != info.titleKey, field.key != info.bodyKey else { return false }
             if case .other = field.kind { return false }
             return true
+        }
+    }
+
+    /// The chips the panel shows for a draft: the kind's required fields first, then what the person added in the
+    /// order added, then any value or parent the draft holds that was not added by hand. A field the kind does
+    /// not have is never shown.
+    static func shownChips(_ draft: Draft, in catalogue: Catalogue) -> [Chip] {
+        let fields = fields(of: draft.typeID, in: catalogue)
+        let keys = Set(fields.map(\.key))
+        var shown = fields.filter(\.required).map { Chip.field($0.key) }
+        for chip in draft.chips where !shown.contains(chip) {
+            switch chip {
+            case .parent: if draft.parentID != nil { shown.append(chip) }
+            case .field(let key): if keys.contains(key) { shown.append(chip) }
+            }
+        }
+        if draft.parentID != nil, !shown.contains(.parent) { shown.append(.parent) }
+        for field in fields where draft.properties[field.key].map({ $0 != .null }) == true && !shown.contains(.field(field.key)) {
+            shown.append(.field(field.key))
+        }
+        return shown
+    }
+
+    /// What the add menu lists besides attaching a file: the parent, where the kind can have one and the draft
+    /// has none, then the kind's fields that are not shown, in the catalogue's order.
+    static func offeredChips(_ draft: Draft, in catalogue: Catalogue, canHaveParent: Bool) -> [Chip] {
+        let shown = shownChips(draft, in: catalogue)
+        var offered: [Chip] = []
+        if canHaveParent, !shown.contains(.parent) { offered.append(.parent) }
+        offered += fields(of: draft.typeID, in: catalogue).map { Chip.field($0.key) }.filter { !shown.contains($0) }
+        return offered
+    }
+
+    /// Whether the person can take a chip away: all but a required field.
+    static func isRemovable(_ chip: Chip, typeID: String, in catalogue: Catalogue) -> Bool {
+        switch chip {
+        case .parent: true
+        case .field(let key): fields(of: typeID, in: catalogue).first { $0.key == key }?.required != true
         }
     }
 
@@ -273,8 +318,8 @@ extension Browser {
         quickAdd.isPresented = true
     }
 
-    /// Changes the kind of item, keeping what was typed and the files given. A place or property the new kind
-    /// cannot take is dropped.
+    /// Changes the kind of item, keeping what was typed and the files given. A place, property or chip the new
+    /// kind cannot take is dropped.
     func chooseQuickAddType(_ typeID: String, in library: any ItemLibrary) {
         guard var draft = quickAdd.draft else { return }
         draft.typeID = typeID
@@ -282,6 +327,12 @@ extension Browser {
         draft.properties = draft.properties.filter { keys.contains($0.key) }
         if let parent = draft.parentID, !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parent }) {
             draft.parentID = nil
+        }
+        draft.chips = draft.chips.filter { chip in
+            switch chip {
+            case .parent: draft.parentID != nil
+            case .field(let key): keys.contains(key)
+            }
         }
         quickAdd.draft = draft
     }

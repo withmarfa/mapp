@@ -527,14 +527,140 @@ struct QuickAddTests {
         #expect(QuickAdd.kindMenu(types, shown: [], chosen: nil).first.map(\.id.rawValue) == ["core.note", TypeID.file.rawValue])
     }
 
-    @Test func pinnedFieldsAreKeptForEachLibraryAndKind() {
-        var pins = QuickAdd.pinning("priority", true, typeID: "core.task", library: "a", in: [:])
-        pins = QuickAdd.pinning("due_at", true, typeID: "core.task", library: "a", in: pins)
-        pins = QuickAdd.pinning("priority", true, typeID: "core.task", library: "b", in: pins)
-        let read = QuickAdd.pins(from: QuickAdd.text(of: pins))
-        #expect(read["a"]?["core.task"] == ["priority", "due_at"])
-        #expect(QuickAdd.pinning("priority", false, typeID: "core.task", library: "b", in: read)["b"] == nil)
-        #expect(QuickAdd.pins(from: "").isEmpty)
+    // MARK: Chips
+
+    /// A kind with a required field, a field that is not, and one the panel never offers.
+    private static let chipCatalogue: Catalogue = {
+        let type = TypeID("test.ticket")
+        return Catalogue(
+            itemTypes: [
+                ItemTypeInfo(
+                    id: type, label: "Ticket",
+                    fields: [
+                        .init(key: "title", label: "Title", kind: .text, declaredBy: type, required: true),
+                        .init(key: "reference", label: "Reference", kind: .text, declaredBy: type, required: true),
+                        .init(key: "priority", label: "Priority", kind: .choice(["high", "low"]), declaredBy: type),
+                        .init(key: "due_at", label: "Due At", kind: .date(includesTime: false), declaredBy: type),
+                        .init(key: "labels", label: "Labels", kind: .other, declaredBy: type),
+                    ],
+                    titleField: "title", bodyField: "body", parent: nil),
+                ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: "title", bodyField: "body", parent: nil),
+            ],
+            edgeTypes: [])
+    }()
+
+    @Test func aRequiredFieldIsAlwaysAChipAndOthersAppearOnlyOnceAdded() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference")])
+        draft.add(.field("due_at"))
+        draft.add(.field("priority"))
+        draft.add(.field("due_at"))
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference"), .field("due_at"), .field("priority")])
+    }
+
+    @Test func thePlusOffersTheParentAndEveryFieldNotYetAChip() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        #expect(
+            QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true)
+                == [.parent, .field("priority"), .field("due_at")])
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false) == [.field("priority"), .field("due_at")])
+
+        draft.add(.field("priority"))
+        draft.setParent(ItemID.mint())
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.field("due_at")])
+    }
+
+    @Test func aKindWithNoFieldsOffersOnlyTheParent() {
+        let draft = QuickAdd.Draft(typeID: "core.note")
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: true) == [.parent])
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false).isEmpty)
+    }
+
+    @Test func aRequiredChipCannotBeRemovedAndAnotherTakesItsValueWithIt() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.properties = ["reference": .string("T-1"), "priority": .string("high")]
+        draft.add(.field("priority"))
+        draft.remove(.field("reference"), in: Self.chipCatalogue)
+        #expect(draft.properties["reference"] == .string("T-1"))
+        #expect(!QuickAdd.isRemovable(.field("reference"), typeID: "test.ticket", in: Self.chipCatalogue))
+
+        draft.remove(.field("priority"), in: Self.chipCatalogue)
+        #expect(draft.properties["priority"] == nil)
+        #expect(!QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.field("priority")))
+        #expect(QuickAdd.offeredChips(draft, in: Self.chipCatalogue, canHaveParent: false).contains(.field("priority")))
+    }
+
+    @Test func removingTheParentChipTakesTheParentAway() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.setParent(ItemID.mint())
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.parent))
+        draft.remove(.parent, in: Self.chipCatalogue)
+        #expect(draft.parentID == nil)
+        #expect(!QuickAdd.shownChips(draft, in: Self.chipCatalogue).contains(.parent))
+    }
+
+    @Test func aValueTheDraftHoldsShowsAsAChipEvenIfNoneWasAdded() {
+        var draft = QuickAdd.Draft(typeID: "test.ticket")
+        draft.properties = ["due_at": .string("2026-10-26")]
+        #expect(QuickAdd.shownChips(draft, in: Self.chipCatalogue) == [.field("reference"), .field("due_at")])
+    }
+
+    @Test func chipsSurviveThePanelBeingPutAwayAndComeBackWithTheDraft() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.title = "Kept"
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.add(.field("assignee"))
+        browser.putAwayQuickAdd()
+        browser.openQuickAdd(in: library)
+        #expect(browser.quickAdd.draft?.chips == [.field("priority"), .field("assignee")])
+        #expect(QuickAdd.shownChips(browser.quickAdd.draft!, in: library.catalogue) == [.field("priority"), .field("assignee")])
+    }
+
+    @Test func changingTheKindDropsTheChipsTheNewKindCannotShow() {
+        let library = FakeItemLibrary(now: start)
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        library.items.append(project)
+        library.parentCandidates["core.task"] = [project.id]
+        library.parentCandidates["test.project"] = [project.id]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.setParent(project.id)
+
+        browser.chooseQuickAddType("test.project", in: library)
+        #expect(browser.quickAdd.draft?.chips == [.parent])
+        #expect(browser.quickAdd.draft?.parentID == project.id)
+
+        browser.chooseQuickAddType("core.note", in: library)
+        #expect(browser.quickAdd.draft?.chips.isEmpty == true)
+        #expect(browser.quickAdd.draft?.parentID == nil)
+    }
+
+    @Test func anItemIsMadeWithTheValuesAndParentOfItsChips() async throws {
+        let library = FakeItemLibrary(now: start)
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        library.items.append(project)
+        library.parentCandidates["core.task"] = [project.id]
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.title = "Plan"
+        browser.quickAdd.draft?.add(.field("priority"))
+        browser.quickAdd.draft?.properties["priority"] = .string("low")
+        browser.quickAdd.draft?.add(.field("assignee"))
+        browser.quickAdd.draft?.setParent(project.id)
+        browser.quickAdd.draft?.remove(.field("assignee"), in: library.catalogue)
+        let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
+
+        let item = try #require(library.item(id))
+        #expect(item.value(of: "priority") == .string("low"))
+        #expect(item.value(of: "assignee") == nil)
+        #expect(item.parentID == project.id)
     }
 
     // MARK: Waiting for the library
