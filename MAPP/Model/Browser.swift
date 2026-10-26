@@ -157,8 +157,8 @@ final class Browser {
     }
 
     /// Shows the note a link in the page names, as choosing it in the list does: the window's place, search, undo
-    /// and the rest of its state are left as they are unless the note is not in the list, which then shows All Items.
-    /// The keyboard stays with the page, as it does when a link is followed anywhere.
+    /// and the rest of its state are left as they are unless the note is not in the list, which then shows the place
+    /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: NoteOrder) {
         reveal(item, in: library, order: order)
         if !usesCollection { focusRequest = .page }
