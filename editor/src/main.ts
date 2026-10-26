@@ -125,10 +125,6 @@ window.addEventListener(
   { capture: true },
 )
 
-// A selection in a window in the background is drawn grey, as the system draws it.
-window.addEventListener('blur', () => document.documentElement.classList.add('inactive'))
-window.addEventListener('focus', () => document.documentElement.classList.remove('inactive'))
-
 let generation = 0
 // The toolbar shows the title once the header has gone under it; the app hears only when that changes. A page
 // with no header to show, as for a deleted note, has its title there from the start.
