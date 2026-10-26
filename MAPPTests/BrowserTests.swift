@@ -74,7 +74,7 @@ struct BrowserTests {
     @Test func everySettingsPageIsListedOnceAndNamed() {
         #expect(SettingsPage.groups.flatMap { $0 } == SettingsPage.allCases)
         #expect(Set(SettingsPage.allCases.map(\.title)).count == SettingsPage.allCases.count)
-        #expect(SettingsPage.allCases.allSatisfy { !$0.summary.isEmpty && !$0.symbol.isEmpty })
+        #expect(SettingsPage.allCases.allSatisfy { !$0.symbol.isEmpty })
     }
 
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {

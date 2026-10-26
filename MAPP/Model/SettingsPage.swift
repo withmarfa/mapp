@@ -20,17 +20,6 @@ nonisolated enum SettingsPage: String, CaseIterable, Identifiable, Hashable, Sen
         }
     }
 
-    /// The one line under the page's heading.
-    var summary: String {
-        switch self {
-        case .appearance: String(localized: "How text and lists look.")
-        case .editor: String(localized: "How a page looks while you write.")
-        case .sidebar: String(localized: "What the sidebar shows, and in what order.")
-        case .library: String(localized: "Where your notes are kept.")
-        case .about: String(localized: "The app, and the library it’s reading.")
-        }
-    }
-
     var symbol: String {
         switch self {
         case .appearance: "paintpalette"

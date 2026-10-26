@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// One page of Settings: a title with a line under it, then the page's grouped form, centered in a column that
+/// One page of Settings: its title, then the page's grouped form, centered in a column that
 /// stays readable however wide the window is. The whole page scrolls as one.
 struct SettingsPageView: View {
     let page: SettingsPage
@@ -30,25 +30,19 @@ struct SettingsPageView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(page.title)
-                .interfaceFont(.title.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
-            Text(page.summary)
-                .interfaceFont(.body)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, Self.headerInset)
-        .padding(.top, 32)
-        .padding(.bottom, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        Text(page.title)
+            .interfaceFont(.title.weight(.semibold))
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, Self.headerInset)
+            .padding(.top, 32)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Where a grouped form starts its text: the form's own margin, then the section's inset.
     private static let headerInset: CGFloat = 30
 
-@ViewBuilder private var content: some View {
+    @ViewBuilder private var content: some View {
         switch page {
         case .appearance: AppearanceSettings()
         case .editor: EditorSettings()
@@ -113,15 +107,20 @@ enum LibraryDescription {
     }
 }
 
+/// What the app is, the library it reads and where to find the project, as the About window of a Mac app gives them.
 private struct AboutSettings: View {
     @Environment(Libraries.self) private var libraries
+
+    private static let source = URL(string: "https://github.com/withmarfa/mapp")!
+    private static let license = URL(string: "https://github.com/withmarfa/mapp/blob/main/LICENSE")!
+    private static let docs = URL(string: "https://docs.marfa.so")!
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 4) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
-                    .frame(width: 112, height: 112)
+                    .frame(width: 64, height: 64)
                     .accessibilityHidden(true)
                     .padding(.bottom, 8)
                 Text(Self.name)
@@ -129,16 +128,24 @@ private struct AboutSettings: View {
                 Text("Version \(Self.version)")
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                Text("A notes app for Marfa.")
+                Text("A notes app for your Marfa server.")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            .padding(.vertical, 16)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("AboutApp")
             Form {
+                if let connection = libraries.host.configuredConnection {
+                    Section("Library") {
+                        LabeledContent("Name", value: LibraryDescription.name(libraries))
+                        LabeledContent("Address", value: connection.address.absoluteString)
+                    }
+                }
                 Section {
-                    LabeledContent("Library", value: LibraryDescription.name(libraries))
+                    LabeledContent("Source") { Link("github.com/withmarfa/mapp", destination: Self.source) }
+                    LabeledContent("Marfa") { Link("docs.marfa.so", destination: Self.docs) }
+                    LabeledContent("License") { Link("Apache-2.0", destination: Self.license) }
                 }
             }
             .settingsForm()

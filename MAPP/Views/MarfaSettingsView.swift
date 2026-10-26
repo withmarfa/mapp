@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// The connection sections of the Library page: the server the app reads from, and the key. How the connection
-/// stands is told by the summary at the top of the page. The sections go in the page's grouped form.
+/// The connection sections of the Library page: the key and the other server while connected, and the address and key
+/// to connect with otherwise. How the connection stands is told by the server section above. The sections go in the
+/// page's grouped form.
 struct MarfaSettingsView: View {
     @Bindable var model: MarfaSettingsModel
 
@@ -35,7 +36,7 @@ struct MarfaSettingsView: View {
                     if model.isWorking { ProgressView().controlSize(.small) }
                 }
             } header: {
-                Text("Marfa Server")
+                Text("Server")
             } footer: {
                 Text("Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again.")
             }
@@ -47,12 +48,7 @@ struct MarfaSettingsView: View {
 
     private func connected(to connection: MarfaConnection) -> some View {
         Group {
-            // The page's summary already names the server, so only what it does not say is listed here.
-            if let waiting = host.waitingChanges, waiting > 0 {
-                Section {
-                    LabeledContent("Waiting to Send") { Text(Words.changes(waiting)).foregroundStyle(.secondary) }
-                }
-            }
+            // The server section above names the server and what waits, so only the key and the other server are here.
             keySection
             notice
             otherServer
@@ -63,16 +59,16 @@ struct MarfaSettingsView: View {
 
     private var keySection: some View {
         Section {
-            SecureField("New Key", text: $model.newKey, prompt: Text("Paste a new key"))
+            SecureField("New key", text: $model.newKey, prompt: Text("Paste a new key"))
                 .accessibilityIdentifier("MarfaNewKey")
             Button(isKeyRefused ? "Use New Key" : "Replace Key") { Task { await model.replaceKey() } }
                 .disabled(!model.canReplaceKey)
                 .accessibilityIdentifier("MarfaReplaceKey")
         } header: {
-            Text(isKeyRefused ? "Key refused" : "Key")
+            Text(isKeyRefused ? "Key not accepted" : "Key")
         } footer: {
             if isKeyRefused {
-                Text("The server doesn’t accept your key. Changes you make are kept on this Mac and sent once a key works.")
+                Text("The server doesn’t accept your key. Your changes stay on this Mac until a key works.")
             } else {
                 Text("MAPP keeps the key in your Keychain and doesn’t show it again.")
             }
@@ -81,7 +77,7 @@ struct MarfaSettingsView: View {
 
     private var otherServer: some View {
         Section {
-            DisclosureGroup("Use a Different Server") {
+            DisclosureGroup("Use a different server") {
                 TextField("Address", text: $model.otherAddress, prompt: Text("https://marfa.example.com"))
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("MarfaOtherAddress")
