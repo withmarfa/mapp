@@ -74,4 +74,19 @@ import Testing
         let members = library.relationships(for: ItemID("collection-home")).first { $0.field == "inverse:in-collection" }
         #expect(members?.label == "Contents")
     }
+
+    /// The sample's views are held by the fake copy and read through it, as a real copy's are, so one made here lists
+    /// its items when opened.
+    @Test func aViewMadeOnTheSampleListsItsItems() async throws {
+        let (library, _) = try await Self.loaded()
+        #expect(library.views.map(\.title).sorted() == ["Recent Notes", "Tasks by Priority"])
+        let notes = Set(library.items(in: .allNotes).filter { $0.type == TypeID("core.note") }.map(\.id))
+        let made = try #require(await library.createView(LibraryViewSettings(
+            title: "Only Notes",
+            query: LibraryViewQuery(types: [TypeID("core.note")], states: [.active]),
+            sort: [LibraryViewSort(field: "updated_at", ascending: false)])))
+        #expect(await eventually { Set(library.items(in: .view(made.id)).map(\.id)) == notes })
+        #expect(!notes.isEmpty)
+        #expect(await eventually { !library.items(in: .view(ItemID("view-recent-notes"))).isEmpty })
+    }
 }
