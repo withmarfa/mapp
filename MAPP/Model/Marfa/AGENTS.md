@@ -66,6 +66,12 @@
 - A restore (`MarfaLibrary.restoreVersion`) restores only the title and the text, through the ordinary edit path: the text through `saveText` on the version the library holds, so a text another device changed is merged or kept apart, and the title through `editProperties`. What it replaces stays in the item's history. Other fields are shown to read and never written back. It is refused, with the usual notice, for an item in the bin, a file, an item the library no longer holds, and a version with no text or title the item keeps. Undo puts back what the restore replaced only while the item still holds what the restore wrote; otherwise it tells the person and writes nothing.
 - The server answers 404 for an item in the bin, so the sheet says to recover it first.
 
+## Server settings
+
+- This Marfa reads and changes the server's settings through `MarfaServerConfig` (the `InstanceConfigSource` seam, made by the host's `Configurer` from the configured connection, nil in the sample), with the package's generated client over `URLSession` like Version History, so ATS applies and a plain-http address fails there. The key is read from the key store on each call.
+- A change is `PATCH /config` with only the changed fields; `null` removes a setting. Never send `PUT`, `instance_id`, or a field the person did not change: a setting left out stays as it is. The answer is the whole configuration and is what the page then shows. The server leaves an unset setting out of the answer and `GET /config` carries no effective values, so the page shows the documented default for it.
+- A 400 or 422 is `MarfaError.validation`; its sentence is shown without the details the client appends. A 403 is a key without `config.manage`: the page shows the settings as unavailable with a button to the server's console.
+
 ## Edges
 
 - A relationship is an edge, named as the end that holds it writes it (`child-of`), with the other end as `inverse:` and the edge type. Check links against the catalogue's types, roles, how many each end may hold, and the contract's cycle rule (`conformance/spec/edges.md`) before sending.

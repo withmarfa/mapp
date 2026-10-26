@@ -48,6 +48,7 @@ struct SettingsPageView: View {
         case .editor: EditorSettings()
         case .sidebar: SidebarSettings()
         case .library: LibrarySettings(browser: browser)
+        case .thisMarfa: ThisMarfaSettings()
         case .about: AboutSettings()
         }
     }

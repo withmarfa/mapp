@@ -3,12 +3,12 @@ import Foundation
 /// A page of Settings, which the window shows in place of the list and the item page once the Settings row of the
 /// sidebar is chosen.
 nonisolated enum SettingsPage: String, CaseIterable, Identifiable, Hashable, Sendable {
-    case appearance, editor, sidebar, library, about
+    case appearance, editor, sidebar, library, thisMarfa, about
 
     var id: Self { self }
 
     /// The pages as the list shows them, in groups.
-    static let groups: [[SettingsPage]] = [[.appearance, .editor, .sidebar], [.library], [.about]]
+    static let groups: [[SettingsPage]] = [[.appearance, .editor, .sidebar], [.library, .thisMarfa], [.about]]
 
     var title: String {
         switch self {
@@ -16,6 +16,7 @@ nonisolated enum SettingsPage: String, CaseIterable, Identifiable, Hashable, Sen
         case .editor: String(localized: "Editor")
         case .sidebar: String(localized: "Sidebar")
         case .library: String(localized: "Library")
+        case .thisMarfa: String(localized: "This Marfa")
         case .about: String(localized: "About")
         }
     }
@@ -26,6 +27,7 @@ nonisolated enum SettingsPage: String, CaseIterable, Identifiable, Hashable, Sen
         case .editor: "square.and.pencil"
         case .sidebar: "sidebar.left"
         case .library: "books.vertical"
+        case .thisMarfa: "server.rack"
         case .about: "info.circle"
         }
     }
