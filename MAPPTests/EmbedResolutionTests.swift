@@ -131,4 +131,35 @@ import Testing
         library.fetchFails = false
         #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width == 5)
     }
+
+    /// Binning, renaming or restoring the file changes nothing of the note, so the card follows the file itself.
+    @Test func aNotesCardFollowsItsFileWhenItIsBinnedRenamedAndRestored() async throws {
+        let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2))))
+        let item = try #require(library.item(note))
+        let index = try #require(library.items.firstIndex { $0.id == id })
+        func picture() async -> Int? { await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width }
+        func basis() -> GalleryArtworkCache.Basis { GalleryArtworkCache.basis(of: item, in: library) }
+        func peek() -> Int? { GalleryArtworkCache.peek(basis(), width: 200)?.image.width }
+
+        #expect(await picture() == 5)
+        #expect(peek() == 5)
+
+        library.items[index].state = .trashed
+        #expect(peek() == nil, "the picture of a file that is binned is not the card's")
+        #expect(await picture() == nil, "a binned file is no picture")
+
+        let binned = basis()
+        library.items[index].title = "Beach.png"
+        #expect(basis() != binned, "a rename is a change to what decides the picture")
+
+        library.items[index].state = .active
+        #expect(await picture() == 5, "a restored file is the card's picture again")
+
+        let restored = basis()
+        library.items[index].title = "Sand.png"
+        #expect(basis() != restored)
+        #expect(peek() == nil, "a picture made for the file under its old name is not taken for the new one")
+        #expect(await picture() == 5)
+        #expect(peek() == 5)
+    }
 }

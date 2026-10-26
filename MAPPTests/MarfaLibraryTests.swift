@@ -988,6 +988,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.map(\.text) == ["Typed while the key changed"])
     }
 
+    /// The source answers nothing for a save it will not take, so no save of it is waited on to be read.
+    @Test func textAClosedSourceWillNotTakeIsNotWaitedOnToBeRead() async throws {
+        let (library, source) = try await loaded()
+        await source.close()
+        library.updateBody(of: LibraryFixture.n1, to: "Typed while the key changed")
+        #expect(!library.hasUnreadSave(LibraryFixture.n1), "nothing is on its way, so no embed waits for the copy to read it")
+    }
+
     /// Text submitted just before the source closed is refused by it as it closes, and goes to the app too.
     @Test func textRefusedAsTheSourceClosesGoesToTheAppWithTheText() async throws {
         let (library, source) = try await loaded()

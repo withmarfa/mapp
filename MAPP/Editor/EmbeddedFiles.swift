@@ -81,13 +81,17 @@ extension ItemLibrary {
     func embedStates(of note: ItemID) -> [String: EmbedState] {
         var states: [String: EmbedState] = [:]
         for embed in item(note)?.boundEmbeds ?? [] where states[embed.text] == nil {
-            var file: EmbedState.File?
-            if case .resolved(let id) = embed.resolution, let held = item(id) {
-                file = EmbedState.File(title: held.title, trashed: held.state == .trashed, version: held.version)
-            }
-            states[embed.text] = EmbedState(binding: embed.resolution, file: file)
+            states[embed.text] = embedState(of: embed)
         }
         return states
+    }
+
+    func embedState(of embed: BoundEmbed) -> EmbedState {
+        var file: EmbedState.File?
+        if case .resolved(let id) = embed.resolution, let held = item(id) {
+            file = EmbedState.File(title: held.title, trashed: held.state == .trashed, version: held.version)
+        }
+        return EmbedState(binding: embed.resolution, file: file)
     }
 
     private func binding(of reference: EmbedReference, in item: ItemID) -> NoteReferenceResolution? {

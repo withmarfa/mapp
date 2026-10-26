@@ -25,7 +25,7 @@ enum GalleryPreview {
             return await thumbnail(at: url).map(Picture.image) ?? .none
         case .markdown:
             var failed = false
-            for embed in item.boundEmbeds.prefix(8) {
+            for embed in item.boundEmbeds.prefix(embedLimit) {
                 guard !Task.isCancelled else { return .failed }
                 let resolution = await library.openEmbeddedFile(EmbedReference(text: embed.text), in: item.id, if: isSmallImage)
                 switch resolution {
@@ -52,6 +52,9 @@ enum GalleryPreview {
         guard case .file(let type, let byteCount) = item.content else { return false }
         return type.conforms(to: .image) && byteCount <= fetchLimit
     }
+
+    /// How many of a note's embeds its picture is chosen from.
+    nonisolated static let embedLimit = 8
 
     nonisolated private static let fetchLimit: Int64 = 8 << 20
 

@@ -519,10 +519,14 @@ import Observation
         let saved = savedOn[id].map { ItemVersion(MarfaEngine.version(read: $0.rawValue, holding: held.rawValue)) }
         let merge: BodyMerge = saved == readAt ? .following : .asRead
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
-        unsettledText[id, default: []].insert(write)
-        unreadText[id, default: []].insert(write)
-        textWrites[write] = id
-        lastTyped[id] = (write, text)
+        // Every write the engine takes ends in `.taken` or `.answered`; only one the source refuses to take, as it
+        // has closed, gets neither, so nothing waits on it.
+        if refusals[write] != nil {
+            unsettledText[id, default: []].insert(write)
+            unreadText[id, default: []].insert(write)
+            textWrites[write] = id
+            lastTyped[id] = (write, text)
+        }
         guard readAt == held else { return }
         savedOn[id] = readAt
         records[id]?.body = ItemBody(id: id, text: text, version: readAt)
