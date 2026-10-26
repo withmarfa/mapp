@@ -196,6 +196,16 @@ nonisolated final class FailingSearchSource: ItemSource {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")
     }
     func items(inView view: ItemID) async throws -> [ItemID] { try await inner.items(inView: view) }
+
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
     func queueSubmitted() async {}
     func close() async {}
     func refresh() {}

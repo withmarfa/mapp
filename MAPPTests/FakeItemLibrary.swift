@@ -17,6 +17,9 @@ final class FakeItemLibrary: ItemLibrary {
     /// What each view lists, by view.
     var viewMembers: [ItemID: [ItemID]] = [:]
     var canPurge = false
+    var canEditViews = true
+    /// What every view write fails with while set.
+    var viewFailure: ViewWriteFailure?
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
@@ -283,6 +286,45 @@ final class FakeItemLibrary: ItemLibrary {
         if refusedAttachments.contains(name) { throw SourceFailure(kind: .failed, message: "The upload failed.") }
         attachedFiles.append((name, try Data(contentsOf: file), id))
         return Embed(link: name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name, name: name)
+    }
+
+    func createView(_ settings: LibraryViewSettings) async -> LibraryView? {
+        if let viewFailure {
+            notices.tell("Can’t Save View", viewFailure.message)
+            return nil
+        }
+        let view = LibraryView(id: ItemID.mint(), title: settings.title, version: 1, query: settings.query, sort: settings.sort, group: settings.group)
+        views = LibraryView.ordered(views + [view])
+        return view
+    }
+
+    func changeView(_ id: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure> {
+        guard var view = views.first(where: { $0.id == id }) else { return .failure(ViewWriteFailure(kind: .gone, message: "Gone")) }
+        let failure = viewFailure ?? (view.version == baseVersion ? nil : ViewWriteFailure(kind: .conflict, message: "Changed elsewhere"))
+        if let failure {
+            notices.tell("Can’t Update View", failure.message)
+            return .failure(failure)
+        }
+        if let title = change.title { view.title = title }
+        if let query = change.query { view.query = query }
+        if let sort = change.sort { view.sort = sort }
+        switch change.group {
+        case .set(let group): view.group = group
+        case .clear: view.group = nil
+        case nil: break
+        }
+        view.version += 1
+        views = LibraryView.ordered(views.filter { $0.id != id } + [view])
+        return .success(view)
+    }
+
+    func deleteView(_ id: ItemID) async -> Bool {
+        if let viewFailure {
+            notices.tell("Can’t Delete View", viewFailure.message)
+            return false
+        }
+        views.removeAll { $0.id == id }
+        return true
     }
 
     /// Every file added, and whether adding one is refused.

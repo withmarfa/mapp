@@ -75,6 +75,16 @@ nonisolated final class FakeMarfaSource: ItemSource {
     func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
     func search(_ text: String, in query: ItemQuery) async throws -> [ItemID] { [] }
     func items(inView view: ItemID) async throws -> [ItemID] { [] }
+
+    func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
+    func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
+        throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")
+    }
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
     let queuing = Mutex(false)
     let queued = Mutex(0)

@@ -300,6 +300,9 @@ struct CommandPalette: View {
             for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
                 add(command.title, command.systemImage, action: command.action)
             }
+            for command in SavedViewCommand.commands(for: browser, in: library) {
+                add(command.title, command.systemImage, action: command.action)
+            }
         }
         if fullWidth {
             add(String(localized: "Standard Width"), "arrow.left.and.right") { fullWidth = false }

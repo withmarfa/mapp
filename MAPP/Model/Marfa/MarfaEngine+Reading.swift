@@ -355,6 +355,8 @@ extension MarfaEngine {
                 await sync.fetchAttachments()
             }
         case .refreshed(.purged): await purged(change.itemId)
+        // A view written through the server changes the views alone.
+        case .refreshed(.viewWritten): await readViews()
         case .saved, .refreshed: await reload()
         case .stopped(let error): await sync.stopped(error)
         }

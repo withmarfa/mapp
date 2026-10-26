@@ -21,6 +21,8 @@ protocol ItemLibrary: AnyObject, Observable {
     var views: [LibraryView] { get }
     /// Whether items in Recently Deleted can be deleted for good now.
     var canPurge: Bool { get }
+    /// Whether views can be saved, changed and deleted now. A view is written to the server at once, never queued.
+    var canEditViews: Bool { get }
     /// How many days an item stays in Recently Deleted, where the library sets it.
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
@@ -115,6 +117,16 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Attaches the file at `file` to the item, read where it is while this runs, and says what the item's text
     /// writes to show it. A failure means the file is not attached.
     func attach(file: URL, to id: ItemID) async throws -> Embed
+
+    // MARK: Views
+
+    // Each tells the person why a write failed, in the server's reason, and nothing else changes.
+    /// The view as the server saved it, or nil.
+    func createView(_ settings: LibraryViewSettings) async -> LibraryView?
+    /// Sent at `baseVersion`, the version of the view the window read.
+    func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure>
+    /// For good and for every app, since a view has no bin, so the views confirm it first.
+    func deleteView(_ view: ItemID) async -> Bool
 }
 
 extension ItemLibrary {

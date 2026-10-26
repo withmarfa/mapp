@@ -79,6 +79,8 @@ struct AppCommands: Commands {
             Divider()
             ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
             Divider()
+            SavedViewMenu(browser: browser, library: library)
+            Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
             }
