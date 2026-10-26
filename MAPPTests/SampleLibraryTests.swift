@@ -35,7 +35,10 @@ import Testing
         }
         #expect(library.notices.waiting.isEmpty)
         #expect(library.syncReport.problems.isEmpty)
-        #expect(library.body(of: id)?.text == "Ask about the leak under the sink. Tomorrow.")
+        let typed = "Ask about the leak under the sink. Tomorrow."
+        #expect(try await source.body(of: id).text == typed)
+        // The library reads the text again after the last answer, on its own stream, which can come after the report.
+        #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
     }
 
     /// The same holds for a note the sample started with.
@@ -52,6 +55,8 @@ import Testing
         }
         #expect(library.notices.waiting.isEmpty)
         #expect(library.syncReport.problems.isEmpty)
-        #expect(library.body(of: id)?.text == read.text + " A B C")
+        let typed = read.text + " A B C"
+        #expect(try await source.body(of: id).text == typed)
+        #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
     }
 }

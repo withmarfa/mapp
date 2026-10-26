@@ -428,7 +428,11 @@ extension LiveMarfaTests {
                 // Other runs can leave copies of their own notes on the instance, so only this note's count.
                 let copies = library.syncReport.problems.filter { $0.content.title == title }
                 #expect(copies.isEmpty, "\(copies)")
-                #expect(library.body(of: id)?.text == "Ask about the leak under the sink. Tomorrow.")
+                let typed = "Ask about the leak under the sink. Tomorrow."
+                #expect(try await source.body(of: id).text == typed)
+                // The library reads the text again after the last answer, on its own stream, which can come after the
+                // report.
+                #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
                 #expect(try await source.copy.items.get(id.rawValue)?.version == 4)
             }
         }
