@@ -13,7 +13,7 @@ struct ItemViewOptions: View {
             choice("as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
             choice("as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
             choice("as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
-            choice("as Agenda", systemImage: ItemViewMode.agenda.symbol, .agenda, key: "5")
+            choice("as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, key: "5")
         }
         .disabled(browser == nil)
     }
@@ -24,7 +24,7 @@ struct ItemViewOptions: View {
         case .gallery: "ViewAsGallery"
         case .table: "ViewAsTable"
         case .board: "ViewAsBoard"
-        case .agenda: "ViewAsAgenda"
+        case .timeline: "ViewAsTimeline"
         }
     }
 
@@ -50,7 +50,7 @@ struct ViewModeMenu: View {
             if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
             if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
             if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
-            if modes.contains(.agenda) { Text("as Agenda").tag(ItemViewMode.agenda) }
+            if modes.contains(.timeline) { Text("as Timeline").tag(ItemViewMode.timeline) }
         } currentValueLabel: {
             Image(systemName: browser.viewMode.symbol)
         }
@@ -81,7 +81,7 @@ struct ViewOptionsMenu: View {
 }
 
 /// What can be set about the view a window shows: the order of the list and the gallery, the table's sort,
-/// grouping and columns, the board's lanes and cards, and the agenda's dates. Each choice belongs to the place
+/// grouping and columns, the board's lanes and cards, and the timeline's dates. Each choice belongs to the place
 /// and is kept for the window, except the list's order, which is the app's.
 struct CurrentViewOptions: View {
     /// Nil while no window is in front, when the list's order is still the app's to change.
@@ -91,7 +91,7 @@ struct CurrentViewOptions: View {
         switch browser?.viewMode {
         case .table: if let browser { ItemTableViewOptions(browser: browser) }
         case .board: if let browser { ItemBoardOptions(browser: browser) }
-        case .agenda: if let browser { ItemAgendaOptions(browser: browser) }
+        case .timeline: if let browser { ItemTimelineOptions(browser: browser) }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
         case .list, .gallery, nil: OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
         }
@@ -125,21 +125,21 @@ struct ItemBoardOptions: View {
     }
 }
 
-/// The date an agenda places each item on.
-struct ItemAgendaOptions: View {
+/// The date a timeline places each item on.
+struct ItemTimelineOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
 
     var body: some View {
-        let fields = ItemAgendaLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
-        let field = ItemAgendaLayout.selectedField(browser.agendaFields[browser.item], fields: fields)
+        let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
-            browser.agendaFields[browser.item] = $0
+            browser.timelineFields[browser.item] = $0
         }) {
             ForEach(fields) { Text(verbatim: $0.displayLabel).tag($0.key) }
         }
         .pickerStyle(.menu)
         .disabled(fields.isEmpty)
-        .accessibilityIdentifier("AgendaDateField")
+        .accessibilityIdentifier("TimelineDateField")
     }
 }

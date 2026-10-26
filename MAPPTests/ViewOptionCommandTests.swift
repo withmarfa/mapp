@@ -47,12 +47,12 @@ struct ViewOptionCommandTests {
         #expect(Self.titles(settings, library).isEmpty)
     }
 
-    @Test func anItemPageOpenedFromATableTheBoardOrTheAgendaOffersNone() {
+    @Test func anItemPageOpenedFromATableTheBoardOrTheTimelineOffersNone() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
-        for mode in [ItemViewMode.table, .board, .agenda] {
+        for mode in [ItemViewMode.table, .board, .timeline] {
             let browser = Self.browser(mode, in: library)
-            // The fixture has no date, so the agenda has nothing to offer even while it shows.
-            if mode != .agenda { #expect(!Self.titles(browser, library).isEmpty, "\(mode) while it shows") }
+            // The fixture has no date, so the timeline has nothing to offer even while it shows.
+            if mode != .timeline { #expect(!Self.titles(browser, library).isEmpty, "\(mode) while it shows") }
             browser.selection = [ItemID("A")]
             browser.openCollectionSelection()
             #expect(!browser.showsCollection)

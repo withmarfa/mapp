@@ -222,7 +222,7 @@ struct CommandPalette: View {
             addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", "⌘2")
             addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
             addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
-            addLayout(.agenda, String(localized: "View as Agenda"), "calendar", "⌘5")
+            addLayout(.timeline, String(localized: "View as Timeline"), "calendar", "⌘5")
             let ordersList = browser.viewMode == .list || browser.viewMode == .gallery
             if ordersList && browser.isSearching && !browser.ordersByRelevance {
                 add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down") { browser.orderSearch(byRelevance: true) }

@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct ItemAgendaRow: Identifiable, Hashable, Sendable {
+nonisolated struct ItemTimelineRow: Identifiable, Hashable, Sendable {
     enum Value: Hashable, Sendable {
         case dated(Date, dateOnly: Bool, raw: String)
         case missing
@@ -13,16 +13,16 @@ nonisolated struct ItemAgendaRow: Identifiable, Hashable, Sendable {
     var id: ItemID { item.id }
 }
 
-nonisolated struct ItemAgendaGroup: Identifiable, Hashable, Sendable {
+nonisolated struct ItemTimelineGroup: Identifiable, Hashable, Sendable {
     enum ID: Hashable, Sendable {
         case day(Date), missing, invalid, notApplicable
     }
 
     let id: ID
-    let rows: [ItemAgendaRow]
+    let rows: [ItemTimelineRow]
 }
 
-nonisolated enum ItemAgendaLayout {
+nonisolated enum ItemTimelineLayout {
     static func fields(for items: [Item], catalogue: Catalogue) -> [ItemTypeInfo.Field] {
         fields(forTypes: Set(items.map(\.type)), catalogue: catalogue)
     }
@@ -47,30 +47,30 @@ nonisolated enum ItemAgendaLayout {
 
     static func groups(
         for items: [Item], field: String?, catalogue: Catalogue, calendar: Calendar = .current
-    ) -> [ItemAgendaGroup] {
-        var groups: [ItemAgendaGroup.ID: [ItemAgendaRow]] = [:]
+    ) -> [ItemTimelineGroup] {
+        var groups: [ItemTimelineGroup.ID: [ItemTimelineRow]] = [:]
         for item in items {
             let value = value(of: item, field: field, catalogue: catalogue, calendar: calendar)
-            let id: ItemAgendaGroup.ID = switch value {
+            let id: ItemTimelineGroup.ID = switch value {
             case .dated(let date, _, _): .day(calendar.startOfDay(for: date))
             case .missing: .missing
             case .invalid: .invalid
             case .notApplicable: .notApplicable
             }
-            groups[id, default: []].append(ItemAgendaRow(item: item, value: value))
+            groups[id, default: []].append(ItemTimelineRow(item: item, value: value))
         }
         let days = groups.keys.compactMap { id -> Date? in
             if case .day(let date) = id { return date }
             return nil
-        }.sorted().map(ItemAgendaGroup.ID.day)
+        }.sorted().map(ItemTimelineGroup.ID.day)
         return (days + [.missing, .invalid, .notApplicable]).compactMap { id in
-            groups[id].map { ItemAgendaGroup(id: id, rows: $0.sorted(by: precedes)) }
+            groups[id].map { ItemTimelineGroup(id: id, rows: $0.sorted(by: precedes)) }
         }
     }
 
     static func value(
         of item: Item, field: String?, catalogue: Catalogue, calendar: Calendar = .current
-    ) -> ItemAgendaRow.Value {
+    ) -> ItemTimelineRow.Value {
         guard let field, catalogue.itemTypes[item.type]?.fields.contains(where: { $0.key == field && $0.kind.isDate }) == true
         else { return .notApplicable }
         guard let value = item.value(of: field), value != .null, value != .string("") else { return .missing }
@@ -80,7 +80,7 @@ nonisolated enum ItemAgendaLayout {
         return .dated(parsed.date, dateOnly: !parsed.hasTime, raw: text)
     }
 
-    private static func precedes(_ lhs: ItemAgendaRow, _ rhs: ItemAgendaRow) -> Bool {
+    private static func precedes(_ lhs: ItemTimelineRow, _ rhs: ItemTimelineRow) -> Bool {
         if case .dated(let left, _, _) = lhs.value, case .dated(let right, _, _) = rhs.value, left != right {
             return left < right
         }

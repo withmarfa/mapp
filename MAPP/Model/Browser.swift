@@ -46,7 +46,7 @@ final class Browser {
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     var boardFields: [SidebarItem: String] = [:]
     var compactBoards: [SidebarItem: Bool] = [:]
-    var agendaFields: [SidebarItem: String] = [:]
+    var timelineFields: [SidebarItem: String] = [:]
     /// Whether the window shows Settings in place of the list and the item page. The place the window was
     /// showing, and its selection are kept, so choosing that place again returns to them.
     private(set) var showsSettings = false
@@ -130,7 +130,7 @@ final class Browser {
     var usesCollection: Bool { viewMode.spansWindow }
     var showsCollection: Bool { usesCollection && !isCollectionItemPresented }
 
-    /// Whether the view's options are on offer: the list and the gallery always, the table, board and agenda only
+    /// Whether the view's options are on offer: the list and the gallery always, the table, board and timeline only
     /// while they are showing, not an item page opened from them, which hides their controls.
     var offersViewOptions: Bool { !usesCollection || showsCollection }
 
@@ -301,7 +301,7 @@ final class Browser {
         viewTitleForm = nil
         boardFields = [:]
         compactBoards = [:]
-        agendaFields = [:]
+        timelineFields = [:]
         selection = []
         history = SelectionHistory()
         isCollectionItemPresented = false
