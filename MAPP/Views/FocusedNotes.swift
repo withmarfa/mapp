@@ -34,6 +34,8 @@ final class DetailsPresentation {
     var isPresented = false
     /// The items the window's Change Type sheet is open for.
     var typeChange: TypeChangeRequest?
+    /// The item the window's Version History sheet is open for.
+    var history: VersionHistoryRequest?
     /// The items the window's Add to Collection sheet is open for.
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag sheet is open for.

@@ -163,6 +163,19 @@ final class EditorWebView: WKWebView {
         controller.titleDrafts?.typeChange = TypeChangeRequest(ids: [id], undoManager: windowUndoManager)
     }
 
+    @objc private func versionHistory(_ sender: NSMenuItem) {
+        guard let controller, let id = controller.noteID else { return }
+        controller.titleDrafts?.history = VersionHistoryRequest(item: id, undoManager: windowUndoManager)
+    }
+
+    /// Version History, for the note on the page, from the window the editor belongs to.
+    private var versionHistoryItem: NSMenuItem? {
+        guard let controller, controller.noteID != nil, controller.titleDrafts != nil else { return nil }
+        let item = NSMenuItem(title: String(localized: "Version History…"), action: #selector(versionHistory(_:)), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
     /// Change Type, for the note on the page, from the window the editor belongs to.
     private var changeTypeItem: NSMenuItem? {
         guard let controller, let id = controller.noteID, controller.titleDrafts != nil, let library = controller.library,
@@ -215,9 +228,10 @@ final class EditorWebView: WKWebView {
             let isRichText = item.submenu?.items.contains { $0.action.map(Self.richTextActions.contains) ?? false } ?? false
             if isUnwanted || isRichText { menu.removeItem(item) }
         }
-        if !isEditingTitle, let changeType = changeTypeItem {
+        if !isEditingTitle, changeTypeItem != nil || versionHistoryItem != nil {
             menu.addItem(.separator())
-            menu.addItem(changeType)
+            if let changeType = changeTypeItem { menu.addItem(changeType) }
+            if let history = versionHistoryItem { menu.addItem(history) }
         }
         // Removing items can leave two separators together, or one at an end.
         while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }

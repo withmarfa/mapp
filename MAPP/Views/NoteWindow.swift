@@ -76,6 +76,7 @@ struct NoteWindow: View {
         .focusedSceneValue(\.detailsPresentation, details)
         .environment(details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
+        .sheet(item: Binding { details.history } set: { details.history = $0 }) { VersionHistorySheet(request: $0) }
         .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
         .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
