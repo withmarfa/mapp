@@ -7,8 +7,9 @@ import SwiftUI
 /// minimized form there.
 ///
 /// The view's own controls (`controls`) follow it, in the same glass while it is a glass. In a list column the field
-/// spans the column's toolbar in place of its title, up to those controls. Elsewhere it is an item of its own, with
-/// the controls as an item after it, and it grows leftwards from the glass.
+/// takes most of the column's toolbar in place of its title, ending before those controls
+/// (`ColumnSearchMetrics.share`). Elsewhere it is an item of its own, with the controls as an item after it, and it
+/// grows leftwards from the glass.
 struct ColumnSearch<Controls: View>: ToolbarContent {
     enum Layout {
         /// Across a list column, whose width a toolbar item cannot tell, so the caller passes it.
