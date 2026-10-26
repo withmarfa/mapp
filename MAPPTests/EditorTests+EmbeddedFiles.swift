@@ -254,9 +254,10 @@ extension EditorTests {
         let editor = try await attachingEditor(library)
 
         editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
-        #expect(await eventually { library.notices.waiting.last != nil })
-        let told = try #require(library.notices.waiting.last)
-        #expect(told.message.contains("“tickets.pdf”") && told.message.contains("“Trip”"))
+        // The page also reports the refusal itself (Inkkit's `preservation`), so wait for the notice about the file.
+        #expect(await eventually { library.notices.waiting.contains { $0.message.contains("“tickets.pdf”") } })
+        let told = try #require(library.notices.waiting.first { $0.message.contains("“tickets.pdf”") })
+        #expect(told.message.contains("“Trip”"))
         #expect(try await markdown(editor) == nil, "the note keeps its text exactly")
         #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
     }
