@@ -247,6 +247,35 @@ extension EditorTests {
         #expect(await eventually { editor.pendingEmbeds.isEmpty })
     }
 
+    @Test func filesQuickAddAttachedToANoteEndingInAnOpenCodeFenceAreTold() async throws {
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [new])
+        library.bodies[new.id] = "```\ncode"
+        let editor = try await attachingEditor(library)
+
+        editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        // The page also reports the refusal itself (Inkkit's `preservation`), so wait for the notice about the file.
+        #expect(await eventually { library.notices.waiting.contains { $0.message.contains("“tickets.pdf”") } })
+        let told = try #require(library.notices.waiting.first { $0.message.contains("“tickets.pdf”") })
+        #expect(told.message.contains("“Trip”"))
+        #expect(try await markdown(editor) == nil, "the note keeps its text exactly")
+        #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
+    }
+
+    @Test func filesQuickAddAttachedToANoteThatIsOnlyARuleAreTold() async throws {
+        for body in ["***", "```\n```\n", "![x](y.png)", "[ref]: http://x.com"] {
+            let new = FakeItemLibrary.note("Trip", modified: .now)
+            let library = FakeItemLibrary(items: [new])
+            library.bodies[new.id] = body
+            let editor = try await attachingEditor(library)
+
+            editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+            #expect(await eventually { library.notices.waiting.contains { $0.message.contains("“tickets.pdf”") } })
+            #expect(try await markdown(editor) == nil, "\(body) keeps its text exactly, so there is nothing to save")
+            #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
+        }
+    }
+
     @Test func filesQuickAddAttachedThatNeverReachTheTextAreTold() async throws {
         let new = FakeItemLibrary.note("Trip", modified: .now)
         let library = FakeItemLibrary(items: [new])

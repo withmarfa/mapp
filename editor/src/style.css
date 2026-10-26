@@ -20,6 +20,11 @@
   --status-orange: rgb(245 134 37);
   --status-red: rgb(255 56 60);
   --status-green: rgb(52 199 89);
+  /* Selected text: the accent over the page while the editor has the keyboard, and a quiet grey of the text's own
+     color while the window is in the background, the header's title has the keyboard or the editor was blurred.
+     Both are translucent, so the text keeps its contrast on the page in light and dark. */
+  --inkkit-selection-background: color-mix(in srgb, var(--inkkit-accent-color) 30%, transparent);
+  --inkkit-inactive-selection-background: color-mix(in srgb, CanvasText 15%, transparent);
   --reading-width: 54rem;
   --page-width: var(--reading-width);
   color-scheme: light dark;
@@ -285,36 +290,6 @@ body {
 
 .item-status-mark[data-fill='full'] {
   background: var(--mark);
-}
-
-/* Inkkit draws a wiki link as plain text, and one that names no note only with a tooltip
-   (aicayzer/inkkit#159). A link takes the link color; one that names no note is muted and underlined with
-   dashes, so the cue is not color alone. Drop this when Inkkit styles wiki links itself. */
-.inkkit-wiki-link {
-  color: var(--inkkit-accent-color);
-}
-
-.inkkit-wiki-link[data-missing='true'] {
-  color: var(--inkkit-muted-color);
-  text-decoration: underline dashed;
-  text-underline-offset: 2px;
-}
-
-/* Inkkit draws text selection without filling the page margins. */
-.ProseMirror ::selection {
-  background: transparent;
-}
-
-.ProseMirror::highlight(inkkit-selection) {
-  background-color: color-mix(in srgb, CanvasText 15%, transparent);
-}
-
-.ProseMirror-focused::highlight(inkkit-selection) {
-  background-color: color-mix(in srgb, var(--inkkit-accent-color) 30%, transparent);
-}
-
-.inactive .ProseMirror::highlight(inkkit-selection) {
-  background-color: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 /* The caret and selection show text focus; embedded controls keep their keyboard rings. */

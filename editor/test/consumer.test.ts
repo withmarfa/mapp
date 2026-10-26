@@ -8,18 +8,21 @@ import {
   caretOffset,
   isPreviewDiagnostic,
   guardedCommand,
-  appendedImages,
   splitLabels,
   type CaretState,
   type FindState,
 } from '../src/editor'
 
-async function withEditor(source: string, run: (editor: NoteEditor) => void | Promise<void>) {
+async function withEditor(
+  source: string,
+  run: (editor: NoteEditor) => void | Promise<void>,
+  changed: (text: string) => void = () => {},
+) {
   const root = document.createElement('div')
   document.body.append(root)
   const editor = await NoteEditor.mount(root, {
     find() {},
-    changed() {},
+    changed,
     stateChanged() {},
     openLink() {},
     copy() {},
@@ -464,28 +467,118 @@ test('files attached in quick add go after a list that ends the text, not into i
   }
 })
 
-test('files attached in quick add are written so they read back as embeds', () => {
-  expect(appendedImages('```\ncode', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '```\ncode\n```\n\n![a](a.png)\n',
+test("files attached in quick add are written so they read back as embeds, in the note's own line endings", async () => {
+  const images = [
+    { src: 'a (1).png', alt: 'a [1]' },
+    { src: 'b%201.png', alt: 'b' },
+  ]
+  const written = '![a \\[1\\]](<a (1).png>)'
+  for (const [source, expected] of [
+    ['```\ncode\n```', '```\ncode\n```\n\n' + written + '\n\n![b](b%201.png)\n'],
+    ['- a\n  ```\n  code', '- a\n  ```\n  code\n\n' + written + '\n\n![b](b%201.png)\n'],
+    ['One\r\nTwo', 'One\r\nTwo\r\n\r\n' + written + '\r\n\r\n![b](b%201.png)\r\n'],
+    ['', written + '\n\n![b](b%201.png)\n'],
+  ] as const) {
+    await withEditor(source, (editor) => {
+      expect(editor.appendImages(images)).toBe(true)
+      expect(editor.snapshot().text).toBe(expected)
+      editor.undo()
+      expect(editor.snapshot().text).toBe(source)
+    })
+  }
+})
+
+test('files attached in quick add are refused, with the note untouched, when the text ends in an open code fence', async () => {
+  for (const source of ['```\ncode', '```\ncode\n', '~~~~ js\n~~~\n']) {
+    await withEditor(source, (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toMatchObject(
+        {
+          commandError: 'preservation',
+        },
+      )
+      expect(editor.snapshot().text).toBe(source)
+      expect(editor.markdown()).toBeNull()
+    })
+  }
+})
+
+test('files attached in quick add never replace a note that Inkkit reads as one empty block', async () => {
+  const images = [
+    { src: 'a.png', alt: 'a' },
+    { src: 'b.png', alt: 'b' },
+  ]
+  const posted: unknown[] = []
+  window.webkit = { messageHandlers: { host: { postMessage: (message) => posted.push(message) } } }
+  for (const source of [
+    '***',
+    '---\n',
+    '___',
+    '```\n```',
+    '```\n```\n',
+    '<br>',
+    '![x](y.png)',
+    '![x](y.png)\n',
+    '[ref]: http://x.com',
+    '[ref]: http://x.com\n',
+  ]) {
+    posted.length = 0
+    const reported: string[] = []
+    await withEditor(
+      source,
+      async (editor) => {
+        expect(
+          guardedCommand(() => editor.appendImages(images)),
+          source,
+        ).toMatchObject({
+          commandError: 'preservation',
+        })
+        // The text is exactly as it was, and neither the replaced text nor the restored one reached the app.
+        expect(editor.snapshot().text).toBe(source)
+        expect(editor.markdown()).toBeNull()
+        await Promise.resolve()
+        expect(reported).toEqual([])
+        expect(posted).toMatchObject([{ type: 'error' }])
+      },
+      (text) => reported.push(text),
+    )
+  }
+})
+
+test('files attached in quick add are appended to an ordinary note and reported once', async () => {
+  const reported: string[] = []
+  await withEditor(
+    'Buy milk\n',
+    async (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toBe(true)
+      expect(editor.snapshot().text).toBe('Buy milk\n\n![a](a.png)\n')
+      await Promise.resolve()
+      expect(reported).toEqual(['Buy milk\n\n![a](a.png)\n'])
+    },
+    (text) => reported.push(text),
   )
-  expect(appendedImages('~~~~ js\n~~~\n', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '~~~~ js\n~~~\n~~~~\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('```\ncode\n```', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '```\ncode\n```\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('- a\n  ```\n  code', [{ src: 'a.png', alt: 'a' }])).toBe(
-    '- a\n  ```\n  code\n\n![a](a.png)\n',
-  )
-  expect(appendedImages('One\r\nTwo', [{ src: 'a.png', alt: 'a' }])).toBe(
-    'One\r\nTwo\r\n\r\n![a](a.png)\r\n',
-  )
-  expect(
-    appendedImages('', [
-      { src: 'a (1).png', alt: 'a [1]' },
-      { src: 'b(2).png', alt: 'b' },
-    ]),
-  ).toBe('![a \\[1\\]](<a (1).png>)\n\n![b](b\\(2\\).png)\n')
+})
+
+test('files attached in quick add are appended after trailing blank lines, which may collapse', async () => {
+  for (const source of ['Hello\n\n\n', 'Hello\n\n', 'Hello  \n\n\n\n', '# Title\n\ntext\n\n\n\n']) {
+    await withEditor(source, (editor) => {
+      expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toBe(true)
+      const text = editor.snapshot().text
+      expect(text.startsWith(source.trimEnd())).toBe(true)
+      expect(text).toContain('![a](a.png)')
+      expect(text.replace(/\s+$/, '').endsWith('![a](a.png)')).toBe(true)
+    })
+  }
+})
+
+test('appended files are taken in formatted editing only, and an empty list changes nothing', async () => {
+  await withEditor('Pack\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    expect(engine.commandState().commands.appendImages).toBe(true)
+    engine.setEditingMode('source', 1)
+    expect(engine.commandState().commands.appendImages).toBe(false)
+    expect(editor.appendImages([{ src: 'a.png', alt: 'a' }])).toBe(false)
+    expect(editor.appendImages([])).toBe(false)
+  })
 })
 
 test('files attached in quick add wait while the note is edited as source', async () => {
@@ -525,6 +618,33 @@ test('a refused edit stays out of the note and reaches the host, from a command 
       )
       expect(editor.snapshot().text).toBe('A <!--note--> B\n')
       expect(posted).toMatchObject([{ type: 'error' }])
+    })
+  } finally {
+    delete window.webkit
+  }
+})
+
+test('a Link to Note the app fails to answer reports an error to the host and leaves the line as typed', async () => {
+  const posted: unknown[] = []
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        host: { postMessage: (message: unknown) => posted.push(message) },
+        notes: { postMessage: () => Promise.reject(new Error('The app went away.')) },
+      },
+    },
+  })
+  try {
+    await withEditor('', async (editor) => {
+      const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor })
+        .engine
+      engine.insertText('/', 1)
+      engine.insertText('link to', 1)
+      expect(engine.keyDown({ key: 'Enter' }, 1)).toBe(true)
+      await new Promise((done) => setTimeout(done, 0))
+      expect(posted).toMatchObject([{ type: 'error' }])
+      expect(editor.snapshot().text).toBe('/link to\n')
     })
   } finally {
     delete window.webkit

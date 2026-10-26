@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { InkKitEditor } from '@aicayzer/inkkit'
 import { NoteEditor, wikiSuggest } from '../src/editor'
 import type { EditorMessage, NoteRequest } from '../src/bridge'
 
@@ -43,6 +44,7 @@ afterEach(() => {
 async function withEditor(
   source: string,
   run: (editor: NoteEditor, root: HTMLElement) => Promise<void>,
+  editable = true,
 ) {
   const root = document.createElement('div')
   document.body.append(root)
@@ -54,7 +56,7 @@ async function withEditor(
     copy() {},
   })
   editor.setItem('note')
-  editor.load(source, 1)
+  editor.load(source, 1, editable)
   try {
     await run(editor, root)
   } finally {
@@ -174,6 +176,61 @@ test('a library change asks again and a link becomes live or missing without the
     ])
     expect(marks(root)).toEqual(['true', null])
     expect(editor.snapshot().text).toBe(before)
+    expect(editor.markdown()).toBeNull()
+  }))
+
+test('only the links whose answer changed are drawn again, by the notes they name', () =>
+  withEditor('[[Here]] and [[Soon]] and [[Else]]\n', async (editor) => {
+    const refresh = vi.spyOn(InkKitEditor.prototype, 'refreshReferences')
+    try {
+      page.missing.add('Soon')
+      await settle()
+      expect(refresh).toHaveBeenCalledTimes(1)
+      expect(refresh).toHaveBeenLastCalledWith(['Soon'])
+      // A change in the library that answers the same draws nothing.
+      editor.linksChanged()
+      await settle()
+      expect(refresh).toHaveBeenCalledTimes(1)
+      page.missing.delete('Soon')
+      page.missing.add('Else')
+      editor.linksChanged()
+      await settle()
+      expect(refresh).toHaveBeenCalledTimes(2)
+      expect(new Set(refresh.mock.lastCall![0])).toEqual(new Set(['Soon', 'Else']))
+    } finally {
+      refresh.mockRestore()
+    }
+  }))
+
+test('links of a note shown read-only are drawn missing, and again when the library changes', () =>
+  withEditor(
+    '[[Here]] and [[Soon]]\n',
+    async (editor, root) => {
+      page.missing.add('Soon')
+      await settle()
+      expect(marks(root)).toEqual([null, 'true'])
+      page.missing.delete('Soon')
+      page.missing.add('Here')
+      editor.linksChanged()
+      await settle()
+      expect(marks(root)).toEqual(['true', null])
+      expect(editor.markdown()).toBeNull()
+    },
+    false,
+  ))
+
+test('links are drawn again while the person composes, without ending the composition', () =>
+  withEditor('[[Here]] and [[Soon]]\n', async (editor, root) => {
+    await settle()
+    editor.focus()
+    const surface = root.querySelector('.ProseMirror')!
+    surface.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    expect(() => editor.setEditingMode('source')).toThrowError(/composition|compos/i)
+    page.missing.add('Soon')
+    editor.linksChanged()
+    await settle()
+    expect(marks(root)).toEqual([null, 'true'])
+    surface.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }))
     expect(editor.markdown()).toBeNull()
   }))
 
