@@ -22,7 +22,6 @@ struct ItemBoard: View {
                 else { EmptyState("No Items") }
             }
         }
-        .background(.windowBackground)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
