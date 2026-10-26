@@ -174,16 +174,10 @@ struct ItemTagsSection: View {
                 .accessibilityIdentifier("ItemTags")
             }
             if isEditable {
-                TagEntryField(text: Binding { drafts.text } set: { drafts.text = $0; drafts.isDirty = true },
-                              held: tags, identifier: "ItemTagField", isInline: true, refusal: $refusal, onAdd: add)
+                TagEntryField(text: Binding { drafts.text } set: { drafts.text = $0 },
+                              held: tags, identifier: "ItemTagField", isInline: true, refusal: $refusal, onAdd: onAdd)
             }
         }
-    }
-
-    private func add(_ text: String) -> ItemTag.Refusal? {
-        let refusal = onAdd(text)
-        if refusal == nil { drafts.isDirty = false }
-        return refusal
     }
 }
 
