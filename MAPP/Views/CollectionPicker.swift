@@ -1,31 +1,30 @@
 import SwiftUI
 
-/// Add to Collection and Remove from Collection for the selected items that can be members of a collection, files
-/// among them, offered apart from the note commands.
+/// Add to Collection and Remove from Collection for the selection, files among it, offered while any selected item can
+/// be a member of a collection. The commands take every selected item and tell the person which they left alone.
 struct CollectionActions: View {
     @CurrentLibrary private var library
-    /// Everything selected; the actions take those of them that can be in a collection.
     let selection: Set<ItemID>
     let details: DetailsPresentation?
     let undoManager: UndoManager?
 
     var body: some View {
-        let ids = library.collectionMembers(selection)
-        if !ids.isEmpty {
+        let members = library.collectionMembers(selection)
+        if !members.isEmpty {
             Button("Add to Collection…", systemImage: "rectangle.stack.badge.plus") {
-                details?.collectionPick = CollectionPickRequest(ids: ids, undoManager: undoManager)
+                details?.collectionPick = CollectionPickRequest(ids: selection, undoManager: undoManager)
             }
             .disabled(details == nil || library.collections.isEmpty)
-            let holding = library.collections(holding: ids)
+            let holding = library.collections(holding: members)
             if holding.count > 1 {
                 Menu("Remove from Collection", systemImage: "rectangle.stack.badge.minus") {
                     ForEach(holding) { collection in
-                        Button(collection.title) { library.removeFromCollection(ids, collection.id, undoManager: undoManager) }
+                        Button(collection.title) { library.removeFromCollection(selection, collection.id, undoManager: undoManager) }
                     }
                 }
             } else if let collection = holding.first {
                 Button("Remove from Collection", systemImage: "rectangle.stack.badge.minus") {
-                    library.removeFromCollection(ids, collection.id, undoManager: undoManager)
+                    library.removeFromCollection(selection, collection.id, undoManager: undoManager)
                 }
             }
         }
@@ -48,6 +47,11 @@ struct CollectionPickerSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Add to Collection").interfaceFont(.title2.bold())
             Text(subtitle).foregroundStyle(.secondary)
+            if let skipped = library.collectionPlan(request.ids, joining: nil).skips.message {
+                Text(skipped).interfaceFont(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("CollectionPickerSkipped")
+            }
             TextField("Filter", text: $filter)
                 .textFieldStyle(.roundedBorder)
                 .focused($focus, equals: .filter)
@@ -112,8 +116,7 @@ struct CollectionPickerSheet: View {
     }
 
     private var canAdd: Bool {
-        let items = request.ids.compactMap { library.item($0) }
-        return !items.isEmpty && items.allSatisfy(library.canJoinCollection)
+        !library.collectionMembers(request.ids).isEmpty
     }
 
     private var subtitle: String {
@@ -125,7 +128,8 @@ struct CollectionPickerSheet: View {
     }
 
     private func holdsAll(_ collection: ItemID) -> Bool {
-        request.ids.allSatisfy { library.item($0)?.collectionIDs.contains(collection) == true }
+        let members = library.collectionMembers(request.ids)
+        return !members.isEmpty && members.allSatisfy { library.item($0)?.collectionIDs.contains(collection) == true }
     }
 
     private func firstAddable(in collections: [Item]) -> ItemID? {

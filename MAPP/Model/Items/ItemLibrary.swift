@@ -79,11 +79,13 @@ protocol ItemLibrary: AnyObject, Observable {
 
     /// The active collections, by title: items whose type plays Marfa's `container` role (`Catalogue.isCollection`).
     var collections: [Item] { get }
-    /// Files each item in the collection with one `in-collection` edge, skipping those already in it. Nothing is
-    /// written when any item can't be a member, as a collection can't, and the library tells the person why.
+    /// Files each item in the collection with one `in-collection` edge, in one undoable change, leaving out those
+    /// already in it. An item that can't be a member, as a collection can't, or can't be changed, is skipped and the
+    /// library tells the person how many and why. False where nothing was filed because every item was skipped.
     @discardableResult
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool
-    /// Removes the items' `in-collection` edges to the collection; false when none of them is in it.
+    /// Removes the items' `in-collection` edges to the collection in one undoable change; false when none of them is
+    /// in it. An item in it that can't be changed is skipped and told.
     @discardableResult
     func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool
 
@@ -119,9 +121,10 @@ protocol ItemLibrary: AnyObject, Observable {
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool
     /// Moves each item to `type`, its title and text to the new type's keys in the same edit, with `filling` for
-    /// the required fields an item lacks (`TypeChange`). Fields the new type does not use stay on the item. A set
-    /// any of whose items cannot become `type` is refused whole, and the library tells the person why. Undo moves
-    /// them back. False where the set is refused before anything is sent.
+    /// the required fields an item lacks (`TypeChange`). Fields the new type does not use stay on the item. An item
+    /// that cannot become `type`, or cannot be changed, is skipped and the library tells the person how many and why;
+    /// the rest change in one undoable step that moves them back. False where nothing is sent, as when every item is
+    /// skipped or a required value is missing, and the library tells the person why.
     @discardableResult
     func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool
     /// Puts the text and title of an earlier version (`restoreCheck`) on the item as a new edit, made on the version
@@ -130,6 +133,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// unless there was nothing to change.
     @discardableResult
     func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool
+    /// In one undoable change. An item in the bin is skipped and told.
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
     /// The tags the library sets itself, which the person neither adds nor removes by hand: the favorite tag, which
     /// the Favorite command owns, and any a library keeps for its own use.
@@ -138,13 +142,15 @@ protocol ItemLibrary: AnyObject, Observable {
     /// suggesting a tag the person has used.
     var knownTags: [String] { get }
     /// Tags `tag` to each of the items that can take it and do not hold it, in one undoable change, and answers nil.
-    /// Nothing is sent, and the refusal is given back, where `tag` is not a tag Marfa takes, is reserved, is held
-    /// by every item, or would leave an item with too many (`checkedTag`). The caller keeps what the person typed.
+    /// An item that can't be changed, or already has the most tags, is skipped and the library tells the person how
+    /// many and why. Nothing is sent, and the refusal is given back, where `tag` is not a tag Marfa takes, is
+    /// reserved, or no item can take it (`checkedTag`). The caller keeps what the person typed.
     @discardableResult
     func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal?
     /// Removes `tag` from each of the items that hold it. An item that no longer holds it, as when another device
     /// removed it first, is left alone.
     func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?)
+    /// To Recently Deleted, in one undoable change. An item already there has nothing to change.
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// Not undoable, so the views confirm it first, and only where `canPurge`.
@@ -200,12 +206,17 @@ extension ItemLibrary {
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
         guard canPurge else {
-            notices.tell(
-                String(localized: "Can’t Delete Immediately"),
-                String(localized: "Notes can’t be deleted immediately right now. They’re still in Recently Deleted."))
+            tellCannotPurge()
             return
         }
         deletePermanently(ids)
+    }
+
+    /// Says why items in Recently Deleted can't be erased now, which is the one reason `canPurge` is false.
+    func tellCannotPurge() {
+        notices.tell(
+            String(localized: "Can’t Delete Immediately"),
+            String(localized: "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted."))
     }
 
     /// Whether the person can give the item a title. A title is kept only as a property, so an item titled by its
@@ -234,20 +245,38 @@ extension ItemLibrary {
         }
     }
 
-    /// The tag as it would be kept and the items it would be added to, or why it can't be added: what Marfa
-    /// refuses (`items/tag-text`, `items/tag-dot-segment`, `items/tags-count`), a tag the library sets itself, and
-    /// items that can't be changed. A set where some item can't hold one more tag is refused whole.
-    func checkedTag(_ text: String, adding ids: Set<ItemID>) -> Result<(tag: String, ids: Set<ItemID>), ItemTag.Refusal> {
+    /// The tag as it would be kept, the items it would be added to and why the others won't take it, or why it can't
+    /// be added at all: what Marfa refuses (`items/tag-text`, `items/tag-dot-segment`, `items/tags-count`), a tag the
+    /// library sets itself, and a set none of whose items can take it. An item that can't be changed or already has
+    /// the most tags is skipped, not a reason to refuse the others.
+    func checkedTag(_ text: String, adding ids: Set<ItemID>) -> Result<(tag: String, ids: Set<ItemID>, skips: BatchSkips), ItemTag.Refusal> {
         let tag = ItemTag.normalized(text)
         if let refusal = ItemTag.refusal(of: tag) { return .failure(refusal) }
         if tag == ItemTag.favorite { return .failure(.favorite) }
         if reservedTags.contains(tag) { return .failure(.reserved) }
-        let editable = ids.compactMap { item($0) }.filter(\.canEditTags)
-        guard !editable.isEmpty else { return .failure(.cantEdit) }
-        let lacking = editable.filter { !$0.tags.contains(tag) }
-        guard !lacking.isEmpty else { return .failure(.alreadyHas) }
-        guard lacking.allSatisfy({ $0.tags.count < ItemTag.maxPerItem }) else { return .failure(.full) }
-        return .success((tag, Set(lacking.map(\.id))))
+        var skips = BatchSkips()
+        var lacking: Set<ItemID> = []
+        var holding = 0
+        for id in ids {
+            guard let item = item(id) else {
+                skips.skip(.gone)
+                continue
+            }
+            if let reason = item.writeObstacle {
+                skips.skip(reason)
+            } else if item.tags.contains(tag) {
+                holding += 1
+            } else if item.tags.count >= ItemTag.maxPerItem {
+                skips.skip(.fullOfTags)
+            } else {
+                lacking.insert(id)
+            }
+        }
+        guard !lacking.isEmpty else {
+            if skips.counts[.fullOfTags] != nil { return .failure(.full) }
+            return .failure(holding > 0 ? .alreadyHas : .cantEdit)
+        }
+        return .success((tag, lacking, skips))
     }
 
     /// Whether the item can be filed in a collection: an active item the library can write, of a type the catalogue
@@ -256,8 +285,9 @@ extension ItemLibrary {
         item.state == .active && item.problem == nil && catalogue.canJoinCollection(item.type)
     }
 
-    /// What Add to Collection and Remove from Collection act on: the whole selection, files too, less the items that
-    /// can't be filed in a collection. They never take only the notes, as the note commands do.
+    /// The items of the selection that can be filed in a collection, files too: Add to Collection and Remove from
+    /// Collection are offered while there is one. The commands themselves take the whole selection and tell the
+    /// person about the items they skip.
     func collectionMembers(_ ids: Set<ItemID>) -> Set<ItemID> {
         Set(ids.compactMap { item($0) }.filter(canJoinCollection).map(\.id))
     }

@@ -61,7 +61,7 @@ struct ItemLibraryTests {
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")
         #expect(library.notices.waiting.last?.title == "Can’t Delete Immediately")
-        #expect(library.notices.waiting.last?.message == "Notes can’t be deleted immediately right now. They’re still in Recently Deleted.")
+        #expect(library.notices.waiting.last?.message == "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted.")
         library.notices.answerAll()
         library.canPurge = true
         library.deletePermanentlyOnConfirm([trashed.id])

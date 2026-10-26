@@ -7,6 +7,7 @@ import SwiftUI
 struct ItemTable: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
     let order: NoteOrder
@@ -96,7 +97,7 @@ struct ItemTable: View {
                 Button("Open") { open(ids) }
                     .disabled(ids.count != 1)
                 Button("Open in New Window", systemImage: "macwindow") {
-                    for id in library.idsForWindows(ids) { openWindow(value: id) }
+                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
                 }
                 Divider()
                 NoteActions(ids: ids, undoManager: undoManager)
@@ -115,10 +116,7 @@ struct ItemTable: View {
         }
         .onDeleteCommand {
             let ids = browser.selection
-            EditorController.flushAll(leaving: false) { [library, undoManager] kept in
-                guard kept else { return }
-                Browser.delete(ids, in: library, undoManager: undoManager)
-            }
+            library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
         }
     }
 

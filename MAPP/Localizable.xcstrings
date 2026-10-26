@@ -1,6 +1,98 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Open %lld windows?" : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "Open %lld window?" } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "Open %lld windows?" } }
+  } } } }
+},
+"Each item opens in a window of its own." : { "extractionState" : "manual" },
+"%lld items are collections, which can’t be in another collection." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a collection, which can’t be in another collection." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are collections, which can’t be in another collection." } }
+  } } } }
+},
+"%lld items are files, which can’t be moved between lanes." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a file, which can’t be moved between lanes." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are files, which can’t be moved between lanes." } }
+  } } } }
+},
+"%lld items aren’t on this board." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item isn’t on this board." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items aren’t on this board." } }
+  } } } }
+},
+"^[Delete %lld item](inflect: true) immediately?" : { "extractionState" : "manual" },
+"They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it." : { "extractionState" : "manual" },
+"Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : { "extractionState" : "manual" },
+"%lld items are no longer in the library." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is no longer in the library." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are no longer in the library." } }
+  } } } }
+},
+"%lld items are in Recently Deleted." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is in Recently Deleted." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are in Recently Deleted." } }
+  } } } }
+},
+"%lld items can’t be changed right now." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t be changed right now." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be changed right now." } }
+  } } } }
+},
+"%lld items are files, which keep their type." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is a file, which keeps its type." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are files, which keep their type." } }
+  } } } }
+},
+"%lld items can’t become this type." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t become this type." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t become this type." } }
+  } } } }
+},
+"%lld items can’t be filed in a collection." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t be filed in a collection." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be filed in a collection." } }
+  } } } }
+},
+"%lld items already have the most tags an item can have." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item already has the most tags an item can have." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items already have the most tags an item can have." } }
+  } } } }
+},
+"%lld items can’t go in this lane." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t go in this lane." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t go in this lane." } }
+  } } } }
+},
+"Some Items Were Skipped" : { "extractionState" : "manual" },
+"^[Move %lld item](inflect: true) to Recently Deleted?" : { "extractionState" : "manual" },
+"Move to Recently Deleted" : { "extractionState" : "manual" },
+"You can bring them back from Recently Deleted." : { "extractionState" : "manual" },
 "Relevance" : { "extractionState" : "manual" },
 "Sort by Relevance" : { "extractionState" : "manual" },
 "Everywhere" : { "extractionState" : "manual" },

@@ -303,6 +303,7 @@ struct MainView: View {
     private var dialogsWindow: some View {
         presentedWindow
         .libraryDialogs()
+        .deleteConfirmation(for: details)
         .savedViewDialogs(browser: browser, order: order)
     }
 

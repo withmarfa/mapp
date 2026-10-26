@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 struct ItemBoardTests {
@@ -73,6 +74,38 @@ struct ItemBoardTests {
         #expect(lanes.map(\.id) == [.option("waiting"), .option("done"), .option("custom_value"), .missing])
         #expect(ItemBoardLayout.move(item, key: "status", to: .option("waiting"), catalogue: Self.catalogue) == .set(.string("waiting")))
         #expect(ItemBoardLayout.move(item, key: "status", to: .option("new_value"), catalogue: Self.catalogue) == .set(.string("new_value")))
+    }
+
+    @Test func aMoveToALaneNamesTheTrueReasonForEachItemItLeavesAlone() {
+        var binned = Self.item("binned", value: .string("todo"))
+        binned.state = .trashed
+        var problem = Self.item("problem", value: .string("todo"))
+        problem.state = .archived
+        let file = Item(
+            id: ItemID("file"), type: .file, title: "file", titleRule: .property("title"), content: .file(.data, byteCount: 1),
+            version: ItemVersion(1), created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0))
+        let items = [
+            Self.item("moves", value: .string("todo")), Self.item("there", value: .string("done")),
+            Self.item("review", type: Self.second, value: .string("done")), Self.item("hidden", value: .string("todo")),
+            binned, problem, file,
+        ]
+        let library = FakeItemLibrary(items: items)
+        library.catalogue = Self.catalogue
+        let shown = Set(items.map(\.id)).subtracting([ItemID("hidden")])
+        let ids = shown.union([ItemID("hidden"), ItemID("ghost")])
+
+        let plan = ItemBoardLayout.movePlan(ids, key: "status", to: .option("done"), shown: shown, in: library)
+        #expect(plan.changes.map(\.id) == [ItemID("moves")], "an item already in the lane is no skip, and the others move")
+        var expected = BatchSkips()
+        for reason in [BatchSkips.Reason.gone, .notShown, .inBin, .cantChange, .fileHasNoLane] { expected.skip(reason) }
+        #expect(plan.skips == expected)
+        #expect(plan.skips.message?.contains("isn’t on this board") == true)
+        #expect(plan.skips.message?.contains("lane") == true)
+
+        let wrongType = ItemBoardLayout.movePlan([ItemID("review")], key: "status", to: .option("todo"), shown: shown, in: library)
+        var cantGo = BatchSkips()
+        cantGo.skip(.cantMoveToLane)
+        #expect(wrongType.skips == cantGo, "only an item whose type doesn’t take the lane reads as one that can’t go in it")
     }
 
     @Test func requiredFieldsCannotBeRemoved() {

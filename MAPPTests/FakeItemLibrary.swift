@@ -249,8 +249,13 @@ final class FakeItemLibrary: ItemLibrary {
     private(set) var typeChanges: [(ids: Set<ItemID>, type: TypeID, filling: [String: PropertyValue])] = []
 
     func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool {
-        typeChanges.append((ids, type, filling))
-        change(ids) { $0.type = type }
+        let plan = typeChangePlan(ids, to: type, filling: filling)
+        guard plan.missing.isEmpty else { return false }
+        tellSkipped(plan.skips, didChange: !plan.items.isEmpty, failing: "Can’t Change Type")
+        guard !plan.items.isEmpty else { return plan.skips.isEmpty }
+        let changing = Set(plan.items.map(\.item.id))
+        typeChanges.append((changing, type, filling))
+        change(changing) { $0.type = type }
         return true
     }
 
@@ -275,7 +280,9 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?) {
-        change(ids) { item in
+        let plan = favoritePlan(ids, isFavorite)
+        tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: "Can’t Change Favorites")
+        change(plan.changing) { item in
             if isFavorite { item.tags.insert(ItemTag.favorite) } else { item.tags.remove(ItemTag.favorite) }
         }
     }
@@ -297,7 +304,8 @@ final class FakeItemLibrary: ItemLibrary {
     func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal? {
         switch checkedTag(tag, adding: ids) {
         case .failure(let refusal): return refusal
-        case .success(let (tag, changing)):
+        case .success(let (tag, changing, skips)):
+            tellSkipped(skips, didChange: true, failing: "Can’t Add Tag")
             tagWrites.append((tag, true, changing))
             change(changing) { $0.tags.insert(tag) }
             return nil
@@ -418,28 +426,35 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
-        guard collections.contains(where: { $0.id == collection }),
-              ids.allSatisfy({ id in item(id).map(canJoinCollection) == true })
-        else {
+        guard collections.contains(where: { $0.id == collection }) else {
             notices.tell("Can’t Add to Collection", "Refused")
             return false
         }
-        for index in items.indices where ids.contains(items[index].id) && !items[index].collectionIDs.contains(collection) {
+        let plan = collectionPlan(ids, joining: collection)
+        tellSkipped(plan.skips, didChange: !plan.joining.isEmpty, failing: "Can’t Add to Collection")
+        let joining = Set(plan.joining.map(\.id))
+        for index in items.indices where joining.contains(items[index].id) {
             let id = items[index].id
             items[index].edgesOut.append(Edge(
                 id: EdgeID("in-collection-\(id.rawValue)-\(collection.rawValue)"), type: MarfaMapping.collectionEdge,
                 source: id, target: .item(collection), origin: .property(MarfaMapping.collectionEdge)))
         }
-        return true
+        return !joining.isEmpty || plan.skips.isEmpty
     }
 
     func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
         var removed = false
+        var skips = BatchSkips()
         for index in items.indices where ids.contains(items[index].id) {
-            let before = items[index].edgesOut.count
+            guard items[index].collectionIDs.contains(collection) else { continue }
+            if let reason = items[index].writeObstacle {
+                skips.skip(reason)
+                continue
+            }
             items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.target == .item(collection) }
-            removed = removed || items[index].edgesOut.count != before
+            removed = true
         }
+        tellSkipped(skips, didChange: removed, failing: "Can’t Remove from Collection")
         return removed
     }
 

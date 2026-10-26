@@ -31,9 +31,9 @@ extension MarfaLibrary {
         }
     }
 
-    /// One edge for each item not already in the collection. Where the collection orders its members, the new ones
-    /// go after the last, in the order given. Nothing is written when any item can't be a member, and the person is
-    /// told why.
+    /// One edge for each item not already in the collection, in one undo step. Where the collection orders its
+    /// members, the new ones go after the last, in the order given. An item that can't be a member, or can't be
+    /// changed, is left out and the person is told how many and why.
     @discardableResult
     func addToCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
         let title = String(localized: "Can’t Add to Collection")
@@ -41,16 +41,20 @@ extension MarfaLibrary {
             notices.tell(title, String(localized: "This collection isn’t in the library."))
             return false
         }
-        let joining = ids.compactMap { item($0) }.filter { !$0.collectionIDs.contains(collection) }.sorted(by: Self.titleOrder)
-        for member in joining {
+        let planned = collectionPlan(ids, joining: collection)
+        var skips = planned.skips
+        var joining: [Item] = []
+        for member in planned.joining {
             let draft = EdgeDraft(type: MarfaMapping.collectionEdge, source: member.id, target: collection)
-            let type: TypeID? = member.state == .active && member.problem == nil ? member.type : nil
-            if let problem = linkProblem(draft, sourceType: type, targetType: target.type) {
-                notices.tell(title, problem)
-                return false
+            if linkProblem(draft, sourceType: member.type, targetType: target.type) == nil {
+                joining.append(member)
+            } else {
+                skips.skip(.cantJoinCollection)
             }
         }
-        guard !joining.isEmpty else { return true }
+        tellSkipped(skips, didChange: !joining.isEmpty, failing: title)
+        guard !joining.isEmpty else { return skips.isEmpty }
+        joining.sort(by: Self.titleOrder)
         let last = positions(in: collection).values.max()
         let drafts = joining.enumerated().map { offset, member in
             EdgeDraft(
@@ -63,16 +67,25 @@ extension MarfaLibrary {
         return true
     }
 
-    /// Removes the items' `in-collection` edges to the collection. An undo puts each back at its position.
+    /// Removes the items' `in-collection` edges to the collection, in one undo step. An undo puts each back at its
+    /// position. An item in the collection that can't be changed is left out and the person is told.
     @discardableResult
     func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
-        let drafts = ids.compactMap { index.link(type: MarfaMapping.collectionEdge, source: $0, target: collection) }
-            .map { EdgeDraft(type: $0.type, source: $0.source, target: $0.target, position: $0.position) }
-            .sorted { $0.source.rawValue < $1.source.rawValue }
+        let title = String(localized: "Can’t Remove from Collection")
+        var skips = BatchSkips()
+        var drafts: [EdgeDraft] = []
+        for id in ids {
+            guard let link = index.link(type: MarfaMapping.collectionEdge, source: id, target: collection) else { continue }
+            if let reason = item(id)?.writeObstacle {
+                skips.skip(reason)
+            } else {
+                drafts.append(EdgeDraft(type: link.type, source: link.source, target: link.target, position: link.position))
+            }
+        }
+        tellSkipped(skips, didChange: !drafts.isEmpty, failing: title)
         guard !drafts.isEmpty else { return false }
-        relink(
-            RelationshipChange(removing: drafts), name: String(localized: "Remove from Collection"),
-            failing: String(localized: "Can’t Remove from Collection"), undoManager: undoManager)
+        drafts.sort { $0.source.rawValue < $1.source.rawValue }
+        relink(RelationshipChange(removing: drafts), name: String(localized: "Remove from Collection"), failing: title, undoManager: undoManager)
         return true
     }
 

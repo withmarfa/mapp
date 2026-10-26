@@ -89,6 +89,42 @@ import Testing
         #expect(library.notices.waiting.isEmpty)
     }
 
+    @Test func addingToACollectionIsOneUndoStepThatUnlinksOnlyWhatJoined() async throws {
+        let (library, source) = try await loaded()
+        let undo = StepCountingUndoManager()
+        // Plain note is in Holiday already and Archive is a collection, so only the other two join.
+        #expect(library.addToCollection([F.e1, F.n2, F.n1, Self.archive], Self.holiday, undoManager: undo))
+        #expect(undo.steps == 1)
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft, _) = write { draft.source } else { nil } }
+        #expect(Set(joined) == [F.e1, F.n2])
+        // The source answers with the edges it made, which the undo then removes.
+        for id in joined {
+            var item = try #require(library.item(id))
+            item.edgesOut.append(Self.member("new-\(id.rawValue)", id, of: Self.holiday))
+            source.send(.upserted([item]))
+        }
+        #expect(await eventually { Set(library.items(in: .collection(Self.holiday)).map(\.id)).isSuperset(of: [F.e1, F.n2]) })
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [.unlink(EdgeID("new-\(F.e1.rawValue)")), .unlink(EdgeID("new-\(F.n2.rawValue)"))])
+        #expect(!undo.canUndo)
+    }
+
+    @Test func removingFromACollectionIsOneUndoStepThatPutsBackOnlyWhatLeft() async throws {
+        let (library, source) = try await loaded()
+        let undo = StepCountingUndoManager()
+        #expect(library.removeFromCollection([F.n1, F.p1, F.e1], Self.holiday, undoManager: undo))
+        #expect(undo.steps == 1)
+        #expect(Set(source.writes) == [.unlink(EdgeID("m1")), .unlink(EdgeID("m2"))], "e1 is in no collection, so nothing is sent for it")
+        source.clearWrites()
+        undo.undo()
+        #expect(Set(source.writes) == [
+            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2), undoing: nil),
+            .link(EdgeDraft(type: "in-collection", source: F.p1, target: Self.holiday, position: 1), undoing: nil),
+        ])
+        #expect(!undo.canUndo)
+    }
+
     @Test func addingToACollectionWithNoPositionsSetsNone() async throws {
         let (library, source) = try await loaded()
         #expect(library.addToCollection([F.e1], Self.archive, undoManager: nil))
@@ -119,15 +155,19 @@ import Testing
         #expect(!library.canJoinCollection(try #require(library.item(Self.archive))))
         #expect(library.canJoinCollection(try #require(library.item(F.e1))))
         #expect(library.canJoinCollection(try #require(library.item(F.f1))))
-        #expect(!library.addToCollection([F.e1, Self.archive], Self.holiday, undoManager: nil))
-        #expect(source.writes.isEmpty)
+        // A collection among the items is skipped and told; the rest are filed.
+        #expect(library.addToCollection([F.e1, Self.archive], Self.holiday, undoManager: nil))
+        #expect(source.writes.count == 1)
+        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
+        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.isCollection, count: 1))
+        #expect(!library.addToCollection([Self.archive], Self.holiday, undoManager: nil))
+        #expect(source.writes.count == 1)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Add to Collection"))
-        #expect(library.notices.waiting.last?.message == String(localized: "A collection can’t be in another collection."))
         // Nor is one offered as a collection for another, or written through the item's own relationship.
         #expect(library.relationshipCandidates(for: Self.archive, field: "in-collection").isEmpty)
         #expect(!library.relationships(for: Self.archive).contains { $0.field == "in-collection" && $0.isEditable })
         #expect(!library.setItemRelationship(Self.archive, field: "in-collection", targetIDs: [Self.holiday], undoManager: nil))
-        #expect(source.writes.isEmpty)
+        #expect(source.writes.count == 1)
     }
 
     @Test func onlyACollectionInTheLibraryTakesMembers() async throws {

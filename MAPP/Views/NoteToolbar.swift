@@ -250,19 +250,18 @@ private struct MoreMenu: View {
     let editableNote: Item?
 
     var body: some View {
-        let noteIDs = Set(notes.map(\.id))
         let note = notes.count == 1 ? notes.first : nil
         Menu("More", systemImage: "ellipsis") {
             if browser != nil {
                 Button("Open in New Window", systemImage: "macwindow") {
-                    for id in library.idsForWindows(ids) { openWindow(value: id) }
+                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
                 }
                 .keyboardShortcut("o")
                 .disabled(ids.isEmpty)
             }
             NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
-            NoteOrganizeActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
+            NoteOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             CollectionActions(selection: ids, details: details, undoManager: undoManager)
             Divider()
             Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
@@ -283,7 +282,7 @@ private struct MoreMenu: View {
             Button("Export as PDF…", systemImage: "doc.richtext") { editor.exportPDF() }
                 .disabled(visibleNote == nil)
             Divider()
-            NoteRemoveActions(ids: noteIDs, undoManager: undoManager, keepsPlace: true)
+            NoteRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
         }
         .menuIndicator(.hidden)
         .help("More")

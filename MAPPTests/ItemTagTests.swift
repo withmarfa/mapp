@@ -64,11 +64,14 @@ import Testing
         library.items[0] = full
         let other = library.add("Other")
         #expect(library.addTag("new", to: [full.id], undoManager: nil) == .full)
-        // A set with one full item is refused whole, so no item is tagged and the others are not left different.
-        #expect(library.addTag("new", to: [full.id, other.id], undoManager: nil) == .full)
         #expect(library.tagWrites.isEmpty)
+        // In a set, the full item is skipped and told, and the rest are tagged.
+        #expect(library.addTag("new", to: [full.id, other.id], undoManager: nil) == nil)
+        #expect(library.item(other.id)?.tags == ["new"])
+        #expect(library.item(full.id)?.tags.contains("new") == false)
+        #expect(library.notices.waiting.last?.title == String(localized: "Some Items Were Skipped"))
         #expect(library.addTag("t0", to: [full.id, other.id], undoManager: nil) == nil, "an item that holds it is not counted")
-        #expect(library.item(other.id)?.tags == ["t0"])
+        #expect(library.item(other.id)?.tags == ["new", "t0"])
     }
 
     @Test func removingATagAnotherDeviceRemovedSendsNothing() {

@@ -116,50 +116,43 @@ extension MarfaLibrary {
 
     // MARK: Types
 
-    /// Each item moves in one edit, its title and text going to the new type's keys (`TypeChange`). The views
-    /// offer only the types every item can become, so a set that cannot is refused whole, before anything is sent.
+    /// Each item moves in one edit, its title and text going to the new type's keys (`TypeChange`), and all of them
+    /// in one undo step. An item that cannot become `type`, or cannot be changed, is left out and the person told
+    /// how many and why. Nothing is sent while a required value is missing.
     @discardableResult
     func changeType(_ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue], undoManager: UndoManager?) -> Bool {
         guard let planned = plannedTypeChange(ids, to: type, filling: filling) else { return false }
+        guard !planned.isEmpty else { return true }
         let undos = TypeUndos()
         undos.items = sendTypeChange(planned, to: type)
-        registerTypeChangeUndo(undos, ids: ids, to: type, filling: filling, undoManager: undoManager)
+        registerTypeChangeUndo(undos, ids: Set(planned.map(\.item.id)), to: type, filling: filling, undoManager: undoManager)
         return true
     }
 
     private static var cantChangeType: String { String(localized: "Can’t Change Type") }
 
-    /// Nil, and the person told why, where any item cannot become `type` as things stand.
+    /// Nil, and the person told why, where nothing can be sent: a required value is missing, or every item is left
+    /// out. Otherwise the items to send, empty where each already has the type, and the person told of those left out.
     private func plannedTypeChange(
         _ ids: Set<ItemID>, to type: TypeID, filling: [String: PropertyValue]
-    ) -> [(item: Item, plan: TypeChange, values: [String: PropertyValue])]? {
-        var planned: [(item: Item, plan: TypeChange, values: [String: PropertyValue])] = []
-        let changing = ids.filter { item($0).map { $0.type != type } ?? true }
-        for id in changing.sorted(by: { $0.rawValue < $1.rawValue }) {
-            guard let item = item(id), let values = typeChangeValues(of: id),
-                  let plan = typeChange(of: id, to: type, filling: filling)
-            else {
-                notices.tell(Self.cantChangeType, String(localized: "One or more of these items can’t become this type."))
-                return nil
-            }
-            guard plan.missing.isEmpty else {
-                let fields = plan.missing.map(\.displayLabel).joined(separator: ", ")
-                notices.tell(Self.cantChangeType, String(localized: "Enter a value for: \(fields)."))
-                return nil
-            }
-            planned.append((item, plan, values))
+    ) -> [TypeChangePlan.Entry]? {
+        let plan = typeChangePlan(ids, to: type, filling: filling)
+        guard plan.missing.isEmpty else {
+            let fields = plan.missing.map(\.displayLabel).joined(separator: ", ")
+            notices.tell(Self.cantChangeType, String(localized: "Enter a value for: \(fields)."))
+            return nil
         }
-        return planned
+        tellSkipped(plan.skips, didChange: !plan.items.isEmpty, failing: Self.cantChangeType)
+        return plan.items.isEmpty && !plan.skips.isEmpty ? nil : plan.items
     }
 
-    private func sendTypeChange(
-        _ planned: [(item: Item, plan: TypeChange, values: [String: PropertyValue])], to type: TypeID
-    ) -> [TypeUndo] {
-        planned.map { item, plan, values in
+    private func sendTypeChange(_ planned: [TypeChangePlan.Entry], to type: TypeID) -> [TypeUndo] {
+        planned.map { entry in
+            let item = entry.item, plan = entry.plan
             submit(.retype(item.id, type, plan.changes, base: item.version), failing: Self.cantChangeType)
             return TypeUndo(
                 id: item.id, from: item.type, to: type,
-                before: Dictionary(uniqueKeysWithValues: plan.changes.keys.map { ($0, values[$0]) }), after: plan.changes)
+                before: Dictionary(uniqueKeysWithValues: plan.changes.keys.map { ($0, entry.values[$0]) }), after: plan.changes)
         }
     }
 
@@ -174,7 +167,7 @@ extension MarfaLibrary {
                 let redone = TypeUndos()
                 library.registerTypeChangeUndo(redone, ids: ids, to: type, filling: filling, undoManager: undoManager)
                 library.afterHandingOverEdits {
-                    guard let planned = library.plannedTypeChange(ids, to: type, filling: filling) else { return }
+                    guard let planned = library.plannedTypeChange(ids, to: type, filling: filling), !planned.isEmpty else { return }
                     redone.items = library.sendTypeChange(planned, to: type)
                 }
             }
@@ -292,8 +285,11 @@ extension MarfaLibrary {
 
     /// Items in the bin keep their tags, since Recently Deleted shows no favorites.
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?) {
-        let changing = Set(ids.filter { id in item(id).map { $0.state == .active && $0.isFavorite != isFavorite } ?? false })
-        tag(changing, favorite: isFavorite, undoManager: undoManager)
+        let plan = favoritePlan(ids, isFavorite)
+        tag(plan.changing, favorite: isFavorite, undoManager: undoManager)
+        tellSkipped(
+            plan.skips, didChange: !plan.changing.isEmpty,
+            failing: isFavorite ? String(localized: "Can’t Add to Favorites") : String(localized: "Can’t Remove from Favorites"))
     }
 
     private func tag(_ ids: Set<ItemID>, favorite: Bool, undoManager: UndoManager?) {
@@ -312,8 +308,9 @@ extension MarfaLibrary {
     func addTag(_ tag: String, to ids: Set<ItemID>, undoManager: UndoManager?) -> ItemTag.Refusal? {
         switch checkedTag(tag, adding: ids) {
         case .failure(let refusal): return refusal
-        case .success(let (tag, changing)):
+        case .success(let (tag, changing, skips)):
             setTag(tag, on: true, changing, undoManager: undoManager)
+            tellSkipped(skips, didChange: true, failing: String(localized: "Can’t Add Tag"))
             return nil
         }
     }

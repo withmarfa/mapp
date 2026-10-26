@@ -178,6 +178,10 @@ final class GalleryTests: XCTestCase {
         XCTAssertEqual(first.value as? String, "Selected")
         XCTAssertEqual(second.value as? String, "Selected")
         app.typeKey(.delete, modifierFlags: .command)
+        // Moving more than one item asks first.
+        let confirm = window.sheets.firstMatch.buttons["Move to Recently Deleted"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.click()
         XCTAssertTrue(first.waitForNonExistence(timeout: 3))
         XCTAssertTrue(second.waitForNonExistence(timeout: 3))
         app.typeKey("z", modifierFlags: .command)

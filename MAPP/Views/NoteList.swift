@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct NoteList: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
     let order: NoteOrder
@@ -93,7 +94,7 @@ struct NoteList: View {
         .contextMenu(forSelectionType: ItemID.self) { ids in
             NoteActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            for id in library.idsForWindows(ids) { openWindow(value: id) }
+            ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
         }
         .overlay {
             if ids.isEmpty {
@@ -115,10 +116,7 @@ struct NoteList: View {
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.
     private func deleteSelection() {
         let ids = browser.selection
-        EditorController.flushAll(leaving: false) { [library, undoManager] kept in
-            guard kept else { return }
-            Browser.delete(ids, in: library, undoManager: undoManager)
-        }
+        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }
 

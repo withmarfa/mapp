@@ -4,6 +4,7 @@ import SwiftUI
 struct ItemGallery: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Environment(\.interfaceTextSize) private var textSize
     @Bindable var browser: Browser
@@ -192,7 +193,7 @@ struct ItemGallery: View {
             let selected = browser.selection.contains(item.id) ? browser.selection : [item.id]
             Button("Open") { browser.selection = [item.id]; browser.openCollectionSelection() }
             Button("Open in New Window", systemImage: "macwindow") {
-                for id in library.idsForWindows(selected) { openWindow(value: id) }
+                ItemWindows.open(library.idsForWindows(selected)) { openWindow(value: $0) }
             }
             Divider()
             NoteActions(ids: selected, undoManager: undoManager)
@@ -209,9 +210,6 @@ struct ItemGallery: View {
 
     private func deleteSelection() {
         let ids = browser.selection
-        EditorController.flushAll(leaving: false) { [library, undoManager] kept in
-            guard kept else { return }
-            Browser.delete(ids, in: library, undoManager: undoManager)
-        }
+        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }
