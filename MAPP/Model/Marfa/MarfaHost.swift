@@ -14,6 +14,9 @@ import Observation
     typealias Remover = @Sendable (URL, UInt64) async throws -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any KeyStore) -> (any ItemHistorySource)?
+    /// Makes the reader and writer of the server's own settings for a connection, or nil where there is no server to
+    /// ask, as in the sample.
+    typealias Configurer = @Sendable (MarfaConnection, any KeyStore) -> (any InstanceConfigSource)?
 
     nonisolated enum State: Hashable, Sendable {
         case disconnected
@@ -105,6 +108,7 @@ import Observation
     private let describer: Describer
     private let remover: Remover
     private let historian: Historian
+    private let configurer: Configurer
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
@@ -133,7 +137,8 @@ import Observation
         opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
         remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) },
-        historian: @escaping Historian = { MarfaServerVersions(connection: $0, keys: $1) }
+        historian: @escaping Historian = { MarfaServerVersions(connection: $0, keys: $1) },
+        configurer: @escaping Configurer = { MarfaServerConfig(connection: $0, keys: $1) }
     ) {
         self.defaults = defaults
         self.keys = keys
@@ -142,6 +147,7 @@ import Observation
         self.describer = describer
         self.remover = remover
         self.historian = historian
+        self.configurer = configurer
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
 
@@ -458,6 +464,18 @@ import Observation
             }
         ]
         source.refresh()
+        readName(of: connection)
+    }
+
+    /// The server's own settings to ask about, for the server the app is set to, with a name for it. Nil where none is set.
+    func instanceConfigTarget() -> InstanceSettingsModel.Target? {
+        guard let connection = configuredConnection, let source = configurer(connection, keys) else { return nil }
+        return InstanceSettingsModel.Target(id: connection.address.absoluteString, source: source)
+    }
+
+    /// Reads the server's name again, as after the person renamed it in This Marfa.
+    func refreshName() {
+        guard let connection else { return }
         readName(of: connection)
     }
 

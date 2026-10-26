@@ -1,0 +1,206 @@
+import Foundation
+import Marfa
+import Synchronization
+import Testing
+@testable import MAPP
+
+/// A server's settings held in memory: it answers as the real one does, taking a patch field by field, and keeps
+/// what it was sent.
+nonisolated final class FakeInstanceConfig: InstanceConfigSource {
+    let config: Mutex<InstanceConfig>
+    let readFailure = Mutex<InstanceConfigFailure?>(nil)
+    let updateFailure = Mutex<InstanceConfigFailure?>(nil)
+    let patches = Mutex<[InstanceConfigPatch]>([])
+
+    init(_ values: [InstanceSetting: InstanceValue] = [:]) {
+        config = Mutex(InstanceConfig(values: values))
+    }
+
+    func read() async throws(InstanceConfigFailure) -> InstanceConfig {
+        if let failure = readFailure.withLock({ $0 }) { throw failure }
+        return config.withLock { $0 }
+    }
+
+    func update(_ patch: InstanceConfigPatch) async throws(InstanceConfigFailure) -> InstanceConfig {
+        patches.withLock { $0.append(patch) }
+        if let failure = updateFailure.withLock({ $0 }) { throw failure }
+        return config.withLock { config in
+            for (setting, value) in patch.values { config.values[setting] = value }
+            for setting in patch.clear { config.values[setting] = nil }
+            return config
+        }
+    }
+
+    var sent: [InstanceConfigPatch] { patches.withLock { $0 } }
+}
+
+@MainActor
+@Suite struct InstanceSettingsTests {
+    private func model(_ source: FakeInstanceConfig, id: String = "https://marfa.test") -> InstanceSettingsModel {
+        InstanceSettingsModel { .init(id: id, source: source) }
+    }
+
+    private func loaded(_ values: [InstanceSetting: InstanceValue] = [:]) async -> (InstanceSettingsModel, FakeInstanceConfig) {
+        let source = FakeInstanceConfig(values)
+        let model = model(source)
+        await model.load()
+        return (model, source)
+    }
+
+    @Test func aSaveSendsOnlyTheFieldsThatChangedAndShowsTheAnswer() async {
+        let (model, source) = await loaded([.name: .text("Library"), .trashRetentionDays: .number(30)])
+        var renamed = 0
+        model.onRenamed = { renamed += 1 }
+        #expect(model.draft[.name] == "Library")
+
+        model.draft[.name] = "  Home  "
+        await model.save()
+
+        #expect(source.sent == [InstanceConfigPatch(values: [.name: .text("Home")])])
+        #expect(model.draft[.name] == "Home")
+        #expect(model.saved == ["Name: Home"])
+        #expect(renamed == 1)
+        #expect(!model.canSave)
+    }
+
+    @Test func anEmptyFieldRemovesTheSettingSoItsDefaultApplies() async {
+        let (model, source) = await loaded([.versionMaxVersions: .number(50), .name: .text("Library")])
+        model.draft[.versionMaxVersions] = " "
+        await model.save()
+        #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
+        #expect(model.loaded?.values[.versionMaxVersions] == nil)
+        #expect(model.saved == ["Most versions kept per item: default, 500"])
+    }
+
+    @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
+        let (model, source) = await loaded()
+        model.draft[.trashRetentionDays] = "-1"
+        model.draft[.versionRecentDays] = "36501"
+        model.draft[.versionMaxVersions] = "0"
+        model.draft[.name] = String(repeating: "a", count: 201)
+        #expect(model.problems[.trashRetentionDays] == .notWhole)
+        #expect(model.problems[.versionRecentDays] == .outOfRange(0...36500))
+        #expect(model.problems[.versionMaxVersions] != nil)
+        #expect(model.problems[.name] == .nameTooLong)
+        model.draft[.name] = "Home\u{202E}"
+        #expect(model.problems[.name] == .nameHidden)
+        #expect(!model.canSave)
+        await model.save()
+        #expect(source.sent.isEmpty)
+
+        model.revert()
+        model.draft[.versionRecentDays] = "100"
+        model.draft[.versionDailyDays] = "50"
+        #expect(model.problems[.versionDailyDays] == .shorterThan(.versionRecentDays))
+    }
+
+    @Test func aShorterRetentionWaitsForTheirAgreementAndNothingElseDoes() async {
+        let (model, source) = await loaded([.trashRetentionDays: .number(60)])
+
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        #expect(source.sent.isEmpty)
+        #expect(model.pending?.shortenings == [.init(setting: .trashRetentionDays, from: 60, to: 7)])
+        model.cancelPending()
+        #expect(source.sent.isEmpty)
+
+        await model.save()
+        if let pending = model.pending { await model.confirm(pending) }
+        #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
+
+        // Longer, and no limit at all, ask nothing.
+        model.draft[.trashRetentionDays] = "0"
+        await model.save()
+        #expect(model.pending == nil)
+        #expect(source.sent.count == 2)
+    }
+
+    @Test func anUnsetRetentionIsComparedWithTheDefaultTheServerWouldUse() async {
+        let (model, _) = await loaded()
+        model.draft[.versionWeeklyDays] = "100"
+        model.draft[.versionMaxVersions] = "900"
+        await model.save()
+        #expect(model.pending?.shortenings.map(\.setting) == [.versionWeeklyDays])
+    }
+
+    @Test func aSettingChangedElsewhereIsShownAndNotOverwritten() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        model.draft[.name] = "Home"
+        source.config.withLock { $0.values[.name] = .text("Office") }
+
+        await model.save()
+
+        #expect(source.sent.isEmpty)
+        #expect(model.elsewhere == [.name])
+        #expect(model.loaded?.name == "Office")
+        #expect(model.draft[.name] == "Home")
+        #expect(model.elsewhereMessage?.contains("Office") == true)
+    }
+
+    @Test func aKeyWithoutPermissionSeesNoSettings() async {
+        let source = FakeInstanceConfig()
+        source.readFailure.withLock { $0 = .notPermitted }
+        let model = model(source)
+        await model.load()
+        #expect(model.loaded == nil)
+        #expect(model.failure == .notPermitted)
+    }
+
+    @Test func aServerThatCannotBeReachedKeepsTheLastAnswerAndWhatWasTyped() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        model.draft[.name] = "Home"
+        source.readFailure.withLock { $0 = .unreachable }
+        await model.load()
+        #expect(model.failure == .unreachable)
+        #expect(model.loaded?.name == "Library")
+        #expect(model.draft[.name] == "Home")
+
+        // Saving offline fails the same way, and nothing is sent.
+        await model.save()
+        #expect(model.failure == .unreachable)
+        #expect(source.sent.isEmpty)
+    }
+
+    @Test func aRefusedValueKeepsWhatWasTypedAndSaysWhy() async {
+        let (model, source) = await loaded([.name: .text("Library")])
+        source.updateFailure.withLock { $0 = .refused("The name is not allowed.") }
+        model.draft[.name] = "Home"
+        await model.save()
+        #expect(model.failure == .refused("The name is not allowed."))
+        #expect(model.draft[.name] == "Home")
+        #expect(model.loaded?.name == "Library")
+        #expect(model.canSave)
+    }
+
+    @Test func anotherServerStartsFromNothing() async {
+        let first = FakeInstanceConfig([.name: .text("One")])
+        let second = FakeInstanceConfig([.name: .text("Two")])
+        var current = (id: "one", source: first)
+        let model = InstanceSettingsModel { .init(id: current.id, source: current.source) }
+        await model.load()
+        model.draft[.name] = "Typed for one"
+        current = (id: "two", source: second)
+        await model.load()
+        #expect(model.loaded?.name == "Two")
+        #expect(model.draft[.name] == "Two")
+    }
+}
+
+/// What goes on the wire, and how the server's refusals are told.
+@Suite struct MarfaServerConfigTests {
+    @Test func theBodyNamesOnlyTheChangedSettingsAndNullRemovesOne() throws {
+        let patch = InstanceConfigPatch(values: [.name: .text("Home"), .versionMaxVersions: .number(200)], clear: [.trashRetentionDays])
+        let data = try JSONEncoder().encode(MarfaServerConfig.payload(patch))
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(Set(json.keys) == ["name", "version_max_versions", "trash_retention_days"])
+        #expect(json["name"] as? String == "Home")
+        #expect(json["version_max_versions"] as? Int == 200)
+        #expect(json["trash_retention_days"] is NSNull)
+    }
+
+    @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {
+        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease. Details: {\"x\":1}")
+        #expect(MarfaServerConfig.failure(error) == .refused("Windows must not decrease."))
+        #expect(MarfaServerConfig.failure(MarfaError.forbidden(code: "forbidden", message: "no")) == .notPermitted)
+    }
+}
