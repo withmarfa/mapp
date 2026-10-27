@@ -155,8 +155,18 @@ struct EmbeddedFilesSafetyTests {
         let real = try #require(OpenFile.realPath(of: folder.root.url))
         let pipe = real.appending(path: "Attachments/Pipe.png")
         try #require(mkfifo(pipe.path, 0o644) == 0)
-        let started = ContinuousClock.now
-        #expect(await OpenFile.open(pipe, inside: folder.root.url) == nil)
-        #expect(ContinuousClock.now - started < .seconds(1))
+        var answered = false
+        let opening = Task {
+            let opened = await OpenFile.open(pipe, inside: folder.root.url)
+            answered = true
+            return opened
+        }
+        let returnedWithoutWriter = await eventually { answered }
+        // Keep a writer open during cleanup so a blocking regression cannot strand the reader's thread.
+        let rescue = returnedWithoutWriter ? -1 : Darwin.open(pipe.path, O_RDWR | O_NONBLOCK | O_CLOEXEC)
+        defer { if rescue >= 0 { close(rescue) } }
+        if !returnedWithoutWriter { try #require(rescue >= 0, "could not release the blocked pipe reader") }
+        #expect(returnedWithoutWriter, "opening a pipe must return without waiting for a writer")
+        #expect(await opening.value == nil)
     }
 }
