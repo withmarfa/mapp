@@ -147,7 +147,8 @@ nonisolated enum MarfaMapping {
     private static func field(_ field: Marfa.TypeField) -> ItemTypeInfo.Field {
         ItemTypeInfo.Field(
             key: field.name, label: label(forField: field.name), kind: kind(of: field),
-            declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description)
+            declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
+            format: field.type == "url" ? .url : field.type == "email" ? .email : nil)
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {

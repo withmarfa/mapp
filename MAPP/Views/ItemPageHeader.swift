@@ -52,6 +52,14 @@ struct ItemPageHeader: ViewModifier {
         let draft = drafts.draft(for: item.id, key: "title")
         let status = library.catalogue.itemTypes[item.type]?.statusField
         let parent = Self.parent(of: item.id, in: library)
+        let relationships = library.relationships(for: item.id)
+        let type = library.catalogue.itemTypes[item.type]
+        let now = library.now()
+        let properties = PropertyRow.rows(
+            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item), relationships: relationships,
+            parentField: "child-of", tags: library.tags(of: item))
+        let linked = LinkedItem.list(
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, item: { library.item($0) })
         return PageHeader(
             item: item.id.rawValue,
             hidden: item.state == .trashed,
@@ -73,6 +81,11 @@ struct ItemPageHeader: ViewModifier {
                 return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
                                       empty: title == nil, opensMenu: title != nil)
             },
+            byline: PageByline(item: item, now: now),
+            properties: properties,
+            linked: linked,
+            showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),
+            showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize

@@ -380,7 +380,9 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
     [
       'discardChanges',
       'itemType',
+      'linkedFrom',
       'parentRejected',
+      'properties',
       'propertyRejected',
       'status',
       'title',
