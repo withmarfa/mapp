@@ -233,7 +233,6 @@
 "Choose Icon…" : { "extractionState" : "manual" },
 "Icons are kept on your server, so you can choose one once MAPP is connected." : { "extractionState" : "manual" },
 "Search Icons" : { "extractionState" : "manual" },
-"This item has no file to show." : { "extractionState" : "manual" },
 "Use Default" : { "extractionState" : "manual" },
 "MAPP can’t reach the server. Your icon choice needs the server, so try again once it’s back." : { "extractionState" : "manual" },
 "This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or use a key that can." : { "extractionState" : "manual" },
@@ -1338,6 +1337,12 @@
     "File Not Found" : {
 
     },
+    "This file isn’t an HTML page." : {
+
+    },
+    "The file for this page isn’t in Marfa." : {
+
+    },
     "File Unavailable" : {
       "extractionState" : "manual"
     },
@@ -1791,6 +1796,9 @@
     },
     "Open Copy" : {
       "extractionState" : "manual"
+    },
+    "Open in Browser" : {
+
     },
     "Open in New Window" : {
 

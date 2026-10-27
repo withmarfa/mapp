@@ -226,13 +226,6 @@ body {
   mask: center / contain no-repeat;
 }
 
-.item-icon-type {
-  width: var(--icon-type-width, 1em);
-  height: var(--icon-type-height, 1em);
-  -webkit-mask-image: var(--icon-type);
-  mask-image: var(--icon-type);
-}
-
 .item-icon-parent {
   width: var(--icon-parent-width, 1em);
   height: var(--icon-parent-height, 1em);
@@ -299,8 +292,8 @@ body {
   outline: none;
 }
 
-/* The byline: the type, who made the item and when, as one quiet line under the title. The type is plain text here
-   rather than an outlined pin. */
+/* The byline: the type with its icon, who made the item and when, as one quiet line under the title. The type is
+   plain text here rather than an outlined pin. */
 #item-header {
   /* One step of the header's 4 point grid, scaled with the interface's text size. */
   --step: calc(var(--interface-text-size) * 4 / 13);
@@ -322,10 +315,6 @@ body {
   box-shadow: none;
   color: inherit;
   font: inherit;
-}
-
-.item-byline .item-pin-icon {
-  display: none;
 }
 
 .item-byline-dot {

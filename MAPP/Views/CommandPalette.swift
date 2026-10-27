@@ -297,6 +297,10 @@ struct CommandPalette: View {
         if browser.selection.count == 1, let original = browser.selectedItems(in: library).first.flatMap({ library.originalAddress(of: $0) }) {
             add(String(localized: "Open Original"), "safari") { NSWorkspace.shared.open(original) }
         }
+        if browser.selection.count == 1, let page = browser.selectedItems(in: library).first,
+           let target = library.browserTarget(of: page, fetchedFile: browser.fileURL(of: page.id)) {
+            add(String(localized: "Open in Browser"), "safari") { BrowserOpening.open(target, for: page) }
+        }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
         let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
         if share.isAvailable {

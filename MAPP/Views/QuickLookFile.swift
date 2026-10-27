@@ -1,7 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// A file as Quick Look can be given it. Quick Look picks a previewer from the file's name, and a Marfa copy keeps
+/// A file as an app that chooses by name can be given it (Quick Look, a browser). Quick Look picks a previewer from the file's name, and a Marfa copy keeps
 /// a file's bytes under their hash with no extension, so it is shown a copy of them named after the item.
 nonisolated struct QuickLookFile {
     let folder: URL
@@ -19,13 +19,16 @@ nonisolated struct QuickLookFile {
         return name + "." + preferred
     }
 
-    /// A copy of `file` in a folder of its own, or nil where it cannot be made and the file is better shown as it is.
+    /// A copy of `file` in a folder of its own under `folderName`, or nil where it cannot be made and the file is better shown as it is.
     /// On APFS the copy is a clone, so it costs no space, and an app that changes it cannot change the kept bytes.
-    static func copy(of file: URL, titled title: String, as type: UTType) -> QuickLookFile? {
-        let folder = URL.temporaryDirectory.appending(path: "Quick Look", directoryHint: .isDirectory)
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    /// With `key`, the copy's folder is named by it and an earlier copy under that key is replaced, so repeating the
+    /// request for the same thing leaves one copy; without it each copy has a folder of its own.
+    static func copy(of file: URL, titled title: String, as type: UTType, in folderName: String = "Quick Look", key: String? = nil) -> QuickLookFile? {
+        let folder = URL.temporaryDirectory.appending(path: folderName, directoryHint: .isDirectory)
+            .appending(path: key.map { name(for: $0, type: .data) } ?? UUID().uuidString, directoryHint: .isDirectory)
         let url = folder.appending(path: name(for: title, type: type), directoryHint: .notDirectory)
         do {
+            if key != nil { try? FileManager.default.removeItem(at: folder) }
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: file, to: url)
             return QuickLookFile(folder: folder, url: url)

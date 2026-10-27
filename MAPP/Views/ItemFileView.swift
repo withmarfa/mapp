@@ -81,3 +81,18 @@ struct ItemFileView: View {
         if case .ready(let url) = await loader.load(id, in: library) { onResolved(url) }
     }
 }
+
+/// A file item's page: a Web Page has its own, and every other file is previewed.
+struct FileItemPage: View {
+    @CurrentLibrary private var library
+    let item: Item
+    var onResolved: (URL?) -> Void = { _ in }
+
+    var body: some View {
+        if library.isWebPage(item) {
+            WebPageItemPage(item: item, onResolved: onResolved)
+        } else {
+            ItemFileView(id: item.id, onResolved: onResolved)
+        }
+    }
+}
