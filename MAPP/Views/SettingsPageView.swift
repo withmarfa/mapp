@@ -104,7 +104,7 @@ private struct EditorSettings: View {
             } header: {
                 Text("Pictures")
             } footer: {
-                Text("A note names the website of a picture at a web address and loads it only when you choose to, or always for items that came from another service. Pictures you have loaded stay on this Mac until you disconnect the library.")
+                Text("A note names the website of a picture at a web address and loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library.")
             }
         }
         .labelStyle(.titleOnly)

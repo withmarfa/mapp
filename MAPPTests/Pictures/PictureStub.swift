@@ -101,3 +101,56 @@ nonisolated enum SamplePicture {
     static let svg = Data(#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><script>alert(1)</script></svg>"#.utf8)
     static let page = Data("<!doctype html><html><body>Not a picture, and long enough to be told so by its first bytes.</body></html>".utf8)
 }
+
+/// A name lookup that answers a public address only once released, and counts the lookups waiting at each moment, so a
+/// test can see how many fetches run at once.
+nonisolated final class HeldResolver: Sendable {
+    private struct State {
+        var active = 0
+        var peak = 0
+        var names: [String] = []
+        var released = false
+        var waiting: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = Mutex(State())
+
+    var resolver: PictureAddressPolicy.Resolver {
+        { [self] name in
+            await hold(name)
+            return [IPAddress(bytes: [93, 184, 216, 34])]
+        }
+    }
+
+    /// The lookups waiting now.
+    var active: Int { state.withLock { $0.active } }
+    /// The most that waited at once.
+    var peak: Int { state.withLock { $0.peak } }
+    /// The name of every lookup asked, in order.
+    var names: [String] { state.withLock { $0.names } }
+
+    /// Answers every lookup waiting, and every later one at once.
+    func release() {
+        let waiting = state.withLock { state in
+            state.released = true
+            state.active = 0
+            defer { state.waiting = [] }
+            return state.waiting
+        }
+        for lookup in waiting { lookup.resume() }
+    }
+
+    private func hold(_ name: String) async {
+        await withCheckedContinuation { continuation in
+            let passes = state.withLock { state in
+                state.names.append(name)
+                guard !state.released else { return true }
+                state.active += 1
+                state.peak = max(state.peak, state.active)
+                state.waiting.append(continuation)
+                return false
+            }
+            if passes { continuation.resume() }
+        }
+    }
+}

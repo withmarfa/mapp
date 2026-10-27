@@ -135,6 +135,70 @@ import Testing
         #expect(await failure(address, using: fetcher(resolver: { _ in [] })) == .unresolved)
     }
 
+    @Test func aLookupCountsInTheTimeLimitAndEndsAtIt() async {
+        let address = "https://\(PictureStub.newHost())/a.png"
+        PictureStub.answer(address, with: .body([SamplePicture.png()]))
+        let started = ContinuousClock.now
+
+        let reason = await failure(
+            address, using: fetcher(limits: .init(time: .milliseconds(300)), resolver: { _ in try await Task.sleep(for: .seconds(600)); return [] }))
+
+        #expect(reason == .tooSlow)
+        #expect(ContinuousClock.now - started < .seconds(30), "it did not wait for the lookup")
+        #expect(PictureStub.requests(to: address).isEmpty)
+        #expect(leftovers.isEmpty)
+    }
+
+    @Test func aLookupIsGivenItsOwnLimitWithinTheTimeLimit() async {
+        let address = "https://\(PictureStub.newHost())/a.png"
+
+        let reason = await failure(
+            address,
+            using: fetcher(limits: .init(time: .seconds(300), resolve: .milliseconds(100)), resolver: { _ in try await Task.sleep(for: .seconds(600)); return [] }))
+
+        #expect(reason == .tooSlow)
+    }
+
+    // MARK: Sign-ins and certificates
+
+    private func disposition(of method: String) -> URLSession.AuthChallengeDisposition {
+        PictureTransfer.disposition(for: URLProtectionSpace(host: "example.com", port: 443, protocol: "https", realm: nil, authenticationMethod: method))
+    }
+
+    @Test(arguments: [
+        NSURLAuthenticationMethodClientCertificate, NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest,
+        NSURLAuthenticationMethodNTLM, NSURLAuthenticationMethodNegotiate, NSURLAuthenticationMethodDefault,
+    ])
+    func aRequestForACertificateOrASignInIsRejected(method: String) {
+        #expect(disposition(of: method) == .rejectProtectionSpace)
+    }
+
+    @Test func onlyTheCheckOfTheServersCertificateIsLeftToTheSystem() {
+        #expect(disposition(of: NSURLAuthenticationMethodServerTrust) == .performDefaultHandling)
+    }
+
+    /// The delegate's own methods, as the session calls them, for a challenge of each kind and for both levels.
+    @Test(arguments: [NSURLAuthenticationMethodClientCertificate, NSURLAuthenticationMethodHTTPBasic])
+    func theSessionsChallengesAreAnsweredWithoutACredential(method: String) async {
+        let transfer = PictureTransfer(limits: .init(), resolver: PictureStub.resolver, file: folder.url.appending(path: "f"), deadline: .now.advanced(by: .seconds(30)))
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let task = session.dataTask(with: URL(string: "https://example.com/a.png")!)
+        let challenge = URLAuthenticationChallenge(
+            protectionSpace: URLProtectionSpace(host: "example.com", port: 443, protocol: "https", realm: nil, authenticationMethod: method),
+            proposedCredential: nil, previousFailureCount: 0, failureResponse: nil, error: nil, sender: ChallengeSender())
+
+        let answers = await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
+            transfer.urlSession(session, didReceive: challenge) { first, credential in
+                transfer.urlSession(session, task: task, didReceive: challenge) { second, other in
+                    continuation.resume(returning: ["\(first)", "\(credential == nil)", "\(second)", "\(other == nil)"])
+                }
+            }
+        }
+
+        #expect(answers == ["\(URLSession.AuthChallengeDisposition.rejectProtectionSpace)", "true", "\(URLSession.AuthChallengeDisposition.rejectProtectionSpace)", "true"])
+    }
+
     // MARK: Redirects
 
     @Test func aRedirectToAPrivateAddressIsRefusedAndNotFollowed() async {
@@ -256,4 +320,11 @@ import Testing
 
         #expect(leftovers.isEmpty)
     }
+}
+
+/// Receives what a challenge reports to its sender, which a test of the delegate does not use.
+private final class ChallengeSender: NSObject, URLAuthenticationChallengeSender, @unchecked Sendable {
+    func use(_ credential: URLCredential, for challenge: URLAuthenticationChallenge) {}
+    func continueWithoutCredential(for challenge: URLAuthenticationChallenge) {}
+    func cancel(_ challenge: URLAuthenticationChallenge) {}
 }

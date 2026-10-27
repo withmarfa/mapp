@@ -29,8 +29,10 @@ nonisolated struct PictureRequest: Equatable, Sendable {
 /// nothing, so the page never waits on a reply that will not come.
 final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
     let pictures: WebPictures
-    /// Whether the item came from another service (`Item.source`), which Always loads pictures for.
-    var fromAnotherService: (ItemID) -> Bool = { _ in false }
+    /// Whether the item is in the feed tier (`Item.tier`), the only place Always loads pictures without asking: connectors
+    /// write there and captures land there. `Item.source` cannot tell, since Marfa stamps every item with the source of
+    /// the key that wrote it, a note the person wrote in MAPP included.
+    var inFeed: (ItemID) -> Bool = { _ in false }
     /// Changed for each note the page shows, as `EmbeddedFiles.version` is, so an answer to a note since left is dropped.
     var version: () -> Int = { 0 }
 
@@ -55,7 +57,7 @@ final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
     func reply(to request: PictureRequest) async -> [String: String]? {
         let version = version()
         let answer = await pictures.answer(
-            request.address, ask: request.exporting ? .cached : request.ask, fromAnotherService: fromAnotherService(request.item)
+            request.address, ask: request.exporting ? .cached : request.ask, inFeed: inFeed(request.item)
         )
         guard version == self.version() else { return nil }
         switch answer {

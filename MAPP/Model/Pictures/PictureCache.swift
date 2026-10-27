@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
 /// The pictures fetched for notes, kept on this Mac so a picture shows again without a request or a question.
 ///
@@ -16,8 +17,14 @@ actor PictureCache {
             .appending(path: "Remote Pictures", directoryHint: .isDirectory)
     }
 
+    /// How many times each folder has been emptied by `removeAll`. A fetch that began before an emptying must not
+    /// store its picture after it, and the lock is held for the emptying and for a store, so neither happens halfway
+    /// through the other.
+    private nonisolated static let emptied = Mutex<[URL: Int]>([:])
+
     nonisolated let folder: URL
     private let limit: Int
+    private var sweptIncoming = false
 
     init(folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit) {
         self.folder = folder
@@ -26,6 +33,18 @@ actor PictureCache {
 
     /// Where a fetch writes before the cache takes the file.
     nonisolated var incoming: URL { folder.appending(path: ".incoming", directoryHint: .isDirectory) }
+
+    /// A token for what the cache holds now. Give it to `store` with a fetch's picture: the picture is kept only if
+    /// the cache has not been emptied (the library disconnected) since the token was read.
+    nonisolated var generation: Int { Self.emptied.withLock { $0[folder] ?? 0 } }
+
+    /// Removes what an earlier run left in `incoming`, the first time it is asked and not again, since a fetch of this
+    /// run may be writing there by then. Ask before the first fetch.
+    func sweepIncomingOnce() {
+        guard !sweptIncoming else { return }
+        sweptIncoming = true
+        try? FileManager.default.removeItem(at: incoming)
+    }
 
     private func directory(for address: URL) -> URL {
         let hash = SHA256.hash(data: Data(address.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -42,17 +61,29 @@ actor PictureCache {
         return file
     }
 
-    /// Takes the fetched file in for the address and trims the cache to its limit.
-    func store(_ picture: FetchedPicture, for address: URL) throws -> URL {
-        let manager = FileManager.default
-        let directory = directory(for: address)
-        try? manager.removeItem(at: directory)
-        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let kept = directory.appending(path: "picture.\(picture.format.fileExtension)", directoryHint: .notDirectory)
-        try manager.moveItem(at: picture.file, to: kept)
-        try? manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: kept.path)
-        trim()
-        return kept
+    /// Takes the fetched file in for the address and trims the cache to its limit. The file is the cache's from here
+    /// on: if it is not kept, because this throws, it is removed.
+    ///
+    /// `generation` is the cache's `generation` from before the fetch began. If the cache was emptied since, the
+    /// library was disconnected while the picture was on its way, so nothing is stored and `CancellationError` is thrown.
+    func store(_ picture: FetchedPicture, for address: URL, generation: Int) throws -> URL {
+        do {
+            return try Self.emptied.withLock { emptied in
+                let manager = FileManager.default
+                guard (emptied[folder] ?? 0) == generation else { throw CancellationError() }
+                let directory = directory(for: address)
+                try? manager.removeItem(at: directory)
+                try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+                let kept = directory.appending(path: "picture.\(picture.format.fileExtension)", directoryHint: .notDirectory)
+                try manager.moveItem(at: picture.file, to: kept)
+                try? manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: kept.path)
+                trim()
+                return kept
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: picture.file)
+            throw error
+        }
     }
 
     /// Removes the least recently used pictures until the rest fit.
@@ -80,7 +111,11 @@ actor PictureCache {
     }
 
     /// Removes every picture, as when the library is disconnected, so pictures fetched for its notes don't outlast it.
+    /// A fetch still on its way is not stored when it ends (`generation`).
     @concurrent static func removeAll(in folder: URL = standardFolder) async {
-        try? FileManager.default.removeItem(at: folder)
+        emptied.withLock { emptied in
+            emptied[folder, default: 0] += 1
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 }

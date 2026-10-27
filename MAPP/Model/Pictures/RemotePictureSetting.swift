@@ -5,7 +5,8 @@ import Foundation
 nonisolated enum RemotePictureSetting: String, CaseIterable, Identifiable, Sendable {
     /// Each picture waits for the person to choose to load it.
     case ask
-    /// A picture in an item that came from another service loads without asking. A note the person wrote never does.
+    /// A picture in an item in the feed tier loads without asking. In the library tier, where the person's own notes
+    /// are, it asks as Ask does.
     case always
     /// No picture is fetched.
     case never

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 /// An address on the internet, as four or sixteen bytes.
 nonisolated struct IPAddress: Hashable, Sendable {
@@ -59,6 +60,10 @@ nonisolated struct IPAddress: Hashable, Sendable {
         if leadingZeros, b[10] == 0, b[11] == 0 { return false }
         // IPv4-mapped: the four bytes at the end decide.
         if leadingZeros, b[10] == 0xFF, b[11] == 0xFF { return isPublic(four: Array(b[12..<16])) }
+        // IPv4-translated (`::ffff:0:a.b.c.d`, RFC 2765), the same: the four bytes at the end decide.
+        if b.prefix(8).allSatisfy({ $0 == 0 }), b[8] == 0xFF, b[9] == 0xFF, b[10] == 0, b[11] == 0 {
+            return isPublic(four: Array(b[12..<16]))
+        }
         // NAT64: the address a name server makes for an IPv4 one.
         if Array(b[0..<12]) == [0x00, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0] { return isPublic(four: Array(b[12..<16])) }
         if b[0] == 0x00, b[1] == 0x64, b[2] == 0xFF, b[3] == 0x9B, b[4] == 0x00, b[5] == 0x01 { return false }
@@ -82,10 +87,22 @@ nonisolated enum PictureAddressPolicy {
 
     /// Asks the system's resolver.
     static let system: Resolver = { name in
-        try await PictureAddressPolicy.resolve(name)
+        try await PictureAddressPolicy.lookup(name)
     }
 
-    @concurrent fileprivate static func resolve(_ name: String) async throws -> [IPAddress] {
+    /// `getaddrinfo` blocks until the system's resolver answers, which can be many seconds, so it runs on queues of
+    /// its own and never holds a thread of Swift's cooperative pool.
+    private static let lookups = DispatchQueue(label: "com.withmarfa.mapp.picture-lookup", qos: .utility, attributes: .concurrent)
+
+    private static func lookup(_ name: String) async throws -> [IPAddress] {
+        try await withCheckedThrowingContinuation { continuation in
+            lookups.async {
+                continuation.resume(with: Result { try addresses(of: name) })
+            }
+        }
+    }
+
+    private static func addresses(of name: String) throws -> [IPAddress] {
         var hints = addrinfo()
         hints.ai_socktype = SOCK_STREAM
         var found: UnsafeMutablePointer<addrinfo>?
@@ -114,6 +131,48 @@ nonisolated enum PictureAddressPolicy {
         return addresses
     }
 
+    /// Answers what `resolver` says for `name`, or `PictureFailure.tooSlow` once `timeout` has passed. A lookup that
+    /// cannot be stopped (`getaddrinfo`) is left to finish on its own, and its answer is dropped.
+    private static func resolve(_ name: String, using resolver: @escaping Resolver, within timeout: Duration) async throws -> [IPAddress] {
+        try await withCheckedThrowingContinuation { continuation in
+            let race = Race()
+            let lookup = Task {
+                let result = await Result { try await resolver(name) }
+                if race.claim() { continuation.resume(with: result) }
+            }
+            let timer = Task {
+                do { try await Task.sleep(for: timeout) } catch { return }
+                if race.claim() {
+                    lookup.cancel()
+                    continuation.resume(throwing: PictureFailure.tooSlow)
+                }
+            }
+            race.timer = timer
+            if race.isDecided { timer.cancel() }
+        }
+    }
+
+    /// Lets the lookup and the timer settle which of them answers.
+    private final class Race: Sendable {
+        private let state = Mutex<(decided: Bool, timer: Task<Void, Never>?)>((false, nil))
+
+        /// True for the first to ask only.
+        func claim() -> Bool {
+            state.withLock { state in
+                defer { state.decided = true }
+                if !state.decided { state.timer?.cancel() }
+                return !state.decided
+            }
+        }
+
+        var isDecided: Bool { state.withLock { $0.decided } }
+
+        var timer: Task<Void, Never>? {
+            get { state.withLock { $0.timer } }
+            set { state.withLock { $0.timer = newValue } }
+        }
+    }
+
     /// Throws why a request to `url` must not be made. Names are resolved here, and every address they have must be
     /// a public one: a name with one private address among public ones is refused too.
     ///
@@ -122,7 +181,9 @@ nonisolated enum PictureAddressPolicy {
     /// Closing that gap means connecting to the address checked, which needs Network.framework, and its own TLS
     /// handling and redirects, which this does not take on. What remains is a request that reads no more than a
     /// picture's first bytes into a file that is shown only if it is a picture of a kind the system decodes.
-    static func check(_ url: URL, resolver: Resolver = system) async throws(PictureFailure) {
+    ///
+    /// A name that has not been answered within `timeout` is refused as too slow.
+    static func check(_ url: URL, resolver: @escaping Resolver = system, timeout: Duration = .seconds(10)) async throws(PictureFailure) {
         guard url.scheme?.lowercased() == "https" else { throw .notSecure }
         guard url.user == nil, url.password == nil else { throw .hasCredentials }
         guard var host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty else { throw .unresolved }
@@ -137,7 +198,9 @@ nonisolated enum PictureAddressPolicy {
         }
         let addresses: [IPAddress]
         do {
-            addresses = try await resolver(host)
+            addresses = try await resolve(host, using: resolver, within: timeout)
+        } catch let failure as PictureFailure where failure == .tooSlow {
+            throw .tooSlow
         } catch {
             throw .unresolved
         }

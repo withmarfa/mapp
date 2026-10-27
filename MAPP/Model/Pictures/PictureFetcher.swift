@@ -17,11 +17,16 @@ nonisolated struct FetchedPicture: Sendable {
 ///   redirects are followed.
 /// - What arrives is a picture only if its first bytes say so (`PictureFormat`), whatever the server called it.
 /// - At most 25 MiB and 30 seconds are taken, counted as the bytes arrive, and a picture one pixel wide or high is
-///   refused as the tracking pixel it nearly always is.
+///   refused as the tracking pixel it nearly always is. The 30 seconds start with the first lookup of the name, so the
+///   lookups count in them, and a lookup is given at most `Limits.resolve` of them.
+/// - Only a check of the server's certificate is answered: a request for a client certificate or a sign-in is
+///   rejected, so nothing in the person's keychain is offered to a website.
 nonisolated final class PictureFetcher: @unchecked Sendable {
     struct Limits: Sendable {
         var bytes = PictureFailure.largest
         var time = Duration.seconds(30)
+        /// The longest one lookup of a name may take, within `time`.
+        var resolve = Duration.seconds(10)
         var redirects = 4
     }
 
@@ -44,7 +49,10 @@ nonisolated final class PictureFetcher: @unchecked Sendable {
 
     /// Fetches the picture at `address` into a new file in `folder`. The file is the caller's to move or remove.
     @concurrent func fetch(_ address: URL, into folder: URL) async throws(PictureFailure) -> FetchedPicture {
-        try await PictureAddressPolicy.check(address, resolver: resolver)
+        let deadline = ContinuousClock.now.advanced(by: limits.time)
+        try await PictureAddressPolicy.check(address, resolver: resolver, timeout: min(limits.resolve, limits.time))
+        let left = ContinuousClock.now.duration(to: deadline)
+        guard left > .zero else { throw .tooSlow }
         let configuration = configuration()
         configuration.httpCookieStorage = nil
         configuration.httpCookieAcceptPolicy = .never
@@ -53,12 +61,12 @@ nonisolated final class PictureFetcher: @unchecked Sendable {
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         configuration.waitsForConnectivity = false
-        configuration.timeoutIntervalForRequest = limits.time.timeInterval
-        configuration.timeoutIntervalForResource = limits.time.timeInterval
+        configuration.timeoutIntervalForRequest = left.timeInterval
+        configuration.timeoutIntervalForResource = left.timeInterval
         configuration.httpAdditionalHeaders = nil
 
         let file = folder.appending(path: ".incoming-\(UUID().uuidString)", directoryHint: .notDirectory)
-        let transfer = Transfer(limits: limits, resolver: resolver, file: file)
+        let transfer = PictureTransfer(limits: limits, resolver: resolver, file: file, deadline: deadline)
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         let session = URLSession(configuration: configuration, delegate: transfer, delegateQueue: queue)
@@ -95,10 +103,11 @@ private nonisolated extension Duration {
 }
 
 /// One fetch, driven by the session's callbacks, which arrive one at a time on its queue.
-private nonisolated final class Transfer: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+nonisolated final class PictureTransfer: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let limits: PictureFetcher.Limits
     private let resolver: PictureAddressPolicy.Resolver
     private let file: URL
+    private let deadline: ContinuousClock.Instant
 
     private let lock = NSLock()
     private var failure: PictureFailure?
@@ -110,15 +119,16 @@ private nonisolated final class Transfer: NSObject, URLSessionDataDelegate, @unc
     private var format: PictureFormat?
     private var redirects = 0
 
-    init(limits: PictureFetcher.Limits, resolver: @escaping PictureAddressPolicy.Resolver, file: URL) {
+    init(limits: PictureFetcher.Limits, resolver: @escaping PictureAddressPolicy.Resolver, file: URL, deadline: ContinuousClock.Instant) {
         self.limits = limits
         self.resolver = resolver
         self.file = file
+        self.deadline = deadline
     }
 
     func run(_ request: URLRequest, in session: URLSession) async throws -> PictureFormat {
         let deadline = Task {
-            try await Task.sleep(for: limits.time)
+            try await Task.sleep(until: deadline)
             fail(.tooSlow)
         }
         defer { deadline.cancel() }
@@ -171,9 +181,10 @@ private nonisolated final class Transfer: NSObject, URLSessionDataDelegate, @unc
             return completionHandler(nil)
         }
         let resolver = resolver
+        let timeout = min(limits.resolve, ContinuousClock.now.duration(to: deadline))
         Task {
             do {
-                try await PictureAddressPolicy.check(target, resolver: resolver)
+                try await PictureAddressPolicy.check(target, resolver: resolver, timeout: timeout)
                 completionHandler(PictureFetcher.request(for: target))
             } catch {
                 fail(error as? PictureFailure ?? .failed)
@@ -199,6 +210,27 @@ private nonisolated final class Transfer: NSObject, URLSessionDataDelegate, @unc
             return completionHandler(.cancel)
         }
         completionHandler(.allow)
+    }
+
+    /// Only the check of the server's certificate is answered, by the system's own rules. A request for a client
+    /// certificate or a sign-in is rejected, so the system never looks in the keychain for an identity or a password
+    /// to give a website. A rejected sign-in ends as the website's own refusal, a status other than 200.
+    static func disposition(for protectionSpace: URLProtectionSpace) -> URLSession.AuthChallengeDisposition {
+        protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust ? .performDefaultHandling : .rejectProtectionSpace
+    }
+
+    func urlSession(
+        _ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        completionHandler(Self.disposition(for: challenge.protectionSpace), nil)
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        completionHandler(Self.disposition(for: challenge.protectionSpace), nil)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

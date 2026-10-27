@@ -72,7 +72,7 @@ final class EditorController: NSObject {
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
     /// Fetches the pictures at web addresses the page asks for, by the Remote Pictures setting.
     @ObservationIgnored let pictures: WebPictures
-    @ObservationIgnored private let pictureRequests: PictureRequests
+    @ObservationIgnored let pictureRequests: PictureRequests
     /// Tells the page when the setting changes, so the pictures waiting or turned off are asked for again at once.
     @ObservationIgnored var pictureSettingWatch: Task<Void, Never>?
     @ObservationIgnored var toldPictureSetting: RemotePictureSetting
@@ -159,7 +159,7 @@ final class EditorController: NSObject {
             return links.map { library.resolveLink($0, in: source) == .missing }
         }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
-        pictureRequests.fromAnotherService = { [weak self] item in self?.library?.item(item)?.source != nil }
+        pictureRequests.inFeed = { [weak self] item in self?.library?.item(item)?.tier == .feed }
         pictureRequests.version = { [weak self] in self?.embeds.version ?? 0 }
         embeds.openPicture = { [pictures] address in await pictures.openKept(address) }
         configuration.userContentController.addScriptMessageHandler(pictureRequests, contentWorld: .page, name: "pictures")

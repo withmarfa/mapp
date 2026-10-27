@@ -27,23 +27,28 @@ nonisolated enum PictureAsk: String, Sendable {
     let cache: PictureCache
     private let fetcher: PictureFetcher
     private let defaults: UserDefaults
+    private let queue: PictureQueue
     private var fetching: [URL: Task<Result<URL, PictureFailure>, Never>] = [:]
 
-    init(cache: PictureCache = PictureCache(), fetcher: PictureFetcher = PictureFetcher(), defaults: UserDefaults = .standard) {
+    init(
+        cache: PictureCache = PictureCache(), fetcher: PictureFetcher = PictureFetcher(), defaults: UserDefaults = .standard,
+        queue: PictureQueue = PictureQueue()
+    ) {
         self.cache = cache
         self.fetcher = fetcher
         self.defaults = defaults
+        self.queue = queue
     }
 
     /// Read at each question, so a change in Settings applies to the next one.
     var setting: RemotePictureSetting { RemotePictureSetting.current(in: defaults) }
 
-    /// Answers a question about the picture at `address`. `fromAnotherService` is whether the item holding the
-    /// picture came from one (`Item.source`): Always loads a picture there without asking, and never in a note the
-    /// person wrote, since the website would learn they opened it.
+    /// Answers a question about the picture at `address`. `inFeed` is whether the item holding the picture is in the
+    /// feed tier (`Item.tier`): Always loads a picture there without asking, and asks in the library tier, where the
+    /// person's own notes are, since the website would learn they opened one.
     ///
     /// A picture already kept shows under every setting, since showing it asks nothing of the website.
-    func answer(_ address: URL, ask: PictureAsk, fromAnotherService: Bool) async -> PictureAnswer {
+    func answer(_ address: URL, ask: PictureAsk, inFeed: Bool) async -> PictureAnswer {
         if address.scheme?.lowercased() != "https" { return .refused(.notSecure) }
         if let kept = await cache.file(for: address) { return .loaded(kept) }
         let setting = setting
@@ -53,7 +58,7 @@ nonisolated enum PictureAsk: String, Sendable {
             switch setting {
             case .never: return .off
             case .ask: return .waiting
-            case .always: if !fromAnotherService { return .waiting }
+            case .always: if !inFeed { return .waiting }
             }
         case .chosen:
             if setting == .never { return .off }
@@ -61,16 +66,24 @@ nonisolated enum PictureAsk: String, Sendable {
         return await load(address)
     }
 
-    /// Fetches the picture, once however many ask at the same time.
+    /// Fetches the picture, once however many ask at the same time, and a few at a time (`PictureQueue`).
+    ///
+    /// The library may be disconnected while a fetch is waiting or on its way, which empties the cache
+    /// (`PictureCache.generation`): such a fetch is not started, or its picture is not stored.
     private func load(_ address: URL) async -> PictureAnswer {
-        let task = fetching[address] ?? Task { [cache, fetcher] in
-            do {
-                let picture = try await fetcher.fetch(address, into: cache.incoming)
-                return .success(try await cache.store(picture, for: address))
-            } catch let failure as PictureFailure {
-                return .failure(failure)
-            } catch {
-                return .failure(.failed)
+        let generation = cache.generation
+        let task = fetching[address] ?? Task { [cache, fetcher, queue] in
+            await cache.sweepIncomingOnce()
+            return await queue.run(host: address.host(percentEncoded: false)?.lowercased() ?? "") {
+                do {
+                    guard cache.generation == generation else { throw CancellationError() }
+                    let picture = try await fetcher.fetch(address, into: cache.incoming)
+                    return .success(try await cache.store(picture, for: address, generation: generation))
+                } catch let failure as PictureFailure {
+                    return .failure(failure)
+                } catch {
+                    return .failure(.failed)
+                }
             }
         }
         fetching[address] = task
