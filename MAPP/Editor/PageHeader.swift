@@ -74,11 +74,16 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// The property block's rows, all of them; the page shows the first `foldAfter` until it is expanded.
     var properties: [PropertyRow]
     var foldAfter = PropertyRow.foldAfter
-    /// Items that link to this one, listed at the foot of the header.
+    /// The items a collection holds, listed under its text; none for any other item.
+    var contents: [LinkedItem]
+    /// Items that link to this one, listed under its text.
     var linked: [LinkedItem]
     var linkedFoldAfter = LinkedItem.foldAfter
-    /// "Show N More", for the rows and for the linked items that are folded away.
+    /// Whether the page has text to write. A collection with no text shows its contents in place of an empty page.
+    var showsText: Bool
+    /// "Show N More", for the rows and for the items that are folded away.
     var showMore: String
+    var showMoreContents: String
     var showMoreLinked: String
     var propertyRejected: Bool
     var parentRejected: Bool

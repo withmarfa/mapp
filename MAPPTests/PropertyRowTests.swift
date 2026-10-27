@@ -200,4 +200,29 @@ struct PropertyRowTests {
         #expect(list.first?.icon == "file-text")
         #expect(list.first?.type == "Note")
     }
+
+    @Test func aCollectionsMembersAreItsContentsAndLeaveTheLinkedList() {
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        func held(_ id: String, _ title: String) -> MAPP.Item {
+            MAPP.Item(
+                id: ItemID(id), type: TypeID("core.note"), title: title, titleRule: .firstLine, version: ItemVersion(1),
+                created: day, modified: day)
+        }
+        let catalogue = Catalogue(itemTypes: [
+            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "file-text")
+        ])
+        let items = [held("a", "File"), held("b", "Mention")]
+        let relationships = [
+            Self.relationship("inverse:in-collection", "Members", [("File", "a")]),
+            Self.relationship("inverse:references", "Linked from", [("Mention", "b")]),
+        ]
+        func titles(_ members: LinkedItem.Members) -> [String] {
+            LinkedItem.list(
+                pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, members: members,
+                item: { id in items.first { $0.id == id } }).map(\.title)
+        }
+        #expect(titles(.only) == ["File"])
+        #expect(titles(.excluding) == ["Mention"])
+        #expect(Set(titles(.all)) == ["File", "Mention"])
+    }
 }

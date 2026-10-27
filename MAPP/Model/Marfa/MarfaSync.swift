@@ -200,7 +200,7 @@ actor MarfaSync {
 
     /// The person gives a new key in Settings; nothing is sent until then.
     nonisolated static var keyRefused: String {
-        String(localized: "The Marfa server refused this library’s key. Check the key in Settings.")
+        String(localized: "The Marfa server no longer accepts this library’s key. Open Settings, choose Library, and enter a new key.")
     }
 
     /// Five seconds, doubling to five minutes.

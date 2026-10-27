@@ -16,7 +16,7 @@ extension EditorTests {
                    parent: .init(label: "Field Research", enabled: true),
                    byline: PageByline(source: "Marfa", date: "Yesterday"),
                    properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   linked: [], showMore: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
+                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
     }
 
     static func json(_ value: some Encodable) -> String {
