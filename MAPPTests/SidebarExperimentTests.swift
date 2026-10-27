@@ -84,24 +84,24 @@ struct SidebarExperimentTests {
         #expect(listed.map { SidebarTypeRow.showsIcon($0, subtypeIcons: true) } == [true, true, true, true, true])
     }
 
-    @Test func aColumnStepsInOnlyWhereEitherRowHasNoMark() {
+    @Test func aColumnStepsInOnlyWhereItsParentHasNoMark() {
         let listed = rows([node("a", [node("a1", [node("a1x")]), node("group", opens: false, [node("g1")])])])
         let indent = SidebarTypeRow.indent
 
         let bare = SidebarTypeRow.steps(for: listed, subtypeIcons: false)
         #expect(bare[0].isEmpty)
-        // a1 has no mark: the column spans a's mark and steps in.
-        #expect(bare[1] == [.init(continues: true, bends: true, spansParentMark: true, extra: indent)])
-        // a1x has no mark either, under a1 which has none: a step alone.
+        // a1 has no mark, and its name starts where a's does.
+        #expect(bare[1] == [.init(continues: true, bends: true, spansParentMark: true, extra: 0)])
+        // a1x has no mark under a1, which has none either: a step alone, since there is no mark to leave from.
         #expect(
             bare[2] == [
-                .init(continues: true, bends: false, spansParentMark: true, extra: indent),
+                .init(continues: true, bends: false, spansParentMark: true, extra: 0),
                 .init(continues: false, bends: true, spansParentMark: false, extra: indent),
             ])
         // g1 has no mark under a group that keeps its own.
-        #expect(bare[4].last == .init(continues: false, bends: true, spansParentMark: true, extra: indent))
+        #expect(bare[4].last == .init(continues: false, bends: true, spansParentMark: true, extra: 0))
 
-        // With marks, every row sits under its parent's name as it always has: no step beyond the parent's mark.
+        // With marks, every row sits under its parent's name: no step beyond the parent's mark.
         let marked = SidebarTypeRow.steps(for: listed, subtypeIcons: true)
         #expect(marked.flatMap { $0 }.allSatisfy { $0.spansParentMark && $0.extra == 0 })
     }

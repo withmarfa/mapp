@@ -13,14 +13,17 @@ struct ToolbarBand: View {
     /// How far the band's lower edge fades out below the toolbar, so it ends softly rather than in a line.
     static let fade: CGFloat = 14
 
+    /// How much of the bar material shows over the toolbar's height, so the page reads through it.
+    static let strength: Double = 0.6
+
     var body: some View {
         Rectangle()
             .fill(.bar)
             .mask(
                 LinearGradient(
                     stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: toolbarHeight / (toolbarHeight + Self.fade)),
+                        .init(color: .black.opacity(Self.strength), location: 0),
+                        .init(color: .black.opacity(Self.strength), location: toolbarHeight / (toolbarHeight + Self.fade)),
                         .init(color: .clear, location: 1),
                     ],
                     startPoint: .top, endPoint: .bottom

@@ -27,8 +27,8 @@ struct SidebarLabel: View {
 /// and, where the row folds subtypes under it, a chevron.
 ///
 /// A subtype sits one step in under its parent, and a thin guide runs down the rows the parent holds and bends into
-/// each of them. A subtype either keeps its mark, so the mark lies under its parent's name, or has none, so its name
-/// starts a small step in from its parent's.
+/// each of them from under the parent's mark. A subtype either keeps its mark, so the mark lies under its parent's
+/// name, or has none, so its name starts level with its parent's.
 struct SidebarTypeRow: View {
     let row: SidebarPlan.TypeRow
     let count: Int
@@ -137,7 +137,7 @@ struct SidebarTypeRow: View {
 
     static let subtypeIconsKey = "sidebarSubtypeIcons"
 
-    /// How far a name sits in from its parent's name when either row has no mark to step by.
+    /// How far a name sits in from its parent's name when the parent has no mark to step by.
     static let indent: CGFloat = 12
     /// The horizontal part of a bend, and the gap it stops short of what follows.
     static let elbow: CGFloat = 9
@@ -148,8 +148,9 @@ struct SidebarTypeRow: View {
         subtypeIcons || row.depth == 0 || !row.node.opens
     }
 
-    /// The columns before each row's content. A row with a mark under a parent with a mark sits under the parent's
-    /// name, as the rows always have; any other row steps in from its parent's name by `indent`.
+    /// The columns before each row's content. A row under a parent with a mark starts where the parent's name does,
+    /// with its mark or, with none, its name; a row under a parent with no mark steps in from the parent's name by
+    /// `indent`.
     static func steps(for rows: [SidebarPlan.TypeRow], subtypeIcons: Bool) -> [[Step]] {
         let flags = guides(for: rows)
         var marks: [Bool] = []
@@ -159,7 +160,7 @@ struct SidebarTypeRow: View {
             return flags[index].indices.map { level in
                 Step(
                     continues: flags[index][level], bends: level == row.depth - 1, spansParentMark: marks[level],
-                    extra: marks[level] && marks[level + 1] ? 0 : indent)
+                    extra: marks[level] ? 0 : indent)
             }
         }
     }
@@ -208,7 +209,7 @@ private struct SidebarGuide: View {
                 Label {
                     Text(verbatim: "")
                 } icon: {
-                    Image(systemName: "circle")
+                    Image(systemName: "circle").alignmentGuide(.markCenter) { $0[HorizontalAlignment.center] }
                 }
                 .interfaceFont(.body)
                 .hidden()
@@ -231,12 +232,27 @@ private struct SidebarGuideLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        if spansParentMark { subviews[0].place(at: bounds.origin, proposal: .unspecified) }
-        let length = SidebarTypeRow.elbow
+        var start = bounds.maxX - SidebarTypeRow.elbowGap - SidebarTypeRow.elbow
+        if spansParentMark {
+            let mark = subviews[0]
+            mark.place(at: bounds.origin, proposal: .unspecified)
+            // The guide leaves from under the middle of the parent's mark, as the Claude app's does from its folder.
+            start = bounds.minX + mark.dimensions(in: .unspecified)[.markCenter]
+        }
+        let end = bounds.maxX - SidebarTypeRow.elbowGap
         subviews[subviews.count - 1].place(
-            at: CGPoint(x: bounds.maxX - SidebarTypeRow.elbowGap - length, y: bounds.minY),
-            proposal: ProposedViewSize(width: length, height: bounds.height))
+            at: CGPoint(x: start, y: bounds.minY),
+            proposal: ProposedViewSize(width: max(end - start, 0), height: bounds.height))
     }
+}
+
+private extension HorizontalAlignment {
+    private nonisolated enum MarkCenter: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[HorizontalAlignment.center] }
+    }
+
+    /// The middle of a row's mark, which the guide leaves from.
+    nonisolated static let markCenter = HorizontalAlignment(MarkCenter.self)
 }
 
 /// A guide in its rectangle: down the left edge, and in a bend turning right at the middle to the far edge.
