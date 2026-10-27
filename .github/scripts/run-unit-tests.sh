@@ -17,7 +17,7 @@ xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'pla
   -parallel-testing-enabled NO test-without-building &
 build=$!
 
-derived=$(cd "${DERIVED_DATA:-build}" && pwd)
+derived=$(cd "${DERIVED_DATA:-build}" && pwd -P)
 deadline=$((SECONDS + limit))
 while kill -0 "$build" 2>/dev/null; do
   if ((SECONDS >= deadline)); then
