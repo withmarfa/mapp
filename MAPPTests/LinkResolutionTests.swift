@@ -70,11 +70,35 @@ import Testing
         #expect(library.resolveLink(NoteLink(name: " Plan", alias: "alias "), in: reader) == .resolved(b.id))
     }
 
-    @Test func anAliasThatRepeatsTheLinkIsTheLinkItself() async throws {
+    @Test func anAliasThatRepeatsTheLinkStillHasItsOwnBinding() async throws {
         let plan = item(ItemID("plan"), "Plan")
         let source = item(reader, "Reader", links: [bound("Plan#Soil|Plan#Soil", .resolved(plan.id))])
         let (library, _) = try await loaded([source, plan])
-        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "Soil"), in: reader) == .resolved(plan.id))
+        #expect(library.resolveLink(NoteLink(reading: "Plan#Soil|Plan#Soil"), in: reader) == .resolved(plan.id))
+        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "Soil"), in: reader) == .pending)
+    }
+
+    @Test func identicalVisibleLinksKeepDistinctAuthoredBindings() async throws {
+        let a = item(ItemID("a"), "Earlier Plan"), b = item(ItemID("b"), "Plan")
+        let source = item(reader, "Reader", links: [bound("Plan", .resolved(a.id)), bound("Plan|Plan", .resolved(b.id))])
+        let (library, _) = try await loaded([source, a, b])
+        let plain = try #require(NoteLink(page: ["raw": "[[Plan]]", "target": "Plan"]))
+        let repeated = try #require(NoteLink(page: ["raw": "[[Plan|Plan]]", "target": "Plan"]))
+        #expect(library.resolveLink(plain, in: reader) == .resolved(a.id))
+        #expect(library.resolveLink(repeated, in: reader) == .resolved(b.id))
+        #expect(Set([plain, repeated]).count == 2)
+    }
+
+    @Test func canonicallyEquivalentUnicodeKeepsDistinctAuthoredBindings() async throws {
+        let a = item(ItemID("a"), "Earlier Plan"), b = item(ItemID("b"), "Plan")
+        let composed = "Plan|é", decomposed = "Plan|e\u{301}"
+        let source = item(reader, "Reader", links: [bound(composed, .resolved(a.id)), bound(decomposed, .resolved(b.id))])
+        let (library, _) = try await loaded([source, a, b])
+        let first = try #require(NoteLink(page: ["raw": "[[\(composed)]]", "target": "Plan", "alias": "é"]))
+        let second = try #require(NoteLink(page: ["raw": "[[\(decomposed)]]", "target": "Plan", "alias": "e\u{301}"]))
+        #expect(library.resolveLink(first, in: reader) == .resolved(a.id))
+        #expect(library.resolveLink(second, in: reader) == .resolved(b.id))
+        #expect(Set([first, second]).count == 2)
     }
 
     @Test func aLinkWithEscapedCharactersIsMatchedToWhatMarfaBoundItTo() async throws {
@@ -83,10 +107,10 @@ import Testing
         let source = item(reader, "Reader", links: [
             bound("Plan|a\\#b", .resolved(a.id)), bound("Plan#A\\#B", .resolved(b.id)), bound("Plan#Soil|a\\|b", .missing)])
         let (library, _) = try await loaded([source, a, b])
-        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "a#b"), in: reader) == .resolved(a.id))
-        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "A#B"), in: reader) == .resolved(b.id))
-        #expect(library.resolveLink(NoteLink(name: "Plan", heading: "Soil", alias: "a|b"), in: reader) == .missing)
-        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "a\\#b"), in: reader) == .pending, "the backslash is not part of the alias")
+        #expect(library.resolveLink(NoteLink(page: ["raw": "[[Plan|a\\#b]]", "target": "Plan", "alias": "a#b"])!, in: reader) == .resolved(a.id))
+        #expect(library.resolveLink(NoteLink(page: ["raw": "[[Plan#A\\#B]]", "target": "Plan", "heading": "A#B"])!, in: reader) == .resolved(b.id))
+        #expect(library.resolveLink(NoteLink(reading: "Plan#Soil|a\\|b"), in: reader) == .missing)
+        #expect(library.resolveLink(NoteLink(name: "Plan", alias: "a#b"), in: reader) == .pending, "an unbound spelling cannot borrow the escaped spelling's binding")
     }
 
     @Test func anIdentityNamesThatNoteWhateverOtherNotesAreTitled() async throws {
@@ -153,18 +177,21 @@ import Testing
         #expect(NoteLink(reading: "Plan#Soil") == NoteLink(name: "Plan", heading: "Soil"))
         #expect(NoteLink(reading: "Plan#Soil|soil") == NoteLink(name: "Plan", heading: "Soil", alias: "soil"))
         #expect(NoteLink(reading: "Plan|a#b") == NoteLink(name: "Plan", alias: "a#b"))
-        #expect(NoteLink(reading: "Plan#Soil|Plan#Soil") == NoteLink(name: "Plan", heading: "Soil"), "an alias that repeats the link is none")
-        #expect(NoteLink(reading: "Plan|a\\#b") == NoteLink(name: "Plan", alias: "a#b"), "escapes are taken out")
-        #expect(NoteLink(reading: "Plan#A\\#B") == NoteLink(name: "Plan", heading: "A#B"))
-        #expect(NoteLink(reading: "Plan#Soil|a\\|b|c") == NoteLink(name: "Plan", heading: "Soil", alias: "a|b|c"))
+        #expect(NoteLink(reading: "Plan#Soil|Plan#Soil") != NoteLink(name: "Plan", heading: "Soil"))
+        #expect(NoteLink(reading: "Plan|a\\#b").alias == "a#b", "escapes are taken out for display")
+        #expect(NoteLink(reading: "Plan#A\\#B").heading == "A#B")
+        #expect(NoteLink(reading: "Plan#Soil|a\\|b|c").alias == "a|b|c")
         #expect(NoteLink(reading: "Plan|a\\x\\") == NoteLink(name: "Plan", alias: "a\\x\\"), "a backslash that escapes nothing stays")
         #expect(NoteLink(reading: "Plan|").alias == nil)
         #expect(NoteLink(reading: "Plan#").heading == nil)
     }
 
     @Test func aLinkIsReadFromWhatThePagePosts() {
-        #expect(NoteLink(page: ["target": "Plan"]) == NoteLink(name: "Plan"))
-        #expect(NoteLink(page: ["target": "Plan", "heading": "Soil", "alias": "soil"]) == NoteLink(name: "Plan", heading: "Soil", alias: "soil"))
+        #expect(NoteLink(page: ["raw": "[[Plan]]", "target": "Plan"]) == NoteLink(name: "Plan"))
+        #expect(NoteLink(page: ["raw": "[[Plan#Soil|soil]]", "target": "Plan", "heading": "Soil", "alias": "soil"]) == NoteLink(name: "Plan", heading: "Soil", alias: "soil"))
+        #expect(NoteLink(page: ["raw": "[[A\\|B]]", "target": "A|B"]) == NoteLink(reading: "A\\|B"))
+        #expect(NoteLink(page: ["target": "Plan"]) == nil)
+        #expect(NoteLink(page: ["raw": "Plan", "target": "Plan"]) == nil)
         #expect(NoteLink(page: ["heading": "Soil"]) == nil)
         #expect(MarfaMapping.inside(brackets: "[[Plan|a]]") == "Plan|a")
     }

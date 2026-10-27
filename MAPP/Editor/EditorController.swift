@@ -17,7 +17,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var abandonedGeneration: Int?
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
-    var isFocused = false
+    var isFocused = false {
+        didSet { if isFocused != oldValue { sendHostActivation() } }
+    }
     /// Whether the item's header in the page has gone under the toolbar, which then shows the title.
     private(set) var isHeaderScrolledAway = false
     /// Whether the page has scrolled far enough for its text to pass under the toolbar, which then gets a band of
@@ -192,6 +194,9 @@ final class EditorController: NSObject {
         NotificationCenter.default.addObserver(
             self, selector: #selector(systemColorsDidChange), name: NSColor.systemColorsDidChangeNotification, object: nil
         )
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(windowActivationChanged), name: name, object: nil)
+        }
         // The accent resolves differently in light and dark, so it is sent again when the appearance changes.
         appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.applyAccent() }
@@ -422,6 +427,17 @@ final class EditorController: NSObject {
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
         }
+        sendHostActivation()
+    }
+
+    @objc private func windowActivationChanged(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === webView.window else { return }
+        sendHostActivation()
+    }
+
+    private func sendHostActivation() {
+        guard isReady else { return }
+        call("setHostActive", String(isFocused && webView.window?.isKeyWindow == true))
     }
 
     /// Formats from outside the page, as the toolbar does: the page takes the keyboard first, so the command
@@ -506,6 +522,7 @@ final class EditorController: NSObject {
         switch message {
         case .ready:
             isReady = true
+            sendHostActivation()
             hasLoadedPage = true
             applyAccent()
             applyKeymap()

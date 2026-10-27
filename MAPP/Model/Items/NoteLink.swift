@@ -3,16 +3,16 @@ import Foundation
 /// A `[[link]]` as the page reads it: the name before any `|` or `#`, the heading after `#`, and the alias after `|`,
 /// with the backslash escapes of `[`, `]`, `|`, `#` and `\` taken out, as Inkkit reads a link and as the page posts it.
 ///
-/// Marfa binds each spelling of a link on its own, so two links to one name can name two notes, and it tells spellings
-/// apart by their text, spaces inside the brackets included. So the parts keep the spaces between the brackets and only
-/// the text as a whole is trimmed, as Marfa trims it. Two spellings Inkkit does not tell apart in what it hands the page
-/// stay one link here: `[[Plan]]` and `[[Plan|Plan]]` (an alias that repeats the link is none).
+/// Marfa binds authored spellings separately. Decoded parts support navigation, but only the original text identifies
+/// a binding, including aliases that repeat the name and escaped separators.
 nonisolated struct NoteLink: Hashable, Sendable {
+    private(set) var raw: String
     var name: String
     var heading: String?
     var alias: String?
 
-    init(name: String, heading: String? = nil, alias: String? = nil) {
+    init(name: String, heading: String? = nil, alias: String? = nil, raw: String? = nil) {
+        self.raw = NoteName.trimmed(raw ?? (name + (heading.map { "#" + $0 } ?? "") + (alias.map { "|" + $0 } ?? "")))
         let heading = heading.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 }
         let alias = alias.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 }
         // An alias that only repeats what the link would show is none.
@@ -34,6 +34,7 @@ nonisolated struct NoteLink: Hashable, Sendable {
     /// after `#` up to a `|`, then an alias; each with its escapes taken out.
     init(reading raw: String) {
         let raw = NoteName.trimmed(raw)
+        defer { self.raw = raw }
         guard let separator = raw.firstIndex(where: { $0 == "|" || $0 == "#" }) else {
             self.init(name: Self.unescaped(raw))
             return
@@ -49,6 +50,14 @@ nonisolated struct NoteLink: Hashable, Sendable {
         } else {
             self.init(name: name, heading: Self.unescaped(String(rest)))
         }
+    }
+
+    // Swift String equality normalizes Unicode; Marfa's authored binding keys compare bytes.
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.raw.utf8.elementsEqual(rhs.raw.utf8) }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(raw.utf8.count)
+        for byte in raw.utf8 { hasher.combine(byte) }
     }
 
     /// A backslash before `[`, `]`, `|`, `#` or `\` stands for that character, as Inkkit reads it.

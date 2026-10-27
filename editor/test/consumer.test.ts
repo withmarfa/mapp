@@ -65,11 +65,18 @@ test('native readable ranges reject stale generations and preserve formatted rep
     expect(() => editor.findReplace(0, 8, 'Wrong', 1)).toThrow()
     expect(editor.snapshot().text).toBe('External\n')
   }))
-test('read-only rejects changes without losing text or history', async () =>
-  withEditor('Original\n', (editor) => {
+test('read-only exposes its state and permits selection, copy and find without mutation', async () =>
+  withEditor('Original\n', async (editor) => {
     editor.reload('Original\n', 2, false)
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    expect(document.querySelector('.ProseMirror')?.getAttribute('aria-readonly')).toBe('true')
+    editor.findSelect(0, 8, 2)
+    expect(engine.textSnapshot(2).selection).toMatchObject({ from: 0, to: 8 })
+    expect((await engine.clipboardSnapshot('selection', 2)).text).toContain('Original')
+    expect(editor.readableSnapshot(2).text).toContain('Original')
     expect(() => editor.findReplace(0, 8, 'Wrong', 2)).toThrow()
     expect(editor.snapshot().text).toBe('Original\n')
+    expect(engine.commandState().commands.undo).toBe(false)
   }))
 
 test('source edits share undo and reject stale mode changes', async () =>
@@ -630,19 +637,47 @@ test('files attached in quick add never replace a note that Inkkit reads as one 
         expect(
           guardedCommand(() => editor.appendImages(images)),
           source,
-        ).toMatchObject({
-          commandError: 'preservation',
-        })
-        // The text is exactly as it was, and neither the replaced text nor the restored one reached the app.
+        ).toBe(true)
+        const appended = editor.snapshot().text
+        expect(appended.startsWith(source)).toBe(true)
+        expect(appended).toContain('![a](a.png)')
+        expect(appended).toContain('![b](b.png)')
+        await Promise.resolve()
+        expect(reported).toEqual([appended])
+        expect(posted).toEqual([])
+        editor.undo()
         expect(editor.snapshot().text).toBe(source)
         expect(editor.markdown()).toBeNull()
-        await Promise.resolve()
-        expect(reported).toEqual([])
-        expect(posted).toMatchObject([{ type: 'error' }])
       },
       (text) => reported.push(text),
     )
   }
+})
+
+test('the defensive append guard restores a lossy engine edit before reporting it', async () => {
+  const reported: string[] = []
+  await withEditor(
+    'Original\n',
+    async (editor) => {
+      const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor })
+        .engine
+      vi.spyOn(engine, 'appendImages').mockImplementation(() => {
+        const snapshot = engine.textSnapshot(1)
+        engine.selectTextRange({
+          snapshotId: snapshot.snapshotId,
+          from: 0,
+          to: snapshot.text.length,
+        })
+        engine.insertText('Replacement', 1)
+        return true
+      })
+      expect(() => editor.appendImages([{ src: 'a.png', alt: 'a' }])).toThrow(InkKitError)
+      expect(editor.snapshot().text).toBe('Original\n')
+      await Promise.resolve()
+      expect(reported).toEqual([])
+    },
+    (text) => reported.push(text),
+  )
 })
 
 test('files attached in quick add are appended to an ordinary note and reported once', async () => {
@@ -659,12 +694,18 @@ test('files attached in quick add are appended to an ordinary note and reported 
   )
 })
 
-test('files attached in quick add are appended after trailing blank lines, which may collapse', async () => {
-  for (const source of ['Hello\n\n\n', 'Hello\n\n', 'Hello  \n\n\n\n', '# Title\n\ntext\n\n\n\n']) {
+test('files attached in quick add preserve trailing blank lines and whitespace', async () => {
+  for (const source of [
+    'Hello\n\n\n',
+    'Hello\n\n',
+    'Hello  \n\n\n\n',
+    '# Title\n\ntext\n\n\n\n',
+    'Hello\r\n\r\n    ',
+  ]) {
     await withEditor(source, (editor) => {
       expect(guardedCommand(() => editor.appendImages([{ src: 'a.png', alt: 'a' }]))).toBe(true)
       const text = editor.snapshot().text
-      expect(text.startsWith(source.trimEnd())).toBe(true)
+      expect(text.startsWith(source)).toBe(true)
       expect(text).toContain('![a](a.png)')
       expect(text.replace(/\s+$/, '').endsWith('![a](a.png)')).toBe(true)
     })
