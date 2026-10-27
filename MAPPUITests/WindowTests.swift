@@ -131,8 +131,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(row(titled: "Draft agenda").exists)
         XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0).exists)
         deleted.click()
-        let actions = window.descendants(matching: .any).matching(identifier: "RecentlyDeletedActions").element(boundBy: 0)
-        let restore = actions.buttons["Restore"]
+        let restore = window.buttons["Restore"]
         XCTAssertTrue(restore.waitForExistence(timeout: 3))
         XCTAssertTrue(restore.isEnabled)
         restore.click()
