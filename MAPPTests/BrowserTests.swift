@@ -220,15 +220,14 @@ struct BrowserTests {
     }
 
     @Test(arguments: [SidebarItem.sources, .collections, .inbox, .source("test"), .collection(ItemID("parent"))])
-    func listSearchIsAvailableOnlyWhereAnItemListExists(place: SidebarItem) {
+    func searchIsAvailableOnEveryPlaceButSettings(place: SidebarItem) {
         let browser = Browser()
         browser.sidebarItem = place
-        let hasList = place != .sources && place != .collections
-        #expect(browser.canSearchList == hasList)
+        #expect(browser.canSearchList)
         browser.showSettings()
         #expect(!browser.canSearchList)
         browser.leaveSettings()
-        #expect(browser.canSearchList == hasList)
+        #expect(browser.canSearchList)
     }
 
     @Test func aWhitespaceSearchIsNoSearch() {

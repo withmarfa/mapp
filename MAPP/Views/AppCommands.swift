@@ -77,7 +77,11 @@ struct AppCommands: Commands {
             }
             .disabled(editor?.hasNote != true)
             Divider()
-            ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
+            if let place = browser?.indexPlace {
+                IndexViewOptions(place: place, bindsKeys: true)
+            } else {
+                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
+            }
             IncludeSubtypesCommand(browser: browser, library: library)
             Divider()
             SavedViewMenu(browser: browser, library: library)
@@ -92,7 +96,7 @@ struct AppCommands: Commands {
             Group {
                 if library != nil, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.
-                    if browser.offersViewOptions {
+                    if browser.offersViewOptions, !browser.showsSidebarIndex {
                         if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
                         CurrentViewOptions(browser: browser)
                     }
