@@ -102,7 +102,7 @@ final class Browser {
 
     var item: SidebarItem { sidebarItem ?? .allNotes }
     var showsSidebarIndex: Bool { !showsSettings && (item == .sources || item == .collections) }
-    var canSearchList: Bool { !showsSettings && item != .sources && item != .collections }
+    var canSearchList: Bool { !showsSettings }
 
     /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
     func showSettings(_ page: SettingsPage? = nil) {

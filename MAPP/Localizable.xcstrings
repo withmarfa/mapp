@@ -2450,6 +2450,67 @@
     },
     "Where each column starts in a new window. Dragging a column to a new width changes only that window." : {
       "extractionState" : "manual"
+    },
+    "Show As" : {
+      "extractionState" : "manual"
+    },
+    "Width" : {
+      "extractionState" : "manual"
+    },
+    "Cards" : {
+      "extractionState" : "manual"
+    },
+    "Writes" : {
+      "extractionState" : "manual"
+    },
+    "Contains" : {
+      "extractionState" : "manual"
+    },
+    "Latest Item" : {
+      "extractionState" : "manual"
+    },
+    "View as Cards" : {
+      "extractionState" : "manual"
+    },
+    "Width: Narrow" : {
+      "extractionState" : "manual"
+    },
+    "Width: Standard" : {
+      "extractionState" : "manual"
+    },
+    "Width: Wide" : {
+      "extractionState" : "manual"
+    },
+    "Latest %@" : {
+      "extractionState" : "manual"
+    },
+    "%lld sources" : {
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "variations" : { "plural" : {
+        "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld source" } },
+        "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld sources" } }
+      } } } }
+    },
+    "%lld collections" : {
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "variations" : { "plural" : {
+        "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld collection" } },
+        "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld collections" } }
+      } } } }
+    },
+    "%lld items" : {
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "variations" : { "plural" : {
+        "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item" } },
+        "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items" } }
+      } } } }
+    },
+    "%lld more" : {
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "variations" : { "plural" : {
+        "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld more" } },
+        "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld more" } }
+      } } } }
     }
   },
   "version" : "1.1"

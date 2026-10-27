@@ -9,7 +9,8 @@ struct ViewOptionCommand {
 
     /// - Parameter storedColumns: Each place's table columns as kept (`ItemTableColumnLayouts`).
     static func commands(for browser: Browser, in library: any ItemLibrary, storedColumns: Binding<Data>) -> [ViewOptionCommand] {
-        guard !browser.showsSettings, !browser.showsSidebarIndex, browser.offersViewOptions else { return [] }
+        if let place = browser.indexPlace { return indexCommands(for: place) }
+        guard !browser.showsSettings, browser.offersViewOptions else { return [] }
         switch browser.viewMode {
         case .table: return table(browser, library, storedColumns)
         case .board: return board(browser, library)

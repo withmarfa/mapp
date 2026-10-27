@@ -6,59 +6,128 @@ struct SidebarIndex: View {
     let browser: Browser
     let order: NoteOrder
     let showsCreation: Bool
+    @State private var model = IndexRowsModel()
+
+    private var place: IndexPlace { browser.indexPlace ?? .sources }
 
     var body: some View {
-        Group {
-            if browser.item == .sources {
-                if library.sourceCounts.isEmpty {
-                    EmptyState("No Sources", detail: "Sources appear here when items identify where they came from.")
-                } else {
-                    List(library.sourceCounts) { source in
-                        destination(source.name, symbol: "antenna.radiowaves.left.and.right", count: source.count, place: .source(source.name))
-                    }
-                }
-            } else {
-                let collections = library.collections
-                if collections.isEmpty {
-                    if library.catalogue.collectionTypes.isEmpty {
-                        EmptyState("No Collections", detail: "This library has no collection type.")
-                    } else {
-                        EmptyState("No Collections", detail: "Collections you make appear here.")
-                    }
-                } else {
-                    List(collections) { collection in
-                        destination(
-                            collection.title, symbol: TypeSymbol.name(for: collection.type, in: library.catalogue),
-                            count: library.count(in: .collection(collection.id)), place: .collection(collection.id))
-                    }
-                }
-            }
+        IndexContent(place: place, rows: model.rows, isBuilt: model.isBuilt, browser: browser) { row in
+            browser.show(row.place, in: library, order: order)
         }
+        .task(id: Following(place: place, library: ObjectIdentifier(library))) { model.follow(place, in: library) }
+        .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
+        .navigationSubtitle(summary)
         .toolbar {
             if showsCreation {
                 ToolbarItem(id: "indexNewItem") {
                     NewItemButton(browser: browser)
                 }
-                ToolbarSpacer(.flexible)
             }
+            ToolbarSpacer(.flexible)
+            IndexToolbar(browser: browser, place: place)
         }
         .accessibilityIdentifier("SidebarIndex")
     }
 
-    private func destination(_ title: String, symbol: String, count: Int, place: SidebarItem) -> some View {
-        Button {
-            browser.show(place, in: library, order: order)
-        } label: {
-            HStack {
-                Label(title, systemImage: symbol)
-                Spacer()
-                Text(count, format: .number).foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, 8)
-            .contentShape(.rect)
+    private struct Following: Hashable {
+        let place: IndexPlace
+        let library: ObjectIdentifier
+    }
+
+    /// How many places the page lists, and for sources how many items they hold between them.
+    private var summary: String {
+        guard model.isBuilt, !model.rows.isEmpty else { return "" }
+        switch place {
+        case .sources:
+            let items = model.rows.reduce(0) { $0 + $1.count }
+            return String(localized: "\(model.rows.count) sources") + ", " + String(localized: "\(items) items")
+        case .collections:
+            return String(localized: "\(model.rows.count) collections")
         }
-        .buttonStyle(.plain)
+    }
+}
+
+/// The rows of one index page, searched, in the layout and width the person chose for the page.
+private struct IndexContent: View {
+    @CurrentLibrary private var library
+    let place: IndexPlace
+    let rows: [IndexRow]
+    let isBuilt: Bool
+    let browser: Browser
+    let open: (IndexRow) -> Void
+    @AppStorage private var layout: IndexLayout
+    @AppStorage private var width: IndexWidth
+
+    init(place: IndexPlace, rows: [IndexRow], isBuilt: Bool, browser: Browser, open: @escaping (IndexRow) -> Void) {
+        self.place = place
+        self.rows = rows
+        self.isBuilt = isBuilt
+        self.browser = browser
+        self.open = open
+        _layout = AppStorage(wrappedValue: .default, place.layoutKey)
+        _width = AppStorage(wrappedValue: .default, place.widthKey)
+    }
+
+    var body: some View {
+        if !isBuilt {
+            Color.clear
+        } else if rows.isEmpty {
+            empty
+        } else {
+            let shown = browser.isSearching ? rows.filter(matches) : rows
+            if shown.isEmpty {
+                EmptyState("No Results")
+            } else {
+                IndexPage(
+                    rows: shown, layout: layout, width: width, typesTitle: typesTitle,
+                    showsSecondaryOnCards: place != .sources, open: open)
+            }
+        }
+    }
+
+    private func matches(_ row: IndexRow) -> Bool {
+        let query = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return row.title.localizedStandardContains(query) || row.secondary.localizedStandardContains(query)
+            || row.types.localizedStandardContains(query)
+    }
+
+    private var typesTitle: LocalizedStringKey {
+        switch place {
+        case .sources: "Writes"
+        case .collections: "Contains"
+        }
+    }
+
+    @ViewBuilder
+    private var empty: some View {
+        switch place {
+        case .sources:
+            EmptyState("No Sources", detail: "Sources appear here when items identify where they came from.")
+        case .collections:
+            if library.catalogue.collectionTypes.isEmpty {
+                EmptyState("No Collections", detail: "This library has no collection type.")
+            } else {
+                EmptyState("No Collections", detail: "Collections you make appear here.")
+            }
+        }
+    }
+}
+
+/// Search and the page's options, as the gallery and the table have them at the toolbar's trailing side.
+private struct IndexToolbar: ToolbarContent {
+    @Bindable var browser: Browser
+    let place: IndexPlace
+
+    var body: some ToolbarContent {
+        ColumnSearch(
+            isExpanded: $browser.isSearchExpanded,
+            text: $browser.searchText,
+            prompt: String(localized: "Search"),
+            layout: .item,
+            focusRequests: browser.searchFocusRequests
+        ) {
+            IndexViewOptionsMenu(place: place)
+        }
     }
 }

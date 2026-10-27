@@ -214,7 +214,7 @@ struct CommandPalette: View {
             if browser.canSearchList {
                 add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F") { browser.focusRequest = .search }
             }
-            let modes = browser.availableViewModes(in: library)
+            let modes = browser.showsSidebarIndex ? [] : browser.availableViewModes(in: library)
             func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ shortcut: String) {
                 if modes.contains(mode) { add(title, systemImage, shortcut) { browser.viewMode = mode } }
             }
