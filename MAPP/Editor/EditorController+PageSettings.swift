@@ -101,6 +101,8 @@ extension EditorController {
             "propertyRejected": String(localized: "The value could not be saved. Please try again."),
             "parentRejected": String(localized: "The connection could not be removed."),
             "linkedFrom": String(localized: "Linked From"),
+            "contents": String(localized: "Contents"),
+            "showLess": String(localized: "Show Less"),
             "timeline": String(localized: "Timeline"),
             "properties": String(localized: "Properties"),
         ]

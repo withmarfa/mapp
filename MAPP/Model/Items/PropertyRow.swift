@@ -168,15 +168,30 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
         try container.encode(date, forKey: .date)
     }
 
+    /// Which of the items that point at a collection a list holds: a collection's members are its contents, and
+    /// every other link to it is a plain link to it.
+    enum Members {
+        case all, only, excluding
+
+        fileprivate func admits(_ field: String) -> Bool {
+            let isMembership = field == "inverse:" + MarfaMapping.collectionEdge
+            switch self {
+            case .all: return true
+            case .only: return isMembership
+            case .excluding: return !isMembership
+            }
+        }
+    }
+
     /// The active items that hold a link to `id` in any relationship the library reads (the inverse ones), once
     /// each, the most recently edited first.
     static func list(
         pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date,
-        item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
+        members: Members = .all, item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
     ) -> [LinkedItem] {
         var seen: Set<ItemID> = [id]
         var found: [Item] = []
-        for relationship in relationships where relationship.field.hasPrefix("inverse:") {
+        for relationship in relationships where relationship.field.hasPrefix("inverse:") && members.admits(relationship.field) {
             for target in relationship.targets {
                 guard let other = target.itemID, !target.isDeleted, let held = item(other), held.state == .active,
                       seen.insert(other).inserted else { continue }

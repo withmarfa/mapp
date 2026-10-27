@@ -2176,7 +2176,7 @@
     "The Marfa server refused this change." : {
       "extractionState" : "manual"
     },
-    "The Marfa server refused this library’s key. Check the key in Settings." : {
+    "The Marfa server no longer accepts this library’s key. Open Settings, choose Library, and enter a new key." : {
       "extractionState" : "manual"
     },
     "The PDF exceeds the export limit of 200 pages or 64 MB." : {
@@ -2472,6 +2472,12 @@
       "extractionState" : "manual"
     },
     "Linked From" : {
+      "extractionState" : "manual"
+    },
+    "Contents" : {
+      "extractionState" : "manual"
+    },
+    "Show Less" : {
       "extractionState" : "manual"
     },
     "Collapse %@" : {

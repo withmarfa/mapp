@@ -61,8 +61,19 @@ struct ItemPageHeader: ViewModifier {
         let properties = lead.refine(PropertyRow.rows(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
             parentField: "child-of", tags: library.tags(of: item)))
+        let isCollection = library.catalogue.isCollection(item.type)
+        let contents = isCollection
+            ? LinkedItem.list(
+                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, members: .only,
+                item: { library.item($0) })
+            : []
         let linked = LinkedItem.list(
-            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, item: { library.item($0) })
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now,
+            members: isCollection ? .excluding : .all, item: { library.item($0) })
+        let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
+        // A collection with no text, as a folder a connector keeps has, is its members: an editor with nothing in it
+        // would only invite typing that the connector puts back.
+        let showsText = hasText && !(isCollection && library.body(of: item.id)?.text.isEmpty != false)
         return PageHeader(
             item: item.id.rawValue,
             hidden: item.state == .trashed,
@@ -91,8 +102,11 @@ struct ItemPageHeader: ViewModifier {
             },
             byline: lead.byline ?? PageByline(item: item, now: now),
             properties: properties,
+            contents: contents,
             linked: linked,
+            showsText: showsText,
             showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),
+            showMoreContents: String(localized: "Show \(max(0, contents.count - LinkedItem.foldAfter)) More"),
             showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
             propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
