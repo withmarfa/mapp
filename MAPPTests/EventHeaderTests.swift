@@ -85,12 +85,13 @@ struct EventHeaderTests {
         let overnight = try #require(Self.header([
             "starts_at": .string("2026-10-29T22:00:00Z"), "ends_at": .string("2026-10-30T02:00:00Z"), "timezone": .string("UTC"),
         ]))
-        #expect(overnight.time == "29 Oct at 22:00 to 30 Oct at 02:00")
+        // The words joining a date and a time differ between system releases, so check the parts, not the phrase.
+        for part in ["29 Oct", "22:00", "30 Oct", "02:00"] { #expect(overnight.time.contains(part)) }
         let flight = try #require(Self.header([
             "starts_at": .string("2026-10-29T10:00:00Z"), "ends_at": .string("2026-10-29T18:00:00Z"),
             "timezone": .string("Europe/London"), "end_timezone": .string("America/New_York"),
         ]))
-        #expect(flight.time.hasSuffix("(GMT-4)"))
+        #expect(["(GMT-4)", "(EDT)"].contains { flight.time.hasSuffix($0) })
     }
 
     @Test func aStartWithNoDayToPlaceStaysInThePropertyBlock() {
