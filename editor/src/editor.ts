@@ -140,7 +140,7 @@ export type FormatCommand =
   | 'deleteRow'
   | 'deleteColumn'
   | 'alignColumn'
-export type Keymap = Record<string, [FormatCommand, string?]>
+export type Keymap = Record<string, [FormatCommand | 'openLink', string?]>
 export interface FindState {
   snapshotId: string
   text: string
@@ -187,6 +187,7 @@ export function wikiSuggest(
 function linkRef(reference: WikiLinkReference): LinkRef {
   const shown = reference.fragment ? `${reference.target}#${reference.fragment}` : reference.target
   return {
+    raw: reference.raw,
     target: reference.target,
     ...(reference.fragment ? { heading: reference.fragment } : {}),
     ...(reference.label !== shown ? { alias: reference.label } : {}),
@@ -523,6 +524,9 @@ export class NoteEditor {
   blur(expected = this.generation) {
     this.engine.blur(expected)
   }
+  setHostActive(active: boolean) {
+    this.engine.setHostActive(active)
+  }
   setEditingMode(mode: 'source' | 'formatted', expected = this.generation) {
     this.engine.setEditingMode(mode, expected)
     this.invalidateFindGeometry()
@@ -550,9 +554,10 @@ export class NoteEditor {
   setKeymap(bindings: Keymap) {
     const keys: Partial<Record<ShortcutName, string[]>> = {}
     for (const [key, [command, arg]] of Object.entries(bindings)) {
+      const table = command === 'openLink' ? undefined : tables[command]
       const name = (
-        tables[command]
-          ? 'table' + tables[command]![0]!.toUpperCase() + tables[command]!.slice(1)
+        table
+          ? 'table' + table[0]!.toUpperCase() + table.slice(1)
           : command === 'heading'
             ? 'heading' + arg
             : command
@@ -677,10 +682,8 @@ export class NoteEditor {
    *  leaves them for the app to send again. A note that ends in a code fence left open refuses them (`preservation`),
    *  and the app tells the person the files are attached but not in the text.
    *
-   *  Inkkit replaces the whole document when it holds one block with nothing in it, which is how it reads a note
-   *  that is only a rule, an empty code fence, an image or a link definition. So the text is checked after the edit:
-   *  anything but trailing whitespace gone is taken back in the same step, before the change is reported, and
-   *  refused as `preservation`. This guard stays whatever Inkkit does about it. */
+   *  Keep the defensive source check after Inkkit's append: anything but trailing whitespace gone is taken back
+   *  in the same step, before the change is reported, and refused as `preservation`. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
     const before = this.snapshot(expected).text
     const reportedBefore = this.pendingChanged

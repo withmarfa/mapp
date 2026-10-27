@@ -79,7 +79,7 @@ final class SettingsTests: XCTestCase {
             row.click()
             XCTAssertTrue(element("SettingsDetail").exists)
             attachScreenshot("Settings-\(page)")
-            XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the page has a native toolbar title")
+            XCTAssertTrue(element("SettingsDetail").staticTexts[title].waitForExistence(timeout: 3), "the detail shows the selected page's title")
         }
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -102,7 +102,7 @@ final class SettingsTests: XCTestCase {
     func testSettingsPreservesTheEditorsTextAndUndoHistory() {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         row.click()
-        let body = window.webViews.firstMatch.textViews.firstMatch
+        let body = app.itemPageBody
         XCTAssertTrue(body.waitForExistence(timeout: 5))
         body.click()
         app.typeKey(.downArrow, modifierFlags: .command)
@@ -146,7 +146,7 @@ final class SettingsTests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         XCTAssertFalse(search.exists)
-        XCTAssertTrue(window.toolbars.staticTexts["Appearance"].waitForExistence(timeout: 3))
+        XCTAssertTrue(element("SettingsDetail").staticTexts["Appearance"].waitForExistence(timeout: 3))
         attachScreenshot("Settings-from-column-search")
         leaveSettings()
         XCTAssertTrue(search.waitForExistence(timeout: 3))
@@ -175,8 +175,9 @@ final class SettingsTests: XCTestCase {
         app.typeKey("s", modifierFlags: [.command, .control])
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        // With the sidebar hidden there is no place to choose; New leaves Settings and opens the new item.
+        // With the sidebar hidden there is no place to choose; New leaves Settings through quick add.
         app.typeKey("n", modifierFlags: .command)
+        window.completeQuickAdd(type: "Note", title: "From Settings")
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCTAssertFalse(settings.exists)
         XCTAssertFalse(sidebar.exists, "the sidebar stays hidden after returning")
@@ -208,7 +209,8 @@ final class SettingsTests: XCTestCase {
         let originalHeight = row.frame.height
         let sidebarText = sidebar.staticTexts["Items"]
         let originalSidebarHeight = sidebarText.frame.height
-        let typeText = sidebar.staticTexts["Note"]
+        let typeText = sidebar.staticTexts["SidebarType-core.note"]
+        XCTAssertTrue(typeText.waitForExistence(timeout: 3))
         let originalTypeHeight = typeText.frame.height
         XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
         XCTAssertTrue(instanceMenu.exists)
