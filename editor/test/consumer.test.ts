@@ -513,6 +513,45 @@ test('the page reports a heading by its level and applies the level the app asks
   }
 })
 
+test('the native link shortcut opens a read-only page link without editing', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const opened: string[] = []
+  const editor = await NoteEditor.mount(root, {
+    find() {},
+    changed() {},
+    stateChanged() {},
+    copy() {},
+    openLink: (href) => opened.push(href),
+  })
+  editor.setItem('note')
+  editor.load('[Link](https://example.com)\r\n', 1)
+  try {
+    editor.reload('[Link](https://example.com)\r\n', 2, false)
+    editor.setKeymap({ 'Mod-O': ['openLink'] })
+    editor.findSelect(0, 4, 2)
+    editor.focus()
+    const surface = root.querySelector('.ProseMirror')!
+    expect(document.activeElement).toBe(surface)
+    surface.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'O',
+        code: 'KeyO',
+        metaKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    expect(opened).toEqual(['https://example.com'])
+    expect(editor.snapshot().text).toBe('[Link](https://example.com)\r\n')
+    expect(editor.markdown()).toBeNull()
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
+
 test('images go in at the caret or at a drop point, and blur leaves the focus off the text', async () => {
   await withEditor('Milk\n', (editor) => {
     expect(editor.insertImages([{ src: 'Attachments/a%201.png', alt: 'a' }])).toBe(true)

@@ -2004,6 +2004,9 @@
     "Reset Columns" : {
 
     },
+    "Resize Image" : {
+      "extractionState" : "manual"
+    },
     "Restore" : {
 
     },
