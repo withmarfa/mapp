@@ -127,6 +127,7 @@ extension EditorController {
         titleDrafts = nil
         for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }
         pendingEmbeds = [:]
+        pictureSettingWatch?.cancel()
         Self.open.remove(self)
     }
 

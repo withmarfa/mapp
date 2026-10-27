@@ -22,6 +22,7 @@ import {
 } from './bridge'
 import type { HeaderLabels } from './header'
 import { NoteLinkStatus } from './links'
+import { WebPictures, webAddress, type PictureWords } from './pictures'
 
 /** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
 export function isPreviewDiagnostic(error: Error): boolean {
@@ -33,7 +34,7 @@ export function isPreviewDiagnostic(error: Error): boolean {
 
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
  *  the header's and the Link to Note command's are MAPP's. */
-export interface AppWords {
+export interface AppWords extends PictureWords {
   linkToNote?: string
 }
 export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
@@ -56,13 +57,25 @@ export function splitLabels(all: AppLabels): {
   header: Partial<HeaderLabels>
   words: AppWords
 } {
-  const { linkToNote, ...rest } = all
+  const {
+    linkToNote,
+    loadPicture,
+    loadingPicture,
+    picturesOff,
+    loadOnePicture,
+    loadPictures,
+    ...rest
+  } = all
   const header: Partial<HeaderLabels> = {}
   for (const key of headerLabelKeys) {
     if (key in rest) header[key] = rest[key]
     delete rest[key]
   }
-  return { editor: rest, header, words: { linkToNote } }
+  return {
+    editor: rest,
+    header,
+    words: { linkToNote, loadPicture, loadingPicture, picturesOff, loadOnePicture, loadPictures },
+  }
 }
 
 /**
@@ -144,6 +157,9 @@ export interface EditorEvents {
   find(state: FindState): void
   openLink(href: string): void
   copy(text: string): void
+  /** How many pictures at web addresses wait for the person to load them, and the words for the button that loads
+   *  them together. */
+  picturesWaiting?(count: number, label: string): void
 }
 const tables: Partial<Record<FormatCommand, TableCommand>> = {
   table: 'insert',
@@ -157,11 +173,6 @@ const tables: Partial<Record<FormatCommand, TableCommand>> = {
 /** An embed as the note's text holds it, which is how Marfa lists the embeds it bound. */
 function request(reference: FileReference, item: string): EmbedRequest {
   return { item, text: reference.raw }
-}
-
-/** A picture at a web address, which the page never loads: it is a card that opens the address in the browser. */
-function webAddress(target: string): string | null {
-  return /^https?:\/\//i.test(target) ? target : null
 }
 
 /** The names of notes to offer after `[[`, unless the person has typed past the request. */
@@ -196,6 +207,7 @@ export class NoteEditor {
   private generation = 0
   private item = ''
   private links!: NoteLinkStatus
+  private pictures!: WebPictures
   private reported = ''
   private original = ''
   private constructor(private events: EditorEvents) {}
@@ -208,6 +220,11 @@ export class NoteEditor {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
     host.links = new NoteLinkStatus(askMissing, (targets) => host.drawLinksAgain(targets))
+    host.pictures = new WebPictures(
+      words,
+      (addresses) => host.drawLinksAgain(addresses),
+      (count, label) => events.picturesWaiting?.(count, label),
+    )
     host.engine = await InkKitEditor.mount(
       root,
       {
@@ -242,8 +259,8 @@ export class NoteEditor {
         labels,
         files: {
           async resolve(reference, context) {
-            if (webAddress(reference.target))
-              return { kind: 'file', label: reference.label ?? reference.target }
+            const picture = webAddress(reference.target)
+            if (picture) return host.pictures.present(picture, reference.label, context)
             const embed = request(reference, context.documentId)
             host.noteTarget(embed.text, reference.target)
             const file = await host.answer(embed)
@@ -269,6 +286,8 @@ export class NoteEditor {
             }
           },
           async exportImage(reference, context) {
+            const picture = webAddress(reference.target)
+            if (picture) return host.pictures.bytes(context.documentId, picture)
             const embed = request(reference, context.documentId)
             const result = (await window.webkit?.messageHandlers?.embeds?.postMessage({
               ...embed,
@@ -283,7 +302,11 @@ export class NoteEditor {
           },
           open(reference, context) {
             const address = webAddress(reference.target)
-            if (address) return events.openLink(address)
+            if (address) {
+              if (host.pictures.opensInBrowser(address)) return events.openLink(address)
+              void host.pictures.choose(address)
+              return
+            }
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })
           },
           contextMenu(reference, _point, context) {
@@ -342,6 +365,15 @@ export class NoteEditor {
       this.targets.clear()
     }
     this.item = id
+    this.pictures.setItem(id)
+  }
+  /** The app's Remote Pictures setting changed: pictures that waited, or were turned off, are asked about again. */
+  picturesChanged(addresses?: string[]) {
+    this.pictures.changed(addresses)
+  }
+  /** The person chose to load every picture that waits. */
+  loadPictures() {
+    this.pictures.chooseAll()
   }
   /** What the app answered for each embed of the note, by its text, so two embeds of one file, and one drawn
    *  again, ask it once. Only a file is kept: an embed the app could not show is asked again. */
@@ -671,8 +703,15 @@ export class NoteEditor {
     )
   }
   async printable(expected = this.generation) {
-    const result = await this.engine.printableSnapshot(expected)
-    return { ...result, assets: undefined, assetCount: result.assets.length }
+    // A printed note shows the pictures at web addresses already on this Mac, and fetches none.
+    this.pictures.cacheOnly = true
+    try {
+      const result = await this.engine.printableSnapshot(expected)
+      return { ...result, assets: undefined, assetCount: result.assets.length }
+    } finally {
+      this.pictures.cacheOnly = false
+      this.pictures.afterCacheOnly()
+    }
   }
   destroy() {
     this.links.end()
