@@ -39,6 +39,9 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("o")
             .disabled(browser == nil || ids.isEmpty)
+            let original = ids.count == 1 ? ids.first.flatMap { library?.item($0) }.flatMap { library?.originalAddress(of: $0) } : nil
+            Button("Open Original", systemImage: "safari") { if let original { NSWorkspace.shared.open(original) } }
+                .disabled(original == nil)
             Divider()
             NoteShareLink(share: library.map { library in
                 NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)

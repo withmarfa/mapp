@@ -259,6 +259,9 @@ private struct MoreMenu: View {
                 .keyboardShortcut("o")
                 .disabled(ids.isEmpty)
             }
+            if let original = (visibleNote ?? note).flatMap({ library.originalAddress(of: $0) }) {
+                Button("Open Original", systemImage: "safari") { NSWorkspace.shared.open(original) }
+            }
             NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
             NoteOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)

@@ -22,7 +22,7 @@ export interface HeaderRow {
   label: string
   /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
   symbol: string
-  kind: 'status' | 'parent' | 'items' | 'tags' | 'date' | 'url' | 'email' | 'text'
+  kind: 'status' | 'parent' | 'items' | 'tags' | 'date' | 'url' | 'email' | 'phone' | 'text'
   text?: string
   texts?: string[]
   items?: { title: string; item: string }[]
@@ -37,6 +37,25 @@ export interface HeaderLinked {
   date: string
 }
 
+/** Which header the page draws, chosen by the app from the core type the item's type builds on. */
+export type HeaderKind = 'general' | 'event' | 'person' | 'reading'
+
+/** An event's when, worked out by the app in the event's own time zone. */
+export interface HeaderEvent {
+  month: string
+  day: string
+  weekday: string
+  time: string
+  zone?: string | null
+  relative: string
+}
+
+/** A person's initials, or the picture the item holds inline. */
+export interface HeaderPerson {
+  initials: string
+  photo?: string | null
+}
+
 /** What the app says the header shows for the item on the page. */
 export interface HeaderModel {
   item: string
@@ -49,10 +68,15 @@ export interface HeaderModel {
   titleRefusal: string
   editable: boolean
   type: string | null
+  kind: HeaderKind
+  event?: HeaderEvent | null
+  person?: HeaderPerson | null
+  /** The line under the title: a person's work, or a reading item's description. */
+  subtitle?: string | null
   status: HeaderPin | null
   parent: HeaderPin | null
   /** Who made the item, if the library knows, and when. */
-  byline: { source?: string | null; date: string }
+  byline: { source?: string | null; date: string; detail?: string | null }
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
   foldAfter: number
@@ -93,6 +117,8 @@ export interface HeaderLabels {
   propertyRejected: string
   parentRejected: string
   linkedFrom: string
+  /** What Linked From is called on a person's page, where it reads as their timeline. */
+  timeline: string
   properties: string
 }
 
@@ -110,6 +136,7 @@ const englishLabels: HeaderLabels = {
   propertyRejected: 'The value could not be saved. Please try again.',
   parentRejected: 'The connection could not be removed.',
   linkedFrom: 'Linked From',
+  timeline: 'Timeline',
   properties: 'Properties',
 }
 
@@ -130,7 +157,11 @@ function element<K extends keyof HTMLElementTagNameMap>(
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
+  private readonly lead: HTMLDivElement
+  private readonly avatar: HTMLSpanElement
   private readonly title: HTMLDivElement
+  private readonly subtitle: HTMLParagraphElement
+  private readonly when: HTMLDivElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
   private readonly byline: HTMLDivElement
@@ -163,13 +194,18 @@ export class ItemHeader {
   ) {
     this.labels = { ...englishLabels, ...labels }
     root.hidden = true
-    this.title = element('div', 'item-title', root)
+    this.lead = element('div', 'item-lead', root)
+    this.avatar = element('span', 'item-avatar', this.lead)
+    this.avatar.setAttribute('aria-hidden', 'true')
+    const heading = element('div', 'item-heading', this.lead)
+    this.title = element('div', 'item-title', heading)
     this.title.id = 'ItemPageTitle'
     this.title.setAttribute('role', 'textbox')
     this.title.setAttribute('aria-label', this.labels.title)
     this.title.setAttribute('aria-placeholder', this.labels.untitled)
     this.title.dataset.placeholder = this.labels.untitled
     this.title.spellcheck = false
+    this.subtitle = element('p', 'item-subtitle', heading)
     this.titleError = element('div', 'item-title-error', root)
     this.titleError.hidden = true
     this.titleRefusal = element('p', 'item-error', this.titleError)
@@ -189,6 +225,7 @@ export class ItemHeader {
       'true',
     )
     element('span', 'item-pin-label', this.typePin)
+    this.when = element('div', 'item-when', root)
     const pins = document.createElement('div')
     this.statusPin = this.menuPin('ItemStatusPin', 'status', pins)
     this.statusPin.setAttribute('aria-label', this.labels.status)
@@ -208,7 +245,6 @@ export class ItemHeader {
     this.parentError.textContent = this.labels.parentRejected
     this.parentError.hidden = true
     this.linked = element('section', 'item-linked', root)
-    this.linked.setAttribute('aria-label', this.labels.linkedFrom)
     this.linkedToggle = element('button', 'item-linked-toggle', this.linked)
     this.linkedToggle.type = 'button'
     this.linkedToggle.addEventListener('click', () => {
@@ -313,6 +349,7 @@ export class ItemHeader {
     if (!model) {
       if (this.isEditingTitle) this.title.blur()
       this.root.hidden = true
+      document.body.dataset.header = 'general'
       return
     }
     // Another item's title is never edited as this one's.
@@ -322,6 +359,10 @@ export class ItemHeader {
     }
     this.root.hidden = model.hidden
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    this.root.dataset.kind = model.kind
+    document.body.dataset.header = model.hidden ? 'general' : model.kind
+    this.subtitle.textContent = model.subtitle ?? ''
+    this.subtitle.hidden = !model.subtitle
     const editable = model.editable ? 'plaintext-only' : 'false'
     if (this.title.getAttribute('contenteditable') !== editable) {
       this.title.setAttribute('contenteditable', editable)
@@ -338,7 +379,13 @@ export class ItemHeader {
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item)
-      this.expanded = { item: model.item, properties: false, linked: false, linkedOpen: false }
+      // A person's timeline is the page's own content, so it opens with the page.
+      this.expanded = {
+        item: model.item,
+        properties: false,
+        linked: false,
+        linkedOpen: model.kind === 'person',
+      }
     this.redraw()
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
@@ -476,6 +523,9 @@ export class ItemHeader {
     if (!model) return
     const source = model.byline.source
     const key = JSON.stringify([
+      model.kind,
+      model.event,
+      model.person,
       model.byline,
       model.properties,
       model.linked,
@@ -489,9 +539,12 @@ export class ItemHeader {
 
     // The type, then who made the item and when, as one quiet line.
     for (const extra of [...this.byline.querySelectorAll('.item-byline-part')]) extra.remove()
-    for (const part of [source, model.byline.date]) {
+    let first = this.typePin.hidden
+    for (const part of [source, model.byline.date, model.byline.detail]) {
       if (!part) continue
-      element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
+      if (!first)
+        element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
+      first = false
       element('span', 'item-byline-part', this.byline).textContent = part
     }
 
@@ -500,6 +553,7 @@ export class ItemHeader {
       : model.properties.slice(0, model.foldAfter)
     this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
     this.properties.hidden = shown.length === 0
+    this.drawLead(model)
     this.moreProperties.hidden = shown.length === model.properties.length
     this.moreProperties.textContent = model.showMore
 
@@ -507,7 +561,9 @@ export class ItemHeader {
     this.linkedToggle.replaceChildren()
     this.linkedToggle.setAttribute('aria-expanded', String(this.expanded.linkedOpen))
     element('span', 'item-chevron', this.linkedToggle).setAttribute('aria-hidden', 'true')
-    element('span', 'item-linked-title', this.linkedToggle).textContent = this.labels.linkedFrom
+    const linkedName = model.kind === 'person' ? this.labels.timeline : this.labels.linkedFrom
+    this.linked.setAttribute('aria-label', linkedName)
+    element('span', 'item-linked-title', this.linkedToggle).textContent = linkedName
     element('span', 'item-linked-count', this.linkedToggle).textContent = String(
       model.linked.length,
     )
@@ -530,6 +586,40 @@ export class ItemHeader {
     )
     this.linkedMore.hidden = !this.expanded.linkedOpen || items.length === model.linked.length
     this.linkedMore.textContent = model.showMoreLinked
+  }
+
+  /** What the kind adds above the properties: a person's avatar, an event's calendar block and when. */
+  private drawLead(model: HeaderModel) {
+    const person = model.kind === 'person' ? model.person : null
+    this.avatar.hidden = !person
+    this.avatar.replaceChildren()
+    this.avatar.classList.toggle('photo', !!person?.photo)
+    if (person?.photo) {
+      const picture = element('img', 'item-avatar-photo', this.avatar)
+      picture.alt = ''
+      picture.src = person.photo
+    } else if (person) {
+      this.avatar.textContent = person.initials
+    }
+
+    const event = model.kind === 'event' ? model.event : null
+    this.when.hidden = !event
+    this.when.replaceChildren()
+    if (!event) return
+    const calendar = element('div', 'item-calendar', this.when)
+    calendar.setAttribute('aria-hidden', 'true')
+    element('span', 'item-calendar-month', calendar).textContent = event.month
+    element('span', 'item-calendar-day', calendar).textContent = event.day
+    const text = element('div', 'item-when-text', this.when)
+    element('p', 'item-when-time', text).textContent = event.time
+    const details = element('p', 'item-when-detail', text)
+    const parts = [event.weekday, event.zone, event.relative].filter(Boolean) as string[]
+    parts.forEach((part, index) => {
+      if (index > 0) element('span', 'item-byline-dot', details).setAttribute('aria-hidden', 'true')
+      element('span', '', details).textContent = part
+    })
+    // The status the event is in sits with its time rather than among the properties.
+    if (model.status) element('div', 'item-when-status', text).append(this.statusPin)
   }
 
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
@@ -563,6 +653,20 @@ export class ItemHeader {
         const address = row.text ?? ''
         const href = `mailto:${address}`
         this.link(value, address, () => postToHost({ type: 'openLink', href }), href)
+        break
+      }
+      case 'phone': {
+        const number = row.text ?? ''
+        // A number is dialed as its digits and a leading plus, whatever spacing it is written with.
+        const dialed = number.replace(/(?!^\+)[^\d]/g, '')
+        if (dialed.replace('+', '') === '') value.textContent = number
+        else
+          this.link(
+            value,
+            number,
+            () => postToHost({ type: 'openLink', href: `tel:${dialed}` }),
+            `tel:${dialed}`,
+          )
         break
       }
       default:

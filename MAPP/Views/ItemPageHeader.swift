@@ -55,9 +55,12 @@ struct ItemPageHeader: ViewModifier {
         let relationships = library.relationships(for: item.id)
         let type = library.catalogue.itemTypes[item.type]
         let now = library.now()
-        let properties = PropertyRow.rows(
-            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item), relationships: relationships,
-            parentField: "child-of", tags: library.tags(of: item))
+        let kind = PageHeaderKind.of(item.type, in: library.catalogue)
+        let lead = PageHeaderLead(
+            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now)
+        let properties = lead.refine(PropertyRow.rows(
+            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
+            parentField: "child-of", tags: library.tags(of: item)))
         let linked = LinkedItem.list(
             pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, item: { library.item($0) })
         return PageHeader(
@@ -68,7 +71,11 @@ struct ItemPageHeader: ViewModifier {
             titleRejected: draft.rejected,
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
-            type: library.catalogue.itemTypes[item.type].map { Self.localized($0.label) },
+            type: lead.showsType ? library.catalogue.itemTypes[item.type].map { Self.localized($0.label) } : nil,
+            kind: kind,
+            event: lead.event,
+            person: lead.person,
+            subtitle: lead.subtitle,
             status: status.map { field in
                 let value = Self.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
@@ -81,7 +88,7 @@ struct ItemPageHeader: ViewModifier {
                 return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
                                       empty: title == nil, opensMenu: title != nil)
             },
-            byline: PageByline(item: item, now: now),
+            byline: lead.byline ?? PageByline(item: item, now: now),
             properties: properties,
             linked: linked,
             showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),

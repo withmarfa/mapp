@@ -21,6 +21,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case date(String)
         case url(String)
         case email(String)
+        /// A number to call.
+        case phone(String)
         case boolean(Bool)
         /// Text, a choice's label or a number.
         case text(String)
@@ -35,13 +37,14 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             case .date: "calendar"
             case .url: "globe"
             case .email: "envelope"
+            case .phone: "phone"
             case .boolean: "checkmark.square"
             case .text: "text.alignleft"
             }
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "checkmark.square", "text.alignleft"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft"]
     }
 
     let id: String
@@ -125,10 +128,13 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
 nonisolated struct PageByline: Hashable, Sendable, Encodable {
     var source: String?
     var date: String
+    /// A last part some pages add, such as how long a page takes to read.
+    var detail: String?
 
-    init(source: String?, date: String) {
+    init(source: String?, date: String, detail: String? = nil) {
         self.source = source
         self.date = date
+        self.detail = detail
     }
 
     init(item: Item, now: Date, calendar: Calendar = .current, locale: Locale = .current) {

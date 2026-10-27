@@ -46,6 +46,7 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'propertyRejected',
   'parentRejected',
   'linkedFrom',
+  'timeline',
   'properties',
 ]
 export function splitLabels(all: AppLabels): {

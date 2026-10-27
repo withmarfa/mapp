@@ -16,6 +16,7 @@ const ticket: HeaderModel = {
     'The title could not be saved. Use a unique file name without slashes or line breaks.',
   editable: true,
   type: 'Task',
+  kind: 'general',
   status: {
     label: 'In Progress',
     enabled: true,
@@ -449,4 +450,103 @@ test('linked items are folded, then listed with their type and date, and open on
 test('an item nothing links to has no Linked From section', () => {
   header.set(ticket)
   expect(root.querySelector<HTMLElement>('.item-linked')!.hidden).toBe(true)
+})
+
+const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
+
+test('an event shows its calendar block, its time and its status together', () => {
+  header.set({
+    ...ticket,
+    kind: 'event',
+    type: 'Event',
+    properties: [],
+    event: {
+      month: 'OCT',
+      day: '29',
+      weekday: 'Thursday',
+      time: '10:00 to 11:00',
+      zone: 'London time (BST)',
+      relative: 'in 2 days',
+    },
+  })
+  const when = root.querySelector<HTMLElement>('.item-when')!
+  expect(when.hidden).toBe(false)
+  expect(when.querySelector('.item-calendar-month')!.textContent).toBe('OCT')
+  expect(when.querySelector('.item-calendar-day')!.textContent).toBe('29')
+  expect(when.querySelector('.item-when-time')!.textContent).toBe('10:00 to 11:00')
+  expect(when.querySelector('.item-when-detail')!.textContent).toBe(
+    'ThursdayLondon time (BST)in 2 days',
+  )
+  expect(when.contains(pin('ItemStatusPin'))).toBe(true)
+  expect(root.dataset.kind).toBe('event')
+
+  header.set({ ...ticket, kind: 'general' })
+  expect(when.hidden).toBe(true)
+  expect(when.children.length).toBe(0)
+})
+
+test('a person shows initials or a picture, a subtitle, and a timeline that starts open', () => {
+  const person = {
+    ...ticket,
+    item: 'ruth',
+    kind: 'person' as const,
+    type: 'Person',
+    subtitle: 'Editor, Okonjo Press',
+    person: { initials: 'RO' },
+    linked: [{ item: 'note', title: 'Lunch', symbol: 'doc', type: 'Note', date: 'Today' }],
+  }
+  header.set(person)
+  expect(root.querySelector<HTMLElement>('.item-avatar')!.textContent).toBe('RO')
+  expect(root.querySelector<HTMLElement>('.item-subtitle')!.textContent).toBe(
+    'Editor, Okonjo Press',
+  )
+  expect(root.querySelector('.item-linked-title')!.textContent).toBe('Timeline')
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(false)
+
+  header.set({
+    ...person,
+    item: 'ruth2',
+    person: { initials: 'RO', photo: 'data:image/png;base64,AA==' },
+  })
+  expect(root.querySelector('.item-avatar img')!.getAttribute('src')).toBe(
+    'data:image/png;base64,AA==',
+  )
+
+  header.set({ ...ticket, item: 'plain', linked: person.linked })
+  expect(root.querySelector<HTMLElement>('.item-avatar')!.hidden).toBe(true)
+  expect(root.querySelector('.item-linked-title')!.textContent).toBe('Linked From')
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(true)
+})
+
+test('a phone number is a link that dials its digits', () => {
+  header.set({
+    ...ticket,
+    kind: 'person',
+    person: { initials: 'RO' },
+    properties: [{ ...phone, text: '+44 (0)20 7946-0000' }],
+  })
+  const link = root.querySelector<HTMLAnchorElement>('.item-prop-value a')!
+  expect(link.textContent).toBe('+44 (0)20 7946-0000')
+  expect(link.getAttribute('href')).toBe('tel:+4402079460000')
+  link.click()
+  expect(posted).toContainEqual({ type: 'openLink', href: link.getAttribute('href') })
+
+  header.set({ ...ticket, properties: [{ ...phone, text: 'ask Ruth' }] })
+  expect(root.querySelector('.item-prop-value a')).toBeNull()
+})
+
+test('a page for reading puts the source and reading time in the byline, with no type', () => {
+  header.set({
+    ...ticket,
+    kind: 'reading',
+    type: null,
+    subtitle: 'Why startups fail',
+    byline: { source: 'Y Combinator Blog', date: '2 Oct 2025', detail: '6 min read' },
+  })
+  const parts = [...root.querySelectorAll('.item-byline-part')].map((part) => part.textContent)
+  expect(parts).toEqual(['Y Combinator Blog', '2 Oct 2025', '6 min read'])
+  // No dot leads the line when the type is not there.
+  expect(root.querySelector('.item-byline')!.children[1]!.className).toBe('item-byline-part')
+  expect(root.querySelector('.item-subtitle')!.textContent).toBe('Why startups fail')
+  expect(document.body.dataset.header).toBe('reading')
 })

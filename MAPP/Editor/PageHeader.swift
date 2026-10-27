@@ -47,6 +47,12 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var titleRefusal: String
     var editable: Bool
     var type: String?
+    /// Which header the page draws, chosen from the core type the item's type builds on.
+    var kind: PageHeaderKind
+    var event: EventHeader?
+    var person: PersonHeader?
+    /// The line under the title: a person's work, or a reading item's description.
+    var subtitle: String?
     var status: Pin?
     var parent: Pin?
     var byline: PageByline
@@ -88,6 +94,7 @@ extension PropertyRow: Encodable {
         case .date(let text): try Self.encode("date", text, into: &container)
         case .url(let text): try Self.encode("url", text, into: &container)
         case .email(let text): try Self.encode("email", text, into: &container)
+        case .phone(let text): try Self.encode("phone", text, into: &container)
         case .boolean(let flag):
             try Self.encode("text", flag ? String(localized: "Yes") : String(localized: "No"), into: &container)
         case .text(let text): try Self.encode("text", text, into: &container)

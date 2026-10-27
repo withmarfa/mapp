@@ -524,7 +524,7 @@ final class EditorController: NSObject {
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
-            if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
+            if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto", "tel"].contains(scheme) {
                 NSWorkspace.shared.open(url)
             }
         case .openItem(let id):
