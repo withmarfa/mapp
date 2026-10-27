@@ -3,17 +3,16 @@ import SwiftUI
 /// What an index page can be set to: how it shows its rows and how wide it runs. The toolbar's View Options menu and
 /// the View menu offer the same choices; only the View menu binds keys.
 struct IndexViewOptions: View {
-    /// Nil while no window is in front, which leaves the choices in the menu, dimmed.
-    let place: IndexPlace?
+    let place: IndexPlace
     var bindsKeys = false
     @AppStorage private var layout: IndexLayout
     @AppStorage private var width: IndexWidth
 
-    init(place: IndexPlace?, bindsKeys: Bool = false) {
+    init(place: IndexPlace, bindsKeys: Bool = false) {
         self.place = place
         self.bindsKeys = bindsKeys
-        _layout = AppStorage(wrappedValue: .default, (place ?? .sources).layoutKey)
-        _width = AppStorage(wrappedValue: .default, (place ?? .sources).widthKey)
+        _layout = AppStorage(wrappedValue: .default, place.layoutKey)
+        _width = AppStorage(wrappedValue: .default, place.widthKey)
     }
 
     var body: some View {
@@ -32,7 +31,6 @@ struct IndexViewOptions: View {
                 }
             }
         }
-        .disabled(place == nil)
     }
 }
 
