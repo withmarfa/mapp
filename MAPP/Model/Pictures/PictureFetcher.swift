@@ -48,9 +48,16 @@ nonisolated final class PictureFetcher: @unchecked Sendable {
     }
 
     /// Fetches the picture at `address` into a new file in `folder`. The file is the caller's to move or remove.
-    @concurrent func fetch(_ address: URL, into folder: URL) async throws(PictureFailure) -> FetchedPicture {
+    ///
+    /// `proceed` is asked once the address has passed its check, which can take most of `Limits.resolve`, and before
+    /// anything else is done: if it answers no, no folder is made, no request is sent and `PictureFailure.failed` is
+    /// thrown.
+    @concurrent func fetch(
+        _ address: URL, into folder: URL, proceed: @Sendable () -> Bool = { true }
+    ) async throws(PictureFailure) -> FetchedPicture {
         let deadline = ContinuousClock.now.advanced(by: limits.time)
         try await PictureAddressPolicy.check(address, resolver: resolver, timeout: min(limits.resolve, limits.time))
+        guard proceed() else { throw .failed }
         let left = ContinuousClock.now.duration(to: deadline)
         guard left > .zero else { throw .tooSlow }
         let configuration = configuration()

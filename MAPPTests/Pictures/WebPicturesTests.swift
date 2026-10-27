@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MAPP
 
@@ -313,7 +314,7 @@ import Testing
     @Test func aPictureThatArrivesAfterTheLibraryWasDisconnectedIsNotKept() async throws {
         let resolver = HeldResolver()
         let pictures = pictures(resolver: resolver.resolver)
-        let (address, _) = served()
+        let (address, requests) = served()
 
         let answer = Task { await pictures.answer(address, ask: .chosen, inFeed: false) }
         try #require(await eventually { resolver.active == 1 })
@@ -321,11 +322,20 @@ import Testing
         resolver.release()
 
         #expect(await answer.value == .refused(.failed))
+        #expect(requests() == 0, "the address was checked after the disconnect, so nothing was asked of the website")
         #expect(await pictures.cache.file(for: address) == nil)
-        let left = (try? FileManager.default.contentsOfDirectory(atPath: pictures.cache.incoming.path)) ?? []
-        #expect(left.isEmpty, "the fetched file went")
-        let kept = ((try? FileManager.default.contentsOfDirectory(atPath: pictures.cache.folder.path)) ?? []).filter { $0 != ".incoming" }
-        #expect(kept.isEmpty)
+        #expect(
+            !FileManager.default.fileExists(atPath: pictures.cache.folder.path),
+            "no folder was made, not even the one fetches are written in")
+    }
+
+    @Test func theLockTheEmptyingTakesIsFreeWhileTheCacheTrims() async throws {
+        let free = Mutex<Bool?>(nil)
+        let cache = PictureCache(folder: folder.url.appending(path: "Cache")) { free.withLock { $0 = PictureCache.isUnlocked } }
+
+        _ = try await cache.store(fetched(in: folder), for: URL(string: "https://example.com/a.png")!, generation: cache.generation)
+
+        #expect(free.withLock { $0 } == true)
     }
 
     @Test func aPictureWaitingItsTurnWhenTheLibraryIsDisconnectedIsNeverFetched() async throws {

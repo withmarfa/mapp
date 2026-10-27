@@ -24,12 +24,21 @@ actor PictureCache {
 
     nonisolated let folder: URL
     private let limit: Int
+    private let whenTrimming: @Sendable () -> Void
     private var sweptIncoming = false
 
-    init(folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit) {
+    /// `whenTrimming` is for tests, which look at what is held when a trim begins.
+    init(
+        folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit,
+        whenTrimming: @escaping @Sendable () -> Void = {}
+    ) {
         self.folder = folder
         self.limit = limit
+        self.whenTrimming = whenTrimming
     }
+
+    /// Whether the lock `removeAll` and `store` share is free to take now.
+    nonisolated static var isUnlocked: Bool { emptied.withLockIfAvailable { _ in true } ?? false }
 
     /// Where a fetch writes before the cache takes the file.
     nonisolated var incoming: URL { folder.appending(path: ".incoming", directoryHint: .isDirectory) }
@@ -67,8 +76,9 @@ actor PictureCache {
     /// `generation` is the cache's `generation` from before the fetch began. If the cache was emptied since, the
     /// library was disconnected while the picture was on its way, so nothing is stored and `CancellationError` is thrown.
     func store(_ picture: FetchedPicture, for address: URL, generation: Int) throws -> URL {
+        let kept: URL
         do {
-            return try Self.emptied.withLock { emptied in
+            kept = try Self.emptied.withLock { emptied in
                 let manager = FileManager.default
                 guard (emptied[folder] ?? 0) == generation else { throw CancellationError() }
                 let directory = directory(for: address)
@@ -77,17 +87,21 @@ actor PictureCache {
                 let kept = directory.appending(path: "picture.\(picture.format.fileExtension)", directoryHint: .notDirectory)
                 try manager.moveItem(at: picture.file, to: kept)
                 try? manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: kept.path)
-                trim()
                 return kept
             }
         } catch {
             try? FileManager.default.removeItem(at: picture.file)
             throw error
         }
+        // Outside the lock: it lists and reads every picture held, and the main actor reads `generation` under the lock.
+        // An emptying that comes first leaves it a missing folder to list.
+        trim()
+        return kept
     }
 
     /// Removes the least recently used pictures until the rest fit.
     func trim() {
+        whenTrimming()
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: folder.path) else { return }
         var held: [(directory: URL, size: Int, used: Date)] = []

@@ -69,7 +69,8 @@ nonisolated enum PictureAsk: String, Sendable {
     /// Fetches the picture, once however many ask at the same time, and a few at a time (`PictureQueue`).
     ///
     /// The library may be disconnected while a fetch is waiting or on its way, which empties the cache
-    /// (`PictureCache.generation`): such a fetch is not started, or its picture is not stored.
+    /// (`PictureCache.generation`): such a fetch is not started, makes no request or folder once its address is checked,
+    /// or has its picture not stored.
     private func load(_ address: URL) async -> PictureAnswer {
         let generation = cache.generation
         let task = fetching[address] ?? Task { [cache, fetcher, queue] in
@@ -77,7 +78,7 @@ nonisolated enum PictureAsk: String, Sendable {
             return await queue.run(host: address.host(percentEncoded: false)?.lowercased() ?? "") {
                 do {
                     guard cache.generation == generation else { throw CancellationError() }
-                    let picture = try await fetcher.fetch(address, into: cache.incoming)
+                    let picture = try await fetcher.fetch(address, into: cache.incoming) { cache.generation == generation }
                     return .success(try await cache.store(picture, for: address, generation: generation))
                 } catch let failure as PictureFailure {
                     return .failure(failure)
