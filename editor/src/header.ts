@@ -15,6 +15,28 @@ export interface HeaderPin {
   mark?: { tone: HeaderTone; fill: HeaderFill }
 }
 
+/** One row of the property block. The status and parent rows hold the header's own pins, which keep their
+ *  menus; every other value is read only, and a link opens its item or its address. */
+export interface HeaderRow {
+  id: string
+  label: string
+  /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
+  symbol: string
+  kind: 'status' | 'parent' | 'items' | 'tags' | 'date' | 'url' | 'email' | 'text'
+  text?: string
+  texts?: string[]
+  items?: { title: string; item: string }[]
+}
+
+/** An item that links to the one on the page. */
+export interface HeaderLinked {
+  item: string
+  title: string
+  symbol: string
+  type: string
+  date: string
+}
+
 /** What the app says the header shows for the item on the page. */
 export interface HeaderModel {
   item: string
@@ -29,6 +51,16 @@ export interface HeaderModel {
   type: string | null
   status: HeaderPin | null
   parent: HeaderPin | null
+  /** Who made the item, if the library knows, and when. */
+  byline: { source?: string | null; date: string }
+  properties: HeaderRow[]
+  /** How many rows show before the rest wait behind a button. */
+  foldAfter: number
+  linked: HeaderLinked[]
+  linkedFoldAfter: number
+  /** "Show N More", worded by the app for the rows and for the linked items that are folded away. */
+  showMore: string
+  showMoreLinked: string
   propertyRejected: boolean
   /** The app could not remove the parent. */
   parentRejected: boolean
@@ -48,6 +80,8 @@ export interface HeaderIcons {
   parent: HeaderIcon
   plus: HeaderIcon
   indicator: HeaderIcon
+  /** The symbols of the property rows and of the types, by SF Symbol name. */
+  symbols: Record<string, HeaderIcon>
 }
 
 export interface HeaderLabels {
@@ -58,6 +92,8 @@ export interface HeaderLabels {
   discardChanges: string
   propertyRejected: string
   parentRejected: string
+  linkedFrom: string
+  properties: string
 }
 
 export type HeaderMenu = 'status' | 'parent'
@@ -73,6 +109,8 @@ const englishLabels: HeaderLabels = {
   discardChanges: 'Discard Changes',
   propertyRejected: 'The value could not be saved. Please try again.',
   parentRejected: 'The connection could not be removed.',
+  linkedFrom: 'Linked From',
+  properties: 'Properties',
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -95,7 +133,19 @@ export class ItemHeader {
   private readonly title: HTMLDivElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
-  private readonly pins: HTMLDivElement
+  private readonly byline: HTMLDivElement
+  private readonly properties: HTMLDListElement
+  private readonly moreProperties: HTMLButtonElement
+  private readonly linked: HTMLElement
+  private readonly linkedToggle: HTMLButtonElement
+  private readonly linkedList: HTMLUListElement
+  private readonly linkedMore: HTMLButtonElement
+  private symbols: Record<string, HeaderIcon> = {}
+  /** What the property block and the linked items were last drawn from, so an unchanged header is not drawn
+   *  again under the pointer. */
+  private drawn = ''
+  /** Whether the person has expanded the rows or the linked items, for the item on the page. */
+  private expanded = { item: '', properties: false, linked: false, linkedOpen: false }
   private readonly typePin: HTMLSpanElement
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
@@ -130,8 +180,8 @@ export class ItemHeader {
     discard.addEventListener('click', () => {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
-    this.pins = element('div', 'item-pins', root)
-    this.typePin = element('span', 'item-pin', this.pins)
+    this.byline = element('div', 'item-byline', root)
+    this.typePin = element('span', 'item-pin', this.byline)
     this.typePin.id = 'ItemTypePin'
     this.typePin.title = this.labels.itemType
     element('span', 'item-pin-icon item-icon-type', this.typePin).setAttribute(
@@ -139,9 +189,16 @@ export class ItemHeader {
       'true',
     )
     element('span', 'item-pin-label', this.typePin)
-    this.statusPin = this.menuPin('ItemStatusPin', 'status')
+    const pins = document.createElement('div')
+    this.statusPin = this.menuPin('ItemStatusPin', 'status', pins)
     this.statusPin.setAttribute('aria-label', this.labels.status)
-    this.parentPin = this.menuPin('ItemParentPin', 'parent')
+    this.parentPin = this.menuPin('ItemParentPin', 'parent', pins)
+    this.properties = element('dl', 'item-props', root)
+    this.properties.setAttribute('aria-label', this.labels.properties)
+    this.moreProperties = this.moreButton(root, () => {
+      this.expanded.properties = true
+      this.redraw()
+    })
     this.propertyError = element('p', 'item-error', root)
     this.propertyError.setAttribute('role', 'alert')
     this.propertyError.textContent = this.labels.propertyRejected
@@ -150,6 +207,19 @@ export class ItemHeader {
     this.parentError.setAttribute('role', 'alert')
     this.parentError.textContent = this.labels.parentRejected
     this.parentError.hidden = true
+    this.linked = element('section', 'item-linked', root)
+    this.linked.setAttribute('aria-label', this.labels.linkedFrom)
+    this.linkedToggle = element('button', 'item-linked-toggle', this.linked)
+    this.linkedToggle.type = 'button'
+    this.linkedToggle.addEventListener('click', () => {
+      this.expanded.linkedOpen = !this.expanded.linkedOpen
+      this.redraw()
+    })
+    this.linkedList = element('ul', 'item-linked-list', this.linked)
+    this.linkedMore = this.moreButton(this.linked, () => {
+      this.expanded.linked = true
+      this.redraw()
+    })
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -267,6 +337,9 @@ export class ItemHeader {
     this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
+    if (previous?.item !== model.item)
+      this.expanded = { item: model.item, properties: false, linked: false, linkedOpen: false }
+    this.redraw()
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
       'aria-description',
@@ -302,7 +375,11 @@ export class ItemHeader {
 
   setIcons(icons: HeaderIcons) {
     const style = this.root.style
+    this.symbols = icons.symbols ?? {}
+    this.drawn = ''
+    this.redraw()
     for (const [name, icon] of Object.entries(icons) as [keyof HeaderIcons, HeaderIcon][]) {
+      if (name === 'symbols') continue
       style.setProperty(`--icon-${name}`, `url("${icon.url}")`)
       style.setProperty(`--icon-${name}-width`, `${icon.width}px`)
       style.setProperty(`--icon-${name}-height`, `${icon.height}px`)
@@ -333,8 +410,8 @@ export class ItemHeader {
     }
   }
 
-  private menuPin(id: string, menu: HeaderMenu): HTMLButtonElement {
-    const pin = element('button', 'item-pin item-menu-pin', this.pins)
+  private menuPin(id: string, menu: HeaderMenu, parent: HTMLElement): HTMLButtonElement {
+    const pin = element('button', 'item-pin item-menu-pin', parent)
     pin.type = 'button'
     pin.id = id
     // An empty pin shows a plus where a filled one shows its symbol.
@@ -358,6 +435,140 @@ export class ItemHeader {
       if (event.detail === 0) this.openMenu(pin, menu)
     })
     return pin
+  }
+
+  private moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
+    const button = element('button', 'item-more', parent)
+    button.type = 'button'
+    button.addEventListener('click', action)
+    return button
+  }
+
+  /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
+  private glyph(name: string, parent: HTMLElement): void {
+    const icon = this.symbols[name]
+    const node = element('span', 'item-glyph', parent)
+    node.setAttribute('aria-hidden', 'true')
+    if (!icon) return
+    node.style.width = `${icon.width}px`
+    node.style.height = `${icon.height}px`
+    node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
+    node.style.maskImage = `url("${icon.url}")`
+  }
+
+  private link(parent: HTMLElement, text: string, open: () => void, href?: string): void {
+    const link = element(href ? 'a' : 'button', 'item-link', parent)
+    link.textContent = text
+    if (link instanceof HTMLButtonElement) link.type = 'button'
+    else {
+      link.href = href!
+      link.setAttribute('role', 'link')
+    }
+    link.addEventListener('click', (event) => {
+      event.preventDefault()
+      open()
+    })
+  }
+
+  /** Draws the byline, the property block and the linked items from the model. */
+  private redraw() {
+    const model = this.model
+    if (!model) return
+    const source = model.byline.source
+    const key = JSON.stringify([
+      model.byline,
+      model.properties,
+      model.linked,
+      model.showMore,
+      model.showMoreLinked,
+      this.expanded,
+      Object.keys(this.symbols).length,
+    ])
+    if (key === this.drawn) return
+    this.drawn = key
+
+    // The type, then who made the item and when, as one quiet line.
+    for (const extra of [...this.byline.querySelectorAll('.item-byline-part')]) extra.remove()
+    for (const part of [source, model.byline.date]) {
+      if (!part) continue
+      element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
+      element('span', 'item-byline-part', this.byline).textContent = part
+    }
+
+    const shown = this.expanded.properties
+      ? model.properties
+      : model.properties.slice(0, model.foldAfter)
+    this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
+    this.properties.hidden = shown.length === 0
+    this.moreProperties.hidden = shown.length === model.properties.length
+    this.moreProperties.textContent = model.showMore
+
+    this.linked.hidden = model.linked.length === 0
+    this.linkedToggle.replaceChildren()
+    this.linkedToggle.setAttribute('aria-expanded', String(this.expanded.linkedOpen))
+    element('span', 'item-chevron', this.linkedToggle).setAttribute('aria-hidden', 'true')
+    element('span', 'item-linked-title', this.linkedToggle).textContent = this.labels.linkedFrom
+    element('span', 'item-linked-count', this.linkedToggle).textContent = String(
+      model.linked.length,
+    )
+    const items = this.expanded.linked ? model.linked : model.linked.slice(0, model.linkedFoldAfter)
+    this.linkedList.hidden = !this.expanded.linkedOpen
+    this.linkedList.replaceChildren(
+      ...items.map((linked) => {
+        const entry = element('li', 'item-linked-row')
+        const button = element('button', 'item-linked-open', entry)
+        button.type = 'button'
+        button.addEventListener('click', () => postToHost({ type: 'openItem', item: linked.item }))
+        this.glyph(linked.symbol, button)
+        element('span', 'item-linked-name', button).textContent = linked.title
+        const detail = element('span', 'item-linked-detail', button)
+        element('span', '', detail).textContent = linked.type
+        element('span', 'item-byline-dot', detail).setAttribute('aria-hidden', 'true')
+        element('span', '', detail).textContent = linked.date
+        return entry
+      }),
+    )
+    this.linkedMore.hidden = !this.expanded.linkedOpen || items.length === model.linked.length
+    this.linkedMore.textContent = model.showMoreLinked
+  }
+
+  private row(row: HeaderRow, model: HeaderModel): HTMLElement {
+    const entry = element('div', 'item-prop')
+    const term = element('dt', 'item-prop-label', entry)
+    this.glyph(row.symbol, term)
+    element('span', 'item-prop-name', term).textContent = row.label
+    const value = element('dd', 'item-prop-value', entry)
+    switch (row.kind) {
+      case 'status':
+        if (model.status) value.append(this.statusPin)
+        break
+      case 'parent':
+        if (model.parent) value.append(this.parentPin)
+        break
+      case 'items':
+        for (const target of row.items ?? [])
+          this.link(value, target.title, () => postToHost({ type: 'openItem', item: target.item }))
+        break
+      case 'tags':
+        for (const tag of row.texts ?? []) element('span', 'item-chip', value).textContent = tag
+        break
+      case 'url': {
+        const href = row.text ?? ''
+        if (/^https?:\/\//i.test(href))
+          this.link(value, href, () => postToHost({ type: 'openLink', href }), href)
+        else value.textContent = href
+        break
+      }
+      case 'email': {
+        const address = row.text ?? ''
+        const href = `mailto:${address}`
+        this.link(value, address, () => postToHost({ type: 'openLink', href }), href)
+        break
+      }
+      default:
+        value.textContent = row.text ?? ''
+    }
+    return entry
   }
 
   private openMenu(pin: HTMLElement, menu: HeaderMenu) {

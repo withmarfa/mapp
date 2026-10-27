@@ -41,6 +41,7 @@ export type EditorMessage =
       viewportHeight: number
     }
   | { type: 'openLink'; href: string }
+  | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }
   | { type: 'escape' }
   | { type: 'pasteImages' }

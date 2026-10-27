@@ -20,6 +20,7 @@
   --status-orange: rgb(245 134 37);
   --status-red: rgb(255 56 60);
   --status-green: rgb(52 199 89);
+  --link: var(--inkkit-accent-color);
   /* Selected text: the accent over the page while the editor has the keyboard, and a quiet grey of the text's own
      color while the window is in the background, the header's title has the keyboard or the editor was blurred.
      Both are translucent, so the text keeps its contrast on the page in light and dark. */
@@ -105,7 +106,7 @@ body {
 .item-title {
   align-self: stretch;
   font-size: 1.9rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--inkkit-text-color);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -296,4 +297,242 @@ body {
 .inkkit-root .ProseMirror:focus-visible,
 .inkkit-root .inkkit-plain:focus-visible {
   outline: none;
+}
+
+/* The byline: the type, who made the item and when, as one quiet line under the title. The type is plain text here
+   rather than an outlined pin. */
+#item-header {
+  /* One step of the header's 4 point grid, scaled with the interface's text size. */
+  --step: calc(var(--interface-text-size) * 4 / 13);
+}
+
+.item-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 calc(var(--step) * 2);
+  margin-top: calc(var(--step) * -1);
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 13 / 13);
+}
+
+.item-byline .item-pin {
+  height: auto;
+  padding: 0;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+}
+
+.item-byline .item-pin-icon {
+  display: none;
+}
+
+.item-byline-dot {
+  flex: none;
+  width: 2px;
+  height: 2px;
+  margin-inline: calc(var(--step) / 2);
+  border-radius: 50%;
+  background: currentcolor;
+  opacity: 0.7;
+}
+
+/* The property block: a label and its value in two columns, every value on one edge. */
+.item-props {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  margin: calc(var(--step) * 3) 0 0;
+  padding: 0;
+}
+
+.item-props[hidden],
+.item-more[hidden],
+.item-linked[hidden],
+.item-linked-list[hidden] {
+  display: none;
+}
+
+.item-prop {
+  display: grid;
+  grid-template-columns: calc(var(--step) * 36) minmax(0, 1fr);
+  column-gap: calc(var(--step) * 3);
+  align-items: start;
+  min-height: calc(var(--step) * 7);
+}
+
+.item-prop-label,
+.item-prop-value {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 2);
+  min-height: calc(var(--step) * 7);
+  margin: 0;
+}
+
+.item-prop-label {
+  color: var(--label-secondary);
+  font-weight: 400;
+}
+
+.item-prop-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-prop-value {
+  flex-wrap: wrap;
+  gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
+  padding-block: calc(var(--step) / 2);
+  color: var(--label-primary);
+  overflow-wrap: anywhere;
+}
+
+/* A symbol the app drew, quiet in the secondary color. */
+.item-glyph {
+  flex: none;
+  background: var(--label-secondary);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.item-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: default;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.item-link:hover {
+  text-decoration: underline;
+}
+
+.item-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--step) * 5);
+  padding: 0 calc(var(--step) * 2);
+  border-radius: calc(var(--step) * 1.5);
+  background: var(--label-quinary);
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+}
+
+.item-more {
+  margin: calc(var(--step) * 1) 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label-secondary);
+  font: inherit;
+  cursor: default;
+}
+
+.item-more:hover {
+  color: var(--label-primary);
+}
+
+/* Linked From: one folded group with a hairline edge. */
+.item-linked {
+  align-self: stretch;
+  margin-top: calc(var(--step) * 4);
+  border-top: 1px solid var(--separator);
+}
+
+.item-linked-toggle {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 2);
+  width: 100%;
+  min-height: calc(var(--step) * 9);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label-primary);
+  font: inherit;
+  font-weight: 500;
+  text-align: start;
+  cursor: default;
+}
+
+.item-chevron {
+  flex: none;
+  width: calc(var(--step) * 2.5);
+  height: calc(var(--step) * 2.5);
+  border-right: 1.5px solid var(--label-secondary);
+  border-bottom: 1.5px solid var(--label-secondary);
+  transform: translateX(-1px) rotate(-45deg);
+  transition: transform 0.12s ease;
+}
+
+.item-linked-toggle[aria-expanded='true'] .item-chevron {
+  transform: translateY(-1px) rotate(45deg);
+}
+
+.item-linked-count {
+  color: var(--label-secondary);
+  font-weight: 400;
+}
+
+.item-linked-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-linked-row + .item-linked-row {
+  border-top: 1px solid var(--separator);
+}
+
+.item-linked-open {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 2);
+  width: 100%;
+  min-height: calc(var(--step) * 9);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label-primary);
+  font: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.item-linked-open:hover .item-linked-name {
+  text-decoration: underline;
+}
+
+.item-linked-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-linked-detail {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+}
+
+.item-linked-toggle:focus-visible,
+.item-linked-open:focus-visible,
+.item-more:focus-visible,
+.item-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline-offset: 2px;
 }

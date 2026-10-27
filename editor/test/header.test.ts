@@ -24,6 +24,16 @@ const ticket: HeaderModel = {
     mark: { tone: 'orange', fill: 'half' },
   },
   parent: { label: 'Field Research', enabled: true, empty: false, opensMenu: true },
+  byline: { source: 'workbench-folder', date: 'Saturday' },
+  properties: [
+    { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
+    { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
+  ],
+  foldAfter: 6,
+  linked: [],
+  linkedFoldAfter: 20,
+  showMore: 'Show 0 More',
+  showMoreLinked: 'Show 0 More',
   propertyRejected: false,
   parentRejected: false,
   interfaceTextSize: 13,
@@ -322,4 +332,121 @@ test('a title that cannot be edited, or a request the keyboard has since left, t
   header.cancelTitleFocus()
   header.set(ticket)
   expect(header.isEditingTitle).toBe(false)
+})
+
+const rows = (count: number): HeaderModel['properties'] =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `field-${index}`,
+    label: `Field ${index}`,
+    symbol: 'text.alignleft',
+    kind: 'text' as const,
+    text: `Value ${index}`,
+  }))
+
+test('the byline reads the type, the source and the date', () => {
+  header.set(ticket)
+  expect(root.querySelector('.item-byline')!.textContent).toBe('Taskworkbench-folderSaturday')
+  header.set({ ...ticket, byline: { source: null, date: 'Today' } })
+  expect(root.querySelector('.item-byline')!.textContent).toBe('TaskToday')
+})
+
+test('the property block reads as label and value pairs, each drawn by its kind', () => {
+  header.set({
+    ...ticket,
+    foldAfter: 10,
+    properties: [
+      { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
+      { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
+      {
+        id: 'blocks',
+        label: 'Blocks',
+        symbol: 'link',
+        kind: 'items',
+        items: [{ title: 'Ship it', item: 'other' }],
+      },
+      { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['mapp', 'storage'] },
+      { id: 'url', label: 'Url', symbol: 'globe', kind: 'url', text: 'https://example.com/a' },
+      { id: 'mail', label: 'Email', symbol: 'envelope', kind: 'email', text: 'a@example.com' },
+      { id: 'done', label: 'Done', symbol: 'text.alignleft', kind: 'text', text: 'Yes' },
+    ],
+  })
+  const pairs = [...root.querySelectorAll('.item-props .item-prop')]
+  expect(pairs.map((pair) => pair.querySelector('dt')!.textContent)).toEqual([
+    'Status',
+    'Epic',
+    'Blocks',
+    'Tags',
+    'Url',
+    'Email',
+    'Done',
+  ])
+  expect(pairs[0]!.querySelector('dd #ItemStatusPin')).not.toBeNull()
+  expect(pairs[1]!.querySelector('dd #ItemParentPin')).not.toBeNull()
+  expect([...pairs[3]!.querySelectorAll('.item-chip')].map((chip) => chip.textContent)).toEqual([
+    'mapp',
+    'storage',
+  ])
+  expect(pairs[6]!.querySelector('dd')!.textContent).toBe('Yes')
+  posted = []
+  pairs[2]!.querySelector<HTMLElement>('.item-link')!.click()
+  pairs[4]!.querySelector<HTMLElement>('.item-link')!.click()
+  pairs[5]!.querySelector<HTMLElement>('.item-link')!.click()
+  expect(posted).toEqual([
+    { type: 'openItem', item: 'other' },
+    { type: 'openLink', href: 'https://example.com/a' },
+    { type: 'openLink', href: 'mailto:a@example.com' },
+  ])
+})
+
+test('a URL that is not web is shown as text, not as a link', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'u', label: 'Url', symbol: 'globe', kind: 'url', text: 'javascript:alert(1)' },
+    ],
+  })
+  expect(root.querySelector('.item-link')).toBeNull()
+  expect(root.querySelector('.item-prop dd')!.textContent).toBe('javascript:alert(1)')
+})
+
+test('rows past the fold wait behind a button that expands them in place', () => {
+  header.set({ ...ticket, properties: rows(9), showMore: 'Show 3 More' })
+  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
+  const more = root.querySelector<HTMLButtonElement>('.item-props + .item-more')!
+  expect(more.hidden).toBe(false)
+  expect(more.textContent).toBe('Show 3 More')
+  more.click()
+  expect(root.querySelectorAll('.item-prop')).toHaveLength(9)
+  expect(more.hidden).toBe(true)
+  // Another item starts folded again.
+  header.set({ ...ticket, item: 'other', properties: rows(9), showMore: 'Show 3 More' })
+  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
+})
+
+test('linked items are folded, then listed with their type and date, and open on a click', () => {
+  const linked = [
+    { item: 'a', title: 'Wiring', symbol: 'calendar', type: 'Session', date: '2 Oct' },
+    { item: 'b', title: 'Decision', symbol: 'doc', type: 'Decision', date: '24 Oct' },
+  ]
+  header.set({ ...ticket, linked })
+  const toggle = root.querySelector<HTMLButtonElement>('.item-linked-toggle')!
+  expect(toggle.textContent).toBe('Linked From2')
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(true)
+  toggle.click()
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  const rowsShown = [...root.querySelectorAll('.item-linked-row')]
+  expect(rowsShown.map((row) => row.querySelector('.item-linked-name')!.textContent)).toEqual([
+    'Wiring',
+    'Decision',
+  ])
+  expect(rowsShown[0]!.querySelector('.item-linked-detail')!.textContent).toBe('Session2 Oct')
+  posted = []
+  rowsShown[1]!.querySelector<HTMLElement>('button')!.click()
+  expect(posted).toEqual([{ type: 'openItem', item: 'b' }])
+})
+
+test('an item nothing links to has no Linked From section', () => {
+  header.set(ticket)
+  expect(root.querySelector<HTMLElement>('.item-linked')!.hidden).toBe(true)
 })
