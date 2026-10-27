@@ -68,6 +68,8 @@ export interface HeaderModel {
   titleRefusal: string
   editable: boolean
   type: string | null
+  /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name. */
+  icon?: string | null
   kind: HeaderKind
   event?: HeaderEvent | null
   person?: HeaderPerson | null
@@ -100,7 +102,6 @@ export interface HeaderIcon {
 }
 
 export interface HeaderIcons {
-  type: HeaderIcon
   parent: HeaderIcon
   plus: HeaderIcon
   indicator: HeaderIcon
@@ -376,6 +377,7 @@ export class ItemHeader {
     this.parentError.hidden = !model.parentRejected
     this.typePin.hidden = model.type == null
     this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
+    this.drawTypeIcon()
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item)
@@ -423,6 +425,7 @@ export class ItemHeader {
   setIcons(icons: HeaderIcons) {
     const style = this.root.style
     this.symbols = icons.symbols ?? {}
+    this.drawTypeIcon()
     this.drawn = ''
     this.redraw()
     for (const [name, icon] of Object.entries(icons) as [keyof HeaderIcons, HeaderIcon][]) {
@@ -431,6 +434,18 @@ export class ItemHeader {
       style.setProperty(`--icon-${name}-width`, `${icon.width}px`)
       style.setProperty(`--icon-${name}-height`, `${icon.height}px`)
     }
+  }
+
+  /** The icon of the item's type before its name, in the secondary color; none for a type the app drew nothing for. */
+  private drawTypeIcon() {
+    const node = this.typePin.querySelector<HTMLElement>('.item-icon-type')!
+    const icon = this.model?.icon ? this.symbols[this.model.icon] : undefined
+    node.hidden = !icon
+    if (!icon) return
+    node.style.width = `${icon.width}px`
+    node.style.height = `${icon.height}px`
+    node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
+    node.style.maskImage = `url("${icon.url}")`
   }
 
   /** The person's draft where there is one, otherwise the saved title; never while they are typing it. */

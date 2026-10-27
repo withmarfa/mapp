@@ -39,6 +39,17 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         var mark: Mark?
     }
 
+    /// A type's icon as the page names it among the images the app sends (`TypeIconKey`), and the Lucide name the app
+    /// draws it from.
+    struct TypeIconRef: Encodable, Equatable, Sendable {
+        var name: String?
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(TypeIconKey.value(for: name))
+        }
+    }
+
     var item: String
     /// A deleted note shows a banner instead.
     var hidden: Bool
@@ -49,6 +60,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var titleRefusal: String
     var editable: Bool
     var type: String?
+    /// The icon of the item's type, drawn before its name.
+    var icon: TypeIconRef
     /// Which header the page draws, chosen from the core type the item's type builds on.
     var kind: PageHeaderKind
     var event: EventHeader?
@@ -132,7 +145,6 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         var height: Double
     }
 
-    var type: Icon
     var parent: Icon
     var plus: Icon
     var indicator: Icon
@@ -144,12 +156,10 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     @MainActor
     init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
-        guard let type = Self.icon("doc.text", size: size, weight: .regular),
-              let parent = Self.icon("square.stack", size: size, weight: .regular),
+        guard let parent = Self.icon("square.stack", size: size, weight: .regular),
               let plus = Self.icon("plus", size: size, weight: .regular),
               let indicator = Self.icon("chevron.down", size: size * 0.7, weight: .bold)
         else { return nil }
-        self.type = type
         self.parent = parent
         self.plus = plus
         self.indicator = indicator

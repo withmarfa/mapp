@@ -72,6 +72,7 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             type: lead.showsType ? library.catalogue.itemTypes[item.type].map { Self.localized($0.label) } : nil,
+            icon: .init(name: library.catalogue.icon(for: item.type)),
             kind: kind,
             event: lead.event,
             person: lead.person,
