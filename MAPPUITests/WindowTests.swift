@@ -193,9 +193,9 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Milk"), "Return moves from the title into the page")
     }
 
-    func testTheDeleteKeyDeletesTheSelectedNote() {
+    func testCommandDeleteDeletesTheSelectedNote() {
         row(titled: "Bike service").click()
-        app.typeKey(.delete, modifierFlags: [])
+        app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
         XCTAssertTrue(editor.exists, "the next note is selected")
     }
