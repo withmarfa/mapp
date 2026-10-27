@@ -11,7 +11,8 @@ struct SidebarIndex: View {
     private var place: IndexPlace { browser.indexPlace ?? .sources }
 
     var body: some View {
-        IndexContent(place: place, rows: model.rows, isBuilt: model.isBuilt, browser: browser) { row in
+        IndexContent(
+            place: place, rows: model.rows(for: place), isBuilt: model.isBuilt(for: place), slots: model.slots, browser: browser) { row in
             browser.show(row.place, in: library, order: order)
         }
         .task(id: Following(place: place, library: ObjectIdentifier(library))) { model.follow(place, in: library) }
@@ -37,13 +38,14 @@ struct SidebarIndex: View {
 
     /// How many places the page lists, and for sources how many items they hold between them.
     private var summary: String {
-        guard model.isBuilt, !model.rows.isEmpty else { return "" }
+        let rows = model.rows(for: place)
+        guard !rows.isEmpty else { return "" }
         switch place {
         case .sources:
-            let items = model.rows.reduce(0) { $0 + $1.count }
-            return String(localized: "\(model.rows.count) sources") + ", " + String(localized: "\(items) items")
+            let items = rows.reduce(0) { $0 + $1.count }
+            return String(localized: "\(rows.count) sources") + ", " + String(localized: "\(items) items")
         case .collections:
-            return String(localized: "\(model.rows.count) collections")
+            return String(localized: "\(rows.count) collections")
         }
     }
 }
@@ -54,15 +56,19 @@ private struct IndexContent: View {
     let place: IndexPlace
     let rows: [IndexRow]
     let isBuilt: Bool
+    let slots: IndexSlots
     let browser: Browser
     let open: (IndexRow) -> Void
     @AppStorage private var layout: IndexLayout
     @AppStorage private var width: IndexWidth
 
-    init(place: IndexPlace, rows: [IndexRow], isBuilt: Bool, browser: Browser, open: @escaping (IndexRow) -> Void) {
+    init(
+        place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, open: @escaping (IndexRow) -> Void
+    ) {
         self.place = place
         self.rows = rows
         self.isBuilt = isBuilt
+        self.slots = slots
         self.browser = browser
         self.open = open
         _layout = AppStorage(wrappedValue: .default, place.layoutKey)
@@ -80,7 +86,7 @@ private struct IndexContent: View {
                 EmptyState("No Results")
             } else {
                 IndexPage(
-                    rows: shown, layout: layout, width: width, typesTitle: typesTitle,
+                    rows: shown, palette: IndexPalette(slots: slots), layout: layout, width: width, typesTitle: typesTitle,
                     showsSecondaryOnCards: place != .sources, open: open)
             }
         }

@@ -6,15 +6,26 @@ import SwiftUI
 @MainActor
 @Observable
 final class IndexRowsModel {
-    private(set) var rows: [IndexRow] = []
-    /// False until the rows have been worked out, so a page does not say it is empty first.
-    private(set) var isBuilt = false
+    private var built: [IndexRow] = []
+    /// The color slots of the types in all of the rows, worked out with them, so searching never recolors a type.
+    private(set) var slots = IndexSlots()
+    /// The place the rows are of; nil until they have been worked out.
+    private(set) var builtPlace: IndexPlace?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var library: (any ItemLibrary)?
 
+    /// The rows of `place`, empty while the model holds another place's, so a page never shows one place's rows
+    /// under another.
+    func rows(for place: IndexPlace) -> [IndexRow] { builtPlace == place ? built : [] }
+
+    /// False until the rows of `place` have been worked out, so a page does not say it is empty first.
+    func isBuilt(for place: IndexPlace) -> Bool { builtPlace == place }
+
     func follow(_ place: IndexPlace, in library: any ItemLibrary) {
         generation += 1
-        isBuilt = false
+        builtPlace = nil
+        built = []
+        slots = IndexSlots()
         self.library = library
         rebuild(place, generation: generation)
     }
@@ -22,6 +33,9 @@ final class IndexRowsModel {
     func stop() {
         generation += 1
         library = nil
+        builtPlace = nil
+        built = []
+        slots = IndexSlots()
     }
 
     private func rebuild(_ place: IndexPlace, generation: Int) {
@@ -35,8 +49,11 @@ final class IndexRowsModel {
                 self.rebuild(place, generation: generation)
             }
         }
-        if rows != next { rows = next }
-        isBuilt = true
+        if built != next {
+            built = next
+            slots = IndexSlots(rows: next)
+        }
+        builtPlace = place
     }
 
     private static func rows(for place: IndexPlace, in library: any ItemLibrary) -> [IndexRow] {

@@ -88,6 +88,41 @@ struct IndexRowsTests {
         #expect(row.breakdown.isEmpty)
     }
 
+    private func rows(withTypes counts: [(String, Int)]) -> [IndexRow] {
+        let shares = counts.map { TypeShare(type: TypeID($0.0), label: $0.0, count: $0.1) }
+        return [
+            IndexRow(
+                place: .source("a"), title: "a", symbol: "x", secondary: "", types: "", count: counts.reduce(0) { $0 + $1.1 },
+                latest: nil, breakdown: shares)
+        ]
+    }
+
+    @Test func aTypeKeepsItsColorSlotWhateverTheCountsDo() {
+        let before = IndexSlots(rows: rows(withTypes: [("t.b", 5), ("t.a", 3), ("t.c", 1)]))
+        let after = IndexSlots(rows: rows(withTypes: [("t.c", 9), ("t.b", 5), ("t.a", 3)]))
+        for id in ["t.a", "t.b", "t.c"] { #expect(before.slot(for: TypeID(id)) == after.slot(for: TypeID(id))) }
+        #expect(before.slot(for: TypeID("t.a")) == 0)
+        #expect(before.slot(for: TypeID("t.c")) == 2)
+    }
+
+    @Test func noTwoOfManyTypesShareASlotAndTheLeastCommonHaveNone() {
+        let counts = (1...12).map { ("t.\(String(format: "%02d", $0))", 100 - $0) }
+        let slots = IndexSlots(rows: rows(withTypes: counts))
+        let given = counts.compactMap { slots.slot(for: TypeID($0.0)) }
+        #expect(given.count == IndexSlots.count)
+        #expect(Set(given).count == given.count)
+        #expect(slots.slot(for: TypeID("t.12")) == nil)
+        #expect(slots.slot(for: nil) == nil)
+    }
+
+    @Test func sourcesAndTheirCountsComeFromOneGrouping() {
+        let items = [item("a", source: "b"), item("b", source: "A"), item("c", source: "b"), item("d")]
+        let library = FakeItemLibrary(items: items, now: base)
+        let groups = IndexRows.groupedBySource(library.items(in: .allNotes))
+        #expect(library.sourceCounts.map(\.name) == groups.map(\.name))
+        #expect(library.sourceCounts.map(\.count) == groups.map(\.items.count))
+    }
+
     @Test func everySourceHasTheSameIconUntilItsKindIsKnown() {
         #expect(SourceTile.symbol(forSource: "workbench-folder") == SourceTile.symbol(forSource: "agents"))
     }
@@ -139,5 +174,25 @@ struct IndexPreferencesTests {
         #expect(IndexPlace(.collections) == .collections)
         #expect(IndexPlace(.allNotes) == nil)
         #expect(IndexPlace(.source("rss")) == nil)
+    }
+}
+
+@MainActor
+struct IndexRowsModelTests {
+    @Test func changingThePlaceNeverShowsTheOldPlacesRows() {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("a", modified: .now)], now: .now)
+        var note = FakeItemLibrary.note("n", modified: .now)
+        note.source = "rss"
+        let model = IndexRowsModel()
+        model.follow(.sources, in: FakeItemLibrary(items: [note], now: .now))
+        #expect(model.rows(for: .sources).map(\.title) == ["rss"])
+        #expect(model.rows(for: .collections).isEmpty)
+        #expect(!model.isBuilt(for: .collections))
+
+        model.follow(.collections, in: library)
+        #expect(model.rows(for: .sources).isEmpty)
+        #expect(!model.isBuilt(for: .sources))
+        #expect(model.isBuilt(for: .collections))
+        model.stop()
     }
 }

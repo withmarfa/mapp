@@ -36,20 +36,26 @@ nonisolated enum SourceTile {
 }
 
 nonisolated enum IndexRows {
-    /// The sources of `items`, by name, each with the types it wrote and its latest change.
-    static func sources(of items: [Item], catalogue: Catalogue) -> [IndexRow] {
+    /// The items of each source, in name order. Items with no source belong to none. The index page and the
+    /// palette's source list both read this, so they cannot disagree.
+    static func groupedBySource(_ items: [Item]) -> [(name: String, items: [Item])] {
         var named: [String: [Item]] = [:]
         for item in items {
             if let source = item.source, !source.isEmpty { named[source, default: []].append(item) }
         }
-        return named.map { name, items in
+        return named.map { (name: $0.key, items: $0.value) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// The sources of `items`, by name, each with the types it wrote and its latest change.
+    static func sources(of items: [Item], catalogue: Catalogue) -> [IndexRow] {
+        groupedBySource(items).map { name, items in
             let breakdown = breakdown(of: items, catalogue: catalogue)
             let types = summary(of: breakdown)
             return IndexRow(
                 place: .source(name), title: name, symbol: SourceTile.symbol(forSource: name), secondary: types, types: types,
                 count: items.count, latest: items.map(\.modified).max(), breakdown: breakdown)
         }
-        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     /// `collections` in the order given, each with its members' types. Its secondary line is its own type.
@@ -88,4 +94,22 @@ nonisolated enum IndexRows {
         let more = String(localized: "\(labels.count - limit) more")
         return (Array(labels.prefix(limit)) + [more]).formatted(.list(type: .and, width: .standard))
     }
+}
+
+/// Which of a page's types has which color slot. Slots follow the order of the type identifiers, never the counts,
+/// so a type keeps its slot as items come and go. When there are more types than slots, the most numerous take
+/// them and the rest have none, which the page draws as part of "Other".
+nonisolated struct IndexSlots: Equatable, Sendable {
+    static let count = 8
+    private let slots: [TypeID: Int]
+
+    init(rows: [IndexRow] = []) {
+        var totals: [TypeID: Int] = [:]
+        for share in rows.flatMap(\.breakdown) { if let type = share.type { totals[type, default: 0] += share.count } }
+        let common = totals.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key.rawValue < $1.key.rawValue }
+            .prefix(Self.count).map(\.key)
+        slots = Dictionary(uniqueKeysWithValues: common.sorted { $0.rawValue < $1.rawValue }.enumerated().map { ($1, $0) })
+    }
+
+    func slot(for type: TypeID?) -> Int? { type.flatMap { slots[$0] } }
 }
