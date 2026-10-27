@@ -22,9 +22,10 @@ struct ItemTable: View {
         let _ = daysSeen
         let content = browser.tableContent(in: library)
         let (allRows, rows) = (content.allRows, content.rows)
+        let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        table(columns: content.columns, rows: rows, groups: content.groups, grouping: content.grouping, collapsed: content.collapsed)
+        table(columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
@@ -45,6 +46,9 @@ struct ItemTable: View {
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
+            // A row the selection names that is not loaded yet, such as one reached by Back or a link, loads its page.
+            .onChange(of: browser.selection, initial: true) { browser.revealSelectionInTable(content) }
+            .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
             .onChange(of: placeKey, initial: true) { loadColumns() }
             // The toolbar's Columns menu changes the stored layout.
             .onChange(of: storedColumns) { loadColumns() }
@@ -57,8 +61,7 @@ struct ItemTable: View {
     }
 
     private func table(
-        columns: [ItemTableColumn], rows: [ItemTableRow], groups: [ItemTableGroup], grouping: ItemTableColumn?,
-        collapsed: Set<String>
+        columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
         Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: $columnCustomization) {
             TableColumnForEach(columns) { column in
@@ -72,23 +75,16 @@ struct ItemTable: View {
             }
         } rows: {
             if let grouping {
-                ForEach(groups) { group in
-                    Section {
-                        if !collapsed.contains(group.id) {
-                            ForEach(group.rows) { TableRow($0) }
-                        }
-                    } header: {
-                        ItemTableGroupHeader(
-                            group: group, column: grouping, isCollapsed: collapsed.contains(group.id)
-                        ) { toggle(group.id, collapsed: collapsed) }
-                    }
-                }
+                ForEach(pages.groups) { groupRows($0, grouping: grouping, collapsed: collapsed) }
             } else {
-                ForEach(rows) { TableRow($0) }
+                ForEach(pages.slice.rows) { TableRow($0) }
+                if pages.slice.remaining > 0 {
+                    loadMoreRow(remaining: pages.slice.remaining, group: nil)
+                }
             }
         }
         .tableStyle(.inset)
-        .softSelection(rows: rows.map(\.id.rawValue) + collapsed.sorted(), selection: browser.selection)
+        .softSelection(rows: pages.shownIDs + collapsed.sorted(), selection: browser.selection)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .focused(pane, equals: .list)
@@ -118,6 +114,31 @@ struct ItemTable: View {
         .onDeleteCommand {
             let ids = browser.selection
             library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
+        }
+    }
+
+    @TableRowBuilder<ItemTableRow>
+    private func groupRows(_ page: Pages.GroupPage, grouping: ItemTableColumn, collapsed: Set<String>) -> some TableRowContent<ItemTableRow> {
+        let id = page.group.id
+        let isCollapsed = collapsed.contains(id)
+        Section {
+            if !isCollapsed {
+                ForEach(page.slice.rows) { TableRow($0) }
+            }
+        } header: {
+            ItemTableGroupHeader(group: page.group, column: grouping, isCollapsed: isCollapsed) { toggle(id, collapsed: collapsed) }
+        }
+        if page.slice.remaining > 0, !isCollapsed {
+            loadMoreRow(remaining: page.slice.remaining, group: id)
+        }
+    }
+
+    @TableRowBuilder<ItemTableRow>
+    private func loadMoreRow(remaining: Int, group: String?) -> some TableRowContent<ItemTableRow> {
+        Section {
+            ForEach([ItemTableRow]()) { TableRow($0) }
+        } header: {
+            ItemTableLoadMore(remaining: remaining, indented: group != nil) { browser.loadMoreTableRows(group: group) }
         }
     }
 
@@ -232,5 +253,61 @@ private struct ItemTableGroupHeader: View {
         .accessibilityLabel(Text("\(group.title), \(group.rows.count)"))
         .accessibilityValue(isCollapsed ? Text("Collapsed") : Text("Expanded"))
         .accessibilityHint(isCollapsed ? Text("Shows the group’s items") : Text("Hides the group’s items"))
+    }
+}
+
+/// The rows the table draws: a page of them, or a page of each group.
+private struct Pages {
+    struct GroupPage: Identifiable {
+        let group: ItemTableGroup
+        let slice: TablePaging.Slice
+        var id: String { group.id }
+    }
+
+    /// The page of an ungrouped table.
+    let slice: TablePaging.Slice
+    let groups: [GroupPage]
+
+    @MainActor
+    init(content: ItemTableContent, paging: TablePaging, size: TablePageSize) {
+        if content.grouping == nil {
+            slice = paging.slice(content.rows, size: size)
+            groups = []
+        } else {
+            slice = TablePaging.Slice(rows: [], remaining: 0)
+            groups = content.groups.map { GroupPage(group: $0, slice: paging.slice($0.rows, size: size, group: $0.id)) }
+        }
+    }
+
+    var shownIDs: [String] {
+        (slice.rows + groups.flatMap(\.slice.rows)).map(\.id.rawValue)
+    }
+}
+
+/// The row at the foot of a table, or of a group, that shows the next page. It reads as a quiet row, as Notion's
+/// does, and is a button, so the keyboard and VoiceOver can reach it.
+private struct ItemTableLoadMore: View {
+    let remaining: Int
+    /// A group's row lines up with the group's name, after its chevron.
+    let indented: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text("Load More")
+                Text("\(remaining) remaining")
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, indented ? 18 : 0)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .interfaceFont(.body)
+        .accessibilityLabel(Text("Load More, \(remaining) remaining"))
+        .accessibilityIdentifier("ItemTableLoadMore")
     }
 }

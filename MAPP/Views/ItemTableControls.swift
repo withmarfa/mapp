@@ -31,6 +31,8 @@ struct ItemTableViewOptions: View {
         Divider()
         controls.groupPicker
         Divider()
+        controls.pageSizePicker
+        Divider()
         controls.columnsMenu
     }
 }
@@ -146,6 +148,16 @@ private struct Controls {
         }
         .pickerStyle(.menu)
         .accessibilityIdentifier("ItemTableGroup")
+    }
+
+    // MARK: Page size
+
+    var pageSizePicker: some View {
+        Picker("Rows at a Time", systemImage: "list.number", selection: Binding { options.pageSize } set: { options.pageSize = $0 }) {
+            ForEach(TablePageSize.allCases, id: \.self) { Text($0.rawValue, format: .number).tag($0) }
+        }
+        .pickerStyle(.menu)
+        .accessibilityIdentifier("ItemTablePageSize")
     }
 
     // MARK: Columns
