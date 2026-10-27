@@ -32,14 +32,12 @@ final class ItemEmptyStateTests: XCTestCase {
     }
 
     func testAnEmptyCollectionLeavesTheContentPaneBlank() {
-        app.typeKey("n", modifierFlags: [.command, .shift])
-        let name = sidebar.textFields.firstMatch
-        XCTAssertTrue(name.waitForExistence(timeout: 3))
-        name.click()
-        name.typeKey("a", modifierFlags: .command)
-        name.typeText("Empty collection check")
-        name.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(name.waitForNonExistence(timeout: 3))
+        window.quickAdd(type: "Collection", title: "Empty collection check")
+        sidebar.staticTexts["Collections"].click()
+        let index = window.descendants(matching: .any).matching(identifier: "SidebarIndex").firstMatch
+        let collection = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Empty collection check")).firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 3))
+        collection.click()
         XCTAssertTrue(window.staticTexts["No Items"].waitForExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
         XCTAssertFalse(window.staticTexts["No Note Selected"].exists)

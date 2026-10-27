@@ -258,7 +258,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertFalse(window.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Print…")).firstMatch.exists)
         field.typeKey("a", modifierFlags: .command)
         field.typeText("View as List")
-        XCTAssertTrue(window.buttons["View as List"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "View as List")).firstMatch.waitForExistence(timeout: 3))
         field.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(list.waitForExistence(timeout: 3))
     }

@@ -18,6 +18,12 @@ final class WindowTests: XCTestCase {
         return XCTWaiter.wait(for: [expectation], timeout: 3) == .completed
     }
 
+    private func waitForNote(_ title: String, containing bodyText: String) -> Bool {
+        let titleShown = expectation(for: NSPredicate(format: "value == %@", title), evaluatedWith: window.itemPageTitle)
+        let bodyShown = expectation(for: NSPredicate(format: "value CONTAINS %@", bodyText), evaluatedWith: editor)
+        return XCTWaiter.wait(for: [titleShown, bodyShown], timeout: 3) == .completed
+    }
+
     override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
@@ -62,12 +68,12 @@ final class WindowTests: XCTestCase {
 
     func testTheFirstNoteIsSelectedAndShownInThePage() {
         XCTAssertTrue(page.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
     }
 
     func testSelectingANoteShowsIt() {
         row(titled: "Trip to Lisbon").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
+        XCTAssertTrue(waitForNote("Trip to Lisbon", containing: "Three days in October."))
     }
 
     private func beginNewItem(title: String = "New test note") {
@@ -145,7 +151,7 @@ final class WindowTests: XCTestCase {
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"), "the page follows the results")
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"), "the page follows the results")
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(listSearch.waitForNonExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Kitchen quotes").waitForExistence(timeout: 2), "the whole list is back")
@@ -163,7 +169,7 @@ final class WindowTests: XCTestCase {
 
     func testReturnEntersThePageAndEscapeGoesBackToTheList() {
         row(titled: "Garden ideas").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
+        XCTAssertTrue(waitForNote("Garden ideas", containing: "Raised beds along the south fence"))
         app.typeKey(.return, modifierFlags: [])
         app.typeText("Draft")
         XCTAssertTrue(waitForText("CONTAINS", "Draft"), "typing after Return goes into the page")
@@ -205,7 +211,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         app.typeText("bike serv\r")
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(waitForText("BEGINSWITH", "Bike service"))
+        XCTAssertTrue(waitForNote("Bike service", containing: "Booked for Saturday morning."))
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
@@ -227,7 +233,7 @@ final class WindowTests: XCTestCase {
 
     func testCommandZInTheSearchFieldLeavesThePageAlone() {
         row(titled: "Garden ideas").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Garden ideas"))
+        XCTAssertTrue(waitForNote("Garden ideas", containing: "Raised beds along the south fence"))
         app.typeKey(.return, modifierFlags: [])
         app.typeText(" Draft")
         XCTAssertTrue(waitForText("CONTAINS", "Draft"))
@@ -250,7 +256,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testShiftCommandPSearchesEveryNotesTextAndOpensTheOneChosen() {
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         editor.click()
         app.typeKey("p", modifierFlags: [.command, .shift])
         let field = window.textFields["CommandPaletteField"]
@@ -259,7 +265,7 @@ final class WindowTests: XCTestCase {
         XCTAssertFalse(text.contains("ragu"), "the palette took the typing, not the page")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
     }
 
     func testDoubleClickingANoteOpensItInItsOwnWindow() {
@@ -319,14 +325,14 @@ final class WindowTests: XCTestCase {
 
     func testCommandFOpensTheSystemFindBarInThePage() {
         row(titled: "Kitchen quotes").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         editor.click()
         let fields = window.searchFields.count
         window.typeKey("f", modifierFlags: .command)
         let findField = window.searchFields.element(boundBy: fields)
         XCTAssertTrue(findField.waitForExistence(timeout: 2), "the find bar shows its search field")
         findField.typeText("quote")
-        XCTAssertTrue(window.staticTexts["3"].waitForExistence(timeout: 2), "the find bar counts the matches")
+        XCTAssertTrue(window.staticTexts["2"].waitForExistence(timeout: 2), "the find bar counts matches in the body")
         findField.typeKey(.escape, modifierFlags: [])
         wait(for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: findField)], timeout: 2)
     }
@@ -335,7 +341,7 @@ final class WindowTests: XCTestCase {
 
     func testALongNoteStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
         row(titled: "The Design of Everyday Things").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "The Design of Everyday Things"))
+        XCTAssertTrue(waitForNote("The Design of Everyday Things", containing: "Notes as I read."))
         // The sample alone can fit a restored, maximized window. Add enough text to overflow any
         // viewport this test uses, so it tests scrolling rather than the screen's dimensions.
         editor.click()
@@ -344,7 +350,7 @@ final class WindowTests: XCTestCase {
         app.typeText("\n\nScroll overflow.\n\n" + Array(repeating: "x", count: paragraphs).joined(separator: "\n\n"))
         XCTAssertTrue(waitForText("CONTAINS", "Scroll overflow."))
         app.typeKey(.upArrow, modifierFlags: .command)
-        let title = page.staticTexts["The Design of Everyday Things"].firstMatch
+        let title = window.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(title.frame.minY, window.toolbars.firstMatch.frame.maxY, "the note starts below the toolbar")
         let heading = page.staticTexts["The psychology of everyday actions"].firstMatch
@@ -360,8 +366,8 @@ final class WindowTests: XCTestCase {
 
     func testAShortNoteStaysPutWhenScrolled() {
         row(titled: "Garden ideas").click()
-        let title = page.staticTexts["Garden ideas"].firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForNote("Garden ideas", containing: "Raised beds along the south fence"))
+        let title = window.itemPageTitle
         let before = title.frame.minY
         page.scroll(byDeltaX: 0, deltaY: -40)
         XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
@@ -379,31 +385,31 @@ final class WindowTests: XCTestCase {
     // MARK: Back and forward
 
     func testBackAndForwardShortcutsMoveThroughTheItemsOpened() {
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         row(titled: "Recipes to try").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
         app.typeKey("[", modifierFlags: .command)
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         app.typeKey("]", modifierFlags: .command)
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
         app.menuBars.menuBarItems["View"].click()
         app.menuItems["Back"].click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         app.menuBars.menuBarItems["View"].click()
         app.menuItems["Forward"].click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
     }
 
     func testBackAndForwardKeysBelongToThePageWhileItHasTheKeyboard() {
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"))
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         row(titled: "Recipes to try").click()
-        XCTAssertTrue(waitForText("BEGINSWITH", "Recipes to try"))
+        XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
         app.typeKey(.return, modifierFlags: [])
         app.typeKey("[", modifierFlags: .command)
-        XCTAssertFalse(waitForText("BEGINSWITH", "Kitchen quotes"), "the page keeps ⌘[ while it has the keyboard")
+        XCTAssertFalse(waitForNote("Kitchen quotes", containing: "Three quotes in so far."), "the page keeps ⌘[ while it has the keyboard")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey("[", modifierFlags: .command)
-        XCTAssertTrue(waitForText("BEGINSWITH", "Kitchen quotes"), "the list has the keyboard again, so ⌘[ goes back")
+        XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."), "the list has the keyboard again, so ⌘[ goes back")
     }
 
     func testTheMainWindowPassesTheAccessibilityAudit() throws {
