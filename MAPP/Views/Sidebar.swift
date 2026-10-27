@@ -6,7 +6,6 @@ import Marfa
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    @Environment(\.interfaceTextSize) private var textSize
     let browser: Browser
     let order: NoteOrder
     @State private var editsTypes = false
@@ -113,34 +112,38 @@ struct Sidebar: View {
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
         let rows = plan.typeRows
-        // Every row keeps the chevron's width once any row can fold, so the counts line up in one column.
-        let reservesChevron = rows.contains(where: \.isExpandable)
+        let guides = SidebarTypeRow.guides(for: rows)
+        let widest = rows.filter(\.isExpandable).map(count(of:)).max() ?? 0
         return Section {
-            ForEach(rows) { typeRow($0, reservesChevron: reservesChevron) }
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                typeRow(row, widestFoldingCount: widest, guides: guides[index])
+            }
         } header: {
             TypesHeading(editsTypes: $editsTypes)
         }
     }
 
     /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. The rows are
-    /// one flat list, a subtype's drawn indented under its parent, because the system's disclosure puts its chevron
-    /// at the leading edge and cannot be moved. `SidebarDisclosure` draws the chevron at the trailing edge instead.
-    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, reservesChevron: Bool) -> some View {
+    /// one flat list, a subtype's drawn one step in under its parent, because the system's disclosure puts its chevron
+    /// at the leading edge and cannot be moved or guided.
+    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int, guides: [Bool]) -> some View {
         let node = row.node
+        let content = SidebarTypeRow(
+            row: row, count: count(of: row), widestFoldingCount: widestFoldingCount, guides: guides, toggle: { toggle(row) })
         if node.opens, let type = node.type {
-            let item = SidebarItem.itemType(type.rawValue)
-            typeContent(row, count: library.count(in: item), reservesChevron: reservesChevron)
-                .tag(item)
+            content
+                .tag(SidebarItem.itemType(type.rawValue))
+                .listRowInsets(.vertical, 0)
                 .contextMenu { hideButton(.type(node.id)) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
             // A group only folds, so a click anywhere on its row does.
             Button { toggle(row) } label: {
-                typeContent(row, count: 0, reservesChevron: reservesChevron)
-                    .contentShape(.rect)
+                content.contentShape(.rect)
             }
             .buttonStyle(.plain)
             .selectionDisabled()
+            .listRowInsets(.vertical, 0)
             .contextMenu { hideButton(.type(node.id)) }
             .accessibilityLabel(Text(node.label))
             .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
@@ -148,31 +151,9 @@ struct Sidebar: View {
         }
     }
 
-    /// The row's mark and name, then its count and chevron at the trailing end.
-    private func typeContent(_ row: SidebarPlan.TypeRow, count: Int, reservesChevron: Bool) -> some View {
-        HStack(spacing: 4) {
-            // The name and count read as one element; the chevron beside them stays a button of its own.
-            HStack(spacing: 4) {
-                sidebarLabel(row.node.label, symbol: row.node.symbol)
-                    .padding(.leading, CGFloat(row.depth) * 14)
-                Spacer(minLength: 8)
-                if count > 0 {
-                    Text(count, format: .number)
-                        .monospacedDigit()
-                        // The size of the system's own count on the rows above, which does not follow the base text size.
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            if row.isExpandable {
-                SidebarDisclosure(title: row.node.label, id: row.node.id, isExpanded: row.isExpanded, isButton: row.node.opens) {
-                    toggle(row)
-                }
-            } else if reservesChevron {
-                Color.clear.frame(width: SidebarDisclosure.width(forTextSize: textSize))
-            }
-        }
+    private func count(of row: SidebarPlan.TypeRow) -> Int {
+        guard row.node.opens, let type = row.node.type else { return 0 }
+        return library.count(in: .itemType(type.rawValue))
     }
 
     /// An arrow key does what the system's outline does for the selected type. Settings shows no selection, and a
@@ -221,7 +202,7 @@ struct Sidebar: View {
     private func row(
         _ item: SidebarItem, symbol: String, title: String? = nil, hiding place: SidebarPlace? = nil, counted: Bool = true
     ) -> some View {
-        sidebarLabel(title ?? library.name(of: item), symbol: symbol)
+        SidebarLabel(title: title ?? library.name(of: item), symbol: symbol)
             .badge(counted ? count(in: item) : nil)
             .tag(item)
             .contextMenu {
@@ -237,14 +218,6 @@ struct Sidebar: View {
     private func count(in item: SidebarItem) -> Text? {
         let count = library.count(in: item)
         return count > 0 ? Text(count, format: .number).monospacedDigit() : nil
-    }
-
-    private func sidebarLabel(_ title: String, symbol: String) -> some View {
-        Label {
-            Text(title).interfaceFont(.body).lineLimit(1).truncationMode(.tail)
-        } icon: {
-            Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
-        }
     }
 }
 
