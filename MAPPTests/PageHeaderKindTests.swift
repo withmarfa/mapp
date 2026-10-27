@@ -10,7 +10,8 @@ struct PageHeaderKindTests {
 
     private static let catalogue = Catalogue(itemTypes: [
         type("core.note"), type("core.event"), type("core.entity.person"), type("core.bookmark"), type("core.media"),
-        type("core.task"),
+        type("core.task"), type("core.file"), type("core.file.webpage", parent: "core.file"),
+        type("aic.report", parent: "core.file.webpage"),
         type("aic.meeting", parent: "core.event"), type("aic.standup", parent: "aic.meeting"),
         type("aic.colleague", parent: "core.entity.person"), type("aic.clipping", parent: "core.bookmark"),
         type("aic.loop-a", parent: "aic.loop-b"), type("aic.loop-b", parent: "aic.loop-a"),
@@ -25,6 +26,13 @@ struct PageHeaderKindTests {
         #expect(kind("core.media") == .reading)
         #expect(kind("core.note") == .general)
         #expect(kind("core.task") == .general)
+    }
+
+    @Test func aWebPageAndTheTypesBuiltOnItHaveTheirOwnPage() {
+        func kind(_ id: String) -> PageHeaderKind { .of(TypeID(id), in: Self.catalogue) }
+        #expect(kind("core.file.webpage") == .webpage)
+        #expect(kind("aic.report") == .webpage)
+        #expect(kind("core.file") == .general)
     }
 
     @Test func aTypeTakesTheHeaderOfTheCoreTypeItBuildsOn() {
