@@ -209,8 +209,9 @@ import Testing
 
         scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
-        #expect(try await scene.title() == "First")
-        #expect(try await scene.links() == 0)
+        // The held count falls when the edit is taken, not when the copy has it.
+        try #require(try await eventuallyAsking { try await scene.title() == "First" })
+        try #require(try await eventuallyAsking { try await scene.links() == 0 })
         scene.becomeWhole()
         try await Task.sleep(for: .milliseconds(300))
         let attempts = scene.reads.attempts.withLock { $0 }

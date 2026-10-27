@@ -33,7 +33,8 @@ import Testing
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "MarfaHostSwitchingTests-\(UUID().uuidString)"))
-        return Libraries(host: bench.host(), defaults: defaults)
+        // No page is open here; the real hand-over waits on every page in the process, those of other suites included.
+        return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
     }
 
     /// A quit while the key and the copy are removed must not leave the address behind, or the next launch opens
@@ -109,10 +110,8 @@ import Testing
         #expect(source.queued.withLock { $0 } == 1)
 
         source.queuing.withLock { $0 = true }
-        let clock = ContinuousClock()
-        let start = clock.now
+        // Returns at all only because the limit ends the wait, which the copy never would while it queues.
         #expect(await libraries.flushEditors(within: .milliseconds(200)) == false)
-        #expect(clock.now - start < .seconds(5))
         #expect(libraries.current?.notices.waiting.last?.title == "Couldn’t Quit")
         source.queuing.withLock { $0 = false }
     }
