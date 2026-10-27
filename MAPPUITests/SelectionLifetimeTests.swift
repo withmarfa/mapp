@@ -16,9 +16,8 @@ final class SelectionLifetimeTests: XCTestCase {
         note.click()
 
         for _ in 0..<3 {
-            for mode in ["Gallery", "Table", "List"] {
-                app.menuBars.menuBarItems["View"].click()
-                app.menuBars.menuItems["as \(mode)"].click()
+            for (mode, key) in [("Gallery", "2"), ("Table", "3"), ("List", "1")] {
+                app.typeKey(key, modifierFlags: .command)
                 let content = mode == "List"
                     ? list
                     : window.descendants(matching: .any).matching(identifier: "Item\(mode)").element(boundBy: 0)
