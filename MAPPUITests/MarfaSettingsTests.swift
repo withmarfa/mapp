@@ -38,7 +38,7 @@ final class MarfaSettingsTests: XCTestCase {
         XCTAssertTrue(key.exists, "the key is typed into a secure field, so it is never shown")
         XCTAssertTrue(connect.exists)
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
-        XCTAssertTrue(window.toolbars.staticTexts["Library"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.descendants(matching: .any)["SettingsDetail"].staticTexts["Library"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsMarfaDisconnected")
     }
 
@@ -64,7 +64,7 @@ final class MarfaSettingsTests: XCTestCase {
         connect.click()
         let notice = window.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
-        XCTAssertTrue(notice.label.contains("Check the Address"), "the notice reads as one element, with its title in its label")
+        XCTAssertTrue(notice.label.contains("Check the Address"), "the notice reads as one element, with its title in its label: \(notice.debugDescription)")
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
@@ -75,7 +75,9 @@ final class MarfaSettingsTests: XCTestCase {
         XCTAssertFalse(window.outlines["Sidebar"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncStatus"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncDetails"].exists)
-        window.buttons["WelcomeConnect"].click()
+        let connect = window.buttons["WelcomeConnect"]
+        XCTAssertTrue(connect.waitForExistence(timeout: 3), window.debugDescription)
+        connect.click()
         XCTAssertTrue(address.waitForExistence(timeout: 3), "Connect opens the page that asks for the server")
         attachScreenshot("WelcomeConnect")
     }

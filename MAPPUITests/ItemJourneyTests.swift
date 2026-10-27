@@ -22,7 +22,9 @@ final class ItemJourneyTests: XCTestCase {
         let addProperty = app.descendants(matching: .any)["ItemInspectorAddProperty"]
         XCTAssertTrue(addProperty.waitForExistence(timeout: 3))
         addProperty.click()
-        app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch.click()
+        let descriptionOption = app.menuItems.matching(NSPredicate(format: "identifier == %@ OR title == %@", "ItemInspectorAdd.description", "Description")).firstMatch
+        XCTAssertTrue(descriptionOption.waitForExistence(timeout: 3), app.debugDescription)
+        descriptionOption.click()
         let description = app.descendants(matching: .any)["ItemProperty.description"]
         XCTAssertTrue(description.waitForExistence(timeout: 3))
         description.typeText("Saved through the native inspector")
