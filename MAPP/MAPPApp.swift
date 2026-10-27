@@ -47,7 +47,6 @@ struct MAPPApp: App {
                 // the window is inactive. The sidebar's material stays above it.
                 .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-                .notices(libraries.host.notices)
                 .environment(libraries)
                 .environment(libraries.host)
         }
@@ -77,7 +76,7 @@ struct MAPPApp: App {
             }
             .interfaceTextStyle()
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-            .notices(libraries.host.notices)
+            .modifier(ItemWindowNotices(notices: libraries.host.notices, settingsRequest: settingsRequest))
         }
         .defaultSize(width: 640, height: 720)
     }

@@ -536,7 +536,7 @@
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
 
     },
-    "The server doesn’t accept your key. Your changes stay on this Mac until a key works." : {
+    "The server doesn’t accept your key. Enter a new one, or disconnect to start again. Changes not yet sent stay on this Mac until a key works or you choose what to do with them." : {
 
     },
     "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
@@ -2176,8 +2176,14 @@
     "The Marfa server refused this change." : {
       "extractionState" : "manual"
     },
-    "The Marfa server no longer accepts this library’s key. Open Settings, choose Library, and enter a new key." : {
+    "The Marfa server no longer accepts this library’s key. Enter a new key in Settings, or disconnect the library there and start again." : {
       "extractionState" : "manual"
+    },
+    "Marfa Server Doesn’t Accept Your Key" : {
+      "extractionState" : "manual"
+    },
+    "Not Now" : {
+
     },
     "The PDF exceeds the export limit of 200 pages or 64 MB." : {
 
