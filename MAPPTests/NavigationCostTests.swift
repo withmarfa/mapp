@@ -207,6 +207,53 @@ struct NavigationCostTests {
     /// before the window was still again, and how long the main actor spent on it all. The editor's web view is
     /// part of the window, so the wall time here includes whatever the window does besides these costs.
     @Test func aHostedWindowAcrossTheMovesAPersonMakes() async throws {
+        try await hosted { browser, library, step in
+            try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("table") { browser.viewMode = .table }
+            try await step("select a row") { browser.selection = [library.items(in: .itemType("aic.decision"))[3].id] }
+            try await step("select another row") { browser.selection = [library.items(in: .itemType("aic.decision"))[4].id] }
+            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("board") { browser.viewMode = .board }
+            try await step("timeline") { browser.viewMode = .timeline }
+            try await step("gallery") { browser.viewMode = .gallery }
+            try await step("list") { browser.viewMode = .list }
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("table") { browser.viewMode = .table }
+        }
+    }
+
+    /// Moving between places while the list stays, which is what a person does most.
+    @Test func aHostedWindowMovingBetweenPlacesInTheList() async throws {
+        try await hosted { browser, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("tasks (list)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("sessions (list)") { browser.sidebarItem = .itemType("aic.session") }
+            try await step("all items (list) again") { browser.sidebarItem = .allNotes }
+            try await step("decisions (list) again") { browser.sidebarItem = .itemType("aic.decision") }
+        }
+    }
+
+    /// The table of every item with no grouping, then the move between two places that stays on the table.
+    @Test func aHostedWindowOnAnUngroupedTable() async throws {
+        try await hosted { browser, _, step in
+            for place in [SidebarItem.allNotes, .itemType("aic.decision"), .itemType("aic.ticket.task")] {
+                browser.tableOptions[place, default: .init()].grouping = .none
+            }
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("all items (ungrouped table)") { browser.viewMode = .table }
+            try await step("decisions (ungrouped table)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("tasks (ungrouped table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (ungrouped table) again") { browser.sidebarItem = .allNotes }
+            try await step("list") { browser.viewMode = .list }
+        }
+    }
+
+    /// Hosts the real window on 650 items and hands `script` the browser, the library and `step`, which runs one move
+    /// and prints what it cost.
+    private func hosted(
+        _ script: (Browser, MarfaLibrary, (String, () -> Void) async throws -> Void) async throws -> Void
+    ) async throws {
         #if DEBUG
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
@@ -223,7 +270,6 @@ struct NavigationCostTests {
         func step(_ name: String, _ move: () -> Void) async throws {
             try await Task.sleep(for: .milliseconds(400))
             Cost.resetTallies()
-            let start = ContinuousClock.now
             move()
             var last = -1
             var stall = 0.0
@@ -242,21 +288,10 @@ struct NavigationCostTests {
             let rows = window.contentView.map { Self.tableRows(in: $0) } ?? []
             let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
-            _ = start
             print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)")
         }
 
-        try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
-        try await step("table") { browser.viewMode = .table }
-        try await step("select a row") { browser.selection = [library.items(in: .itemType("aic.decision"))[3].id] }
-        try await step("select another row") { browser.selection = [library.items(in: .itemType("aic.decision"))[4].id] }
-        try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
-        try await step("board") { browser.viewMode = .board }
-        try await step("timeline") { browser.viewMode = .timeline }
-        try await step("gallery") { browser.viewMode = .gallery }
-        try await step("list") { browser.viewMode = .list }
-        try await step("all items (list)") { browser.sidebarItem = .allNotes }
-        try await step("table") { browser.viewMode = .table }
+        try await script(browser, library, step)
         #endif
     }
 
