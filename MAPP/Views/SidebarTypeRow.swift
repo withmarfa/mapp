@@ -38,13 +38,7 @@ struct SidebarTypeRow: View {
     /// The guide columns before the row's own content, outermost first.
     let steps: [Step]
     let showsIcon: Bool
-    let chevron: SidebarExperiment.ChevronPlace
-    /// Told when the row is clicked anywhere but on its chevron, with when the press began; nil where a click does
-    /// nothing of its own.
-    var reselect: ((Date) -> Void)?
     let toggle: () -> Void
-
-    @State private var pressBegan: Date?
 
     /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
     /// guide runs unbroken from one row to the next, and this puts the space back inside the row.
@@ -59,21 +53,8 @@ struct SidebarTypeRow: View {
             content.padding(.vertical, Self.verticalInset).padding(.trailing, Self.countInset)
         }
         .frame(maxHeight: .infinity)
-        .background {
-            // Behind the content, so the chevron on top keeps its own clicks.
-            if let reselect {
-                Color.clear.contentShape(.rect).simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in if pressBegan == nil { pressBegan = .now } }
-                        .onEnded { value in
-                            defer { pressBegan = nil }
-                            guard let began = pressBegan, abs(value.translation.width) < 4, abs(value.translation.height) < 4 else { return }
-                            reselect(began)
-                        })
-            }
-        }
         .overlay(alignment: .trailing) {
-            if chevron == .trailing, row.isExpandable {
+            if row.isExpandable {
                 HStack(spacing: 0) {
                     disclosure
                     SidebarCount(count: count, widest: widestFoldingCount).hidden().accessibilityHidden(true)
@@ -91,38 +72,15 @@ struct SidebarTypeRow: View {
         SidebarLabel(title: row.node.label, symbol: showsIcon ? row.node.symbol : nil)
     }
 
-    @ViewBuilder private var content: some View {
-        switch chevron {
-        case .trailing:
-            // The name and count read as one element; the chevron beside them stays a button of its own.
-            HStack(spacing: 0) {
-                label
-                Spacer(minLength: 8)
-                if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
-                SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
-            }
-            .accessibilityElement(children: .combine)
-        case .afterName:
-            HStack(spacing: 0) {
-                HStack(spacing: 2) {
-                    label
-                    if row.isExpandable { disclosure.fixedSize() }
-                }
-                Spacer(minLength: 8)
-                SidebarCount(count: count, widest: 0)
-            }
-        case .leading:
-            // Every row holds the slot, so the marks of the rows at one depth stay in line.
-            HStack(spacing: 0) {
-                if row.isExpandable { disclosure } else { disclosure.hidden().accessibilityHidden(true) }
-                HStack(spacing: 0) {
-                    label
-                    Spacer(minLength: 8)
-                    SidebarCount(count: count, widest: 0)
-                }
-                .accessibilityElement(children: .combine)
-            }
+    /// The name and count read as one element; a chevron beside them stays a button of its own.
+    private var content: some View {
+        HStack(spacing: 0) {
+            label
+            Spacer(minLength: 8)
+            if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
+            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
         }
+        .accessibilityElement(children: .combine)
     }
 
     /// One column of the guide before a row's content.
@@ -281,7 +239,6 @@ private struct TypeRowsPreview: View {
     let nodes: [TypeNode]
     var collapsed: Set<String> = []
     var subtypeIcons = false
-    var chevron = SidebarExperiment.ChevronPlace.trailing
 
     var body: some View {
         let rows = Self.rows(nodes, depth: 0, collapsed: collapsed)
@@ -296,7 +253,7 @@ private struct TypeRowsPreview: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     SidebarTypeRow(
                         row: row, count: row.node.count, widestFoldingCount: widest, steps: steps[index],
-                        showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: subtypeIcons), chevron: chevron
+                        showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: subtypeIcons)
                     ) {}
                     .listRowInsets(.vertical, 0)
                 }
@@ -351,13 +308,5 @@ private struct TypeRowsPreview: View {
 
 #Preview("Types: icons on subtypes") {
     TypeRowsPreview(nodes: TypeRowsPreview.tree, subtypeIcons: true).frame(width: 260, height: 420)
-}
-
-#Preview("Types: chevron after the name") {
-    TypeRowsPreview(nodes: TypeRowsPreview.tree, chevron: .afterName).frame(width: 260, height: 420)
-}
-
-#Preview("Types: chevron at the leading edge") {
-    TypeRowsPreview(nodes: TypeRowsPreview.tree, chevron: .leading).frame(width: 260, height: 420)
 }
 #endif

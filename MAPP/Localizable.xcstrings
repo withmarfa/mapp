@@ -372,12 +372,6 @@
     "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
 
     },
-    "At the leading edge" : {
-
-    },
-    "At the trailing end beside the count" : {
-
-    },
     "Attachment counts aren’t available." : {
 
     },
@@ -1065,9 +1059,6 @@
     "Checklist" : {
 
     },
-    "Chevron" : {
-
-    },
     "Choice" : {
       "extractionState" : "manual"
     },
@@ -1093,9 +1084,6 @@
       "extractionState" : "manual"
     },
     "Clear Search" : {
-
-    },
-    "Click on a Type With Subtypes" : {
 
     },
     "Code" : {
@@ -1294,9 +1282,6 @@
 
     },
     "Expanded" : {
-
-    },
-    "Experiments" : {
 
     },
     "Export as PDF…" : {
@@ -1918,12 +1903,6 @@
     "Row" : {
 
     },
-    "Row opens, and a second click folds or unfolds it" : {
-
-    },
-    "Row opens, chevron folds" : {
-
-    },
     "Save" : {
       "extractionState" : "manual"
     },
@@ -2065,9 +2044,6 @@
     },
     "Still Working" : {
       "extractionState" : "manual"
-    },
-    "Straight after the name" : {
-
     },
     "Strikethrough" : {
 
@@ -2218,9 +2194,6 @@
     },
     "There’s no key for this Marfa server." : {
       "extractionState" : "manual"
-    },
-    "These compare ways the sidebar could work and may change or go. Include Subtypes is in the list’s toolbar and the View menu, for a type that has subtypes." : {
-
     },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
       "extractionState" : "manual"

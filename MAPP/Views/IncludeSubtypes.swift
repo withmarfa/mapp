@@ -12,7 +12,7 @@ extension Browser {
     func setStacksSubtypes(_ isOn: Bool, in library: any ItemLibrary) {
         guard let type = stackableType(in: library) else { return }
         if isOn { stackedTypes.insert(type) } else { stackedTypes.remove(type) }
-        SidebarExperiment.update { $0.setStacked(type, isOn) }
+        IncludedSubtypes.update { $0.set(type, included: isOn) }
     }
 
     /// The open type's switch, for a control.

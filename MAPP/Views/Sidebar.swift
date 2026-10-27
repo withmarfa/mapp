@@ -10,8 +10,6 @@ struct Sidebar: View {
     let order: NoteOrder
     @State private var editsTypes = false
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
-    @AppStorage(SidebarExperiment.key) private var experiment = SidebarExperiment()
-    @State private var selectionStamp = SelectionStamp()
 
     /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the
     /// previous destination returns to its existing state.
@@ -20,7 +18,6 @@ struct Sidebar: View {
             browser.showsSettings ? nil : browser.sidebarItem
         } set: { item in
             guard let item else { return }
-            selectionStamp.date = .now
             if item == browser.sidebarItem {
                 browser.leaveSettings()
             } else {
@@ -134,9 +131,7 @@ struct Sidebar: View {
         let node = row.node
         let content = SidebarTypeRow(
             row: row, count: count(of: row), widestFoldingCount: widestFoldingCount, steps: steps,
-            showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), chevron: experiment.chevron,
-            reselect: node.opens && row.isExpandable && experiment.rowClick == .opensThenFolds ? { reselect(row, pressBegan: $0) } : nil,
-            toggle: { toggle(row) })
+            showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), toggle: { toggle(row) })
         if node.opens, let type = node.type {
             content
                 .tag(SidebarItem.itemType(type.rawValue))
@@ -174,12 +169,6 @@ struct Sidebar: View {
         case nil: return .ignored
         }
         return .handled
-    }
-
-    /// A click on a row that is already open folds it, when the experiment asks for that.
-    private func reselect(_ row: SidebarPlan.TypeRow, pressBegan: Date) {
-        guard experiment.foldsOnClick(pressBegan: pressBegan, selectedAt: selectionStamp.date) else { return }
-        toggle(row)
     }
 
     private func toggle(_ row: SidebarPlan.TypeRow) {
@@ -232,12 +221,6 @@ struct Sidebar: View {
         let count = library.count(in: item)
         return count > 0 ? Text(count, format: .number).monospacedDigit() : nil
     }
-}
-
-/// When the list last reported a selection, which a click on a row is judged against (`SidebarExperiment.foldsOnClick`).
-/// Not observed: the rows do not change when it does.
-private final class SelectionStamp {
-    var date: Date?
 }
 
 /// The Types heading. Edit shows only while the pointer is over the heading, or its picker is open, as the control

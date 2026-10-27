@@ -210,7 +210,7 @@ final class Browser {
     }
 
     /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
-    /// that list items follow a change (`SidebarExperiment`).
+    /// that list items follow a change (`IncludedSubtypes`).
     var stackedTypes: Set<String> = []
 
     /// The type whose list could also show its subtypes: the open place when it is a type that has subtypes holding
