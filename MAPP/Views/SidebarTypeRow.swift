@@ -29,12 +29,11 @@ struct SidebarTypeRow: View {
     let guides: [Bool]
     let toggle: () -> Void
 
-    /// The same wide row inset the system's rows have above and below their content, which the row gives up so the
-    /// guide can run unbroken from one row to the next.
+    /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
+    /// guide runs unbroken from one row to the next, and this puts the space back inside the row.
     private static let verticalInset: CGFloat = 4
 
-    /// How far the system's own count on the rows above sits in from the edge a row's content ends at, measured so a
-    /// count here ends where theirs do.
+    /// Measured so that a count here ends where the system's count on the rows above does.
     private static let countInset: CGFloat = 4
 
     var body: some View {
