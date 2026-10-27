@@ -31,8 +31,16 @@ import Observation
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
-    init(host: MarfaHost, defaults: UserDefaults = .standard) {
+    /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
+    /// the real one waits on every page in the process, those of tests running beside it too.
+    private let handOverPages: (@escaping (Bool) -> Void) -> Void
+
+    init(
+        host: MarfaHost, defaults: UserDefaults = .standard,
+        handOverPages: @escaping (@escaping (Bool) -> Void) -> Void = { EditorController.flushAll(then: $0) }
+    ) {
         self.host = host
+        self.handOverPages = handOverPages
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
@@ -87,7 +95,7 @@ import Observation
     /// and before quitting.
     @discardableResult
     func flushEditors() async -> Bool {
-        guard await Self.flush() else { return false }
+        guard await flush() else { return false }
         await host.library?.finish()
         return true
     }
@@ -126,9 +134,9 @@ import Observation
     }
 
     /// The pages first, since an edit still in a page reaches a library only by being handed over.
-    private static func flush() async -> Bool {
+    private func flush() async -> Bool {
         await withCheckedContinuation { continuation in
-            EditorController.flushAll { continuation.resume(returning: $0) }
+            handOverPages { continuation.resume(returning: $0) }
         }
     }
 
