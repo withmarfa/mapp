@@ -15,6 +15,15 @@ import Observation
         var text: String?
         /// Whether this tells of changes not kept, which gather into one notice until it is shown.
         var isNotKept = false
+        /// What the person can do about it, offered beside Not Now. Nil where nothing can be done from here, and
+        /// the alert only says so.
+        var action: Action?
+    }
+
+    /// A way forward a notice offers, which the window showing it carries out.
+    nonisolated enum Action: Hashable, Sendable {
+        /// Opens Settings at a page.
+        case openSettings(SettingsPage)
     }
 
     /// Oldest first. The first is the one shown.
@@ -32,11 +41,12 @@ import Observation
     /// something since.
     private var shown: Set<Notice.ID> = []
 
-    /// Tells the person something that was not done. A notice already waiting with the same words is not told twice.
-    func tell(_ title: String, _ message: String) {
+    /// Tells the person something that was not done, with `action` where they can do something about it. A notice
+    /// already waiting with the same words and action is not told twice.
+    func tell(_ title: String, _ message: String, action: Action? = nil) {
         told += 1
-        guard !waiting.contains(where: { !$0.isNotKept && $0.title == title && $0.message == message }) else { return }
-        waiting.append(Notice(id: UUID(), title: title, message: message))
+        guard !waiting.contains(where: { !$0.isNotKept && $0.title == title && $0.message == message && $0.action == action }) else { return }
+        waiting.append(Notice(id: UUID(), title: title, message: message, action: action))
     }
 
     /// Tells the person that a change was not kept, with `reason` where it was not that the library closed, and

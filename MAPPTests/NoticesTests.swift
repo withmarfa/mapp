@@ -198,3 +198,43 @@ extension Notices {
         for notice in waiting { answered(notice.id) }
     }
 }
+
+/// A key the server refuses while the copy is open leaves the windows showing the library, so its notice is the only
+/// sign and has to lead to the way out.
+@MainActor struct RefusedKeyNoticeTests {
+    @Test func aRefusedKeyIsToldWithTheWayToLibrarySettings() async throws {
+        let source = FakeItemSource()
+        let notices = Notices()
+        let library = MarfaLibrary(source: source, notices: notices)
+        source.send(.unavailable(SourceFailure(kind: .denied, message: MarfaSync.keyRefused)))
+        #expect(await eventually { !notices.waiting.isEmpty })
+
+        let notice = try #require(notices.waiting.first)
+        #expect(notice.action == .openSettings(.library))
+        #expect(notice.message == MarfaSync.keyRefused)
+        #expect(notice.message.contains("disconnect"), "the words say Settings can start again")
+        _ = library
+    }
+
+    @Test func otherLibraryFailuresAndOrdinaryNoticesOfferNothing() async throws {
+        let source = FakeItemSource()
+        let notices = Notices()
+        let library = MarfaLibrary(source: source, notices: notices)
+        source.send(.unavailable(SourceFailure(kind: .failed, message: "The store is damaged.")))
+        #expect(await eventually { !notices.waiting.isEmpty })
+        notices.tell("Can’t Search", "The search failed.")
+        notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
+
+        #expect(notices.waiting.count == 3)
+        #expect(notices.waiting.allSatisfy { $0.action == nil })
+        _ = library
+    }
+
+    @Test func theSameWordsWithAndWithoutAnActionAreTwoNotices() {
+        let notices = Notices()
+        notices.tell("Title", "Message", action: .openSettings(.library))
+        notices.tell("Title", "Message", action: .openSettings(.library))
+        notices.tell("Title", "Message")
+        #expect(notices.waiting.map(\.action) == [.openSettings(.library), nil])
+    }
+}

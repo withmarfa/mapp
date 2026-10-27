@@ -332,7 +332,13 @@ import Observation
         case .views(let views):
             take(views)
         case .unavailable(let failure):
-            notices.tell(String(localized: "Can’t Read This Library"), failure.message)
+            // The window keeps showing the library while its copy is open, so a refused key is told with the way
+            // to Settings, where the key is replaced or the library disconnected.
+            if failure.kind == .denied {
+                notices.tell(String(localized: "Marfa Server Doesn’t Accept Your Key"), failure.message, action: .openSettings(.library))
+            } else {
+                notices.tell(String(localized: "Can’t Read This Library"), failure.message)
+            }
         }
     }
 

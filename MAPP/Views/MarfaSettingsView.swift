@@ -64,11 +64,20 @@ struct MarfaSettingsView: View {
             Button(isKeyRefused ? "Use New Key" : "Replace Key") { Task { await model.replaceKey() } }
                 .disabled(!model.canReplaceKey)
                 .accessibilityIdentifier("MarfaReplaceKey")
+            if isKeyRefused {
+                // The other way out: a key that will never work again needs the library disconnected to start over.
+                HStack {
+                    Button("Disconnect…") { model.requestDisconnect() }
+                        .disabled(model.isWorking)
+                        .accessibilityIdentifier("MarfaRefusedDisconnect")
+                    if model.isWorking { ProgressView().controlSize(.small) }
+                }
+            }
         } header: {
             Text(isKeyRefused ? "Key not accepted" : "Key")
         } footer: {
             if isKeyRefused {
-                Text("The server doesn’t accept your key. Your changes stay on this Mac until a key works.")
+                Text("The server doesn’t accept your key. Enter a new one, or disconnect to start again. Changes not yet sent stay on this Mac until a key works or you choose what to do with them.")
             } else {
                 Text("MAPP keeps the key in your Keychain and doesn’t show it again.")
             }

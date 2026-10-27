@@ -22,9 +22,11 @@ struct RootView: View {
         .onAppear {
             if settingsRequest.isPending {
                 settingsRequest.isPending = false
-                browser.showSettings()
+                browser.showSettings(settingsRequest.page)
+                settingsRequest.page = nil
             }
         }
+        .notices(libraries.host.notices) { browser.showSettings($0) }
     }
 
     @ViewBuilder private var workspace: some View {
