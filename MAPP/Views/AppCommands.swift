@@ -47,7 +47,7 @@ struct AppCommands: Commands {
                 library?.browserTarget(of: page, fetchedFile: ids.first.flatMap { browser?.fileURL(of: $0) })
             }
             Button("Open in Browser", systemImage: "safari") {
-                if let page, let target { BrowserOpening.open(target, titled: page.title) }
+                if let page, let target { BrowserOpening.open(target, for: page) }
             }
             .disabled(target == nil)
             Divider()
