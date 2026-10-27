@@ -14,7 +14,6 @@ struct ItemTable: View {
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
-    @State private var columnCustomization = TableColumnCustomization<ItemTableRow>()
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
 
@@ -49,12 +48,6 @@ struct ItemTable: View {
             // A row the selection names that is not loaded yet, such as one reached by Back or a link, loads its page.
             .onChange(of: browser.selection, initial: true) { browser.revealSelectionInTable(content) }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
-            .onChange(of: placeKey, initial: true) { loadColumns() }
-            // The toolbar's Columns menu changes the stored layout.
-            .onChange(of: storedColumns) { loadColumns() }
-            .onChange(of: columnCustomization) {
-                storedColumns = ItemTableColumnLayouts.storing(columnCustomization, for: browser.item, in: storedColumns)
-            }
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
             }
@@ -63,14 +56,16 @@ struct ItemTable: View {
     private func table(
         columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: $columnCustomization) {
-            TableColumnForEach(columns) { column in
+        let layout = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
+        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization) {
+            // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
+            // changes, which for the many columns of a mixed place costs far more than the few it shows.
+            TableColumnForEach(ItemTableColumnLayouts.shown(columns, in: layout)) { column in
                 TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
                     ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, hover: hover)
                 }
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)
-                .defaultVisibility(column.isShownByDefault ? .automatic : .hidden)
                 .disabledCustomizationBehavior(column.content == .title ? .visibility : [])
             }
         } rows: {
@@ -173,11 +168,14 @@ struct ItemTable: View {
 
     // MARK: Column layouts
 
-    private var placeKey: String { ItemTableColumnLayouts.key(for: browser.item) }
-
-    private func loadColumns() {
-        let stored = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        if stored != columnCustomization { columnCustomization = stored }
+    /// The place's stored layout, which the table reads and writes directly, so the Columns menu and the table's own
+    /// header always agree and a change of place never shows the previous place's columns.
+    private var customization: Binding<TableColumnCustomization<ItemTableRow>> {
+        Binding {
+            ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
+        } set: {
+            storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+        }
     }
 }
 
@@ -198,6 +196,12 @@ enum ItemTableColumnLayouts {
         var layouts = layouts(in: stored)
         layouts[key(for: place)] = layout
         return (try? JSONEncoder().encode(layouts)) ?? stored
+    }
+
+    /// The columns the table is given: those the layout shows, and always the name. A hidden column stays out of the
+    /// table, so its width and place in the order wait in the layout and come back when the Columns menu shows it.
+    static func shown(_ columns: [ItemTableColumn], in layout: TableColumnCustomization<ItemTableRow>) -> [ItemTableColumn] {
+        columns.filter { $0.content == .title || layout.shows($0) }
     }
 
     private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>] {
