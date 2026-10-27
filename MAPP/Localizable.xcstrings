@@ -441,6 +441,24 @@
     "Keep the copy and the changes stay on this Mac." : {
       "extractionState" : "manual"
     },
+    "%lld remaining" : {
+
+    },
+    "Load More" : {
+
+    },
+    "Load More Rows" : {
+
+    },
+    "Load More, %lld remaining" : {
+
+    },
+    "Rows at a Time" : {
+
+    },
+    "Show %lld Rows at a Time" : {
+
+    },
     "Key not accepted" : {
 
     },
