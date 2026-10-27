@@ -132,6 +132,8 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
 
     /// The file an item's embed names, opened; `ItemLibrary.openEmbeddedFile` for the editor's library.
     var open: (EmbedReference, ItemID) async -> EmbedResolution = { _, _ in .missing }
+    /// The kept copy of the picture at a web address, opened; the web pictures' cache for the editor.
+    var openPicture: (URL) async -> OpenFile? = { _ in nil }
     /// Changed for each note the page shows, so a file changed on disk is loaded again rather than taken from
     /// WebKit's memory of the page.
     var version = 0
@@ -233,6 +235,28 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         return components.url!
     }
 
+    /// Where the page shows the kept picture of a web address from. Only an address already fetched is served.
+    nonisolated static func pictureURL(for address: URL, version: Int) -> URL {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = "picture"
+        components.path = "/"
+        components.percentEncodedQueryItems = [("address", address.absoluteString), ("v", String(version))].map {
+            URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: valueAllowed))
+        }
+        return components.url!
+    }
+
+    /// The web address a URL of `pictureURL(for:version:)` names.
+    nonisolated static func pictureAddress(in url: URL) -> URL? {
+        guard url.scheme == scheme, url.host == "picture",
+              let text = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems?
+                  .first(where: { $0.name == "address" })?.value?.removingPercentEncoding,
+              let address = URL(string: text), address.scheme?.lowercased() == "https"
+        else { return nil }
+        return address
+    }
+
     /// The item and embed a URL of `url(for:in:version:)` names.
     nonisolated static func request(in url: URL) -> (item: ItemID, reference: EmbedReference)? {
         guard url.scheme == scheme, url.host == "file",
@@ -317,7 +341,13 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     private func serve(_ task: any WKURLSchemeTask, _ id: ObjectIdentifier) async {
         guard let url = task.request.url else { return finish(task, id, failing: URLError(.badURL)) }
         if url.host == "icon" { return serveIcon(task, id, url) }
-        guard let (item, reference) = Self.request(in: url), let file = await open(reference, item).file else {
+        var opened: OpenFile?
+        if url.host == "picture" {
+            if let address = Self.pictureAddress(in: url) { opened = await openPicture(address) }
+        } else if let (item, reference) = Self.request(in: url) {
+            opened = await open(reference, item).file
+        }
+        guard let file = opened else {
             if respond(task, id, status: 404) { finish(task, id) }
             return
         }

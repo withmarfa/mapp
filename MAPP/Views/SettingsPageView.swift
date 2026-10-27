@@ -99,9 +99,33 @@ private struct EditorSettings: View {
                 ReadingWidthOptions()
             }
             Section("Text") { TextOptions() }
+            Section {
+                RemotePictureOptions()
+            } header: {
+                Text("Pictures")
+            } footer: {
+                Text("A note names the website of a picture at a web address and loads it only when you choose to, or always for items that came from another service. Pictures you have loaded stay on this Mac until you disconnect the library.")
+            }
         }
         .labelStyle(.titleOnly)
         .settingsForm()
+    }
+}
+
+private struct RemotePictureOptions: View {
+    @AppStorage(RemotePictureSetting.key) private var setting = RemotePictureSetting.standard
+
+    var body: some View {
+        Picker("Remote Pictures", selection: $setting) {
+            ForEach(RemotePictureSetting.allCases) { option in
+                switch option {
+                case .ask: Text("Ask")
+                case .always: Text("Always")
+                case .never: Text("Never")
+                }
+            }
+        }
+        .accessibilityIdentifier("RemotePictures")
     }
 }
 

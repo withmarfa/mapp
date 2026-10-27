@@ -70,6 +70,12 @@ final class EditorController: NSObject {
     @ObservationIgnored var embedWatch = 0
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
+    /// Fetches the pictures at web addresses the page asks for, by the Remote Pictures setting.
+    @ObservationIgnored let pictures: WebPictures
+    @ObservationIgnored private let pictureRequests: PictureRequests
+    /// Tells the page when the setting changes, so the pictures waiting or turned off are asked for again at once.
+    @ObservationIgnored var pictureSettingWatch: Task<Void, Never>?
+    @ObservationIgnored var toldPictureSetting: RemotePictureSetting
 
     /// The Link to Note command, until the person has chosen a note or declined; the page waits on it.
     struct LinkRequest: Identifiable {
@@ -120,8 +126,11 @@ final class EditorController: NSObject {
     /// Every editor open, so their edits can be handed over before the app quits or changes library.
     @ObservationIgnored static let open = NSHashTable<EditorController>.weakObjects()
 
-    init(library: any ItemLibrary) {
+    init(library: any ItemLibrary, pictures: WebPictures = .standard) {
         self.library = library
+        self.pictures = pictures
+        pictureRequests = PictureRequests(pictures: pictures)
+        toldPictureSetting = pictures.setting
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         configuration.websiteDataStore = .nonPersistent()
@@ -150,6 +159,16 @@ final class EditorController: NSObject {
             return links.map { library.resolveLink($0, in: source) == .missing }
         }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
+        pictureRequests.fromAnotherService = { [weak self] item in self?.library?.item(item)?.source != nil }
+        pictureRequests.version = { [weak self] in self?.embeds.version ?? 0 }
+        embeds.openPicture = { [pictures] address in await pictures.openKept(address) }
+        configuration.userContentController.addScriptMessageHandler(pictureRequests, contentWorld: .page, name: "pictures")
+        pictureSettingWatch = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: UserDefaults.didChangeNotification) {
+                guard let self else { return }
+                self.pictureSettingChanged()
+            }
+        }
         #if DEBUG
         webView.isInspectable = true
         #endif

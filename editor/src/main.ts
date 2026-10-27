@@ -30,6 +30,7 @@ declare global {
       setItem(id: string): void
       linksChanged(): void
       embedsChanged(texts: string[]): void
+      picturesChanged(addresses?: string[]): void
       revealHeading(text: string, expected?: number): boolean
       setFinding(finding: boolean): void
       findSelect(from: number, to: number, generation?: number, snapshotId?: string): void
@@ -66,7 +67,10 @@ declare global {
 const root = document.getElementById('editor')
 const headerRoot = document.getElementById('item-header')
 const footerRoot = document.getElementById('item-footer')
-if (!root || !headerRoot || !footerRoot) throw new Error('editor root missing')
+const pictureBar = document.getElementById('picture-bar')
+const pictureButton = pictureBar?.querySelector('button')
+if (!root || !headerRoot || !footerRoot || !pictureBar || !pictureButton)
+  throw new Error('editor root missing')
 const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
 
 const editor = await NoteEditor.mount(
@@ -87,11 +91,17 @@ const editor = await NoteEditor.mount(
     copy(text) {
       postToHost({ type: 'copy', text })
     },
+    // Above the text, so a note with pictures that wait can load them all at once.
+    picturesWaiting(count, label) {
+      pictureBar.hidden = count === 0
+      pictureButton.textContent = label
+    },
   },
   labels.editor,
   labels.words,
 )
 const header = new ItemHeader(headerRoot, footerRoot, labels.header)
+pictureButton.addEventListener('click', () => editor.loadPictures())
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -165,7 +175,7 @@ window.addEventListener('resize', () => {
 // A header that only grew wider moves nothing below it.
 let surround = -1
 const surroundObserver = new ResizeObserver(() => {
-  const height = headerRoot.offsetHeight + footerRoot.offsetHeight
+  const height = headerRoot.offsetHeight + pictureBar.offsetHeight + footerRoot.offsetHeight
   if (height === surround) return
   surround = height
   requestAnimationFrame(() => {
@@ -175,6 +185,7 @@ const surroundObserver = new ResizeObserver(() => {
   })
 })
 surroundObserver.observe(headerRoot)
+surroundObserver.observe(pictureBar)
 surroundObserver.observe(footerRoot)
 
 function setPageProperty(name: string, value: string): void {
@@ -223,6 +234,7 @@ window.editor = {
   setItem: (id) => editor.setItem(id),
   linksChanged: () => editor.linksChanged(),
   embedsChanged: (texts) => editor.embedsChanged(texts),
+  picturesChanged: (addresses) => editor.picturesChanged(addresses),
   revealHeading: (text, expected) => {
     const result = guardedCommand(() => editor.revealHeading(text, expected))
     return result === true
@@ -266,6 +278,7 @@ window.editor = {
   setReadingWidth: (ems) => setPageProperty('--reading-width', `${ems}rem`),
   setHeader: (model) => {
     header.set(model)
+    if (model) pictureBar.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     checkHeaderScrolledAway()
   },
   setHeaderIcons: (icons) => header.setIcons(icons),

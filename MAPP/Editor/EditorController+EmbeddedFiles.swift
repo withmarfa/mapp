@@ -182,3 +182,14 @@ extension EditorController {
         return menuEmbed
     }
 }
+
+extension EditorController {
+    /// The page asks again for the pictures at web addresses that were waiting or turned off, and for those it
+    /// loaded, when the Remote Pictures setting has changed. Settings changes of any kind arrive here.
+    func pictureSettingChanged() {
+        let setting = pictures.setting
+        guard setting != toldPictureSetting else { return }
+        toldPictureSetting = setting
+        call("picturesChanged")
+    }
+}

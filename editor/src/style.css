@@ -115,6 +115,35 @@ body {
   user-select: none;
 }
 
+/* Above the text while pictures at web addresses wait for the person: one button loads them all. */
+#picture-bar {
+  --interface-text-size: 13px;
+  padding: 0 var(--inkkit-column-inset) 8px;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: var(--interface-text-size);
+  line-height: normal;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#picture-bar[hidden] {
+  display: none;
+}
+
+#picture-bar button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--label-quinary);
+  color: var(--link);
+  font: inherit;
+  cursor: default;
+}
+
+#picture-bar button:hover {
+  background: var(--separator);
+}
+
 /* A page with no text to write draws no editor, rather than an empty one that takes typing. */
 body[data-text='none'] #editor {
   display: none;

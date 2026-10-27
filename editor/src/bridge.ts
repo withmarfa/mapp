@@ -65,6 +65,30 @@ export type NoteRequest =
   | { type: 'pick'; item: string }
   | { type: 'resolve'; item: string; links: LinkRef[] }
 
+/** Why the page asks for a picture at a web address: it is drawing the card, the person chose to load it, or the
+ *  page is printing and wants only what the app already holds. */
+export type PictureAsk = 'drawing' | 'chosen' | 'cached'
+
+/** A question about the picture at a web address. With `export`, the app answers with its bytes (a picture it holds)
+ *  for a portable export, rather than a URL to show it from. */
+export type PictureRequest = {
+  type: 'load'
+  item: string
+  address: string
+  ask: PictureAsk
+  export?: boolean
+}
+
+/** What the app says of a picture at a web address. `loaded` gives the `url` the page shows it from; `waiting` means
+ *  nothing was fetched and the person may choose to; `off` that Settings says never; `refused` why the app would not
+ *  fetch it or could not, and whether trying again may differ (`retry`). */
+export type PictureAnswer =
+  | { state: 'loaded'; url: string }
+  | { state: 'loaded'; data: string; mimeType: string }
+  | { state: 'waiting' }
+  | { state: 'off' }
+  | { state: 'refused'; reason: string; retry?: string }
+
 declare global {
   interface Window {
     webkit?: {
@@ -78,6 +102,9 @@ declare global {
         /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
          *  `resolve` with whether each name is missing. */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }
+        /** Answers a question about a picture at a web address, or null when the app has no answer. The page
+         *  fetches nothing itself: this is the only way such a picture reaches it. */
+        pictures?: { postMessage(request: PictureRequest): Promise<PictureAnswer | null> }
       }
     }
   }
@@ -119,4 +146,19 @@ export async function askMissing(item: string, links: LinkRef[]): Promise<boolea
     answer.every((missing) => typeof missing === 'boolean')
     ? answer
     : null
+}
+
+/** What the app says of the picture at a web address, or null when it does not answer. */
+export async function askPicture(
+  request: Omit<PictureRequest, 'type'>,
+): Promise<PictureAnswer | null> {
+  try {
+    const answer = await window.webkit?.messageHandlers?.pictures?.postMessage({
+      type: 'load',
+      ...request,
+    })
+    return answer && typeof answer === 'object' && 'state' in answer ? answer : null
+  } catch {
+    return null
+  }
 }

@@ -1,11 +1,80 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Always" : {
+
+    },
+    "A note names the website of a picture at a web address and loads it only when you choose to, or always for items that came from another service. Pictures you have loaded stay on this Mac until you disconnect the library." : {
+
+    },
+    "Ask" : {
+
+    },
     "“%@” couldn’t be attached. %@" : {
       "extractionState" : "manual"
     },
     "“%@” is larger than %@ or can’t be read." : {
       "extractionState" : "manual"
+    },
+    "Load 1 Picture" : {
+
+    },
+    "Loading Picture…" : {
+
+    },
+    "Load %lld Pictures" : {
+      "extractionState" : "manual"
+    },
+    "Load Picture" : {
+
+    },
+    "Never" : {
+
+    },
+    "Only pictures at secure (https) addresses can be loaded." : {
+
+    },
+    "Pictures" : {
+
+    },
+    "Remote Pictures" : {
+
+    },
+    "Remote Pictures Are Off" : {
+
+    },
+    "The picture couldn’t be loaded." : {
+
+    },
+    "The picture is a single pixel wide or high, so it isn’t shown." : {
+
+    },
+    "The picture is larger than %@." : {
+
+    },
+    "The picture is too large to show." : {
+
+    },
+    "The picture took too long to load." : {
+
+    },
+    "The website didn’t return a picture." : {
+
+    },
+    "The website didn’t return a picture of a kind that can be shown." : {
+
+    },
+    "The website sent the request on too many times." : {
+
+    },
+    "This address includes a sign-in, so it isn’t loaded." : {
+
+    },
+    "This address is on a private network, so it isn’t loaded." : {
+
+    },
+    "This website can’t be found." : {
+
     },
     "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
       "extractionState" : "manual"

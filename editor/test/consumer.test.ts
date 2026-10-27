@@ -119,18 +119,24 @@ test('an embed asks the app by its text as written, and one the app does not ans
   }
 })
 
-test('a picture at a web address is never asked of the app, and its card opens the address', async () => {
-  const asked: unknown[] = []
-  const posted: unknown[] = []
+test('a picture at a web address is asked of the app as a picture, never as an embed, and the text is untouched', async () => {
+  const embeds: unknown[] = []
+  const pictures: unknown[] = []
   Object.defineProperty(window, 'webkit', {
     configurable: true,
     value: {
       messageHandlers: {
-        host: { postMessage: (message: unknown) => posted.push(message) },
+        host: { postMessage: () => {} },
         embeds: {
           postMessage: async (request: unknown) => {
-            asked.push(request)
+            embeds.push(request)
             return null
+          },
+        },
+        pictures: {
+          postMessage: async (request: unknown) => {
+            pictures.push(request)
+            return { state: 'waiting' }
           },
         },
       },
@@ -139,11 +145,20 @@ test('a picture at a web address is never asked of the app, and its card opens t
   try {
     await withEditor('![A picture](https://example.com/a.png)\n', async (editor) => {
       await vi.waitFor(() =>
-        expect(document.querySelector('.inkkit-file-card, .inkkit-file')).not.toBeNull(),
+        expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
+          'example.com: Load Picture',
+        ),
       )
-      expect(asked).toEqual([])
+      expect(embeds).toEqual([])
+      expect(pictures).toEqual([
+        {
+          type: 'load',
+          item: expect.any(String),
+          address: 'https://example.com/a.png',
+          ask: 'drawing',
+        },
+      ])
       expect(document.body.textContent).not.toContain('File not found')
-      expect(document.body.textContent).toContain('A picture')
       expect(editor.snapshot().text).toBe('![A picture](https://example.com/a.png)\n')
     })
   } finally {
