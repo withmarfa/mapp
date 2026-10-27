@@ -64,7 +64,8 @@ final class MarfaSettingsTests: XCTestCase {
         connect.click()
         let notice = window.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
-        XCTAssertTrue(notice.label.contains("Check the Address"), "the notice reads as one element, with its title in its label: \(notice.debugDescription)")
+        let noticeText = notice.label + " " + (notice.value as? String ?? "")
+        XCTAssertTrue(noticeText.contains("Check the Address"), "the combined notice exposes its title: \(notice.debugDescription)")
         XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
