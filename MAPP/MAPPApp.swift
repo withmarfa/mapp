@@ -57,7 +57,19 @@ struct MAPPApp: App {
             FormatCommands()
             ToolbarCommands()
             SettingsCommands(request: settingsRequest)
+            #if DEBUG
+            TuningCommands()
+            #endif
         }
+
+        #if DEBUG
+        UtilityWindow(LocalizedStringKey(TuningPanel.title), id: TuningPanel.windowID) {
+            TuningPanel()
+        }
+        .commandsRemoved()
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
+        #endif
 
         WindowGroup("Item", for: ItemID.self) { $id in
             Group {
