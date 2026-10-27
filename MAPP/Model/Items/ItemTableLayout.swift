@@ -242,6 +242,9 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
     /// For each column filtered, the categories it keeps; the empty string keeps empty cells.
     var filters: [String: Set<String>] = [:]
     var collapsed: Set<String>?
+    /// How many rows show at first and each time Load More is chosen. Kept with the place's other choices, not in
+    /// a saved view, which has no field for it.
+    var pageSize = TablePageSize.standard
 }
 
 nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {

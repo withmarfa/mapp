@@ -67,6 +67,16 @@ struct ViewOptionCommand {
                 storedColumns.wrappedValue = ItemTableColumnLayouts.storing(changed, for: place, in: storedColumns.wrappedValue)
             })
         }
+        if browser.tableRowsNotLoaded(in: content) > 0 {
+            commands.append(.init(title: String(localized: "Load More Rows"), systemImage: "arrow.down.to.line") {
+                browser.loadMoreTableRows(in: content)
+            })
+        }
+        for size in TablePageSize.allCases where size != browser.tablePageSize {
+            commands.append(.init(title: String(localized: "Show \(size.rawValue) Rows at a Time"), systemImage: "list.number") {
+                browser.tableOptions[place, default: .init()].pageSize = size
+            })
+        }
         if browser.tableOptions[place]?.filters.isEmpty == false {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
                 browser.tableOptions[place, default: .init()].filters = [:]

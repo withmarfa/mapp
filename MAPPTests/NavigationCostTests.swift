@@ -226,16 +226,24 @@ struct NavigationCostTests {
             let start = ContinuousClock.now
             move()
             var last = -1
+            var stall = 0.0
             while true {
-                try await Task.sleep(for: .milliseconds(150))
+                // A short sleep that wakes late says how long the main actor was held in between.
+                for _ in 0..<30 {
+                    let before = ContinuousClock.now
+                    try await Task.sleep(for: .milliseconds(5))
+                    let late = (ContinuousClock.now - before) - .milliseconds(5)
+                    stall = max(stall, Double(late.components.seconds) * 1000 + Double(late.components.attoseconds) / 1e15)
+                }
                 let now = Cost.tallies.values.map(\.count).reduce(0, +)
                 if now == last { break }
                 last = now
             }
+            let rows = window.contentView.map { Self.tableRows(in: $0) } ?? []
             let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
             _ = start
-            print("HOSTED|\(name)|\(counts)")
+            print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)")
         }
 
         try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
@@ -250,5 +258,10 @@ struct NavigationCostTests {
         try await step("all items (list)") { browser.sidebarItem = .allNotes }
         try await step("table") { browser.viewMode = .table }
         #endif
+    }
+
+    /// The row counts of every table the window holds, found in its view tree.
+    private static func tableRows(in view: NSView) -> [Int] {
+        (view as? NSTableView).map { [$0.numberOfRows] } ?? view.subviews.flatMap { tableRows(in: $0) }
     }
 }
