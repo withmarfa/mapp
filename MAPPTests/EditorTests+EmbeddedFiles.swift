@@ -18,6 +18,26 @@ extension EditorTests {
         return value
     }
 
+    @Test func webAddressPictureIsAnOpenableCardWithoutLoadingTheImage() async throws {
+        let page = try await Page()
+        try await page.load("![RSS picture](https://example.com/rss-picture.png)\r\n")
+        let label = try await settle(page.editor,
+            "document.querySelector('.inkkit-file[data-inkkit-file-kind=file] .inkkit-file-label')?.textContent",
+            as: String.self) { $0 == "RSS picture" }
+        #expect(label == "RSS picture")
+        #expect(try await page.editor.webView.evaluateJavaScript(
+            "document.querySelector('.inkkit-file-open')?.getAttribute('aria-label')"
+        ) as? String == "Open RSS picture")
+        #expect(try await page.editor.webView.evaluateJavaScript(
+            "document.querySelectorAll('.ProseMirror img, .ProseMirror iframe').length"
+        ) as? Int == 0)
+        #expect(try await page.editor.webView.evaluateJavaScript(
+            "performance.getEntriesByType('resource').some(entry => entry.name.startsWith('https://example.com/'))"
+        ) as? Bool == false)
+        #expect(try await page.markdown() == nil)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func eachKindOfEmbeddedFileShowsAsWhatItIs() async throws {
         let root = try TemporaryFolder()
         let attachments = root.url.appending(path: "Attachments")

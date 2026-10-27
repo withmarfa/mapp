@@ -17,6 +17,7 @@ async function withEditor(
   source: string,
   run: (editor: NoteEditor) => void | Promise<void>,
   changed: (text: string) => void = () => {},
+  openLink: (href: string) => void = () => {},
 ) {
   const root = document.createElement('div')
   document.body.append(root)
@@ -24,7 +25,7 @@ async function withEditor(
     find() {},
     changed,
     stateChanged() {},
-    openLink() {},
+    openLink,
     copy() {},
   })
   editor.setItem('note')
@@ -129,6 +130,7 @@ test('an embed asks the app by its text as written, and one the app does not ans
 test('a picture at a web address is never asked of the app, and its card opens the address', async () => {
   const asked: unknown[] = []
   const posted: unknown[] = []
+  const opened: string[] = []
   Object.defineProperty(window, 'webkit', {
     configurable: true,
     value: {
@@ -144,15 +146,26 @@ test('a picture at a web address is never asked of the app, and its card opens t
     },
   })
   try {
-    await withEditor('![A picture](https://example.com/a.png)\n', async (editor) => {
-      await vi.waitFor(() =>
-        expect(document.querySelector('.inkkit-file-card, .inkkit-file')).not.toBeNull(),
-      )
-      expect(asked).toEqual([])
-      expect(document.body.textContent).not.toContain('File not found')
-      expect(document.body.textContent).toContain('A picture')
-      expect(editor.snapshot().text).toBe('![A picture](https://example.com/a.png)\n')
-    })
+    await withEditor(
+      '![A picture](https://example.com/a.png)\n',
+      async (editor) => {
+        await vi.waitFor(() =>
+          expect(document.querySelector('.inkkit-file-card, .inkkit-file')).not.toBeNull(),
+        )
+        expect(asked).toEqual([])
+        expect(document.body.textContent).not.toContain('File not found')
+        expect(document.body.textContent).toContain('A picture')
+        const open = document.querySelector<HTMLButtonElement>('.inkkit-file-open')!
+        expect(open).not.toBeNull()
+        open.click()
+        expect(opened).toEqual(['https://example.com/a.png'])
+        expect(asked).toEqual([])
+        expect(posted).toEqual([])
+        expect(editor.snapshot().text).toBe('![A picture](https://example.com/a.png)\n')
+      },
+      undefined,
+      (href) => opened.push(href),
+    )
   } finally {
     delete (window as { webkit?: unknown }).webkit
   }
