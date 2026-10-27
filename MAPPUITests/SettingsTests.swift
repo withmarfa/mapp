@@ -175,8 +175,9 @@ final class SettingsTests: XCTestCase {
         app.typeKey("s", modifierFlags: [.command, .control])
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        // With the sidebar hidden there is no place to choose; New leaves Settings and opens the new item.
+        // With the sidebar hidden there is no place to choose; New leaves Settings through quick add.
         app.typeKey("n", modifierFlags: .command)
+        window.completeQuickAdd(type: "Note", title: "From Settings")
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCTAssertFalse(settings.exists)
         XCTAssertFalse(sidebar.exists, "the sidebar stays hidden after returning")

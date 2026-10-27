@@ -70,16 +70,11 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("BEGINSWITH", "Trip to Lisbon"))
     }
 
-    /// New makes the item at once and opens its page with the title selected, so typing names it.
-    private func beginNewItem(title: String = "") {
-        app.typeKey("n", modifierFlags: .command)
-        let field = window.itemPageTitle
-        XCTAssertTrue(field.waitForExistence(timeout: 3))
-        if !title.isEmpty {
-            app.typeText(title)
-            app.typeKey(.return, modifierFlags: [])
-        }
+    private func beginNewItem(title: String = "New test note") {
+        window.quickAdd(type: "Note", title: title)
+        XCTAssertTrue(row(titled: title).waitForExistence(timeout: 3))
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
+        editor.click()
     }
 
     func testANewItemHasAnEditableTitleIndependentOfItsBody() {
@@ -95,11 +90,11 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Milk and eggs"))
     }
 
-    func testNewNoteIsCreatedSelectedAndEmpty() {
+    func testNewNoteWithOnlyATitleIsCreatedSelectedAndHasAnEmptyBody() {
         let before = count(of: "Items")
         sidebarItem("Inbox").click()
-        beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
+        beginNewItem(title: "Empty body note")
+        XCTAssertEqual(window.itemPageTitle.value as? String, "Empty body note")
         // An empty page holds nothing but the line the caret sits on.
         let empty = expectation(for: NSPredicate(format: "value == nil OR value MATCHES %@", "\\s*"), evaluatedWith: editor)
         wait(for: [empty], timeout: 3)
@@ -177,11 +172,15 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("NOT CONTAINS", "Draft"), "Escape handed the arrows back to the list")
     }
 
-    func testCommandNMakesANoteReadyForTitling() {
-        beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
-        app.typeText("Shopping")
-        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 3), "the title is selected, so typing replaces it")
+    func testCommandNOpensQuickAddAndCreatesTheTitledNote() {
+        let before = count(of: "Items")
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(window.descendants(matching: .any)["QuickAddTitle"].waitForExistence(timeout: 3))
+        XCTAssertFalse(window.buttons["QuickAddAdd"].isEnabled, "an empty draft cannot make an item")
+        XCTAssertEqual(count(of: "Items"), before)
+        window.completeQuickAdd(type: "Note", title: "Shopping")
+        XCTAssertTrue(row(titled: "Shopping").waitForExistence(timeout: 3))
+        window.itemPageTitle.click()
         app.typeKey(.return, modifierFlags: [])
         app.typeText("Milk")
         XCTAssertTrue(waitForText("CONTAINS", "Milk"), "Return moves from the title into the page")
@@ -214,7 +213,8 @@ final class WindowTests: XCTestCase {
         app.typeText("new")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 3), "the command made a new item")
+        window.completeQuickAdd(type: "Note", title: "Palette note")
+        XCTAssertTrue(row(titled: "Palette note").waitForExistence(timeout: 3), "the command opened quick add and its item was made")
     }
 
     func testEscapePutsTheCommandPaletteAway() {
@@ -282,8 +282,6 @@ final class WindowTests: XCTestCase {
 
     func testUndoInTheEditMenuUndoesTypingInThePage() {
         beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
-        app.typeKey(.return, modifierFlags: [])
         app.typeText("Groceries")
         XCTAssertTrue(waitForText("==", "Groceries"))
         app.menuBars.menuBarItems["Edit"].click()
@@ -294,16 +292,13 @@ final class WindowTests: XCTestCase {
     func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
         let before = count(of: "Items")
         beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
         app.typeKey("z", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "Untitled").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(row(titled: "New test note").waitForNonExistence(timeout: 2))
         XCTAssertEqual(count(of: "Items"), before)
     }
 
     func testATableIsInsertedFromTheFormatMenu() {
         beginNewItem()
-        XCTAssertTrue(row(titled: "Untitled").waitForExistence(timeout: 2))
-        app.typeKey(.return, modifierFlags: [])
         app.typeText("Quotes")
         app.typeKey("t", modifierFlags: [.command, .option])
         let table = page.tables.firstMatch
