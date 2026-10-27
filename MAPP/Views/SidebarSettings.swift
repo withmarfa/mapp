@@ -7,6 +7,7 @@ import SwiftUI
 struct SidebarSettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
 
     var body: some View {
         if let library {
@@ -28,6 +29,11 @@ struct SidebarSettings: View {
                 group(plan.browse, in: library, plan: plan)
             }
             if plan.library.contains(.types) {
+                Section {
+                    Toggle("Show Icons on Subtypes", isOn: $showsSubtypeIcons)
+                        .toggleStyle(.switch)
+                        .accessibilityIdentifier("SidebarSubtypeIcons")
+                }
                 Section {
                     row(.types, title: String(localized: "Show Types"), in: library, plan: plan, among: [])
                     ForEach(plan.types) { node in

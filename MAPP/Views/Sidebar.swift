@@ -9,6 +9,7 @@ struct Sidebar: View {
     let browser: Browser
     let order: NoteOrder
     @State private var editsTypes = false
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
 
     /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the
     /// previous destination returns to its existing state.
@@ -112,11 +113,11 @@ struct Sidebar: View {
 
     private func typesSection(_ plan: SidebarPlan) -> some View {
         let rows = plan.typeRows
-        let guides = SidebarTypeRow.guides(for: rows)
+        let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
         let widest = rows.filter(\.isExpandable).map(count(of:)).max() ?? 0
         return Section {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                typeRow(row, widestFoldingCount: widest, guides: guides[index])
+                typeRow(row, widestFoldingCount: widest, steps: steps[index])
             }
         } header: {
             TypesHeading(editsTypes: $editsTypes)
@@ -126,10 +127,11 @@ struct Sidebar: View {
     /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. The rows are
     /// one flat list, a subtype's drawn one step in under its parent, because the system's disclosure puts its chevron
     /// at the leading edge and cannot be moved or guided.
-    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int, guides: [Bool]) -> some View {
+    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int, steps: [SidebarTypeRow.Step]) -> some View {
         let node = row.node
         let content = SidebarTypeRow(
-            row: row, count: count(of: row), widestFoldingCount: widestFoldingCount, guides: guides, toggle: { toggle(row) })
+            row: row, count: count(of: row), widestFoldingCount: widestFoldingCount, steps: steps,
+            showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), toggle: { toggle(row) })
         if node.opens, let type = node.type {
             content
                 .tag(SidebarItem.itemType(type.rawValue))

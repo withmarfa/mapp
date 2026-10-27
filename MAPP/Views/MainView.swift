@@ -9,6 +9,7 @@ struct MainView: View {
     @State private var details = DetailsPresentation()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
+    @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
@@ -269,6 +270,7 @@ struct MainView: View {
         .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
         // A place whose layouts match the last one's raises no change above, so a move to it is checked here.
         .onChange(of: browser.item) { browser.fallBackToListIfUnavailable(in: library) }
+        .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }

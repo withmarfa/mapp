@@ -1,32 +1,43 @@
 import SwiftUI
 
-/// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels.
+/// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. Without a mark it is the
+/// name alone.
 struct SidebarLabel: View {
     let title: String
-    let symbol: String
+    let symbol: String?
 
     var body: some View {
-        Label {
-            Text(title).interfaceFont(.body).lineLimit(1).truncationMode(.tail)
-        } icon: {
-            Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+        if let symbol {
+            Label {
+                name
+            } icon: {
+                Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+            }
+        } else {
+            name
         }
+    }
+
+    private var name: some View {
+        Text(title).interfaceFont(.body).lineLimit(1).truncationMode(.tail)
     }
 }
 
 /// A row of the Types section: the type's mark and name, a count at the trailing edge in line with the system's own,
-/// and, where the row folds subtypes under it, a chevron in one slot just before the count.
+/// and, where the row folds subtypes under it, a chevron.
 ///
-/// A subtype sits one step in, so its mark lies under its parent's name, and a thin guide runs from the parent's mark
-/// down the rows it holds and bends into each of them.
+/// A subtype sits one step in under its parent, and a thin guide runs down the rows the parent holds and bends into
+/// each of them from under the parent's mark. A subtype either keeps its mark, so the mark lies under its parent's
+/// name, or has none, so its name starts level with its parent's.
 struct SidebarTypeRow: View {
     let row: SidebarPlan.TypeRow
     let count: Int
     /// The largest count on a row that folds. The count column of every folding row is as wide as it, so their
     /// chevrons share one place whatever each count is.
     let widestFoldingCount: Int
-    /// Whether a row after this one sits under the same parent at each level from the top, outermost first.
-    let guides: [Bool]
+    /// The guide columns before the row's own content, outermost first.
+    let steps: [Step]
+    let showsIcon: Bool
     let toggle: () -> Void
 
     /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
@@ -38,9 +49,7 @@ struct SidebarTypeRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(guides.indices, id: \.self) { level in
-                SidebarGuide(continues: guides[level], bends: level == guides.count - 1)
-            }
+            ForEach(steps.indices, id: \.self) { SidebarGuide(step: steps[$0]) }
             content.padding(.vertical, Self.verticalInset).padding(.trailing, Self.countInset)
         }
         .frame(maxHeight: .infinity)
@@ -59,15 +68,59 @@ struct SidebarTypeRow: View {
         SidebarDisclosure(title: row.node.label, id: row.node.id, isExpanded: row.isExpanded, isButton: row.node.opens, toggle: toggle)
     }
 
+    private var label: SidebarLabel {
+        SidebarLabel(title: row.node.label, symbol: showsIcon ? row.node.symbol : nil)
+    }
+
     /// The name and count read as one element; a chevron beside them stays a button of its own.
     private var content: some View {
         HStack(spacing: 0) {
-            SidebarLabel(title: row.node.label, symbol: row.node.symbol)
+            label
             Spacer(minLength: 8)
             if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
             SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// One column of the guide before a row's content.
+    struct Step: Equatable {
+        /// Whether the guide carries on below the row, and whether it ends at this row's own bend.
+        var continues: Bool
+        var bends: Bool
+        /// Whether the column is as wide as the mark and the space after it that its parent's row has, plus `extra`.
+        var spansParentMark: Bool
+        var extra: CGFloat
+    }
+
+    static let subtypeIconsKey = "sidebarSubtypeIcons"
+
+    /// How far a name sits in from its parent's name when the parent has no mark to step by.
+    static let indent: CGFloat = 12
+    /// The horizontal part of a bend, and the gap it stops short of what follows.
+    static let elbow: CGFloat = 9
+    static let elbowGap: CGFloat = 3
+
+    /// Whether a row has a mark. Subtypes lose theirs unless `subtypeIcons`; top-level types and groups keep theirs.
+    static func showsIcon(_ row: SidebarPlan.TypeRow, subtypeIcons: Bool) -> Bool {
+        subtypeIcons || row.depth == 0 || !row.node.opens
+    }
+
+    /// The columns before each row's content. A row under a parent with a mark starts where the parent's name does,
+    /// with its mark or, with none, its name; a row under a parent with no mark steps in from the parent's name by
+    /// `indent`.
+    static func steps(for rows: [SidebarPlan.TypeRow], subtypeIcons: Bool) -> [[Step]] {
+        let flags = guides(for: rows)
+        var marks: [Bool] = []
+        return rows.indices.map { index in
+            let row = rows[index]
+            marks = Array(marks.prefix(row.depth)) + [showsIcon(row, subtypeIcons: subtypeIcons)]
+            return flags[index].indices.map { level in
+                Step(
+                    continues: flags[index][level], bends: level == row.depth - 1, spansParentMark: marks[level],
+                    extra: marks[level] ? 0 : indent)
+            }
+        }
     }
 
     /// For each row, whether a row after it sits under the same parent at each level from the top, outermost first:
@@ -102,60 +155,62 @@ private struct SidebarCount: View {
     }
 }
 
-/// One step of a subtype's indent: as wide as a mark and the space after it, so what follows lies under the parent's
-/// name. A guide runs down it at the parent's mark, and in the innermost step bends toward the row.
+/// One column of a subtype's indent. It ends at the left edge of what follows, a short bend before it: a guide runs
+/// down it, and in the innermost column bends toward the row.
 private struct SidebarGuide: View {
-    let continues: Bool
-    let bends: Bool
+    let step: SidebarTypeRow.Step
 
     var body: some View {
-        // The system's own label gives the step its width and the mark's centre, so nesting follows its metrics.
-        SidebarGuideLayout {
-            Label {
-                Text(verbatim: "").alignmentGuide(.titleStart) { $0[.leading] }
-            } icon: {
-                Image(systemName: "circle").alignmentGuide(.iconCenter) { $0[HorizontalAlignment.center] }
+        SidebarGuideLayout(spansParentMark: step.spansParentMark, extra: step.extra) {
+            if step.spansParentMark {
+                // The system's own label gives the width of a mark and the space after it, so nesting follows its metrics.
+                Label {
+                    Text(verbatim: "")
+                } icon: {
+                    Image(systemName: "circle").alignmentGuide(.markCenter) { $0[HorizontalAlignment.center] }
+                }
+                .interfaceFont(.body)
+                .hidden()
             }
-            .interfaceFont(.body)
-            .hidden()
-            GuideShape(continues: continues, bends: bends).stroke(.quaternary, lineWidth: 1)
+            GuideShape(continues: step.continues, bends: step.bends).stroke(.quaternary, lineWidth: 1)
         }
         .frame(maxHeight: .infinity)
         .accessibilityHidden(true)
     }
 }
 
-private nonisolated extension HorizontalAlignment {
-    enum IconCenterID: AlignmentID {
-        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.leading] }
-    }
-
-    enum TitleStartID: AlignmentID {
-        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.leading] }
-    }
-
-    static let iconCenter = HorizontalAlignment(IconCenterID.self)
-    static let titleStart = HorizontalAlignment(TitleStartID.self)
-}
-
-/// Sizes a step as its label, and draws the guide between the label's mark and its name.
+/// Sizes a column as its parent's mark, where it has one, and `extra`, and draws the guide in its last stretch.
 private struct SidebarGuideLayout: Layout {
-    /// Where a bend stops short of the name, so it does not touch the row's mark.
-    static let gap: CGFloat = 3
+    let spansParentMark: Bool
+    let extra: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let label = subviews[0].sizeThatFits(.unspecified)
-        return CGSize(width: label.width, height: proposal.height ?? label.height)
+        let mark = spansParentMark ? subviews[0].sizeThatFits(.unspecified).width : 0
+        return CGSize(width: mark + extra, height: proposal.height ?? 0)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let label = subviews[0].dimensions(in: .unspecified)
-        subviews[0].place(at: bounds.origin, proposal: .unspecified)
-        let start = label[.iconCenter]
-        let end = label[.titleStart] - Self.gap
-        subviews[1].place(
-            at: CGPoint(x: bounds.minX + start, y: bounds.minY), proposal: ProposedViewSize(width: max(end - start, 0), height: bounds.height))
+        var start = bounds.maxX - SidebarTypeRow.elbowGap - SidebarTypeRow.elbow
+        if spansParentMark {
+            let mark = subviews[0]
+            mark.place(at: bounds.origin, proposal: .unspecified)
+            // The guide leaves from under the middle of the parent's mark, as the Claude app's does from its folder.
+            start = bounds.minX + mark.dimensions(in: .unspecified)[.markCenter]
+        }
+        let end = bounds.maxX - SidebarTypeRow.elbowGap
+        subviews[subviews.count - 1].place(
+            at: CGPoint(x: start, y: bounds.minY),
+            proposal: ProposedViewSize(width: max(end - start, 0), height: bounds.height))
     }
+}
+
+private extension HorizontalAlignment {
+    private nonisolated enum MarkCenter: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[HorizontalAlignment.center] }
+    }
+
+    /// The middle of a row's mark, which the guide leaves from.
+    nonisolated static let markCenter = HorizontalAlignment(MarkCenter.self)
 }
 
 /// A guide in its rectangle: down the left edge, and in a bend turning right at the middle to the far edge.
@@ -166,7 +221,7 @@ private nonisolated struct GuideShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         guard continues || bends else { return path }
-        let radius: CGFloat = 4
+        let radius: CGFloat = 3
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.minX, y: continues ? rect.maxY : rect.midY - radius))
         if bends {
@@ -183,10 +238,11 @@ private nonisolated struct GuideShape: Shape {
 private struct TypeRowsPreview: View {
     let nodes: [TypeNode]
     var collapsed: Set<String> = []
+    var subtypeIcons = false
 
     var body: some View {
         let rows = Self.rows(nodes, depth: 0, collapsed: collapsed)
-        let guides = SidebarTypeRow.guides(for: rows)
+        let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: subtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
         List {
             Section {
@@ -195,8 +251,11 @@ private struct TypeRowsPreview: View {
             }
             Section("Types") {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    SidebarTypeRow(row: row, count: row.node.count, widestFoldingCount: widest, guides: guides[index]) {}
-                        .listRowInsets(.vertical, 0)
+                    SidebarTypeRow(
+                        row: row, count: row.node.count, widestFoldingCount: widest, steps: steps[index],
+                        showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: subtypeIcons)
+                    ) {}
+                    .listRowInsets(.vertical, 0)
                 }
             }
         }
@@ -245,5 +304,9 @@ private struct TypeRowsPreview: View {
 
 #Preview("Types: three levels, inner folded shut") {
     TypeRowsPreview(nodes: TypeRowsPreview.tree, collapsed: ["aic.ticket.task"]).frame(width: 260, height: 420)
+}
+
+#Preview("Types: icons on subtypes") {
+    TypeRowsPreview(nodes: TypeRowsPreview.tree, subtypeIcons: true).frame(width: 260, height: 420)
 }
 #endif

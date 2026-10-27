@@ -1426,6 +1426,12 @@
     "Inbox" : {
 
     },
+    "Include Subtypes" : {
+
+    },
+    "Include the items of its subtypes in this list" : {
+
+    },
     "Insert Table" : {
 
     },
@@ -1973,6 +1979,9 @@
     "Show Formatted Text" : {
 
     },
+    "Show Icons on Subtypes" : {
+
+    },
     "Show in Finder" : {
 
     },
@@ -1980,6 +1989,12 @@
 
     },
     "Show only some items" : {
+
+    },
+    "Show only this type’s own items" : {
+
+    },
+    "Show This Type Only" : {
 
     },
     "Show Types" : {

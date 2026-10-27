@@ -31,7 +31,7 @@ final class Browser {
     /// A type's own place counts the type even while it holds no items.
     func availableViewModes(in library: any ItemLibrary) -> [ItemViewMode] {
         guard library.isLoaded else { return ItemViewMode.allCases }
-        var types = Set(library.items(in: item).map(\.type))
+        var types = Set(placeItems(in: library).map(\.type))
         if case .itemType(let type) = item { types.insert(TypeID(type)) }
         return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
     }
@@ -206,7 +206,29 @@ final class Browser {
 
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
-        searchResults(in: library)?.items ?? library.items(in: item)
+        searchResults(in: library)?.items ?? placeItems(in: library)
+    }
+
+    /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
+    /// that list items follow a change (`IncludedSubtypes`).
+    var stackedTypes: Set<String> = []
+
+    /// The type whose list could also show its subtypes: the open place when it is a type that has subtypes holding
+    /// items.
+    func stackableType(in library: any ItemLibrary) -> String? {
+        guard case .itemType(let type) = item, !library.subtypesHoldingItems(of: type).isEmpty else { return nil }
+        return type
+    }
+
+    /// Whether the open place lists its subtypes' items with its own.
+    func stacksSubtypes(in library: any ItemLibrary) -> Bool {
+        stackableType(in: library).map(stackedTypes.contains) ?? false
+    }
+
+    /// What the open place lists. A type lists its own items, and its subtypes' too while it is stacked.
+    func placeItems(in library: any ItemLibrary) -> [Item] {
+        guard stacksSubtypes(in: library), case .itemType(let type) = item else { return library.items(in: item) }
+        return library.items(inTypeAndSubtypes: type)
     }
 
     /// The selected items that still exist.
