@@ -37,6 +37,7 @@ final class ItemLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20)
         XCTAssertLessThan(page.frame.width, normalWidth)
         app.typeKey("n", modifierFlags: .command)
+        app.completeQuickAdd(type: "Note", title: "Narrow item")
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         capture("New item narrow width")
         XCTAssertFalse(app.buttons["Back"].exists)
