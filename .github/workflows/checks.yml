@@ -39,7 +39,7 @@ jobs:
           if echo "$files" | grep -qE '^(editor/|MAPP/Editor/Page/editor\.html$|\.github/workflows/checks\.yml$)'; then
             echo "editor=true" >> "$GITHUB_OUTPUT"
           fi
-          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$)' || true)
+          app=$(echo "$files" | grep -vE '\.md$' | grep -E '^(MAPP/|MAPPTests/|MAPPUITests/|MAPP\.xcodeproj/|TestPlans/|Config/|\.github/workflows/checks\.yml$|\.github/scripts/)' || true)
           if [ -n "$app" ]; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
           fi
@@ -91,16 +91,21 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo xcode-select -s /Applications/Xcode_27.1.app
-      - name: Run the unit tests
-        if: needs.changes.outputs.logic == 'true'
-        run: >
-          xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
-          -derivedDataPath build -resultBundlePath TestResults.xcresult test
-      - name: Build the app and unit tests without running them
-        if: needs.changes.outputs.logic != 'true'
+      # The build and the tests are separate steps, so the tests get a limit of their own: a stall then ends
+      # in minutes, with a sample of the blocked process, instead of at the job's limit.
+      - name: Build the app and unit tests
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Unit -destination 'platform=macOS'
           -derivedDataPath build build-for-testing
+      - name: Run the unit tests
+        if: needs.changes.outputs.logic == 'true'
+        run: .github/scripts/run-unit-tests.sh 720 diagnostics
+      - name: Upload the stall diagnostics
+        if: failure() && hashFiles('diagnostics/**') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-diagnostics
+          path: diagnostics
       # The UI tests take over the keyboard and mouse, so they run locally before a merge; here they
       # are only built, so a change that breaks them is seen.
       - name: Build the UI tests
