@@ -63,7 +63,7 @@ import Testing
         browser.show(.allNotes, in: library, order: ranked)
         browser.viewMode = .table
         browser.searchText = "search"
-        func rows() -> [ItemID] { ItemTableContent(browser: browser, library: library).rows.map(\.item.id) }
+        func rows() -> [ItemID] { browser.tableContent(in: library).rows.map(\.item.id) }
         #expect(rows() == [weakNew.id, strongOld.id], "the table starts on its own sort, Edited, newest first")
 
         browser.orderSearch(byRelevance: true)

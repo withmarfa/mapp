@@ -31,9 +31,11 @@ final class Browser {
     /// A type's own place counts the type even while it holds no items.
     func availableViewModes(in library: any ItemLibrary) -> [ItemViewMode] {
         guard library.isLoaded else { return ItemViewMode.allCases }
-        var types = Set(placeItems(in: library).map(\.type))
-        if case .itemType(let type) = item { types.insert(TypeID(type)) }
-        return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
+        return Cost.measure(.viewModes) {
+            var types = Set(placeItems(in: library).map(\.type))
+            if case .itemType(let type) = item { types.insert(TypeID(type)) }
+            return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
+        }
     }
 
     /// A window left on a layout its place cannot show goes back to the list without saying so. The indexes of
@@ -44,6 +46,8 @@ final class Browser {
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
+    @ObservationIgnored private var tableMemo: (key: TableKey, content: ItemTableContent)?
+    @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [NoteSection])?
     var boardFields: [SidebarItem: String] = [:]
     var compactBoards: [SidebarItem: Bool] = [:]
     var timelineFields: [SidebarItem: String] = [:]
@@ -206,7 +210,7 @@ final class Browser {
 
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.
     func items(in library: any ItemLibrary) -> [Item] {
-        searchResults(in: library)?.items ?? placeItems(in: library)
+        Cost.measure(.items) { searchResults(in: library)?.items ?? placeItems(in: library) }
     }
 
     /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
@@ -245,19 +249,71 @@ final class Browser {
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
     /// note is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
-    /// one section, in the order given.
+    /// one section, in the order given. The window's views ask for them as often as they are drawn, so the last
+    /// answer stands until the items, the order, the day or the place change.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+        let items = items(in: library)
+        let key = SectionsKey(
+            derived: derivedKey(in: library, items: items), order: order, day: Calendar.current.startOfDay(for: now))
+        if let held = sectionsMemo, held.key == key { return held.sections }
+        let sections = Cost.measure(.sections) { sectionsUnmeasured(of: items, order: order, now: now) }
+        sectionsMemo = (key, sections)
+        return sections
+    }
+
+    private func sectionsUnmeasured(of items: [Item], order: NoteOrder, now: Date) -> [NoteSection] {
         if keepsPlaceOrder || ordersByRelevance {
-            let items = items(in: library)
             return items.isEmpty ? [] : [NoteSection(group: nil, items: items)]
         }
         return NoteGroup.sections(
-            of: items(in: library),
+            of: items,
             sort: order.sort,
             favoritesFirst: !isSearching && !showsOnlyFavorites,
             groupsByDate: order.groupsByDate,
             now: now
         )
+    }
+
+    /// What the place's table shows, worked out once and shared by everything that draws the table, its controls or
+    /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
+    /// the selection, so a selection never makes it again.
+    func tableContent(in library: any ItemLibrary) -> ItemTableContent {
+        let items = items(in: library)
+        let key = TableKey(derived: derivedKey(in: library, items: items), options: tableOptions[item] ?? ItemTableOptions())
+        if let held = tableMemo, held.key == key { return held.content }
+        let content = ItemTableContent(browser: self, library: library, items: items)
+        tableMemo = (key, content)
+        return content
+    }
+
+    /// What everything worked out from a place's items depends on: which library and how often it changed, the
+    /// place, the items listed (a search answering changes them without the library changing) and how the window
+    /// orders them. Reading it observes the library's revision, so a view that asks is told of the next change.
+    private func derivedKey(in library: any ItemLibrary, items: [Item]) -> DerivedKey {
+        DerivedKey(
+            library: ObjectIdentifier(library), revision: library.contentRevision, place: item, ids: items.map(\.id),
+            byRelevance: ordersByRelevance, keepsPlaceOrder: keepsPlaceOrder, favoritesFirst: !isSearching && !showsOnlyFavorites)
+    }
+
+    private struct DerivedKey: Equatable {
+        let library: ObjectIdentifier
+        let revision: Int
+        let place: SidebarItem
+        let ids: [ItemID]
+        let byRelevance: Bool
+        let keepsPlaceOrder: Bool
+        let favoritesFirst: Bool
+    }
+
+    private struct SectionsKey: Equatable {
+        let derived: DerivedKey
+        let order: NoteOrder
+        let day: Date
+    }
+
+    private struct TableKey: Equatable {
+        let derived: DerivedKey
+        let options: ItemTableOptions
     }
 
     /// What the rows of the list say about themselves: the type where the list holds several, and nothing that the
@@ -314,6 +370,8 @@ final class Browser {
         guard libraryID != id else { return }
         let isFirst = libraryID == nil
         libraryID = id
+        tableMemo = nil
+        sectionsMemo = nil
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         tableOptions = [:]

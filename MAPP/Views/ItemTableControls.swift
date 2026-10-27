@@ -7,7 +7,7 @@ struct ItemTableFilterMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let content = ItemTableContent(browser: browser, library: library)
+        let content = browser.tableContent(in: library)
         Controls(browser: browser, content: content, customization: .constant(.init())).filterMenu
             .menuIndicator(.hidden)
     }
@@ -21,7 +21,7 @@ struct ItemTableViewOptions: View {
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
 
     var body: some View {
-        let content = ItemTableContent(browser: browser, library: library)
+        let content = browser.tableContent(in: library)
         let controls = Controls(browser: browser, content: content, customization: Binding {
             ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
         } set: {

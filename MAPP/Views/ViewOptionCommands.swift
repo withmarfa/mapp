@@ -21,7 +21,7 @@ struct ViewOptionCommand {
 
     private static func table(_ browser: Browser, _ library: any ItemLibrary, _ storedColumns: Binding<Data>) -> [ViewOptionCommand] {
         let place = browser.item
-        let content = ItemTableContent(browser: browser, library: library)
+        let content = browser.tableContent(in: library)
         let layout = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []

@@ -20,7 +20,7 @@ struct ItemTable: View {
 
     var body: some View {
         let _ = daysSeen
-        let content = ItemTableContent(browser: browser, library: library)
+        let content = browser.tableContent(in: library)
         let (allRows, rows) = (content.allRows, content.rows)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
@@ -157,40 +157,6 @@ struct ItemTable: View {
     private func loadColumns() {
         let stored = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
         if stored != columnCustomization { columnCustomization = stored }
-    }
-}
-
-/// What a place's table shows, worked out alike by the table and its toolbar's controls. The columns, the sort and
-/// the grouping come from the items alone; the rows the filters keep, their groups and what is folded away are
-/// worked out when first read, so the controls and the command palette, which need only the columns, never sort.
-@MainActor
-final class ItemTableContent {
-    /// Every row before the filters.
-    let allRows: [ItemTableRow]
-    let columns: [ItemTableColumn]
-    let sort: [ItemTableComparator]
-    let grouping: ItemTableColumn?
-    private let options: ItemTableOptions
-
-    /// The rows the filters keep, in order.
-    lazy var rows: [ItemTableRow] = ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
-    lazy var groups: [ItemTableGroup] = grouping.map { ItemTableLayout.groups(of: rows, by: $0) } ?? []
-    lazy var collapsed: Set<String> = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0) } ?? []
-
-    init(browser: Browser, library: any ItemLibrary) {
-        allRows = ItemTableRow.rows(of: browser.items(in: library), in: library)
-        let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
-        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden)
-        options = browser.tableOptions[browser.item] ?? ItemTableOptions()
-        // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
-        sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
-        grouping = ItemTableLayout.grouping(options, columns: columns)
-    }
-
-    /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row
-    /// holds one.
-    var categoricalColumns: [ItemTableColumn] {
-        columns.filter { column in column.isCategorical && allRows.contains { column.category(of: $0) != nil } }
     }
 }
 

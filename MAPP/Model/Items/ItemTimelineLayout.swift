@@ -24,7 +24,7 @@ nonisolated struct ItemTimelineGroup: Identifiable, Hashable, Sendable {
 
 nonisolated enum ItemTimelineLayout {
     static func fields(for items: [Item], catalogue: Catalogue) -> [ItemTypeInfo.Field] {
-        fields(forTypes: Set(items.map(\.type)), catalogue: catalogue)
+        Cost.measure(.timelineFields) { fields(forTypes: Set(items.map(\.type)), catalogue: catalogue) }
     }
 
     static func fields(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemTypeInfo.Field] {
