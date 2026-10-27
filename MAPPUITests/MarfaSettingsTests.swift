@@ -75,7 +75,7 @@ final class MarfaSettingsTests: XCTestCase {
         XCTAssertFalse(window.outlines["Sidebar"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncStatus"].exists)
         XCTAssertFalse(window.descendants(matching: .any)["SyncDetails"].exists)
-        let connect = window.buttons["WelcomeConnect"]
+        let connect = window.buttons["Connect…"]
         XCTAssertTrue(connect.waitForExistence(timeout: 3), window.debugDescription)
         connect.click()
         XCTAssertTrue(address.waitForExistence(timeout: 3), "Connect opens the page that asks for the server")
