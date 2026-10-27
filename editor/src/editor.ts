@@ -140,7 +140,7 @@ export type FormatCommand =
   | 'deleteRow'
   | 'deleteColumn'
   | 'alignColumn'
-export type Keymap = Record<string, [FormatCommand, string?]>
+export type Keymap = Record<string, [FormatCommand | 'openLink', string?]>
 export interface FindState {
   snapshotId: string
   text: string
@@ -553,9 +553,10 @@ export class NoteEditor {
   setKeymap(bindings: Keymap) {
     const keys: Partial<Record<ShortcutName, string[]>> = {}
     for (const [key, [command, arg]] of Object.entries(bindings)) {
+      const table = command === 'openLink' ? undefined : tables[command]
       const name = (
-        tables[command]
-          ? 'table' + tables[command]![0]!.toUpperCase() + tables[command]!.slice(1)
+        table
+          ? 'table' + table[0]!.toUpperCase() + table.slice(1)
           : command === 'heading'
             ? 'heading' + arg
             : command
