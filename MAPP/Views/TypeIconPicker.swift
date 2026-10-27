@@ -48,6 +48,7 @@ struct TypeIconPicker: View {
                         .accessibilityIdentifier("TypeIcon.\(name)")
                     }
                 }
+                .disabled(!model.canChoose)
                 .padding(4)
             }
             .frame(height: 280)
@@ -74,10 +75,12 @@ struct TypeIconPicker: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .disabled(!model.canCancel)
             }
         }
         .padding(20)
         .frame(width: 460)
+        .interactiveDismissDisabled(!model.canCancel)
         .onAppear { searchFocused = true }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("TypeIconPicker")

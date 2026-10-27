@@ -44,6 +44,28 @@ import Testing
         #expect(model.failure == nil)
     }
 
+    @Test func theGridAndCancelAreOffWhileAChoiceIsBeingWritten() async {
+        let library = FakeItemLibrary(items: [])
+        library.holdsIconAnswers = true
+        let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, names: ["zap"])
+        #expect(model.canChoose && model.canCancel)
+        let choice = Task { await model.choose("zap") }
+        #expect(await eventually { model.isWorking })
+        #expect(!model.canChoose, "a second choice cannot start")
+        #expect(!model.canCancel, "the sheet stays open until the server answers")
+        library.answerIcon()
+        #expect(await choice.value)
+        #expect(model.canChoose && model.canCancel)
+    }
+
+    @Test func theGridIsOffWithoutAServer() {
+        let library = FakeItemLibrary(items: [])
+        library.canChooseTypeIcons = false
+        let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, names: ["zap"])
+        #expect(!model.canChoose)
+        #expect(model.canCancel)
+    }
+
     @Test func aRefusalIsKeptForThePickerToShow() async {
         let library = FakeItemLibrary(items: [])
         library.iconFailure = .notPermitted
@@ -109,6 +131,29 @@ private struct FakeTypeIcons: TypeIconSource {
         later.itemTypes[task]?.icon = "bug"
         source.send(.catalogue(later))
         #expect(await eventually { library.catalogue.icon(for: task) == "bug" })
+    }
+
+    @Test func anotherAppsIconEndsTheHoldToo() async throws {
+        let (library, source) = try await open(.success("zap"))
+        let task = TypeID("core.task")
+        _ = await library.setIcon("zap", ofType: task)
+        // Another app then chose a different icon, which the copy reports without ever showing this one.
+        var other = FakeItemLibrary.testCatalogue
+        other.itemTypes[task]?.icon = "bug"
+        source.send(.catalogue(other))
+        #expect(await eventually { library.catalogue.icon(for: task) == "bug" })
+    }
+
+    @Test func aReadThatChangesAnotherTypeKeepsTheHold() async throws {
+        let (library, source) = try await open(.success("zap"))
+        let task = TypeID("core.task")
+        _ = await library.setIcon("zap", ofType: task)
+        var changed = FakeItemLibrary.testCatalogue
+        let other = try #require(changed.itemTypes.keys.first { $0 != task })
+        changed.itemTypes[other]?.icon = "bug"
+        source.send(.catalogue(changed))
+        #expect(await eventually { library.catalogue.icon(for: other) == "bug" })
+        #expect(library.catalogue.icon(for: task) == "zap")
     }
 
     @Test func aRefusalChangesNothingAndSaysWhy() async throws {

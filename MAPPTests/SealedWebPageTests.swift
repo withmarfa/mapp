@@ -43,14 +43,56 @@ nonisolated final class Probe: @unchecked Sendable {
     deinit { listener.cancel() }
 }
 
+/// The same for UDP, which a content rule never sees: counts the datagrams that arrive.
+nonisolated final class DatagramProbe: @unchecked Sendable {
+    private let listener: NWListener
+    private let lock = NSLock()
+    private var datagrams = 0
+    private(set) var port: UInt16 = 0
+
+    var count: Int { lock.withLock { datagrams } }
+
+    init() async throws {
+        listener = try NWListener(using: .udp, on: .any)
+        listener.newConnectionHandler = { [self] connection in
+            connection.start(queue: .global())
+            receive(on: connection)
+        }
+        let (states, report) = AsyncStream<NWListener.State>.makeStream()
+        listener.stateUpdateHandler = { report.yield($0) }
+        listener.start(queue: .global())
+        for await state in states {
+            if case .failed(let error) = state { throw error }
+            if case .ready = state { break }
+        }
+        port = listener.port?.rawValue ?? 0
+    }
+
+    private func receive(on connection: NWConnection) {
+        connection.receiveMessage { [self] data, _, _, error in
+            if data != nil { lock.withLock { datagrams += 1 } }
+            if error == nil { receive(on: connection) }
+        }
+    }
+
+    deinit { listener.cancel() }
+}
+
 @MainActor struct SealedWebPageTests {
     /// A document that tries every way to reach out, then reports what happened.
     private func hostile(port: UInt16) -> Data {
         let target = "http://127.0.0.1:\(port)"
         return Data("""
-            <!doctype html><html><body>
+            <!doctype html><html><head><meta http-equiv="refresh" content="0;url=\(target)/meta"></head><body>
             <form id="f" method="post" action="\(target)/form"><input name="a" value="1"></form>
             <a id="link" href="\(target)/link">link</a>
+            <a id="blank" href="\(target)/blank" target="_blank">blank</a>
+            <style>
+              @import url("\(target)/import.css");
+              body { background: url("\(target)/background.png"); }
+              p { list-style-image: url("\(target)/list.png"); cursor: url("\(target)/cursor.png"), auto; }
+            </style>
+            <p>styled</p>
             <script>
             window.results = { ran: 'yes' };
             const pending = [];
@@ -71,6 +113,10 @@ nonisolated final class Probe: @unchecked Sendable {
             track('socket', new Promise((res, rej) => { const s = new WebSocket('ws://127.0.0.1:\(port)/socket'); s.onopen = () => res('loaded'); s.onerror = () => rej(); }));
             document.getElementById('f').submit();
             document.getElementById('link').click();
+            document.getElementById('blank').click();
+            results.beacon = String(navigator.sendBeacon('\(target)/beacon', 'x'));
+            const refresh = document.createElement('meta'); refresh.httpEquiv = 'refresh'; refresh.content = '0;url=\(target)/refresh';
+            document.head.append(refresh);
             location.href = '\(target)/navigate';
             window.open('\(target)/popup');
             Promise.all(pending).then(() => setTimeout(() => { results.href = location.href; window.done = true; }, 500));
@@ -97,7 +143,111 @@ nonisolated final class Probe: @unchecked Sendable {
             // A blocked load answers with an error; one that never answers is still no load.
             #expect(results[attempt] == "blocked" || results[attempt] == "pending", "\(attempt) did not load")
         }
-        #expect(results["href"] == "about:blank", "the form, the link, location and window.open went nowhere")
+        #expect(results["href"] == "about:blank", "the form, the links, a refresh, location and window.open went nowhere")
+        // A fixed wait, to give a request that was wrongly let through time to arrive.
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(probe.count == 0, "nothing reached the server, but \(probe.seen) did")
+    }
+
+    /// A document that tries to open a WebRTC connection that gathers candidates through a STUN server it names, from
+    /// its own realm and from every kind of frame it can build, then reports which of them could.
+    private func peerConnecting(udpPort: UInt16) -> Data {
+        Data("""
+            <!doctype html><html><body><script>
+            window.results = {};
+            const stun = { iceServers: [{ urls: 'stun:127.0.0.1:\(udpPort)' }] };
+            function attempt(name, scope) {
+              const names = ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCSessionDescription', 'RTCIceCandidate'];
+              const present = names.filter(n => typeof scope[n] !== 'undefined');
+              const media = typeof scope.navigator.mediaDevices !== 'undefined';
+              results[name] = present.length === 0 && !media ? 'absent' : 'present: ' + present.join(',') + (media ? ',mediaDevices' : '');
+              const Peer = scope.RTCPeerConnection || scope.webkitRTCPeerConnection;
+              if (!Peer) return;
+              try {
+                const pc = new Peer(stun);
+                pc.createDataChannel('x');
+                pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => {});
+              } catch (e) {}
+            }
+            attempt('main', window);
+            const blank = document.createElement('iframe');
+            document.body.append(blank);
+            attempt('blankFrame', blank.contentWindow);
+            const srcdoc = document.createElement('iframe');
+            srcdoc.srcdoc = '<p>x</p>';
+            document.body.append(srcdoc);
+            srcdoc.onload = () => attempt('srcdocFrame', srcdoc.contentWindow);
+            const written = document.createElement('iframe');
+            document.body.append(written);
+            written.contentDocument.open(); written.contentDocument.write('<p>x</p>'); written.contentDocument.close();
+            attempt('writtenFrame', written.contentWindow);
+            const nested = document.createElement('iframe');
+            document.body.append(nested);
+            const inner = nested.contentDocument.createElement('iframe');
+            nested.contentDocument.body.append(inner);
+            attempt('nestedFrame', inner.contentWindow);
+            // A frame taken from a window opened by the document.
+            const opened = window.open('about:blank');
+            if (opened) attempt('openedWindow', opened); else results.openedWindow = 'absent';
+            setTimeout(() => { window.done = true; }, 1000);
+            </script></body></html>
+            """.utf8)
+    }
+
+    @Test func aPageCannotOpenAPeerConnection() async throws {
+        let probe = try await DatagramProbe()
+        let page = try await SealedWebPage.make()
+        try await page.show(peerConnecting(udpPort: probe.port))
+        let results = try await results(of: page)
+        for frame in ["main", "blankFrame", "srcdocFrame", "writtenFrame", "nestedFrame", "openedWindow"] {
+            #expect(results[frame] == "absent", "\(frame) has no WebRTC: \(results[frame] ?? "never ran")")
+        }
+        // A fixed wait, to give a datagram that was wrongly sent time to arrive.
+        try await Task.sleep(for: .seconds(2))
+        #expect(probe.count == 0, "\(probe.count) datagrams reached the server")
+    }
+
+    @Test func theSamePeerConnectionSendsDatagramsWithoutTheSeal() async throws {
+        // The control: an ordinary web page does send the datagram, so the test above can tell.
+        let probe = try await DatagramProbe()
+        let page = WebPage()
+        _ = page.load(peerConnecting(udpPort: probe.port), mimeType: "text/html", characterEncoding: .utf8, baseURL: URL(string: "about:blank")!)
+        let sent = await eventually(within: .seconds(20)) { probe.count > 0 }
+        #expect(sent, "the control sent no datagram, so the test above shows nothing")
+    }
+
+    @Test func theGateLetsThroughOnlyTheLoadItWasToldAbout() {
+        let gate = SealedWebPage.NavigationGate()
+        let elsewhere = URL(string: "http://127.0.0.1:9/")
+        #expect(gate.decide(url: SealedWebPage.base, inMainFrame: true) == .cancel, "nothing is allowed until a load is started")
+        gate.allow(SealedWebPage.base)
+        #expect(gate.decide(url: elsewhere, inMainFrame: true) == .cancel, "another request cannot take the allowance")
+        #expect(gate.decide(url: nil, inMainFrame: true) == .cancel)
+        #expect(gate.decide(url: SealedWebPage.base, inMainFrame: true) == .allow, "the load's own request passes")
+        #expect(gate.decide(url: SealedWebPage.base, inMainFrame: true) == .cancel, "once")
+        gate.allow(SealedWebPage.base)
+        gate.disallow()
+        #expect(gate.decide(url: SealedWebPage.base, inMainFrame: true) == .cancel, "the allowance ends with the load")
+    }
+
+    @Test func theGateAllowsOnlyFramesTheDocumentBuildsForItself() {
+        let gate = SealedWebPage.NavigationGate()
+        for allowed in ["about:blank", "data:text/html,x", "blob:null/1", "DATA:text/html,x"] {
+            #expect(gate.decide(url: URL(string: allowed), inMainFrame: false) == .allow, "\(allowed)")
+        }
+        for refused in ["http://127.0.0.1:9/", "https://example.com/", "file:///etc/hosts"] {
+            #expect(gate.decide(url: URL(string: refused), inMainFrame: false) == .cancel, "\(refused)")
+        }
+    }
+
+    @Test func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
+        let probe = try await Probe()
+        let page = try await SealedWebPage.make()
+        try await page.show(Data("<html><body><script>setInterval(() => { location.href = 'http://127.0.0.1:\(probe.port)/pending'; }, 2);</script></body></html>".utf8))
+        for n in 1...5 {
+            try await page.show(Data("<html><body><script>window.results = {n: '\(n)'}; window.done = true;</script></body></html>".utf8))
+        }
+        #expect(try await results(of: page) == ["n": "5"])
         // A fixed wait, to give a request that was wrongly let through time to arrive.
         try await Task.sleep(for: .milliseconds(500))
         #expect(probe.count == 0, "nothing reached the server, but \(probe.seen) did")
@@ -124,8 +274,7 @@ nonisolated final class Probe: @unchecked Sendable {
         let page = WebPage()
         // The document navigates away from itself, so the load is not awaited.
         _ = page.load(hostile(port: probe.port), mimeType: "text/html", characterEncoding: .utf8, baseURL: URL(string: "about:blank")!)
-        try await Task.sleep(for: .seconds(2))
-        #expect(probe.count > 0)
+        #expect(await eventually { probe.count > 0 })
     }
 
     @Test func aLaterDocumentReplacesTheFirst() async throws {

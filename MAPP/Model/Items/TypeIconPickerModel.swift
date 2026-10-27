@@ -22,7 +22,11 @@ import Observation
     /// The icon the type shows now, so the grid can mark it.
     var current: String? { library.catalogue.icon(for: type) }
     var results: [String] { IconNameSearch.matching(search, in: names) }
+    /// Whether the grid and Use Default take a click: with a server to keep the choice, and none being written.
     var canChoose: Bool { library.canChooseTypeIcons && !isWorking }
+    /// Cancel waits for the write in flight, since closing the sheet would not stop it and the person would not see
+    /// whether it was kept.
+    var canCancel: Bool { !isWorking }
 
     /// Chooses `name` for the type. True when the server took it, so the picker can close.
     func choose(_ name: String?) async -> Bool {

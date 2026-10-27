@@ -23,6 +23,9 @@ final class FakeItemLibrary: ItemLibrary {
     /// What the next icon choice answers: nil keeps it, a failure refuses it.
     var iconFailure: TypeIconFailure?
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
+    /// While set, an icon choice waits for `answerIcon()` before it answers.
+    var holdsIconAnswers = false
+    private var heldIconAnswer: CheckedContinuation<Void, Never>?
     /// What every view write fails with while set.
     var viewFailure: ViewWriteFailure?
     var trashDays: Int?
@@ -390,7 +393,13 @@ final class FakeItemLibrary: ItemLibrary {
         return Embed(link: name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name, name: name)
     }
 
+    func answerIcon() {
+        heldIconAnswer?.resume()
+        heldIconAnswer = nil
+    }
+
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
+        if holdsIconAnswers { await withCheckedContinuation { heldIconAnswer = $0 } }
         if let iconFailure { return iconFailure }
         chosenIcons.append((type, icon))
         catalogue = catalogue.choosingIcon(icon, ofType: type)

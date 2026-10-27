@@ -47,9 +47,12 @@ import Observation
     @ObservationIgnored let history: (any ItemHistorySource)?
     /// Keeps the owner's choice of a type's icon on the server. Nil where there is no server to ask.
     @ObservationIgnored let typeIcons: (any TypeIconSource)?
-    /// The icon each type last showed after the person chose one, until the working copy's own catalogue says the same,
-    /// since the copy takes a schema change only when its stream reopens.
-    @ObservationIgnored private var chosenIcons: [TypeID: String?] = [:]
+    /// The icon each type last showed after the person chose one, until the working copy's own catalogue shows the type
+    /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
+    /// reopens. `before` is the icon the copy showed then.
+    @ObservationIgnored private var chosenIcons: [TypeID: (icon: String?, before: String?)] = [:]
+    /// The catalogue the working copy last reported, without the chosen icons.
+    @ObservationIgnored private var readCatalogue = Catalogue(itemTypes: [])
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
@@ -196,7 +199,7 @@ import Observation
         guard let typeIcons else { return .unsupported }
         do {
             let shown = try await typeIcons.setIcon(icon, ofType: type)
-            chosenIcons[type] = .some(shown)
+            chosenIcons[type] = (shown, readCatalogue.itemTypes[type]?.icon)
             catalogue = catalogue.choosingIcon(shown, ofType: type)
             reindex()
             return nil
@@ -205,14 +208,16 @@ import Observation
         }
     }
 
-    /// The catalogue the copy read, with the icons the person has chosen since, dropping a choice once the copy shows it.
+    /// The catalogue the copy read, with the icons the person has chosen since. A choice ends once the copy shows the
+    /// type with a different icon than it did at the choice, whether the chosen one or one another app set.
     private func holdingChosenIcons(_ read: Catalogue) -> Catalogue {
+        readCatalogue = read
         var held = read
-        for (type, icon) in chosenIcons {
-            if read.itemTypes[type]?.icon == icon {
+        for (type, choice) in chosenIcons {
+            if read.itemTypes[type]?.icon != choice.before {
                 chosenIcons[type] = nil
             } else {
-                held = held.choosingIcon(icon, ofType: type)
+                held = held.choosingIcon(choice.icon, ofType: type)
             }
         }
         return held
