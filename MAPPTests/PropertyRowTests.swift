@@ -185,6 +185,9 @@ struct PropertyRowTests {
             item.state = state
             return item
         }
+        let catalogue = Catalogue(itemTypes: [
+            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "file-text")
+        ])
         let items = [held("a", "Old", age: 100), held("b", "New", age: 0), held("c", "Binned", age: 0, state: .trashed)]
         let relationships = [
             Self.relationship("inverse:references", "Linked from", [("Old", "a"), ("New", "b"), ("Binned", "c")]),
@@ -192,9 +195,9 @@ struct PropertyRowTests {
             Self.relationship("blocks", "Blocks", [("Mine", "d")]),
         ]
         let list = LinkedItem.list(
-            pointingTo: ItemID("self"), in: relationships, catalogue: Catalogue(), now: day, item: { id in items.first { $0.id == id } })
+            pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, item: { id in items.first { $0.id == id } })
         #expect(list.map(\.title) == ["New", "Old"])
-        #expect(list.first?.symbol == "doc.text")
+        #expect(list.first?.icon == "file-text")
         #expect(list.first?.type == "Note")
     }
 }

@@ -176,6 +176,11 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // Each tells the person why a write failed, in the server's reason, and nothing else changes.
     /// The view as the server saved it, or nil.
+    /// Whether the owner can choose a type's icon now. It is kept on the server, so only while it can be reached.
+    var canChooseTypeIcons: Bool { get }
+    /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
+    /// once. Nil on success; otherwise why not, in words for the person.
+    func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
     func createView(_ settings: LibraryViewSettings) async -> LibraryView?
     /// Sent at `baseVersion`, the version of the view the window read.
     func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure>
@@ -309,6 +314,6 @@ extension ItemLibrary {
     /// What a flat list of items, such as the palette or the link picker, says beside a title: Inbox for an item
     /// waiting there, otherwise its type.
     func placeLabel(of item: Item) -> String {
-        item.tier == .feed ? String(localized: "Inbox") : TypeSymbol.label(for: item.type, in: catalogue)
+        item.tier == .feed ? String(localized: "Inbox") : catalogue.label(for: item.type)
     }
 }

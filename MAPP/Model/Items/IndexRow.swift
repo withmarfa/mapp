@@ -13,7 +13,7 @@ nonisolated struct TypeShare: Identifiable, Hashable, Sendable {
 nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
     let place: SidebarItem
     let title: String
-    let symbol: String
+    let icon: RowIcon
     /// The line under the title where the rows are a list.
     let secondary: String
     /// The types of its items, as a line of text.
@@ -53,7 +53,7 @@ nonisolated enum IndexRows {
             let breakdown = breakdown(of: items, catalogue: catalogue)
             let types = summary(of: breakdown)
             return IndexRow(
-                place: .source(name), title: name, symbol: SourceTile.symbol(forSource: name), secondary: types, types: types,
+                place: .source(name), title: name, icon: .symbol(SourceTile.symbol(forSource: name)), secondary: types, types: types,
                 count: items.count, latest: items.map(\.modified).max(), breakdown: breakdown)
         }
     }
@@ -65,8 +65,8 @@ nonisolated enum IndexRows {
             let breakdown = breakdown(of: members, catalogue: catalogue)
             return IndexRow(
                 place: .collection(collection.id), title: collection.title,
-                symbol: TypeSymbol.name(for: collection.type, in: catalogue),
-                secondary: TypeSymbol.label(for: collection.type, in: catalogue), types: summary(of: breakdown),
+                icon: .type(catalogue.icon(for: collection.type)),
+                secondary: catalogue.label(for: collection.type), types: summary(of: breakdown),
                 count: members.count, latest: members.map(\.modified).max(), breakdown: breakdown)
         }
     }
@@ -76,7 +76,7 @@ nonisolated enum IndexRows {
         var counts: [TypeID: Int] = [:]
         for item in items { counts[item.type, default: 0] += 1 }
         return counts
-            .map { TypeShare(type: $0.key, label: TypeSymbol.label(for: $0.key, in: catalogue), count: $0.value) }
+            .map { TypeShare(type: $0.key, label: catalogue.label(for: $0.key), count: $0.value) }
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.label.localizedStandardCompare($1.label) == .orderedAscending }
     }
 

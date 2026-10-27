@@ -4,14 +4,14 @@ import SwiftUI
 /// name alone.
 struct SidebarLabel: View {
     let title: String
-    let symbol: String?
+    let icon: RowIcon?
 
     var body: some View {
-        if let symbol {
+        if let icon {
             Label {
                 name
             } icon: {
-                Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+                RowIconImage(icon: icon).interfaceFont(.body).foregroundStyle(.secondary)
             }
         } else {
             name
@@ -69,7 +69,7 @@ struct SidebarTypeRow: View {
     }
 
     private var label: SidebarLabel {
-        SidebarLabel(title: row.node.label, symbol: showsIcon ? row.node.symbol : nil)
+        SidebarLabel(title: row.node.label, icon: showsIcon ? .type(row.node.icon) : nil)
     }
 
     /// The name and count read as one element; a chevron beside them stays a button of its own.
@@ -246,7 +246,7 @@ private struct TypeRowsPreview: View {
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
         List {
             Section {
-                SidebarLabel(title: "All Items", symbol: "note.text")
+                SidebarLabel(title: "All Items", icon: .symbol("note.text"))
                     .badge(Text(412, format: .number).monospacedDigit())
             }
             Section("Types") {
@@ -270,25 +270,25 @@ private struct TypeRowsPreview: View {
         }
     }
 
-    private static func node(_ id: String, _ label: String, _ symbol: String, count: Int, _ children: [TypeNode] = []) -> TypeNode {
+    private static func node(_ id: String, _ label: String, _ icon: String, count: Int, _ children: [TypeNode] = []) -> TypeNode {
         TypeNode(
-            id: id, type: TypeID(id), label: label, symbol: symbol, count: count,
+            id: id, type: TypeID(id), label: label, icon: icon, count: count,
             total: count + children.map(\.total).reduce(0, +), children: children)
     }
 
     static let tree = [
-        node("core.note", "Note", "doc.text", count: 412),
+        node("core.note", "Note", "file-text", count: 412),
         node(
             "aic.ticket", "Ticket", "ticket", count: 36,
             [
-                node("aic.ticket.bug", "Bug", "ladybug", count: 9),
+                node("aic.ticket.bug", "Bug", "bug", count: 9),
                 node(
-                    "aic.ticket.task", "Task", "checklist", count: 21,
+                    "aic.ticket.task", "Task", "list-checks", count: 21,
                     [
                         node("aic.ticket.task.chore", "Chore with a name long enough to run out of room", "wrench", count: 3),
                         node("aic.ticket.task.review", "Review", "eye", count: 0),
                     ]),
-                node("aic.ticket.spike", "Spike", "bolt", count: 2),
+                node("aic.ticket.spike", "Spike", "zap", count: 2),
             ]),
         node("aic.project", "Project", "folder", count: 5),
     ]

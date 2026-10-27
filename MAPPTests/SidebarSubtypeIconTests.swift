@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct SidebarSubtypeIconTests {
     func node(_ id: String, opens: Bool = true, _ children: [TypeNode] = []) -> TypeNode {
-        TypeNode(id: id, type: opens ? TypeID(id) : nil, label: id, symbol: "doc", count: opens ? 1 : 0, total: 1, children: children)
+        TypeNode(id: id, type: opens ? TypeID(id) : nil, label: id, icon: nil, count: opens ? 1 : 0, total: 1, children: children)
     }
 
     func rows(_ nodes: [TypeNode], depth: Int = 0) -> [SidebarPlan.TypeRow] {

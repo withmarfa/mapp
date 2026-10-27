@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 
 struct ItemTimeline: View {
@@ -130,7 +131,7 @@ private struct ItemTimelineEntry: View {
                 .interfaceFont(.body)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Label(TypeSymbol.label(for: row.item.type, in: catalogue), systemImage: TypeSymbol.name(for: row.item.type, in: catalogue))
+                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeIcon(name: catalogue.icon(for: row.item.type)) }
                 if let source = row.item.source {
                     Text(verbatim: source)
                 }

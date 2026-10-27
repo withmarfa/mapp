@@ -10,7 +10,7 @@ struct ItemTablePagingTests {
                 id: ItemID(title), type: TypeID("core.note"), title: title, titleRule: .property("title"),
                 properties: [Property(key: "title", value: .string(title))],
                 version: ItemVersion(1), created: .now, modified: .now)
-            return ItemTableRow(item: item, typeLabel: "Note", typeSymbol: "doc", parent: nil)
+            return ItemTableRow(item: item, typeLabel: "Note", typeIcon: nil, parent: nil)
         }
     }
 

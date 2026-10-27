@@ -25,8 +25,8 @@ struct SidebarTests {
         // the file types are reached through All Items.
         #expect(counts.map(\.label) == ["Note", "Project", "Bug", "Entity", "Task"])
         #expect(counts.map(\.count) == [2, 2, 1, 1, 1])
-        // Project, Bug and Task descend from Note and take its symbol; Entity has no built-in symbol.
-        #expect(counts.map(\.symbol) == ["doc.text", "doc.text", "doc.text", "doc", "doc.text"])
+        // Each type answers the icon the catalogue gives it; Entity has none.
+        #expect(counts.map(\.icon) == ["file-text", "folder", "bug", nil, "list-checks"])
     }
 
     @Test func aMarfaTypeCountsOnlyItsOwnItemsAndItsListAgrees() async throws {
@@ -87,7 +87,7 @@ struct SidebarTests {
 
     static func counts(_ counts: [String: Int], in catalogue: Catalogue) -> [ItemTypeCount] {
         counts.map { id, count in
-            ItemTypeCount(id: TypeID(id), label: TypeSymbol.label(for: TypeID(id), in: catalogue), symbol: "doc", count: count)
+            ItemTypeCount(id: TypeID(id), label: catalogue.label(for: TypeID(id)), icon: nil, count: count)
         }
     }
 
@@ -168,8 +168,8 @@ struct SidebarTests {
         let library = try await marfaLibrary()
         let types = library.creatableTypes
         #expect(types.map(\.label) == ["Album", "Bug", "Entity", "Note", "Project", "Task", "Ticket"])
-        #expect(types.first { $0.id == LibraryFixture.project }?.symbol == "doc.text")
-        #expect(types.allSatisfy { !$0.symbol.isEmpty })
+        #expect(types.first { $0.id == LibraryFixture.project }?.icon == "folder")
+        #expect(types.first { $0.id == LibraryFixture.entity }?.icon == nil)
     }
 
     @Test func aLibraryShowsItsTypesWithoutFiles() async throws {
@@ -392,7 +392,7 @@ struct SidebarTests {
 
     @Test func aGuideCarriesOnPastEveryRowThatHasASiblingAfterIt() {
         func node(_ id: String, _ children: [TypeNode] = []) -> TypeNode {
-            TypeNode(id: id, type: nil, label: id, symbol: "doc", count: 0, total: 0, children: children)
+            TypeNode(id: id, type: nil, label: id, icon: nil, count: 0, total: 0, children: children)
         }
         func rows(_ nodes: [TypeNode], depth: Int = 0) -> [SidebarPlan.TypeRow] {
             nodes.flatMap { [SidebarPlan.TypeRow(node: $0, depth: depth, isExpanded: true)] + rows($0.children, depth: depth + 1) }

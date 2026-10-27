@@ -1,4 +1,6 @@
 import Foundation
+import struct Marfa.ItemType
+import MarfaIcons
 import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
@@ -80,43 +82,54 @@ struct ItemPreviewTests {
     }
 }
 
-struct TypeSymbolTests {
-    @Test(arguments: [
-        ("core.note", "doc.text"), ("core.task", "checkmark.circle"), ("core.event", "calendar"),
-        ("core.bookmark", "bookmark"), ("core.entity.person", "person"), ("core.file", "doc"), ("core.file.image", "photo"),
-    ])
-    func eachBuiltInTypeHasItsSymbol(id: String, symbol: String) {
-        #expect(TypeSymbol.name(for: TypeID(id), in: Catalogue()) == symbol)
+struct TypeIconTests {
+    private func info(_ id: String, icon: String?, parent: String? = nil) -> ItemTypeInfo {
+        ItemTypeInfo(id: TypeID(id), label: id, fields: [], titleField: nil, bodyField: nil, parent: parent.map { TypeID($0) }, icon: icon)
     }
 
-    @Test func anotherTypeTakesItsNearestBuiltInAncestor() {
-        let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("acme.bug"), label: "Bug", fields: [], titleField: nil, bodyField: nil, parent: TypeID("core.task")),
-            ItemTypeInfo(id: TypeID("acme.crash"), label: "Crash", fields: [], titleField: nil, bodyField: nil, parent: TypeID("acme.bug")),
-        ])
-        #expect(TypeSymbol.name(for: TypeID("acme.crash"), in: catalogue) == "checkmark.circle")
+    @Test func aTypeAnswersTheIconTheServerResolvedForIt() {
+        let catalogue = Catalogue(itemTypes: [info("core.note", icon: "file-text"), info("acme.bug", icon: "bug", parent: "core.note")])
+        #expect(catalogue.icon(for: TypeID("core.note")) == "file-text")
+        #expect(catalogue.icon(for: TypeID("acme.bug")) == "bug")
     }
 
-    @Test func aTypeNamedLikeABuiltInIsNotOne() {
-        // The app reads no meaning into a type's name, only into the catalogue's parents.
-        #expect(TypeSymbol.name(for: TypeID("acme.task"), in: Catalogue()) == "doc")
-        #expect(TypeSymbol.name(for: TypeID(""), in: Catalogue()) == "doc")
+    @Test func theOwnersChoiceReachesTheCatalogueThroughTheMapping() {
+        let type = MarfaMapping.itemType(ItemType(id: "user.decision", label: "Decision", icon: "scale"))
+        #expect(type.icon == "scale")
+        #expect(Catalogue(itemTypes: [type]).icon(for: TypeID("user.decision")) == "scale")
     }
 
-    @Test func aParentCycleEnds() {
-        let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("a.one"), label: "One", fields: [], titleField: nil, bodyField: nil, parent: TypeID("a.two")),
-            ItemTypeInfo(id: TypeID("a.two"), label: "Two", fields: [], titleField: nil, bodyField: nil, parent: TypeID("a.one")),
-        ])
-        #expect(TypeSymbol.name(for: TypeID("a.one"), in: catalogue) == "doc")
+    @Test func aTypeWithNoIconAnywhereAnswersNilAndIsDrawnAsTheFallback() {
+        let catalogue = Catalogue(itemTypes: [info("acme.thing", icon: nil)])
+        #expect(catalogue.icon(for: TypeID("acme.thing")) == nil)
+        #expect(catalogue.icon(for: TypeID("not.in.the.catalogue")) == nil)
+        #expect(TypeIconArtwork(name: catalogue.icon(for: TypeID("acme.thing"))) == .fallback)
+    }
+
+    @Test func theAppReadsNoMeaningIntoATypesName() {
+        // A type named like a built-in has no icon of the built-in's; only the catalogue gives one.
+        #expect(Catalogue().icon(for: TypeID("core.note")) == nil)
+    }
+
+    @Test func anUnknownNameIsDrawnAsTheFallbackAndAKnownOneIsNot() {
+        #expect(TypeIconArtwork(name: "no-such-lucide-icon") == .fallback)
+        #expect(TypeIconArtwork(name: "scale") != .fallback)
+        #expect(TypeIconArtwork(name: "file-text") != .fallback)
+    }
+
+    @Test func theEditorPageFindsATypesIconByItsKey() throws {
+        let item = LinkedItem(item: ItemID("a"), title: "A", icon: "file-text", type: "Note", date: "Today")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(item)) as? [String: String]
+        #expect(json?["symbol"] == TypeIconKey.value(for: "file-text"))
+        #expect(TypeIconKey.value(for: "link") != "link")
     }
 
     @Test func theLabelComesFromTheCatalogueElseTheLastSegment() {
         let catalogue = Catalogue(itemTypes: [
             ItemTypeInfo(id: TypeID("aic.ticket.spike"), label: "Question", fields: [], titleField: nil, bodyField: nil, parent: nil)
         ])
-        #expect(TypeSymbol.label(for: TypeID("aic.ticket.spike"), in: catalogue) == "Question")
-        #expect(TypeSymbol.label(for: TypeID("acme.widget"), in: catalogue) == "Widget")
+        #expect(catalogue.label(for: TypeID("aic.ticket.spike")) == "Question")
+        #expect(catalogue.label(for: TypeID("acme.widget")) == "Widget")
     }
 }
 
@@ -141,7 +154,7 @@ struct ItemMetaTests {
         let library = FakeItemLibrary(items: [project, notes, task])
         let meta = ItemMeta.make(for: task, in: library, context: .init(mixesTypes: true))
         #expect(meta.pieces.map(\.label) == ["Task"])
-        #expect(meta.pieces.map(\.symbol) == ["checkmark.circle"])
+        #expect(meta.pieces.map(\.icon) == [.type("list-checks")])
     }
 
     @Test func aListOfOneTypeLeavesTheTypeOut() {

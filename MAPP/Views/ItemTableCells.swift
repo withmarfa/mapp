@@ -1,4 +1,5 @@
 import AppKit
+import MarfaIcons
 import SwiftUI
 
 /// One cell of the table. A value a person picks, such as a status or a priority, is a menu that changes it in place;
@@ -40,7 +41,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: Label { Text(row.typeLabel) } icon: { Image(systemName: row.typeSymbol) }
+        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(name: row.typeIcon) }
             .labelStyle(ItemTableLabelStyle())
             .foregroundStyle(.secondary)
         case .parent: link(row.parent)
@@ -61,7 +62,7 @@ struct ItemTableCell: View {
 
     private var title: some View {
         HStack(spacing: 8) {
-            Image(systemName: row.typeSymbol)
+            TypeIcon(name: row.typeIcon)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -197,7 +198,7 @@ struct ItemTableCell: View {
             Button {
                 if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
             } label: {
-                Label { Text(link.title).underline(isHovering) } icon: { Image(systemName: link.symbol) }
+                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(name: link.icon) }
                     .labelStyle(ItemTableLabelStyle())
             }
             .buttonStyle(.plain)

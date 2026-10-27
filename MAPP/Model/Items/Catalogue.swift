@@ -34,6 +34,9 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let titleField: String?
     let bodyField: String?
     let parent: TypeID?
+    /// The Lucide name of the icon that stands for the type, as the server resolves it: the owner's choice, else the
+    /// nearest type's that sets one. Nil where none does.
+    var icon: String?
     var description: String?
     var version: Int64?
     /// With the roles it inherits, as Marfa resolves them.
@@ -184,6 +187,17 @@ nonisolated struct Catalogue: Hashable, Sendable {
             for field in type.fields where labels[field.key] == nil { labels[field.key] = field.label }
         }
         return labels
+    }
+
+    /// The icon of `type`, a Lucide name; nil where no type in its chain sets one, and for a type the catalogue does
+    /// not hold.
+    func icon(for type: TypeID) -> String? { itemTypes[type]?.icon }
+
+    /// The type's name as people read it: the catalogue's label, else its last segment capitalized.
+    func label(for type: TypeID) -> String {
+        if let label = itemTypes[type]?.label, !label.isEmpty { return label }
+        let segment = type.rawValue.split(whereSeparator: { $0 == "." || $0 == "/" }).last.map(String.init)?.lowercased() ?? ""
+        return segment.capitalized
     }
 
     /// The label for a property key: the item's own type's, else the one the catalogue gives it for any type. Nil

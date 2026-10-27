@@ -103,7 +103,7 @@ struct SidebarSettings: View {
             Label {
                 Text(title ?? self.title(place, in: library, plan: plan)).interfaceFont(.body)
             } icon: {
-                Image(systemName: symbol(place, plan: plan)).interfaceFont(.body).foregroundStyle(.tint)
+                RowIconImage(icon: icon(place, plan: plan)).interfaceFont(.body).foregroundStyle(.tint)
             }
             .padding(.leading, CGFloat(depth) * 20)
         }
@@ -140,19 +140,19 @@ struct SidebarSettings: View {
         }
     }
 
-    private func symbol(_ place: SidebarPlace, plan: SidebarPlan) -> String {
+    private func icon(_ place: SidebarPlace, plan: SidebarPlan) -> RowIcon {
         switch place {
-        case .inbox: "tray"
-        case .recents: "clock"
-        case .all: "note.text"
-        case .favorites: "heart"
-        case .sources: "antenna.radiowaves.left.and.right"
-        case .collections: "square.stack"
-        case .types: "square.grid.2x2"
-        case .views: SidebarPlace.viewSymbol
-        case .files: "doc"
-        case .type(let id): Self.typeNode(id, in: plan.types)?.symbol ?? TypeSymbol.fallback
-        case .view: SidebarPlace.viewSymbol
+        case .inbox: .symbol("tray")
+        case .recents: .symbol("clock")
+        case .all: .symbol("note.text")
+        case .favorites: .symbol("heart")
+        case .sources: .symbol("antenna.radiowaves.left.and.right")
+        case .collections: .symbol("square.stack")
+        case .types: .symbol("square.grid.2x2")
+        case .views: .symbol(SidebarPlace.viewSymbol)
+        case .files: .symbol("doc")
+        case .type(let id): .type(Self.typeNode(id, in: plan.types)?.icon)
+        case .view: .symbol(SidebarPlace.viewSymbol)
         }
     }
 

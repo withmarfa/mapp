@@ -113,7 +113,7 @@ Report only a problem you can show: name the input, state, or step, and what goe
 
 - **Person's text lost.** Flag any path where a write that fails, is refused, or races another change is dropped or written over newer text. Safe path: keep it as a conflicted copy, in the queue, or on the clipboard, and tell the person.
 - **Bytes rewritten.** Flag any change that rewrites a note the person did not edit, or changes blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.
-- **Library type leaks.** Flag a view, command, or editor change that names `MarfaLibrary` outside a preview, offers Delete Immediately without checking `canPurge`, or names an item type other than Marfa's built-in ones (`TypeSymbol`, and `PageHeaderKind` for the item page's header).
+- **Library type leaks.** Flag a view, command, or editor change that names `MarfaLibrary` outside a preview, offers Delete Immediately without checking `canPurge`, or names an item type other than Marfa's built-in ones (`PageHeaderKind` for the item page's header), or names an SF Symbol for a type (a type's icon is `ItemType.icon` from the catalogue, drawn by the SDK's `TypeIcon`).
 - **Platform rules.** Flag `#available` checks, compatibility shims, hard-coded user-facing strings, a committed team identifier or version, and new custom chrome where a system control exists.
 - **Tests touch real data.** Flag a test that reaches the Keychain, the default store location, or a server, and a UI test run without `-MAPPSampleLibrary`.
 - **Stale instructions.** Flag a change that leaves an `AGENTS.md`, the README, or a comment untrue. Fix it in the same pull request.

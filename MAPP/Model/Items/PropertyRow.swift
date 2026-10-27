@@ -148,12 +148,25 @@ nonisolated struct PageByline: Hashable, Sendable, Encodable {
 nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
     let item: ItemID
     let title: String
-    let symbol: String
+    /// The icon of the item's type, a Lucide name.
+    let icon: String?
     let type: String
     let date: String
 
     /// Most items listed before "Show N more".
     static let foldAfter = LinkLimit.limit
+
+    private enum CodingKeys: String, CodingKey { case item, title, symbol, type, date }
+
+    /// The editor page draws the icon from the images the app sends (`PageHeaderIcons`), which it finds by this key.
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(item, forKey: .item)
+        try container.encode(title, forKey: .title)
+        try container.encode(TypeIconKey.value(for: icon), forKey: .symbol)
+        try container.encode(type, forKey: .type)
+        try container.encode(date, forKey: .date)
+    }
 
     /// The active items that hold a link to `id` in any relationship the library reads (the inverse ones), once
     /// each, the most recently edited first.
@@ -174,8 +187,8 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
             .sorted { $0.modified != $1.modified ? $0.modified > $1.modified : $0.title < $1.title }
             .map { held in
                 LinkedItem(
-                    item: held.id, title: held.title, symbol: TypeSymbol.name(for: held.type, in: catalogue),
-                    type: TypeSymbol.label(for: held.type, in: catalogue),
+                    item: held.id, title: held.title, icon: catalogue.icon(for: held.type),
+                    type: catalogue.label(for: held.type),
                     date: NoteDate.listLabel(for: held.modified, now: now, calendar: calendar, locale: locale))
             }
     }

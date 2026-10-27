@@ -4,9 +4,9 @@ import Foundation
 /// already says, so a list of one type names no type, and the Inbox does not name itself.
 nonisolated struct ItemMeta: Hashable, Sendable {
     struct Piece: Hashable, Sendable, Identifiable {
-        let symbol: String
+        let icon: RowIcon
         let label: String
-        var id: String { symbol + label }
+        var id: String { "\(icon)" + label }
     }
 
     var pieces: [Piece]
@@ -24,12 +24,12 @@ nonisolated struct ItemMeta: Hashable, Sendable {
         var pieces: [Piece] = []
         if context.mixesTypes {
             pieces.append(Piece(
-                symbol: TypeSymbol.name(for: item.type, in: library.catalogue),
-                label: TypeSymbol.label(for: item.type, in: library.catalogue)))
+                icon: .type(library.catalogue.icon(for: item.type)),
+                label: library.catalogue.label(for: item.type)))
         }
         // Feed items wait in the Inbox, which the Inbox's own list need not say.
         if item.tier == .feed, !context.isInbox {
-            pieces.append(Piece(symbol: "tray", label: String(localized: "Inbox")))
+            pieces.append(Piece(icon: .symbol("tray"), label: String(localized: "Inbox")))
         }
         return ItemMeta(pieces: pieces)
     }

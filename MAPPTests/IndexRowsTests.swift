@@ -76,7 +76,7 @@ struct IndexRowsTests {
         #expect(row.count == 2)
         #expect(row.latest == base + 7 * 60)
         #expect(row.breakdown.count == 2)
-        #expect(row.secondary == TypeSymbol.label(for: collection.type, in: catalogue))
+        #expect(row.secondary == catalogue.label(for: collection.type))
     }
 
     @Test func anEmptyCollectionHasNoLatestItemAndSortsAsTheOldest() throws {
@@ -92,7 +92,7 @@ struct IndexRowsTests {
         let shares = counts.map { TypeShare(type: TypeID($0.0), label: $0.0, count: $0.1) }
         return [
             IndexRow(
-                place: .source("a"), title: "a", symbol: "x", secondary: "", types: "", count: counts.reduce(0) { $0 + $1.1 },
+                place: .source("a"), title: "a", icon: .symbol("x"), secondary: "", types: "", count: counts.reduce(0) { $0 + $1.1 },
                 latest: nil, breakdown: shares)
         ]
     }

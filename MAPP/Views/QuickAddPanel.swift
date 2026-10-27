@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -121,7 +122,7 @@ struct QuickAddPanel: View {
     }
 
     private func kindLabel(_ type: ItemTypeOption) -> some View {
-        Label(type.label, systemImage: TypeSymbol.name(for: type.id, in: library.catalogue))
+        Label(type.label, typeIcon: library.catalogue.icon(for: type.id))
     }
 
     private func choose(_ typeID: String) {
@@ -201,7 +202,7 @@ struct QuickAddPanel: View {
         } label: {
             VStack(spacing: 6) {
                 if let file = draft.files.first {
-                    Image(systemName: TypeSymbol.name(for: .file, in: catalogue))
+                    TypeIcon(name: catalogue.icon(for: .file))
                         .font(.title)
                     Text(verbatim: file.name)
                         .lineLimit(1)
@@ -234,7 +235,7 @@ struct QuickAddPanel: View {
         chipShell(remove: (String(localized: "Remove “\(file.name)”"), "QuickAddRemoveAttachment", { quickAdd.draft?.files.removeAll { $0 == file } })) {
             chipFace(hasRemove: true) {
                 HStack(spacing: 6) {
-                    Image(systemName: TypeSymbol.name(for: .file, in: library.catalogue))
+                    TypeIcon(name: library.catalogue.icon(for: .file))
                         .foregroundStyle(.secondary)
                     Text(verbatim: file.name)
                         .truncationMode(.middle)
@@ -453,7 +454,7 @@ struct QuickAddPanel: View {
                         editing = nil
                     } label: {
                         HStack {
-                            Label(candidate.title, systemImage: TypeSymbol.name(for: candidate.type, in: library.catalogue))
+                            Label { Text(candidate.title) } icon: { TypeIcon(name: library.catalogue.icon(for: candidate.type)) }
                                 .lineLimit(1)
                             Spacer(minLength: 8)
                             if candidate.id == draft.parentID {

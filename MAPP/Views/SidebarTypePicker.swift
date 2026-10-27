@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 
 struct SidebarTypePicker: View {
@@ -35,7 +36,7 @@ struct SidebarTypePicker: View {
             } set: { shown in
                 libraries.updateSidebarLayout { $0.setHidden(.type(node.id), !shown) }
             }) {
-                Label(node.label, systemImage: node.symbol)
+                Label { Text(node.label) } icon: { TypeIcon(name: node.icon) }
             }
             .toggleStyle(.checkbox)
             .disabled(parentHidden)

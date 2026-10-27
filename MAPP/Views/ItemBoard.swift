@@ -1,4 +1,5 @@
 import AppKit
+import MarfaIcons
 import SwiftUI
 
 struct ItemBoard: View {
@@ -235,8 +236,8 @@ private struct BoardCard: View {
                     .lineLimit(3)
             }
             HStack(spacing: 6) {
-                Image(systemName: TypeSymbol.name(for: item.type, in: catalogue))
-                Text(verbatim: TypeSymbol.label(for: item.type, in: catalogue))
+                TypeIcon(name: catalogue.icon(for: item.type))
+                Text(verbatim: catalogue.label(for: item.type))
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if !item.isEditable { Image(systemName: "lock").accessibilityLabel("Read Only") }
