@@ -367,9 +367,10 @@ export class NoteEditor {
     this.item = id
     this.pictures.setItem(id)
   }
-  /** The app's Remote Pictures setting changed: pictures that waited, or were turned off, are asked about again. */
-  picturesChanged(addresses?: string[]) {
-    this.pictures.changed(addresses)
+  /** The app's Remote Pictures setting changed: pictures that waited, or were turned off, are asked about again. With
+   *  `afresh`, a file saved from a web address came to the note's item or went from it: every picture is asked about again. */
+  picturesChanged(addresses?: string[], afresh?: boolean) {
+    this.pictures.changed(addresses, afresh)
   }
   /** The person chose to load every picture that waits. */
   loadPictures() {

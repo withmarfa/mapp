@@ -164,14 +164,21 @@ export class WebPictures {
   }
 
   /** The app's setting changed, or the app wants these asked again: the pictures that were waiting or turned off
-   *  are asked about anew. A picture already loaded, or refused for a reason that stays, is left as it is. */
-  changed(addresses?: string[]) {
+   *  are asked about anew. A picture already loaded, or refused for a reason that stays, is left as it is, unless
+   *  `afresh`: a file saved from an address has come to the item or gone from it, so what the app answers may differ for
+   *  any picture, except one the person is choosing now. */
+  changed(addresses?: string[], afresh = false) {
     const wanted = addresses ? new Set(addresses) : null
     const again: string[] = []
     for (const address of this.live.keys()) {
       if (wanted && !wanted.has(address)) continue
       const kind = this.states.get(address)?.kind
-      if (kind === 'waiting' || kind === 'off' || kind === undefined) {
+      if (
+        kind === 'waiting' ||
+        kind === 'off' ||
+        kind === undefined ||
+        (afresh && kind !== 'loading')
+      ) {
         this.states.delete(address)
         again.push(address)
       }

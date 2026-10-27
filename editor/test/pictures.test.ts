@@ -225,6 +225,34 @@ test('a changed setting asks again about pictures that waited or were off, and n
   )
 })
 
+test('a picture saved as a file on the item is asked about again, loaded or not, but not one being chosen', async () => {
+  let saved = false
+  const { asked } = app((request) =>
+    request.address.includes('chosen')
+      ? { state: 'waiting' }
+      : saved
+        ? loaded
+        : { state: 'refused', reason: 'No' },
+  )
+  await withNote(
+    '![a](https://example.com/a.png)\n\n![b](https://chosen.example.com/b.png)\n',
+    async (editor) => {
+      await vi.waitFor(() => expect(labels()[0]).toBe('example.com: No'))
+      editor.picturesChanged()
+      await settled()
+      expect(asked.filter((request) => request.address.includes('example.com/a'))).toHaveLength(1)
+      saved = true
+      editor.picturesChanged(undefined, true)
+      await vi.waitFor(() =>
+        expect(asked.filter((request) => request.address.includes('example.com/a'))).toHaveLength(
+          2,
+        ),
+      )
+      await vi.waitFor(() => expect(labels()).not.toContain('example.com: No'))
+    },
+  )
+})
+
 test('another note forgets what it was told of the last one', async () => {
   const { asked } = app(() => ({ state: 'waiting' }))
   await withNote(picture, async (editor) => {

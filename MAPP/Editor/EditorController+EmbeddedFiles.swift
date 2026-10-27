@@ -131,18 +131,23 @@ extension EditorController {
 
     /// Follows the library for the embeds of the note on the page, and tells the page which have changed: a file
     /// that arrived, was renamed or removed, or an embed the copy has since bound. The page then asks again for just
-    /// those (`refreshReferences`). Changes come in bursts, as files arrive and text is saved, so the page hears
+    /// those (`refreshReferences`). It also follows the files attached to the note that were saved from a web
+    /// address, and has the page ask again about its pictures when one arrives, is changed or goes
+    /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and text is saved, so the page hears
     /// once they pause. Never rewrites the note.
     func watchEmbeds() {
         embedWatch += 1
         guard let library, let note = noteID else {
             embedStates = nil
+            savedStates = nil
             return
         }
         let watch = embedWatch
         var states: [String: EmbedState] = [:]
+        var saved: [SavedPictureState] = []
         withObservationTracking {
             states = library.embedStates(of: note)
+            saved = library.savedPictureStates(of: note)
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(300))
@@ -151,6 +156,7 @@ extension EditorController {
             }
         }
         if embedStates?.note != note { embedStates = (note, states) }
+        if savedStates?.note != note { savedStates = (note, saved) }
     }
 
     private func tellEmbedsChanged(in note: ItemID) {
@@ -160,6 +166,10 @@ extension EditorController {
         embedStates = (note, now)
         let changed = now.filter { before[$0.key] != $0.value }.keys.sorted()
         if !changed.isEmpty, isReady { call("embedsChanged", json(changed)) }
+        let saved = library.savedPictureStates(of: note)
+        let savedBefore = savedStates?.states ?? []
+        savedStates = (note, saved)
+        if saved != savedBefore, isReady { call("picturesChanged", "undefined", "true") }
         watchEmbeds()
     }
 
