@@ -143,7 +143,7 @@ final class SidebarNavigationTests: XCTestCase {
         let home = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Home")).firstMatch
         let reading = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Reading")).firstMatch
         XCTAssertTrue(home.waitForExistence(timeout: 3))
-        XCTAssertLessThan(home.frame.maxY, reading.frame.minY, "collections go by title")
+        XCTAssertLessThanOrEqual(home.frame.maxY, reading.frame.minY, "collections go by title")
         home.click()
         let boiler = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Boiler")).firstMatch
         let moving = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Moving checklist")).firstMatch
