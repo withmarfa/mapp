@@ -9,7 +9,8 @@ import Testing
 
     private func libraries(_ bench: HostBench) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
-        return Libraries(host: bench.host(), defaults: defaults)
+        // No page is open here; the real hand-over waits on every page in the process, those of other suites included.
+        return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
     }
 
     @Test func withNoServerSetTheWindowsAskForOne() {

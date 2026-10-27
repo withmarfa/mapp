@@ -10,7 +10,8 @@ import Testing
 
     private func libraries(_ bench: HostBench, host: MarfaHost) throws -> Libraries {
         let defaults = try #require(UserDefaults(suiteName: "MarfaInstanceNameTests-\(UUID().uuidString)"))
-        return Libraries(host: host, defaults: defaults)
+        // No page is open here; the real hand-over waits on every page in the process, those of other suites included.
+        return Libraries(host: host, defaults: defaults, handOverPages: { $0(true) })
     }
 
     @Test func theNameIsReadOnceTheConnectionIsSet() async throws {
