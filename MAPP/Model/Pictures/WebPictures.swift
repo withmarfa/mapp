@@ -47,7 +47,9 @@ nonisolated enum PictureAsk: String, Sendable {
     /// feed tier (`Item.tier`): Always loads a picture there without asking, and asks in the library tier, where the
     /// person's own notes are, since the website would learn they opened one.
     ///
-    /// A picture already kept shows under every setting, since showing it asks nothing of the website.
+    /// A picture already kept shows under every setting, since showing it asks nothing of the website. A file attached to
+    /// the item that was saved from `address` is looked for before this is asked (`PictureRequests.reply`), and the picture
+    /// is that file, without this.
     func answer(_ address: URL, ask: PictureAsk, inFeed: Bool) async -> PictureAnswer {
         if address.scheme?.lowercased() != "https" { return .refused(.notSecure) }
         if let kept = await cache.file(for: address) { return .loaded(kept) }
