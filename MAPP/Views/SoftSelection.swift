@@ -29,7 +29,10 @@ struct SoftSelection: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            // The list's table joins the window in the same pass, so it is looked for once the pass is done.
+            // Looked for at once, since turning the highlight off reloads every row the table has made, and a
+            // table that is already filled is built twice. The table may not be in the window yet, so it is looked
+            // for again once the pass is done.
+            refresh()
             DispatchQueue.main.async { [weak self] in self?.refresh() }
         }
 
@@ -125,9 +128,12 @@ struct SoftSelection: NSViewRepresentable {
             // A selected row that grows or shrinks, or moves under one that does, changes no frame but its own row
             // view's: the table's frame stays put while it has room, and no selection or row identifier changes.
             observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: nil, queue: .main) { [weak self] note in
-                let view = note.object as? NSTableRowView
+                // Every view in the app posts this, a filled table's cells by the hundred, so the test is a plain
+                // class check; a Swift cast from `Any` looks up protocol conformances each time.
+                guard let object = note.object as AnyObject?, object.isKind(of: NSTableRowView.self) else { return }
+                nonisolated(unsafe) let view = unsafeDowncast(object, to: NSTableRowView.self)
                 MainActor.assumeIsolated {
-                    guard let self, let view, view.superview === self.table else { return }
+                    guard let self, view.superview === self.table else { return }
                     self.update()
                 }
             })
