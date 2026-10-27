@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The View Options of the table, the board and the timeline as the command palette lists them: each choice not
-/// already made. The list's and the gallery's order are the palette's own Sort and Group entries.
+/// The View Options of the table, the board, the timeline and the index pages as the command palette lists them: each
+/// choice not already made. The list's and the gallery's order are the palette's own Sort and Group entries.
 struct ViewOptionCommand {
     let title: String
     let systemImage: String
