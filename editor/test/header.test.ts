@@ -550,3 +550,15 @@ test('a page for reading puts the source and reading time in the byline, with no
   expect(root.querySelector('.item-subtitle')!.textContent).toBe('Why startups fail')
   expect(document.body.dataset.header).toBe('reading')
 })
+
+test('the byline draws the icon of the item type, and none for a type with no icon', () => {
+  const drawn = { url: 'data:image/png;base64,AAAA', width: 13, height: 13 }
+  const icons = { parent: drawn, plus: drawn, indicator: drawn, symbols: { 'type:globe': drawn } }
+  const node = () => pin('ItemTypePin').querySelector<HTMLElement>('.item-icon-type')!
+  header.setIcons(icons)
+  header.set({ ...ticket, icon: 'type:globe' })
+  expect(node().hidden).toBe(false)
+  expect(node().style.width).toBe('13px')
+  header.set({ ...ticket, icon: 'type:' })
+  expect(node().hidden).toBe(true)
+})

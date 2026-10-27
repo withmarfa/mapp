@@ -252,7 +252,7 @@ final class EditorController: NSObject {
 
     private func sendHeader() {
         if let size = header?.interfaceTextSize {
-            let needed = Set((header?.linked ?? []).map(\.icon))
+            let needed = Set((header?.linked ?? []).map(\.icon)).union(header.map { [$0.icon.name] } ?? [])
             if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
                 let typeIcons = needed.union(size == headerIconSize ? headerTypeIcons : [])
                 if let icons = PageHeaderIcons(textSize: size, typeIcons: typeIcons) {
