@@ -35,6 +35,9 @@
          <TestPlanReference
             reference = "container:TestPlans/Live.xctestplan">
          </TestPlanReference>
+         <TestPlanReference
+            reference = "container:TestPlans/Measure.xctestplan">
+         </TestPlanReference>
       </TestPlans>
    </TestAction>
    <LaunchAction

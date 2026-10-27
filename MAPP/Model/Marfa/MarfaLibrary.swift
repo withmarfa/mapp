@@ -35,7 +35,7 @@ import Observation
     let now: () -> Date
 
     /// Bumped when any item changes, for the lists and search.
-    private var contentRevision = 0
+    private(set) var contentRevision = 0
     /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
     private var membershipRevision = 0
     private var searchRevision = 0

@@ -18,7 +18,7 @@ enum SavedViews {
 
     /// What the window shows, as the table works it out. Only the table applies filters, so only its are taken.
     static func window(_ browser: Browser, in library: any ItemLibrary) -> ViewDraft.Window {
-        let content = ItemTableContent(browser: browser, library: library)
+        let content = browser.tableContent(in: library)
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return ViewDraft.Window(

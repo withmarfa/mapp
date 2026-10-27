@@ -35,6 +35,10 @@ nonisolated enum ItemBoardLayout {
     }
 
     static func availableFields(items: [Item], catalogue: Catalogue) -> [ItemBoardField] {
+        Cost.measure(.boardFields) { availableFieldsUnmeasured(items: items, catalogue: catalogue) }
+    }
+
+    private static func availableFieldsUnmeasured(items: [Item], catalogue: Catalogue) -> [ItemBoardField] {
         var seen: Set<String> = []
         var result: [ItemBoardField] = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {

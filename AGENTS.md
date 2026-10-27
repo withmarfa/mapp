@@ -60,7 +60,7 @@ These hold across the app. The nested files say how the library keeps them.
 - `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source.
 - `MAPPTests/`: Swift Testing unit tests. They are hosted in the app built with the `Debug Tests` configuration, which marks it background-only (`LSBackgroundOnly`), so the host never shows in the Dock, never becomes the active app and puts no window in front of the person; under XCTest it starts a bare `NSApplication` with no scene (`TestHost` in `MAPP/MAPPApp.swift`). `FakeItemLibrary` holds items in memory for testing view models and the editor without a server. `FakeItemSource` is a source the test drives, for testing `MarfaLibrary` without a server.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
-- `TestPlans/`: the test plans. `Unit`, the `MAPP` scheme's default, runs every unit test except those tagged `live`; `Live` runs only those; `UI`, the `MAPP UI Tests` scheme's, runs the UI tests.
+- `TestPlans/`: the test plans. `Unit`, the `MAPP` scheme's default, runs every unit test except those tagged `live`; `Live` runs only those; `Measure` runs only the tests tagged `measure`, which the other plans leave out by their own switch (the plan sets `MAPP_MEASURE`), which time and count what moving around a window costs on 650 generated items (`NavigationCostTests`, `Cost`) and print `COST|`, `COUNT|` and `HOSTED|` lines for a person to read, never a gate (`xcodebuild -testPlan Measure`, in a Debug Tests build); `UI`, the `MAPP UI Tests` scheme's, runs the UI tests.
 - `Design/`: artwork that is not built into the app.
 
 ## Commands

@@ -1,0 +1,34 @@
+{
+  "configurations" : [
+    {
+      "id" : "7A1D2C64-5B0E-4E57-9C58-137000000001",
+      "name" : "Measure",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "MAPP_MEASURE",
+            "value" : "1"
+          }
+        ]
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:MAPP.xcodeproj",
+        "identifier" : "3303FE023066ED47005D07A2",
+        "name" : "MAPPTests"
+      },
+      "selectedTags" : {
+        "tags" : [
+          "measure"
+        ]
+      }
+    }
+  ],
+  "version" : 1
+}

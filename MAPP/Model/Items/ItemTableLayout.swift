@@ -205,7 +205,13 @@ nonisolated struct ItemTableComparator: SortComparator, Hashable, Sendable {
     var order: SortOrder = .forward
 
     func compare(_ lhs: ItemTableRow, _ rhs: ItemTableRow) -> ComparisonResult {
-        switch (column.sortValue(of: lhs), column.sortValue(of: rhs)) {
+        compareValues(column.sortValue(of: lhs), column.sortValue(of: rhs))
+    }
+
+    /// The comparison of two cells' values, which a sort of many rows reads once for each row rather than for
+    /// each comparison (`ItemTableLayout.sorted`).
+    func compareValues(_ lhs: ItemTableValue.Sort?, _ rhs: ItemTableValue.Sort?) -> ComparisonResult {
+        switch (lhs, rhs) {
         case (nil, nil): return .orderedSame
         case (nil, _): return .orderedDescending
         case (_, nil): return .orderedAscending
@@ -371,16 +377,26 @@ nonisolated enum ItemTableLayout {
 
     static func sorted(_ rows: [ItemTableRow], by sort: [ItemTableComparator]) -> [ItemTableRow] {
         guard !sort.isEmpty else { return rows }
-        return rows.sorted { a, b in
-            for comparator in sort {
-                switch comparator.compare(a, b) {
+        // Each row's values are read once, not at each of the roughly n log n comparisons: reading one parses a
+        // date or works out a status's tone. The row's place is the last tie-break, which keeps rows that compare
+        // equal in the order given, as a stable sort does.
+        let values = sort.map { comparator in rows.map { comparator.column.sortValue(of: $0) } }
+        let titles = rows.map(\.item.title)
+        let order = rows.indices.sorted { a, b in
+            for (position, comparator) in sort.enumerated() {
+                switch comparator.compareValues(values[position][a], values[position][b]) {
                 case .orderedAscending: return true
                 case .orderedDescending: return false
                 case .orderedSame: continue
                 }
             }
-            return a.item.title.localizedStandardCompare(b.item.title) == .orderedAscending
+            switch titles[a].localizedStandardCompare(titles[b]) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return a < b
+            }
         }
+        return order.map { rows[$0] }
     }
 
     /// The rows in groups by `column`: a picked value's groups in the order its values are given, any other
