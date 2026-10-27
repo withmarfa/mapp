@@ -2430,6 +2430,9 @@
     "Show %lld More" : {
       "extractionState" : "manual"
     },
+    "Linked From" : {
+      "extractionState" : "manual"
+    },
     "Collapse %@" : {
       "extractionState" : "manual"
     },

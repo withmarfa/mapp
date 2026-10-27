@@ -26,6 +26,9 @@ nonisolated enum TypeSymbol {
         type.rawValue.split(whereSeparator: { $0 == "." || $0 == "/" }).last.map(String.init)?.lowercased() ?? ""
     }
 
+    /// Every symbol `name(for:in:)` can answer, for a page that draws them as images.
+    static var all: [String] { Array(Set(builtIn.values).union([fallback])).sorted() }
+
     private static let builtIn: [TypeID: String] = [
         TypeID("core.note"): "doc.text",
         TypeID("core.task"): "checkmark.circle",

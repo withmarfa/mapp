@@ -49,9 +49,55 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var type: String?
     var status: Pin?
     var parent: Pin?
+    var byline: PageByline
+    /// The property block's rows, all of them; the page shows the first `foldAfter` until it is expanded.
+    var properties: [PropertyRow]
+    var foldAfter = PropertyRow.foldAfter
+    /// Items that link to this one, listed at the foot of the header.
+    var linked: [LinkedItem]
+    var linkedFoldAfter = LinkedItem.foldAfter
+    /// "Show N More", for the rows and for the linked items that are folded away.
+    var showMore: String
+    var showMoreLinked: String
     var propertyRejected: Bool
     var parentRejected: Bool
     var interfaceTextSize: Int
+}
+
+extension PropertyRow: Encodable {
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items }
+    private struct Link: Encodable {
+        let title: String
+        let item: String
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: Key.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(label, forKey: .label)
+        try container.encode(value.symbol, forKey: .symbol)
+        switch value {
+        case .status: try container.encode("status", forKey: .kind)
+        case .parent: try container.encode("parent", forKey: .kind)
+        case .items(let targets):
+            try container.encode("items", forKey: .kind)
+            try container.encode(targets.map { Link(title: $0.title, item: $0.item.rawValue) }, forKey: .items)
+        case .tags(let tags):
+            try container.encode("tags", forKey: .kind)
+            try container.encode(tags, forKey: .texts)
+        case .date(let text): try Self.encode("date", text, into: &container)
+        case .url(let text): try Self.encode("url", text, into: &container)
+        case .email(let text): try Self.encode("email", text, into: &container)
+        case .boolean(let flag):
+            try Self.encode("text", flag ? String(localized: "Yes") : String(localized: "No"), into: &container)
+        case .text(let text): try Self.encode("text", text, into: &container)
+        }
+    }
+
+    private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {
+        try container.encode(kind, forKey: .kind)
+        try container.encode(text, forKey: .text)
+    }
 }
 
 /// The menus the header's pins open.
@@ -81,6 +127,8 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     var parent: Icon
     var plus: Icon
     var indicator: Icon
+    /// The symbols of the property rows and of the types, by SF Symbol name.
+    var symbols: [String: Icon]
 
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size.
     @MainActor
@@ -95,6 +143,11 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.parent = parent
         self.plus = plus
         self.indicator = indicator
+        var symbols: [String: Icon] = [:]
+        for name in PropertyRow.Value.symbols + TypeSymbol.all {
+            symbols[name] = Self.icon(name, size: size, weight: .regular)
+        }
+        self.symbols = symbols
     }
 
     @MainActor

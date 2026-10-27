@@ -11,6 +11,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             case other
         }
 
+        enum TextFormat: Hashable, Sendable { case url, email }
+
         let key: String
         let label: String
         let kind: Kind
@@ -18,6 +20,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         let declaredBy: TypeID
         var required = false
         var description: String?
+        /// What a text field holds beyond plain text, where the contract names it: a `url` or an `email`.
+        var format: TextFormat?
         var id: String { key }
     }
 

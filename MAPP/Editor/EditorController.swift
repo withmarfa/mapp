@@ -527,6 +527,8 @@ final class EditorController: NSObject {
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme) {
                 NSWorkspace.shared.open(url)
             }
+        case .openItem(let id):
+            onOpenNote(id)
         case .copy(let text):
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)

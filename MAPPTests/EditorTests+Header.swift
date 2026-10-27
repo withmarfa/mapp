@@ -13,7 +13,10 @@ extension EditorTests {
         PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
                    type: "Task", status: .init(label: "In Progress", enabled: true),
-                   parent: .init(label: "Field Research", enabled: true), propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
+                   parent: .init(label: "Field Research", enabled: true),
+                   byline: PageByline(source: "Marfa", date: "Yesterday"),
+                   properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
+                   linked: [], showMore: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
     }
 
     static func json(_ value: some Encodable) -> String {
