@@ -28,15 +28,16 @@ final class ItemLayoutTests: XCTestCase {
         else { app.typeKey(.escape, modifierFlags: []) }
         let normalWidth = page.frame.width
         capture("Document normal width")
-        let bodyHeading = page.textViews.firstMatch.staticTexts["Kitchen quotes"].firstMatch
-        XCTAssertTrue(bodyHeading.waitForExistence(timeout: 3))
-        XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20,
+        let firstParagraph = page.staticTexts["Three quotes in so far. Waiting on the fourth before deciding."].firstMatch
+        XCTAssertTrue(firstParagraph.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(firstParagraph.frame.minY, title.frame.maxY + 20,
                                     "Body content must start below the title and pinned properties.")
         app.descendants(matching: .any)["DetailsToggle"].click()
         capture("Document with inspector and narrower content")
-        XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20)
+        XCTAssertGreaterThanOrEqual(firstParagraph.frame.minY, title.frame.maxY + 20)
         XCTAssertLessThan(page.frame.width, normalWidth)
         app.typeKey("n", modifierFlags: .command)
+        app.completeQuickAdd(type: "Note", title: "Narrow item")
         XCTAssertTrue(app.itemPageTitle.waitForExistence(timeout: 3))
         capture("New item narrow width")
         XCTAssertFalse(app.buttons["Back"].exists)
@@ -69,7 +70,7 @@ final class ItemLayoutTests: XCTestCase {
         let page = app.webViews.firstMatch
         XCTAssertTrue(page.waitForExistence(timeout: 5))
         XCTAssertTrue(page.staticTexts["The Design of Everyday Things"].firstMatch.waitForExistence(timeout: 5))
-        let body = page.textViews.firstMatch
+        let body = app.itemPageBody
         XCTAssertTrue(body.waitForExistence(timeout: 5))
         body.click()
         app.typeKey(.downArrow, modifierFlags: .command)

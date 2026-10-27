@@ -56,6 +56,8 @@ extension EditorController {
             "fileError": String(localized: "File could not be loaded"),
             "filePreviewUnavailable": String(localized: "Preview unavailable"),
             "filePDFPreview": String(localized: "Open to view this PDF"),
+            "imageResize": String(localized: "Resize Image"),
+            "taskCheckbox": String(localized: "Task"),
             "wikiMissing": String(localized: "Link unavailable"),
             "formattedEditor": String(localized: "Note"),
             "sourceEditor": String(localized: "Markdown Source"),
@@ -115,7 +117,7 @@ extension EditorController {
     }
 
     func applyKeymap() {
-        var keymap: [String: [String]] = [:]
+        var keymap: [String: [String]] = ["Mod-O": ["openLink"]]
         for format in Format.allCases {
             guard let key = format.pageKey else { continue }
             let (name, argument) = format.command

@@ -3,9 +3,9 @@ import type { LinkRef } from './bridge'
 /** Asks the app which of these links of the item name no note. */
 export type AskMissing = (item: string, links: LinkRef[]) => Promise<boolean[] | null>
 
-/** A link is told from another by its name, heading and alias, since the library binds each spelling alone. */
+/** Decoded names can coincide even when Marfa bound the authored spellings separately. */
 function keyOf(link: LinkRef): string {
-  return JSON.stringify([link.target, link.heading ?? '', link.alias ?? ''])
+  return link.raw
 }
 
 /**

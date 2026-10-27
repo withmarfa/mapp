@@ -24,6 +24,7 @@ declare global {
       focusTitle(item: string): void
       focusText(prefix: string | null): void
       blurText(expected: number): void
+      setHostActive(active: boolean): void
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
       redo(expected?: number): void
@@ -218,6 +219,7 @@ window.editor = {
     editor.focus()
   },
   focusTitle: (item) => header.focusTitle(item),
+  setHostActive: (active) => editor.setHostActive(active),
   focusText: (prefix) => {
     header.cancelTitleFocus()
     guardedCommand(() => editor.focusText(prefix))

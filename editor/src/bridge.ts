@@ -50,9 +50,9 @@ export type EditorMessage =
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 
-/** A `[[link]]` as the page reads it: the name, any heading after `#`, and the alias after `|` when it has one.
- *  The app tells links apart by all three, since the library binds each spelling on its own. */
+/** The authored spelling identifies the binding; decoded parts serve navigation and display. */
 export interface LinkRef {
+  raw: string
   target: string
   heading?: string
   alias?: string
