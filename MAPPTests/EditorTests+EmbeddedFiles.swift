@@ -18,21 +18,42 @@ extension EditorTests {
         return value
     }
 
-    @Test func webAddressPictureIsAnOpenableCardWithoutLoadingTheImage() async throws {
-        let page = try await Page()
-        try await page.load("![RSS picture](https://example.com/rss-picture.png)\r\n")
+    @Test func webAddressPictureWaitsForTheOwnersChoiceThenLoadsThroughTheApp() async throws {
+        let folder = try TemporaryFolder()
+        let suite = "EditorPictureTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(RemotePictureSetting.ask.rawValue, forKey: RemotePictureSetting.key)
+        let host = PictureStub.newHost()
+        let address = "https://\(host)/rss-picture.png"
+        PictureStub.answer(address, with: .body([SamplePicture.png()]))
+        let page = try await Page(library: FakeItemLibrary(), pictures: WebPictures(
+            cache: PictureCache(folder: folder.url.appending(path: "Cache")),
+            fetcher: PictureFetcher(resolver: PictureStub.resolver, configuration: PictureStub.configuration),
+            defaults: defaults))
+        try await page.load("![RSS picture](\(address))\r\n")
         let label = try await settle(page.editor,
             "document.querySelector('.inkkit-file[data-inkkit-file-kind=file] .inkkit-file-label')?.textContent",
-            as: String.self) { $0 == "RSS picture" }
-        #expect(label == "RSS picture")
+            as: String.self) { $0 == "\(host): Load Picture" }
+        #expect(label == "\(host): Load Picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
             "document.querySelector('.inkkit-file-open')?.getAttribute('aria-label')"
-        ) as? String == "Open RSS picture")
+        ) as? String == "Open \(host): Load Picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
             "document.querySelectorAll('.ProseMirror img, .ProseMirror iframe').length"
         ) as? Int == 0)
         #expect(try await page.editor.webView.evaluateJavaScript(
-            "performance.getEntriesByType('resource').some(entry => entry.name.startsWith('https://example.com/'))"
+            "performance.getEntriesByType('resource').some(entry => /^https?:/.test(entry.name))"
+        ) as? Bool == false)
+        #expect(PictureStub.requests(to: address).isEmpty)
+        try await page.run("document.querySelector('.inkkit-file-open').click()")
+        let loaded = try await settle(page.editor,
+            "(() => { const image = document.querySelector('.inkkit-image img'); return !!image && image.naturalWidth > 0 && image.src.startsWith('mapp-embed:'); })()",
+            as: Bool.self) { $0 == true }
+        #expect(loaded == true)
+        #expect(PictureStub.requests(to: address).count == 1)
+        #expect(try await page.editor.webView.evaluateJavaScript(
+            "performance.getEntriesByType('resource').some(entry => /^https?:/.test(entry.name))"
         ) as? Bool == false)
         #expect(try await page.markdown() == nil)
         #expect(page.changes.isEmpty)

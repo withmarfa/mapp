@@ -16,9 +16,9 @@ struct EditorTests {
         let editor: EditorController
         var changes: [String] = []
 
-        init(library: Library) async throws {
+        init(library: Library, pictures: WebPictures = .standard) async throws {
             self.library = library
-            editor = EditorController(library: library)
+            editor = EditorController(library: library, pictures: pictures)
             editor.onChange = { [unowned self] _, markdown, _ in changes.append(markdown) }
             try await wait { self.editor.isReady }
         }
