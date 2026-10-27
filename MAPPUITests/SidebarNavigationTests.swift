@@ -34,8 +34,8 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(element("SidebarSearch").exists, "Search is the palette's, not the foot's")
         XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is in the instance menu")
         XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in the instance menu")
-        for identifier in ["SidebarSources", "SidebarCollections"] {
-            let row = sidebar.outlineRows.containing(.any, identifier: identifier).element(boundBy: 0)
+        for title in ["Sources", "Collections"] {
+            let row = sidebar.outlineRows.containing(NSPredicate(format: "label == %@ OR value == %@", title, title)).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
         }
         for (before, after) in zip(destinations, destinations.dropFirst()) {
@@ -135,7 +135,7 @@ final class SidebarNavigationTests: XCTestCase {
     func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
-        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY)
+        XCTAssertLessThan(sidebarText("Favorites").frame.maxY, sidebarText("Sources").frame.minY)
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         sidebarText("Collections").click()
         let index = element("SidebarIndex")
@@ -157,21 +157,10 @@ final class SidebarNavigationTests: XCTestCase {
     }
 
     private func sidebarText(_ title: String) -> XCUIElement {
-        if let identifier = groupIdentifier(for: title) {
-            // Use the full indexed query: firstMatch omitted native outline labels visible in its own snapshot.
-            return sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
-        }
-        return sidebar.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title)).firstMatch
-    }
-
-    private func groupIdentifier(for title: String) -> String? {
-        switch title {
-        case "Favorites": "SidebarFavorites"
-        case "Sources": "SidebarSources"
-        case "Collections": "SidebarCollections"
-        case "Types": "SidebarTypes"
-        default: nil
-        }
+        // Section identifiers propagate to their rows, and headings may have a distinct accessibility role.
+        sidebar.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
+            .element(boundBy: 0)
     }
 
     private func attachScreenshot(_ name: String) {
