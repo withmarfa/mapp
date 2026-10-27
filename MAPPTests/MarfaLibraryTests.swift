@@ -929,6 +929,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let attachedTo = try #require(library.relationships(for: F.f1).first { $0.field == "attached-to" })
         #expect(attachedTo.targets.map(\.itemID) == [F.n1])
     }
+
+    @Test func theAttachmentsOfAnItemAreTheItemsWhoseAttachedToEdgePointsAtIt() async throws {
+        let library = try await Self.loaded()
+
+        #expect(library.attachments(of: F.n1) == [F.f1])
+        #expect(library.attachments(of: F.t1).isEmpty, "an edge of another type, or of another item, is no attachment")
+        #expect(library.attachments(of: F.f1).isEmpty)
+    }
 }
 
 /// The connect review's findings for the Marfa library, each failing on the code before its fix.
