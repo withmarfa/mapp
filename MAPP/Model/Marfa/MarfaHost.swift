@@ -14,9 +14,11 @@ import Observation
     typealias Remover = @Sendable (URL, UInt64) async throws -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any KeyStore) -> (any ItemHistorySource)?
+    /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
+    /// sample.
+    typealias IconKeeper = @Sendable (MarfaConnection, any KeyStore) -> (any TypeIconSource)?
     /// Makes the reader and writer of the server's own settings for a connection, or nil where there is no server to
     /// ask, as in the sample.
-    typealias IconKeeper = @Sendable (MarfaConnection, any KeyStore) -> (any TypeIconSource)?
     typealias Configurer = @Sendable (MarfaConnection, any KeyStore) -> (any InstanceConfigSource)?
 
     nonisolated enum State: Hashable, Sendable {
