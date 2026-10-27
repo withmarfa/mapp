@@ -10,9 +10,9 @@ nonisolated struct ReadingHeader: Equatable, Sendable {
     /// The address "Open Original" opens: a web address in the item's `url`.
     let original: URL?
 
-    /// The properties the header draws. `image_url` is not here: the page loads nothing from the network, so the
-    /// address stays in the property block.
-    static let keys: Set<String> = ["description", "publisher", "source_title", "published_at"]
+    /// The properties the header draws, and `image_url`, which it leaves out: the page loads nothing from the network,
+    /// and a bare image address reads as clutter above an article. The inspector still shows it.
+    static let keys: Set<String> = ["description", "publisher", "source_title", "published_at", "image_url"]
 
     /// Fewer words than this are a clipping, not something to read for a time.
     static let shortestRead = 100
