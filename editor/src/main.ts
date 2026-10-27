@@ -65,8 +65,7 @@ declare global {
 
 const root = document.getElementById('editor')
 const headerRoot = document.getElementById('item-header')
-const footerRoot = document.getElementById('item-footer')
-if (!root || !headerRoot || !footerRoot) throw new Error('editor root missing')
+if (!root || !headerRoot) throw new Error('editor root missing')
 const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
 
 const editor = await NoteEditor.mount(
@@ -91,7 +90,7 @@ const editor = await NoteEditor.mount(
   labels.editor,
   labels.words,
 )
-const header = new ItemHeader(headerRoot, footerRoot, labels.header)
+const header = new ItemHeader(headerRoot, labels.header)
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -159,23 +158,21 @@ window.addEventListener('resize', () => {
   checkHeaderScrolledAway()
   checkContentUnderToolbar()
 })
-// The note's text fills the rest of the window between the header and the footer, so a click anywhere below it
-// places the caret and a short note does not scroll. The text's height changes in the next frame: changed while
-// the browser reports sizes, it would be reported late, which WebKit raises as an error.
+// The note's text fills the rest of the window below the header, so a click anywhere below it places the caret
+// and a short note does not scroll. The text's height changes in the next frame: changed while the browser
+// reports sizes, it would be reported late, which WebKit raises as an error.
 // A header that only grew wider moves nothing below it.
-let surround = -1
-const surroundObserver = new ResizeObserver(() => {
-  const height = headerRoot.offsetHeight + footerRoot.offsetHeight
-  if (height === surround) return
-  surround = height
+let headerHeight = -1
+new ResizeObserver(() => {
+  const height = headerRoot.offsetHeight
+  if (height === headerHeight) return
+  headerHeight = height
   requestAnimationFrame(() => {
     root.style.setProperty('--inkkit-min-height', `calc(100vh - ${height}px)`)
     editor.invalidateFindGeometry()
     checkHeaderScrolledAway()
   })
-})
-surroundObserver.observe(headerRoot)
-surroundObserver.observe(footerRoot)
+}).observe(headerRoot)
 
 function setPageProperty(name: string, value: string): void {
   const style = document.documentElement.style

@@ -4,7 +4,6 @@ import { ItemHeader, type HeaderModel } from '../src/header'
 
 let posted: EditorMessage[] = []
 let root: HTMLElement
-let footer: HTMLElement
 let header: ItemHeader
 
 const ticket: HeaderModel = {
@@ -32,12 +31,9 @@ const ticket: HeaderModel = {
     { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
   ],
   foldAfter: 6,
-  contents: [],
   linked: [],
   linkedFoldAfter: 20,
-  showsText: true,
   showMore: 'Show 0 More',
-  showMoreContents: 'Show 0 More',
   showMoreLinked: 'Show 0 More',
   propertyRejected: false,
   parentRejected: false,
@@ -48,14 +44,12 @@ beforeEach(() => {
   posted = []
   window.webkit = { messageHandlers: { host: { postMessage: (message) => posted.push(message) } } }
   root = document.createElement('header')
-  footer = document.createElement('footer')
-  document.body.append(root, footer)
-  header = new ItemHeader(root, footer, { untitled: 'Sans titre' })
+  document.body.append(root)
+  header = new ItemHeader(root, { untitled: 'Sans titre' })
 })
 
 afterEach(() => {
   root.remove()
-  footer.remove()
   delete window.webkit
 })
 
@@ -424,13 +418,7 @@ test('rows past the fold wait behind a button that expands them in place', () =>
   expect(more.textContent).toBe('Show 3 More')
   more.click()
   expect(root.querySelectorAll('.item-prop')).toHaveLength(9)
-  // The same button folds them again.
-  expect(more.hidden).toBe(false)
-  expect(more.textContent).toBe('Show Less')
-  more.click()
-  expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
-  expect(more.textContent).toBe('Show 3 More')
-  more.click()
+  expect(more.hidden).toBe(true)
   // Another item starts folded again.
   header.set({ ...ticket, item: 'other', properties: rows(9), showMore: 'Show 3 More' })
   expect(root.querySelectorAll('.item-prop')).toHaveLength(6)
@@ -442,15 +430,13 @@ test('linked items are folded, then listed with their type and date, and open on
     { item: 'b', title: 'Decision', symbol: 'doc', type: 'Decision', date: '24 Oct' },
   ]
   header.set({ ...ticket, linked })
-  const toggle = footer.querySelector<HTMLButtonElement>('.item-linked-from .item-linked-toggle')!
+  const toggle = root.querySelector<HTMLButtonElement>('.item-linked-toggle')!
   expect(toggle.textContent).toBe('Linked From2')
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(true)
   toggle.click()
   expect(toggle.getAttribute('aria-expanded')).toBe('true')
-  const rowsShown = [...footer.querySelectorAll('.item-linked-from .item-linked-row')]
+  const rowsShown = [...root.querySelectorAll('.item-linked-row')]
   expect(rowsShown.map((row) => row.querySelector('.item-linked-name')!.textContent)).toEqual([
     'Wiring',
     'Decision',
@@ -461,57 +447,9 @@ test('linked items are folded, then listed with their type and date, and open on
   expect(posted).toEqual([{ type: 'openItem', item: 'b' }])
 })
 
-test('a long list of linked items expands, and folds again', () => {
-  const linked = Array.from({ length: 5 }, (_, index) => ({
-    item: `i${index}`,
-    title: `Item ${index}`,
-    symbol: 'doc',
-    type: 'Note',
-    date: 'Today',
-  }))
-  header.set({ ...ticket, linked, linkedFoldAfter: 3, showMoreLinked: 'Show 2 More' })
-  const section = footer.querySelector<HTMLElement>('.item-linked-from')!
-  section.querySelector<HTMLButtonElement>('.item-linked-toggle')!.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
-  const more = section.querySelector<HTMLButtonElement>('.item-more')!
-  expect(more.textContent).toBe('Show 2 More')
-  more.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(5)
-  expect(more.textContent).toBe('Show Less')
-  more.click()
-  expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
-})
-
-test('the byline keeps one dot between its parts however often it is drawn again', () => {
-  const dots = () => root.querySelectorAll('.item-byline-dot').length
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  const first = dots()
-  expect(first).toBe(2)
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Yesterday' } })
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  expect(dots()).toBe(first)
-})
-
-test('a collection lists what it holds under its text, open, apart from what links to it', () => {
-  const member = { item: 'f', title: 'README', symbol: 'doc', type: 'GitHub File', date: 'Today' }
-  const mention = { item: 'n', title: 'Notes', symbol: 'doc', type: 'Note', date: 'Today' }
-  header.set({ ...ticket, contents: [member], linked: [mention], showsText: false })
-  const contents = footer.querySelector<HTMLElement>('.item-contents')!
-  expect(contents.querySelector('.item-linked-title')!.textContent).toBe('Contents')
-  expect(contents.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(false)
-  expect(contents.querySelector('.item-linked-name')!.textContent).toBe('README')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
-  expect(document.body.dataset.text).toBe('none')
-  header.set({ ...ticket, item: 'other' })
-  expect(contents.hidden).toBe(true)
-  expect(document.body.dataset.text).toBe('shown')
-})
-
 test('an item nothing links to has no Linked From section', () => {
   header.set(ticket)
-  expect(footer.querySelector<HTMLElement>('.item-linked-from')!.hidden).toBe(true)
+  expect(root.querySelector<HTMLElement>('.item-linked')!.hidden).toBe(true)
 })
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
@@ -562,10 +500,8 @@ test('a person shows initials or a picture, a subtitle, and a timeline that star
   expect(root.querySelector<HTMLElement>('.item-subtitle')!.textContent).toBe(
     'Editor, Okonjo Press',
   )
-  expect(footer.querySelector('.item-linked-from .item-linked-title')!.textContent).toBe('Timeline')
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    false,
-  )
+  expect(root.querySelector('.item-linked-title')!.textContent).toBe('Timeline')
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(false)
 
   header.set({
     ...person,
@@ -578,12 +514,8 @@ test('a person shows initials or a picture, a subtitle, and a timeline that star
 
   header.set({ ...ticket, item: 'plain', linked: person.linked })
   expect(root.querySelector<HTMLElement>('.item-avatar')!.hidden).toBe(true)
-  expect(footer.querySelector('.item-linked-from .item-linked-title')!.textContent).toBe(
-    'Linked From',
-  )
-  expect(footer.querySelector<HTMLElement>('.item-linked-from .item-linked-list')!.hidden).toBe(
-    true,
-  )
+  expect(root.querySelector('.item-linked-title')!.textContent).toBe('Linked From')
+  expect(root.querySelector<HTMLElement>('.item-linked-list')!.hidden).toBe(true)
 })
 
 test('a phone number is a link that dials its digits', () => {

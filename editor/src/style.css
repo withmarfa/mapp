@@ -99,24 +99,7 @@ body {
   user-select: none;
 }
 
-#item-header[hidden],
-#item-footer[hidden] {
-  display: none;
-}
-
-/* What follows the text: a collection's contents and Linked From, on the header's margins and type. */
-#item-footer {
-  --interface-text-size: 13px;
-  --step: calc(var(--interface-text-size) * 4 / 13);
-  padding: calc(var(--step) * 6) var(--inkkit-column-inset) calc(var(--step) * 8);
-  font-family: -apple-system, system-ui, sans-serif;
-  line-height: normal;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* A page with no text to write draws no editor, rather than an empty one that takes typing. */
-body[data-text='none'] #editor {
+#item-header[hidden] {
   display: none;
 }
 
@@ -447,13 +430,11 @@ body[data-text='none'] #editor {
   color: var(--label-primary);
 }
 
-/* Linked From and a collection's contents: a folded group under a faint hairline. */
+/* Linked From: one folded group with a hairline edge. */
 .item-linked {
-  border-top: 1px solid var(--label-quinary);
-}
-
-.item-linked + .item-linked {
+  align-self: stretch;
   margin-top: calc(var(--step) * 4);
+  border-top: 1px solid var(--separator);
 }
 
 .item-linked-toggle {
@@ -465,37 +446,40 @@ body[data-text='none'] #editor {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--label-secondary);
+  color: var(--label-primary);
   font: inherit;
+  font-weight: 500;
   text-align: start;
   cursor: default;
 }
 
-/* The same small chevron the pins end in, turned to point along the row while the group is folded. */
 .item-chevron {
   flex: none;
-  width: var(--icon-indicator-width, 0.6em);
-  height: var(--icon-indicator-height, 0.6em);
-  background: var(--label-secondary);
-  -webkit-mask: var(--icon-indicator) center / contain no-repeat;
-  mask: var(--icon-indicator) center / contain no-repeat;
-  transform: rotate(-90deg);
+  width: calc(var(--step) * 2.5);
+  height: calc(var(--step) * 2.5);
+  border-right: 1.5px solid var(--label-secondary);
+  border-bottom: 1.5px solid var(--label-secondary);
+  transform: translateX(-1px) rotate(-45deg);
   transition: transform 0.12s ease;
 }
 
 .item-linked-toggle[aria-expanded='true'] .item-chevron {
-  transform: none;
+  transform: translateY(-1px) rotate(45deg);
 }
 
 .item-linked-count {
   color: var(--label-secondary);
-  opacity: 0.7;
+  font-weight: 400;
 }
 
 .item-linked-list {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.item-linked-row + .item-linked-row {
+  border-top: 1px solid var(--separator);
 }
 
 .item-linked-open {
