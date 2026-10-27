@@ -5,7 +5,7 @@ name: Checks
 # - A change that touches only views, the String Catalog, assets or UI tests compiles everything
 #   but does not run the unit tests, which cover logic, not styling.
 # - The release build runs beside the unit tests, not after them.
-# The final job, "Checks", always runs; make it the one required check.
+# The final job, "Checks", always runs; make it the one required check. (experiment)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
