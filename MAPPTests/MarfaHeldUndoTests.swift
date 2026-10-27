@@ -269,8 +269,9 @@ import Testing
 
         scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
-        #expect(try await scene.links() == 1, "unlinked, then linked again")
-        #expect(scene.reads.attempts.withLock { $0.count } == 3)
+        // The held count falls when the writes are taken, not when they are made. The third attempt begins only once the
+        // unlink is made, so the link is back only after it.
+        try #require(try await eventuallyAsking { try await scene.links() == 1 && scene.reads.attempts.withLock { $0.count } == 3 })
         await finish(scene)
     }
 
