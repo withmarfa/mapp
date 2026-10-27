@@ -47,6 +47,7 @@ final class WindowTests: XCTestCase {
         switch name {
         case "Favorites": "SidebarFavorites"
         case "Types": "SidebarTypes"
+        case "Note": "SidebarType-core.note"
         default: nil
         }
     }
