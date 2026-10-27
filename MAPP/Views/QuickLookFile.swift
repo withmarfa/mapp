@@ -21,11 +21,14 @@ nonisolated struct QuickLookFile {
 
     /// A copy of `file` in a folder of its own under `folderName`, or nil where it cannot be made and the file is better shown as it is.
     /// On APFS the copy is a clone, so it costs no space, and an app that changes it cannot change the kept bytes.
-    static func copy(of file: URL, titled title: String, as type: UTType, in folderName: String = "Quick Look") -> QuickLookFile? {
+    /// With `key`, the copy's folder is named by it and an earlier copy under that key is replaced, so repeating the
+    /// request for the same thing leaves one copy; without it each copy has a folder of its own.
+    static func copy(of file: URL, titled title: String, as type: UTType, in folderName: String = "Quick Look", key: String? = nil) -> QuickLookFile? {
         let folder = URL.temporaryDirectory.appending(path: folderName, directoryHint: .isDirectory)
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            .appending(path: key.map { name(for: $0, type: .data) } ?? UUID().uuidString, directoryHint: .isDirectory)
         let url = folder.appending(path: name(for: title, type: type), directoryHint: .notDirectory)
         do {
+            if key != nil { try? FileManager.default.removeItem(at: folder) }
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: file, to: url)
             return QuickLookFile(folder: folder, url: url)

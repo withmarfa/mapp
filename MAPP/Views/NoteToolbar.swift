@@ -270,7 +270,7 @@ private struct MoreMenu: View {
             }
             if let page = pageInBrowser {
                 Button("Open in Browser", systemImage: "safari") {
-                    if let target = page.target { BrowserOpening.open(target, titled: page.item.title) }
+                    if let target = page.target { BrowserOpening.open(target, for: page.item) }
                 }
                 .disabled(page.target == nil)
             }

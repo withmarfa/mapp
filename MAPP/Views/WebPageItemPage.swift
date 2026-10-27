@@ -36,6 +36,9 @@ struct WebPageItemPage: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 WebPageHeader(item: item, inset: style.horizontalInset(for: geometry.size.width))
+                // The header is inset like the other item pages' and the page draws to its own margin, so the line
+                // sets the page apart as a document under its header.
+                Divider()
                 pageBody
             }
         }
@@ -50,7 +53,11 @@ struct WebPageItemPage: View {
         case .ready(let html):
             WebPageView(html: html)
         case .unavailable:
-            ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
+            ContentUnavailableView {
+                Label("File Unavailable", systemImage: "questionmark.folder")
+            } description: {
+                Text("The file for this page isn’t in Marfa.")
+            }
         case .failed:
             ContentUnavailableView {
                 Label("Can’t Get This File", systemImage: "exclamationmark.icloud")

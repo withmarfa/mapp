@@ -299,7 +299,7 @@ struct CommandPalette: View {
         }
         if browser.selection.count == 1, let page = browser.selectedItems(in: library).first,
            let target = library.browserTarget(of: page, fetchedFile: browser.fileURL(of: page.id)) {
-            add(String(localized: "Open in Browser"), "safari") { BrowserOpening.open(target, titled: page.title) }
+            add(String(localized: "Open in Browser"), "safari") { BrowserOpening.open(target, for: page) }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
         let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
