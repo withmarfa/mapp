@@ -218,10 +218,10 @@ class LinkedSection {
     this.root.hidden = items.length === 0
     this.toggle.replaceChildren()
     this.toggle.setAttribute('aria-expanded', String(this.open))
-    element('span', 'item-chevron', this.toggle).setAttribute('aria-hidden', 'true')
     this.root.setAttribute('aria-label', name)
     element('span', 'item-linked-title', this.toggle).textContent = name
     element('span', 'item-linked-count', this.toggle).textContent = String(items.length)
+    element('span', 'item-chevron', this.toggle).setAttribute('aria-hidden', 'true')
     const shown = this.all ? items : items.slice(0, foldAfter)
     this.list.hidden = !this.open
     this.list.replaceChildren(
