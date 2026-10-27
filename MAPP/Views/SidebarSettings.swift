@@ -7,6 +7,8 @@ import SwiftUI
 struct SidebarSettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
+    @AppStorage(SidebarExperiment.key) private var experiment = SidebarExperiment()
 
     var body: some View {
         if let library {
@@ -28,6 +30,11 @@ struct SidebarSettings: View {
                 group(plan.browse, in: library, plan: plan)
             }
             if plan.library.contains(.types) {
+                Section {
+                    Toggle("Show Icons on Subtypes", isOn: $showsSubtypeIcons)
+                        .toggleStyle(.switch)
+                        .accessibilityIdentifier("SidebarSubtypeIcons")
+                }
                 Section {
                     row(.types, title: String(localized: "Show Types"), in: library, plan: plan, among: [])
                     ForEach(plan.types) { node in
@@ -57,9 +64,31 @@ struct SidebarSettings: View {
                     }
                 }
             }
+            experiments
         }
         .settingsForm()
         .accessibilityIdentifier("SidebarSettings")
+    }
+
+    /// The switches that compare ways the sidebar could work, all in `SidebarExperiment`.
+    private var experiments: some View {
+        Section {
+            Picker("Chevron", selection: $experiment.chevron) {
+                Text("At the trailing end beside the count").tag(SidebarExperiment.ChevronPlace.trailing)
+                Text("Straight after the name").tag(SidebarExperiment.ChevronPlace.afterName)
+                Text("At the leading edge").tag(SidebarExperiment.ChevronPlace.leading)
+            }
+            .accessibilityIdentifier("SidebarExperimentChevron")
+            Picker("Click on a Type With Subtypes", selection: $experiment.rowClick) {
+                Text("Row opens, chevron folds").tag(SidebarExperiment.RowClick.opensOnly)
+                Text("Row opens, and a second click folds or unfolds it").tag(SidebarExperiment.RowClick.opensThenFolds)
+            }
+            .accessibilityIdentifier("SidebarExperimentRowClick")
+        } header: {
+            Text("Experiments")
+        } footer: {
+            Text("These compare ways the sidebar could work and may change or go. Include Subtypes is in the list’s toolbar and the View menu, for a type that has subtypes.")
+        }
     }
 
     /// The rows under a type, indented, each with its switch; they keep the order of their items.

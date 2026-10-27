@@ -223,6 +223,12 @@ struct CommandPalette: View {
             addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
             addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
             addLayout(.timeline, String(localized: "View as Timeline"), "calendar", "⌘5")
+            if browser.stackableType(in: library) != nil {
+                let isOn = browser.stacksSubtypes(in: library)
+                add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol) {
+                    browser.setStacksSubtypes(!isOn, in: library)
+                }
+            }
             let ordersList = browser.viewMode == .list || browser.viewMode == .gallery
             if ordersList && browser.isSearching && !browser.ordersByRelevance {
                 add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down") { browser.orderSearch(byRelevance: true) }
