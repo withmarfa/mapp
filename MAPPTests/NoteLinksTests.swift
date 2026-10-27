@@ -154,7 +154,7 @@ struct NoteLinksTests {
         #expect(NoteRequest(body: ["type": "suggest", "query": ""]) == .suggest("", in: nil))
         #expect(NoteRequest(body: ["type": "pick", "item": "abc"]) == .pick(ItemID("abc")))
         #expect(NoteRequest(body: ["type": "pick", "item": ""]) == nil)
-        let links: [[String: Any]] = [["target": "Plan"], ["target": "Plan", "alias": "new", "heading": "Soil"]]
+        let links: [[String: Any]] = [["raw": "[[Plan]]", "target": "Plan"], ["raw": "[[Plan#Soil|new]]", "target": "Plan", "alias": "new", "heading": "Soil"]]
         #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "links": links])
             == .resolve([NoteLink(name: "Plan"), NoteLink(name: "Plan", heading: "Soil", alias: "new")], in: ItemID("abc")))
         #expect(NoteRequest(body: ["type": "resolve", "item": "abc", "links": []]) == .resolve([], in: ItemID("abc")))

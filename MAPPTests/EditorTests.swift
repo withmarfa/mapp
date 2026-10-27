@@ -100,6 +100,84 @@ struct EditorTests {
         #expect(outline == "none")
     }
 
+    @Test func nativeFocusChangesUpdateSelectionWithoutEditingTheNote() async throws {
+        let page = try await Page()
+        try await page.load("Selected text")
+        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
+                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        let content = NSView(frame: window.contentLayoutRect)
+        let search = NSTextField(frame: NSRect(x: 20, y: 540, width: 250, height: 28))
+        content.addSubview(search)
+        page.editor.webView.frame = NSRect(x: 0, y: 0, width: 500, height: 500)
+        content.addSubview(page.editor.webView)
+        window.contentView = content
+        window.makeKeyAndOrderFront(nil)
+        page.editor.focus()
+        try await page.run("document.execCommand('selectAll')")
+        let color = "getComputedStyle(document.querySelector('.ProseMirror'), '::highlight(inkkit-selection)').backgroundColor"
+        let active = try #require(try await page.editor.webView.evaluateJavaScript(color) as? String)
+        #expect(window.makeFirstResponder(search))
+        try #require(await eventuallyAsking {
+            let inactive = try await page.editor.webView.evaluateJavaScript(color) as? String
+            return inactive != nil && inactive != active
+        })
+        page.editor.focus()
+        try #require(await eventuallyAsking {
+            try await page.editor.webView.evaluateJavaScript(color) as? String == active
+        })
+        let other = ReadingPanel(contentRect: .zero, styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        defer { other.orderOut(nil); other.close() }
+        other.makeKeyAndOrderFront(nil)
+        try #require(await eventuallyAsking {
+            let inactive = try await page.editor.webView.evaluateJavaScript(color) as? String
+            return inactive != nil && inactive != active
+        })
+        window.makeKeyAndOrderFront(nil)
+        try #require(await eventuallyAsking {
+            try await page.editor.webView.evaluateJavaScript(color) as? String == active
+        })
+        #expect(try await page.markdown() == nil)
+        #expect(page.changes.isEmpty)
+    }
+
+    @Test func readOnlyPageSupportsNativeSelectionCopyAndFind() async throws {
+        let page = try await Page()
+        try await page.load("Reading **text**\n")
+        let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
+                                  styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.webView
+        let board = NSPasteboard.general
+        let saved = (board.pasteboardItems ?? []).map { item in
+            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in item.data(forType: type).map { (type, $0) } })
+        }
+        defer {
+            board.clearContents()
+            board.writeObjects(saved.map { values in
+                let item = NSPasteboardItem()
+                for (type, data) in values { item.setData(data, forType: type) }
+                return item
+            })
+            window.orderOut(nil); window.contentView = nil; window.close()
+        }
+        window.makeKeyAndOrderFront(nil)
+        #expect(window.makeFirstResponder(page.editor.webView))
+        try await page.run("window.editor.reload('Reading **text**\\n', 2, false); window.editor.findSelect(0, 7, 2)")
+        #expect(try await page.editor.webView.evaluateJavaScript("document.querySelector('.ProseMirror').getAttribute('aria-readonly')") as? String == "true")
+        #expect(try await page.editor.webView.evaluateJavaScript("getSelection().toString()") as? String == "Reading")
+        board.clearContents()
+        #expect(NSApp.sendAction(#selector(NSText.copy(_:)), to: page.editor.webView, from: nil))
+        #expect(await eventually { board.string(forType: .string) == "Reading" })
+        let readable = try #require(try await page.editor.webView.evaluateJavaScript("window.editor.readableSnapshot(2).text") as? String)
+        #expect(readable.contains("Reading text"))
+        try await page.run("window.editor.findReplace(0, 7, 'Wrong', 2)")
+        #expect(try await page.markdown() == nil)
+        #expect(page.changes.isEmpty)
+    }
+
     @Test func deferredFocusBelongsToTheRequestedItem() async throws {
         let library = FakeItemLibrary()
         let first = library.add("First")

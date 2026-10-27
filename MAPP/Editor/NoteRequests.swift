@@ -57,9 +57,11 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
 }
 
 extension NoteLink {
-    /// A link as the page posts it: `target`, and `heading` and `alias` when it has them.
+    /// The authored spelling is the binding key even when decoded components look identical.
     nonisolated init?(page dict: [String: Any]) {
-        guard let target = dict["target"] as? String else { return nil }
-        self.init(name: target, heading: dict["heading"] as? String, alias: dict["alias"] as? String)
+        guard let target = dict["target"] as? String, let raw = dict["raw"] as? String,
+              raw.hasPrefix("[["), raw.hasSuffix("]]"), raw.count >= 4 else { return nil }
+        self.init(name: target, heading: dict["heading"] as? String, alias: dict["alias"] as? String,
+                  raw: String(raw.dropFirst(2).dropLast(2)))
     }
 }

@@ -27,9 +27,7 @@ beforeEach(() => {
             page.asked.push(request)
             if (page.silent) return null
             return request.type === 'resolve'
-              ? request.links.map((l) =>
-                  page.missing.has(l.alias ? `${l.target}|${l.alias}` : l.target),
-                )
+              ? request.links.map((l) => page.missing.has(l.raw.slice(2, -2)))
               : null
           },
         },
@@ -70,6 +68,38 @@ const marks = (root: HTMLElement) => links(root).map((link) => link.dataset.miss
 const modClick = (link: HTMLElement) =>
   link.dispatchEvent(new MouseEvent('click', { metaKey: true, button: 0, bubbles: true }))
 
+test('an alias repeating the name keeps its own binding and opening request', () =>
+  withEditor('[[Plan]] and [[Plan|Plan]]\n', async (editor, root) => {
+    page.missing.add('Plan|Plan')
+    await settle()
+    expect(marks(root)).toEqual([null, 'true'])
+    const request = page.asked.find((request) => request.type === 'resolve')
+    expect(request?.type === 'resolve' && request.links.map((link) => link.raw)).toEqual([
+      '[[Plan]]',
+      '[[Plan|Plan]]',
+    ])
+    page.hosted.length = 0
+    modClick(links(root)[1]!)
+    expect(page.hosted).toEqual([
+      { type: 'openNote', item: 'note', raw: '[[Plan|Plan]]', target: 'Plan' },
+    ])
+    expect(editor.snapshot().text).toBe('[[Plan]] and [[Plan|Plan]]\n')
+  }))
+
+test('escaped link separators reach the host exactly as authored', () =>
+  withEditor('[[A\\|B]] and [[Plan#A\\#B|alias]]\n', async (editor, root) => {
+    await settle()
+    const request = page.asked.find((request) => request.type === 'resolve')
+    expect(request?.type === 'resolve' && request.links.map((link) => link.raw)).toEqual([
+      '[[A\\|B]]',
+      '[[Plan#A\\#B|alias]]',
+    ])
+    page.hosted.length = 0
+    modClick(links(root)[0]!)
+    expect(page.hosted[0]).toMatchObject({ type: 'openNote', raw: '[[A\\|B]]', target: 'A|B' })
+    expect(editor.snapshot().text).toBe('[[A\\|B]] and [[Plan#A\\#B|alias]]\n')
+  }))
+
 const forms: [string, { target: string; heading?: string; alias?: string }][] = [
   ['[[Plan]]', { target: 'Plan' }],
   ['[[Plan|alias]]', { target: 'Plan', alias: 'alias' }],
@@ -84,7 +114,7 @@ for (const [link, named] of forms) {
       await settle()
       page.hosted.length = 0
       modClick(links(root)[0]!)
-      expect(page.hosted).toEqual([{ type: 'openNote', item: 'note', ...named }])
+      expect(page.hosted).toEqual([{ type: 'openNote', item: 'note', raw: link, ...named }])
     }))
 }
 
@@ -96,13 +126,18 @@ test('two links with one name but different spellings are told apart', () =>
       {
         type: 'resolve',
         item: 'note',
-        links: [{ target: 'Plan' }, { target: 'Plan', alias: 'new' }],
+        links: [
+          { raw: '[[Plan]]', target: 'Plan' },
+          { raw: '[[Plan|new]]', target: 'Plan', alias: 'new' },
+        ],
       },
     ])
     expect(marks(root)).toEqual([null, 'true'])
     page.hosted.length = 0
     modClick(links(root)[1]!)
-    expect(page.hosted).toEqual([{ type: 'openNote', item: 'note', target: 'Plan', alias: 'new' }])
+    expect(page.hosted).toEqual([
+      { type: 'openNote', item: 'note', raw: '[[Plan|new]]', target: 'Plan', alias: 'new' },
+    ])
   }))
 
 test('a plain click on a note link opens nothing', () =>
@@ -133,7 +168,14 @@ test('links that name no note are marked missing, asking the app once for every 
     page.missing.add('Gone')
     await settle()
     expect(page.asked).toEqual([
-      { type: 'resolve', item: 'note', links: [{ target: 'Here' }, { target: 'Gone' }] },
+      {
+        type: 'resolve',
+        item: 'note',
+        links: [
+          { raw: '[[Here]]', target: 'Here' },
+          { raw: '[[Gone]]', target: 'Gone' },
+        ],
+      },
     ])
     expect(marks(root)).toEqual([null, 'true', null])
   }))
@@ -143,7 +185,11 @@ test('a link that names a note by identity is asked about by that identity', () 
     page.missing.add(`${identity}|Plan`)
     await settle()
     expect(page.asked).toEqual([
-      { type: 'resolve', item: 'note', links: [{ target: identity, alias: 'Plan' }] },
+      {
+        type: 'resolve',
+        item: 'note',
+        links: [{ raw: `[[${identity}|Plan]]`, target: identity, alias: 'Plan' }],
+      },
     ])
     expect(marks(root)).toEqual(['true'])
   }))
@@ -172,7 +218,14 @@ test('a library change asks again and a link becomes live or missing without the
     editor.linksChanged()
     await settle()
     expect(page.asked).toEqual([
-      { type: 'resolve', item: 'note', links: [{ target: 'Here' }, { target: 'Soon' }] },
+      {
+        type: 'resolve',
+        item: 'note',
+        links: [
+          { raw: '[[Here]]', target: 'Here' },
+          { raw: '[[Soon]]', target: 'Soon' },
+        ],
+      },
     ])
     expect(marks(root)).toEqual(['true', null])
     expect(editor.snapshot().text).toBe(before)
@@ -251,7 +304,9 @@ test('answers are kept for the note on the page only', () =>
     editor.load('[[Here]]\n', 2)
     page.asked.length = 0
     await settle()
-    expect(page.asked).toEqual([{ type: 'resolve', item: 'other', links: [{ target: 'Here' }] }])
+    expect(page.asked).toEqual([
+      { type: 'resolve', item: 'other', links: [{ raw: '[[Here]]', target: 'Here' }] },
+    ])
   }))
 
 test('names queued for a note that is replaced before they are sent are never sent', () =>
@@ -260,7 +315,9 @@ test('names queued for a note that is replaced before they are sent are never se
     editor.setItem('other')
     editor.load('[[Late]]\n', 2)
     await settle()
-    expect(page.asked).toEqual([{ type: 'resolve', item: 'other', links: [{ target: 'Late' }] }])
+    expect(page.asked).toEqual([
+      { type: 'resolve', item: 'other', links: [{ raw: '[[Late]]', target: 'Late' }] },
+    ])
   }))
 
 test('an answer that arrives after the note was replaced is dropped', () =>
