@@ -79,7 +79,7 @@ final class SettingsTests: XCTestCase {
             row.click()
             XCTAssertTrue(element("SettingsDetail").exists)
             attachScreenshot("Settings-\(page)")
-            XCTAssertTrue(window.toolbars.staticTexts[title].waitForExistence(timeout: 3), "the page has a native toolbar title")
+            XCTAssertTrue(element("SettingsDetail").staticTexts[title].waitForExistence(timeout: 3), "the detail shows the selected page's title")
         }
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -146,7 +146,7 @@ final class SettingsTests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         XCTAssertFalse(search.exists)
-        XCTAssertTrue(window.toolbars.staticTexts["Appearance"].waitForExistence(timeout: 3))
+        XCTAssertTrue(element("SettingsDetail").staticTexts["Appearance"].waitForExistence(timeout: 3))
         attachScreenshot("Settings-from-column-search")
         leaveSettings()
         XCTAssertTrue(search.waitForExistence(timeout: 3))
@@ -209,8 +209,8 @@ final class SettingsTests: XCTestCase {
         let originalHeight = row.frame.height
         let sidebarText = sidebar.staticTexts["Items"]
         let originalSidebarHeight = sidebarText.frame.height
-        let typeText = sidebar.staticTexts["Note"]
-        let originalTypeHeight = typeText.frame.height
+        let typesIndex = sidebar.staticTexts["Types"]
+        let originalTypesHeight = typesIndex.frame.height
         XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
         XCTAssertTrue(instanceMenu.exists)
         XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
@@ -223,7 +223,7 @@ final class SettingsTests: XCTestCase {
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertGreaterThan(row.frame.height, originalHeight + 8, "list text and row height scale together")
-        XCTAssertGreaterThan(typeText.frame.height, originalTypeHeight + 3, "a type's row scales with the interface")
+        XCTAssertGreaterThan(typesIndex.frame.height, originalTypesHeight + 3, "the types index scales with the interface")
         XCTAssertGreaterThan(sidebarText.frame.height, originalSidebarHeight + 3, "sidebar text scales too")
         attachScreenshot("LargerInterfaceText")
         app.typeKey(",", modifierFlags: .command)
