@@ -59,7 +59,7 @@ struct NoteWindow: View {
                         NoteToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
             } else if let item {
-                ItemFileView(id: item.id) { fileURL = $0 }
+                FileItemPage(item: item) { fileURL = $0 }
                     .navigationTitle(item.title)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {

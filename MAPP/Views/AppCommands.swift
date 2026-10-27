@@ -42,6 +42,14 @@ struct AppCommands: Commands {
             let original = ids.count == 1 ? ids.first.flatMap { library?.item($0) }.flatMap { library?.originalAddress(of: $0) } : nil
             Button("Open Original", systemImage: "safari") { if let original { NSWorkspace.shared.open(original) } }
                 .disabled(original == nil)
+            let page = ids.count == 1 ? ids.first.flatMap { library?.item($0) } : nil
+            let target = page.flatMap { page in
+                library?.browserTarget(of: page, fetchedFile: ids.first.flatMap { browser?.fileURL(of: $0) })
+            }
+            Button("Open in Browser", systemImage: "safari") {
+                if let page, let target { BrowserOpening.open(target, titled: page.title) }
+            }
+            .disabled(target == nil)
             Divider()
             NoteShareLink(share: library.map { library in
                 NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)

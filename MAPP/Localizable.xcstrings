@@ -1338,6 +1338,9 @@
     "File Not Found" : {
 
     },
+    "This file isn’t an HTML page." : {
+
+    },
     "File Unavailable" : {
       "extractionState" : "manual"
     },
@@ -1791,6 +1794,9 @@
     },
     "Open Copy" : {
       "extractionState" : "manual"
+    },
+    "Open in Browser" : {
+
     },
     "Open in New Window" : {
 

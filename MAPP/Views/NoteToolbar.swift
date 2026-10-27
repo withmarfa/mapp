@@ -249,6 +249,12 @@ private struct MoreMenu: View {
     let visibleNote: Item?
     let editableNote: Item?
 
+    /// The Web Page on the page and where "Open in Browser" takes it.
+    private var pageInBrowser: (item: Item, target: BrowserTarget?)? {
+        guard ids.count == 1, let item = ids.first.flatMap({ library.item($0) }), library.isWebPage(item) else { return nil }
+        return (item, library.browserTarget(of: item, fetchedFile: fileURL))
+    }
+
     var body: some View {
         let note = notes.count == 1 ? notes.first : nil
         Menu("More", systemImage: "ellipsis") {
@@ -261,6 +267,12 @@ private struct MoreMenu: View {
             }
             if let original = (visibleNote ?? note).flatMap({ library.originalAddress(of: $0) }) {
                 Button("Open Original", systemImage: "safari") { NSWorkspace.shared.open(original) }
+            }
+            if let page = pageInBrowser {
+                Button("Open in Browser", systemImage: "safari") {
+                    if let target = page.target { BrowserOpening.open(target, titled: page.item.title) }
+                }
+                .disabled(page.target == nil)
             }
             NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()

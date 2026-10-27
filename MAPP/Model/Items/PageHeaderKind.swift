@@ -1,7 +1,7 @@
 import Foundation
 
 /// Which header an item's page draws above its text, chosen by the core type the item's type builds on: the page
-/// is the general one (title, byline, properties, Linked From), and these three extend it with what a person looks
+/// is the general one (title, byline, properties, Linked From), and these extend it with what a person looks
 /// for first. A type nobody at WithMarfa defined takes the nearest core type above it through the parents the
 /// catalogue names, so the app names no type a person or an app made.
 nonisolated enum PageHeaderKind: String, Encodable, Sendable {
@@ -12,6 +12,9 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     case person
     /// `core.bookmark` and `core.media`: something to read.
     case reading
+    /// `core.file.webpage`: the page itself. A file has no text to edit, so the page draws a title and byline above
+    /// the HTML (`WebPageItemPage`), not the editor's header.
+    case webpage
 
     static func of(_ type: TypeID, in catalogue: Catalogue) -> PageHeaderKind {
         var visited: Set<TypeID> = []
@@ -28,6 +31,7 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
         TypeID("core.entity.person"): .person,
         TypeID("core.bookmark"): .reading,
         TypeID("core.media"): .reading,
+        TypeID("core.file.webpage"): .webpage,
     ]
 }
 
@@ -54,7 +58,7 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
     ) {
         self.kind = kind
         switch kind {
-        case .general:
+        case .general, .webpage:
             break
         case .event:
             if let event = EventHeader(item: item, now: now, calendar: calendar, locale: locale) {
@@ -94,4 +98,14 @@ extension ItemLibrary {
         guard PageHeaderKind.of(item.type, in: catalogue) == .reading else { return nil }
         return ReadingHeader.webAddress(item.value(of: "url")?.string?.trimmingCharacters(in: .whitespacesAndNewlines))
     }
+
+    /// What "Open in Browser" opens for `item`, if it is a Web Page. `fetchedFile` is the page's file once the window
+    /// has it.
+    func browserTarget(of item: Item, fetchedFile: URL?) -> BrowserTarget? {
+        guard PageHeaderKind.of(item.type, in: catalogue) == .webpage else { return nil }
+        return BrowserTarget.of(item, fetchedFile: fetchedFile)
+    }
+
+    /// Whether the item is a Web Page, which has the "Open in Browser" action.
+    func isWebPage(_ item: Item) -> Bool { PageHeaderKind.of(item.type, in: catalogue) == .webpage }
 }
