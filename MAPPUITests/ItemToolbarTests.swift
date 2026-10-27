@@ -12,7 +12,7 @@ final class ItemToolbarTests: XCTestCase {
         app.launch()
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 5))
-        XCTAssertTrue(window.webViews.firstMatch.textViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.itemPageBody.waitForExistence(timeout: 5))
     }
 
     override func tearDown() async throws { app.terminate() }
@@ -116,7 +116,7 @@ final class ItemToolbarTests: XCTestCase {
 
     func testMovedAttachmentAndFormattingActionsStillWork() {
         let page = window.webViews.firstMatch
-        let editor = page.textViews.firstMatch
+        let editor = app.itemPageBody
         editor.click()
         app.typeKey(.downArrow, modifierFlags: .command)
         editor.typeText("\nToolbar list check")

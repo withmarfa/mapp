@@ -79,7 +79,7 @@ final class GalleryTests: XCTestCase {
         gap.click()
         XCTAssertNotEqual(target.value as? String, "Selected", "a click between the cards clears the selection")
         target.doubleClick()
-        let editor = window.webViews.firstMatch.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         let reading = editor.value as? String
         app.typeKey("q", modifierFlags: [])
@@ -126,7 +126,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(target.waitForExistence(timeout: 3))
         target.doubleClick()
         let page = window.webViews.firstMatch
-        let editor = page.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.click()
         app.typeKey(.downArrow, modifierFlags: .command)
@@ -231,7 +231,7 @@ final class GalleryTests: XCTestCase {
         let title = window.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        let editor = window.webViews.firstMatch.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.typeText("Created from the gallery")
         window.buttons["BackToGallery"].click()
@@ -242,7 +242,7 @@ final class GalleryTests: XCTestCase {
     }
 
     func testPaletteOffersViewModesAndHidesEditorCommandsInGallery() {
-        let editor = window.webViews.firstMatch.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]

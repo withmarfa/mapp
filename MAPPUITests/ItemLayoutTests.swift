@@ -28,7 +28,7 @@ final class ItemLayoutTests: XCTestCase {
         else { app.typeKey(.escape, modifierFlags: []) }
         let normalWidth = page.frame.width
         capture("Document normal width")
-        let bodyHeading = page.textViews.firstMatch.staticTexts["Kitchen quotes"].firstMatch
+        let bodyHeading = app.itemPageBody.staticTexts["Kitchen quotes"].firstMatch
         XCTAssertTrue(bodyHeading.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(bodyHeading.frame.minY, title.frame.maxY + 20,
                                     "Body content must start below the title and pinned properties.")
@@ -70,7 +70,7 @@ final class ItemLayoutTests: XCTestCase {
         let page = app.webViews.firstMatch
         XCTAssertTrue(page.waitForExistence(timeout: 5))
         XCTAssertTrue(page.staticTexts["The Design of Everyday Things"].firstMatch.waitForExistence(timeout: 5))
-        let body = page.textViews.firstMatch
+        let body = app.itemPageBody
         XCTAssertTrue(body.waitForExistence(timeout: 5))
         body.click()
         app.typeKey(.downArrow, modifierFlags: .command)

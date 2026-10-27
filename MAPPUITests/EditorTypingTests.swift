@@ -7,7 +7,7 @@ final class EditorTypingTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var page: XCUIElement { window.webViews.firstMatch }
-    private var editor: XCUIElement { page.textViews.firstMatch }
+    private var editor: XCUIElement { app.itemPageBody }
     private var text: String { editor.value as? String ?? "" }
 
     override func setUp() async throws {

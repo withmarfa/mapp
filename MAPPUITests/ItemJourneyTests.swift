@@ -44,7 +44,7 @@ final class ItemJourneyTests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'RelationshipCandidate.'")).firstMatch.click()
         app.buttons["RelationshipSave"].click()
         details.click()
-        let editor = app.webViews.firstMatch.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.click()
         editor.typeText("A document written through the existing editor.")
@@ -52,7 +52,7 @@ final class ItemJourneyTests: XCTestCase {
         wait(for: [typedBody], timeout: 5)
 
         reopen("Interface Test Task")
-        let reopened = app.webViews.firstMatch.textViews.firstMatch
+        let reopened = app.itemPageBody
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "A document written through the existing editor."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)
@@ -69,7 +69,7 @@ final class ItemJourneyTests: XCTestCase {
         let pageTitle = app.itemPageTitle
         XCTAssertTrue(pageTitle.waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        let editor = app.webViews.firstMatch.textViews.firstMatch
+        let editor = app.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         editor.typeText("Created by starting the document body.")
         let typedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: editor)
@@ -96,7 +96,7 @@ final class ItemJourneyTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         reopen("Body Focus Saved Task")
-        let reopened = app.webViews.firstMatch.textViews.firstMatch
+        let reopened = app.itemPageBody
         XCTAssertTrue(reopened.waitForExistence(timeout: 3))
         let savedBody = expectation(for: NSPredicate(format: "value CONTAINS %@", "Created by starting the document body."), evaluatedWith: reopened)
         wait(for: [savedBody], timeout: 5)

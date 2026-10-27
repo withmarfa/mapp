@@ -102,7 +102,7 @@ final class SettingsTests: XCTestCase {
     func testSettingsPreservesTheEditorsTextAndUndoHistory() {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         row.click()
-        let body = window.webViews.firstMatch.textViews.firstMatch
+        let body = app.itemPageBody
         XCTAssertTrue(body.waitForExistence(timeout: 5))
         body.click()
         app.typeKey(.downArrow, modifierFlags: .command)

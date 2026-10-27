@@ -9,7 +9,7 @@ final class WindowTests: XCTestCase {
     private var list: XCUIElement { window.outlines["NoteList"] }
     private var page: XCUIElement { window.webViews.firstMatch }
     /// The note's text as the page shows it: formatted, so without markdown's marks.
-    private var editor: XCUIElement { page.textViews.firstMatch }
+    private var editor: XCUIElement { app.itemPageBody }
     private var text: String { editor.value as? String ?? "" }
 
     private func waitForText(_ predicate: String, _ argument: String) -> Bool {
