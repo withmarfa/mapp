@@ -536,3 +536,172 @@ body {
   outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
   outline-offset: 2px;
 }
+
+/* The title and what sits beside or under it. A general page has only the title; a person's page puts an avatar
+   beside it, and a page for reading puts a dek under it. */
+.item-lead {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 4);
+}
+
+.item-lead:has(.item-avatar[hidden]) {
+  display: block;
+}
+
+.item-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--step) * 1);
+}
+
+.item-subtitle {
+  margin: 0;
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 15 / 13);
+  line-height: 1.4;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.item-subtitle[hidden] {
+  display: none;
+}
+
+/* A person: a circle of initials, or the picture the item holds, and the name beside it. */
+.item-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--step) * 16);
+  height: calc(var(--step) * 16);
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--label-quinary);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 22 / 13);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.item-avatar[hidden] {
+  display: none;
+}
+
+.item-avatar-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* An event: a calendar block, then the time and what places it. */
+.item-when {
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--step) * 4);
+  margin-top: calc(var(--step) * 1);
+}
+
+.item-when[hidden] {
+  display: none;
+}
+
+.item-calendar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(var(--step) * 16);
+  overflow: hidden;
+  border-radius: calc(var(--step) * 2);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  background: var(--label-quinary);
+}
+
+.item-calendar-month {
+  align-self: stretch;
+  padding-block: calc(var(--step) * 0.5);
+  background: var(--status-red);
+  color: white;
+  font-size: calc(var(--interface-text-size) * 10 / 13);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.item-calendar-day {
+  padding-block: calc(var(--step) * 1);
+  color: var(--inkkit-text-color);
+  font-size: calc(var(--interface-text-size) * 24 / 13);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.item-when-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--step) * 1);
+  min-width: 0;
+}
+
+.item-when-time,
+.item-when-detail {
+  margin: 0;
+}
+
+.item-when-time {
+  color: var(--inkkit-text-color);
+  font-size: calc(var(--interface-text-size) * 17 / 13);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-when-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 calc(var(--step) * 2);
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 13 / 13);
+}
+
+.item-when-status {
+  margin-top: calc(var(--step) * 1);
+}
+
+/* A page for reading: the source above the title, a narrower serif column, the description under the title. */
+body[data-header='reading'] {
+  --inkkit-font-family: 'New York', ui-serif, Georgia, serif;
+  --inkkit-font-size: 1.125rem;
+  --inkkit-line-height: 1.65;
+  --inkkit-reading-width: calc(min(var(--page-width), 40rem) + 6rem);
+}
+
+#item-header[data-kind='reading'] .item-byline {
+  order: -1;
+  margin-top: 0;
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#item-header[data-kind='reading'] .item-title {
+  font-family: 'New York', ui-serif, Georgia, serif;
+  font-size: 2.1rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+#item-header[data-kind='reading'] .item-subtitle {
+  font-family: 'New York', ui-serif, Georgia, serif;
+  font-size: 1.2rem;
+  line-height: 1.45;
+}
