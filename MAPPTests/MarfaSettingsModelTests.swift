@@ -380,6 +380,22 @@ import Testing
         #expect(bench.keys.key(for: first) == "key-2")
     }
 
+    @Test func aRefusedKeyCanBeLeftByDisconnectingAndStartingAgain() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        let source = try #require(bench.servers.last)
+        source.state.set(.keyRefused)
+        #expect(await eventually { model.host.state == .keyRefused })
+
+        model.requestDisconnect()
+        #expect(model.isConfirmingDisconnect)
+        await model.disconnect()
+        #expect(model.host.configuredConnection == nil, "the connect page is back")
+        #expect(bench.keys.key(for: first) == nil)
+        #expect(bench.savedAddress == nil)
+    }
+
     @Test func aNewKeyTheServerRefusesIsToldAndTheOldOneKept() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
