@@ -235,6 +235,7 @@ import Observation
         detach()
         forgetName(of: connection)
         await MarfaSource.removeKeptCopies()
+        await PictureCache.removeAll()
         // The address goes first, so a quit while the key and the copy are removed never opens this server again
         // at the next launch, with a key already gone.
         defaults.removeObject(forKey: Self.addressKey)
