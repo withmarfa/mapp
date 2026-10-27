@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 
 /// Changes the type of the items a window asked for: the types any of them can become, a value for each required field
@@ -20,7 +21,7 @@ struct TypeChangeSheet: View {
             Text("Change Type").interfaceFont(.title2.bold())
             Text(subtitle).foregroundStyle(.secondary)
             List(options, selection: $selected) { option in
-                Label(option.label, systemImage: option.symbol)
+                Label { Text(option.label) } icon: { TypeIcon(name: option.icon) }
                     .tag(option.id)
                     .accessibilityIdentifier("TypeChangeOption.\(option.id.rawValue)")
             }

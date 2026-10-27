@@ -1,4 +1,6 @@
 import AppKit
+import MarfaIcons
+import SwiftUI
 
 /// What the page's item header shows: the item's title, or the person's unsaved draft of it, and its pinned
 /// properties. The page draws it above the note so the two scroll as one surface; what it does stays native.
@@ -134,12 +136,13 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     var parent: Icon
     var plus: Icon
     var indicator: Icon
-    /// The symbols of the property rows and of the types, by SF Symbol name.
+    /// The symbols of the property rows by SF Symbol name, and the icons of the types by `TypeIconKey`.
     var symbols: [String: Icon]
 
-    /// The symbols at the size the pins' 12 point text gives them, following the interface's text size.
+    /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
+    /// icons of `typeIcons` (Lucide names), which the Swift SDK draws.
     @MainActor
-    init?(textSize: Int) {
+    init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
         guard let type = Self.icon("doc.text", size: size, weight: .regular),
               let parent = Self.icon("square.stack", size: size, weight: .regular),
@@ -151,10 +154,26 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + TypeSymbol.all {
+        for name in PropertyRow.Value.symbols {
             symbols[name] = Self.icon(name, size: size, weight: .regular)
         }
+        for name in typeIcons {
+            symbols[TypeIconKey.value(for: name)] = Self.typeIcon(name, size: size)
+        }
         self.symbols = symbols
+    }
+
+    /// A type's icon as the page's mask: drawn black, since only its shape matters.
+    @MainActor
+    private static func typeIcon(_ name: String?, size: CGFloat) -> Icon? {
+        let renderer = ImageRenderer(content: TypeIcon(name: name).font(.system(size: size)).foregroundStyle(.black))
+        // Three times its size, as the symbols are.
+        renderer.scale = 3
+        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+        else { return nil }
+        return Icon(url: "data:image/png;base64," + png.base64EncodedString(),
+                    width: Double(image.size.width), height: Double(image.size.height))
     }
 
     @MainActor

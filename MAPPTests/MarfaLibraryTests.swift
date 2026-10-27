@@ -33,18 +33,18 @@ nonisolated enum LibraryFixture {
         itemTypes: [
             ItemTypeInfo(
                 id: note, label: "Note", fields: [field("title", .text), field("body", .text)], titleField: "title",
-                bodyField: "body", parent: nil),
-            ItemTypeInfo(id: ticket, label: "Ticket", fields: ticketFields, titleField: "title", bodyField: "body", parent: note),
-            ItemTypeInfo(id: task, label: "Task", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket),
-            ItemTypeInfo(id: bug, label: "Bug", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket),
+                bodyField: "body", parent: nil, icon: "file-text"),
+            ItemTypeInfo(id: ticket, label: "Ticket", fields: ticketFields, titleField: "title", bodyField: "body", parent: note, icon: "ticket"),
+            ItemTypeInfo(id: task, label: "Task", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "list-checks"),
+            ItemTypeInfo(id: bug, label: "Bug", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "bug"),
             ItemTypeInfo(
                 id: project, label: "Project", fields: [field("title", .text), field("body", .text)],
-                titleField: "title", bodyField: "body", parent: note),
+                titleField: "title", bodyField: "body", parent: note, icon: "folder"),
             ItemTypeInfo(
                 id: entity, label: "Entity", fields: [field("name", .text, in: entity)], titleField: "name",
                 bodyField: nil, parent: nil),
-            ItemTypeInfo(id: MarfaMapping.fileType, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil),
-            ItemTypeInfo(id: image, label: "Image", fields: [], titleField: nil, bodyField: nil, parent: MarfaMapping.fileType),
+            ItemTypeInfo(id: MarfaMapping.fileType, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "file"),
+            ItemTypeInfo(id: image, label: "Image", fields: [], titleField: nil, bodyField: nil, parent: MarfaMapping.fileType, icon: "image"),
             ItemTypeInfo(
                 id: album, label: "Album", fields: [field("title", .text, in: album)], titleField: "title", bodyField: nil,
                 parent: nil, roles: ["container"]),

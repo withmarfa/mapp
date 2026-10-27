@@ -9,7 +9,7 @@ struct ItemTableColumnsTests {
     /// The columns of a place that mixes types: the name, type, fields, parent and the dates, where Created starts hidden.
     private static var columns: [ItemTableColumn] {
         let rows = BigLibrary.items().prefix(300).map {
-            ItemTableRow(item: $0, typeLabel: $0.type.rawValue, typeSymbol: "doc", parent: nil)
+            ItemTableRow(item: $0, typeLabel: $0.type.rawValue, typeIcon: nil, parent: nil)
         }
         return ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
     }

@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 
 /// Add to Collection and Remove from Collection for the selection, files among it, offered while any selected item can
@@ -65,7 +66,7 @@ struct CollectionPickerSheet: View {
                 .accessibilityIdentifier("CollectionPickerFilter")
             List(collections, selection: $selected) { collection in
                 HStack {
-                    Label(collection.title, systemImage: TypeSymbol.name(for: collection.type, in: library.catalogue))
+                    Label { Text(collection.title) } icon: { TypeIcon(name: library.catalogue.icon(for: collection.type)) }
                     Spacer()
                     if holdsAll(collection.id) { Image(systemName: "checkmark").foregroundStyle(.secondary) }
                 }

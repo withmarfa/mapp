@@ -37,8 +37,8 @@ struct ItemTableLayoutTests {
         let item = Item(
             id: ItemID(title), type: TypeID(type), title: title, titleRule: .property("title"), properties: properties,
             version: ItemVersion(1), created: modified, modified: modified)
-        func link(_ title: String?) -> ItemTableRow.Link? { title.map { .init(id: ItemID($0), title: $0, symbol: "folder") } }
-        return ItemTableRow(item: item, typeLabel: type, typeSymbol: "doc", parent: link(parent))
+        func link(_ title: String?) -> ItemTableRow.Link? { title.map { .init(id: ItemID($0), title: $0, icon: "folder") } }
+        return ItemTableRow(item: item, typeLabel: type, typeIcon: nil, parent: link(parent))
     }
 
     private static func columns(_ rows: [ItemTableRow]) -> [ItemTableColumn] {

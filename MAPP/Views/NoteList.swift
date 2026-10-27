@@ -186,7 +186,7 @@ struct ItemMetaLine: View {
     var body: some View {
         HStack(spacing: 12) {
             ForEach(meta.pieces) { piece in
-                Label(piece.label, systemImage: piece.symbol)
+                Label { Text(piece.label) } icon: { RowIconImage(icon: piece.icon) }
                     .labelStyle(.titleAndIcon)
                     .lineLimit(1)
             }
@@ -224,10 +224,10 @@ private enum ListLine: Identifiable {
 #Preview("Rows") {
     let now = Date.now
     let rows: [(String, String, String, [ItemMeta.Piece], String)] = [
-        ("Review the findings", "Compare the field notes and photographs, then write up what the interviews changed about the plan.", "9:41 AM", [.init(symbol: "checkmark.circle", label: "Task"), .init(symbol: "folder", label: "Field Research")], ""),
-        ("Field notes", "Start with what we observed in the kitchen: three quotes, two photos and the measurements.", "Yesterday", [.init(symbol: "doc.text", label: "Note")], ""),
-        ("Decide on the sync wording", "Two names are in use. Pick one and update the docs and the app together.", "Wednesday", [.init(symbol: "signpost.right", label: "Decision"), .init(symbol: "folder", label: "Marfa")], ""),
-        ("Contract.pdf", "PDF Document, 1.2 MB", "23/09/2026", [.init(symbol: "doc", label: "File")], ""),
+        ("Review the findings", "Compare the field notes and photographs, then write up what the interviews changed about the plan.", "9:41 AM", [.init(icon: .type("circle-check"), label: "Task"), .init(icon: .type("folder"), label: "Field Research")], ""),
+        ("Field notes", "Start with what we observed in the kitchen: three quotes, two photos and the measurements.", "Yesterday", [.init(icon: .type("file-text"), label: "Note")], ""),
+        ("Decide on the sync wording", "Two names are in use. Pick one and update the docs and the app together.", "Wednesday", [.init(icon: .type("signpost"), label: "Decision"), .init(icon: .type("folder"), label: "Marfa")], ""),
+        ("Contract.pdf", "PDF Document, 1.2 MB", "23/09/2026", [.init(icon: .type("file"), label: "File")], ""),
         ("Untitled", "", "04/09/2026", [], ""),
     ]
     List {

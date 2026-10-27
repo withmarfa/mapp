@@ -45,6 +45,14 @@ import Observation
     /// Reads an item's earlier versions from the server, which the copy does not hold. Nil where there is no server
     /// to ask, as in the sample library.
     @ObservationIgnored let history: (any ItemHistorySource)?
+    /// Keeps the owner's choice of a type's icon on the server. Nil where there is no server to ask.
+    @ObservationIgnored let typeIcons: (any TypeIconSource)?
+    /// The icon each type last showed after the person chose one, until the working copy's own catalogue shows the type
+    /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
+    /// reopens. `before` is the icon the copy showed then.
+    @ObservationIgnored private var chosenIcons: [TypeID: (icon: String?, before: String?)] = [:]
+    /// The catalogue the working copy last reported, without the chosen icons.
+    @ObservationIgnored private var readCatalogue = Catalogue(itemTypes: [])
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
@@ -145,9 +153,12 @@ import Observation
     /// Searches keep the items not in the bin.
     static let searchScope = ItemQuery(states: [.active, .archived])
 
-    init(source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil, now: @escaping () -> Date = Date.init) {
+    init(
+        source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
+        typeIcons: (any TypeIconSource)? = nil, now: @escaping () -> Date = Date.init) {
         self.source = source
         self.history = history
+        self.typeIcons = typeIcons
         self.notices = notices
         self.now = now
         syncReport = source.syncReport
@@ -180,6 +191,37 @@ import Observation
 
     /// A view is written through the server at once, so it can be only while the server can be reached.
     var canEditViews: Bool { connection == .online }
+
+    /// Whether a type's icon can be chosen: it is kept on the server, so only while the server can be reached.
+    var canChooseTypeIcons: Bool { typeIcons != nil && connection == .online }
+
+    func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
+        guard let typeIcons else { return .unsupported }
+        do {
+            let shown = try await typeIcons.setIcon(icon, ofType: type)
+            chosenIcons[type] = (shown, readCatalogue.itemTypes[type]?.icon)
+            catalogue = catalogue.choosingIcon(shown, ofType: type)
+            reindex()
+            return nil
+        } catch {
+            return error
+        }
+    }
+
+    /// The catalogue the copy read, with the icons the person has chosen since. A choice ends once the copy shows the
+    /// type with a different icon than it did at the choice, whether the chosen one or one another app set.
+    private func holdingChosenIcons(_ read: Catalogue) -> Catalogue {
+        readCatalogue = read
+        var held = read
+        for (type, choice) in chosenIcons {
+            if read.itemTypes[type]?.icon != choice.before {
+                chosenIcons[type] = nil
+            } else {
+                held = held.choosingIcon(choice.icon, ofType: type)
+            }
+        }
+        return held
+    }
 
     func createView(_ settings: LibraryViewSettings) async -> LibraryView? {
         let result = await writingView(.create(settings), failing: String(localized: "Can’t Save View")) { [source] key in
@@ -285,7 +327,7 @@ import Observation
         case .taken(let id):
             read(id)
         case .catalogue(let catalogue):
-            self.catalogue = catalogue
+            self.catalogue = holdingChosenIcons(catalogue)
             reindex()
         case .views(let views):
             take(views)
@@ -305,7 +347,7 @@ import Observation
 
     /// Keeps the records the views already observe, so a second load tells each of them what changed.
     private func load(_ snapshot: SourceSnapshot, bodies: [ItemBody]) {
-        catalogue = snapshot.catalogue
+        catalogue = holdingChosenIcons(snapshot.catalogue)
         take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
         for (id, record) in records where !present.contains(id) {

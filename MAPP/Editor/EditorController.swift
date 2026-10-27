@@ -27,6 +27,8 @@ final class EditorController: NSObject {
     private(set) var isEditingTitle = false
     @ObservationIgnored private var header: PageHeader?
     @ObservationIgnored private var headerIconSize: Int?
+    /// The types' icons the page already has, so it is sent more only when a header needs one it lacks.
+    @ObservationIgnored private var headerTypeIcons: Set<String?> = []
     /// What the person does in the page's item header, for the window showing it to carry out.
     @ObservationIgnored var onHeaderEvent: (PageHeaderEvent) -> Void = { _ in }
     /// The window's drafts of item titles, which are saved before the window closes or the library changes.
@@ -249,9 +251,16 @@ final class EditorController: NSObject {
     }
 
     private func sendHeader() {
-        if let size = header?.interfaceTextSize, size != headerIconSize, let icons = PageHeaderIcons(textSize: size) {
-            headerIconSize = size
-            call("setHeaderIcons", json(icons))
+        if let size = header?.interfaceTextSize {
+            let needed = Set((header?.linked ?? []).map(\.icon))
+            if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
+                let typeIcons = needed.union(size == headerIconSize ? headerTypeIcons : [])
+                if let icons = PageHeaderIcons(textSize: size, typeIcons: typeIcons) {
+                    headerIconSize = size
+                    headerTypeIcons = typeIcons
+                    call("setHeaderIcons", json(icons))
+                }
+            }
         }
         call("setHeader", header.map(json) ?? "null")
     }
@@ -488,6 +497,7 @@ final class EditorController: NSObject {
             isContentUnderToolbar = false
             isEditingTitle = false
             headerIconSize = nil
+            headerTypeIcons = []
             sendHeader()
             if let noteID {
                 embeds.version += 1

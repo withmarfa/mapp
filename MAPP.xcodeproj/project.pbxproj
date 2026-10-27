@@ -10,6 +10,7 @@
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 		331000093066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000A3066ED47005D07A2 /* MarfaAPI */; };
+		3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000C3066ED47005D07A2 /* MarfaIcons */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +80,7 @@
 			files = (
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000093066ED47005D07A2 /* MarfaAPI in Frameworks */,
+				3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */,
 				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
 			);
 		};
@@ -144,6 +146,7 @@
 			packageProductDependencies = (
 				331000053066ED47005D07A2 /* Marfa */,
 				3310000A3066ED47005D07A2 /* MarfaAPI */,
+				3310000C3066ED47005D07A2 /* MarfaIcons */,
 				331000083066ED47005D07A2 /* MarfaTesting */,
 			);
 			productName = MAPP;
@@ -521,6 +524,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				CODE_SIGN_ENTITLEMENTS = MAPP/MAPP.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
@@ -712,7 +716,7 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.37;
+				minimumVersion = 0.0.39;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -727,6 +731,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = MarfaAPI;
+		};
+		3310000C3066ED47005D07A2 /* MarfaIcons */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaIcons;
 		};
 		331000083066ED47005D07A2 /* MarfaTesting */ = {
 			isa = XCSwiftPackageProductDependency;

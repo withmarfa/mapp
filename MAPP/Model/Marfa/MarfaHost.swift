@@ -14,6 +14,9 @@ import Observation
     typealias Remover = @Sendable (URL, UInt64) async throws -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any KeyStore) -> (any ItemHistorySource)?
+    /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
+    /// sample.
+    typealias IconKeeper = @Sendable (MarfaConnection, any KeyStore) -> (any TypeIconSource)?
     /// Makes the reader and writer of the server's own settings for a connection, or nil where there is no server to
     /// ask, as in the sample.
     typealias Configurer = @Sendable (MarfaConnection, any KeyStore) -> (any InstanceConfigSource)?
@@ -109,6 +112,7 @@ import Observation
     private let remover: Remover
     private let historian: Historian
     private let configurer: Configurer
+    private let iconKeeper: IconKeeper
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
@@ -138,7 +142,8 @@ import Observation
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
         remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) },
         historian: @escaping Historian = { MarfaServerVersions(connection: $0, keys: $1) },
-        configurer: @escaping Configurer = { MarfaServerConfig(connection: $0, keys: $1) }
+        configurer: @escaping Configurer = { MarfaServerConfig(connection: $0, keys: $1) },
+        iconKeeper: @escaping IconKeeper = { MarfaServerTypeIcons(connection: $0, keys: $1) }
     ) {
         self.defaults = defaults
         self.keys = keys
@@ -148,6 +153,7 @@ import Observation
         self.remover = remover
         self.historian = historian
         self.configurer = configurer
+        self.iconKeeper = iconKeeper
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
 
@@ -447,7 +453,7 @@ import Observation
 
     private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
-        let library = MarfaLibrary(source: source, notices: notices, history: historian(connection, keys))
+        let library = MarfaLibrary(source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys))
         self.library = library
         if let notice = connection.server(key: "").takePlainHTTPNotice() {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))

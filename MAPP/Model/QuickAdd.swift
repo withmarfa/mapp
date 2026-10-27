@@ -211,7 +211,7 @@ final class QuickAdd {
         let catalogue = library.catalogue
         var types = library.creatableTypes
         if catalogue.itemTypes[.file] != nil {
-            types.append(ItemTypeOption(id: .file, label: TypeSymbol.label(for: .file, in: catalogue), symbol: TypeSymbol.name(for: .file, in: catalogue)))
+            types.append(ItemTypeOption(id: .file, label: catalogue.label(for: .file), icon: catalogue.icon(for: .file)))
         }
         return types
     }

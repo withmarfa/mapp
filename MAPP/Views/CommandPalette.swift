@@ -34,7 +34,7 @@ struct CommandPalette: View {
         /// The words around what a search found, or an item's preview where nothing was searched for.
         var snippet: String?
         var excerpt: SearchExcerpt?
-        let systemImage: String
+        let icon: RowIcon
         var shortcut: String?
         /// Another interface takes the keyboard itself, so the note should not regain focus first.
         var takesFocus = false
@@ -106,7 +106,7 @@ struct CommandPalette: View {
 
     private func row(_ entry: Entry, isHighlighted: Bool) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: entry.systemImage)
+            RowIconImage(icon: entry.icon)
                 .frame(width: 20)
                 .foregroundStyle(isHighlighted ? .white : .secondary)
             VStack(alignment: .leading, spacing: 2) {
@@ -189,7 +189,7 @@ struct CommandPalette: View {
             return Entry(
                 id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item),
                 snippet: item.preview.isEmpty ? nil : item.preview, excerpt: excerpt,
-                systemImage: symbol(for: item), takesFocus: true
+                icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true
             ) {
                 reveal(item)
             }
@@ -204,7 +204,7 @@ struct CommandPalette: View {
         let hasVisibleEditor = !browser.showsCollection && !browser.showsSidebarIndex && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
-            entries.append(Entry(id: "command:" + title, title: title, systemImage: systemImage, shortcut: shortcut, action: action))
+            entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, action: action))
         }
 
         // The page keeps ⌘[ and ⌘] while it has the keyboard (see AppCommands), so the palette does not suggest them.
@@ -256,13 +256,13 @@ struct CommandPalette: View {
                     add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
                 }
             }
-            entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), systemImage: "plus", shortcut: "⌘N",
+            entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
             })
             for type in QuickAdd.types(in: library) {
                 entries.append(Entry(id: "command:new:" + type.id.rawValue, title: String(localized: "New \(type.label)"),
-                                     systemImage: TypeSymbol.name(for: type.id, in: library.catalogue), takesFocus: true) {
+                                     icon: .type(library.catalogue.icon(for: type.id)), takesFocus: true) {
                     browser.openQuickAdd(typeID: type.id.rawValue, in: library)
                 })
             }
@@ -271,7 +271,7 @@ struct CommandPalette: View {
             }
         }
         let search = String(localized: "Search Notes")
-        entries.append(Entry(id: "command:" + search, title: search, systemImage: "magnifyingglass", shortcut: "⇧⌘P", takesFocus: true) {
+        entries.append(Entry(id: "command:" + search, title: search, icon: .symbol("magnifyingglass"), shortcut: "⇧⌘P", takesFocus: true) {
             browser.palette = .search
         })
 
@@ -368,12 +368,12 @@ struct CommandPalette: View {
             add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
         let settingsTitle = String(localized: "Settings…")
-        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, systemImage: "gearshape", shortcut: "⌘,", takesFocus: true) {
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true) {
             browser.showSettings()
         })
         for page in SettingsPage.allCases {
             let title = String(localized: "Settings: \(page.title)")
-            entries.append(Entry(id: "command:" + title, title: title, systemImage: page.symbol, takesFocus: true) {
+            entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true) {
                 browser.showSettings(page)
             })
         }
@@ -381,18 +381,18 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, String, String?)] = [
-            (.inbox, "tray", nil), (.recents, "clock", nil), (.allNotes, "note.text", nil),
-            (.sources, "antenna.radiowaves.left.and.right", nil), (.collections, "square.stack", nil),
-            (.favorites, "heart", nil), (.recentlyDeleted, "trash", nil),
+        var items: [(SidebarItem, RowIcon, String?)] = [
+            (.inbox, .symbol("tray"), nil), (.recents, .symbol("clock"), nil), (.allNotes, .symbol("note.text"), nil),
+            (.sources, .symbol("antenna.radiowaves.left.and.right"), nil), (.collections, .symbol("square.stack"), nil),
+            (.favorites, .symbol("heart"), nil), (.recentlyDeleted, .symbol("trash"), nil),
         ]
-        items += library.sourceCounts.map { (.source($0.name), "antenna.radiowaves.left.and.right", $0.name) }
-        items += library.collections.map { (.collection($0.id), TypeSymbol.name(for: $0.type, in: library.catalogue), $0.title) }
+        items += library.sourceCounts.map { (.source($0.name), .symbol("antenna.radiowaves.left.and.right"), $0.name) }
+        items += library.collections.map { (.collection($0.id), .type(library.catalogue.icon(for: $0.type)), $0.title) }
         // The types the sidebar shows, under the names it gives them.
-        items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), $0.symbol, $0.label) }
-        items += library.views.map { (.view($0.id), SidebarPlace.viewSymbol, $0.title) }
-        return items.map { item, systemImage, title in
-            Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), systemImage: systemImage) {
+        items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), .type($0.icon), $0.label) }
+        items += library.views.map { (.view($0.id), .symbol(SidebarPlace.viewSymbol), $0.title) }
+        return items.map { item, icon, title in
+            Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), icon: icon) {
                 browser.show(item, in: library, order: order)
                 browser.focusRequest = .list
             }
@@ -402,15 +402,10 @@ struct CommandPalette: View {
     /// Items by title, most recently edited first, each with its type, or the Inbox for one waiting there.
     private var notes: [Entry] {
         library.items(in: .allNotes).sorted { $0.modified > $1.modified }.map { item in
-            Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), systemImage: symbol(for: item), takesFocus: true) {
+            Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
                 reveal(item)
             }
         }
-    }
-
-    private func symbol(for item: Item) -> String {
-        guard case .file(let type, _) = item.content else { return "note.text" }
-        return type.conforms(to: .image) ? "photo" : "doc"
     }
 
     private func reveal(_ item: Item) {

@@ -139,7 +139,7 @@ nonisolated enum MarfaMapping {
         ItemTypeInfo(
             id: TypeID(type.id), label: type.label ?? type.id,
             fields: type.fields.map(field),
-            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) },
+            titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) }, icon: type.icon,
             description: type.description, version: type.version, roles: type.roles,
             compatibleWith: type.compatibleWith.map { TypeID($0) })
     }

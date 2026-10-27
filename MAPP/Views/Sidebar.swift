@@ -9,6 +9,7 @@ struct Sidebar: View {
     let browser: Browser
     let order: NoteOrder
     @State private var editsTypes = false
+    @State private var choosingIcon: TypeIconRequest?
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
 
     /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the
@@ -84,6 +85,7 @@ struct Sidebar: View {
         .onChange(of: library.views.map(\.id)) {
             browser.placeRemoved(in: library, order: order)
         }
+        .sheet(item: $choosingIcon) { TypeIconPicker(request: $0, library: library) }
     }
 
     private func selectionRows(_ plan: SidebarPlan) -> [String] {
@@ -136,7 +138,7 @@ struct Sidebar: View {
             content
                 .tag(SidebarItem.itemType(type.rawValue))
                 .listRowInsets(.vertical, 0)
-                .contextMenu { hideButton(.type(node.id)) }
+                .contextMenu { typeMenu(node) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
             // A group only folds, so a click anywhere on its row does.
@@ -146,7 +148,7 @@ struct Sidebar: View {
             .buttonStyle(.plain)
             .selectionDisabled()
             .listRowInsets(.vertical, 0)
-            .contextMenu { hideButton(.type(node.id)) }
+            .contextMenu { typeMenu(node) }
             .accessibilityLabel(Text(node.label))
             .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
             .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
@@ -193,6 +195,16 @@ struct Sidebar: View {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    /// A type's own icon is chosen from its row; a group has no type of its own, so it only hides.
+    @ViewBuilder private func typeMenu(_ node: TypeNode) -> some View {
+        if let type = node.type {
+            Button("Choose Icon…") { choosingIcon = TypeIconRequest(type: type) }
+                .disabled(!library.canChooseTypeIcons)
+            Divider()
+        }
+        hideButton(.type(node.id))
+    }
+
     /// A view's row hides that view alone, and offers the whole Views section as well.
     @ViewBuilder private func hideButton(_ place: SidebarPlace) -> some View {
         Button("Hide from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
@@ -204,7 +216,7 @@ struct Sidebar: View {
     private func row(
         _ item: SidebarItem, symbol: String, title: String? = nil, hiding place: SidebarPlace? = nil, counted: Bool = true
     ) -> some View {
-        SidebarLabel(title: title ?? library.name(of: item), symbol: symbol)
+        SidebarLabel(title: title ?? library.name(of: item), icon: .symbol(symbol))
             .badge(counted ? count(in: item) : nil)
             .tag(item)
             .contextMenu {

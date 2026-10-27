@@ -232,7 +232,7 @@ struct SidebarPlan {
 
     private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {
         nodes.filter { plan.isShown(.type($0.id)) }.map { node in
-            TypeNode(id: node.id, type: node.type, label: node.label, symbol: node.symbol, count: node.count, total: node.total,
+            TypeNode(id: node.id, type: node.type, label: node.label, icon: node.icon, count: node.count, total: node.total,
                      children: shown(node.children, by: plan))
         }
     }

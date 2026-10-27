@@ -41,11 +41,11 @@ struct IndexPage: View {
 /// The icon of a row. Every row has the same neutral look until something about it is known that should tell
 /// rows apart.
 struct IndexTile: View {
-    let symbol: String
+    let icon: RowIcon
     var size: CGFloat = IndexMetrics.tile
 
     var body: some View {
-        Image(systemName: symbol)
+        RowIconImage(icon: icon)
             .font(.system(size: size * 0.5))
             .foregroundStyle(.secondary)
             .frame(width: size, height: size)
@@ -78,7 +78,7 @@ private struct IndexList: View {
         List(rows) { row in
             Button { open(row) } label: {
                 HStack(spacing: spacing) {
-                    IndexTile(symbol: row.symbol)
+                    IndexTile(icon: row.icon)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
                         if !row.secondary.isEmpty {
@@ -149,7 +149,7 @@ private struct IndexCard: View {
         Button { open(row) } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    IndexTile(symbol: row.symbol)
+                    IndexTile(icon: row.icon)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
                         if showsSecondary, !row.secondary.isEmpty {
@@ -247,7 +247,7 @@ private struct IndexTable: View {
         Table(sorted, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.title, comparator: .localizedStandard) { row in
                 HStack(spacing: 8) {
-                    IndexTile(symbol: row.symbol, size: 20)
+                    IndexTile(icon: row.icon, size: 20)
                     Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
                 }
             }

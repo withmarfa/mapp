@@ -1,4 +1,5 @@
 import AppKit
+import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -23,13 +24,13 @@ enum GalleryKind {
     }
 
     /// The first start-like date field the type declares. A type the catalogue does not describe, as a folder's
-    /// events are, is known by its symbol and the usual names.
+    /// events are, is known as an event by the type it builds on, and the usual names.
     private static func startDate(of item: Item, info: ItemTypeInfo?, in library: any ItemLibrary) -> Date? {
         var keys = (info?.fields ?? []).filter { field in
             guard case .date = field.kind else { return false }
             return field.key == "start" || field.key.hasPrefix("start_") || field.key.hasPrefix("starts")
         }.map(\.key)
-        if keys.isEmpty, TypeSymbol.name(for: item.type, in: library.catalogue) == "calendar" {
+        if keys.isEmpty, PageHeaderKind.of(item.type, in: library.catalogue) == .event {
             keys = ["start", "starts_at", "start_at", "start_date", "date"]
         }
         for key in keys {
@@ -62,7 +63,6 @@ struct GalleryCard: View {
     let width: CGFloat
 
     var body: some View {
-        let symbol = TypeSymbol.name(for: item.type, in: library.catalogue)
         VStack(alignment: .leading, spacing: 10) {
             GalleryThumbnail(item: item, kind: GalleryKind.of(item, in: library), selected: selected, width: width)
             VStack(alignment: .leading, spacing: 2) {
@@ -72,7 +72,7 @@ struct GalleryCard: View {
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
-                    Image(systemName: symbol)
+                    TypeIcon(name: library.catalogue.icon(for: item.type))
                     Text(date).lineLimit(1)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }

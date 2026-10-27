@@ -5,12 +5,12 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     struct Link: Hashable, Sendable {
         let id: ItemID
         let title: String
-        let symbol: String
+        let icon: String?
     }
 
     let item: Item
     let typeLabel: String
-    let typeSymbol: String
+    let typeIcon: String?
     /// The item the row's item is filed under (`child-of`).
     let parent: Link?
     var id: ItemID { item.id }
@@ -24,9 +24,9 @@ extension ItemTableRow {
             let parent = item.parentID.flatMap { library.item($0) }
             return ItemTableRow(
                 item: item,
-                typeLabel: TypeSymbol.label(for: item.type, in: catalogue),
-                typeSymbol: TypeSymbol.name(for: item.type, in: catalogue),
-                parent: parent.map { Link(id: $0.id, title: $0.title, symbol: TypeSymbol.name(for: $0.type, in: catalogue)) })
+                typeLabel: catalogue.label(for: item.type),
+                typeIcon: catalogue.icon(for: item.type),
+                parent: parent.map { Link(id: $0.id, title: $0.title, icon: catalogue.icon(for: $0.type)) })
         }
     }
 }

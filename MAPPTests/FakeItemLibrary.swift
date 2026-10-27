@@ -19,6 +19,13 @@ final class FakeItemLibrary: ItemLibrary {
     var viewMembers: [ItemID: [ItemID]] = [:]
     var canPurge = false
     var canEditViews = true
+    var canChooseTypeIcons = true
+    /// What the next icon choice answers: nil keeps it, a failure refuses it.
+    var iconFailure: TypeIconFailure?
+    private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
+    /// While set, an icon choice waits for `answerIcon()` before it answers.
+    var holdsIconAnswers = false
+    private var heldIconAnswer: CheckedContinuation<Void, Never>?
     /// What every view write fails with while set.
     var viewFailure: ViewWriteFailure?
     var trashDays: Int?
@@ -72,7 +79,7 @@ final class FakeItemLibrary: ItemLibrary {
         ]
         let types = [
             ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: "title", bodyField: "body", parent: nil),
-            ItemTypeInfo(id: task, label: "Task", fields: taskFields, titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(id: task, label: "Task", fields: taskFields, titleField: "title", bodyField: "body", parent: nil, icon: "list-checks"),
             ItemTypeInfo(
                 id: project, label: "Project",
                 fields: [ItemTypeInfo.Field(key: "description", label: "Description", kind: .text, declaredBy: project)],
@@ -384,6 +391,19 @@ final class FakeItemLibrary: ItemLibrary {
         if refusedAttachments.contains(name) { throw SourceFailure(kind: .failed, message: "The upload failed.") }
         attachedFiles.append((name, try Data(contentsOf: file), id))
         return Embed(link: name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name, name: name)
+    }
+
+    func answerIcon() {
+        heldIconAnswer?.resume()
+        heldIconAnswer = nil
+    }
+
+    func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
+        if holdsIconAnswers { await withCheckedContinuation { heldIconAnswer = $0 } }
+        if let iconFailure { return iconFailure }
+        chosenIcons.append((type, icon))
+        catalogue = catalogue.choosingIcon(icon, ofType: type)
+        return nil
     }
 
     func createView(_ settings: LibraryViewSettings) async -> LibraryView? {

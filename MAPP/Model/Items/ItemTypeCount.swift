@@ -5,7 +5,8 @@ nonisolated struct ItemTypeCount: Identifiable, Hashable, Sendable {
     let id: TypeID
     /// The type's label, with its parent's in parentheses where another shown type has the same label.
     let label: String
-    let symbol: String
+    /// The type's icon, a Lucide name.
+    let icon: String?
     /// The items the type holds itself, never those of its subtypes, so the number is the length of the list the
     /// row opens.
     let count: Int
@@ -20,7 +21,7 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
     /// Nil for a group, which only holds other rows.
     let type: TypeID?
     let label: String
-    let symbol: String
+    let icon: String?
     /// The type's own items, which its row opens; zero for a group.
     let count: Int
     /// The items of the whole branch, the type's own included.
@@ -51,8 +52,8 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
         func node(_ id: String, under parentLabel: String?) -> TypeNode {
             let known = catalogue.itemTypes[TypeID(id)] != nil
             let own = held[id]
-            let label = own.map { TypeSymbol.label(for: $0.id, in: catalogue) }
-                ?? (known ? TypeSymbol.label(for: TypeID(id), in: catalogue) : segment(of: id).capitalized)
+            let label = own.map { catalogue.label(for: $0.id) }
+                ?? (known ? catalogue.label(for: TypeID(id)) : segment(of: id).capitalized)
             let shown = trimmed(label, under: parentLabel)
             let below = (children[id] ?? []).map { node($0, under: label) }
             let count = own?.count ?? 0
@@ -62,9 +63,9 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
             if !known, own == nil, sorted.count == 1, let only = sorted.first {
                 return node(only.id, under: parentLabel)
             }
-            let symbol = own?.symbol ?? (known ? TypeSymbol.name(for: TypeID(id), in: catalogue) : sorted.first?.symbol ?? TypeSymbol.fallback)
+            let icon = own?.icon ?? (known ? catalogue.icon(for: TypeID(id)) : sorted.first?.icon)
             return TypeNode(
-                id: id, type: known || own != nil ? TypeID(id) : nil, label: shown, symbol: symbol,
+                id: id, type: known || own != nil ? TypeID(id) : nil, label: shown, icon: icon,
                 count: count, total: total, children: sorted)
         }
         return ordered(roots.map { node($0, under: nil) })
@@ -101,7 +102,7 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
 nonisolated struct ItemTypeOption: Identifiable, Hashable, Sendable {
     let id: TypeID
     let label: String
-    let symbol: String
+    let icon: String?
 }
 
 nonisolated extension Catalogue {
@@ -113,12 +114,12 @@ nonisolated extension Catalogue {
     /// The label each of `types` goes by. A label two of them share gets its parent's label in parentheses,
     /// "Task (Ticket)", so the rows can be told apart.
     func displayLabels(for types: some Collection<TypeID>) -> [TypeID: String] {
-        let labels = Dictionary(uniqueKeysWithValues: types.map { ($0, TypeSymbol.label(for: $0, in: self)) })
+        let labels = Dictionary(uniqueKeysWithValues: types.map { ($0, self.label(for: $0)) })
         let shared = Dictionary(grouping: types, by: { labels[$0] ?? "" }).filter { $0.value.count > 1 }
         return labels.reduce(into: [:]) { result, entry in
             let (type, label) = entry
             if shared[label] != nil, let parent = itemTypes[type]?.parent, itemTypes[parent] != nil {
-                result[type] = "\(label) (\(TypeSymbol.label(for: parent, in: self)))"
+                result[type] = "\(label) (\(self.label(for: parent)))"
             } else {
                 result[type] = label
             }
@@ -151,7 +152,7 @@ extension ItemLibrary {
         }
         let labels = catalogue.displayLabels(for: held.map(\.0))
         return held.map { type, count in
-            ItemTypeCount(id: type, label: labels[type] ?? type.rawValue, symbol: TypeSymbol.name(for: type, in: catalogue), count: count)
+            ItemTypeCount(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type), count: count)
         }
         .sorted {
             if $0.count != $1.count { return $0.count > $1.count }
@@ -170,7 +171,7 @@ extension ItemLibrary {
         let types = catalogue.itemTypes.keys.filter { !catalogue.isFileType($0) && !$0.rawValue.hasPrefix("system.") }
         let labels = catalogue.displayLabels(for: types)
         return types.map { type in
-            ItemTypeOption(id: type, label: labels[type] ?? type.rawValue, symbol: TypeSymbol.name(for: type, in: catalogue))
+            ItemTypeOption(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type))
         }
         .sorted {
             let order = $0.label.localizedStandardCompare($1.label)
