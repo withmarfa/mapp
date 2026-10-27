@@ -48,7 +48,7 @@ struct SidebarTypeRow: View {
             if row.isExpandable {
                 HStack(spacing: 0) {
                     disclosure
-                    SidebarCount(count: count, widest: widestFoldingCount).hidden()
+                    SidebarCount(count: count, widest: widestFoldingCount).hidden().accessibilityHidden(true)
                 }
                 .padding(.trailing, Self.countInset)
             }
@@ -64,7 +64,7 @@ struct SidebarTypeRow: View {
         HStack(spacing: 0) {
             SidebarLabel(title: row.node.label, symbol: row.node.symbol)
             Spacer(minLength: 8)
-            if row.isExpandable { disclosure.hidden() }
+            if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
             SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
         }
         .accessibilityElement(children: .combine)
@@ -93,7 +93,7 @@ private struct SidebarCount: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            if widest > 0 { Text(widest, format: .number).hidden() }
+            if widest > 0 { Text(widest, format: .number).hidden().accessibilityHidden(true) }
             if count > 0 { Text(count, format: .number) }
         }
         .monospacedDigit()
