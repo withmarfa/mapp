@@ -46,6 +46,8 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'propertyRejected',
   'parentRejected',
   'linkedFrom',
+  'contents',
+  'showLess',
   'timeline',
   'properties',
 ]
@@ -157,6 +159,11 @@ function request(reference: FileReference, item: string): EmbedRequest {
   return { item, text: reference.raw }
 }
 
+/** A picture at a web address, which the page never loads: it is a card that opens the address in the browser. */
+function webAddress(target: string): string | null {
+  return /^https?:\/\//i.test(target) ? target : null
+}
+
 /** The names of notes to offer after `[[`, unless the person has typed past the request. */
 export function wikiSuggest(
   query: string,
@@ -235,6 +242,8 @@ export class NoteEditor {
         labels,
         files: {
           async resolve(reference, context) {
+            if (webAddress(reference.target))
+              return { kind: 'file', label: reference.label ?? reference.target }
             const embed = request(reference, context.documentId)
             host.noteTarget(embed.text, reference.target)
             const file = await host.answer(embed)
@@ -273,9 +282,12 @@ export class NoteEditor {
             }
           },
           open(reference, context) {
+            const address = webAddress(reference.target)
+            if (address) return events.openLink(address)
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })
           },
           contextMenu(reference, _point, context) {
+            if (webAddress(reference.target)) return
             const embed = request(reference, context.documentId)
             postToHost({
               type: 'embedMenu',

@@ -119,6 +119,38 @@ test('an embed asks the app by its text as written, and one the app does not ans
   }
 })
 
+test('a picture at a web address is never asked of the app, and its card opens the address', async () => {
+  const asked: unknown[] = []
+  const posted: unknown[] = []
+  Object.defineProperty(window, 'webkit', {
+    configurable: true,
+    value: {
+      messageHandlers: {
+        host: { postMessage: (message: unknown) => posted.push(message) },
+        embeds: {
+          postMessage: async (request: unknown) => {
+            asked.push(request)
+            return null
+          },
+        },
+      },
+    },
+  })
+  try {
+    await withEditor('![A picture](https://example.com/a.png)\n', async (editor) => {
+      await vi.waitFor(() =>
+        expect(document.querySelector('.inkkit-file-card, .inkkit-file')).not.toBeNull(),
+      )
+      expect(asked).toEqual([])
+      expect(document.body.textContent).not.toContain('File not found')
+      expect(document.body.textContent).toContain('A picture')
+      expect(editor.snapshot().text).toBe('![A picture](https://example.com/a.png)\n')
+    })
+  } finally {
+    delete (window as { webkit?: unknown }).webkit
+  }
+})
+
 test('embeds are asked by their text as written, once each, and asked again only when the app says they changed', async () => {
   const asked: { text: string }[] = []
   let name = 'one.png'
@@ -381,9 +413,11 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
       'discardChanges',
       'itemType',
       'linkedFrom',
+      'contents',
       'parentRejected',
       'properties',
       'propertyRejected',
+      'showLess',
       'status',
       'timeline',
       'title',

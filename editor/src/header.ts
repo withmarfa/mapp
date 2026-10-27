@@ -82,10 +82,15 @@ export interface HeaderModel {
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
   foldAfter: number
+  /** The items a collection holds, listed under its text. Empty for any other item. */
+  contents: HeaderLinked[]
   linked: HeaderLinked[]
   linkedFoldAfter: number
-  /** "Show N More", worded by the app for the rows and for the linked items that are folded away. */
+  /** False where the page has no text to write, so the page draws no empty editor. */
+  showsText: boolean
+  /** "Show N More", worded by the app for the rows and for the items that are folded away. */
   showMore: string
+  showMoreContents: string
   showMoreLinked: string
   propertyRejected: boolean
   /** The app could not remove the parent. */
@@ -118,6 +123,9 @@ export interface HeaderLabels {
   propertyRejected: string
   parentRejected: string
   linkedFrom: string
+  /** What a collection's members are called. */
+  contents: string
+  showLess: string
   /** What Linked From is called on a person's page, where it reads as their timeline. */
   timeline: string
   properties: string
@@ -137,6 +145,8 @@ const englishLabels: HeaderLabels = {
   propertyRejected: 'The value could not be saved. Please try again.',
   parentRejected: 'The connection could not be removed.',
   linkedFrom: 'Linked From',
+  contents: 'Contents',
+  showLess: 'Show Less',
   timeline: 'Timeline',
   properties: 'Properties',
 }
@@ -150,6 +160,88 @@ function element<K extends keyof HTMLElementTagNameMap>(
   node.className = className
   parent?.append(node)
   return node
+}
+
+function moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
+  const button = element('button', 'item-more', parent)
+  button.type = 'button'
+  button.addEventListener('click', action)
+  return button
+}
+
+/** A folded list of items under the text: its heading with a chevron and a count, then rows that open an item. */
+class LinkedSection {
+  private readonly root: HTMLElement
+  private readonly toggle: HTMLButtonElement
+  private readonly list: HTMLUListElement
+  private readonly more: HTMLButtonElement
+  private open = false
+  private all = false
+
+  constructor(
+    parent: HTMLElement,
+    className: string,
+    private readonly changed: () => void,
+    private readonly glyph: (name: string, parent: HTMLElement) => void,
+  ) {
+    this.root = element('section', `item-linked ${className}`, parent)
+    this.toggle = element('button', 'item-linked-toggle', this.root)
+    this.toggle.type = 'button'
+    this.toggle.addEventListener('click', () => {
+      this.open = !this.open
+      this.changed()
+    })
+    this.list = element('ul', 'item-linked-list', this.root)
+    this.more = moreButton(this.root, () => {
+      this.all = !this.all
+      this.changed()
+    })
+  }
+
+  /** What the section was last drawn from, so a change of what the person opened is drawn. */
+  get state(): [boolean, boolean] {
+    return [this.open, this.all]
+  }
+
+  /** A new item starts folded, or open where its own content is the list. */
+  reset(open: boolean) {
+    this.open = open
+    this.all = false
+  }
+
+  draw(
+    name: string,
+    items: HeaderLinked[],
+    foldAfter: number,
+    words: { more: string; less: string },
+  ) {
+    this.root.hidden = items.length === 0
+    this.toggle.replaceChildren()
+    this.toggle.setAttribute('aria-expanded', String(this.open))
+    element('span', 'item-chevron', this.toggle).setAttribute('aria-hidden', 'true')
+    this.root.setAttribute('aria-label', name)
+    element('span', 'item-linked-title', this.toggle).textContent = name
+    element('span', 'item-linked-count', this.toggle).textContent = String(items.length)
+    const shown = this.all ? items : items.slice(0, foldAfter)
+    this.list.hidden = !this.open
+    this.list.replaceChildren(
+      ...shown.map((linked) => {
+        const entry = element('li', 'item-linked-row')
+        const button = element('button', 'item-linked-open', entry)
+        button.type = 'button'
+        button.addEventListener('click', () => postToHost({ type: 'openItem', item: linked.item }))
+        this.glyph(linked.symbol, button)
+        element('span', 'item-linked-name', button).textContent = linked.title
+        const detail = element('span', 'item-linked-detail', button)
+        element('span', '', detail).textContent = linked.type
+        element('span', 'item-byline-dot', detail).setAttribute('aria-hidden', 'true')
+        element('span', '', detail).textContent = linked.date
+        return entry
+      }),
+    )
+    this.more.hidden = !this.open || items.length <= foldAfter
+    this.more.textContent = this.all ? words.less : words.more
+  }
 }
 
 /** The item's title and pinned properties, drawn in the page above the note so they scroll with it as one
@@ -168,16 +260,14 @@ export class ItemHeader {
   private readonly byline: HTMLDivElement
   private readonly properties: HTMLDListElement
   private readonly moreProperties: HTMLButtonElement
-  private readonly linked: HTMLElement
-  private readonly linkedToggle: HTMLButtonElement
-  private readonly linkedList: HTMLUListElement
-  private readonly linkedMore: HTMLButtonElement
+  private readonly contents: LinkedSection
+  private readonly linked: LinkedSection
   private symbols: Record<string, HeaderIcon> = {}
   /** What the property block and the linked items were last drawn from, so an unchanged header is not drawn
    *  again under the pointer. */
   private drawn = ''
-  /** Whether the person has expanded the rows or the linked items, for the item on the page. */
-  private expanded = { item: '', properties: false, linked: false, linkedOpen: false }
+  /** Whether the person has expanded the rows, for the item on the page. */
+  private expanded = { item: '', properties: false }
   private readonly typePin: HTMLSpanElement
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
@@ -189,12 +279,15 @@ export class ItemHeader {
    *  it has sent that item's header. */
   private wantedTitle?: string
 
+  /** `footer` holds what follows the text, the contents of a collection and Linked From. */
   constructor(
     readonly root: HTMLElement,
+    readonly footer: HTMLElement,
     labels: Partial<HeaderLabels> = {},
   ) {
     this.labels = { ...englishLabels, ...labels }
     root.hidden = true
+    footer.hidden = true
     this.lead = element('div', 'item-lead', root)
     this.avatar = element('span', 'item-avatar', this.lead)
     this.avatar.setAttribute('aria-hidden', 'true')
@@ -234,7 +327,7 @@ export class ItemHeader {
     this.properties = element('dl', 'item-props', root)
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = this.moreButton(root, () => {
-      this.expanded.properties = true
+      this.expanded.properties = !this.expanded.properties
       this.redraw()
     })
     this.propertyError = element('p', 'item-error', root)
@@ -245,18 +338,10 @@ export class ItemHeader {
     this.parentError.setAttribute('role', 'alert')
     this.parentError.textContent = this.labels.parentRejected
     this.parentError.hidden = true
-    this.linked = element('section', 'item-linked', root)
-    this.linkedToggle = element('button', 'item-linked-toggle', this.linked)
-    this.linkedToggle.type = 'button'
-    this.linkedToggle.addEventListener('click', () => {
-      this.expanded.linkedOpen = !this.expanded.linkedOpen
-      this.redraw()
-    })
-    this.linkedList = element('ul', 'item-linked-list', this.linked)
-    this.linkedMore = this.moreButton(this.linked, () => {
-      this.expanded.linked = true
-      this.redraw()
-    })
+    const redraw = () => this.redraw()
+    const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
+    this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
+    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph)
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -350,7 +435,9 @@ export class ItemHeader {
     if (!model) {
       if (this.isEditingTitle) this.title.blur()
       this.root.hidden = true
+      this.footer.hidden = true
       document.body.dataset.header = 'general'
+      document.body.dataset.text = 'shown'
       return
     }
     // Another item's title is never edited as this one's.
@@ -359,7 +446,10 @@ export class ItemHeader {
       this.title.blur()
     }
     this.root.hidden = model.hidden
+    this.footer.hidden = model.hidden
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    document.body.dataset.text = model.showsText ? 'shown' : 'none'
     this.root.dataset.kind = model.kind
     document.body.dataset.header = model.hidden ? 'general' : model.kind
     this.subtitle.textContent = model.subtitle ?? ''
@@ -380,14 +470,12 @@ export class ItemHeader {
     this.drawTypeIcon()
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
-    if (previous?.item !== model.item)
-      // A person's timeline is the page's own content, so it opens with the page.
-      this.expanded = {
-        item: model.item,
-        properties: false,
-        linked: false,
-        linkedOpen: model.kind === 'person',
-      }
+    if (previous?.item !== model.item) {
+      this.expanded = { item: model.item, properties: false }
+      // A person's timeline and a collection's contents are the page's own content, so they open with the page.
+      this.contents.reset(true)
+      this.linked.reset(model.kind === 'person')
+    }
     this.redraw()
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
@@ -424,6 +512,7 @@ export class ItemHeader {
 
   setIcons(icons: HeaderIcons) {
     const style = this.root.style
+    const footerStyle = this.footer.style
     this.symbols = icons.symbols ?? {}
     this.drawTypeIcon()
     this.drawn = ''
@@ -433,6 +522,9 @@ export class ItemHeader {
       style.setProperty(`--icon-${name}`, `url("${icon.url}")`)
       style.setProperty(`--icon-${name}-width`, `${icon.width}px`)
       style.setProperty(`--icon-${name}-height`, `${icon.height}px`)
+      footerStyle.setProperty(`--icon-${name}`, `url("${icon.url}")`)
+      footerStyle.setProperty(`--icon-${name}-width`, `${icon.width}px`)
+      footerStyle.setProperty(`--icon-${name}-height`, `${icon.height}px`)
     }
   }
 
@@ -500,10 +592,7 @@ export class ItemHeader {
   }
 
   private moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
-    const button = element('button', 'item-more', parent)
-    button.type = 'button'
-    button.addEventListener('click', action)
-    return button
+    return moreButton(parent, action)
   }
 
   /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
@@ -543,17 +632,22 @@ export class ItemHeader {
       model.person,
       model.byline,
       model.properties,
+      model.contents,
       model.linked,
       model.showMore,
+      model.showMoreContents,
       model.showMoreLinked,
       this.expanded,
+      this.contents.state,
+      this.linked.state,
       Object.keys(this.symbols).length,
     ])
     if (key === this.drawn) return
     this.drawn = key
 
     // The type, then who made the item and when, as one quiet line.
-    for (const extra of [...this.byline.querySelectorAll('.item-byline-part')]) extra.remove()
+    for (const extra of [...this.byline.querySelectorAll('.item-byline-part, .item-byline-dot')])
+      extra.remove()
     let first = this.typePin.hidden
     for (const part of [source, model.byline.date, model.byline.detail]) {
       if (!part) continue
@@ -569,38 +663,20 @@ export class ItemHeader {
     this.properties.replaceChildren(...shown.map((row) => this.row(row, model)))
     this.properties.hidden = shown.length === 0
     this.drawLead(model)
-    this.moreProperties.hidden = shown.length === model.properties.length
-    this.moreProperties.textContent = model.showMore
+    this.moreProperties.hidden = model.properties.length <= model.foldAfter
+    this.moreProperties.textContent = this.expanded.properties
+      ? this.labels.showLess
+      : model.showMore
 
-    this.linked.hidden = model.linked.length === 0
-    this.linkedToggle.replaceChildren()
-    this.linkedToggle.setAttribute('aria-expanded', String(this.expanded.linkedOpen))
-    element('span', 'item-chevron', this.linkedToggle).setAttribute('aria-hidden', 'true')
     const linkedName = model.kind === 'person' ? this.labels.timeline : this.labels.linkedFrom
-    this.linked.setAttribute('aria-label', linkedName)
-    element('span', 'item-linked-title', this.linkedToggle).textContent = linkedName
-    element('span', 'item-linked-count', this.linkedToggle).textContent = String(
-      model.linked.length,
-    )
-    const items = this.expanded.linked ? model.linked : model.linked.slice(0, model.linkedFoldAfter)
-    this.linkedList.hidden = !this.expanded.linkedOpen
-    this.linkedList.replaceChildren(
-      ...items.map((linked) => {
-        const entry = element('li', 'item-linked-row')
-        const button = element('button', 'item-linked-open', entry)
-        button.type = 'button'
-        button.addEventListener('click', () => postToHost({ type: 'openItem', item: linked.item }))
-        this.glyph(linked.symbol, button)
-        element('span', 'item-linked-name', button).textContent = linked.title
-        const detail = element('span', 'item-linked-detail', button)
-        element('span', '', detail).textContent = linked.type
-        element('span', 'item-byline-dot', detail).setAttribute('aria-hidden', 'true')
-        element('span', '', detail).textContent = linked.date
-        return entry
-      }),
-    )
-    this.linkedMore.hidden = !this.expanded.linkedOpen || items.length === model.linked.length
-    this.linkedMore.textContent = model.showMoreLinked
+    this.contents.draw(this.labels.contents, model.contents, model.linkedFoldAfter, {
+      more: model.showMoreContents,
+      less: this.labels.showLess,
+    })
+    this.linked.draw(linkedName, model.linked, model.linkedFoldAfter, {
+      more: model.showMoreLinked,
+      less: this.labels.showLess,
+    })
   }
 
   /** What the kind adds above the properties: a person's avatar, an event's calendar block and when. */
