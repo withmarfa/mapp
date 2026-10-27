@@ -99,7 +99,7 @@ jobs:
           -derivedDataPath build build-for-testing
       - name: Run the unit tests
         if: needs.changes.outputs.logic == 'true'
-        run: .github/scripts/run-unit-tests.sh 720 diagnostics
+        run: .github/scripts/run-unit-tests.sh 90 diagnostics
       - name: Upload the stall diagnostics
         if: failure() && hashFiles('diagnostics/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
