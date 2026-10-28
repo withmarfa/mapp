@@ -31,6 +31,14 @@ nonisolated enum EmbedResolution: Sendable {
     }
 }
 
+/// What a web address's saved picture is: a file attached to the item that was saved from the address, opened for
+/// reading, none, or why the one that is can't be shown now.
+nonisolated enum SavedPictureResolution: Sendable {
+    case file(OpenFile)
+    case none
+    case unavailable(String)
+}
+
 /// What decides how an embed is drawn, so the page draws it again when this changes.
 nonisolated struct EmbedState: Hashable, Sendable {
     nonisolated struct File: Hashable, Sendable {
@@ -94,6 +102,24 @@ extension ItemLibrary {
         return EmbedState(binding: embed.resolution, file: file)
     }
 
+    /// The picture saved for `address` on `item`: the first of its attachments saved from that address (see
+    /// `savedPictures(of:at:)`) that is an image and can be opened. The file is the one the embed route would open, with
+    /// its checks. One that can't be had now is reported only when no other can, so the page does not take the website
+    /// for a picture it holds.
+    func openSavedPicture(of item: ItemID, at address: URL) async -> SavedPictureResolution {
+        var failure: String?
+        for file in savedPictures(of: item, at: address) {
+            switch await open(file) {
+            case .file(let opened):
+                guard EmbeddedFiles.kind(of: UTType(filenameExtension: opened.url.pathExtension)) == "image" else { continue }
+                return .file(opened)
+            case .unavailable(let reason): failure = failure ?? reason
+            case .missing: continue
+            }
+        }
+        return failure.map(SavedPictureResolution.unavailable) ?? .none
+    }
+
     private func binding(of reference: EmbedReference, in item: ItemID) -> NoteReferenceResolution? {
         self.item(item)?.boundEmbeds.first { $0.text == reference.text }?.resolution
     }
@@ -134,6 +160,8 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     var open: (EmbedReference, ItemID) async -> EmbedResolution = { _, _ in .missing }
     /// The kept copy of the picture at a web address, opened; the web pictures' cache for the editor.
     var openPicture: (URL) async -> OpenFile? = { _ in nil }
+    /// The picture saved for a web address on an item, opened; `ItemLibrary.openSavedPicture` for the editor's library.
+    var openSaved: (ItemID, URL) async -> OpenFile? = { _, _ in nil }
     /// Changed for each note the page shows, so a file changed on disk is loaded again rather than taken from
     /// WebKit's memory of the page.
     var version = 0
@@ -235,16 +263,41 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         return components.url!
     }
 
-    /// Where the page shows the kept picture of a web address from. Only an address already fetched is served.
-    nonisolated static func pictureURL(for address: URL, version: Int) -> URL {
+    /// Where the page shows the picture of a web address from. Only an address already fetched is served, or, where
+    /// `savedIn` names the item, the file attached to it that was saved from the address, which is looked for again
+    /// each time the URL is loaded, so one taken off is no longer served. `stamp` names the bytes the URL is for, as
+    /// for an embed.
+    nonisolated static func pictureURL(for address: URL, version: Int, savedIn item: ItemID? = nil, stamp: String = "") -> URL {
         var components = URLComponents()
         components.scheme = scheme
         components.host = "picture"
         components.path = "/"
-        components.percentEncodedQueryItems = [("address", address.absoluteString), ("v", String(version))].map {
+        var fields = [("address", address.absoluteString), ("v", String(version))]
+        if let item { fields += [("item", item.rawValue), ("f", stamp)] }
+        components.percentEncodedQueryItems = fields.map {
             URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: valueAllowed))
         }
         return components.url!
+    }
+
+    /// Whether a picture URL has an `item` field, whatever it holds: it is then a request for a saved file, and
+    /// only that.
+    nonisolated static func asksForSavedPicture(_ url: URL) -> Bool {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems?.contains { $0.name == "item" } == true
+    }
+
+    /// The item and web address a URL of `pictureURL(for:version:savedIn:stamp:)` with an item names.
+    nonisolated static func savedPicture(in url: URL) -> (item: ItemID, address: URL)? {
+        guard url.scheme == scheme, url.host == "picture",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems
+        else { return nil }
+        func value(_ name: String) -> String? {
+            items.first { $0.name == name }?.value?.removingPercentEncoding
+        }
+        guard let item = value("item"), !item.isEmpty, let text = value("address"), let address = URL(string: text),
+              ["http", "https"].contains(address.scheme?.lowercased())
+        else { return nil }
+        return (ItemID(item), address)
     }
 
     /// The web address a URL of `pictureURL(for:version:)` names.
@@ -343,7 +396,13 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         if url.host == "icon" { return serveIcon(task, id, url) }
         var opened: OpenFile?
         if url.host == "picture" {
-            if let address = Self.pictureAddress(in: url) { opened = await openPicture(address) }
+            if Self.asksForSavedPicture(url) {
+                // Never the cache, even for a URL that names no file: the saved file is gone once its attachment is, and
+                // the person's setting is asked again.
+                if let (item, address) = Self.savedPicture(in: url) { opened = await openSaved(item, address) }
+            } else if let address = Self.pictureAddress(in: url) {
+                opened = await openPicture(address)
+            }
         } else if let (item, reference) = Self.request(in: url) {
             opened = await open(reference, item).file
         }

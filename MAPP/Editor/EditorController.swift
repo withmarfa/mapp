@@ -70,6 +70,9 @@ final class EditorController: NSObject {
     /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the note before.
     @ObservationIgnored var embedStates: (note: ItemID, states: [String: EmbedState])?
     @ObservationIgnored var embedWatch = 0
+    /// The files saved from web addresses that are attached to the note on the page, as the page was last told (see
+    /// `watchEmbeds`): the page draws its pictures again when one comes or goes.
+    @ObservationIgnored var savedStates: (note: ItemID, states: [SavedPictureState])?
     @ObservationIgnored private let noteRequests = NoteRequests()
     @ObservationIgnored private let noteTitles = NoteLinks.Index()
     /// Fetches the pictures at web addresses the page asks for, by the Remote Pictures setting.
@@ -164,6 +167,13 @@ final class EditorController: NSObject {
         pictureRequests.inFeed = { [weak self] item in self?.library?.item(item)?.tier == .feed }
         pictureRequests.version = { [weak self] in self?.embeds.version ?? 0 }
         embeds.openPicture = { [pictures] address in await pictures.openKept(address) }
+        pictureRequests.saved = { [weak self] item, address in
+            await self?.library?.openSavedPicture(of: item, at: address) ?? .none
+        }
+        embeds.openSaved = { [weak self] item, address in
+            guard case .file(let file) = await self?.library?.openSavedPicture(of: item, at: address) else { return nil }
+            return file
+        }
         configuration.userContentController.addScriptMessageHandler(pictureRequests, contentWorld: .page, name: "pictures")
         pictureSettingWatch = Task { [weak self] in
             for await _ in NotificationCenter.default.notifications(named: UserDefaults.didChangeNotification) {

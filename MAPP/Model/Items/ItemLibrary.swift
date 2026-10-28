@@ -103,6 +103,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// A file item's file, fetched first; nil for an item that is not a file.
     func fileURL(of id: ItemID) async throws -> URL?
 
+    /// The file items attached to `id`, in any state: those with an `attached-to` edge to it. Observed, so a file
+    /// attached or taken off, or changed, is told to whoever read this.
+    func attachments(of id: ItemID) -> [ItemID]
+
     // MARK: Writing
 
     /// Nil when the item cannot be made, and the library tells the person why. The properties go in the create

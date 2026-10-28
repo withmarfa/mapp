@@ -693,6 +693,11 @@ extension EditorTests.Harness where Library == FakeItemLibrary {
         try await self.init(library: FakeItemLibrary())
     }
 
+    /// A page whose web pictures are `pictures`, as a test with its own cache, fetcher and setting has.
+    convenience init(pictures: WebPictures) async throws {
+        try await self.init(library: FakeItemLibrary(), pictures: pictures)
+    }
+
     /// Adds a note holding `body` and shows it.
     func load(_ body: String, deleted: Bool = false) async throws {
         try await show(library.add(body, state: deleted ? .trashed : .active).id)

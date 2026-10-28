@@ -862,4 +862,10 @@ import Observation
         guard item(id)?.isFile == true else { return nil }
         return try await source.fileURL(of: id)
     }
+
+    func attachments(of id: ItemID) -> [ItemID] {
+        // The index is not observed. A file attached, taken off or changed is an item changing.
+        _ = contentRevision
+        return index.links(to: id, type: MarfaMapping.attachmentEdge).map(\.source)
+    }
 }

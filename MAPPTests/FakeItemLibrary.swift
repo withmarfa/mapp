@@ -219,6 +219,31 @@ final class FakeItemLibrary: ItemLibrary {
         return made
     }
 
+    func attachments(of id: ItemID) -> [ItemID] {
+        items.filter { file in
+            file.edgesOut.contains { $0.type == MarfaMapping.attachmentEdge && $0.target == .item(id) }
+        }.map(\.id)
+    }
+
+    /// Attaches a new image file, fetched as `file`, to `host` as a connector saves a picture, with the web address
+    /// it was saved from where one is given.
+    @discardableResult
+    func attachPicture(
+        _ file: URL, to host: ItemID, from address: String? = nil, state: ItemState = .active, created: Date? = nil
+    ) -> ItemID {
+        let id = ItemID.mint()
+        let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let moment = created ?? now()
+        items.append(Item(
+            id: id, type: TypeID("core.file.image"), title: file.lastPathComponent, titleRule: .property("title"),
+            properties: address.map { [Property(key: SavedPictures.sourceField, value: .string($0))] } ?? [],
+            content: .file(UTType(filenameExtension: file.pathExtension) ?? .data, byteCount: Int64(size)), state: state,
+            version: ItemVersion(1), created: moment, modified: moment,
+            edgesOut: [Edge(id: EdgeID("attached-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, source: id, target: .item(host), origin: .body)]))
+        files[id] = file
+        return id
+    }
+
     func fileURL(of id: ItemID) async throws -> URL? {
         fetches += 1
         if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }

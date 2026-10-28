@@ -35,6 +35,8 @@ final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
     var inFeed: (ItemID) -> Bool = { _ in false }
     /// Changed for each note the page shows, as `EmbeddedFiles.version` is, so an answer to a note since left is dropped.
     var version: () -> Int = { 0 }
+    /// The picture saved for a web address on an item, as a file attached to it (`ItemLibrary.openSavedPicture`).
+    var saved: (ItemID, URL) async -> SavedPictureResolution = { _, _ in .none }
 
     /// The largest picture handed to a portable export, as for any embedded image.
     nonisolated static let largestExport = 16 << 20
@@ -54,8 +56,26 @@ final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
 
     /// `state` is `loaded` with the `url` to show it from, `waiting` where the person may choose to load it, `off`
     /// where Settings says never, or `refused` with the `reason`, and `retry` where choosing the card again may end differently.
+    /// A file attached to the item that was saved from the address is looked for first and answers `loaded` whatever the
+    /// setting and the ask, with no request to the website; one that can't be opened now is `refused`, to be retried,
+    /// rather than the website being asked for what the item holds.
     func reply(to request: PictureRequest) async -> [String: String]? {
         let version = version()
+        switch await saved(request.item, request.address) {
+        case .file(let file):
+            guard version == self.version() else { return nil }
+            if request.exporting { return await export(file) }
+            let stamp = file.url.deletingLastPathComponent().lastPathComponent
+            return [
+                "state": "loaded",
+                "url": EmbeddedFiles.pictureURL(for: request.address, version: version, savedIn: request.item, stamp: stamp).absoluteString,
+            ]
+        case .unavailable(let reason):
+            guard version == self.version() else { return nil }
+            return ["state": "refused", "reason": reason, "retry": "true"]
+        case .none:
+            break
+        }
         let answer = await pictures.answer(
             request.address, ask: request.exporting ? .cached : request.ask, inFeed: inFeed(request.item)
         )
@@ -68,13 +88,16 @@ final class PictureRequests: NSObject, WKScriptMessageHandlerWithReply {
             if failure.isTransient { reply["retry"] = "true" }
             return reply
         case .loaded:
-            if request.exporting { return await export(request.address) }
+            if request.exporting {
+                guard let file = await pictures.openKept(request.address) else { return nil }
+                return await export(file)
+            }
             return ["state": "loaded", "url": EmbeddedFiles.pictureURL(for: request.address, version: version).absoluteString]
         }
     }
 
-    private func export(_ address: URL) async -> [String: String]? {
-        guard let file = await pictures.openKept(address), file.length <= UInt64(Self.largestExport),
+    private func export(_ file: OpenFile) async -> [String: String]? {
+        guard file.length <= UInt64(Self.largestExport),
               let data = await file.read(at: 0, count: Int(file.length)), data.count == Int(file.length),
               let type = UTType(filenameExtension: file.url.pathExtension)
         else { return nil }
