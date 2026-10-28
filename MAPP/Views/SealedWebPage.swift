@@ -5,7 +5,12 @@ import WebKit
 /// A web page that can show one HTML document and nothing else. The document is untrusted: it may run its own scripts,
 /// but it reaches no network, loads nothing from outside itself, submits no form and leaves no trace.
 ///
-/// The seal has four parts, each of which holds without the others:
+/// Each document gets a page of its own, sealed the same way, and `page` changes to it once it has loaded. A document
+/// can start a navigation at any moment, and one it starts while a load into its own page still waits for that load's
+/// policy decision replaces the load: WebKit then drops the replaced load without finishing or failing it, so the new
+/// document would never appear. A page that has held no document has no script that could start one.
+///
+/// The seal has four parts, each of which holds in every page without the others:
 /// - A content rule list blocks every load but `data:`, `blob:` and `about:`, which cover only what the document holds
 ///   itself. It applies to images, scripts, styles, `fetch`, XHR, WebSockets and frames alike.
 /// - A navigation decider cancels every navigation of the main frame but the one this type starts, so a link, a form
@@ -20,16 +25,26 @@ import WebKit
 /// Links do nothing. A document from a file in someone's library is not a page to browse from; a link that opened the
 /// browser would be the document choosing where the person goes.
 @MainActor @Observable final class SealedWebPage {
-    let page: WebPage
-    private let gate: NavigationGate
+    /// The page that holds the document shown last.
+    private(set) var page: WebPage
+    /// The decider of the first page until a `show` takes that page for its document, so the first document loads
+    /// into it; every later document gets a page and decider of its own.
+    @ObservationIgnored private var unused: NavigationGate?
+    /// Counts the calls to `show`, so a load that finishes after a later one started is not shown over it.
+    @ObservationIgnored private var shows = 0
 
     private init(page: WebPage, gate: NavigationGate) {
         self.page = page
-        self.gate = gate
+        unused = gate
     }
 
-    /// Compiles the rules the first time and reuses them after.
     static func make() async throws -> SealedWebPage {
+        let (page, gate) = try await blank()
+        return SealedWebPage(page: page, gate: gate)
+    }
+
+    /// A sealed page that has held no document. Compiles the rules the first time and reuses them after.
+    private static func blank() async throws -> (WebPage, NavigationGate) {
         let rules = try await ruleList()
         var configuration = WebPage.Configuration()
         configuration.websiteDataStore = .nonPersistent()
@@ -37,17 +52,34 @@ import WebKit
         configuration.userContentController.add(rules)
         configuration.userContentController.addUserScript(WKUserScript(source: Self.lockdown, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let gate = NavigationGate()
-        return SealedWebPage(page: WebPage(configuration: configuration, navigationDecider: gate), gate: gate)
+        return (WebPage(configuration: configuration, navigationDecider: gate), gate)
     }
 
-    /// Shows `html`, replacing what the page held, and returns once the document has loaded. Its relative links
-    /// resolve against nothing.
+    /// Shows `html` in place of what was shown, once the document has loaded. Until then, and if the load fails, `page`
+    /// keeps the page it had, which for the first document is the page that document loads into. Throws
+    /// `CancellationError` when the task is cancelled or a later call starts before this one's document has loaded,
+    /// since a document shown over a newer one would be out of date. Its relative links resolve against nothing.
     func show(_ html: Data) async throws {
+        shows += 1
+        let call = shows
         let text = String(data: html, encoding: .utf8)
         let data = text.map { Data($0.utf8) } ?? html
-        gate.allow(Self.base)
-        defer { gate.disallow() }
-        for try await _ in page.load(data, mimeType: "text/html", characterEncoding: text == nil ? .windowsCP1252 : .utf8, baseURL: Self.base) {}
+        let next: WebPage
+        let nextGate: NavigationGate
+        if let gate = unused {
+            unused = nil
+            (next, nextGate) = (page, gate)
+        } else {
+            (next, nextGate) = try await Self.blank()
+            guard call == shows else { throw CancellationError() }
+        }
+        nextGate.allow(Self.base)
+        defer { nextGate.disallow() }
+        for try await _ in next.load(data, mimeType: "text/html", characterEncoding: text == nil ? .windowsCP1252 : .utf8, baseURL: Self.base) {}
+        // A cancelled load ends its sequence without an error.
+        try Task.checkCancellation()
+        guard call == shows else { throw CancellationError() }
+        page = next
     }
 
     static let base = URL(string: "about:blank")!
@@ -90,7 +122,7 @@ import WebKit
     enum SealFailure: Error { case rulesNotCompiled }
 
     /// Decides every navigation: only the load `show` starts passes, once, and only for the request it makes, so a
-    /// navigation the previous document left pending can neither take the allowance nor outlive the load.
+    /// navigation the document starts, while it loads or after, can neither take the allowance nor outlive the load.
     final class NavigationGate: WebPage.NavigationDeciding {
         private var allowed: URL?
 

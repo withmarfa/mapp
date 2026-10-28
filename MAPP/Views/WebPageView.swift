@@ -15,17 +15,21 @@ struct WebPageView: View {
 
     var body: some View {
         Group {
-            if let sealed {
-                WebView(sealed.page)
-                    .webViewBackForwardNavigationGestures(.disabled)
-                    .webViewMagnificationGestures(.disabled)
-                    .webViewLinkPreviews(.disabled)
-            } else if let failure {
+            // The failure comes first, since the page that is still held is the last document's, not this one's.
+            if let failure {
                 ContentUnavailableView {
                     Label("Can’t Show This Page", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(failure)
                 }
+            } else if let sealed {
+                WebView(sealed.page)
+                    .webViewBackForwardNavigationGestures(.disabled)
+                    .webViewMagnificationGestures(.disabled)
+                    .webViewLinkPreviews(.disabled)
+                    // Each document has a page of its own, so a new one gets a new web view, which lets go of the
+                    // page that held the last document and stops its scripts.
+                    .id(ObjectIdentifier(sealed.page))
             } else {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
