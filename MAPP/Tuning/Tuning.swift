@@ -67,9 +67,9 @@ extension Knob.Value {
 /// `body` redraws when it changes.
 @Observable
 final class Tuning {
-    /// Add a knob here to show it in the panel; remove it here when it is settled. Empty until a design value needs
-    /// comparing.
-    static let shared = Tuning(knobs: [])
+    /// Add a knob here to show it in the panel; remove it here when it is settled. Holds only the sidebar experiment's
+    /// switch for now.
+    static let shared = Tuning(knobs: [SidebarStyle.knob])
 
     static let prefix = "tuning."
 

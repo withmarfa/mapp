@@ -5,9 +5,23 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allNotes
+    var sidebarItem: SidebarItem? = .allNotes {
+        didSet {
+            #if DEBUG
+            landing = false
+            #endif
+        }
+    }
+    #if DEBUG
+    /// The sidebar experiment's landing page shows in place of the Items list. Any move to a place or an item ends it.
+    var landing = false
+    var showsExperimentLanding: Bool { landing && !showsSettings && SidebarStyle.selected == .experiment }
+    #endif
     var selection: Set<ItemID> = [] {
         didSet {
+            #if DEBUG
+            if landing, !isSelectingAutomatically, !selection.isEmpty { landing = false }
+            #endif
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
             history.record(selection, in: item)
         }
