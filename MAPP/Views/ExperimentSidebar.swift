@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The sidebar design experiment: a short list in the manner of the Claude app. New and Search act, then Items,
 /// Sources and Collections open. Below that every block is one the person can switch off in Settings > Sidebar, with
-/// the real sidebar's own switches, order and per-library layout (`SidebarLayouts`): the places (Inbox, Recents,
-/// Favorites), the types and the saved views. There is no More. The foot is the real one, and Recently Deleted stays in
+/// the real sidebar's own switches, order and per-library layout (`SidebarLayouts`): the Views block (the built-in
+/// Inbox, Recents and Favorites, then the saved views) and the types. There is no More. The foot is the real one, and Recently Deleted stays in
 /// its menu. Its text is not localized.
 struct ExperimentSidebar: View {
     @CurrentLibrary private var library
@@ -45,14 +45,8 @@ struct ExperimentSidebar: View {
                     .accessibilityIdentifier("ExperimentSearch")
                 ForEach(blocks.top, id: \.key) { placeRow($0) }
             }
-            if !blocks.places.isEmpty {
-                Section {
-                    ForEach(blocks.places, id: \.key) { placeRow($0) }
-                }
-                .accessibilityIdentifier("ExperimentPlaces")
-            }
+            if blocks.showsViews { viewsSection(blocks, plan) }
             if blocks.showsTypes { typesSection(plan) }
-            if blocks.showsViews { viewsSection(plan) }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
@@ -136,20 +130,17 @@ struct ExperimentSidebar: View {
         }
     }
 
-    /// A row of text under the types, laid out like a row with a mark so its words start where the names above do.
+    /// A row of text under the types. A depth-0 type row puts its mark at the list's own leading content edge, so this
+    /// text, with no mark of its own, starts there too: the same inset at any text size, with subtype icons on or off.
     private var showMoreRow: some View {
         Button {
             withAnimation(.snappy(duration: 0.2)) { showsAllTypes.toggle() }
         } label: {
-            Label {
-                Text(verbatim: showsAllTypes ? "Show Less" : "Show More")
-                    .interfaceFont(.body)
-                    .foregroundStyle(.secondary)
-            } icon: {
-                RowIconImage(icon: .symbol("circle")).interfaceFont(.body).hidden()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+            Text(verbatim: showsAllTypes ? "Show Less" : "Show More")
+                .interfaceFont(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .selectionDisabled()
@@ -223,9 +214,12 @@ struct ExperimentSidebar: View {
 
     // MARK: Views
 
-    private func viewsSection(_ plan: SidebarPlan) -> some View {
+    /// One block under the Views heading: the built-in views, then the saved ones, which the person can rename, hide and
+    /// reorder as in the real sidebar. The built-ins are places drawn here, not stored views.
+    private func viewsSection(_ blocks: ExperimentBlocks, _ plan: SidebarPlan) -> some View {
         Section {
-            ForEach(plan.shownViews) { view in
+            ForEach(blocks.builtInViews, id: \.key) { placeRow($0) }
+            ForEach(blocks.savedViews) { view in
                 SidebarLabel(title: view.title, icon: .symbol(SidebarPlace.viewSymbol))
                     .tag(SidebarItem.view(view.id))
                     .contextMenu {

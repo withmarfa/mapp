@@ -21,48 +21,72 @@ struct SidebarExperimentTests {
         return library
     }
 
+    private let viewOne = ItemID("view-1")
+    private let viewTwo = ItemID("view-2")
+
     @Test func everyBlockShowsByDefault() {
         let blocks = ExperimentBlocks(SidebarPlan(library(), layout: SidebarLayout()))
         #expect(blocks.top == [.all, .sources, .collections])
-        #expect(blocks.places == [.inbox, .recents, .favorites])
+        #expect(blocks.builtInViews == [.inbox, .recents, .favorites])
+        #expect(blocks.savedViews.map(\.id) == [viewOne, viewTwo])
         #expect(blocks.showsTypes)
         #expect(blocks.showsViews)
     }
 
-    @Test func aPlaceSwitchedOffLeavesItsBlock() {
+    @Test func aBuiltInViewSwitchedOffLeavesTheBlock() {
         var layout = SidebarLayout()
         layout.setHidden(.recents, true)
         layout.setHidden(.sources, true)
         let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
-        #expect(blocks.places == [.inbox, .favorites])
+        #expect(blocks.builtInViews == [.inbox, .favorites])
         #expect(blocks.top == [.all, .collections])
+        #expect(blocks.savedViews.count == 2)
     }
 
-    @Test func thePlacesBlockIsGoneOnceAllThreeAreOff() {
+    @Test func theViewsBlockStaysOnSavedViewsOnceAllThreeBuiltInsAreOff() {
         var layout = SidebarLayout()
         for place in [SidebarPlace.inbox, .recents, .favorites] { layout.setHidden(place, true) }
-        #expect(ExperimentBlocks(SidebarPlan(library(), layout: layout)).places.isEmpty)
+        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
+        #expect(blocks.builtInViews.isEmpty)
+        #expect(blocks.showsViews)
     }
 
-    @Test func theTypesAndViewsBlocksFollowTheirSwitches() {
+    @Test func theViewsBlockStaysOnBuiltInsWhenShowViewsIsOffOrThereAreNoSavedViews() {
+        var layout = SidebarLayout()
+        layout.setHidden(.views, true)
+        var blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
+        #expect(blocks.savedViews.isEmpty)
+        #expect(blocks.builtInViews == [.inbox, .recents, .favorites])
+        #expect(blocks.showsViews)
+
+        let bare = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
+        blocks = ExperimentBlocks(SidebarPlan(bare, layout: SidebarLayout()))
+        #expect(blocks.savedViews.isEmpty)
+        #expect(blocks.showsViews)
+    }
+
+    @Test func theViewsBlockIsGoneOnlyWhenEveryBuiltInAndSavedViewIsOff() {
+        var layout = SidebarLayout()
+        for place in [SidebarPlace.inbox, .recents, .favorites] { layout.setHidden(place, true) }
+        layout.setHidden(.view(viewOne), true)
+        #expect(ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+        layout.setHidden(.view(viewTwo), true)
+        #expect(!ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+
+        // Show Views off with the built-ins off as well leaves nothing.
+        layout.setHidden(.view(viewOne), false)
+        layout.setHidden(.view(viewTwo), false)
+        layout.setHidden(.views, true)
+        #expect(!ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+    }
+
+    @Test func theTypesBlockFollowsItsSwitchAndSavedViewsKeepTheirOrder() {
         var layout = SidebarLayout()
         layout.setHidden(.types, true)
-        var blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
+        layout.move([SidebarPlace.view(viewOne), .view(viewTwo)], fromOffsets: IndexSet(integer: 1), toOffset: 0)
+        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
         #expect(!blocks.showsTypes)
-        #expect(blocks.showsViews)
-        layout.setHidden(.types, false)
-        layout.setHidden(.views, true)
-        blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
-        #expect(blocks.showsTypes)
-        #expect(!blocks.showsViews)
-    }
-
-    @Test func theViewsBlockIsGoneOnceEveryViewIsOff() {
-        var layout = SidebarLayout()
-        layout.setHidden(.view(ItemID("view-1")), true)
-        #expect(ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
-        layout.setHidden(.view(ItemID("view-2")), true)
-        #expect(!ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+        #expect(blocks.savedViews.map(\.id) == [viewTwo, viewOne])
     }
 
     // MARK: Six types

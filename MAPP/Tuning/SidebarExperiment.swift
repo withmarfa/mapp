@@ -22,18 +22,21 @@ enum SidebarStyle: String, CaseIterable {
 struct ExperimentBlocks: Equatable {
     /// The block above the rest, after New and Search: the Browse places that are switched on.
     let top: [SidebarPlace]
-    /// Inbox, Recents and Favorites, each when switched on. The block is absent once all three are off.
-    let places: [SidebarPlace]
+    /// The Views block's built-in views, Inbox, Recents and Favorites, each when switched on.
+    let builtInViews: [SidebarPlace]
+    /// The Views block's saved views below them, in the person's order, when Show Views is on and these are not hidden.
+    let savedViews: [LibraryView]
     /// The Types block, where the library has types and Show Types is on.
     let showsTypes: Bool
-    /// The Views block, where the server has views and Show Views is on and some view is.
-    let showsViews: Bool
+
+    /// The one Views block shows while some built-in view or saved view is switched on.
+    var showsViews: Bool { !builtInViews.isEmpty || !savedViews.isEmpty }
 
     init(_ plan: SidebarPlan) {
         top = plan.shownBrowse
-        places = plan.shownTop
+        builtInViews = plan.shownTop
+        savedViews = plan.shownLibrary.contains(.views) ? plan.shownViews : []
         showsTypes = plan.shownLibrary.contains(.types)
-        showsViews = plan.shownLibrary.contains(.views)
     }
 }
 
