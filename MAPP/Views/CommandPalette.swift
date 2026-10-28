@@ -275,6 +275,11 @@ struct CommandPalette: View {
             browser.palette = .search
         })
 
+        #if DEBUG
+        // Dev-only and not a toolbar action, so it is not localized and has no toolbar button or shortcut.
+        add("Show Tuning Panel", "slider.horizontal.3") { openWindow(id: TuningPanel.windowID) }
+        #endif
+
         if let one, one.isWritable {
             if hasVisibleEditor {
                 add(editor.caret.sourceMode ? String(localized: "Show Formatted Text") : String(localized: "Show Markdown Source"), "doc.plaintext") {

@@ -6,6 +6,7 @@ import SwiftUI
 /// While the inspector is open, Share, More and Details sit above it instead (`InspectorToolbar`).
 struct NoteToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
+    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     let browser: Browser?
     let items: [Item]
     let editor: EditorController
@@ -24,14 +25,11 @@ struct NoteToolbar: CustomizableToolbarContent {
         .customizationBehavior(.disabled)
         .hidden(!showsCreation)
         ToolbarItem(id: "scrolledTitle") {
-            Text(tools.notes.first?.title ?? "")
-                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: 220, alignment: .leading)
-                .accessibilityIdentifier("ScrolledItemTitle")
+            ScrolledItemTitle(title: tools.notes.first?.title ?? "")
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.showsCollection == true)
+        .hidden(!showsScrolledTitle || !editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.showsCollection == true)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
@@ -52,6 +50,25 @@ struct NoteToolbar: CustomizableToolbarContent {
             .hidden(tools.showsInspector)
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(tools.showsInspector)
+    }
+}
+
+/// The title of the note on the page, in the toolbar once the page's header has scrolled away.
+struct ScrolledItemTitle: View {
+    let title: String
+
+    /// The most room a title takes, so a long one never crowds the buttons beside it.
+    static let widest: CGFloat = 300
+
+    var body: some View {
+        Text(title)
+            .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+            .frame(maxWidth: Self.widest, alignment: .leading)
+            // The toolbar sizes an item from what it reports, and the title would otherwise report whatever width it
+            // was last offered: a stale or still-growing one while the item is placed shows as "14…". Fixed, it always
+            // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("ScrolledItemTitle")
     }
 }
 
@@ -101,6 +118,7 @@ struct DetailsToggle: View {
 /// columns (`ListToolbar`, `NoteToolbar`). Opened on an item, Search, Filter and View Options give way.
 struct GalleryToolbar: ToolbarContent {
     @CurrentLibrary private var library
+    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     @Bindable var browser: Browser
     let items: [Item]
     let editor: EditorController
@@ -112,12 +130,9 @@ struct GalleryToolbar: ToolbarContent {
         if showsCreation {
             ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
         }
-        if !browser.showsCollection, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+        if showsScrolledTitle, !browser.showsCollection, editor.isHeaderScrolledAway, tools.notes.count == 1 {
             ToolbarItem(placement: .navigation) {
-                Text(tools.notes.first?.title ?? "")
-                    .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-                    .frame(maxWidth: 220, alignment: .leading)
-                    .accessibilityIdentifier("ScrolledItemTitle")
+                ScrolledItemTitle(title: tools.notes.first?.title ?? "")
             }
             .sharedBackgroundVisibility(.hidden)
         }

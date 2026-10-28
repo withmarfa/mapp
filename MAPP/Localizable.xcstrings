@@ -1406,6 +1406,9 @@
     "File Not Found" : {
 
     },
+    "For notes and items. Lists always keep their background." : {
+
+    },
     "This file isn’t an HTML page." : {
 
     },
@@ -2110,6 +2113,12 @@
     "Show This Type Only" : {
 
     },
+    "Show Title When Scrolling" : {
+
+    },
+    "Show Toolbar Background When Scrolling" : {
+
+    },
     "Show Types" : {
 
     },
@@ -2387,6 +2396,9 @@
 
     },
     "Tomorrow" : {
+
+    },
+    "Toolbar" : {
 
     },
     "Try Again" : {

@@ -75,6 +75,13 @@ private struct AppearanceSettings: View {
                 Text("Changes text in the sidebar, lists, and controls. Note text size is set in Editor.")
             }
             Section {
+                ToolbarOptions()
+            } header: {
+                Text("Toolbar")
+            } footer: {
+                Text("For notes and items. Lists always keep their background.")
+            }
+            Section {
                 ColumnWidthOptions()
             } header: {
                 Text("Default Column Widths")

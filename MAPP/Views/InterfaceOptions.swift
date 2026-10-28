@@ -5,7 +5,11 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// Whether the inspector's Details section is open, kept across items and launches.
     static let inspectorDetailsOpen = "inspectorDetailsOpen"
-    static let all = [textSize, inspectorDetailsOpen] + ColumnWidth.allCases.map(\.key)
+    /// Whether the window's toolbar shows a note's or item's title once the page's header has scrolled away.
+    static let showsScrolledTitle = "showsScrolledTitle"
+    /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
+    static let showsPageToolbarBackground = "showsPageToolbarBackground"
+    static let all = [textSize, inspectorDetailsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {
@@ -50,6 +54,21 @@ extension View {
 
     func interfaceFont(_ font: Font) -> some View {
         modifier(InterfaceFont(font: font))
+    }
+}
+
+/// What the toolbar does as a note's or item's page scrolls beneath it. Both are on until turned off.
+struct ToolbarOptions: View {
+    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsTitle = true
+    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
+
+    var body: some View {
+        Toggle("Show Title When Scrolling", isOn: $showsTitle)
+            .toggleStyle(.switch)
+            .accessibilityIdentifier("ToolbarScrolledTitle")
+        Toggle("Show Toolbar Background When Scrolling", isOn: $showsBackground)
+            .toggleStyle(.switch)
+            .accessibilityIdentifier("ToolbarPageBackground")
     }
 }
 
