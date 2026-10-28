@@ -65,6 +65,8 @@ extension View {
 }
 
 private struct AppearanceSettings: View {
+    @AppStorage(ToolbarBand.edgeKey) private var showsToolbarEdge = true
+
     var body: some View {
         Form {
             Section {
@@ -84,6 +86,13 @@ private struct AppearanceSettings: View {
             Section("Notes List") {
                 OrderOptions()
                 ListPreviewOptions()
+            }
+            Section {
+                Toggle("Toolbar Edge", isOn: $showsToolbarEdge)
+                    .toggleStyle(.switch)
+                    .accessibilityIdentifier("ToolbarEdge")
+            } footer: {
+                Text("Shows a blurred band behind the toolbar once a note or list has scrolled underneath it.")
             }
         }
         .labelStyle(.titleOnly)

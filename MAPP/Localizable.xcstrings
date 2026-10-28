@@ -2119,6 +2119,9 @@
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
     },
+    "Shows a blurred band behind the toolbar once a note or list has scrolled underneath it." : {
+
+    },
     "Shows the group’s items" : {
 
     },
@@ -2387,6 +2390,9 @@
 
     },
     "Tomorrow" : {
+
+    },
+    "Toolbar Edge" : {
 
     },
     "Try Again" : {
