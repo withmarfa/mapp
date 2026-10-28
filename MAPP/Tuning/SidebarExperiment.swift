@@ -16,46 +16,62 @@ enum SidebarStyle: String, CaseIterable {
     }
 }
 
-/// The places above the experiment sidebar's More row, kept as a comma-separated list of keys. The mock keeps it in
-/// this Mac's defaults, not per server, and leaves the real sidebar's layout alone.
-struct ExperimentMainBlock: Equatable {
-    static let storageKey = "experiment.sidebar.mainBlock"
-    static let defaultStored = "all,sources,collections"
+/// What the experiment sidebar shows, block by block, from the same plan the real sidebar and Settings > Sidebar read.
+/// Every block follows the switches in Settings > Sidebar, so the experiment keeps no list of its own.
+@MainActor
+struct ExperimentBlocks: Equatable {
+    /// The block above the rest, after New and Search: the Browse places that are switched on.
+    let top: [SidebarPlace]
+    /// Inbox, Recents and Favorites, each when switched on. The block is absent once all three are off.
+    let places: [SidebarPlace]
+    /// The Types block, where the library has types and Show Types is on.
+    let showsTypes: Bool
+    /// The Views block, where the server has views and Show Views is on and some view is.
+    let showsViews: Bool
 
-    /// Places that are not types, by key, in the order the Edit list offers them.
-    static let placeKeys = ["all", "sources", "collections", "inbox", "recents", "favorites", "deleted"]
-    static let typePrefix = "type:"
-
-    private(set) var keys: [String]
-
-    init(stored: String) {
-        var seen: Set<String> = []
-        keys = stored.split(separator: ",").map { String($0) }.filter { seen.insert($0).inserted }
+    init(_ plan: SidebarPlan) {
+        top = plan.shownBrowse
+        places = plan.shownTop
+        showsTypes = plan.shownLibrary.contains(.types)
+        showsViews = plan.shownLibrary.contains(.views)
     }
+}
 
-    var stored: String { keys.joined(separator: ",") }
+/// The Types block shows this many types, with their subtypes, until Show More.
+enum ExperimentTypeLimit {
+    static let shownCount = 6
 
-    func contains(_ key: String) -> Bool { keys.contains(key) }
-
-    /// Adds a place at the end of the block, or takes it out.
-    mutating func toggle(_ key: String) {
-        if let index = keys.firstIndex(of: key) { keys.remove(at: index) } else { keys.append(key) }
-    }
-
-    static func typeKey(_ id: String) -> String { typePrefix + id }
-
-    /// The sidebar item a key opens; nil for a key this build does not know.
-    static func item(forKey key: String) -> SidebarItem? {
-        switch key {
-        case "all": .allNotes
-        case "sources": .sources
-        case "collections": .collections
-        case "inbox": .inbox
-        case "recents": .recents
-        case "favorites": .favorites
-        case "deleted": .recentlyDeleted
-        default: key.hasPrefix(typePrefix) ? .itemType(String(key.dropFirst(typePrefix.count))) : nil
+    /// The rows of the first `limit` types, each with the subtype rows folded open under it, and whether more types
+    /// follow. With `showsAll` every row stays. A type's subtypes are never cut off from it.
+    static func rows(
+        _ rows: [SidebarPlan.TypeRow], showsAll: Bool, limit: Int = shownCount
+    ) -> (rows: [SidebarPlan.TypeRow], hasMore: Bool) {
+        let topLevel = rows.filter { $0.depth == 0 }.count
+        guard topLevel > limit else { return (rows, false) }
+        guard !showsAll else { return (rows, true) }
+        var seen = 0
+        let kept = rows.prefix { row in
+            if row.depth == 0 { seen += 1 }
+            return seen <= limit
         }
+        return (Array(kept), true)
+    }
+}
+
+extension Browser {
+    /// Whether the experiment's "Make something new" row stands above the page: on the Sources and Collections indexes,
+    /// and on Items while it shows in a layout that spans the window (the gallery, table, board or timeline), not once
+    /// an item is open.
+    var offersExperimentLanding: Bool {
+        if showsSettings { return false }
+        return showsSidebarIndex || (item == .allNotes && showsCollection)
+    }
+
+    /// Choosing Items in the experiment sidebar. The landing is Items in a layout that spans the window, so a window
+    /// on the list moves to the gallery; the person's own choice of another layout stands.
+    func showItemsLanding(in library: any ItemLibrary, order: NoteOrder) {
+        if viewMode == .list { viewMode = .gallery }
+        show(.allNotes, in: library, order: order)
     }
 }
 

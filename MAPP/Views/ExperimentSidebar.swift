@@ -1,29 +1,31 @@
 #if DEBUG
 import SwiftUI
 
-/// The sidebar design experiment: a short list in the manner of the Claude app. New and Search act, a few places
-/// open, More holds the rest, and favorites sit below as Pinned. Every place the real sidebar reaches is reachable
-/// here, and the foot is the real one. Its text is not localized.
+/// The sidebar design experiment: a short list in the manner of the Claude app. New and Search act, then Items,
+/// Sources and Collections open. Below that every block is one the person can switch off in Settings > Sidebar, with
+/// the real sidebar's own switches, order and per-library layout (`SidebarLayouts`): the places (Inbox, Recents,
+/// Favorites), the types and the saved views. There is no More. The foot is the real one, and Recently Deleted stays in
+/// its menu. Its text is not localized.
 struct ExperimentSidebar: View {
     @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     let browser: Browser
     let order: NoteOrder
-    @AppStorage(ExperimentMainBlock.storageKey) private var storedBlock = ExperimentMainBlock.defaultStored
-    @AppStorage("experiment.sidebar.showsMore") private var showsMore = false
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
-    @State private var collapsed: Set<String> = []
-    @State private var editsBlock = false
+    @State private var showsAllTypes = false
+    @State private var editsTypes = false
+    @State private var choosingIcon: TypeIconRequest?
 
-    /// Items opens the landing page; every other place opens as in the real sidebar.
+    /// Items opens the landing, which is Items in a layout that spans the window; every other place opens as in the
+    /// real sidebar.
     private var selection: Binding<SidebarItem?> {
         Binding {
             browser.showsSettings ? nil : browser.sidebarItem
         } set: { item in
             guard let item else { return }
             if item == .allNotes {
-                browser.show(item, in: library, order: order)
-                browser.landing = true
+                browser.showItemsLanding(in: library, order: order)
             } else if item == browser.sidebarItem {
                 browser.leaveSettings()
             } else {
@@ -33,31 +35,39 @@ struct ExperimentSidebar: View {
     }
 
     var body: some View {
-        let block = ExperimentMainBlock(stored: storedBlock)
-        let tree = library.typeTree
-        let rows = typeRows(tree.filter { !block.contains(ExperimentMainBlock.typeKey($0.id)) })
-        let pinned = pinnedItems
+        let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
+        let blocks = ExperimentBlocks(plan)
         List(selection: selection) {
             Section {
                 actionRow("New", symbol: "square.and.pencil") { browser.openQuickAdd(remembered: lastType, in: library) }
                     .accessibilityIdentifier("ExperimentNew")
                 actionRow("Search", symbol: "magnifyingglass") { browser.palette = .search }
                     .accessibilityIdentifier("ExperimentSearch")
-                ForEach(block.keys, id: \.self) { placeRow($0) }
-                moreRow
+                ForEach(blocks.top, id: \.key) { placeRow($0) }
             }
-            if showsMore { moreSections(block, rows: rows) }
-            if !pinned.isEmpty { pinnedSection(pinned) }
+            if !blocks.places.isEmpty {
+                Section {
+                    ForEach(blocks.places, id: \.key) { placeRow($0) }
+                }
+                .accessibilityIdentifier("ExperimentPlaces")
+            }
+            if blocks.showsTypes { typesSection(plan) }
+            if blocks.showsViews { viewsSection(plan) }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
-        .softSelection(
-            rows: block.keys + [String(showsMore)] + collapsed.sorted() + pinned.map(\.id.rawValue) + library.views.map(\.id.rawValue)
-                + tree.map(\.id),
-            selection: browser.sidebarItem)
+        .softSelection(rows: selectionRows(plan) + [String(showsAllTypes)], selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
-        .onChange(of: pinned.map(\.id)) { browser.placeRemoved(in: library, order: order) }
+        .onKeyPress(.rightArrow, phases: [.down, .repeat]) { pressArrow(.right, $0) }
+        .onKeyPress(.leftArrow, phases: [.down, .repeat]) { pressArrow(.left, $0) }
         .onChange(of: library.views.map(\.id)) { browser.placeRemoved(in: library, order: order) }
+        .sheet(item: $choosingIcon) { TypeIconPicker(request: $0, library: library) }
+    }
+
+    private func selectionRows(_ plan: SidebarPlan) -> [String] {
+        plan.shownTop.map(\.key) + plan.shownBrowse.map(\.key) + plan.shownLibrary.map(\.key)
+            + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
+            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue)
     }
 
     // MARK: Rows
@@ -70,102 +80,82 @@ struct ExperimentSidebar: View {
         .selectionDisabled()
     }
 
-    private var moreRow: some View {
-        Button {
-            withAnimation(.snappy(duration: 0.2)) { showsMore.toggle() }
-        } label: {
-            HStack {
-                SidebarLabel(title: "More", icon: .symbol("ellipsis"))
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .interfaceFont(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(showsMore ? 90 : 0))
+    private struct PlaceLook {
+        let item: SidebarItem
+        let symbol: String
+        let counted: Bool
+    }
+
+    private func look(of place: SidebarPlace) -> PlaceLook? {
+        switch place {
+        case .all: PlaceLook(item: .allNotes, symbol: "square.grid.2x2", counted: true)
+        case .sources: PlaceLook(item: .sources, symbol: "antenna.radiowaves.left.and.right", counted: false)
+        case .collections: PlaceLook(item: .collections, symbol: "square.stack", counted: false)
+        case .inbox: PlaceLook(item: .inbox, symbol: "tray", counted: true)
+        // Always the same number, so it says nothing.
+        case .recents: PlaceLook(item: .recents, symbol: "clock", counted: false)
+        case .favorites: PlaceLook(item: .favorites, symbol: "heart", counted: true)
+        default: nil
+        }
+    }
+
+    @ViewBuilder private func placeRow(_ place: SidebarPlace) -> some View {
+        if let look = look(of: place) {
+            let count = look.counted ? library.count(in: look.item) : 0
+            SidebarLabel(title: library.name(of: look.item), icon: .symbol(look.symbol))
+                .badge(count > 0 ? Text(count, format: .number).monospacedDigit() : nil)
+                .tag(look.item)
+                .contextMenu { hideButton(place) }
+                .accessibilityIdentifier("ExperimentPlace-\(place.key)")
+        }
+    }
+
+    @ViewBuilder private func hideButton(_ place: SidebarPlace) -> some View {
+        Button("Hide from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(place, true) } }
+        if case .view = place {
+            Button("Hide Views from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(.views, true) } }
+        }
+    }
+
+    // MARK: Types
+
+    /// The real Types block: its heading with Edit on hover, the same folding rows, and at most `shownCount` types until
+    /// Show More.
+    private func typesSection(_ plan: SidebarPlan) -> some View {
+        let limited = ExperimentTypeLimit.rows(plan.typeRows, showsAll: showsAllTypes)
+        let rows = limited.rows
+        let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
+        let widest = rows.filter(\.isExpandable).map(count(of:)).max() ?? 0
+        return Section {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                typeRow(row, widestFoldingCount: widest, steps: steps[index])
             }
+            if limited.hasMore { showMoreRow }
+        } header: {
+            TypesHeading(editsTypes: $editsTypes)
+        }
+    }
+
+    /// A row of text under the types, laid out like a row with a mark so its words start where the names above do.
+    private var showMoreRow: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.2)) { showsAllTypes.toggle() }
+        } label: {
+            Label {
+                Text(verbatim: showsAllTypes ? "Show Less" : "Show More")
+                    .interfaceFont(.body)
+                    .foregroundStyle(.secondary)
+            } icon: {
+                RowIconImage(icon: .symbol("circle")).interfaceFont(.body).hidden()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .selectionDisabled()
-        .accessibilityValue(Text(verbatim: showsMore ? "Expanded" : "Collapsed"))
-        .accessibilityIdentifier("ExperimentMore")
+        .accessibilityIdentifier(showsAllTypes ? "ExperimentShowLess" : "ExperimentShowMore")
     }
 
-    private struct PlaceLook {
-        let title: String
-        let icon: RowIcon
-        let counted: Bool
-    }
-
-    private func look(ofKey key: String) -> PlaceLook? {
-        switch key {
-        case "all": return PlaceLook(title: "Items", icon: .symbol("square.grid.2x2"), counted: true)
-        case "sources": return PlaceLook(title: library.name(of: .sources), icon: .symbol("antenna.radiowaves.left.and.right"), counted: false)
-        case "collections": return PlaceLook(title: library.name(of: .collections), icon: .symbol("square.stack"), counted: false)
-        case "inbox": return PlaceLook(title: library.name(of: .inbox), icon: .symbol("tray"), counted: true)
-        case "recents": return PlaceLook(title: library.name(of: .recents), icon: .symbol("clock"), counted: false)
-        case "favorites": return PlaceLook(title: library.name(of: .favorites), icon: .symbol("heart"), counted: true)
-        case "deleted": return PlaceLook(title: library.name(of: .recentlyDeleted), icon: .symbol("trash"), counted: false)
-        default:
-            if key.hasPrefix(ExperimentMainBlock.typePrefix) {
-                let type = TypeID(String(key.dropFirst(ExperimentMainBlock.typePrefix.count)))
-                guard library.catalogue.itemTypes[type] != nil else { return nil }
-                return PlaceLook(title: library.catalogue.label(for: type), icon: .type(library.catalogue.icon(for: type)), counted: true)
-            }
-            return nil
-        }
-    }
-
-    @ViewBuilder private func placeRow(_ key: String) -> some View {
-        if let item = ExperimentMainBlock.item(forKey: key), let look = look(ofKey: key) {
-            let count = look.counted ? library.count(in: item) : 0
-            SidebarLabel(title: look.title, icon: look.icon)
-                .badge(count > 0 ? Text(count, format: .number).monospacedDigit() : nil)
-                .tag(item)
-                .accessibilityIdentifier("ExperimentPlace-\(key)")
-        }
-    }
-
-    // MARK: More
-
-    @ViewBuilder private func moreSections(_ block: ExperimentMainBlock, rows: [SidebarPlan.TypeRow]) -> some View {
-        Section {
-            ForEach(ExperimentMainBlock.placeKeys.filter { !block.contains($0) }, id: \.self) { placeRow($0) }
-            Button { editsBlock = true } label: {
-                SidebarLabel(title: "Edit Sidebar", icon: .symbol("slider.horizontal.3")).contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .selectionDisabled()
-            .popover(isPresented: $editsBlock) {
-                ExperimentBlockEditor(stored: $storedBlock, candidates: candidates)
-            }
-            .accessibilityIdentifier("ExperimentEdit")
-        } header: {
-            Text(verbatim: "More")
-        }
-        if !rows.isEmpty {
-            let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
-            let widest = rows.filter(\.isExpandable).map(count(of:)).max() ?? 0
-            Section {
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    typeRow(row, widestFoldingCount: widest, steps: steps[index])
-                }
-            } header: {
-                Text(verbatim: "Types")
-            }
-        }
-        if !library.views.isEmpty {
-            Section {
-                ForEach(library.views) { view in
-                    SidebarLabel(title: view.title, icon: .symbol(SidebarPlace.viewSymbol))
-                        .tag(SidebarItem.view(view.id))
-                }
-            } header: {
-                Text(verbatim: "Views")
-            }
-        }
-    }
-
-    /// Type rows as the real sidebar draws them, folded by this view's own state so the real layout is left alone.
     @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int, steps: [SidebarTypeRow.Step]) -> some View {
         let node = row.node
         let content = SidebarTypeRow(
@@ -175,20 +165,27 @@ struct ExperimentSidebar: View {
             content
                 .tag(SidebarItem.itemType(type.rawValue))
                 .listRowInsets(.vertical, 0)
+                .contextMenu { typeMenu(node) }
+                .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
             Button { toggle(row) } label: { content.contentShape(.rect) }
                 .buttonStyle(.plain)
                 .selectionDisabled()
                 .listRowInsets(.vertical, 0)
+                .contextMenu { typeMenu(node) }
+                .accessibilityLabel(Text(node.label))
+                .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
+                .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
         }
     }
 
-    private func typeRows(_ nodes: [TypeNode], depth: Int = 0) -> [SidebarPlan.TypeRow] {
-        nodes.flatMap { node in
-            let isExpanded = !collapsed.contains(node.id)
-            return [SidebarPlan.TypeRow(node: node, depth: depth, isExpanded: isExpanded)]
-                + (isExpanded ? typeRows(node.children, depth: depth + 1) : [])
+    @ViewBuilder private func typeMenu(_ node: TypeNode) -> some View {
+        if let type = node.type {
+            Button("Choose Icon…") { choosingIcon = TypeIconRequest(type: type) }
+                .disabled(!library.canChooseTypeIcons)
+            Divider()
         }
+        hideButton(.type(node.id))
     }
 
     private func count(of row: SidebarPlan.TypeRow) -> Int {
@@ -197,86 +194,56 @@ struct ExperimentSidebar: View {
     }
 
     private func toggle(_ row: SidebarPlan.TypeRow) {
+        setCollapsed(row.node.id, row.isExpanded)
+    }
+
+    /// Folding a row that holds the selected type selects the row, so something stays highlighted.
+    private func setCollapsed(_ id: String, _ collapsed: Bool) {
+        if collapsed, !browser.showsSettings {
+            let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
+            if let item = plan.selectionAfterFolding(id, selected: browser.sidebarItem) {
+                browser.show(item, in: library, order: order)
+            }
+        }
         withAnimation(.snappy(duration: 0.2)) {
-            if row.isExpanded { collapsed.insert(row.node.id) } else { collapsed.remove(row.node.id) }
+            libraries.updateSidebarLayout { $0.setCollapsed(.type(id), collapsed) }
         }
     }
 
-    /// What the Edit list offers for the main block: every place, then each top-level type.
-    private var candidates: [ExperimentBlockEditor.Candidate] {
-        let places = ExperimentMainBlock.placeKeys.compactMap { key in
-            look(ofKey: key).map { ExperimentBlockEditor.Candidate(key: key, title: $0.title, icon: $0.icon) }
+    private func pressArrow(_ arrow: SidebarPlan.Arrow, _ press: KeyPress) -> KeyPress.Result {
+        guard press.modifiers.isEmpty, !browser.showsSettings else { return .ignored }
+        let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
+        switch plan.outcome(of: arrow, selected: browser.sidebarItem) {
+        case .fold(let id, let collapsed): setCollapsed(id, collapsed)
+        case .select(let item): browser.show(item, in: library, order: order)
+        case nil: return .ignored
         }
-        let types = library.typeTree.filter(\.opens).compactMap { node in
-            node.type.map {
-                ExperimentBlockEditor.Candidate(
-                    key: ExperimentMainBlock.typeKey($0.rawValue), title: node.label, icon: .type(node.icon))
-            }
-        }
-        return places + types
+        return .handled
     }
 
-    // MARK: Pinned
+    // MARK: Views
 
-    private var pinnedItems: [Item] {
-        library.items(in: .favorites).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-    }
-
-    private func pinnedSection(_ items: [Item]) -> some View {
+    private func viewsSection(_ plan: SidebarPlan) -> some View {
         Section {
-            ForEach(items) { item in
-                SidebarLabel(
-                    title: item.title.isEmpty ? String(localized: "Untitled") : item.title,
-                    icon: .type(library.catalogue.icon(for: item.type))
-                )
-                .tag(SidebarItem.favoriteItem(item.id))
+            ForEach(plan.shownViews) { view in
+                SidebarLabel(title: view.title, icon: .symbol(SidebarPlace.viewSymbol))
+                    .tag(SidebarItem.view(view.id))
+                    .contextMenu {
+                        SavedViewRowMenu(view: view.id, browser: browser)
+                        Divider()
+                        hideButton(.view(view.id))
+                    }
+                    .accessibilityIdentifier("SidebarView-\(view.id.rawValue)")
             }
-        } header: {
-            Text(verbatim: "Pinned")
-        }
-        .accessibilityIdentifier("ExperimentPinned")
-    }
-}
-
-/// The popover that chooses which places stand above More. A place that is ticked leaves More and a place that is
-/// not ticked goes back into it.
-private struct ExperimentBlockEditor: View {
-    struct Candidate: Identifiable {
-        let key: String
-        let title: String
-        let icon: RowIcon
-        var id: String { key }
-    }
-
-    @Binding var stored: String
-    let candidates: [Candidate]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: "Show in the main list")
-                .font(.headline)
-            Text(verbatim: "The rest stay under More. Kept on this Mac, not per server.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
-            ForEach(candidates) { candidate in
-                Toggle(isOn: binding(for: candidate.key)) {
-                    SidebarLabel(title: candidate.title, icon: candidate.icon)
+            .onMove { source, destination in
+                libraries.updateSidebarLayout {
+                    $0.move(plan.views, shown: plan.shownViews, by: { SidebarPlace.view($0.id).key }, fromOffsets: source, toOffset: destination)
                 }
             }
+        } header: {
+            ViewsHeading(browser: browser)
         }
-        .padding(16)
-        .frame(width: 260, alignment: .leading)
-    }
-
-    private func binding(for key: String) -> Binding<Bool> {
-        Binding {
-            ExperimentMainBlock(stored: stored).contains(key)
-        } set: { _ in
-            var block = ExperimentMainBlock(stored: stored)
-            block.toggle(key)
-            stored = block.stored
-        }
+        .accessibilityIdentifier("SidebarViews")
     }
 }
 #endif

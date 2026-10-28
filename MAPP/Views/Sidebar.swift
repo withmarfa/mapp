@@ -250,7 +250,7 @@ struct Sidebar: View {
 
 /// The Types heading. Edit shows only while the pointer is over the heading, or its picker is open, as the control
 /// of a sidebar's section heading does.
-private struct TypesHeading: View {
+struct TypesHeading: View {
     @Binding var editsTypes: Bool
     @State private var isHovering = false
 
