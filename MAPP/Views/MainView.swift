@@ -140,14 +140,16 @@ struct MainView: View {
 
     private var workspace: some View {
         #if DEBUG
-        if browser.showsTabsHome {
-            NavigationSplitView(columnVisibility: galleryColumnVisibility) {
-                sidebarColumn
-            } detail: {
-                TabsHome(browser: browser, order: order, showsCreation: !isSidebarVisible)
+        Group {
+            if browser.showsTabsHome {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    TabsHome(browser: browser, order: order, showsCreation: !isSidebarVisible)
+                }
+            } else {
+                standardWorkspace
             }
-        } else {
-            standardWorkspace
         }
         #else
         standardWorkspace
