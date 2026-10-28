@@ -42,6 +42,9 @@ struct MainView: View {
 
     private var workspacePresentation: WorkspacePresentation {
         if browser.showsSettings { return .settings }
+        #if DEBUG
+        if browser.showsExperimentLanding { return .landing }
+        #endif
         if browser.showsSidebarIndex { return .index }
         return usesCollectionLayout ? .collection : .list
     }
@@ -136,6 +139,24 @@ struct MainView: View {
     }
 
     private var workspace: some View {
+        #if DEBUG
+        Group {
+            if browser.showsExperimentLanding {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    ExperimentLanding(browser: browser, order: order, showsCreation: !isSidebarVisible)
+                }
+            } else {
+                standardWorkspace
+            }
+        }
+        #else
+        standardWorkspace
+        #endif
+    }
+
+    private var standardWorkspace: some View {
         Group {
             if browser.showsSidebarIndex {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
@@ -220,10 +241,17 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
+        .focusedSceneValue(\.editor, hidesEditor ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
         .environment(details)
+    }
+
+    private var hidesEditor: Bool {
+        #if DEBUG
+        if browser.showsExperimentLanding { return true }
+        #endif
+        return browser.showsCollection || browser.showsSidebarIndex
     }
 
     private var lifecycleWindow: some View {
@@ -346,6 +374,9 @@ struct MainView: View {
 
 private enum WorkspacePresentation: Hashable {
     case list, collection, settings, index
+    #if DEBUG
+    case landing
+    #endif
 }
 
 // Measuring a drag must not invalidate the view and reapply its preferred column widths.

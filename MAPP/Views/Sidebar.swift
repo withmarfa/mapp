@@ -28,8 +28,21 @@ struct Sidebar: View {
     }
 
     var body: some View {
+        #if DEBUG
+        // The sidebar experiment (`SidebarStyle`), switched live from the tuning panel.
+        if SidebarStyle.selected == .experiment {
+            ExperimentSidebar(browser: browser, order: order)
+        } else {
+            currentSidebar
+        }
+        #else
+        currentSidebar
+        #endif
+    }
+
+    private var currentSidebar: some View {
         let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
-        List(selection: selection) {
+        return List(selection: selection) {
             if !plan.shownTop.isEmpty {
                 Section {
                     ForEach(plan.shownTop, id: \.key) { place in
