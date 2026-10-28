@@ -1,12 +1,14 @@
 #if DEBUG
 import Foundation
 
-/// The sidebar design experiment's switch: the sidebar and landing page as they are, or the Claude-app-style mock.
+/// The sidebar design experiment's switch: the sidebar and landing page as they are, the Claude-app-style mock, or the
+/// Notion-style tab bar over a short sidebar of collections and views (`TabsSidebar`).
 /// Delete this file, its knob in `Tuning.shared`, and every `#if DEBUG` branch that reads it once August has chosen,
 /// or promote the experiment into the real sidebar.
 enum SidebarStyle: String, CaseIterable {
     case current
     case experiment
+    case tabs
 
     static let knob = Knob.picker("sidebar", "style", SidebarStyle.current)
 

@@ -5,9 +5,23 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allNotes
+    var sidebarItem: SidebarItem? = .allNotes {
+        didSet {
+            #if DEBUG
+            tabsHome = false
+            #endif
+        }
+    }
+    #if DEBUG
+    /// The tab-bar experiment's Home page shows in place of the Items list. Any move to a place or an item ends it.
+    var tabsHome = false
+    var showsTabsHome: Bool { tabsHome && !showsSettings && SidebarStyle.selected == .tabs }
+    #endif
     var selection: Set<ItemID> = [] {
         didSet {
+            #if DEBUG
+            if tabsHome, !isSelectingAutomatically, !selection.isEmpty { tabsHome = false }
+            #endif
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
             history.record(selection, in: item)
         }

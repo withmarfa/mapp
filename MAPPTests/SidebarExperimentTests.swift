@@ -10,7 +10,7 @@ struct SidebarExperimentTests {
 
     @Test func theSwitchStartsOnTheCurrentSidebar() {
         #expect(SidebarStyle.knob.initial == .option("current"))
-        #expect(SidebarStyle.allCases.map(\.rawValue) == ["current", "experiment"])
+        #expect(SidebarStyle.allCases.map(\.rawValue) == ["current", "experiment", "tabs"])
     }
 
     // MARK: Blocks

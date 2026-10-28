@@ -30,10 +30,10 @@ struct Sidebar: View {
     var body: some View {
         #if DEBUG
         // The sidebar experiment (`SidebarStyle`), switched live from the tuning panel.
-        if SidebarStyle.selected == .experiment {
-            ExperimentSidebar(browser: browser, order: order)
-        } else {
-            currentSidebar
+        switch SidebarStyle.selected {
+        case .experiment: ExperimentSidebar(browser: browser, order: order)
+        case .tabs: TabsSidebar(browser: browser, order: order)
+        case .current: currentSidebar
         }
         #else
         currentSidebar
