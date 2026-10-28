@@ -5,7 +5,7 @@ import Testing
 /// The sample library the UI tests and screenshots use, over the package's fake working copy, which answers the
 /// writes it holds when it is flushed.
 @MainActor
-@Suite struct SampleLibraryTests {
+@Suite(.hangLimit) struct SampleLibraryTests {
     private static func loaded() async throws -> (MarfaLibrary, MarfaSource) {
         let source = SampleLibrary.open(SampleLibrary.connection)
         let library = MarfaLibrary(source: source, notices: Notices())

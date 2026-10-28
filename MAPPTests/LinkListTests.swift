@@ -5,7 +5,7 @@ import Testing
 /// Long lists of links draw a part of themselves, and a link to an item in the bin or one the library does not hold
 /// says so.
 @MainActor
-@Suite struct LinkListTests {
+@Suite(.hangLimit) struct LinkListTests {
     typealias F = LibraryFixture
 
     // MARK: The cut

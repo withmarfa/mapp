@@ -3,7 +3,7 @@ import Testing
 @testable import MAPP
 
 @MainActor
-@Suite struct ItemTagTests {
+@Suite(.hangLimit) struct ItemTagTests {
     typealias F = LibraryFixture
 
     // MARK: Rules

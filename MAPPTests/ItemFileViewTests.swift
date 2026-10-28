@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 @testable import MAPP
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct ItemFileViewTests {
     /// A file item whose bytes are held under a hash with no extension, as a Marfa copy holds them.
     private func fixture() throws -> (library: FakeItemLibrary, id: ItemID, folder: URL) {

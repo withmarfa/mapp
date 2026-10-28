@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-@Suite struct MarfaKeptFileTests {
+@Suite(.hangLimit) struct MarfaKeptFileTests {
     let folder: TemporaryFolder
     var kept: URL { folder.url.appending(path: "MAPP Files", directoryHint: .isDirectory) }
 

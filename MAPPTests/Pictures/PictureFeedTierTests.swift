@@ -9,6 +9,7 @@ import Testing
 /// Which items Always loads pictures for without asking. Marfa stamps every item with the source of the key that wrote
 /// it, so a note written in MAPP has a source too: the tier is what tells the feed from the library. The items are
 /// mapped from rows as the library maps them, and the answers come from the editor's own wiring.
+@Suite(.hangLimit)
 @MainActor struct PictureFeedTierTests {
     private let folder: TemporaryFolder
     private let defaults: UserDefaults

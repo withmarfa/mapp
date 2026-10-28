@@ -4,6 +4,7 @@ import Testing
 
 /// Which library the windows read, and when. Every host is on its own defaults, key store and store directory,
 /// never the person's Keychain or saved server.
+@Suite(.hangLimit)
 @MainActor struct LibrariesTests {
     private let address = "http://first.test:8210"
 

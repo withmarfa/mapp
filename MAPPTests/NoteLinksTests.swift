@@ -3,6 +3,7 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct NoteLinksTests {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 

@@ -6,7 +6,7 @@ import Testing
 
 /// A drain the copy runs itself ends in a report or an error, and every answer the queue holds is taken before any is
 /// forgotten. The queue is made to hold the answers the server would have recorded.
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct MarfaDrainAnswersTests {
     private nonisolated static func recordAccepted(_ id: String, at url: URL) throws {
         try record(id, "UPDATE queue SET verdict = 'accepted', sent = 1 WHERE id = ?", at: url)
@@ -28,7 +28,7 @@ struct MarfaDrainAnswersTests {
         #expect(sqlite3_changes(db) == 1)
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aDrainThatStopsOnAnErrorLeavesItsRecordedAnswersToBeTaken() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -64,7 +64,7 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func anEarlierReportDoesNotForgetAnswersARunningDrainRecorded() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -101,7 +101,7 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func anAnswerRecordedAfterTheQueueWasReadSurvivesTheForgetting() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -140,7 +140,7 @@ struct MarfaDrainAnswersTests {
 
     /// A blocked answer is one the copy never forgets, since the write may be released, and a released write keeps its
     /// queue id. Its next answer, recorded while another report is cleaned up, is not one the engine has taken.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aReleasedWritesNewAnswerSurvivesAnotherReportsCleanup() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

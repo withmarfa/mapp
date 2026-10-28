@@ -38,7 +38,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
 
 /// What the Version History sheet lists, and when a version can be put back.
 @MainActor
-@Suite struct VersionHistoryTests {
+@Suite(.hangLimit) struct VersionHistoryTests {
     private static let id = ItemID("launch")
 
     private func loaded(_ source: FakeHistory?) async -> ItemHistoryModel {
@@ -149,7 +149,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
 
 /// Restoring a version through `MarfaLibrary`: the edit it sends, its undo, and what it refuses.
 @MainActor
-@Suite struct MarfaRestoreTests {
+@Suite(.hangLimit) struct MarfaRestoreTests {
     typealias F = TypeChangeFixture
     private static let launch = ItemID("launch")
 

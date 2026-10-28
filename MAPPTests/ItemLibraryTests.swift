@@ -6,6 +6,7 @@ import Testing
 
 /// The views hold a library as `any ItemLibrary`, so what they read through it must still be observed.
 @MainActor
+@Suite(.hangLimit)
 struct ItemLibraryTests {
     typealias F = LibraryFixture
 

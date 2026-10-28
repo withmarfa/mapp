@@ -6,6 +6,7 @@ import WebKit
 /// A picture saved as a file on an item replaces its web address on the item's page: the answer comes from the file
 /// whatever the Remote Pictures setting and whatever the ask, and the website is never asked. The answers come from
 /// the editor's own wiring, with a stand-in internet that counts every request made to it.
+@Suite(.hangLimit)
 @MainActor struct SavedPictureRequestsTests {
     private let folder: TemporaryFolder
     private let defaults: UserDefaults

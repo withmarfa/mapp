@@ -5,6 +5,7 @@ import Synchronization
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 @MainActor struct MarfaHostTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")
@@ -142,7 +143,7 @@ import Testing
     }
 
     /// Discarding the copy takes it from under nobody: while another process writes it, it stays, marked to go.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func discardingACopyAnotherProcessWritesLeavesIt() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
@@ -171,7 +172,7 @@ import Testing
 
     /// The package removes a copy only against a count of its changes, so a copy that can't be opened, and whose
     /// changes nobody could count, is never discarded: the person is told where it is, and nothing is left.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyThatCannotBeOpenedIsNotDiscardedAndThePersonIsToldWhereItIs() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
@@ -194,7 +195,7 @@ import Testing
 
     /// Even when a count was shown, a copy the package can't read to count is kept, and not marked to go: the
     /// next connection opens or refuses it as it did.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyThePackageCannotCountIsKeptWhateverTheCountShown() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
@@ -215,7 +216,7 @@ import Testing
 
     /// The person agreed to lose the number of changes they were shown. A copy holding another number is kept,
     /// and they are told the number it holds.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyHoldingOtherChangesThanThePersonWasShownIsKept() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
@@ -242,7 +243,7 @@ import Testing
     }
 
     /// A copy marked to go that has since gained changes is not removed when its address is opened again either.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyMarkedToGoThatHoldsOtherChangesIsKeptWhenItsAddressIsOpened() async throws {
         let bench = try HostBench()
         let store = bench.location.store(for: first)
@@ -263,7 +264,7 @@ import Testing
 
     /// A discard interrupted after the store went leaves a marked folder with no store. It holds nothing, so
     /// whatever count was agreed, it is removed and the address opens.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aMarkedCopyWhoseStoreIsAlreadyGoneIsRemovedWhateverWasAgreed() async throws {
         let bench = try HostBench()
         let directory = bench.location.directory(for: first)
@@ -280,7 +281,7 @@ import Testing
 
     /// A shown write may be sent while the sheet is open, so the copy holds fewer than the person agreed to
     /// lose. Nothing beyond what they agreed is lost, so the discard goes through.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyHoldingFewerChangesThanThePersonAgreedToLoseIsRemoved() async throws {
         let bench = try HostBench()
         let store = bench.location.store(for: first)
@@ -298,7 +299,7 @@ import Testing
 
     /// The retry is made once, with the count the copy held: a copy that gains a change between the two asks is
     /// kept, not asked again without end.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aRetryThatFindsMoreChangesKeepsTheCopy() async throws {
         let bench = try HostBench()
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
@@ -318,7 +319,7 @@ import Testing
 
     /// The package refuses a folder's store, which can't be made here, so its answer is given to the host. The
     /// copy stays, its mark is dropped, and the person is told it isn't MAPP's.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aMarkedStoreThatIsAFoldersIsLeftAndToldSo() async throws {
         let bench = try HostBench()
         let directory = bench.location.directory(for: first)
@@ -334,7 +335,7 @@ import Testing
     }
 
     /// An earlier version of the app may still be writing a copy this version refuses, so it stays too.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func discardingACopyADifferentVersionWritesLeavesIt() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")

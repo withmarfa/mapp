@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 @MainActor struct PictureDisconnectTests {
     /// The pictures kept for a library's notes go with the library. The cache is the app's own folder in the caches
     /// folder of the test host, which has a bundle identifier of its own, never the installed app's.

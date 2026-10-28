@@ -4,7 +4,7 @@ import Testing
 
 /// What a `[[link]]` written in one note names, as a Marfa library reads it from its copy.
 @MainActor
-@Suite struct MarfaLinkResolutionTests {
+@Suite(.hangLimit) struct MarfaLinkResolutionTests {
     typealias F = LibraryFixture
 
     private func item(_ id: ItemID, _ title: String, state: ItemState = .active, links: [BoundLink] = []) -> Item {

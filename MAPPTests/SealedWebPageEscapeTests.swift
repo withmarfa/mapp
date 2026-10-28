@@ -5,7 +5,7 @@ import WebKit
 
 /// Each way a script might still reach WebRTC from inside the sealed page, tried on its own against a UDP listener that
 /// counts the datagrams that arrive.
-@Suite(.serialized) @MainActor struct SealedWebPageEscapeTests {
+@Suite(.serialized, .hangLimit) @MainActor struct SealedWebPageEscapeTests {
     enum Escape: String, CaseIterable, CustomTestStringConvertible {
         case blankFrameAtOnce, blankFrameEval, blankFrameSrcLater, srcdocFrame, dataFrame, blobFrame
         case blobWorker, blobSharedWorker, openedBlank, sandboxedSrcdocFrame, objectFrame, parserWrittenFrame

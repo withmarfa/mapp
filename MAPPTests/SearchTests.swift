@@ -52,7 +52,7 @@ import Testing
 }
 
 @MainActor
-@Suite struct MarfaLibrarySearchTests {
+@Suite(.hangLimit) struct MarfaLibrarySearchTests {
     typealias F = LibraryFixture
 
     private func loaded(filling: Bool = false) async throws -> (MarfaLibrary, FakeItemSource) {

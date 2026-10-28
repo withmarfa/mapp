@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct ItemTableColumnsTests {
     private static let catalogue = BigLibrary.catalogue
 

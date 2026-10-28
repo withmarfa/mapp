@@ -27,6 +27,7 @@ import Testing
 
 /// Switching and leaving servers as the windows see them, and quitting while a copy queues. Each test was first
 /// seen failing on the code before its fix.
+@Suite(.hangLimit)
 @MainActor struct MarfaHostSwitchingTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")

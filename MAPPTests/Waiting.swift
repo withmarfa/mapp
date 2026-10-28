@@ -1,10 +1,19 @@
 import Foundation
 import Observation
+import Testing
 
 /// How long a test waits for something before it fails. A passing test never waits this long, since a wait returns as
 /// soon as its condition holds. The limit is long because a hosted runner is slow and runs many suites at once, and
 /// the first editor page of a test process starts WebKit cold, which has taken 27 seconds there.
 nonisolated let waitLimit: Duration = .seconds(60)
+
+/// The time limit of a suite whose tests await something that may never arrive, such as a WebKit call, an answer from
+/// another process or a task. A hang then fails the test that hangs, by name, and the run goes on, where it would
+/// otherwise hold the whole job to its own limit. It is above `waitLimit`, so that a wait that gives up reports its own
+/// expectation first, and well above the slowest test on a hosted runner.
+extension Trait where Self == TimeLimitTrait {
+    nonisolated static var hangLimit: Self { .timeLimit(.minutes(2)) }
+}
 
 /// Waits until `condition` holds, and answers whether it did before `limit` passed.
 ///

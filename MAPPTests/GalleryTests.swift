@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct GalleryTests {
     let a = ItemID.mint(), b = ItemID.mint(), c = ItemID.mint(), d = ItemID.mint()
 

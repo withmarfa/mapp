@@ -3,7 +3,7 @@ import Marfa
 import Testing
 @testable import MAPP
 
-@Suite struct DownloadedFilesTests {
+@Suite(.hangLimit) struct DownloadedFilesTests {
     @Test func budgetRoundTripsWithoutRounding() {
         for budget in [DownloadBudget.automatic, .bytes(12345), .keepAll] {
             #expect(DownloadBudget(budget.marfa) == budget)

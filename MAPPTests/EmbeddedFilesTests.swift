@@ -129,7 +129,7 @@ extension EmbedResolution {
     }
 }
 
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct EmbeddedFilesTests {
     /// A directory of files, a link out of it, and a directory outside it. It answers an embed as a library will
     /// once it resolves them: a name from `Attachments/`, a path from `Projects/`, opened only inside the directory.

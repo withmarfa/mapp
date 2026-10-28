@@ -4,6 +4,7 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct InspectorFieldsTests {
     private static func field(_ name: String, _ type: String = "string", description: String? = nil, definition: JSONObject = [:]) -> TypeField {
         TypeField(name: name, type: type, description: description, declaredBy: "core.task", definition: definition)

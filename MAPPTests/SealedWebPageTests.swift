@@ -78,6 +78,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     deinit { listener.cancel() }
 }
 
+@Suite(.hangLimit)
 @MainActor struct SealedWebPageTests {
     /// A document that tries every way to reach out, then reports what happened.
     private func hostile(port: UInt16) -> Data {
@@ -245,8 +246,8 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
 
     /// When one page held every document, a navigation the shown document started while the next document's load waited
     /// for its policy decision replaced that load, which WebKit then dropped without finishing or failing it, so `show`
-    /// never returned. The time limit makes that a failure rather than a run that never ends.
-    @Test(.timeLimit(.minutes(1))) func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
+    /// never returned. The suite's hang limit makes that a failure rather than a run that never ends.
+    @Test func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
         let probe = try await Probe()
         let page = try await SealedWebPage.make()
         // A message loop, which no timer throttling slows, starts a navigation at every turn of the page's event loop,

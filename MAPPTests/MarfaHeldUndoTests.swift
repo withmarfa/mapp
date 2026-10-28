@@ -9,7 +9,7 @@ import Testing
 
 /// An Undo or Redo pressed while the copy is brought up to date is held by the engine and made once the copy is whole
 /// (`MarfaEngine+Holding`), and put back for the person where it can't be.
-@Suite struct MarfaHeldUndoTests {
+@Suite(.hangLimit) struct MarfaHeldUndoTests {
     /// A copy that is whole only when the test says so. Until then it refuses what the package refuses while a fill is
     /// under way: an edge write, and a write to a row it does not hold yet. A write to a row it holds is queued as usual.
     private nonisolated final class Catchup: MarfaReading {
@@ -323,7 +323,7 @@ import Testing
 
 /// How the library marks the writes of an undo or a redo, and puts back the step the engine could not make.
 @MainActor
-@Suite struct MarfaUndoGiveBackTests {
+@Suite(.hangLimit) struct MarfaUndoGiveBackTests {
     private static let launch = ItemID("launch")
 
     private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {

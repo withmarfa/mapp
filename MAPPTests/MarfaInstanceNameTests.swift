@@ -4,6 +4,7 @@ import Testing
 @testable import MAPP
 
 /// The name a server gives itself, read through a fake description source.
+@Suite(.hangLimit)
 @MainActor struct MarfaInstanceNameTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")
