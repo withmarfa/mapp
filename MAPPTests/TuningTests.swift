@@ -80,17 +80,20 @@ struct TuningTests {
         }
     }
 
-    @Test func theAppsKnobsAreUniqueAndStartAtValuesTheyAccept() {
-        let ids = Tuning.shared.knobs.map(\.id)
-        #expect(Set(ids).count == ids.count)
-        for knob in Tuning.shared.knobs { #expect(knob.coerced(knob.initial) == knob.initial, "\(knob.id)") }
+    @Test func aRegistryWithNoKnobsReportsOnlyTheBuild() throws {
+        let suite = "TuningTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let empty = Tuning(knobs: [], defaults: defaults)
+        #expect(empty.report(build: "19") == "MAPP build 19")
+        empty.reset()
     }
 
-    @Test func onlyTheBandLeavesTheListsEdgeToTheApp() {
-        #expect(ToolbarBand.ListEdge.band.systemStyle == nil)
-        for edge in ToolbarBand.ListEdge.allCases where edge != .band { #expect(edge.systemStyle != nil) }
-        #expect(ToolbarBand.WindowToolbarBackground.hidden.visibility == .hidden)
-        #expect(ToolbarBand.WindowToolbarBackground.automatic.visibility == .automatic)
+    @Test func theKnobsOfOneRegistryHaveUniqueIDs() throws {
+        try tuning { tuning, _ in
+            #expect(Set(tuning.knobs.map(\.id)).count == tuning.knobs.count)
+            for knob in tuning.knobs { #expect(knob.coerced(knob.initial) == knob.initial, "\(knob.id)") }
+        }
     }
 }
 #endif

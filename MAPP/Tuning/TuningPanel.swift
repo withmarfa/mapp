@@ -11,16 +11,22 @@ struct TuningPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Form {
-                ForEach(groups, id: \.name) { group in
-                    Section {
-                        ForEach(group.knobs) { knob in control(for: knob) }
-                    } header: {
-                        Text(verbatim: group.name)
+            if tuning.knobs.isEmpty {
+                Text(verbatim: "No knobs yet")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Form {
+                    ForEach(groups, id: \.name) { group in
+                        Section {
+                            ForEach(group.knobs) { knob in control(for: knob) }
+                        } header: {
+                            Text(verbatim: group.name)
+                        }
                     }
                 }
+                .formStyle(.grouped)
             }
-            .formStyle(.grouped)
             Divider()
             HStack {
                 Spacer()

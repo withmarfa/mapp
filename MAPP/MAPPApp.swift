@@ -46,7 +46,7 @@ struct MAPPApp: App {
                 // page one color, reaching up under the toolbar, which then draws no band of its own, even while
                 // the window is inactive. The sidebar's material stays above it.
                 .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
-                .toolbarBackgroundVisibility(ToolbarBand.windowToolbarBackground, for: .windowToolbar)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .environment(libraries)
                 .environment(libraries.host)
         }
