@@ -4,6 +4,7 @@ import Testing
 
 /// A new item that a server's library shows only when its source says so, a window carried to another library,
 /// and a file fetched rather than at hand.
+@Suite(.hangLimit)
 struct LibraryChangeTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

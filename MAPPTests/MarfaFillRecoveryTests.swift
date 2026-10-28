@@ -93,7 +93,7 @@ private actor FillServer: MarfaRefreshing {
     }
 }
 
-@Suite struct MarfaFillRecoveryTests {
+@Suite(.hangLimit) struct MarfaFillRecoveryTests {
     private func withSync(_ server: FillServer, body: (MarfaSync) async throws -> Void) async throws {
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }

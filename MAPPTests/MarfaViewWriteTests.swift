@@ -5,6 +5,7 @@ import Testing
 
 /// Saving, changing and deleting views, which go to the server at once and are never queued.
 @MainActor
+@Suite(.hangLimit)
 struct MarfaViewWriteTests {
     private static let settings = LibraryViewSettings(
         title: "Open Tasks", query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active]),

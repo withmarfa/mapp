@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-@Suite struct PictureFetcherTests {
+@Suite(.hangLimit) struct PictureFetcherTests {
     let folder: TemporaryFolder
 
     init() throws {

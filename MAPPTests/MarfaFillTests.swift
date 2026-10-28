@@ -8,7 +8,7 @@ import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
-@Suite struct MarfaFillTests {
+@Suite(.hangLimit) struct MarfaFillTests {
     @Test(arguments: [Completeness.partial, .stale])
     func incompleteRowsPaintAndSavesWorkWithoutEdgeReads(_ completeness: Completeness) async throws {
         let store = try TemporaryMarfaCopy()

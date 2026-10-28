@@ -113,9 +113,9 @@ private nonisolated final class HeldRefresh: MarfaRefreshing {
 }
 
 /// A server that refuses every connection, so a copy made for it never hears from it.
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct MarfaSourceOfflineTests {
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyPaintsAndKeepsWritesWithoutTheServer() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -156,7 +156,7 @@ struct MarfaSourceOfflineTests {
 
     /// The copy drains what waited when the server is back, and tells the report. The write is answered, as for a
     /// drain `MarfaSync` ran.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aDrainTheCopyRunsItselfAnswersTheWrite() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -180,7 +180,7 @@ struct MarfaSourceOfflineTests {
 
     /// A copy an earlier version made is refused with what it holds that the server has not taken, and nothing in
     /// it is removed.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyADifferentVersionMadeIsRefusedWithItsUnsentChangesAndKept() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -205,7 +205,7 @@ struct MarfaSourceOfflineTests {
 
     /// With nothing the server has not taken, a copy is only what the server holds, so it is made again. The
     /// files it downloaded stay, and so does the person's choice of how many to keep.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyADifferentVersionMadeWithNothingUnsentIsMadeAgainKeepingItsFiles() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -234,7 +234,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// Without a count, the copy may hold changes only the version that made it can send.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyADifferentVersionMadeWhoseChangesCantBeCountedIsKept() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -256,7 +256,7 @@ struct MarfaSourceOfflineTests {
 
     /// Another copy of the app holding the copy as its writer may still write to it, so it is never replaced. The
     /// lock is held by a different process, as another copy of the app sharing the container would hold it.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyADifferentVersionMadeThatAnotherProcessHoldsIsKept() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -338,7 +338,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// A refresh that waits on the server must not hold up a write: the write is queued and shown at once.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteIsQueuedAtOnceWhileARefreshIsHeld() async throws {
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
@@ -363,7 +363,7 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aSecondOpenerOfTheSameCopyIsRefused() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -375,7 +375,7 @@ struct MarfaSourceOfflineTests {
         await again.close()
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aBodyForATypeWithoutABodyFieldIsRefused() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -393,7 +393,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// The child is queued and answered as itself; a parent link that cannot be made is told on its own.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCreateIsKeptWhateverBecomesOfItsParentLink() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -414,7 +414,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// A read that fails says so and keeps what was shown, rather than emptying the library or settling it.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aReadThatFailsKeepsWhatWasShown() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -435,7 +435,7 @@ struct MarfaSourceOfflineTests {
 
     /// The package takes properties as values: a text edit names the body alone, which the server merges, and a
     /// property taken away is the item's whole properties without it. Both are read back from the queue.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aTextEditMergesTheBodyAndAPropertyTakenAwayReplacesTheWhole() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -471,7 +471,7 @@ struct MarfaSourceOfflineTests {
 
     /// A stream the core ended on a fault is followed by `.resumed`, which refreshes the copy so the library leaves
     /// "stopped" once the server answers, and the person is told of the fault once until it has.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aFaultTheCoreEndedAStreamOnIsToldOnceAndTheNextStreamRefreshes() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -500,7 +500,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// A row the copy could not read is replaced only by a hydration, which the sync asks for once for each row.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aRowTheCopyCouldNotReadIsHydratedForOnceAtMost() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -549,7 +549,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// The follow stops when the copy expires, and only a new hydration starts it again.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func anExpiredCopyIsHydratedAgain() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -585,7 +585,7 @@ struct MarfaSourceOfflineTests {
 
     /// A new parent is one queued update of the edge, shown at once and never a delete and a create, so the child
     /// holds a parent the whole time.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aMovedEdgeIsOneQueuedWriteShownAtItsNewEnd() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -614,7 +614,7 @@ struct MarfaSourceOfflineTests {
     /// The engine reads again every item a move touches, and the edge it moved is the same edge at its new ends, so
     /// the order the items are read in must not decide whether the child ends up holding it. Moved back and forth,
     /// every order is met.
-    @Test(.timeLimit(.minutes(2)))
+    @Test
     func aChildMovedBackAndForthAlwaysShowsItsCurrentParent() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -637,7 +637,7 @@ struct MarfaSourceOfflineTests {
     }
 
     /// What the package refuses before it queues anything is told in plain words, and nothing is queued.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aMoveThePackageRefusesIsToldPlainlyAndQueuesNothing() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -673,7 +673,7 @@ struct MarfaSourceOfflineTests {
 
     /// A move to the end the edge already holds, as an undo after a refused move makes, is taken at once and
     /// queues nothing, since the server refuses an update that changes nothing.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aMoveToTheEndTheEdgeHoldsIsTakenAndQueuesNothing() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -740,7 +740,7 @@ struct MarfaSourceOfflineTests {
     /// A source move the server accepts expires the copy as the drain answers it, and the drain throws without its
     /// report. The answers are read from the queue instead, once the copy is hydrated again, so the person's write is
     /// answered and nothing queued is lost.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aCopyExpiredByAMoveKeepsEveryQueuedWriteAndTheView() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -796,7 +796,7 @@ struct MarfaSourceOfflineTests {
 
     /// The package names the item a conflicted copy was made from, from the copy alone, so the two know each other
     /// without a server and without the verdict that made the copy.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aConflictedCopyIsShownBesideItsOriginal() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1440,7 +1440,7 @@ nonisolated enum LiveMarfa {
 
 /// Quitting and closing over a real copy whose server refuses every connection: each test failed on the code
 /// before the connect review's fixes.
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct MarfaSourceClosingTests {
     private func open() async throws -> (MarfaSource, MarfaConnection, MemoryKeyStore, MarfaStoreLocation, URL) {
         let root = scratch()
@@ -1453,7 +1453,7 @@ struct MarfaSourceClosingTests {
 
     /// A write made the moment before quitting is in the queue once `queueSubmitted` returns, which never waits
     /// for the server, so it is there at the next launch.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteMadeJustBeforeQuittingIsKept() async throws {
         let (source, connection, keys, location, root) = try await open()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1472,7 +1472,7 @@ struct MarfaSourceClosingTests {
     }
 
     /// A write that reaches the source after it closed is kept nowhere, and says so rather than vanishing.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteAfterClosingIsToldItWasNotKept() async throws {
         let (source, _, _, _, root) = try await open()
         defer { try? FileManager.default.removeItem(at: root) }

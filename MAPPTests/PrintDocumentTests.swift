@@ -4,7 +4,7 @@ import WebKit
 import Testing
 @testable import MAPP
 
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct PrintDocumentTests {
     private func html() throws -> String {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 80, pixelsHigh: 80,

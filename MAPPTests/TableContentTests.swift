@@ -7,7 +7,7 @@ import Testing
 /// each row's values once. These check that sharing never shows stale rows, and that the sort puts rows where the
 /// comparison it replaced did.
 @MainActor
-@Suite struct TableContentTests {
+@Suite(.hangLimit) struct TableContentTests {
     private let tasks = SidebarItem.itemType("aic.ticket.task")
 
     private func browser(showing place: SidebarItem) -> Browser {

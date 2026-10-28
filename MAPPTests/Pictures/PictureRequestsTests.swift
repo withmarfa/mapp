@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 @MainActor struct PictureRequestsTests {
     private let folder: TemporaryFolder
     private let defaults: UserDefaults

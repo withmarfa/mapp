@@ -28,7 +28,7 @@ final class StrictSchemeTask: NSObject, WKURLSchemeTask {
 
 /// What a scheme task hears once WebKit has stopped it or a folder has changed under it, and what Open hands
 /// to other apps.
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct EmbeddedFilesSafetyTests {
     @Test func aFileRequestStoppedAtOnceHearsNothing() async throws {
         let folder = try EmbeddedFilesTests.Folder()

@@ -4,6 +4,7 @@ import Testing
 
 /// A view's title or new name stays where it was typed until the server takes it.
 @MainActor
+@Suite(.hangLimit)
 struct ViewTitleFormTests {
     private static let view = LibraryView(id: ItemID("view-open"), title: "Open", version: 1)
     private static let draft = ViewDraft.Draft(query: LibraryViewQuery(), sort: [], group: nil)

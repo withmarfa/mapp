@@ -5,6 +5,7 @@ import Testing
 @testable import MAPP
 
 @MainActor
+@Suite(.hangLimit)
 struct MarfaCreationTests {
     @Test(arguments: ["core.note", "test.entry"])
     func aTitleOnlyCreateIncludesItsRequiredTextBody(_ typeID: String) async throws {

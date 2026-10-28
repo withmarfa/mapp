@@ -4,7 +4,7 @@ import Testing
 @testable import MAPP
 
 /// The host over a real copy whose server refuses every connection.
-@MainActor @Suite(.serialized)
+@MainActor @Suite(.serialized, .hangLimit)
 struct MarfaHostOfflineTests {
     private let address = "http://127.0.0.1:9"
 
@@ -17,7 +17,7 @@ struct MarfaHostOfflineTests {
         if case .changesWaiting(let unsent) = problem { unsent?.count } else { nil }
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aKeptCopyGoesOnWhereItWasLeft() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -48,7 +48,7 @@ struct MarfaHostOfflineTests {
     }
 
     /// A key the server ends expires the copy; it waits for another key rather than hydrating again at once.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func anEndedKeyWaitsForAnother() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -71,7 +71,7 @@ struct MarfaHostOfflineTests {
     }
 
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteMadeJustBeforeLeavingIsNotLost() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -93,7 +93,7 @@ struct MarfaHostOfflineTests {
 
     /// A write that lands while the person is being asked, such as an editor's late save, is not discarded with
     /// what they were shown.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteMadeAfterThePersonWasAskedIsNotDiscarded() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -121,7 +121,7 @@ struct MarfaHostOfflineTests {
         try await host.disconnect(.keepCopy)
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteMadeWhileMovingAddressAfterThePersonWasAskedIsNotDiscarded() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -152,7 +152,7 @@ struct MarfaHostOfflineTests {
     }
 
     /// The package refuses every call while the copy changes key, and asks for it again.
-    @Test(.timeLimit(.minutes(2)))
+    @Test
     func writesMadeWhileTheKeyChangesAreQueued() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
@@ -179,7 +179,7 @@ struct MarfaHostOfflineTests {
         try await discardEverything(host)
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aDamagedCopyIsAPlainProblem() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })

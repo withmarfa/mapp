@@ -4,6 +4,7 @@ import Testing
 
 /// The Include Subtypes choice kept in the defaults, and what it adds to a type's list.
 @MainActor
+@Suite(.hangLimit)
 struct IncludedSubtypesTests {
     func library() async throws -> MarfaLibrary {
         let source = FakeItemSource()

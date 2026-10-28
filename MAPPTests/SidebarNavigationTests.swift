@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct SidebarNavigationTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

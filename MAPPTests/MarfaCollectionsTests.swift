@@ -5,7 +5,7 @@ import Testing
 /// Collections as Marfa keeps them: items whose type plays the `container` role, holding members through
 /// `in-collection` edges from each member.
 @MainActor
-@Suite struct MarfaCollectionsTests {
+@Suite(.hangLimit) struct MarfaCollectionsTests {
     typealias F = LibraryFixture
 
     static let holiday = ItemID("al1"), archive = ItemID("al2"), oldAlbum = ItemID("al3")

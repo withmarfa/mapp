@@ -44,7 +44,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 }
 
 @MainActor
-@Suite struct InstanceSettingsTests {
+@Suite(.hangLimit) struct InstanceSettingsTests {
     private func model(_ source: FakeInstanceConfig, id: String = "https://marfa.test") -> InstanceSettingsModel {
         InstanceSettingsModel { .init(id: id, source: source) }
     }

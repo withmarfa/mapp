@@ -10,6 +10,7 @@ import Testing
 /// The views saved on the server: kept out of the items, listed in the sidebar, and each a place that lists what
 /// the copy holds of its items.
 @MainActor
+@Suite(.hangLimit)
 struct MarfaViewsTests {
     private static let planning = LibraryView(id: ItemID("view-planning"), title: "Planning")
     private static let reading = LibraryView(id: ItemID("view-reading"), title: "Reading")

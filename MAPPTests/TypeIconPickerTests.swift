@@ -1,6 +1,7 @@
 @testable import MAPP
 import Testing
 
+@Suite(.hangLimit)
 @MainActor struct TypeIconPickerTests {
     private let names = ["arrow-down", "arrow-up", "book", "book-open", "bookmark", "folder", "folder-open", "square-arrow-up"]
 
@@ -101,6 +102,7 @@ private struct FakeTypeIcons: TypeIconSource {
     }
 }
 
+@Suite(.hangLimit)
 @MainActor struct MarfaLibraryTypeIconTests {
     private func open(_ answer: Result<String?, TypeIconFailure>) async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()

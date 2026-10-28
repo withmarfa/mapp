@@ -53,7 +53,7 @@ private nonisolated func finished(_ changes: Change...) -> AsyncStream<Change> {
 private nonisolated let stopped = Change(origin: .stopped(.network(message: "gone")), itemId: nil, edgeId: nil)
 private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a", edgeId: nil)
 
-@Suite struct MarfaFollowTests {
+@Suite(.hangLimit) struct MarfaFollowTests {
     @Test func aStreamTheCoreEndedOnAFaultIsReplacedAndTheCopyIsReadAgain() async {
         let streams = Streams([finished(saved, stopped), finished(saved, stopped), finished(saved)])
         let task = MarfaFollow.start(

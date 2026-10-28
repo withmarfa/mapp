@@ -7,6 +7,7 @@ import Testing
 
 /// Leaving a server: what is removed, in what order, and what the person is told when a removal fails. Each test
 /// was first seen failing on the code before its fix.
+@Suite(.hangLimit)
 @MainActor struct MarfaHostLeavingTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")
@@ -74,7 +75,7 @@ import Testing
         #expect(bench.servers.opened.count == 2)
     }
 
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aRetryInACancelledTaskStops() async throws {
         let hub = MarfaHub()
         hub.changingKey(true)

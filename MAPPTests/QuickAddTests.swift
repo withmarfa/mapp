@@ -32,6 +32,7 @@ final class TestFiles {
     }
 }
 
+@Suite(.hangLimit)
 struct QuickAddTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     let disk = TestFiles()

@@ -8,6 +8,7 @@ import Testing
 /// The Marfa section of Settings, through the model the view holds, so its steps and words are tested without a
 /// window. The host is on fakes, in memory, and a temporary store location: never the Keychain, and never the
 /// default location.
+@Suite(.hangLimit)
 @MainActor struct MarfaSettingsModelTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let second = try! MarfaConnection(address: "http://second.test:8210")

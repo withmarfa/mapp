@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct ItemTableHoverTests {
     private let a = ItemID("a")
     private let b = ItemID("b")

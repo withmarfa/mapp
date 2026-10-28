@@ -8,7 +8,7 @@ import Testing
 
 /// Changing an item's type through `MarfaLibrary`: what it sends, what it refuses before sending, and its undo.
 @MainActor
-@Suite struct MarfaTypeChangeTests {
+@Suite(.hangLimit) struct MarfaTypeChangeTests {
     typealias F = TypeChangeFixture
     private static let launch = ItemID("launch")
 
@@ -184,7 +184,7 @@ import Testing
 
 /// A change of type through the package's fake working copy, as the engine queues it.
 @MainActor
-@Suite struct MarfaTypeChangeCopyTests {
+@Suite(.hangLimit) struct MarfaTypeChangeCopyTests {
     private static let stamp = "2026-10-26T00:00:00Z"
 
     private static let itemTypes: [Marfa.ItemType] = [

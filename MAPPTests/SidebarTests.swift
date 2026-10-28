@@ -5,6 +5,7 @@ import Testing
 /// What a library reports for the sidebar: its collections, its types with their counts and how they nest, and the
 /// plan the sidebar makes of them.
 @MainActor
+@Suite(.hangLimit)
 struct SidebarTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
 

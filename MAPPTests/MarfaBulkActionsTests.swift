@@ -16,7 +16,7 @@ final class StepCountingUndoManager: UndoManager {
 
 /// A command on a selection: what it writes for the items that take it, and how it tells the person about the rest.
 @MainActor
-@Suite struct MarfaBulkActionsTests {
+@Suite(.hangLimit) struct MarfaBulkActionsTests {
     typealias F = TypeChangeFixture
 
     private static func note(_ id: ItemID, state: ItemState = .active) -> Item {

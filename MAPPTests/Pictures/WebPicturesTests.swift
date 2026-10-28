@@ -5,6 +5,7 @@ import Testing
 
 /// What is fetched, and when, by the Remote Pictures setting. Nothing here reaches a network: the fetcher is given
 /// `PictureStub`, which counts the requests made to a host of the test's own.
+@Suite(.hangLimit)
 @MainActor struct WebPicturesTests {
     private let folder: TemporaryFolder
     private let defaults: UserDefaults

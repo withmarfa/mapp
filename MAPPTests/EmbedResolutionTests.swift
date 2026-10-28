@@ -4,7 +4,7 @@ import Testing
 @testable import MAPP
 
 /// How an embed in a note becomes the file Marfa's core bound it to, for the page and the gallery alike.
-@Suite struct EmbedResolutionTests {
+@Suite(.hangLimit) struct EmbedResolutionTests {
     let folder: TemporaryFolder
     let library = FakeItemLibrary()
     let note: ItemID

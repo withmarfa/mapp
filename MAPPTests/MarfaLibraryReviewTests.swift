@@ -9,7 +9,7 @@ import Testing
 
 /// Reviewer's adversarial tests for the Marfa library. Each states what should hold.
 @MainActor
-@Suite struct MarfaLibraryReviewFakeTests {
+@Suite(.hangLimit) struct MarfaLibraryReviewFakeTests {
     typealias F = LibraryFixture
 
     private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {

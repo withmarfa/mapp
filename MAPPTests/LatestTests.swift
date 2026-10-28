@@ -3,11 +3,12 @@ import Synchronization
 import Testing
 @testable import MAPP
 
+@Suite(.hangLimit)
 nonisolated struct LatestTests {
     /// Cancelling a task that watches runs the stream's termination handler while the runtime holds that task's
     /// status lock, and telling the watcher a value needs the same lock. If the two take `Latest`'s lock and the
     /// task's in opposite orders, an updater and a canceller wait on each other for ever (withmarfa/mapp#91).
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func watchersCancelledWhileValuesAreToldNeverBlockTheUpdaters() async {
         let latest = Latest(0)
         let group = DispatchGroup()
@@ -26,7 +27,7 @@ nonisolated struct LatestTests {
     }
 
     /// Every watcher is told values in the order they were set, whichever thread sets them, and ends on the last.
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func eachWatcherIsToldValuesInOrderAndEndsOnTheLast() async {
         let latest = Latest(0)
         let lanes = 4, perLane = 5_000

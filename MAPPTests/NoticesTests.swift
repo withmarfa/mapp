@@ -201,6 +201,7 @@ extension Notices {
 
 /// A key the server refuses while the copy is open leaves the windows showing the library, so its notice is the only
 /// sign and has to lead to the way out.
+@Suite(.hangLimit)
 @MainActor struct RefusedKeyNoticeTests {
     @Test func aRefusedKeyIsToldWithTheWayToLibrarySettings() async throws {
         let source = FakeItemSource()

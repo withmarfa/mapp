@@ -133,7 +133,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 }
 
 @MainActor
-@Suite struct MarfaLibraryReadingTests {
+@Suite(.hangLimit) struct MarfaLibraryReadingTests {
     typealias F = LibraryFixture
 
     @Test func isLoadedOnlyOnceTheCopyAndItsTextAreRead() async throws {
@@ -317,7 +317,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 }
 
 @MainActor
-@Suite struct MarfaLibraryWritingTests {
+@Suite(.hangLimit) struct MarfaLibraryWritingTests {
     typealias F = LibraryFixture
 
     @Test func creatingMintsTheIdAndPutsTheItemUnderItsParent() async throws {
@@ -784,7 +784,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 }
 
 @MainActor
-@Suite struct MarfaLibrarySyncTests {
+@Suite(.hangLimit) struct MarfaLibrarySyncTests {
     typealias F = LibraryFixture
 
     @Test func purgeIsOfferedOnlyWhileTheServerCanBeReached() async throws {
@@ -868,7 +868,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 /// What an item's text links and embeds: the package writes each as an edge when the text is saved, so the items
 /// at both ends show it.
 @MainActor
-@Suite struct MarfaLibraryTextEdgeTests {
+@Suite(.hangLimit) struct MarfaLibraryTextEdgeTests {
     typealias F = LibraryFixture
 
     private static var catalogue: Catalogue {
@@ -941,7 +941,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
 /// The connect review's findings for the Marfa library, each failing on the code before its fix.
 @MainActor
-@Suite struct MarfaLibraryConnectReviewTests {
+@Suite(.hangLimit) struct MarfaLibraryConnectReviewTests {
     /// A create refused before it was queued, as one made while the copy is brought up to date, has no problem in
     /// the queue to show; the library says so, and the window gives the new item up rather than open it.
     @Test func aCreateRefusedBeforeItIsQueuedOpensNothingAndSaysWhy() async throws {
@@ -1125,7 +1125,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
 /// A relation whose two ends share one name reads the same from either item, so its links are one list.
 @MainActor
-@Suite struct MarfaLibraryTwoWayTests {
+@Suite(.hangLimit) struct MarfaLibraryTwoWayTests {
     typealias F = LibraryFixture
 
     private static func loaded() async throws -> (MarfaLibrary, FakeItemSource) {

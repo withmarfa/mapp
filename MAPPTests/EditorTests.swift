@@ -7,7 +7,7 @@ import WebKit
 @testable import MAPP
 
 /// The editor's page running in real WebKit, driven through the same bridge the app uses.
-@Suite(.serialized)
+@Suite(.serialized, .hangLimit)
 struct EditorTests {
     /// An editor whose page has loaded, reporting each change it makes.
     final class Harness<Library: ItemLibrary> {
