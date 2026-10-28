@@ -308,6 +308,17 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         #expect(try await results(of: page) == ["n": "1"])
     }
 
+    @Test func aShowThatAnotherStartedBeforeItFinishedThrowsAndLeavesTheNewerDocument() async throws {
+        let page = try await SealedWebPage.make()
+        // Both start before either load can finish, since the first reaches its load and waits for WebKit before the
+        // second runs, so the first is the older whichever load ends first.
+        let older = Task { try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8)) }
+        let newer = Task { try await page.show(Data("<html><body><script>window.results = {n: '2'}; window.done = true;</script></body></html>".utf8)) }
+        await #expect(throws: CancellationError.self) { try await older.value }
+        try await newer.value
+        #expect(try await results(of: page) == ["n": "2"])
+    }
+
     @Test func aPageKeepsNothingBetweenOpens() async throws {
         let write = "try { localStorage.setItem('k', 'v') } catch (e) {} document.cookie = 'a=b'; window.results = {}; window.done = true;"
         let read = "let k = 'denied'; try { k = String(localStorage.getItem('k')) } catch (e) {} window.results = {k: k, c: document.cookie}; window.done = true;"
