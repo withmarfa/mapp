@@ -79,7 +79,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Toolbar")
             } footer: {
-                Text("Notes and items show their title in the toolbar once the page’s header has scrolled away, and a blurred background once text scrolls beneath it. Lists always keep their background.")
+                Text("For notes and items. Lists always keep their background.")
             }
             Section {
                 ColumnWidthOptions()

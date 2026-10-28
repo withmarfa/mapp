@@ -1406,6 +1406,9 @@
     "File Not Found" : {
 
     },
+    "For notes and items. Lists always keep their background." : {
+
+    },
     "This file isn’t an HTML page." : {
 
     },
@@ -1809,9 +1812,6 @@
 
     },
     "Note reference: %@. Open to edit source." : {
-
-    },
-    "Notes and items show their title in the toolbar once the page’s header has scrolled away, and a blurred background once text scrolls beneath it. Lists always keep their background." : {
 
     },
     "Notes can’t be deleted immediately right now. They’re still in Recently Deleted." : {
