@@ -1811,6 +1811,9 @@
     "Note reference: %@. Open to edit source." : {
 
     },
+    "Notes and items show their title in the toolbar once the page’s header has scrolled away, and a blurred background once text scrolls beneath it. Lists always keep their background." : {
+
+    },
     "Notes can’t be deleted immediately right now. They’re still in Recently Deleted." : {
 
     },
@@ -2110,6 +2113,12 @@
     "Show This Type Only" : {
 
     },
+    "Show Title When Scrolling" : {
+
+    },
+    "Show Toolbar Background When Scrolling" : {
+
+    },
     "Show Types" : {
 
     },
@@ -2118,9 +2127,6 @@
     },
     "Showing what’s on this Mac while MAPP reaches the server." : {
       "extractionState" : "manual"
-    },
-    "Shows a blurred band behind the toolbar once a note or list has scrolled underneath it." : {
-
     },
     "Shows the group’s items" : {
 
@@ -2392,7 +2398,7 @@
     "Tomorrow" : {
 
     },
-    "Toolbar Edge" : {
+    "Toolbar" : {
 
     },
     "Try Again" : {
