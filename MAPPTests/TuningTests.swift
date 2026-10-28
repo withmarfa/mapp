@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import MAPP
@@ -77,6 +78,19 @@ struct TuningTests {
                 shapes.shape = round
                 """)
         }
+    }
+
+    @Test func theAppsKnobsAreUniqueAndStartAtValuesTheyAccept() {
+        let ids = Tuning.shared.knobs.map(\.id)
+        #expect(Set(ids).count == ids.count)
+        for knob in Tuning.shared.knobs { #expect(knob.coerced(knob.initial) == knob.initial, "\(knob.id)") }
+    }
+
+    @Test func onlyTheBandLeavesTheListsEdgeToTheApp() {
+        #expect(ToolbarBand.ListEdge.band.systemStyle == nil)
+        for edge in ToolbarBand.ListEdge.allCases where edge != .band { #expect(edge.systemStyle != nil) }
+        #expect(ToolbarBand.WindowToolbarBackground.hidden.visibility == .hidden)
+        #expect(ToolbarBand.WindowToolbarBackground.automatic.visibility == .automatic)
     }
 }
 #endif

@@ -69,7 +69,8 @@ extension Knob.Value {
 final class Tuning {
     /// Add a knob here to show it in the panel; remove it here when it is settled.
     static let shared = Tuning(knobs: [
-        ToolbarBand.Knobs.strength, ToolbarBand.Knobs.fade, ToolbarBand.Knobs.material,
+        ToolbarBand.Knobs.strength, ToolbarBand.Knobs.hairline, ToolbarBand.Knobs.listEdge,
+        ToolbarBand.Knobs.toolbarBackground,
     ])
 
     static let prefix = "tuning."
