@@ -20,6 +20,9 @@ struct WebPageView: View {
                     .webViewBackForwardNavigationGestures(.disabled)
                     .webViewMagnificationGestures(.disabled)
                     .webViewLinkPreviews(.disabled)
+                    // Each document has a page of its own, so a new one gets a new web view, which lets go of the
+                    // page that held the last document and stops its scripts.
+                    .id(ObjectIdentifier(sealed.page))
             } else if let failure {
                 ContentUnavailableView {
                     Label("Can’t Show This Page", systemImage: "exclamationmark.triangle")

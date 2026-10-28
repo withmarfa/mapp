@@ -240,14 +240,27 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         }
     }
 
-    @Test func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
+    /// When one page held every document, a navigation the shown document started while the next document's load waited
+    /// for its policy decision replaced that load, which WebKit then dropped without finishing or failing it, so `show`
+    /// never returned. The time limit makes that a failure rather than a run that never ends.
+    @Test(.timeLimit(.minutes(1))) func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
         let probe = try await Probe()
         let page = try await SealedWebPage.make()
-        try await page.show(Data("<html><body><script>setInterval(() => { location.href = 'http://127.0.0.1:\(probe.port)/pending'; }, 2);</script></body></html>".utf8))
+        // A message loop, which no timer throttling slows, starts a navigation at every turn of the page's event loop,
+        // so one is always starting while the next load waits for its policy decision.
+        try await page.show(Data("""
+            <html><body><script>
+            const channel = new MessageChannel();
+            channel.port1.onmessage = () => { location.href = 'http://127.0.0.1:\(probe.port)/pending'; channel.port2.postMessage(0); };
+            channel.port2.postMessage(0);
+            </script></body></html>
+            """.utf8))
+        weak var navigating = page.page
         for n in 1...5 {
             try await page.show(Data("<html><body><script>window.results = {n: '\(n)'}; window.done = true;</script></body></html>".utf8))
         }
         #expect(try await results(of: page) == ["n": "5"])
+        #expect(await eventually { navigating == nil }, "the page that held the navigating document is let go, which ends its scripts")
         // A fixed wait, to give a request that was wrongly let through time to arrive.
         try await Task.sleep(for: .milliseconds(500))
         #expect(probe.count == 0, "nothing reached the server, but \(probe.seen) did")
@@ -282,6 +295,17 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8))
         try await page.show(Data("<html><body><script>window.results = {n: '2'}; window.done = true;</script></body></html>".utf8))
         #expect(try await results(of: page) == ["n": "2"])
+    }
+
+    @Test func aCancelledShowLeavesTheEarlierDocumentShowing() async throws {
+        let page = try await SealedWebPage.make()
+        try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8))
+        let shown = page.page
+        let later = Task { try await page.show(Data("<html><body><script>window.results = {n: '2'}; window.done = true;</script></body></html>".utf8)) }
+        later.cancel()
+        await #expect(throws: (any Error).self) { try await later.value }
+        #expect(page.page === shown)
+        #expect(try await results(of: page) == ["n": "1"])
     }
 
     @Test func aPageKeepsNothingBetweenOpens() async throws {
