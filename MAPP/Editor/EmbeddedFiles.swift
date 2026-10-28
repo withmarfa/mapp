@@ -280,6 +280,12 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         return components.url!
     }
 
+    /// Whether a picture URL has an `item` field, whatever it holds: it is then a request for a saved file, and
+    /// only that.
+    nonisolated static func asksForSavedPicture(_ url: URL) -> Bool {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems?.contains { $0.name == "item" } == true
+    }
+
     /// The item and web address a URL of `pictureURL(for:version:savedIn:stamp:)` with an item names.
     nonisolated static func savedPicture(in url: URL) -> (item: ItemID, address: URL)? {
         guard url.scheme == scheme, url.host == "picture",
@@ -390,9 +396,10 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
         if url.host == "icon" { return serveIcon(task, id, url) }
         var opened: OpenFile?
         if url.host == "picture" {
-            if let (item, address) = Self.savedPicture(in: url) {
-                // Never the cache: the saved file is gone once its attachment is, and the person's setting is asked again.
-                opened = await openSaved(item, address)
+            if Self.asksForSavedPicture(url) {
+                // Never the cache, even for a URL that names no file: the saved file is gone once its attachment is, and
+                // the person's setting is asked again.
+                if let (item, address) = Self.savedPicture(in: url) { opened = await openSaved(item, address) }
             } else if let address = Self.pictureAddress(in: url) {
                 opened = await openPicture(address)
             }

@@ -132,7 +132,7 @@ extension EditorController {
     /// Follows the library for the embeds of the note on the page, and tells the page which have changed: a file
     /// that arrived, was renamed or removed, or an embed the copy has since bound. The page then asks again for just
     /// those (`refreshReferences`). It also follows the files attached to the note that were saved from a web
-    /// address, and has the page ask again about its pictures when one arrives, is changed or goes
+    /// address, and has the page ask again about the pictures at those addresses when a file arrives, is changed or goes
     /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and text is saved, so the page hears
     /// once they pause. Never rewrites the note.
     func watchEmbeds() {
@@ -169,7 +169,8 @@ extension EditorController {
         let saved = library.savedPictureStates(of: note)
         let savedBefore = savedStates?.states ?? []
         savedStates = (note, saved)
-        if saved != savedBefore, isReady { call("picturesChanged", "undefined", "true") }
+        let differing = Set(Set(saved).symmetricDifference(savedBefore).map(\.address)).sorted()
+        if !differing.isEmpty, isReady { call("savedPicturesChanged", json(differing)) }
         watchEmbeds()
     }
 

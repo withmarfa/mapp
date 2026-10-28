@@ -163,28 +163,40 @@ export class WebPictures {
     )
   }
 
-  /** The app's setting changed, or the app wants these asked again: the pictures that were waiting or turned off
-   *  are asked about anew. A picture already loaded, or refused for a reason that stays, is left as it is, unless
-   *  `afresh`: a file saved from an address has come to the item or gone from it, so what the app answers may differ for
-   *  any picture, except one the person is choosing now. */
-  changed(addresses?: string[], afresh = false) {
-    const wanted = addresses ? new Set(addresses) : null
-    const again: string[] = []
-    for (const address of this.live.keys()) {
-      if (wanted && !wanted.has(address)) continue
+  /** The app's setting changed: the pictures that were waiting or turned off are asked about anew. A picture
+   *  already loaded, or refused, is left as it is. */
+  changed() {
+    this.askAgain((address) => {
       const kind = this.states.get(address)?.kind
-      if (
-        kind === 'waiting' ||
-        kind === 'off' ||
-        kind === undefined ||
-        (afresh && kind !== 'loading')
-      ) {
-        this.states.delete(address)
-        again.push(address)
-      }
-    }
-    for (const key of [...this.asking.keys()]) this.asking.delete(key)
+      return kind === 'waiting' || kind === 'off' || kind === undefined
+    })
+  }
+
+  /** Files saved from these web addresses came to the item, changed or went, so what the app answers for the pictures
+   *  at them may differ, as `loaded` from the file or back to the website's answer. Each is asked about anew, whatever
+   *  it showed, except one the person is choosing now, whose answer is still on its way. A picture at any other
+   *  address is left alone, so a refusal that stays is not asked again. */
+  savedChanged(sources: string[]) {
+    const named = new Set(sources.map(sameAddress))
+    this.askAgain(
+      (address) => named.has(sameAddress(address)) && this.states.get(address)?.kind !== 'loading',
+    )
+  }
+
+  private askAgain(wants: (address: string) => boolean) {
+    const again = [...this.live.keys()].filter(
+      (address) => wants(address) && !this.choosing(address),
+    )
+    for (const address of again) this.states.delete(address)
+    // An answer still on its way for any other address is kept: dropping a chosen picture's answer would leave its card
+    // waiting although it was fetched.
+    for (const key of [...this.asking.keys()])
+      if (again.includes(key.slice(key.indexOf('\n') + 1))) this.asking.delete(key)
     if (again.length) this.redraw(again)
+  }
+
+  private choosing(address: string): boolean {
+    return this.states.get(address)?.kind === 'loading'
   }
 
   /** Draws again the cards a print left without their state, as a card drawn while only the cache was wanted is. */
@@ -240,6 +252,19 @@ function stateOf(answer: PictureAnswer | null): PictureState {
     default:
       return { kind: 'waiting' }
   }
+}
+
+/** An address as the app compares a saved file's with a picture's (`SavedPictures.same`): the scheme and host in any
+ *  case, the default port as none and the fragment ignored, the path and query exactly. */
+export function sameAddress(address: string): string {
+  const parts = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)(\?[^#]*)?/i.exec(address)
+  if (!parts) return address
+  const [, name = '', host = '', path = '', query = ''] = parts
+  const scheme = name.toLowerCase()
+  const authority = host.toLowerCase().replace(/:(\d*)$/, (_, port: string) => {
+    return Number(port) === (scheme === 'https' ? 443 : 80) && port !== '' ? '' : `:${port}`
+  })
+  return `${scheme}://${authority}${path || '/'}${query}`
 }
 
 function hostOf(address: string): string {

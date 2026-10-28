@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { PictureAnswer, PictureRequest } from '../src/bridge'
 import { NoteEditor } from '../src/editor'
-import { WebPictures } from '../src/pictures'
+import { sameAddress, WebPictures } from '../src/pictures'
 
 type Asked = Omit<PictureRequest, 'type'>
 
@@ -227,30 +227,118 @@ test('a changed setting asks again about pictures that waited or were off, and n
 
 test('a picture saved as a file on the item is asked about again, loaded or not, but not one being chosen', async () => {
   let saved = false
-  const { asked } = app((request) =>
-    request.address.includes('chosen')
-      ? { state: 'waiting' }
-      : saved
-        ? loaded
-        : { state: 'refused', reason: 'No' },
-  )
+  let finish: (answer: PictureAnswer) => void = () => {}
+  const { asked } = app((request) => {
+    if (request.address.includes('chosen')) {
+      if (request.ask !== 'chosen') return { state: 'waiting' }
+      return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
+    }
+    return saved ? loaded : { state: 'refused', reason: 'No', retry: 'true' }
+  })
   await withNote(
     '![a](https://example.com/a.png)\n\n![b](https://chosen.example.com/b.png)\n',
     async (editor) => {
       await vi.waitFor(() => expect(labels()[0]).toBe('example.com: No'))
-      editor.picturesChanged()
-      await settled()
       expect(asked.filter((request) => request.address.includes('example.com/a'))).toHaveLength(1)
+      open(1)
+      await vi.waitFor(() => expect(labels()[1]).toBe('chosen.example.com: Loading Picture…'))
       saved = true
-      editor.picturesChanged(undefined, true)
+      editor.savedPicturesChanged(['https://example.com/a.png', 'https://chosen.example.com/b.png'])
       await vi.waitFor(() =>
         expect(asked.filter((request) => request.address.includes('example.com/a'))).toHaveLength(
           2,
         ),
       )
       await vi.waitFor(() => expect(labels()).not.toContain('example.com: No'))
+      expect(asked.filter((request) => request.address.includes('chosen.example.com'))).toEqual([
+        { item: 'note', address: 'https://chosen.example.com/b.png', ask: 'drawing' },
+        { item: 'note', address: 'https://chosen.example.com/b.png', ask: 'chosen' },
+      ])
+      finish(loaded)
     },
   )
+})
+
+test('a picture being chosen when a saved file comes still ends loaded with the answer', async () => {
+  let finish: (answer: PictureAnswer) => void = () => {}
+  app((request) => {
+    if (request.ask !== 'chosen') return { state: 'waiting' }
+    return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
+  })
+  await withNote(picture, async (editor) => {
+    await vi.waitFor(() => expect(labels()).toEqual(['example.com: Load Picture']))
+    open()
+    await vi.waitFor(() => expect(labels()).toEqual(['example.com: Loading Picture…']))
+    editor.savedPicturesChanged(['https://example.com/a.png'])
+    await settled()
+    finish(loaded)
+    await vi.waitFor(() => expect(document.querySelector('.inkkit-file img')).not.toBeNull())
+    expect(labels()).not.toContain('example.com: Load Picture')
+    expect(bar.at(-1)?.count).toBe(0)
+  })
+})
+
+test('a picture being chosen when the setting changes still ends loaded with the answer', async () => {
+  let finish: (answer: PictureAnswer) => void = () => {}
+  app((request) => {
+    if (request.ask !== 'chosen') return { state: 'waiting' }
+    return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
+  })
+  await withNote(picture, async (editor) => {
+    await vi.waitFor(() => expect(labels()).toEqual(['example.com: Load Picture']))
+    open()
+    await vi.waitFor(() => expect(labels()).toEqual(['example.com: Loading Picture…']))
+    editor.picturesChanged()
+    await settled()
+    finish(loaded)
+    await vi.waitFor(() => expect(document.querySelector('.inkkit-file img')).not.toBeNull())
+    expect(labels()).not.toContain('example.com: Load Picture')
+  })
+})
+
+test('a saved file coming asks again only about the pictures at its address', async () => {
+  const { asked } = app((request) =>
+    request.address.includes('gone')
+      ? { state: 'refused', reason: 'Not found.' }
+      : request.address.includes('slow')
+        ? { state: 'refused', reason: 'Too slow.', retry: 'true' }
+        : request.address.includes('kept')
+          ? loaded
+          : { state: 'waiting' },
+  )
+  await withNote(
+    '![a](https://gone.example.com/a.png)\n\n![b](https://slow.example.com/b.png)\n\n![c](https://kept.example.com/c.png)\n',
+    async (editor) => {
+      await vi.waitFor(() =>
+        expect(labels()).toEqual([
+          'gone.example.com: Not found.',
+          'slow.example.com: Too slow.',
+          'c',
+        ]),
+      )
+      asked.length = 0
+      // A refusal that stays is not asked about again when a file comes for another picture.
+      editor.savedPicturesChanged(['https://slow.example.com/b.png'])
+      await settled()
+      expect(asked.map((request) => request.address)).toEqual(['https://slow.example.com/b.png'])
+      // A file saved from the address of a refused picture can answer it, so that one is asked.
+      asked.length = 0
+      editor.savedPicturesChanged(['https://GONE.example.com:443/a.png#top'])
+      await settled()
+      expect(asked.map((request) => request.address)).toEqual(['https://gone.example.com/a.png'])
+    },
+  )
+})
+
+test('an address is compared as the app compares a saved file with a picture', () => {
+  const same = (a: string, b: string) => sameAddress(a) === sameAddress(b)
+  expect(same('HTTPS://Example.com:443/a.png#x', 'https://example.com/a.png')).toBe(true)
+  expect(same('http://example.com:80', 'http://example.com/')).toBe(true)
+  expect(same('https://example.com/a.png?x=1', 'https://example.com/a.png?x=1')).toBe(true)
+  expect(same('https://example.com/A.png', 'https://example.com/a.png')).toBe(false)
+  expect(same('https://example.com/a.png?x=1', 'https://example.com/a.png')).toBe(false)
+  expect(same('https://example.com:8443/a.png', 'https://example.com/a.png')).toBe(false)
+  expect(same('https://example.com/a/', 'https://example.com/a')).toBe(false)
 })
 
 test('another note forgets what it was told of the last one', async () => {
