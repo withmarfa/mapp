@@ -66,24 +66,28 @@ private struct BandsToolbar: ViewModifier {
     func body(content: Content) -> some View {
         #if DEBUG
         let edge = Tuning.shared.choice(ToolbarBand.Knobs.listEdge, as: ToolbarBand.ListEdge.self) ?? .band
+        let drawsBand = edge == .band
         #else
-        let edge = ToolbarBand.ListEdge.band
+        let drawsBand = true
         #endif
         content
             // At rest the content starts exactly below the toolbar, which the scroll geometry reports as an inset.
             .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in
                 isUnderToolbar = new
             }
-            .scrollEdgeEffectHidden(edge == .band, for: .top)
+            .scrollEdgeEffectHidden(drawsBand, for: .top)
+            #if DEBUG
             .scrollEdgeEffectStyle(edge.systemStyle, for: .top)
+            #endif
             .overlay(alignment: .top) {
                 GeometryReader { proxy in
-                    ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: edge == .band && isUnderToolbar)
+                    ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: drawsBand && isUnderToolbar)
                 }
             }
     }
 }
 
+#if DEBUG
 extension ToolbarBand {
     /// What draws the toolbar's edge over a scrolling list.
     enum ListEdge: String, CaseIterable {
@@ -99,10 +103,7 @@ extension ToolbarBand {
             }
         }
     }
-}
 
-#if DEBUG
-extension ToolbarBand {
     /// The tuning knobs for the toolbar's edge, defaulting to the constants above. Delete each once its value is
     /// settled.
     enum Knobs {
