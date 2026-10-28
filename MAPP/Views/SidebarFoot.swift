@@ -34,7 +34,12 @@ struct SidebarFoot: View {
 
 /// The foot's row, given what it shows and what its menu does. The Console is dimmed in the menu while it has no
 /// address, which is until a server is set.
+///
+/// Both controls are plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the
+/// keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches both.
 struct SidebarFootRow: View {
+    @Environment(\.appearsActive) private var appearsActive
+    @FocusState private var focus: Control?
     let name: String
     let dot: SidebarStatusDot?
     let status: SyncStatus?
@@ -42,6 +47,8 @@ struct SidebarFootRow: View {
     let openConsole: (() -> Void)?
     let openSettings: () -> Void
     let showRecentlyDeleted: () -> Void
+
+    private enum Control: Hashable { case menu, newItem }
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
@@ -54,18 +61,22 @@ struct SidebarFootRow: View {
             } label: {
                 HStack(spacing: 4) {
                     Text(name)
-                        .interfaceFont(.body)
+                        // A step above the rows' text, since it names the instance the rows belong to.
+                        .interfaceFont(.title3)
+                        .foregroundStyle(appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Image(systemName: "chevron.down")
                         .interfaceFont(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                         .fixedSize()
                 }
                 .contentShape(.rect)
             }
             .menuIndicator(.hidden)
             .buttonStyle(.plain)
+            .focused($focus, equals: .menu)
+            .simultaneousGesture(TapGesture().onEnded { focus = nil })
             .help("Instance Menu")
             .accessibilityLabel(Text(name))
             .accessibilityHint(Text("Opens the Console, Settings and Recently Deleted"))
@@ -73,11 +84,14 @@ struct SidebarFootRow: View {
             if let dot { statusDot(dot) }
             Spacer(minLength: 0)
             NewItemButton(browser: browser)
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .interfaceFont(.body)
                 .imageScale(.large)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                .focused($focus, equals: .newItem)
+                .simultaneousGesture(TapGesture().onEnded { focus = nil })
         }
+        .onChange(of: appearsActive) { if !appearsActive { focus = nil } }
         .padding(.leading, 20)
         .padding(.trailing, 14)
         .padding(.vertical, 10)
