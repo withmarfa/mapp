@@ -27,15 +27,15 @@ import WebKit
 @MainActor @Observable final class SealedWebPage {
     /// The page that holds the document shown last.
     private(set) var page: WebPage
-    @ObservationIgnored private var gate: NavigationGate
-    /// Whether `page` is still the first page and no `show` has used it, so the first document can load into it.
-    @ObservationIgnored private var isEmpty = true
+    /// The decider of the first page until a `show` takes that page for its document, so the first document loads
+    /// into it; every later document gets a page and decider of its own.
+    @ObservationIgnored private var unused: NavigationGate?
     /// Counts the calls to `show`, so a load that finishes after a later one started is not shown over it.
     @ObservationIgnored private var shows = 0
 
     private init(page: WebPage, gate: NavigationGate) {
         self.page = page
-        self.gate = gate
+        unused = gate
     }
 
     static func make() async throws -> SealedWebPage {
@@ -66,11 +66,12 @@ import WebKit
         let data = text.map { Data($0.utf8) } ?? html
         let next: WebPage
         let nextGate: NavigationGate
-        if isEmpty {
-            isEmpty = false
+        if let gate = unused {
+            unused = nil
             (next, nextGate) = (page, gate)
         } else {
             (next, nextGate) = try await Self.blank()
+            guard call == shows else { throw CancellationError() }
         }
         nextGate.allow(Self.base)
         defer { nextGate.disallow() }
@@ -79,7 +80,6 @@ import WebKit
         try Task.checkCancellation()
         guard call == shows else { throw CancellationError() }
         page = next
-        gate = nextGate
     }
 
     static let base = URL(string: "about:blank")!

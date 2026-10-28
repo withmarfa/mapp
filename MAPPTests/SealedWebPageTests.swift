@@ -136,6 +136,8 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     @Test func aPageThatReachesOutReachesNothing() async throws {
         let probe = try await Probe()
         let page = try await SealedWebPage.make()
+        // A later document runs in a page of its own, which is sealed the same way as the first.
+        try await page.show(Data("<html><body></body></html>".utf8))
         try await page.show(hostile(port: probe.port))
         let results = try await results(of: page)
         #expect(results["ran"] == "yes", "JavaScript runs")
@@ -197,6 +199,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     @Test func aPageCannotOpenAPeerConnection() async throws {
         let probe = try await DatagramProbe()
         let page = try await SealedWebPage.make()
+        try await page.show(Data("<html><body></body></html>".utf8))
         try await page.show(peerConnecting(udpPort: probe.port))
         let results = try await results(of: page)
         for frame in ["main", "blankFrame", "srcdocFrame", "writtenFrame", "nestedFrame", "openedWindow"] {
