@@ -516,12 +516,13 @@ test('an item nothing links to has no Linked From section', () => {
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
 
-test('an event shows its calendar block, its time and its status together', () => {
+test('an event shows its calendar block and its time, and keeps its status among the rows', () => {
   header.set({
     ...ticket,
     kind: 'event',
     type: 'Event',
-    properties: [],
+    status: { label: 'Confirmed', enabled: true, empty: false, opensMenu: true },
+    properties: [{ id: 'status', label: 'Status', symbol: 'circle', kind: 'status' as const }],
     event: {
       month: 'OCT',
       day: '29',
@@ -539,7 +540,8 @@ test('an event shows its calendar block, its time and its status together', () =
   expect(when.querySelector('.item-when-detail')!.textContent).toBe(
     'ThursdayLondon time (BST)in 2 days',
   )
-  expect(when.contains(pin('ItemStatusPin'))).toBe(true)
+  expect(when.contains(pin('ItemStatusPin'))).toBe(false)
+  expect(root.querySelector('.item-prop')!.contains(pin('ItemStatusPin'))).toBe(true)
   expect(root.dataset.kind).toBe('event')
 
   header.set({ ...ticket, kind: 'general' })

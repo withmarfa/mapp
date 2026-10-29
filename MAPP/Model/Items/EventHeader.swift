@@ -17,7 +17,7 @@ nonisolated struct EventHeader: Hashable, Sendable, Encodable {
 
     /// The properties the header draws, which the property block leaves out.
     static let keys: Set<String> = [
-        "starts_at", "ends_at", "duration", "all_day", "timezone", "end_timezone", "precision", "status",
+        "starts_at", "ends_at", "duration", "all_day", "timezone", "end_timezone", "precision",
     ]
 
     /// Nil where the event has no start the header can place: none, one that is not a date, or one known only to

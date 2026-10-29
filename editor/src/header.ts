@@ -713,8 +713,6 @@ export class ItemHeader {
       if (index > 0) element('span', 'item-byline-dot', details).setAttribute('aria-hidden', 'true')
       element('span', '', details).textContent = part
     })
-    // The status the event is in sits with its time rather than among the properties.
-    if (model.status) element('div', 'item-when-status', text).append(this.statusPin)
   }
 
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
