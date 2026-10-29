@@ -196,6 +196,8 @@ const surroundObserver = new ResizeObserver(() => {
   surround = key
   requestAnimationFrame(() => {
     root.style.setProperty('--inkkit-min-height', follows ? '0px' : `calc(100vh - ${height}px)`)
+    // The footer's own top padding already separates it, so the text's reserve for a floating footer is not needed.
+    root.style.setProperty('--inkkit-padding-bottom', follows ? '16px' : '')
     editor.invalidateFindGeometry()
     checkHeaderScrolledAway()
   })
