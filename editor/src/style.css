@@ -441,11 +441,13 @@ body[data-text='none'] #editor {
   display: none;
 }
 
+/* A flex row, not a grid: WebKit keeps a grid row's height from the layout it was first drawn in. A row drawn while
+   the page was a point wide, as it is when a sidebar or the inspector animates over it, stayed as tall as a value
+   that breaks after every character, with the same row hundreds of points tall once the page was wide again. */
 .item-prop {
-  display: grid;
-  grid-template-columns: calc(var(--step) * 36) minmax(0, 1fr);
+  display: flex;
   column-gap: calc(var(--step) * 3);
-  align-items: start;
+  align-items: flex-start;
   min-height: calc(var(--step) * 7);
 }
 
@@ -459,6 +461,8 @@ body[data-text='none'] #editor {
 }
 
 .item-prop-label {
+  flex: none;
+  width: calc(var(--step) * 36);
   color: var(--label-secondary);
   font-weight: 400;
 }
@@ -470,6 +474,8 @@ body[data-text='none'] #editor {
 }
 
 .item-prop-value {
+  flex: 1 1 0;
+  min-width: 0;
   flex-wrap: wrap;
   gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
   padding-block: calc(var(--step) / 2);
@@ -524,18 +530,31 @@ body[data-text='none'] #editor {
   font-size: calc(var(--interface-text-size) * 12 / 13);
 }
 
-/* An item a row links to is a chip too, with the icon of its type before its title. */
+/* An item a row links to is a chip in the pins' shape: the same height, fill, radius and type, the icon of its type
+   before its title in the primary color, and a small arrow where a menu pin has its chevron. */
 .item-link-chip {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: calc(var(--step) * 1.5);
+  gap: calc(var(--interface-text-size) * 5 / 13);
   max-width: 100%;
-  height: calc(var(--step) * 5);
-  padding: 0 calc(var(--step) * 2);
+  height: calc(var(--interface-text-size) * 24 / 13);
+  padding: 0 calc(var(--interface-text-size) * 8 / 13);
+  border: 1px solid transparent;
   border-radius: calc(var(--step) * 2);
   background: var(--label-quinary);
-  font-size: calc(var(--interface-text-size) * 12 / 13);
+  color: var(--label-primary);
+  font:
+    500 calc(var(--interface-text-size) * 12 / 13) / normal -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+.item-link-chip::after {
+  content: '\2197';
+  flex: none;
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 10 / 13);
 }
 
 .item-link-chip:hover {
