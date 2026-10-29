@@ -64,6 +64,15 @@ test('formatting that opens with a link is saved once after an edit inside it', 
     engine.insertText('c', 1)
     expect(editor.snapshot().text).toBe('~~[x](u)bc~~\n')
   }))
+test('making part of a paragraph bold keeps a character reference elsewhere as authored', async () =>
+  withEditor('Keep &amp; these words here\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    const text = engine.textSnapshot(1)
+    const from = text.text.indexOf('words')
+    engine.selectTextRange({ snapshotId: text.snapshotId, from, to: from + 'words'.length })
+    editor.format('bold')
+    expect(editor.snapshot().text).toBe('Keep &amp; these **words** here\n')
+  }))
 test('a diagram draws with Pele, and an unsupported or refused one keeps its source', async () => {
   const source =
     '```mermaid\nflowchart LR\n A-->B\n```\n\n' +
