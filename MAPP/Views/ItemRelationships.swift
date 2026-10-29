@@ -21,7 +21,7 @@ struct ItemRelationshipGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            InspectorSubheading(title: relationship.label)
+            InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
             ForEach(links.shown) { target in
                 ItemTargetChip(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
