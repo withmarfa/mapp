@@ -85,9 +85,9 @@ struct ItemInspectorHost: View {
 }
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable. It reads as
-/// a property sheet: the type's properties, the item's relationships and tags, the items that link to it where the
-/// person placed that list here, then its details, which the person can fold away. Every property is listed here;
-/// a context menu on one says whether the page shows it too.
+/// a property sheet: the item's details first, then the type's properties, the item's relationships and tags, and
+/// the items that link to it where the person placed that list here. Every section folds. Every property is listed
+/// here; a context menu on one says whether the page shows it too.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
     let item: Item
@@ -123,8 +123,6 @@ struct ItemInspector: View {
     var typeIcon: (ItemID) -> String? = { _ in nil }
     /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
     @State private var ownPresentation = DetailsPresentation()
-    @AppStorage(InterfaceKey.inspectorDetailsOpen) private var detailsOpen = true
-    @AppStorage(InterfaceKey.inspectorLinkedFromOpen) private var linkedOpen = true
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
     /// The host remakes the inspector for another item, which forgets them.
     @State private var revealed: Set<String> = []
@@ -138,11 +136,11 @@ struct ItemInspector: View {
                     Label(message, systemImage: "exclamationmark.triangle")
                         .interfaceFont(.callout).foregroundStyle(.red)
                 }
+                detailsSection
                 if hasProperties { properties }
                 if hasRelationships { relationshipSection }
                 if hasTags { tagSection }
                 if !linked.isEmpty { linkedSection }
-                detailsSection
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -163,8 +161,7 @@ struct ItemInspector: View {
     // MARK: Sections
 
     private var properties: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorHeading(title: "Properties")
+        InspectorSectionView(.properties, title: "Properties") {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(fields) { field in
                     ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
@@ -183,14 +180,14 @@ struct ItemInspector: View {
                             .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
                     }
                 }
+                .padding(.top, 4)
             }
         }
     }
 
     private var relationshipSection: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorHeading(title: "Relationships")
-            VStack(alignment: .leading, spacing: 14) {
+        InspectorSectionView(.relationships, title: "Relationships") {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(shownRelationships) { relationship in
                     let group = LinkGroup(item: item.id, field: relationship.field)
                     ItemRelationshipGroup(
@@ -211,10 +208,10 @@ struct ItemInspector: View {
     private var contentLinks: some View {
         let group = LinkGroup.content(of: item.id)
         let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
-        return VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 0) {
             InspectorSubheading(title: String(localized: "Links in Content"))
             ForEach(links.shown) { target in
-                ItemChip(target: target, typeIcon: typeIcon, onOpen: onOpen)
+                InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
             }
             if links.hidden > 0 {
                 ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
@@ -225,8 +222,7 @@ struct ItemInspector: View {
     }
 
     private var tagSection: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorHeading(title: "Tags")
+        InspectorSectionView(.tags, title: "Tags") {
             ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
                             onAdd: onAddTag, onRemove: onRemoveTag)
         }
@@ -236,17 +232,14 @@ struct ItemInspector: View {
     private var linkedSection: some View {
         let group = LinkGroup(item: item.id, field: "#linked")
         let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
-        return VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: "Linked From", count: linked.count, isOpen: $linkedOpen, identifier: "ItemInspectorLinkedFrom")
-            if linkedOpen {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(links.shown, id: \.item) { link in
-                        LinkedItemChip(link: link, onOpen: onOpen)
-                    }
-                    if links.hidden > 0 {
-                        ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
-                            presentation.expandLinks(group)
-                        }
+        return InspectorSectionView(.linkedFrom, title: "Linked From", count: linked.count) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(links.shown, id: \.item) { link in
+                    LinkedItemRow(link: link, onOpen: onOpen)
+                }
+                if links.hidden > 0 {
+                    ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
+                        presentation.expandLinks(group)
                     }
                 }
             }
@@ -255,14 +248,11 @@ struct ItemInspector: View {
     }
 
     private var detailsSection: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: "Details", isQuiet: true, isOpen: $detailsOpen, identifier: "ItemInspectorDetails")
-            if detailsOpen { details }
-        }
+        InspectorSectionView(.details, title: "Details") { details }
     }
 
     @ViewBuilder private var details: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             detail("Created", ItemDate(date: item.created, hasTime: true).text())
             detail("Edited", ItemDate(date: item.modified, hasTime: true).text())
             if let source = item.source { detail("Made by", source) }
@@ -341,34 +331,21 @@ struct ItemInspector: View {
     }
 }
 
-/// A fact about the item in Details: its name leading and its value trailing in the secondary color, or the value
-/// under the name where it will not fit beside it.
+/// A fact about the item in Details: a compact row, with its value cut in the middle where it is long.
 private struct InspectorDetailRow: View {
     let name: String
     let value: String
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(verbatim: name)
-                Spacer(minLength: 0)
-                Text(verbatim: value).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: name)
-                Text(verbatim: value).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        InspectorRow(verbatimName: name, isCompact: true) {
+            InspectorText(text: value)
         }
-        .interfaceFont(.callout)
-        .textSelection(.enabled)
+        .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
     }
 }
 
-/// An item that links to the one shown: a chip with its type's icon and title, and the day it last changed.
-private struct LinkedItemChip: View {
+/// An item that links to the one shown: a light row with its type's icon and title, and the day it last changed.
+private struct LinkedItemRow: View {
     let link: LinkedItem
     let onOpen: (ItemID) -> Void
 
@@ -381,9 +358,10 @@ private struct LinkedItemChip: View {
                 Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1)
                     .interfaceFont(.caption)
             }
+            .interfaceFont(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(InspectorChipStyle())
+        .buttonStyle(InspectorRowButtonStyle())
         .foregroundStyle(.primary)
         .help(link.title)
         .accessibilityIdentifier("LinkedFrom.\(link.item.rawValue)")

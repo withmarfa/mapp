@@ -16,8 +16,11 @@ struct TagEntryField: View {
     /// The tags the item or items already hold, which are not suggested again.
     let held: [String]
     let identifier: String
-    /// Whether the field is part of the inspector's property sheet, which shows a placeholder and no border.
+    /// Whether the field is part of the inspector, which shows a placeholder in a light rounded field.
     var isInline = false
+    /// Whether the field takes the keyboard when it appears, and what it tells when it gives it up.
+    var takesFocus = false
+    var onEnd: () -> Void = {}
     /// Why the last text was refused, which the caller clears when the text changes, and the field shows.
     @Binding var refusal: ItemTag.Refusal?
     let onAdd: (String) -> ItemTag.Refusal?
@@ -49,31 +52,24 @@ struct TagEntryField: View {
             .onChange(of: text) { refusal = nil }
             .accessibilityIdentifier(identifier)
         if isInline {
-            // The same quiet dashed row as every other place the inspector adds to.
-            HStack(spacing: 6) {
-                Image(systemName: "plus").foregroundStyle(.secondary).accessibilityHidden(true)
-                field
-                    .textFieldStyle(.plain)
-                    .focusEffectDisabled()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
-                    .overlay(alignment: .leading) {
-                        if text.isEmpty && !isFocused {
-                            InspectorPlaceholder(text: "Add Tag").allowsHitTesting(false).accessibilityHidden(true)
-                        }
+            field
+                .textFieldStyle(.plain)
+                .focusEffectDisabled()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
+                .overlay(alignment: .leading) {
+                    if text.isEmpty && !isFocused {
+                        InspectorPlaceholder(text: "Add Tag").allowsHitTesting(false).accessibilityHidden(true)
                     }
-            }
-            .padding(.horizontal, InspectorMetrics.chipPadding / 2)
-            .padding(.vertical, 3)
-            .background(isFocused ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: addShape)
-            .overlay { addShape.strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [3, 3])) }
+                }
+                .padding(.horizontal, InspectorMetrics.chipPadding / 2)
+                .padding(.vertical, 3)
+                .background(.quinary, in: .rect(cornerRadius: InspectorMetrics.chipRadius, style: .continuous))
+                .task { if takesFocus { await Task.yield(); isFocused = true } }
+                .onChange(of: isFocused) { if !isFocused { onEnd() } }
         } else {
             field.textFieldStyle(.roundedBorder)
         }
-    }
-
-    private var addShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: InspectorMetrics.chipRadius, style: .continuous)
     }
 
     private func submit() {
@@ -159,7 +155,8 @@ extension ItemLibrary {
     }
 }
 
-/// The inspector's Tags section: the item's tags, each with a button that removes it, and a field that adds one.
+/// The inspector's Tags section: the item's tags, each with a button that removes it, and the Add Tag control, which
+/// opens a field.
 /// An item that can't be changed lists its tags with neither.
 struct ItemTagsSection: View {
     let tags: [String]
@@ -170,6 +167,8 @@ struct ItemTagsSection: View {
     let onRemove: (String) -> Void
     @State private var localDraft = ItemPropertyDraft()
     @State private var refusal: ItemTag.Refusal?
+    /// Whether the person has asked to add a tag, which opens the field until they leave it empty.
+    @State private var isAdding = false
 
     private var drafts: ItemPropertyDraft { retainedDraft ?? localDraft }
 
@@ -184,8 +183,14 @@ struct ItemTagsSection: View {
                 .accessibilityIdentifier("ItemTags")
             }
             if isEditable {
-                TagEntryField(text: Binding { drafts.text } set: { drafts.text = $0 },
-                              held: tags, identifier: "ItemTagField", isInline: true, refusal: $refusal, onAdd: onAdd)
+                if isAdding || !drafts.text.isEmpty {
+                    TagEntryField(text: Binding { drafts.text } set: { drafts.text = $0 },
+                                  held: tags, identifier: "ItemTagField", isInline: true, takesFocus: isAdding,
+                                  onEnd: { if drafts.text.isEmpty { isAdding = false } },
+                                  refusal: $refusal, onAdd: onAdd)
+                } else {
+                    InspectorAddButton(title: "Add Tag", identifier: "ItemTagAdd") { isAdding = true }
+                }
             }
         }
     }

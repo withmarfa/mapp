@@ -4,6 +4,36 @@
     "A collection’s contents always stay on its page." : {
       "extractionState" : "manual"
     },
+    "Keep My Edit" : {
+      "extractionState" : "manual"
+    },
+    "Use Current Value" : {
+      "extractionState" : "manual"
+    },
+    "Add to %@" : {
+      "extractionState" : "manual"
+    },
+    "Edits this value" : {
+      "extractionState" : "manual"
+    },
+    "Collapses the section" : {
+      "extractionState" : "manual"
+    },
+    "Expands the section" : {
+      "extractionState" : "manual"
+    },
+    "Writes to this address" : {
+      "extractionState" : "manual"
+    },
+    "Opens this address" : {
+      "extractionState" : "manual"
+    },
+    "Opens a calendar" : {
+      "extractionState" : "manual"
+    },
+    "This value changed while you were editing. Your edit hasn’t been saved." : {
+      "extractionState" : "manual"
+    },
     "Add Relationship" : {
       "extractionState" : "manual"
     },

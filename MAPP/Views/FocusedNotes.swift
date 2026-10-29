@@ -105,4 +105,6 @@ final class ItemPropertyDraft {
     var text = ""
     var isDirty = false
     var rejected = false
+    /// The stored text the draft started from, to tell whether the item changed under it.
+    var base: String?
 }
