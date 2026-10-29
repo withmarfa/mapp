@@ -95,7 +95,16 @@ nonisolated enum NoteText {
     /// Whether the text may hold a control character (U+0000 to U+001F, U+007F to U+009F), read from its bytes: the
     /// lead byte 0xC2 also starts other characters, which only runs the full check.
     private static func mayHoldControl(_ text: String) -> Bool {
-        text.utf8.contains { $0 < 0x20 || $0 == 0x7F || $0 == 0xC2 }
+        func control(_ byte: UInt8) -> Bool { byte < 0x20 || byte == 0x7F || byte == 0xC2 }
+        let found = text.utf8.withContiguousStorageIfAvailable { bytes in
+            var index = 0
+            while index < bytes.count {
+                if control(bytes[index]) { return true }
+                index += 1
+            }
+            return false
+        }
+        return found ?? text.utf8.contains(where: control)
     }
 
     /// A text's lines, split where `Character.isNewline` splits them, with empty lines left out, read from the
@@ -214,10 +223,15 @@ nonisolated enum NoteText {
 
     /// Whether the text holds an ASCII character, read from its bytes: `StringProtocol.contains` with a string
     /// searches through Foundation, which costs more than the patterns it guards. A byte that is part of a larger
-    /// character still answers true, which only runs the pattern, as it would run with no check.
+    /// character still answers true, which only runs the pattern, as it would run with no check. A native string's
+    /// bytes are read in one block, so the search costs the same in an unoptimized build.
     static func holds(_ text: some StringProtocol, _ character: Unicode.Scalar) -> Bool {
         let byte = UInt8(character.value)
-        return text.utf8.contains(byte)
+        let found = text.utf8.withContiguousStorageIfAvailable { bytes in
+            guard let start = bytes.baseAddress else { return false }
+            return memchr(start, Int32(byte), bytes.count) != nil
+        }
+        return found ?? text.utf8.contains(byte)
     }
 
     private static func isEscaped(at index: String.Index, in text: String) -> Bool {

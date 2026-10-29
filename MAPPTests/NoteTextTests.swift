@@ -114,4 +114,22 @@ struct NoteTextTests {
             #expect(Array(NoteText.Lines(text)) == text.split(whereSeparator: \.isNewline), "\(text.debugDescription)")
         }
     }
+
+    /// A native string is searched in one block of bytes; a string bridged from Foundation, byte by byte.
+    @Test func holdsFindsACharacterInEveryKindOfString() {
+        let native = "plain <tag> text"
+        #expect(NoteText.holds(native, "<"))
+        #expect(!NoteText.holds(native, "["))
+        #expect(NoteText.holds(native.dropFirst(6), "<"))
+        #expect(!NoteText.holds(native.dropFirst(7), "<"))
+        let bridged = NSString(string: "bridged café <tag>") as String
+        #expect(NoteText.holds(bridged, "<"))
+        #expect(!NoteText.holds(bridged, "["))
+        #expect(!NoteText.holds("", "<"))
+    }
+
+    @Test func aControlCharacterReadsAsASpace() {
+        #expect(NoteText.plainText(of: "one\u{01}two\u{7F}three\u{85}four\u{9F}five") == "one two three four five")
+        #expect(NoteText.plainText(of: "café ½ © non-break\u{A0}space") == "café ½ © non-break\u{A0}space")
+    }
 }
