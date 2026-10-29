@@ -5,9 +5,14 @@ nonisolated struct SyncReport: Hashable, Sendable {
         case current
         /// The copy is being pulled again from the start. The writes waiting are kept and go once it is done.
         case catchingUp
+        /// The copy is being brought up to date from where it stood, or its refresh is under way.
+        case updating
     }
 
     var phase = Phase.current
+    /// When the copy last finished a sync with the server without an error. The source stamps it, a launch's first
+    /// until a sync finishes it is nil, and `MarfaHost.lastSynced` carries the one kept from the launch before.
+    var lastSynced: Date?
     var fill: LibraryFill?
     /// Writes not answered yet, problems aside.
     var waiting = 0

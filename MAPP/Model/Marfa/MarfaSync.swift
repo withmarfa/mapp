@@ -178,7 +178,16 @@ actor MarfaSync {
     /// A server event says the server is there, whatever was last believed.
     func heard() {
         if hub.connection != .online { hub.set(.online) }
+        // A change the follow applied is the copy in step with the server, but a busy server would stamp the report
+        // on every one.
+        guard refreshed else { return }
+        let now = Date.now
+        if let last = hub.report.value.lastSynced, now.timeIntervalSince(last) < Self.stampInterval { return }
+        hub.report.update { $0.lastSynced = now }
     }
+
+    /// The least time between two stamps made by the follow.
+    nonisolated static let stampInterval: TimeInterval = 30
 
     /// The follow stays stopped until the next hydration or catch-up.
     func stopped(_ error: MarfaError) async {
@@ -307,6 +316,9 @@ actor MarfaSync {
     }
 
     func refreshNow() async throws {
+        hub.report.update { if $0.phase == .current { $0.phase = .updating } }
+        // A hydration ends in `.current` itself; this covers a catch-up and a pull that throws.
+        defer { hub.report.update { $0.phase = .current } }
         let status = try await refreshing.readStatus()
         if !Self.needsFill(status), !rehydration.wanted {
             try await refreshing.catchUp()
@@ -317,6 +329,7 @@ actor MarfaSync {
         fetchAttachments()
         // Kept until the queue has been read, so a read that fails is tried again by the next refresh.
         if answersWaiting, await takeAnswersFromQueue() { answersWaiting = false }
+        hub.report.update { $0.lastSynced = .now }
     }
 
     func fetchAttachments() {
