@@ -82,6 +82,7 @@ struct ItemPageHeader: ViewModifier {
             titleRejected: draft.rejected,
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
+            showsTitle: item.titleRule != .firstLine,
             type: lead.showsType ? library.catalogue.itemTypes[item.type].map { Self.localized($0.label) } : nil,
             icon: .init(name: library.catalogue.icon(for: item.type)),
             kind: kind,

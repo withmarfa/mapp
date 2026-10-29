@@ -162,6 +162,20 @@ body[data-text='none'] #editor {
   user-select: text;
 }
 
+.item-title[hidden] {
+  display: none;
+}
+
+/* A title read from the text is not drawn, so nothing is left to tuck the byline under. */
+#item-header[data-title='derived'] .item-byline {
+  margin-top: 0;
+}
+
+#item-header[data-title='derived']
+  .item-lead:has(.item-avatar[hidden]):has(.item-subtitle[hidden]) {
+  display: none;
+}
+
 .item-title[contenteditable='false'] {
   cursor: default;
 }

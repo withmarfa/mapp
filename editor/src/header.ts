@@ -67,6 +67,8 @@ export interface HeaderModel {
   /** Why the title was refused, in the words of the library the item is in. */
   titleRefusal: string
   editable: boolean
+  /** False where the item is titled by the first line of its text, which the page already shows as its text. */
+  showsTitle?: boolean
   type: string | null
   /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name. */
   icon?: string | null
@@ -454,6 +456,8 @@ export class ItemHeader {
     document.body.dataset.header = model.hidden ? 'general' : model.kind
     this.subtitle.textContent = model.subtitle ?? ''
     this.subtitle.hidden = !model.subtitle
+    this.title.hidden = model.showsTitle === false
+    this.root.dataset.title = model.showsTitle === false ? 'derived' : 'own'
     const editable = model.editable ? 'plaintext-only' : 'false'
     if (this.title.getAttribute('contenteditable') !== editable) {
       this.title.setAttribute('contenteditable', editable)

@@ -630,3 +630,19 @@ test('the byline draws the icon of the item type, and none for a type with no ic
   header.set({ ...ticket, icon: 'type:' })
   expect(node().hidden).toBe(true)
 })
+
+test('an item titled by its text draws no title, and one with a title of its own does', () => {
+  header.set({ ...ticket, showsTitle: false, editable: false })
+  expect(root.querySelector<HTMLElement>('.item-title')!.hidden).toBe(true)
+  expect(root.dataset.title).toBe('derived')
+  expect(root.querySelector<HTMLElement>('.item-byline')).not.toBeNull()
+  header.set(ticket)
+  expect(root.querySelector<HTMLElement>('.item-title')!.hidden).toBe(false)
+  expect(root.dataset.title).toBe('own')
+})
+
+test('a title read from the text still ends where the header ends, so the toolbar names the item as it scrolls', () => {
+  header.set({ ...ticket, showsTitle: false, editable: false })
+  expect(header.bottom).toBe(root.offsetTop + root.offsetHeight)
+  expect(header.isEditingTitle).toBe(false)
+})

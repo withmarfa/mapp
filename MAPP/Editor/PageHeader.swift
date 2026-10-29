@@ -59,6 +59,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// Why a title is refused, which depends on the library.
     var titleRefusal: String
     var editable: Bool
+    /// False where the item is titled by the first line of its text, which the page already shows as its text.
+    var showsTitle = true
     var type: String?
     /// The icon of the item's type, drawn before its name.
     var icon: TypeIconRef

@@ -94,6 +94,15 @@ struct InspectorFieldsTests {
         #expect(header?.status?.opensMenu == true)
     }
 
+    @MainActor @Test func theHeaderDrawsATitleOnlyForAnItemWhoseTitleIsItsOwn() {
+        let titled = Self.item("aic.ticket.task")
+        let fromText = Self.item("core.note", id: "10000000-0000-0000-0000-000000000003", rule: .firstLine)
+        let library = FakeItemLibrary(items: [titled, fromText])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        #expect(ItemPageHeader.header(of: titled.id, in: library, drafts: DetailsPresentation())?.showsTitle == true)
+        #expect(ItemPageHeader.header(of: fromText.id, in: library, drafts: DetailsPresentation())?.showsTitle == false)
+    }
+
     @MainActor @Test func aStatusWithNoValueIsAnEmptyPinAndATypeWithoutOneHasNone() {
         let library = FakeItemLibrary(items: [Self.item("aic.ticket.task"), Self.item("core.file", id: "10000000-0000-0000-0000-000000000002")])
         library.catalogue = Catalogue(itemTypes: [Self.task, Self.file])
