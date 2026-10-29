@@ -58,7 +58,7 @@ struct ColumnWidthOptions: View {
                 }
             }
             .disabled(registry.front == nil)
-            .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths this window shows the defaults for new windows.")
+            .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
             .accessibilityIdentifier("ColumnWidthsUseCurrent")
         }
     }
@@ -97,14 +97,13 @@ private struct ColumnWidthRow: View {
     }
 }
 
-/// What one main window knows of its columns' widths. Each starts at the width set in Settings; a width measured
-/// in the window replaces it. The split view lays out narrow for a moment whenever it is built, so a measurement is
-/// kept only once the layout has settled; one taken earlier would be copied back as the column's ideal width and the
-/// column would open at its minimum.
+/// The widths a person has set in one main window by dragging a divider. Each column starts at the width set in
+/// Settings. The split view takes a column's ideal width only when it is built, and lays out at other widths while it
+/// settles and whenever the window changes shape, so only a drag counts: a width read from the layout would be copied
+/// back as the ideal and the column would open at whatever width the layout last squeezed it to.
 @MainActor
 final class ColumnWidthTracker {
     private var widths: [ColumnWidth: CGFloat]
-    private(set) var isSettling = true
 
     init(defaults: UserDefaults = .standard) {
         widths = Dictionary(uniqueKeysWithValues: ColumnWidth.allCases.map { ($0, $0.stored(in: defaults)) })
@@ -112,14 +111,19 @@ final class ColumnWidthTracker {
 
     func width(of column: ColumnWidth) -> CGFloat { widths[column] ?? column.defaultWidth }
 
+    /// Keeps a width the person dragged a column to; a width outside the column's limits is not one they can have set.
     func record(_ width: CGFloat, for column: ColumnWidth) {
-        guard !isSettling, width.isFinite, width >= column.range.lowerBound else { return }
+        guard width.isFinite, column.range.contains(width) else { return }
         widths[column] = width
     }
 
-    /// Called as the split view is built again; measurements are ignored until `endSettling`.
-    func beginSettling() { isSettling = true }
-    func endSettling() { isSettling = false }
+    /// The width of each column from the right edges of a split view's items, first to last. A sidebar that floats over
+    /// the content starts at the left edge like the content does, so a column runs from the previous item's right edge.
+    static func columnWidths(rightEdges: [CGFloat]) -> [CGFloat] {
+        rightEdges.enumerated().map { index, edge in
+            max(0, edge - (index == 0 ? 0 : max(0, rightEdges[index - 1])))
+        }
+    }
 }
 
 /// The tracker of the main window in front, which Settings reads for Use Current Widths. It holds the tracker weakly,

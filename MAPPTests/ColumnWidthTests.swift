@@ -69,29 +69,27 @@ struct ColumnWidthTrackerTests {
         for column in ColumnWidth.allCases { #expect(tracker.width(of: column) == column.defaultWidth) }
     }
 
-    @Test func theNarrowLayoutOfABuiltSplitViewIsNotKept() {
+    @Test func aDraggedWidthIsKeptAndOneOutsideTheLimitsIsNot() {
         let tracker = tracker()
-        tracker.record(280, for: .list)
-        tracker.record(200, for: .settings)
-        #expect(tracker.width(of: .list) == 350)
-        #expect(tracker.width(of: .settings) == 290)
-    }
-
-    @Test func aSettledWidthIsKeptAndABelowLimitOneIsNot() {
-        let tracker = tracker()
-        tracker.endSettling()
         tracker.record(410, for: .list)
         tracker.record(12, for: .list)
+        tracker.record(900, for: .list)
         tracker.record(.nan, for: .list)
         #expect(tracker.width(of: .list) == 410)
     }
 
-    @Test func buildingTheSplitViewAgainSettlesAgain() {
+    @Test func eachColumnKeepsItsOwnDraggedWidth() {
         let tracker = tracker()
-        tracker.endSettling()
-        tracker.beginSettling()
-        tracker.record(300, for: .sidebar)
+        tracker.record(300, for: .settings)
+        #expect(tracker.width(of: .settings) == 300)
+        #expect(tracker.width(of: .list) == 350)
         #expect(tracker.width(of: .sidebar) == 230)
+    }
+
+    @Test func columnWidthsComeFromTheDividerPositions() {
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: [230, 580, 1700]) == [230, 350, 1120])
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: [-230, 350, 1700]) == [0, 350, 1350])
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: []).isEmpty)
     }
 
     @Test func onlyTheWindowInFrontIsRead() {
