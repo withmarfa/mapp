@@ -142,6 +142,7 @@ struct ItemInspector: View {
                 if hasTags { tagSection }
                 if !linked.isEmpty { linkedSection }
             }
+            .sharesInspectorNameColumn()
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 20)
@@ -253,8 +254,8 @@ struct ItemInspector: View {
 
     @ViewBuilder private var details: some View {
         VStack(alignment: .leading, spacing: 0) {
-            detail("Created", ItemDate(date: item.created, hasTime: true).text())
-            detail("Edited", ItemDate(date: item.modified, hasTime: true).text())
+            detail("Created", ItemDate(date: item.created, hasTime: true).text(), isDate: true)
+            detail("Edited", ItemDate(date: item.modified, hasTime: true).text(), isDate: true)
             if let source = item.source { detail("Made by", source) }
             if let place { detail("Place", place) }
             detail("Version", item.version.rawValue.formatted())
@@ -268,13 +269,13 @@ struct ItemInspector: View {
             ForEach(otherProperties) { property in
                 InspectorDetailRow(
                     name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
-                    value: Self.text(of: property.value))
+                    value: Self.text(of: property.value), isDate: Self.isDate(property.value))
             }
         }
     }
 
-    private func detail(_ name: LocalizedStringResource, _ value: String) -> some View {
-        InspectorDetailRow(name: String(localized: name), value: value)
+    private func detail(_ name: LocalizedStringResource, _ value: String, isDate: Bool = false) -> some View {
+        InspectorDetailRow(name: String(localized: name), value: value, isDate: isDate)
     }
 
     // MARK: Contents
@@ -310,6 +311,10 @@ struct ItemInspector: View {
         relationships.filter { $0.isEditable && ($0.targets.isEmpty || $0.allowsMultiple) }
     }
 
+    private static func isDate(_ value: PropertyValue) -> Bool {
+        value.string.flatMap { ItemDate.parse($0) } != nil
+    }
+
     /// A value no field describes, with a date in it read as the fields' dates are.
     private static func text(of value: PropertyValue) -> String {
         if let string = value.string, let date = ItemDate.parse(string) { return date.text() }
@@ -335,10 +340,11 @@ struct ItemInspector: View {
 private struct InspectorDetailRow: View {
     let name: String
     let value: String
+    var isDate = false
 
     var body: some View {
         InspectorRow(verbatimName: name, isCompact: true) {
-            InspectorText(text: value)
+            InspectorText(text: value, keepsOneLine: isDate)
         }
         .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
     }

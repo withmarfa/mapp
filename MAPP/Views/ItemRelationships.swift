@@ -2,7 +2,7 @@ import MarfaIcons
 import SwiftUI
 
 /// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a light row with
-/// the item's type icon, which opens it, and the one Add control where the relationship takes several. An editable
+/// the item's type icon, which opens it, and a small plus at the end of its name where the relationship takes several. An editable
 /// one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the context menu.
 struct ItemRelationshipGroup: View {
     let relationship: ItemRelationship
@@ -18,10 +18,19 @@ struct ItemRelationshipGroup: View {
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
     @State private var rejected = false
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
+            HStack(spacing: 4) {
+                InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
+                Spacer(minLength: 0)
+                if relationship.isEditable && relationship.allowsMultiple {
+                    InspectorPlusButton(
+                        accessibilityLabel: "Add to \(ItemTypeInfo.Field.displayLabel(relationship.label))",
+                        identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
+                }
+            }
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
             ForEach(links.shown) { target in
                 ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
@@ -31,17 +40,12 @@ struct ItemRelationshipGroup: View {
             if links.hidden > 0 {
                 ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
             }
-            if relationship.isEditable && relationship.allowsMultiple {
-                InspectorAddButton(
-                    title: "Add", accessibilityLabel: "Add to \(ItemTypeInfo.Field.displayLabel(relationship.label))",
-                    identifier: "RelationshipAddRow.\(relationship.field)", action: onEdit)
-                    .padding(.top, 4)
-            }
             if rejected {
                 Text("The connection could not be removed.")
                     .interfaceFont(.caption).foregroundStyle(.red)
             }
         }
+        .onHover { hovering = $0 }
         .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
     }
 }

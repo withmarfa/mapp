@@ -19,6 +19,39 @@ enum InspectorMetrics {
     /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
     static let rowInset: CGFloat = 6
     static let rowRadius: CGFloat = 6
+
+    /// The width of the name column: the longest name shown, or `fallback` until one is measured, and never more
+    /// than `maxNameShare` of the `available` width.
+    static func nameColumn(longest: CGFloat?, fallback: CGFloat, available: CGFloat) -> CGFloat {
+        min(longest ?? fallback, available * maxNameShare)
+    }
+}
+
+extension EnvironmentValues {
+    /// The widest name among the rows of the inspector, which every row's name column takes, so Details and
+    /// Properties line up. Nil until the rows have measured their names.
+    @Entry var inspectorNameWidth: CGFloat?
+}
+
+/// The natural width of a row's name, which the inspector gathers as the widest.
+private struct InspectorNameWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+extension View {
+    /// Gives the rows below one name column, as wide as their longest name.
+    func sharesInspectorNameColumn() -> some View { modifier(SharedNameColumn()) }
+}
+
+private struct SharedNameColumn: ViewModifier {
+    @State private var width: CGFloat?
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.inspectorNameWidth, width)
+            .onPreferenceChange(InspectorNameWidthKey.self) { width = $0 > 0 ? $0 : nil }
+    }
 }
 
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
@@ -61,7 +94,7 @@ struct InspectorSectionView<Content: View>: View {
     @ViewBuilder let content: Content
 
     init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil, @ViewBuilder content: () -> Content) {
-        _isOpen = AppStorage(wrappedValue: true, section.key)
+        _isOpen = AppStorage(wrappedValue: InspectorSection.isOpen(section), section.key)
         self.section = section
         self.title = title
         self.count = count
@@ -117,6 +150,7 @@ struct InspectorFoldHeading: View {
 /// baseline, whatever the value holds, and a name that does not fit its column wraps to a second line.
 struct InspectorRow<Value: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
+    @Environment(\.inspectorNameWidth) private var sharedNameWidth
     let name: Text
     let help: String
     /// A tighter row in a smaller size, for the facts under Details.
@@ -156,7 +190,13 @@ struct InspectorRow<Value: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .help(help)
                 .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
-                    min(InspectorMetrics.nameWidth * scale, width * InspectorMetrics.maxNameShare)
+                    InspectorMetrics.nameColumn(longest: sharedNameWidth, fallback: InspectorMetrics.nameWidth * scale, available: width)
+                }
+                .background {
+                    // Measured on one line, so the column fits the whole name.
+                    name.lineLimit(1).fixedSize().hidden().background {
+                        GeometryReader { Color.clear.preference(key: InspectorNameWidthKey.self, value: ceil($0.size.width)) }
+                    }
                 }
             value
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,18 +207,24 @@ struct InspectorRow<Value: View>: View {
 }
 
 /// A value drawn as plain text. A value with no space in it (a link, an ID, a hash) takes one line and is cut in the
-/// middle, where its ends say most; a value of words wraps to three lines. The whole value is its help.
+/// middle, where its ends say most; a date takes one line and is cut at its end; a value of words wraps to three lines. The whole value is its help.
 struct InspectorText: View {
     let text: String
     var style: AnyShapeStyle = AnyShapeStyle(.primary)
+    /// A date, whose day and time stay together: it is cut at its end before it wraps.
+    var keepsOneLine = false
 
     static func isToken(_ text: String) -> Bool { !text.contains(where: \.isWhitespace) }
 
+    static func lineLimit(for text: String, keepsOneLine: Bool) -> Int {
+        keepsOneLine || isToken(text) ? 1 : 3
+    }
+
     var body: some View {
-        let token = Self.isToken(text)
+        let token = Self.isToken(text) && !keepsOneLine
         Text(verbatim: text)
             .foregroundStyle(style)
-            .lineLimit(token ? 1 : 3)
+            .lineLimit(Self.lineLimit(for: text, keepsOneLine: keepsOneLine))
             .truncationMode(token ? .middle : .tail)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,18 +287,29 @@ extension View {
     }
 }
 
+/// The label of every control that adds something to a section: a plus and the words, a fixed gap apart.
+struct InspectorAddLabel: View {
+    let title: LocalizedStringKey
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "plus")
+            Text(title)
+        }
+        .interfaceFont(.callout)
+    }
+}
+
 /// The one control that adds something to a section: a filled, rounded button with a plus.
 struct InspectorAddButton: View {
     let title: LocalizedStringKey
-    var accessibilityLabel: LocalizedStringKey?
     let identifier: String
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) { Label(title, systemImage: "plus").interfaceFont(.callout) }
+        Button(action: action) { InspectorAddLabel(title: title) }
             .buttonStyle(.bordered)
             .fixedSize()
-            .accessibilityLabel(accessibilityLabel ?? title)
             .accessibilityIdentifier(identifier)
     }
 }
@@ -267,7 +324,7 @@ struct InspectorAddMenu<Content: View>: View {
         Menu {
             content
         } label: {
-            Label(title, systemImage: "plus").interfaceFont(.callout)
+            InspectorAddLabel(title: title)
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
@@ -296,5 +353,62 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: Keyboard
+
+extension View {
+    /// Makes a value at rest act like a button the keyboard reaches. A plain `Button` is skipped by Tab unless the
+    /// person turned on full keyboard access; a focusable view is always reached, and Return or Space starts
+    /// `action`, as a click does. VoiceOver still reads a button. `isFocused` reports the focus, for a control that
+    /// shows itself only then.
+    /// `keyboard` replaces `action` for Return and Space, for a value a click opens but the keyboard edits.
+    func inspectorActivates(isFocused: Binding<Bool>? = nil, keyboard: (() -> Void)? = nil, perform action: @escaping () -> Void) -> some View {
+        modifier(InspectorActivation(isFocusedOutside: isFocused, action: action, keyboard: keyboard ?? action))
+    }
+}
+
+private struct InspectorActivation: ViewModifier {
+    let isFocusedOutside: Binding<Bool>?
+    let action: () -> Void
+    let keyboard: () -> Void
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(.rect)
+            .onTapGesture(perform: action)
+            .focusable()
+            .focused($isFocused)
+            .onKeyPress(keys: [.return, .space], phases: .down) { _ in
+                keyboard()
+                return .handled
+            }
+            .onChange(of: isFocused) { isFocusedOutside?.wrappedValue = isFocused }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, action)
+    }
+}
+
+/// The small plus at the end of a relationship's name row, which adds to it. It shows while the pointer is over the
+/// row or the plus has the keyboard, and VoiceOver reaches it always.
+struct InspectorPlusButton: View {
+    let accessibilityLabel: LocalizedStringKey
+    let identifier: String
+    let isRowHovered: Bool
+    let action: () -> Void
+    @State private var isFocused = false
+
+    var body: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+            .inspectorActivates(isFocused: $isFocused, perform: action)
+            .opacity(isRowHovered || isFocused ? 1 : 0)
+            .help(accessibilityLabel)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityIdentifier(identifier)
     }
 }
