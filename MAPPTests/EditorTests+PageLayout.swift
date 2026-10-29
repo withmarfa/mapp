@@ -58,7 +58,7 @@ extension EditorTests {
         let window = try await Self.show(page, width: 700)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         // For each row, how far past its column the furthest thing in the value reaches and how tall the row is, then
-        // the width the page scrolls to and the width it has.
+        // the width the page scrolls to and the width it shows, which leaves out a scroll bar that takes up room.
         let measured = try #require(try await settle(page.editor, """
             (() => {
               const rows = [...document.querySelectorAll('.item-prop')]
@@ -71,14 +71,14 @@ extension EditorTests {
                 const reach = range.getBoundingClientRect().right
                 return [Math.round(reach - column), Math.round(row.getBoundingClientRect().height)]
               })
-              return [...numbers, document.documentElement.scrollWidth, innerWidth]
+              return [...numbers, document.documentElement.scrollWidth, document.documentElement.clientWidth]
             })()
             """, as: [Int].self) { $0?.count == 10 && $0?[7] ?? 0 <= 64 })
         let rows = ["text", "url", "email", "short"]
         for (index, name) in rows.enumerated() {
             #expect(measured[index * 2] <= 0, "the \(name) value stays inside its column, not \(measured[index * 2]) points past it")
         }
-        #expect(measured[8] == measured[9], "the page is no wider than its window: \(measured[8]) against \(measured[9])")
+        #expect(measured[8] == measured[9], "the page scrolls no wider than it shows: \(measured[8]) against \(measured[9])")
         #expect(measured[7] <= 64, "a short value stays one line, not \(measured[7]) points tall")
     }
 
@@ -107,11 +107,11 @@ extension EditorTests {
               if (!detail || !text || !tile || !detail.textContent) return null
               const middle = rect => rect.top + rect.height / 2
               return [detail.scrollWidth - detail.clientWidth, Math.round(Math.abs(middle(text.getBoundingClientRect()) - middle(tile.getBoundingClientRect()))),
-                      document.documentElement.scrollWidth - innerWidth]
+                      document.documentElement.scrollWidth - document.documentElement.clientWidth]
             })()
             """, as: [Int].self) { $0?.count == 3 })
         #expect(measured[0] <= 0, "the detail line is cut off by \(measured[0]) points instead of wrapping")
         #expect(measured[1] <= 1, "the tile is \(measured[1]) points off the middle of the text beside it")
-        #expect(measured[2] <= 0, "the page is \(measured[2]) points wider than its window")
+        #expect(measured[2] <= 0, "the page is \(measured[2]) points wider than it shows")
     }
 }
