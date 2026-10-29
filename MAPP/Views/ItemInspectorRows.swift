@@ -19,6 +19,10 @@ enum InspectorMetrics {
     /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
     static let rowInset: CGFloat = 6
     static let rowRadius: CGFloat = 6
+    /// The column at the trailing end of the inspector that holds every add plus and every row menu, so they line up
+    /// down the inspector. The fold chevron sits beyond it, in `foldColumn`.
+    static let trailingColumn: CGFloat = 20
+    static let foldColumn: CGFloat = 14
 
     /// The width of the name column: the longest name shown, or `fallback` until one is measured, and never more
     /// than `maxNameShare` of the `available` width.
@@ -56,7 +60,7 @@ private struct SharedNameColumn: ViewModifier {
 
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
 enum InspectorSection: CaseIterable {
-    case details, properties, relationships, tags, linkedFrom
+    case details, properties, relationships, tags
 
     var key: String {
         switch self {
@@ -64,7 +68,6 @@ enum InspectorSection: CaseIterable {
         case .properties: InterfaceKey.inspectorPropertiesOpen
         case .relationships: InterfaceKey.inspectorRelationshipsOpen
         case .tags: InterfaceKey.inspectorTagsOpen
-        case .linkedFrom: InterfaceKey.inspectorLinkedFromOpen
         }
     }
 
@@ -74,46 +77,59 @@ enum InspectorSection: CaseIterable {
         case .properties: "ItemInspectorProperties"
         case .relationships: "ItemInspectorRelationships"
         case .tags: "ItemInspectorTags"
-        case .linkedFrom: "ItemInspectorLinkedFrom"
         }
     }
 }
 
 /// A section: a heading with a chevron at its end that folds what the section holds, open until the person folds it.
-/// The heading is one button, so VoiceOver and the keyboard reach the chevron by it.
-struct InspectorSectionView<Content: View>: View {
+/// The heading is one button, so VoiceOver and the keyboard reach the chevron by it. A section that can take
+/// something new has a small plus on its heading, beside the chevron.
+struct InspectorSectionView<Content: View, Add: View>: View {
     @AppStorage private var isOpen: Bool
     let section: InspectorSection
     let title: LocalizedStringKey
     var count: Int?
+    /// The plus control, given whether the heading is hovered.
+    let add: (Bool) -> Add
     @ViewBuilder let content: Content
 
-    init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil, @ViewBuilder content: () -> Content) {
+    init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil,
+         @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
         _isOpen = AppStorage(wrappedValue: true, section.key)
         self.section = section
         self.title = title
         self.count = count
+        self.add = add
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: section.identifier)
+            InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: section.identifier, add: add)
             if isOpen { content }
         }
     }
 }
 
-/// A section's heading: the system's headline with the disclosure at its end, and a count where the section lists
-/// things.
-struct InspectorFoldHeading: View {
+extension InspectorSectionView where Add == EmptyView {
+    init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil, @ViewBuilder content: () -> Content) {
+        self.init(section, title: title, count: count, add: { _ in EmptyView() }, content: content)
+    }
+}
+
+/// A section's heading: the system's title with the disclosure at its end, a count where the section lists things,
+/// and the plus, in the trailing column, where the section takes something new.
+struct InspectorFoldHeading<Add: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
     let title: LocalizedStringKey
     var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
+    let add: (Bool) -> Add
+    @State private var hovering = false
 
     var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
         Button {
             withAnimation(.snappy(duration: 0.2)) { isOpen.toggle() }
         } label: {
@@ -124,12 +140,13 @@ struct InspectorFoldHeading: View {
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10 * InterfaceStyle.scale(for: textSize), weight: .semibold))
+                    .font(.system(size: 10 * scale, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .frame(width: InspectorMetrics.foldColumn * scale)
                     .accessibilityHidden(true)
             }
-            .interfaceFont(.headline)
+            .interfaceFont(.title3.weight(.semibold))
             .foregroundStyle(.primary)
             .contentShape(.rect)
         }
@@ -138,6 +155,10 @@ struct InspectorFoldHeading: View {
         .accessibilityValue(isOpen ? Text("Expanded") : Text("Collapsed"))
         .accessibilityHint(isOpen ? Text("Collapses the section") : Text("Expands the section"))
         .accessibilityIdentifier(identifier)
+        .overlay(alignment: .trailing) {
+            add(hovering).inspectorTrailingColumn()
+        }
+        .onHover { hovering = $0 }
     }
 }
 
@@ -148,30 +169,25 @@ struct InspectorRow<Value: View>: View {
     @Environment(\.inspectorNameWidth) private var sharedNameWidth
     let name: Text
     let help: String
-    /// A tighter row in a smaller size, for the facts under Details.
-    var isCompact = false
     @ViewBuilder let value: Value
 
-    init(name: LocalizedStringResource, isCompact: Bool = false, @ViewBuilder value: () -> Value) {
+    init(name: LocalizedStringResource, @ViewBuilder value: () -> Value) {
         self.name = Text(name)
         help = String(localized: name)
-        self.isCompact = isCompact
         self.value = value()
     }
 
     /// A name that comes from Marfa, shown as it is.
-    init(verbatimName: String, isCompact: Bool = false, @ViewBuilder value: () -> Value) {
+    init(verbatimName: String, @ViewBuilder value: () -> Value) {
         name = Text(verbatim: verbatimName)
         help = verbatimName
-        self.isCompact = isCompact
         self.value = value()
     }
 
     /// A field's label, which the app may have a translation for.
-    init(fieldLabel: String, isCompact: Bool = false, @ViewBuilder value: () -> Value) {
+    init(fieldLabel: String, @ViewBuilder value: () -> Value) {
         name = Text(LocalizedStringKey(fieldLabel))
         help = fieldLabel
-        self.isCompact = isCompact
         self.value = value()
     }
 
@@ -196,8 +212,8 @@ struct InspectorRow<Value: View>: View {
             value
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, (isCompact ? 1.5 : InspectorMetrics.rowPadding) * scale)
-        .interfaceFont(isCompact ? .subheadline : .callout)
+        .padding(.vertical, InspectorMetrics.rowPadding * scale)
+        .interfaceFont(.body)
     }
 }
 
@@ -283,53 +299,6 @@ extension View {
     }
 }
 
-/// The label of a section's Add button or menu: a plus and the words, a fixed gap apart.
-struct InspectorAddLabel: View {
-    let title: LocalizedStringKey
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "plus")
-            Text(title)
-        }
-        .interfaceFont(.callout)
-    }
-}
-
-/// A section's Add button: a filled, rounded button with a plus.
-struct InspectorAddButton: View {
-    let title: LocalizedStringKey
-    let identifier: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) { InspectorAddLabel(title: title) }
-            .buttonStyle(.bordered)
-            .fixedSize()
-            .accessibilityIdentifier(identifier)
-    }
-}
-
-/// The same control where there is a choice of what to add, from a menu.
-struct InspectorAddMenu<Content: View>: View {
-    let title: LocalizedStringKey
-    let identifier: String
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        Menu {
-            content
-        } label: {
-            InspectorAddLabel(title: title)
-        }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
-        .accessibilityIdentifier(identifier)
-    }
-}
-
 /// The context menu a row of the inspector offers: whether the page shows it too.
 struct ShowOnPageMenu: View {
     let isShown: Bool
@@ -352,9 +321,27 @@ extension View {
     }
 }
 
-/// The small plus at the end of a relationship's name row, which adds to it. It shows while the pointer is over the
-/// row or the plus has the keyboard. Hidden, it is drawn in the clear color rather than faded to nothing, so it
-/// stays a button in the accessibility tree and VoiceOver reaches it always.
+/// The mark of a small plus: drawn in the clear color rather than faded to nothing while hidden, so its button stays
+/// in the accessibility tree and VoiceOver reaches it always.
+private struct InspectorPlusMark: View {
+    @Environment(\.interfaceTextSize) private var textSize
+    let isVisible: Bool
+    /// A menu names itself from its label's content, so the label carries the name.
+    let name: LocalizedStringKey
+
+    var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        Image(systemName: "plus")
+            .font(.system(size: 11 * scale, weight: .semibold))
+            .foregroundStyle(isVisible ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
+            .frame(width: InspectorMetrics.trailingColumn * scale, height: InspectorMetrics.trailingColumn * scale)
+            .contentShape(.rect)
+            .accessibilityLabel(name)
+    }
+}
+
+/// The small plus that adds to a section or a relationship. It shows while the pointer is over the row it ends or the
+/// plus has the keyboard.
 struct InspectorPlusButton: View {
     let accessibilityLabel: LocalizedStringKey
     let identifier: String
@@ -363,17 +350,56 @@ struct InspectorPlusButton: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(isRowHovered || isFocused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
-                .frame(width: 20, height: 20)
-                .contentShape(.rect)
+        Button(action: action) { InspectorPlusMark(isVisible: isRowHovered || isFocused, name: accessibilityLabel) }
+            .buttonStyle(.plain)
+            .focused($isFocused)
+            .help(accessibilityLabel)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityIdentifier(identifier)
+    }
+}
+
+/// The same plus where there is a choice of what to add, from a menu.
+struct InspectorPlusMenu<Content: View>: View {
+    let accessibilityLabel: LocalizedStringKey
+    let identifier: String
+    let isRowHovered: Bool
+    @ViewBuilder let content: Content
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            InspectorPlusMark(isVisible: isRowHovered || isFocused, name: accessibilityLabel)
         }
-        .buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        // A menu button draws its label in the system's color whatever the label's style says, so it is hidden by
+        // opacity. Fully transparent, a view leaves the accessibility tree; this faint, it stays in it and shows nothing.
+        .opacity(isRowHovered || isFocused ? 1 : 0.002)
         .focused($isFocused)
         .help(accessibilityLabel)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier(identifier)
     }
+}
+
+private struct InspectorTrailingColumn: ViewModifier {
+    @Environment(\.interfaceTextSize) private var textSize
+    /// Room kept beyond the column, where the control sits in a row that reaches past the headings.
+    var extra: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        content
+            .frame(width: InspectorMetrics.trailingColumn * scale)
+            .padding(.trailing, InspectorMetrics.foldColumn * scale + extra)
+    }
+}
+
+extension View {
+    /// Puts the view in the inspector's trailing column, where every add plus and row menu lines up.
+    func inspectorTrailingColumn(extra: CGFloat = 0) -> some View { modifier(InspectorTrailingColumn(extra: extra)) }
 }
