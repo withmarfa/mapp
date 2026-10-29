@@ -372,9 +372,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.item(F.n1)?.edgesOut.isEmpty == true })
         #expect(library.body(of: F.n1)?.text == "Typed")
 
-        // Once answered, what the copy holds stands, merged or not.
+        // Once answered, what the copy holds stands, merged or not, told in the change after the answer.
         source.setBody("Typed, merged", of: F.n1, version: 2)
         source.send(.answered(try #require(source.submitted.first?.id), .accepted))
+        source.sendBody(of: F.n1)
         #expect(await eventually { library.body(of: F.n1)?.text == "Typed, merged" })
         #expect(library.notices.waiting.last == nil)
 
