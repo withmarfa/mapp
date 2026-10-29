@@ -481,7 +481,7 @@ import Testing
 
     @Test func aFloodOfDeletionsThatNeverPausesReadsTheBinWithinTheLongestWait() async throws {
         let fake = Self.fake([Self.row("kept", title: "Kept")])
-        let doomed = try await Self.makeDoomed(60, in: fake)
+        let doomed = try await Self.makeDoomed(400, in: fake)
         let scene = try await Self.open(fake)
         await scene.source.engineTook()
         let quiet = Duration.milliseconds(400)
@@ -489,13 +489,13 @@ import Testing
         await scene.source.engine.sync.setBinWait(quiet: quiet, longest: longest)
         let before = await scene.binReads
 
-        // A deletion every 100 milliseconds for twice the longest wait, so the changes never pause for `quiet`.
+        // One deletion after another for twice the longest wait, so the changes never pause for `quiet`.
         let start = ContinuousClock.now
         var index = 0
-        while ContinuousClock.now - start < longest * 2, index < 60 {
+        while ContinuousClock.now - start < longest * 2 {
+            try #require(index < doomed.count, "\(index) deletions took less than \(longest * 2)")
             try await scene.deleteElsewhere(doomed[index])
             index += 1
-            try await Task.sleep(for: .milliseconds(100))
         }
         let read = await scene.binReads - before
         #expect(read >= 1, "a flood of \(index) deletions over \(ContinuousClock.now - start) never read the bin")
