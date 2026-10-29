@@ -15,7 +15,6 @@ struct SidebarIndex: View {
             place: place, rows: model.rows(for: place), isBuilt: model.isBuilt(for: place), slots: model.slots, browser: browser) { row in
             browser.show(row.place, in: library, order: order)
         }
-        .toolbarScrollEdge()
         .task(id: Following(place: place, library: ObjectIdentifier(library))) { model.follow(place, in: library) }
         .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
