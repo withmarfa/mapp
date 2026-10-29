@@ -416,6 +416,29 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.last == .editBody(F.n1, "Third", base: ItemVersion(3), merge: .asRead))
     }
 
+    /// The engine tells what it read back of a save before it tells the copy took it, and the copy keeps the version
+    /// it held until the answer, so the page keeps the person's text on that version.
+    @Test func aSavesReadBackToldBeforeItIsTakenKeepsThePersonsText() async throws {
+        let (library, source) = try await loaded()
+        library.updateBody(of: F.n1, to: "Typed")
+        let write = try #require(source.submitted.first?.id)
+        // A read that raced the write, then the read of the write itself.
+        source.sendBody(of: F.n1)
+        source.setBody("Typed", of: F.n1, version: 1)
+        source.sendBody(of: F.n1)
+        source.send(.taken(write))
+        #expect(await eventually { !library.hasUnreadSave(F.n1) }, "the copy has read the save back")
+        #expect(library.body(of: F.n1) == ItemBody(id: F.n1, text: "Typed", version: ItemVersion(1)))
+        source.send(.answered(write, .accepted))
+        source.send(.upserted([F.item(F.n2, F.note, "Answered", age: 5, tier: .feed)]))
+        #expect(await eventually { library.item(F.n2)?.title == "Answered" })
+        #expect(library.body(of: F.n1) == ItemBody(id: F.n1, text: "Typed", version: ItemVersion(1)))
+
+        // The next save is typed on the person's own text, so it follows the write the copy took.
+        library.updateBody(of: F.n1, to: "Typed again")
+        #expect(source.writes.last == .editBody(F.n1, "Typed again", base: ItemVersion(1), merge: .following))
+    }
+
     /// A save refused before it was queued left the copy as it was, so the page goes back to the copy's text.
     @Test func aSaveRefusedBeforeItWasQueuedShowsTheCopysText() async throws {
         let (library, source) = try await loaded()
