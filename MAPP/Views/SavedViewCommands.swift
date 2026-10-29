@@ -36,11 +36,11 @@ enum SavedViews {
         case .list, .gallery:
             window.layout = .list(order)
         case .board:
-            let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
+            let fields = browser.boardFieldChoices(in: library)
             let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
             window.layout = .board(key: field?.key, label: field?.label ?? "")
         case .timeline:
-            let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+            let fields = browser.timelineFieldChoices(in: library)
             let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
             window.layout = .timeline(key: key, label: fields.first { $0.key == key }?.displayLabel ?? "")
         }

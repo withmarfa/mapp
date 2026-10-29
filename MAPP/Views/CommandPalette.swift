@@ -183,7 +183,7 @@ struct CommandPalette: View {
     private var found: [Entry] {
         let isEmpty = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let results = isEmpty ? nil : library.search(query, in: .everywhere)
-        let items = results.map(Self.listed) ?? Array(library.items(in: .allNotes).sorted { $0.modified > $1.modified }.prefix(12))
+        let items = results.map(Self.listed) ?? Array(browser.paletteIndex(in: library).recent.prefix(12))
         return items.map { item in
             // An excerpt that is the title says nothing the title does not, so the preview stands.
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.title ? nil : $0 }
@@ -409,18 +409,9 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, RowIcon, String?)] = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
-            place.item.flatMap { item in place.symbol.map { (item, .symbol($0), nil) } }
-        }
-        items.append((.recentlyDeleted, .symbol("trash"), nil))
-        items += library.sourceCounts.map { (.source($0.name), .symbol("antenna.radiowaves.left.and.right"), $0.name) }
-        items += library.collections.map { (.collection($0.id), .type(library.catalogue.icon(for: $0.type)), $0.title) }
-        // The types the sidebar shows, under the names it gives them.
-        items += library.itemTypeCounts.map { (.itemType($0.id.rawValue), .type($0.icon), $0.label) }
-        items += library.views.map { (.view($0.id), .symbol(SidebarPlace.viewSymbol), $0.title) }
-        return items.map { item, icon, title in
-            Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), icon: icon) {
-                browser.choose(item, in: library, order: order)
+        browser.paletteIndex(in: library).places.map { place in
+            Entry(id: "place:\(place.item)", title: place.title ?? library.name(of: place.item), detail: String(localized: "Show"), icon: place.icon) {
+                browser.choose(place.item, in: library, order: order)
                 browser.focusRequest = .list
             }
         }
@@ -428,7 +419,7 @@ struct CommandPalette: View {
 
     /// Items by title, most recently edited first, each with its type, or the Inbox for one waiting there.
     private var notes: [Entry] {
-        library.items(in: .allNotes).sorted { $0.modified > $1.modified }.map { item in
+        browser.paletteIndex(in: library).recent.map { item in
             Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
                 reveal(item)
             }

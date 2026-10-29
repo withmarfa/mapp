@@ -114,7 +114,11 @@ final class FakeItemLibrary: ItemLibrary {
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
 
+    /// How often a place's items were listed, for tests of what is kept rather than asked for again.
+    @ObservationIgnored private(set) var placeReads = 0
+
     func items(in place: SidebarItem) -> [Item] {
+        placeReads += 1
         if place == .recents { return Self.recent(items) }
         return items.filter { item in
             switch place {

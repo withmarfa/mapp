@@ -10,7 +10,7 @@ struct ItemTimeline: View {
     var body: some View {
         let _ = daysSeen
         let items = browser.items(in: library)
-        let fields = ItemTimelineLayout.fields(for: items, catalogue: library.catalogue)
+        let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         let groups = ItemTimelineLayout.groups(for: items, field: field, catalogue: library.catalogue)

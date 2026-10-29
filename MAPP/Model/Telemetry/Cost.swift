@@ -30,6 +30,8 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case sidebarPlan
     /// One pass over the catalogue for the types that hold items (`itemTypeCounts`).
     case typeCounts
+    /// The command palette's places and items, listed and sorted (`Browser.paletteIndex`).
+    case paletteIndex
     /// One run of a sidebar view's body, the sidebar's list and each part of it.
     case sidebarBody
 

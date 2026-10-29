@@ -87,7 +87,7 @@ struct ViewOptionCommand {
 
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
-        let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
+        let fields = browser.boardFieldChoices(in: library)
         let field = ItemBoardLayout.selectedField(browser.boardFields[place], available: fields)
         var commands = fields.filter { $0.key != field?.key }.map { field in
             ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1") {
@@ -106,7 +106,7 @@ struct ViewOptionCommand {
 
     private static func timeline(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
-        let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+        let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         return fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.displayLabel)"), systemImage: "calendar") {
