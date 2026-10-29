@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// ⌘N, the toolbar's New Item and the palette's New commands: a panel near the top of the window for making one
 /// item. What it holds comes first (a title and text, a file, or a title alone); above the footer, chips show the
 /// details the person added, its properties and parent, and the files to attach to it. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window.
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -87,6 +87,11 @@ struct QuickAddPanel: View {
         .onKeyPress(.escape) {
             putAway()
             return .handled
+        }
+        // An empty panel does not wait in a window the person has left. The file importer and the popovers take the
+        // key for a moment, and are not leaving.
+        .onWindowResignsKey { keyWindowIsOwn in
+            browser.putAwayQuickAddLeftEmpty(usesOwnSurface: isChoosingFile || editing != nil, keyWindowIsOwn: keyWindowIsOwn)
         }
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
         .defaultFocus($focus, .title)
