@@ -181,6 +181,45 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden).map(\.key) == ["status", "priority"])
     }
 
+    @Test func theRelationshipsListLeavesOutWhatLinksToTheItem() {
+        func target(_ title: String) -> ItemRelationshipTarget {
+            ItemRelationshipTarget(title: title, itemID: ItemID(title), resolution: .resolved(ItemID(title)))
+        }
+        let groups = [
+            ItemRelationship(field: "child-of", label: "Parent", targets: [target("a")], isEditable: true, allowsMultiple: false),
+            ItemRelationship(field: "inverse:parent-of", label: "Children", targets: [target("b")], isEditable: false, allowsMultiple: true),
+            ItemRelationship(field: "inverse:references", label: "Referenced By", targets: [target("c")], isEditable: false, allowsMultiple: true),
+            ItemRelationship(field: "about", label: "About", targets: [], isEditable: true, allowsMultiple: true),
+        ]
+        #expect(InspectorFields.relationships(groups).map(\.field) == ["child-of"], "incoming links are Linked From's, once")
+    }
+
+    @Test func aYesNoPropertyThatWasNeverSetIsNotNo() {
+        #expect(InspectorFields.yesNo(.bool(true)) == .yes)
+        #expect(InspectorFields.yesNo(.bool(false)) == .no)
+        #expect(InspectorFields.yesNo(nil) == .unset, "cleared")
+        #expect(InspectorFields.yesNo(.null) == .unset)
+        #expect(InspectorFields.yesNo(.string("yes")) == .unset, "text is not a yes")
+    }
+
+    @Test func aUrlOrEmailValueIsALinkOnlyToAWebOrMailAddress() {
+        func link(_ format: ItemTypeInfo.Field.TextFormat?, _ text: String) -> String? {
+            let field = ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: format)
+            return InspectorFields.link(of: field, value: .string(text))?.absoluteString
+        }
+        #expect(link(.url, "https://example.com/a?b=1") == "https://example.com/a?b=1")
+        #expect(link(.url, " HTTP://Example.com ") == "HTTP://Example.com")
+        #expect(link(.url, "javascript:alert(1)") == nil)
+        #expect(link(.url, "file:///etc/passwd") == nil)
+        #expect(link(.url, "example.com") == nil, "the page leaves an address with no scheme as text")
+        #expect(link(.url, "https://") == nil)
+        #expect(link(.email, "ada@example.com") == "mailto:ada@example.com")
+        #expect(link(.email, "not an address") == nil)
+        #expect(link(.email, "a@b.co\nc@d.co") == nil)
+        #expect(link(nil, "https://example.com") == nil, "a plain text field is text")
+        #expect(InspectorFields.link(of: ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: .url), value: nil) == nil)
+    }
+
     // MARK: Only what has a value
 
     @Test func propertiesListOnlyWhatHasAValueInTheCataloguesOrder() {

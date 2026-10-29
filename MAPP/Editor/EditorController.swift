@@ -51,6 +51,9 @@ final class EditorController: NSObject {
     /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
     /// was told it may be.
     @ObservationIgnored var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
+    /// The row of the property block, or Linked From, the context menu is opening over, which it offers to hide
+    /// from the page.
+    @ObservationIgnored var menuRow: (item: ItemID, row: String)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
     /// A link in the page names this note, which the window opens as choosing it in the list does.
@@ -286,7 +289,7 @@ final class EditorController: NSObject {
 
     private func sendHeader() {
         if let size = header?.interfaceTextSize {
-            let needed = Set(((header?.contents ?? []) + (header?.linked ?? [])).map(\.icon)).union(header.map { [$0.icon.name] } ?? [])
+            let needed = header?.typeIconNames ?? []
             if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
                 let typeIcons = needed.union(size == headerIconSize ? headerTypeIcons : [])
                 if let icons = Cost.measure(.headerIcons, { PageHeaderIcons(textSize: size, typeIcons: typeIcons) }) {
@@ -598,6 +601,8 @@ final class EditorController: NSObject {
             openNote(link, from: item)
         case .embedMenu(let embed):
             menuEmbed = embed
+        case .rowMenu(let row):
+            menuRow = row
         case .find(let state):
             guard state.generation == generation else { return }
             pageFinder.update(state)

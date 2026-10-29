@@ -424,6 +424,36 @@ extension EditorTests {
         #expect(menus[0].2.minY > 52 - 30, "the pin lies below the covered top, less what has scrolled")
     }
 
+    @Test func theContextMenuOverARowKnowsWhichRowAndLeavesTheMenuToWebKit() async throws {
+        let page = try await Page()
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        try await page.load("Some text.\n")
+        let id = try #require(page.editor.noteID)
+        var header = Self.header("Review the findings", id: id)
+        header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/mapp")))
+        page.editor.setHeader(header)
+        var events = 0
+        page.editor.onHeaderEvent = { _ in events += 1 }
+        try #require(await eventuallyAsking { (try? await Self.rect("[data-row='repo']", in: page)) != nil })
+        let prevented = try await page.editor.webView.evaluateJavaScript("""
+            (() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+              document.querySelector('[data-row="repo"] .item-prop-value').dispatchEvent(e); return e.defaultPrevented })()
+            """) as? Bool
+        #expect(prevented == false, "WebKit's own menu opens")
+        try await page.wait { page.editor.menuRow != nil }
+        #expect(page.editor.menuRow?.item == id)
+        #expect(page.editor.menuRow?.row == "repo")
+        _ = page.editor.takeMenuRow()
+        try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.menuRow == nil, "a menu elsewhere offers no row")
+        #expect(events == 0, "the menu itself needs nothing from the header")
+    }
+
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
     @Observable final class Shown {
         var id: ItemID

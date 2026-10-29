@@ -17,6 +17,39 @@ nonisolated enum InspectorFields {
         }
     }
 
+    /// Where a value is a link to: a web address of a url field, or a mail address of an email field. Only http,
+    /// https and mailto are ever opened, so a stored `javascript:` or file address stays text.
+    static func link(of field: ItemTypeInfo.Field, value: PropertyValue?) -> URL? {
+        guard case .string(let raw)? = value else { return nil }
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch field.format {
+        case .url?:
+            guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+                  url.host(percentEncoded: false)?.isEmpty == false
+            else { return nil }
+            return url
+        case .email?:
+            let parts = text.split(separator: "@", omittingEmptySubsequences: false)
+            guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }), !text.contains(where: { $0.isWhitespace }) else { return nil }
+            var components = URLComponents()
+            components.scheme = "mailto"
+            components.path = text
+            return components.url
+        case nil:
+            return nil
+        }
+    }
+
+    /// What a yes/no property's checkbox shows: a value that was never set, or has been cleared, is neither yes nor
+    /// no, so it is not drawn as an unticked box.
+    enum YesNo: Equatable {
+        case yes, no, unset
+    }
+
+    static func yesNo(_ value: PropertyValue?) -> YesNo {
+        if case .bool(let flag)? = value { flag ? .yes : .no } else { .unset }
+    }
+
     /// The type's fields the inspector lists under Properties, in the catalogue's order: those with a value, and
     /// those `revealed`, which the person added or cleared while the inspector showed this item, so a row does not
     /// jump away while they work on it.
@@ -37,6 +70,12 @@ nonisolated enum InspectorFields {
             if case .other = field.kind { return false }
             return true
         }
+    }
+
+    /// The relationship groups the inspector lists under Relationships: those the item holds. What points at it is
+    /// Linked From's, wherever that is placed, so it is not listed twice.
+    static func relationships(_ relationships: [ItemRelationship]) -> [ItemRelationship] {
+        relationships.filter { !$0.targets.isEmpty && !$0.field.hasPrefix("inverse:") }
     }
 
     /// Every property the inspector lists elsewhere or never: what the type names, what is hidden, and the

@@ -107,8 +107,13 @@ struct PropertyRowTests {
         let type = MarfaMapping.itemType(ItemType(id: "aic.note", label: "Note", fields: [Self.field("title")], titleField: "title"))
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: type, hidden: ["title"],
-            relationships: [Self.relationship("child-of", "Parent", [])], parentField: "child-of", tags: [])
+            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", tags: [])
         #expect(rows.map(\.value) == [.parent])
+    }
+
+    @Test func anItemWithNoParentHasNoParentRow() {
+        let rows = Self.rows([:], relationships: [Self.relationship("child-of", "Parent", [])])
+        #expect(rows.map(\.id) == ["status"])
     }
 
     @Test func otherRelationshipsShowAsLinksAndIncomingOnesDoNot() {
@@ -119,6 +124,17 @@ struct PropertyRowTests {
         #expect(rows.map(\.id) == ["status", "blocks"])
         #expect(rows[1].label == "Blocks")
         #expect(rows[1].value == .items([PropertyRow.Target(title: "Ship it", item: ItemID("a")), PropertyRow.Target(title: "Test it", item: ItemID("b"))]))
+    }
+
+    @Test func aLinkCarriesTheIconOfTheItemItOpens() {
+        let blocks = Self.relationship("blocks", "blocks", [("Ship it", "a"), ("Test it", "b")])
+        let rows = PropertyRow.rows(
+            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", tags: [],
+            icon: { $0 == ItemID("a") ? "rocket" : nil })
+        #expect(rows[1].value == .items([
+            PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "rocket"),
+            PropertyRow.Target(title: "Test it", item: ItemID("b"), icon: nil),
+        ]))
     }
 
     @Test func aLinkThatOpensNothingIsLeftOut() {

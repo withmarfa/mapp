@@ -10,6 +10,7 @@ struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
+    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
@@ -43,12 +44,18 @@ struct ItemPageHeader: ViewModifier {
                 editor.showHeader { Cost.measure(.pageHeader) { Self.header(of: id, in: library, drafts: drafts) } }
             }
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
+            // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
+            // inspector, in the sheet or from the page's own menu, needs it read again.
+            .onChange(of: placements) { editor.refreshHeader() }
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
     }
 
     /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
-    static func header(of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation) -> PageHeader? {
+    static func header(
+        of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored()
+    ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
+        let placement = placements.placement(of: item.type, in: library.catalogue)
         let draft = drafts.draft(for: item.id, key: "title")
         let status = library.catalogue.itemTypes[item.type]?.statusField
         let relationships = library.relationships(for: item.id)
@@ -60,16 +67,20 @@ struct ItemPageHeader: ViewModifier {
             for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now)
         let properties = lead.refine(PropertyRow.rows(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
-            parentField: Self.parentField, tags: library.tags(of: item)))
+            parentField: Self.parentField, tags: library.tags(of: item), placement: placement,
+            icon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(
                 pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, members: .only,
                 item: { library.item($0) })
             : []
-        let linked = LinkedItem.list(
-            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now,
-            members: isCollection ? .excluding : .all, item: { library.item($0) })
+        // Where the person put Linked From: the page's foot, or only the inspector.
+        let linked = placement.linkedFromPlace == .page
+            ? LinkedItem.list(
+                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now,
+                members: isCollection ? .excluding : .all, item: { library.item($0) })
+            : []
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
         // A collection with no text, as a folder a connector keeps has, is its members: an editor with nothing in it
         // would only invite typing that the connector puts back.
@@ -115,7 +126,8 @@ struct ItemPageHeader: ViewModifier {
         )
     }
 
-    /// Carries out what the page asks, for the item it names, which may be one the page has just left.
+    /// Carries out what the page asks, for the item it names, which may be one the page has just left: a title draft
+    /// is kept for it, but a menu is only for the item on the page now.
     private var handler: (PageHeaderEvent) -> Void {
         let library = library, drafts = drafts, undoManager = undoManager
         let choosingParent = $choosingParent
@@ -143,7 +155,7 @@ struct ItemPageHeader: ViewModifier {
                 draft.isDirty = false
                 draft.rejected = false
             case .menu(.status, let id, let rect):
-                guard let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
+                guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 let menu = NSMenu()
                 for choice in Self.statusChoices(of: item, in: status) {
                     let entry = actionItem(Self.localized(ItemTypeInfo.Field.label(ofOption: choice))) {
@@ -153,8 +165,11 @@ struct ItemPageHeader: ViewModifier {
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
+            case .hideFromPage(let row, let id):
+                guard editor.noteID == id, let type = library.item(id)?.type else { return }
+                PagePlacements.update { $0.set(false, row: row, of: type) }
             case .menu(.parent, let id, let rect):
-                guard let parent = Self.parent(of: id, in: library) else { return }
+                guard editor.noteID == id, let parent = Self.parent(of: id, in: library) else { return }
                 guard let target = parent.targets.first else {
                     if parent.isEditable { choosingParent.wrappedValue = rect }
                     return

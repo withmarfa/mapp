@@ -148,6 +148,16 @@ final class EditorWebView: WKWebView {
         }
     }
 
+    private final class MenuRow: NSObject {
+        let item: ItemID
+        let row: String
+
+        init(item: ItemID, row: String) {
+            self.item = item
+            self.row = row
+        }
+    }
+
     @objc private func openEmbed(_ sender: NSMenuItem) {
         guard let embed = sender.representedObject as? MenuEmbed else { return }
         controller?.openEmbed(embed.reference, in: embed.item)
@@ -156,6 +166,11 @@ final class EditorWebView: WKWebView {
     @objc private func revealEmbed(_ sender: NSMenuItem) {
         guard let embed = sender.representedObject as? MenuEmbed else { return }
         controller?.openEmbed(embed.reference, in: embed.item, revealing: true)
+    }
+
+    @objc private func hideRow(_ sender: NSMenuItem) {
+        guard let row = sender.representedObject as? MenuRow else { return }
+        controller?.onHeaderEvent(.hideFromPage(row: row.row, row.item))
     }
 
     @objc private func changeType(_ sender: NSMenuItem) {
@@ -222,6 +237,13 @@ final class EditorWebView: WKWebView {
             let items = embed.opens ? [open, reveal] : [reveal]
             for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
             menu.insertItem(.separator(), at: items.count)
+        }
+        if let row = controller?.takeMenuRow() {
+            let hide = NSMenuItem(title: String(localized: "Hide from Page"), action: #selector(hideRow(_:)), keyEquivalent: "")
+            hide.target = self
+            hide.representedObject = MenuRow(item: row.item, row: row.row)
+            menu.insertItem(hide, at: 0)
+            menu.insertItem(.separator(), at: 1)
         }
         for item in menu.items {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")

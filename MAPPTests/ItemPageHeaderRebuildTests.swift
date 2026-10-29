@@ -29,9 +29,12 @@ import Testing
             try #require(await eventually { library.isLoaded })
             let page = Page(source: source, library: library)
             let drafts = DetailsPresentation()
+            // Linked From is on the inspector unless the person puts it on the page; these tests are about the page's list.
+            var placements = PagePlacements()
+            placements.setLinkedFrom(.page, of: try #require(library.item(id)).type)
             page.editor.showHeader { [unowned page] in
                 page.builds += 1
-                return ItemPageHeader.header(of: id, in: library, drafts: drafts)
+                return ItemPageHeader.header(of: id, in: library, drafts: drafts, placements: placements)
             }
             return page
         }
@@ -96,6 +99,20 @@ import Testing
         linking.edgesOut = [Edge(id: EdgeID("a1"), type: "about", source: F.n1, target: .item(F.p2), origin: .property("about"))]
         try await page.send(linking)
         #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note") == false })
+    }
+
+    @Test func linkedFromIsSentOnlyWhereTheTypePlacesItOnThePage() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let drafts = DetailsPresentation()
+        let byDefault = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: PagePlacements()))
+        #expect(byDefault.linked.isEmpty, "an ordinary type keeps Linked From in the inspector")
+        var placements = PagePlacements()
+        placements.setLinkedFrom(.page, of: F.project)
+        let onPage = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: placements))
+        #expect(onPage.linked.map(\.title).contains("Plain note"))
     }
 
     @Test func aLinkingItemThatIsRemovedIsGone() async throws {

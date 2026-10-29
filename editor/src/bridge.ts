@@ -47,6 +47,7 @@ export type EditorMessage =
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
+  | { type: 'rowMenu'; row: { item: string; row: string } | null }
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 

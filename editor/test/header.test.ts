@@ -369,7 +369,7 @@ test('the property block reads as label and value pairs, each drawn by its kind'
         label: 'Blocks',
         symbol: 'link',
         kind: 'items',
-        items: [{ title: 'Ship it', item: 'other' }],
+        items: [{ title: 'Ship it', item: 'other', symbol: 'square.stack' }],
       },
       { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['mapp', 'storage'] },
       { id: 'url', label: 'Url', symbol: 'globe', kind: 'url', text: 'https://example.com/a' },
@@ -403,6 +403,49 @@ test('the property block reads as label and value pairs, each drawn by its kind'
     { type: 'openLink', href: 'https://example.com/a' },
     { type: 'openLink', href: 'mailto:a@example.com' },
   ])
+})
+
+test('an item a row links to is a chip with the icon of its type before the title', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      {
+        id: 'blocks',
+        label: 'Blocks',
+        symbol: 'link',
+        kind: 'items',
+        items: [{ title: 'Ship it', item: 'other', symbol: 'square.stack' }],
+      },
+    ],
+  })
+  const chip = root.querySelector<HTMLElement>('.item-prop-value .item-link-chip')!
+  expect(chip.querySelector('.item-glyph')).not.toBeNull()
+  expect(chip.querySelector('.item-link-text')!.textContent).toBe('Ship it')
+  posted = []
+  chip.click()
+  expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
+})
+
+test('a row under the pointer is named, and the context menu is left to WebKit', () => {
+  header.set({
+    ...ticket,
+    properties: [{ id: 'repo', label: 'Repo', symbol: 'link', kind: 'text', text: 'x' }],
+  })
+  posted = []
+  const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+  root.querySelector('.item-prop-value')!.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(false)
+  expect(posted).toEqual([])
+  expect(header.rowAt(event.target)).toEqual({ item: 'ticket', row: 'repo' })
+  expect(header.rowAt(document.body)).toBeNull()
+})
+
+test('the Linked From heading is a row the menu can name', () => {
+  const mention = { item: 'm', title: 'Mention', symbol: 'link', type: 'Note', date: 'Today' }
+  header.set({ ...ticket, linked: [mention] })
+  expect(header.hasFooterItems).toBe(true)
+  const toggle = footer.querySelector('.item-linked-from .item-linked-toggle')!
+  expect(header.rowAt(toggle)).toEqual({ item: 'ticket', row: '#linked' })
 })
 
 test('a URL that is not web is shown as text, not as a link', () => {

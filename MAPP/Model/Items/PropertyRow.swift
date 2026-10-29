@@ -8,6 +8,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     struct Target: Hashable, Sendable {
         let title: String
         let item: ItemID
+        /// The icon of the item's type, a Lucide name, which the page draws before the title.
+        var icon: String?
     }
 
     enum Value: Hashable, Sendable {
@@ -64,35 +66,43 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static let longestText = 120
 
     /// The rows for an item, in the order a person reads them: the type's fields as the catalogue orders them,
-    /// then the parent if the type has one, then the item's other relationships, then its tags. A field shows only
+    /// then the parent if the item has one, then the item's other relationships, then its tags. A field shows only
     /// with a value, except the status, which always shows where the type has one, since its pill is how a status
-    /// is set. The keys in `hidden` are what the page shows elsewhere, such as the title and the text.
+    /// is set. The keys in `hidden` are what the page shows elsewhere, such as the title and the text, and
+    /// `placement` is the person's choice of which of the rest the page shows (the inspector lists them all). An
+    /// item with no parent has no parent row: the parent is set from the inspector, and the pin keeps its menu once
+    /// it has a value.
     static func rows(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String,
-        tags: [String]
+        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
-        let parent = relationships.contains { $0.field == parentField }
+        let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
         let status = type?.statusField
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
             if field.key == status?.key {
-                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: .status))
-                if parent { rows.append(parentRow(relationships, parentField)) }
-            } else if let value = value(of: field, in: item) {
+                if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: .status)) }
+                if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
+            } else if placement.showsOnPage(field.key), let value = value(of: field, in: item) {
                 rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value))
             }
         }
-        if parent, !rows.contains(where: { $0.value == .parent }) { rows.insert(parentRow(relationships, parentField), at: 0) }
-        for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
+        if parent, placement.showsOnPage(parentField), !rows.contains(where: { $0.value == .parent }) {
+            rows.insert(parentRow(relationships, parentField), at: 0)
+        }
+        for relationship in relationships
+        where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField && placement.showsOnPage(relationship.field) {
             let targets = relationship.targets.compactMap { target -> Target? in
                 guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
-                return Target(title: target.title, item: id)
+                return Target(title: target.title, item: id, icon: icon(id))
             }
             if !targets.isEmpty {
                 rows.append(PropertyRow(id: relationship.field, label: ItemTypeInfo.Field.displayLabel(relationship.label), value: .items(targets)))
             }
         }
-        if !tags.isEmpty { rows.append(PropertyRow(id: "#tags", label: String(localized: "Tags"), value: .tags(tags))) }
+        if !tags.isEmpty, placement.showsOnPage(PagePlacement.tags) {
+            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags)))
+        }
         return rows
     }
 

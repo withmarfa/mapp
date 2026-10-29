@@ -144,9 +144,14 @@ window.addEventListener(
   { capture: true },
 )
 
+// WebKit opens its own menu, which the app adds to: it hears which embed and which header row the pointer is
+// over just before. Heard first on the window, so a menu over neither clears what the last one named.
 window.addEventListener(
   'contextmenu',
-  () => postToHost({ type: 'embedMenu', embed: null, opens: false }),
+  (event) => {
+    postToHost({ type: 'embedMenu', embed: null, opens: false })
+    postToHost({ type: 'rowMenu', row: header.rowAt(event.target) })
+  },
   { capture: true },
 )
 
@@ -189,10 +194,15 @@ window.addEventListener('resize', () => {
 let surround = -1
 const surroundObserver = new ResizeObserver(() => {
   const height = headerRoot.offsetHeight + pictureBar.offsetHeight + footerRoot.offsetHeight
-  if (height === surround) return
-  surround = height
+  // With linked items the text ends where it ends and they follow it; with none, the text fills the window.
+  const follows = header.hasFooterItems
+  const key = follows ? -2 - height : height
+  if (key === surround) return
+  surround = key
   requestAnimationFrame(() => {
-    root.style.setProperty('--inkkit-min-height', `calc(100vh - ${height}px)`)
+    root.style.setProperty('--inkkit-min-height', follows ? '0px' : `calc(100vh - ${height}px)`)
+    // The footer's own top padding already separates it, so the text's reserve for a floating footer is not needed.
+    root.style.setProperty('--inkkit-padding-bottom', follows ? '1rem' : '')
     editor.invalidateFindGeometry()
     checkHeaderScrolledAway()
   })
