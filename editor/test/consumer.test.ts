@@ -152,9 +152,7 @@ test('a picture at a web address is asked of the app as a picture, never as an e
   try {
     await withEditor('![A picture](https://example.com/a.png)\n', async (editor) => {
       await vi.waitFor(() =>
-        expect(document.querySelector('.inkkit-file-label')?.textContent).toBe(
-          'example.com: Load Picture',
-        ),
+        expect(document.querySelector('.inkkit-file-label')?.textContent).toBe('A picture'),
       )
       expect(embeds).toEqual([])
       expect(pictures).toEqual([

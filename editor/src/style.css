@@ -115,10 +115,12 @@ body {
   user-select: none;
 }
 
-/* Above the text while pictures at web addresses wait for the person: one button loads them all. */
+/* Above the text while pictures at web addresses wait for the person: a callout on the text's margins, whose
+   button loads them all. */
 #picture-bar {
   --interface-text-size: 13px;
-  padding: 0 var(--inkkit-column-inset) 8px;
+  --step: calc(var(--interface-text-size) * 4 / 13);
+  padding: 0 var(--inkkit-column-inset) calc(var(--step) * 3);
   font-family: -apple-system, system-ui, sans-serif;
   font-size: var(--interface-text-size);
   line-height: normal;
@@ -130,13 +132,42 @@ body {
   display: none;
 }
 
-#picture-bar button {
-  padding: 4px 10px;
-  border: 0;
-  border-radius: 6px;
+.picture-callout {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 2.5);
+  padding: calc(var(--step) * 2.5) calc(var(--step) * 3);
+  border-radius: calc(var(--step) * 2.5);
   background: var(--label-quinary);
-  color: var(--link);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+
+.picture-icon {
+  flex: none;
+  background: var(--label-secondary);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.picture-icon[hidden] {
+  display: none;
+}
+
+.picture-sentence {
+  flex: 1;
+  min-width: 0;
+  color: var(--label-secondary);
+}
+
+#picture-bar button {
+  flex: none;
+  padding: calc(var(--step) * 0.75) calc(var(--step) * 2.5);
+  border: 0.5px solid var(--separator);
+  border-radius: calc(var(--step) * 1.5);
+  background: transparent;
+  color: var(--label-primary);
   font: inherit;
+  font-weight: 500;
   cursor: default;
 }
 

@@ -34,11 +34,11 @@ extension EditorTests {
         try await page.load("![RSS picture](\(address))\r\n")
         let label = try await settle(page.editor,
             "document.querySelector('.inkkit-file[data-inkkit-file-kind=file] .inkkit-file-label')?.textContent",
-            as: String.self) { $0 == "\(host): Load Picture" }
-        #expect(label == "\(host): Load Picture")
+            as: String.self) { $0 == "RSS picture" }
+        #expect(label == "RSS picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
             "document.querySelector('.inkkit-file-open')?.getAttribute('aria-label')"
-        ) as? String == "Open \(host): Load Picture")
+        ) as? String == "Open RSS picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
             "document.querySelectorAll('.ProseMirror img, .ProseMirror iframe').length"
         ) as? Int == 0)

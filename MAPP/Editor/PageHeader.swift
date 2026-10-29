@@ -158,6 +158,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbols of the property rows by SF Symbol name, and the icons of the types by `TypeIconKey`.
     var symbols: [String: Icon]
 
+    /// The symbol on the callout that says pictures at web addresses are not loaded, kept with the row symbols.
+    static let pictureSymbol = "photo"
+
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Lucide names), which the Swift SDK draws.
     @MainActor
@@ -172,7 +175,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols {
+        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         for name in typeIcons {
