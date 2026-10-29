@@ -15,7 +15,7 @@ extension MarfaEngine {
     /// copy that cannot be read keeps showing what it last held, and says why.
     func reload() async {
         let reloading = Telemetry.begin(.engine, "reload")
-        defer { reloading.end(("rows", self.rows.count), ("edges", self.edges.all.count), ("bodyLinks", self.bodyLinks.count)) }
+        defer { reloading.end(("rows", self.rows.count), ("edges", self.edges.count), ("bodyLinks", self.bodyLinks.count)) }
         let rows: [String: Marfa.Item]
         let edges: [Marfa.Edge]
         let catalogue: Catalogue
