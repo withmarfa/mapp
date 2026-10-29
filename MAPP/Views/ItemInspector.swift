@@ -1,3 +1,4 @@
+import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -9,6 +10,7 @@ struct ItemInspectorHost: View {
     let itemID: ItemID?
     let details: DetailsPresentation
     @State private var editing: ItemRelationship?
+    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
 
     init(browser: Browser, details: DetailsPresentation) { self.browser = browser; itemID = nil; self.details = details }
     init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
@@ -18,13 +20,15 @@ struct ItemInspectorHost: View {
     var body: some View {
         Group {
             if let id = selectedID, let item = library.item(id) {
+                let placement = placements.placement(of: item.type, in: library.catalogue)
+                let relationships = library.relationships(for: id)
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
                     place: item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library"),
                     catalogue: library.catalogue,
                     hiddenKeys: library.hiddenPropertyKeys(of: item),
-                    relationships: library.relationships(for: id),
+                    relationships: relationships,
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
                     onOpen: open,
@@ -36,7 +40,11 @@ struct ItemInspectorHost: View {
                     tags: library.tags(of: item),
                     onAddTag: { library.addTag($0, to: [id], undoManager: undoManager) },
                     onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
-                    drafts: details
+                    drafts: details,
+                    placement: placement,
+                    onPlace: { row, shown in placements.set(shown, row: row, of: item.type) },
+                    linked: placement.linkedFromPlace == .inspector ? linked(to: item, in: relationships) : [],
+                    typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }
                 )
                 .id(id)
             } else {
@@ -55,6 +63,14 @@ struct ItemInspectorHost: View {
         .accessibilityIdentifier("ItemInspector")
     }
 
+    /// The items that link to the one shown, newest first. A collection's members are its contents, which stay on
+    /// its page.
+    private func linked(to item: Item, in relationships: [ItemRelationship]) -> [LinkedItem] {
+        LinkedItem.list(
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(),
+            members: library.catalogue.isCollection(item.type) ? .excluding : .all, item: { library.item($0) })
+    }
+
     private func open(_ id: ItemID) {
         guard let browser else {
             if library.item(id) != nil { openWindow(value: id) }
@@ -68,8 +84,9 @@ struct ItemInspectorHost: View {
 }
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable. It reads as
-/// a property sheet: the type's properties, the item's relationships, then its details, which the person can fold
-/// away.
+/// a property sheet: the type's properties, the item's relationships and tags, the items that link to it where the
+/// person placed that list here, then its details, which the person can fold away. Every property is listed here;
+/// a context menu on one says whether the page shows it too.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
     let item: Item
@@ -93,9 +110,18 @@ struct ItemInspector: View {
     var onAddTag: (String) -> ItemTag.Refusal? = { _ in nil }
     var onRemoveTag: (String) -> Void = { _ in }
     var drafts: DetailsPresentation? = nil
+    /// What the page shows of this type's items, and what changes a row of it. A row not offered a change has no
+    /// Show on Page menu.
+    var placement: PagePlacement = .standard
+    var onPlace: ((String, Bool) -> Void)?
+    /// The items that link to this one, when the person placed Linked From in the inspector.
+    var linked: [LinkedItem] = []
+    /// The icon of the type of the item with this identifier, for the chips that name an item.
+    var typeIcon: (ItemID) -> String? = { _ in nil }
     /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
     @State private var ownPresentation = DetailsPresentation()
     @AppStorage(InterfaceKey.inspectorDetailsOpen) private var detailsOpen = true
+    @AppStorage(InterfaceKey.inspectorLinkedFromOpen) private var linkedOpen = true
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
     /// The host remakes the inspector for another item, which forgets them.
     @State private var revealed: Set<String> = []
@@ -104,79 +130,162 @@ struct ItemInspector: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
                 if let message = item.problem?.message {
                     Label(message, systemImage: "exclamationmark.triangle")
                         .interfaceFont(.callout).foregroundStyle(.red)
-                        .padding(.vertical, 8)
                 }
-                if hasProperties {
-                    InspectorHeading(title: "Properties", topPadding: 2)
-                    ForEach(fields) { field in
-                        ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
-                                        // A property the person has touched stays listed, even once cleared.
-                                        onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
-                                        retainedDraft: drafts?.draft(for: item.id, key: field.key),
-                                        startsEditing: adding == field.key)
-                    }
-                    if !emptyFields.isEmpty {
-                        InspectorAddMenu(title: "Add Property", identifier: "ItemInspectorAddProperty") {
-                            ForEach(emptyFields) { field in
-                                Button(field.displayLabel) { add(field) }
-                                    .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
-                            }
-                        }
-                    }
-                }
-                if hasRelationships {
-                    if hasProperties { InspectorSectionDivider() }
-                    InspectorHeading(title: "Relationships", topPadding: hasProperties ? InspectorMetrics.sectionGap : 2)
-                    ForEach(shownRelationships) { relationship in
-                        let group = LinkGroup(item: item.id, field: relationship.field)
-                        ItemRelationshipRow(relationship: relationship, isExpanded: presentation.expandedLinks.contains(group),
-                                            onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen,
-                                            onEdit: { onEdit(relationship) }, onRemove: { onRemove(relationship, $0) })
-                    }
-                    if !mentions.isEmpty {
-                        let group = LinkGroup.content(of: item.id)
-                        InspectorRow(name: "Links in Content") {
-                            VStack(alignment: .leading, spacing: 0) {
-                                let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
-                                ForEach(links.shown) { target in
-                                    ItemTargetRow(target: target, onOpen: onOpen)
-                                        .inspectorMinimumHeight()
-                                }
-                                if links.hidden > 0 {
-                                    ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
-                                        presentation.expandLinks(group)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !addable.isEmpty {
-                        ItemAddRelationshipRow(options: addable, onEdit: onEdit)
-                    }
-                }
-                if hasTags {
-                    if hasProperties || hasRelationships { InspectorSectionDivider() }
-                    InspectorHeading(title: "Tags", topPadding: hasProperties || hasRelationships ? InspectorMetrics.sectionGap : 2)
-                    ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
-                                    onAdd: onAddTag, onRemove: onRemoveTag)
-                }
-                if hasProperties || hasRelationships || hasTags { InspectorSectionDivider() }
-                detailsHeading
-                if detailsOpen { details }
+                if hasProperties { properties }
+                if hasRelationships { relationshipSection }
+                if hasTags { tagSection }
+                if !linked.isEmpty { linkedSection }
+                detailsSection
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
 
     private var presentation: DetailsPresentation { drafts ?? ownPresentation }
+
+    /// The change a row's Show on Page menu makes, where the inspector has one to make.
+    private func showOnPage(_ row: String) -> ((Bool) -> Void)? {
+        onPlace.map { place in { place(row, $0) } }
+    }
+
+    // MARK: Sections
+
+    private var properties: some View {
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorHeading(title: "Properties")
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(fields) { field in
+                    ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
+                                    // A property the person has touched stays listed, even once cleared.
+                                    onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
+                                    retainedDraft: drafts?.draft(for: item.id, key: field.key),
+                                    startsEditing: adding == field.key,
+                                    isStatus: field.key == type?.statusField?.key,
+                                    shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key))
+                }
+            }
+            if !emptyFields.isEmpty {
+                InspectorAddMenu(title: "Add Property", identifier: "ItemInspectorAddProperty") {
+                    ForEach(emptyFields) { field in
+                        Button(field.displayLabel) { add(field) }
+                            .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
+                    }
+                }
+            }
+        }
+    }
+
+    private var relationshipSection: some View {
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorHeading(title: "Relationships")
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(shownRelationships) { relationship in
+                    let group = LinkGroup(item: item.id, field: relationship.field)
+                    // What points at the item is not a row of the page, which lists it as Linked From.
+                    let isIncoming = relationship.field.hasPrefix("inverse:")
+                    ItemRelationshipGroup(
+                        relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
+                        onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
+                        onRemove: { onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
+                        onShowOnPage: isIncoming ? nil : showOnPage(relationship.field))
+                }
+                if !mentions.isEmpty { contentLinks }
+            }
+            if !addable.isEmpty {
+                ItemAddRelationshipButton(options: addable, onEdit: onEdit)
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    private var contentLinks: some View {
+        let group = LinkGroup.content(of: item.id)
+        let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
+        return VStack(alignment: .leading, spacing: 4) {
+            InspectorSubheading(title: String(localized: "Links in Content"))
+            ForEach(links.shown) { target in
+                ItemChip(target: target, typeIcon: typeIcon, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
+                    presentation.expandLinks(group)
+                }
+            }
+        }
+    }
+
+    private var tagSection: some View {
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorHeading(title: "Tags")
+            ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
+                            onAdd: onAddTag, onRemove: onRemoveTag)
+        }
+        .showOnPageMenu(isShown: placement.showsOnPage(PagePlacement.tags), onChange: showOnPage(PagePlacement.tags))
+    }
+
+    private var linkedSection: some View {
+        let group = LinkGroup(item: item.id, field: "#linked")
+        let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
+        return VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorFoldHeading(title: "Linked From", count: linked.count, isOpen: $linkedOpen, identifier: "ItemInspectorLinkedFrom")
+            if linkedOpen {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(links.shown, id: \.item) { link in
+                        LinkedItemChip(link: link, onOpen: onOpen)
+                    }
+                    if links.hidden > 0 {
+                        ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
+                            presentation.expandLinks(group)
+                        }
+                    }
+                }
+            }
+        }
+        .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
+    }
+
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorFoldHeading(title: "Details", isQuiet: true, isOpen: $detailsOpen, identifier: "ItemInspectorDetails")
+            if detailsOpen { details }
+        }
+    }
+
+    @ViewBuilder private var details: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            detail("Created", ItemDate(date: item.created, hasTime: true).text())
+            detail("Edited", ItemDate(date: item.modified, hasTime: true).text())
+            if let source = item.source { detail("Made by", source) }
+            if let place { detail("Place", place) }
+            detail("Version", item.version.rawValue.formatted())
+            if case .file(let contentType, let byteCount) = item.content {
+                detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
+                // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
+                if byteCount > 0 {
+                    detail("Size", ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
+                }
+            }
+            ForEach(otherProperties) { property in
+                InspectorDetailRow(
+                    name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
+                    value: Self.text(of: property.value))
+            }
+        }
+    }
+
+    private func detail(_ name: LocalizedStringResource, _ value: String) -> some View {
+        InspectorDetailRow(name: String(localized: name), value: value)
+    }
+
+    // MARK: Contents
 
     /// The properties that have a value, then any the person added or cleared since the inspector showed this item.
     private var fields: [ItemTypeInfo.Field] {
@@ -209,62 +318,6 @@ struct ItemInspector: View {
         relationships.filter { $0.isEditable && ($0.targets.isEmpty || $0.allowsMultiple) }
     }
 
-    private var detailsHeading: some View {
-        Button {
-            withAnimation(.snappy(duration: 0.2)) { detailsOpen.toggle() }
-        } label: {
-            // As a sidebar section folds: the heading reads as the others do, with the disclosure at its end.
-            HStack {
-                Text("Details")
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10 * InterfaceStyle.scale(for: textSize), weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(detailsOpen ? 90 : 0))
-                    .accessibilityHidden(true)
-            }
-            .interfaceFont(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .padding(.top, hasProperties || hasRelationships || hasTags ? InspectorMetrics.sectionGap : 2)
-        .padding(.bottom, 6)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityValue(detailsOpen ? Text("Expanded") : Text("Collapsed"))
-        .accessibilityIdentifier("ItemInspectorDetails")
-    }
-
-    @ViewBuilder private var details: some View {
-        detail("Created", ItemDate(date: item.created, hasTime: true).text())
-        detail("Edited", ItemDate(date: item.modified, hasTime: true).text())
-        if let source = item.source { detail("Made by", source) }
-        if let place { detail("Place", place) }
-        detail("Version", item.version.rawValue.formatted())
-        if case .file(let contentType, let byteCount) = item.content {
-            detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
-            // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
-            if byteCount > 0 {
-                detail("Size", ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
-            }
-        }
-        ForEach(otherProperties) { property in
-            InspectorRow(name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type))) {
-                Text(Self.text(of: property.value))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func detail(_ name: LocalizedStringKey, _ value: String) -> some View {
-        InspectorRow(name: name) {
-            Text(value)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     /// A value no field describes, with a date in it read as the fields' dates are.
     private static func text(of value: PropertyValue) -> String {
         if let string = value.string, let date = ItemDate.parse(string) { return date.text() }
@@ -272,10 +325,10 @@ struct ItemInspector: View {
     }
 
     /// The catalogue's label for a key, else the key written for reading.
-    private static func name(of key: String, label: String?) -> LocalizedStringKey {
-        if let label { return LocalizedStringKey(ItemTypeInfo.Field.displayLabel(label)) }
+    private static func name(of key: String, label: String?) -> String {
+        if let label { return ItemTypeInfo.Field.displayLabel(label) }
         let words = key.split { $0 == "_" || $0 == "-" || $0 == "." }.joined(separator: " ")
-        return LocalizedStringKey(ItemTypeInfo.Field.displayLabel(words))
+        return ItemTypeInfo.Field.displayLabel(words)
     }
 
     /// Every property the type does not name or show elsewhere, in the order the item holds them.
@@ -283,5 +336,54 @@ struct ItemInspector: View {
         var shown = InspectorFields.accountedFor(type: type, hidden: hiddenKeys)
         shown.formUnion(relationships.map(\.field))
         return item.properties.filter { !shown.contains($0.key) }
+    }
+}
+
+/// A fact about the item in Details: its name leading and its value trailing in the secondary color, or the value
+/// under the name where it will not fit beside it.
+private struct InspectorDetailRow: View {
+    let name: String
+    let value: String
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(verbatim: name)
+                Spacer(minLength: 0)
+                Text(verbatim: value).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: name)
+                Text(verbatim: value).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .interfaceFont(.callout)
+        .textSelection(.enabled)
+    }
+}
+
+/// An item that links to the one shown: a chip with its type's icon and title, and the day it last changed.
+private struct LinkedItemChip: View {
+    let link: LinkedItem
+    let onOpen: (ItemID) -> Void
+
+    var body: some View {
+        Button { onOpen(link.item) } label: {
+            HStack(spacing: 6) {
+                TypeIcon(name: link.icon)
+                Text(verbatim: link.title).lineLimit(1)
+                Spacer(minLength: 6)
+                Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1)
+                    .interfaceFont(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(InspectorChipStyle())
+        .foregroundStyle(.primary)
+        .help(link.title)
+        .accessibilityIdentifier("LinkedFrom.\(link.item.rawValue)")
     }
 }

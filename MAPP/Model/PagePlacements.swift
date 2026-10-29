@@ -39,6 +39,16 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         update(type) { $0.rows[row] = shown }
     }
 
+    /// Chooses whether the page shows a row. Linked From is either on the page or in the inspector, so showing it
+    /// moves it.
+    mutating func set(_ shown: Bool, row: String, of type: TypeID) {
+        if row == PagePlacement.linkedFrom {
+            setLinkedFrom(shown ? .page : .inspector, of: type)
+        } else {
+            setShown(shown, row: row, of: type)
+        }
+    }
+
     mutating func setLinkedFrom(_ place: LinkedFromPlace, of type: TypeID) {
         update(type) { $0.linkedFrom = place }
     }

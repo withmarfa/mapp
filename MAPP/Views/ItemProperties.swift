@@ -11,6 +11,12 @@ struct ItemPropertyRow: View {
     /// A row the person has just added opens ready to edit: a text field takes the keyboard and a date shows its
     /// picker. A menu cannot be opened from code, so it reads "Choose" instead.
     var startsEditing = false
+    /// The type's status field: its value is a chip with the status's ring.
+    var isStatus = false
+    /// Whether the page shows this property too, and what changes it; nil offers no choice.
+    var shownOnPage = true
+    var onShowOnPage: ((Bool) -> Void)?
+    @Environment(\.interfaceTextSize) private var textSize
     @State private var localDraft = ItemPropertyDraft()
     @State private var choosingDate = false
     /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
@@ -21,10 +27,21 @@ struct ItemPropertyRow: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        InspectorRow(name: LocalizedStringKey(definition.displayLabel)) {
+        InspectorRow(fieldLabel: definition.displayLabel, fit: fit) {
             VStack(alignment: .leading, spacing: 4) {
                 if isEditable {
                     control
+                } else if definition.kind == .boolean {
+                    checkbox
+                } else if shapesAsChip, let chipText {
+                    // A value that cannot be changed is still a chip, but not a control.
+                    HStack(spacing: 0) {
+                        chipLabel(chipText)
+                            .inspectorChip()
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("ItemProperty.\(definition.key)")
+                        Spacer(minLength: 0)
+                    }
                 } else if let readOnlyText {
                     // A value that cannot be changed reads as a Details row does, not as a dimmed control.
                     readOnlyText
@@ -57,6 +74,7 @@ struct ItemPropertyRow: View {
                 }
             }
         }
+        .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
         .onAppear { if !input.isDirty { seed(value) } }
         .task { if startsEditing { await beginEditing() } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
@@ -76,44 +94,88 @@ struct ItemPropertyRow: View {
         }
     }
 
+    /// A choice, a status and a date have a shape of their own, drawn as a chip.
+    private var shapesAsChip: Bool {
+        switch definition.kind {
+        case .choice, .date: true
+        case .text: definition.isPicked
+        default: false
+        }
+    }
+
+    /// The text of the value's chip, or nil where it has none.
+    private var chipText: Text? {
+        if definition.kind.isDate { return dateText.map { Text(verbatim: $0) } }
+        return value?.string.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }
+    }
+
+    private var statusMark: PageHeader.Mark { .init(status: value?.string) }
+
+    private var chipPlaceholder: LocalizedStringKey { definition.kind.isDate ? "None" : "Choose" }
+
+    /// The inside of a chip: the status's ring where the property is the status, then the value or what stands for
+    /// none.
+    private func chipLabel(_ text: Text?) -> some View {
+        HStack(spacing: 6) {
+            if isStatus { StatusMark(mark: statusMark, size: 10 * InterfaceStyle.scale(for: textSize)) }
+            if let text { text } else { InspectorPlaceholder(text: chipPlaceholder) }
+        }
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+
+    /// What the row measures to choose between a value beside the name and one under it.
+    private var fit: InspectorFit? {
+        if definition.kind == .boolean { return nil }
+        let chip = InspectorMetrics.chipPadding + (isStatus ? 16 : 0)
+        if shapesAsChip {
+            let text = definition.kind.isDate
+                ? dateText ?? String(localized: "None")
+                : value?.string.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Choose")
+            return InspectorFit(text: text, extra: chip)
+        }
+        guard let value else { return nil }
+        let text = ItemValueText.string(value)
+        // A value of several lines never sits beside its name.
+        return InspectorFit(text: text, extra: text.contains(where: \.isNewline) ? 10_000 : 0)
+    }
+
+    private var checkbox: some View {
+        let current: Bool = if case .bool(let selected) = value { selected } else { false }
+        return Toggle(isOn: Binding { current } set: { selected in
+            input.rejected = !onChange(.bool(selected))
+        }) {
+            Text(LocalizedStringKey(definition.displayLabel))
+        }
+        .labelsHidden()
+        .toggleStyle(.checkbox)
+        .disabled(!isEditable)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    }
+
     @ViewBuilder private var control: some View {
         switch definition.kind {
         case .choice:
             choiceMenu()
         case .boolean:
-            let current: Bool? = if case .bool(let selected) = value { selected } else { nil }
-            menu(current: current.map { Text($0 ? "Yes" : "No") }) {
-                Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
-                    current.map { $0 ? "true" : "false" } ?? ""
-                } set: { selected in
-                    input.rejected = !onChange(selected.isEmpty ? nil : .bool(selected == "true"))
-                }) {
-                    Text("Not Set").tag("")
-                    Text("Yes").tag("true")
-                    Text("No").tag("false")
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            }
+            checkbox
         case .date:
             // The value reads as a person writes a date, and changes only through the calendar, so what is stored
             // is always one of the forms Marfa takes.
-            Button { choosingDate = true } label: {
-                Group {
-                    if let text = dateText { Text(verbatim: text) } else { InspectorPlaceholder(text: "None") }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
+            HStack(spacing: 0) {
+                Button { choosingDate = true } label: { chipLabel(chipText) }
+                    .buttonStyle(InspectorChipStyle())
+                    .foregroundStyle(.primary)
+                    .focused($dateButtonFocused)
+                    .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
+                    .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+                    .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
+                    .accessibilityHint("Opens a calendar")
+                    .accessibilityIdentifier("ItemProperty.\(definition.key)")
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .focused($dateButtonFocused)
-            .inspectorValue(isFocused: dateButtonFocused || choosingDate)
-            .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
-            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
-            .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
-            .accessibilityHint("Opens a calendar")
-            .accessibilityIdentifier("ItemProperty.\(definition.key)")
         // Marfa only recommends these values, so any other text is as valid: the menu offers them, and Other… types one.
         case .text where definition.isPicked:
             if typingOwnValue {
@@ -137,11 +199,6 @@ struct ItemPropertyRow: View {
     /// The value as the control would show it: a choice by its label, a Boolean as Yes or No, anything else as written.
     private var readOnlyText: Text? {
         guard let value else { return nil }
-        if definition.kind == .boolean, case .bool(let flag) = value { return Text(flag ? "Yes" : "No") }
-        if definition.kind.isDate, let text = dateText { return Text(verbatim: text) }
-        if definition.isPicked, let option = value.string {
-            return Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: option)))
-        }
         return Text(ItemValueText.string(value))
     }
 
@@ -168,26 +225,23 @@ struct ItemPropertyRow: View {
         }
     }
 
-    /// A choice as plain text that opens a menu: no chevron and no fill until hovered. The button style with a plain
-    /// label, unlike the borderless one, adds no inset of its own, so the text starts where a text value does.
+    /// A choice as a chip that opens a menu.
     private func menu<Content: View>(current: Text?, @ViewBuilder content: () -> Content) -> some View {
-        Menu {
-            content()
-        } label: {
-            Group {
-                if let current { current } else { InspectorPlaceholder(text: "Choose") }
+        HStack(spacing: 0) {
+            Menu {
+                content()
+            } label: {
+                chipLabel(current)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(InspectorChipStyle())
+            .foregroundStyle(.primary)
+            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+            .accessibilityValue(current == nil ? Text("Not Set") : current!)
+            .accessibilityIdentifier("ItemProperty.\(definition.key)")
+            Spacer(minLength: 0)
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .foregroundStyle(.primary)
-        .inspectorValue()
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
-        .accessibilityValue(current == nil ? Text("Not Set") : current!)
-        .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
     /// A date as the person reads it; a value that is not one keeps its text, and the row warns about it.

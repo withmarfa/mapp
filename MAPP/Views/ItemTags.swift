@@ -49,21 +49,31 @@ struct TagEntryField: View {
             .onChange(of: text) { refusal = nil }
             .accessibilityIdentifier(identifier)
         if isInline {
-            field
-                .textFieldStyle(.plain)
-                .focusEffectDisabled()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
-                .overlay(alignment: .leading) {
-                    if text.isEmpty && !isFocused {
-                        InspectorPlaceholder(text: "Add Tag").allowsHitTesting(false).accessibilityHidden(true)
+            // The same quiet dashed row as every other place the inspector adds to.
+            HStack(spacing: 6) {
+                Image(systemName: "plus").foregroundStyle(.secondary).accessibilityHidden(true)
+                field
+                    .textFieldStyle(.plain)
+                    .focusEffectDisabled()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Drawn here and not as the field's prompt, whose colour differs from a menu's placeholder.
+                    .overlay(alignment: .leading) {
+                        if text.isEmpty && !isFocused {
+                            InspectorPlaceholder(text: "Add Tag").allowsHitTesting(false).accessibilityHidden(true)
+                        }
                     }
-                }
-                .inspectorValue(isFocused: isFocused)
-                .inspectorMinimumHeight()
+            }
+            .padding(.horizontal, InspectorMetrics.chipPadding / 2)
+            .padding(.vertical, 3)
+            .background(isFocused ? AnyShapeStyle(.quinary) : AnyShapeStyle(.clear), in: addShape)
+            .overlay { addShape.strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [3, 3])) }
         } else {
             field.textFieldStyle(.roundedBorder)
         }
+    }
+
+    private var addShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: InspectorMetrics.chipRadius, style: .continuous)
     }
 
     private func submit() {
@@ -208,9 +218,7 @@ private struct TagChip: View {
             }
         }
         .interfaceFont(.callout)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
-        .background(.quinary, in: .capsule)
+        .inspectorChip()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemTag.\(tag)")
     }
