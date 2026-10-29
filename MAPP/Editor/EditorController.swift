@@ -255,7 +255,7 @@ final class EditorController: NSObject {
             show(item, as: "load")
         }
         if noteID != nil, noteID != item.id {
-            flush { kept in if kept { present() } }
+            flush { kept in if kept { present() } else { interval.end() } }
         } else { present() }
     }
 

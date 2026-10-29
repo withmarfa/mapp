@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// The app's one place for logs and signposts. A `Logger` and an `OSSignposter` share each category, so
-/// `log stream` and Instruments (os_signpost, Points of Interest) show one story. Nothing here ever records a
+/// `log stream` and Instruments' os_signpost instrument show one story. Nothing here ever records a
 /// person's text, titles, property values or keys: kinds, durations and counts only, and ids only as counts.
 nonisolated enum Telemetry {
     nonisolated enum Category: String, CaseIterable, Sendable {

@@ -43,11 +43,12 @@ nonisolated final class LaunchTrace: Sendable {
     /// Records a milestone the first time it is reached; later ones are ignored. `note` is a kind, never a name.
     func mark(_ milestone: Milestone, note: String? = nil, at now: Date = .now) {
         let since = Self.processStart.map { Duration.seconds(now.timeIntervalSince($0)) } ?? .zero
-        let line: String? = state.withLock { state in
-            guard state.marks[milestone] == nil else { return nil }
+        let (first, line): (Bool, String?) = state.withLock { state in
+            guard state.marks[milestone] == nil else { return (false, nil) }
             state.marks[milestone] = (since, note)
-            return Self.completed(state) ? Self.line(&state) : nil
+            return (true, Self.completed(state) ? Self.line(&state) : nil)
         }
+        guard first else { return }
         milestone.signpost()
         if let line {
             Telemetry.logger(.launch).notice("\(line, privacy: .public)")
