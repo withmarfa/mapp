@@ -27,7 +27,7 @@ final class EditorController: NSObject {
     private(set) var isContentUnderToolbar = false
     /// Whether the item's title in the page has the keyboard rather than the note's text.
     private(set) var isEditingTitle = false
-    @ObservationIgnored private var header: PageHeader?
+    @ObservationIgnored private(set) var header: PageHeader?
     @ObservationIgnored private var headerIconSize: Int?
     /// The types' icons the page already has, so it is sent more only when a header needs one it lacks.
     @ObservationIgnored private var headerTypeIcons: Set<String?> = []
@@ -289,7 +289,7 @@ final class EditorController: NSObject {
             let needed = Set(((header?.contents ?? []) + (header?.linked ?? [])).map(\.icon)).union(header.map { [$0.icon.name] } ?? [])
             if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
                 let typeIcons = needed.union(size == headerIconSize ? headerTypeIcons : [])
-                if let icons = PageHeaderIcons(textSize: size, typeIcons: typeIcons) {
+                if let icons = Cost.measure(.headerIcons, { PageHeaderIcons(textSize: size, typeIcons: typeIcons) }) {
                     headerIconSize = size
                     headerTypeIcons = typeIcons
                     call("setHeaderIcons", json(icons))

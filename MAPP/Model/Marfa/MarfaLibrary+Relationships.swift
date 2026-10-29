@@ -124,9 +124,13 @@ extension MarfaLibrary {
     }
 
     func relationships(for id: ItemID) -> [ItemRelationship] {
+        Cost.measure(.relationships) { readRelationships(for: id) }
+    }
+
+    private func readRelationships(for id: ItemID) -> [ItemRelationship] {
         guard let item = item(id) else { return [] }
-        // Another item's edge can point here, so every item's change is watched.
-        _ = heldItems([])
+        // Another item's edge can point here; its title and state are followed through its own record.
+        _ = linksRevision
         var fields = ownFields(of: item.type)
         for edge in item.edgesOut where edge.origin != .body && !fields.contains(where: { $0.name == edge.type }) {
             if let end = fieldEnd(edge.type) { fields.append((edge.type, end)) }

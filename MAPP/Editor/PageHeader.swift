@@ -161,26 +161,51 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     @MainActor
     init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
-        guard let parent = Self.icon("square.stack", size: size, weight: .regular),
-              let plus = Self.icon("plus", size: size, weight: .regular),
-              let indicator = Self.icon("chevron.down", size: size * 0.7, weight: .bold)
+        if Self.drawn.textSize != textSize { Self.drawn = Drawn(textSize: textSize) }
+        guard let parent = Self.symbol("square.stack", size: size, weight: .regular),
+              let plus = Self.symbol("plus", size: size, weight: .regular),
+              let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold)
         else { return nil }
         self.parent = parent
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
         for name in PropertyRow.Value.symbols {
-            symbols[name] = Self.icon(name, size: size, weight: .regular)
+            symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         for name in typeIcons {
-            symbols[TypeIconKey.value(for: name)] = Self.typeIcon(name, size: size)
+            if Self.drawn.types[name] == nil { Self.drawn.types[name] = Self.typeIcon(name, size: size) }
+            symbols[TypeIconKey.value(for: name)] = Self.drawn.types[name]
         }
         self.symbols = symbols
     }
 
+    /// What has been drawn at the text size last asked for, so a window, an item or a type icon that appears later
+    /// draws only what is new. A different text size draws everything again.
+    private struct Drawn {
+        var textSize: Int?
+        /// By name, size and weight, since one symbol can be drawn two ways.
+        var symbols: [String: Icon] = [:]
+        var types: [String?: Icon] = [:]
+    }
+
+    @MainActor
+    private static func symbol(_ name: String, size: CGFloat, weight: NSFont.Weight) -> Icon? {
+        let key = "\(name)|\(size)|\(weight.rawValue)"
+        if drawn.symbols[key] == nil { drawn.symbols[key] = icon(name, size: size, weight: weight) }
+        return drawn.symbols[key]
+    }
+
+    @MainActor private static var drawn = Drawn()
+
     /// A type's icon as the page's mask: drawn black, since only its shape matters.
     @MainActor
     private static func typeIcon(_ name: String?, size: CGFloat) -> Icon? {
+        Cost.measure(.iconDraw) { drawTypeIcon(name, size: size) }
+    }
+
+    @MainActor
+    private static func drawTypeIcon(_ name: String?, size: CGFloat) -> Icon? {
         let renderer = ImageRenderer(content: TypeIcon(name: name).font(.system(size: size)).foregroundStyle(.black))
         // Three times its size, as the symbols are.
         renderer.scale = 3
@@ -193,6 +218,11 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
 
     @MainActor
     private static func icon(_ name: String, size: CGFloat, weight: NSFont.Weight) -> Icon? {
+        Cost.measure(.iconDraw) { drawSymbol(name, size: size, weight: weight) }
+    }
+
+    @MainActor
+    private static func drawSymbol(_ name: String, size: CGFloat, weight: NSFont.Weight) -> Icon? {
         let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: weight, scale: .medium)
         guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
         else { return nil }

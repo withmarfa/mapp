@@ -16,6 +16,16 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case tableGroups
     case boardFields
     case timelineFields
+    /// One build of the item page's header, from the library and the window's drafts.
+    case pageHeader
+    /// One `ItemLibrary.relationships(for:)` read.
+    case relationships
+    /// One `LinkedItem.list`, found and sorted.
+    case linkedItems
+    /// Drawing the symbols and type icons the page's header uses, as pictures.
+    case headerIcons
+    /// Drawing one symbol or type icon as a picture.
+    case iconDraw
 
     private static let signposter = OSSignposter(subsystem: Bundle.main.bundleIdentifier ?? "MAPP", category: "performance")
 

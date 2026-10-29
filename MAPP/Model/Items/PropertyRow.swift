@@ -189,6 +189,15 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
         pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date,
         members: Members = .all, item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
     ) -> [LinkedItem] {
+        Cost.measure(.linkedItems) {
+            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, members: members, item: item, calendar: calendar, locale: locale)
+        }
+    }
+
+    private static func find(
+        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date,
+        members: Members, item: (ItemID) -> Item?, calendar: Calendar, locale: Locale
+    ) -> [LinkedItem] {
         var seen: Set<ItemID> = [id]
         var found: [Item] = []
         for relationship in relationships where relationship.field.hasPrefix("inverse:") && members.admits(relationship.field) {

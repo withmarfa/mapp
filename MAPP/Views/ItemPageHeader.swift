@@ -35,12 +35,12 @@ struct ItemPageHeader: ViewModifier {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     // A refused status belongs to the visit, as the page showed it before.
                     drafts.draft(for: old, key: "status").rejected = false
-                    if let parent = Self.parent(of: old, in: library) { drafts.draft(for: old, key: parent.field).rejected = false }
+                    drafts.draft(for: old, key: Self.parentField).rejected = false
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
                 let library = library, drafts = drafts
-                editor.showHeader { Self.header(of: id, in: library, drafts: drafts) }
+                editor.showHeader { Cost.measure(.pageHeader) { Self.header(of: id, in: library, drafts: drafts) } }
             }
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
@@ -51,8 +51,8 @@ struct ItemPageHeader: ViewModifier {
         guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
         let status = library.catalogue.itemTypes[item.type]?.statusField
-        let parent = Self.parent(of: item.id, in: library)
         let relationships = library.relationships(for: item.id)
+        let parent = Self.parent(in: relationships)
         let type = library.catalogue.itemTypes[item.type]
         let now = library.now()
         let kind = PageHeaderKind.of(item.type, in: library.catalogue)
@@ -60,7 +60,7 @@ struct ItemPageHeader: ViewModifier {
             for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now)
         let properties = lead.refine(PropertyRow.rows(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
-            parentField: "child-of", tags: library.tags(of: item)))
+            parentField: Self.parentField, tags: library.tags(of: item)))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(
@@ -199,8 +199,15 @@ struct ItemPageHeader: ViewModifier {
     }
 
     private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {
-        library.relationships(for: id).first { $0.field == "child-of" }
+        parent(in: library.relationships(for: id))
     }
+
+    private static func parent(in relationships: [ItemRelationship]) -> ItemRelationship? {
+        relationships.first { $0.field == parentField }
+    }
+
+    /// The relationship the parent pin shows.
+    private static let parentField = "child-of"
 
     /// A catalogue's words, looked up in the String Catalog as SwiftUI's text would look them up.
     static func localized(_ key: String) -> String {
