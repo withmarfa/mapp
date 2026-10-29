@@ -705,9 +705,6 @@
     "Show All" : {
       "extractionState" : "manual"
     },
-    "Connecting to the server." : {
-      "extractionState" : "manual"
-    },
     "Edit" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
@@ -2567,8 +2564,51 @@
     "Instance Menu" : {
       "extractionState" : "manual"
     },
-    "Opens the Console, Settings and Recently Deleted" : {
-      "extractionState" : "manual"
+    "Opens Refresh, the Console, Settings and Recently Deleted" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Couldn’t sync" : {
+
+    },
+    "Syncing…" : {
+
+    },
+    "Updated just now" : {
+
+    },
+    "Updated %@" : {
+
+    },
+    "Offline, updated just now" : {
+
+    },
+    "Offline, updated %@" : {
+
+    },
+    "%lld changes waiting to send" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change waiting to send"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes waiting to send"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "Default Column Widths" : {
       "extractionState" : "manual"

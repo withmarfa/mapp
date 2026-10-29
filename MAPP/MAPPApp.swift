@@ -52,7 +52,7 @@ struct MAPPApp: App {
         }
         .defaultSize(width: 1100, height: 720)
         .commands {
-            AppCommands(library: libraries.current)
+            AppCommands(library: libraries.current, host: libraries.host)
             PlaceCommands(library: libraries.current)
             FindCommands()
             FormatCommands()
