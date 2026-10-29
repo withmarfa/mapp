@@ -14,22 +14,31 @@ extension MarfaEngine {
     /// Reads the catalogue, every row in every state, their edges and the queue, and publishes what differs. A
     /// copy that cannot be read keeps showing what it last held, and says why.
     func reload() async {
+        let reloading = Telemetry.begin(.engine, "reload")
+        defer { reloading.end(("rows", self.rows.count), ("edges", self.edges.all.count), ("bodyLinks", self.bodyLinks.count)) }
         let rows: [String: Marfa.Item]
         let edges: [Marfa.Edge]
         let catalogue: Catalogue
         let whole: Bool
         do {
             (catalogue, rows, edges, whole) = try await Self.asking(hub) {
+                let cataloguing = Telemetry.begin(.engine, "reload.catalogue")
                 let catalogue = try await MarfaMapping.catalogue(
                     itemTypes: copy.catalog.itemTypes(), edgeTypes: copy.catalog.edgeTypes())
+                cataloguing.end(("itemTypes", catalogue.itemTypes.count), ("edgeTypes", catalogue.edgeTypes.count))
                 var rows: [String: Marfa.Item] = [:]
                 var edges: [Marfa.Edge] = []
+                let listing = Telemetry.begin(.engine, "reload.rows")
                 let listed = try await reading.items()
                 for row in listed where MarfaMapping.isLibraryItem(row) { rows[row.id] = row }
+                listing.end(("rows", rows.count))
+                let statusing = Telemetry.begin(.engine, "reload.status")
                 let status = try await reading.status()
+                statusing.end()
                 let fill = LibraryFill(status, completeness: listed.completeness)
                 hub.report.update { $0.fill = fill }
                 var whole = fill.state == .complete
+                let edging = Telemetry.begin(.engine, "reload.edges")
                 do {
                     edges = try await reading.edges(ofTypes: Array(catalogue.edgeTypes.keys))
                 } catch MarfaError.hydrationIncomplete {
@@ -37,6 +46,7 @@ extension MarfaEngine {
                     edges = self.edges.all
                     whole = false
                 }
+                edging.end(("edges", edges.count))
                 return (catalogue, rows, edges, whole)
             }
         } catch {
@@ -54,11 +64,25 @@ extension MarfaEngine {
         binned = binned.filter { rows[$0.key] == nil }
         for row in departed { await left(row) }
         bodyLinks = [:]
-        for row in rows.values where Self.mayName(row, catalogue: catalogue) { await readLinks(of: row) }
+        let linking = Telemetry.begin(.engine, "reload.links")
+        var linkReads = 0
+        for row in rows.values where Self.mayName(row, catalogue: catalogue) {
+            linkReads += 1
+            await readLinks(of: row)
+        }
+        linking.end(("read", linkReads), ("kept", bodyLinks.count))
+        let conflicts = Telemetry.begin(.engine, "reload.conflicts")
         await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
+        conflicts.end()
+        let queueing = Telemetry.begin(.engine, "reload.queue")
         await readQueue()
+        queueing.end()
+        let viewing = Telemetry.begin(.engine, "reload.views")
         await readViews()
+        viewing.end()
+        let publishing = Telemetry.begin(.engine, "reload.publish")
         publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
+        publishing.end()
         // Held undos are judged on what this read found, so they wait until it found the copy whole.
         if whole { await releaseHeld() }
     }
@@ -138,6 +162,8 @@ extension MarfaEngine {
     /// after putting it back.
     func reread(_ ids: Set<String>) async {
         var affected = Set(ids)
+        let interval = Telemetry.begin(.engine, "reread", ("ids", ids.count))
+        defer { interval.end(("ids", ids.count), ("affected", affected.count)) }
         var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
             for id in ids {

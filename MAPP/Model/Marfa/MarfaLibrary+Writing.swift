@@ -61,6 +61,8 @@ extension MarfaLibrary {
         await source.queueSubmitted()
     }
 
+    var engineActivity: EngineActivity? { source.engineActivity }
+
     func wasRefused(creating id: ItemID) -> Bool {
         refusedCreations.contains(id)
     }

@@ -3,8 +3,8 @@ import os
 import Synchronization
 
 /// The work that runs when a person moves around the window: each is a signpost interval, so Instruments shows
-/// it under the app's `performance` category, and a debug build also tallies how often it ran and for how long,
-/// which `NavigationCostTests` reads.
+/// it under the app's `navigation` category (`Telemetry`), and a debug build also tallies how often it ran and for
+/// how long, which `NavigationCostTests` reads.
 nonisolated enum Cost: String, CaseIterable, Sendable {
     /// `Browser.items(in:)`, the place's items or the search's.
     case items
@@ -27,7 +27,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     /// Drawing one symbol or type icon as a picture.
     case iconDraw
 
-    private static let signposter = OSSignposter(subsystem: Bundle.main.bundleIdentifier ?? "MAPP", category: "performance")
+    private static let signposter = Telemetry.signposter(.navigation)
 
     @discardableResult
     static func measure<Result>(_ cost: Cost, _ work: () -> Result) -> Result {

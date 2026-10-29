@@ -218,89 +218,103 @@ actor MarfaEngine {
     }
 
     func run(_ events: AsyncStream<Event>) async {
-        for await event in events {
-            if closed {
-                if case .write(_, let id) = event {
-                    hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
-                }
-                if case .undo(_, let id, _) = event {
-                    hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
-                }
-                if case .flush(let done) = event { done.resume() }
-                if case .queued(let done) = event { done.resume() }
-                if case .fillProgress(let done) = event { done.resume() }
-                if case .close(let done) = event { done.resume() }
-                if case .drained(_, let taken) = event { taken.resume() }
-                if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
-                if case .release(_, let done) = event { done.resume(returning: .success(false)) }
-                if case .unsent(let done) = event { done.resume(returning: nil) }
-                if case .closeAgreeing(_, let done) = event { done.resume(returning: .closed) }
-                if case .attach(_, _, let done) = event {
-                    done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
-                }
-                if case .addFile(_, _, _, _, let done) = event {
-                    done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
-                }
-                continue
-            }
-            switch event {
-            case .paint: await paint()
-            case .fillProgress(let done):
-                if let status = try? await reading.status() {
-                    let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
-                                            status.hydration == .complete ? .complete : .partial)
-                    if hub.report.value.fill != fill {
-                        await reload()
-                    }
-                }
-                done.resume()
-            case .resumed:
-                await reload()
-                // The follow of the server is new with the stream, so the copy is brought up to date, which also
-                // sets the library right again after a fault.
-                await sync.refresh()
-            case .write(let write, let id): await perform(write, as: id)
-            case .undo(let write, let id, let group): await perform(write, as: id, holding: group)
-            case .holdExpired(let group): expire(group)
-            case .change(let change): await handle(change)
-            case .binned(let found, let complete): take(bin: found, complete: complete)
-            case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
-            case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
-            case .addFile(let file, let title, let tier, let parent, let done):
-                done.resume(returning: await addFile(file, title: title, tier: tier, under: parent))
-            case .drained(let report, let taken):
-                await answer(report)
-                taken.resume()
-            case .failed(let failure):
-                failures.append(failure)
-                publish([])
-            case .flush(let done):
-                Task { [sync] in
-                    await sync.flush()
-                    done.resume()
-                }
-            case .queued(let done): done.resume()
-            case .discard(let id, let done): done.resume(returning: await discard(id))
-            case .release(let id, let done): done.resume(returning: await release(id))
-            case .unsent(let done):
-                done.resume(returning: await unsentWrites())
-            case .closeAgreeing(let agreed, let done):
-                let unsent = await unsentWrites()
-                let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
-                if covered {
-                    await shutDown()
-                    done.resume(returning: .closed)
-                } else {
-                    done.resume(returning: .waiting(unsent))
-                }
-            case .close(let done):
-                await shutDown()
-                done.resume()
-            }
-        }
+        for await event in events { await process(event) }
         // Finished only once the events that came after the close are answered, so a write made too late is told
         // to its library rather than dropped unseen.
         hub.finish()
+    }
+
+    /// One event, timed and recorded on the hub as the step the engine is in, which anyone can read without
+    /// awaiting this actor (`EngineActivity`).
+    private func process(_ event: Event) async {
+        let kind = event.kind
+        hub.activity.begin(kind)
+        let interval = Telemetry.begin(.engine, kind)
+        await apply(event)
+        let elapsed = interval.end()
+        hub.activity.end()
+        Self.reportIfSlow(kind, elapsed)
+    }
+
+    private func apply(_ event: Event) async {
+        if closed {
+            if case .write(_, let id) = event {
+                hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
+            }
+            if case .undo(_, let id, _) = event {
+                hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
+            }
+            if case .flush(let done) = event { done.resume() }
+            if case .queued(let done) = event { done.resume() }
+            if case .fillProgress(let done) = event { done.resume() }
+            if case .close(let done) = event { done.resume() }
+            if case .drained(_, let taken) = event { taken.resume() }
+            if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
+            if case .release(_, let done) = event { done.resume(returning: .success(false)) }
+            if case .unsent(let done) = event { done.resume(returning: nil) }
+            if case .closeAgreeing(_, let done) = event { done.resume(returning: .closed) }
+            if case .attach(_, _, let done) = event {
+                done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
+            }
+            if case .addFile(_, _, _, _, let done) = event {
+                done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
+            }
+            return
+        }
+        switch event {
+        case .paint: await paint()
+        case .fillProgress(let done):
+            if let status = try? await reading.status() {
+                let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
+                                        status.hydration == .complete ? .complete : .partial)
+                if hub.report.value.fill != fill {
+                    await reload()
+                }
+            }
+            done.resume()
+        case .resumed:
+            await reload()
+            // The follow of the server is new with the stream, so the copy is brought up to date, which also
+            // sets the library right again after a fault.
+            await sync.refresh()
+        case .write(let write, let id): await perform(write, as: id)
+        case .undo(let write, let id, let group): await perform(write, as: id, holding: group)
+        case .holdExpired(let group): expire(group)
+        case .change(let change): await handle(change)
+        case .binned(let found, let complete): take(bin: found, complete: complete)
+        case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
+        case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
+        case .addFile(let file, let title, let tier, let parent, let done):
+            done.resume(returning: await addFile(file, title: title, tier: tier, under: parent))
+        case .drained(let report, let taken):
+            await answer(report)
+            taken.resume()
+        case .failed(let failure):
+            failures.append(failure)
+            publish([])
+        case .flush(let done):
+            Task { [sync] in
+                await sync.flush()
+                done.resume()
+            }
+        case .queued(let done): done.resume()
+        case .discard(let id, let done): done.resume(returning: await discard(id))
+        case .release(let id, let done): done.resume(returning: await release(id))
+        case .unsent(let done):
+            done.resume(returning: await unsentWrites())
+        case .closeAgreeing(let agreed, let done):
+            let unsent = await unsentWrites()
+            let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
+            if covered {
+                await shutDown()
+                done.resume(returning: .closed)
+            } else {
+                done.resume(returning: .waiting(unsent))
+            }
+        case .close(let done):
+            await shutDown()
+            done.resume()
+        }
     }
 
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
