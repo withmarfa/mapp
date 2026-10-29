@@ -148,7 +148,10 @@ private struct SidebarActionRow: View {
 
     var body: some View {
         Button(action: action) {
-            SidebarLabel(title: title, icon: .symbol(symbol)).contentShape(.rect)
+            // The label is only as wide as its words; the frame gives the click the whole row.
+            SidebarLabel(title: title, icon: .symbol(symbol))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .selectionDisabled()
