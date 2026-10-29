@@ -199,7 +199,7 @@ struct MainView: View {
         workspace
         .safeAreaBar(edge: .bottom, spacing: 0) {
             if !browser.showsSettings, browser.item == .recentlyDeleted {
-                RecentlyDeletedActions(browser: browser)
+                RecentlyDeletedActions(chosen: browser.selectedItems(in: library))
             }
         }
         .focusedSceneValue(\.detailsPresentation, details)

@@ -1,15 +1,10 @@
 import SwiftUI
 
 /// The Library page of Settings, as plain grouped rows: the server in use and how it stands, each change that needs
-/// the person, the key and the other server, the downloaded files, then the server's web console and Recently
-/// Deleted.
+/// the person, the key and the other server, the downloaded files.
 struct LibrarySettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
-    @Environment(\.openURL) private var openURL
-    @StoredOrder private var order
-    let browser: Browser
-
     private var host: MarfaHost { libraries.host }
 
     var body: some View {
@@ -31,7 +26,6 @@ struct LibrarySettings: View {
                 LibraryDownloads(files: files)
                     .id(ObjectIdentifier(library))
             }
-            places
         }
         .settingsForm()
         .accessibilityIdentifier("LibrarySettings")
@@ -46,30 +40,6 @@ struct LibrarySettings: View {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
         } message: {
             Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes.")
-        }
-    }
-}
-
-extension LibrarySettings {
-    /// What the library holds beyond the window: the server's own console in the browser, and the items deleted
-    /// from it.
-    @ViewBuilder private var places: some View {
-        let address = host.connection?.address
-        if address != nil || library != nil {
-            Section {
-                if let address {
-                    LabeledContent("Console") {
-                        Button("Open in Browser") { openURL(address) }
-                            .accessibilityIdentifier("LibraryOpenConsole")
-                    }
-                }
-                if let library {
-                    LabeledContent("Recently deleted") {
-                        Button("Show") { browser.show(.recentlyDeleted, in: library, order: order) }
-                            .accessibilityIdentifier("LibraryShowRecentlyDeleted")
-                    }
-                }
-            }
         }
     }
 }

@@ -5,6 +5,8 @@ import SwiftUI
 /// space rather than by headings.
 struct SettingsPageList: View {
     let browser: Browser
+    @Environment(Libraries.self) private var libraries
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         List(selection: Binding<SettingsPage?> {
@@ -29,6 +31,7 @@ struct SettingsPageList: View {
                         .tag(page)
                         .listRowSeparator(.hidden)
                         .accessibilityIdentifier("SettingsPage-\(page.rawValue)")
+                    if page == .recentlyDeleted { consoleRow }
                 }
             }
         }
@@ -36,6 +39,29 @@ struct SettingsPageList: View {
         .scrollContentBackground(.hidden)
         .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsPageList")
+    }
+}
+
+extension SettingsPageList {
+    /// Not a page: it opens the server's console in the browser, which the arrow says. It stays out of the selection.
+    private var consoleRow: some View {
+        let address = libraries.host.connection?.address
+        return Button { if let address { openURL(address) } } label: {
+            HStack {
+                Text("Console").interfaceFont(.body)
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right").imageScale(.small).foregroundStyle(.secondary).accessibilityHidden(true)
+            }
+            .frame(minHeight: 30)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(address == nil)
+        .selectionDisabled()
+        .listRowSeparator(.hidden)
+        .help("Open the server\u{2019}s console in the browser")
+        .accessibilityHint(Text("Opens in the browser"))
+        .accessibilityIdentifier("SettingsConsole")
     }
 }
 

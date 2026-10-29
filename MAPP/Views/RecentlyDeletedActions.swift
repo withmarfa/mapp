@@ -3,11 +3,10 @@ import SwiftUI
 struct RecentlyDeletedActions: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    let browser: Browser
+    /// The items chosen; any that are not in Recently Deleted are left out.
+    let chosen: [Item]
 
-    private var selection: Set<ItemID> {
-        Set(browser.selectedItems(in: library).filter { $0.state == .trashed }.map(\.id))
-    }
+    private var selection: Set<ItemID> { Set(chosen.filter { $0.state == .trashed }.map(\.id)) }
 
     var body: some View {
         HStack(spacing: 12) {

@@ -6,7 +6,7 @@ final class SidebarNavigationTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var instanceName: XCUIElement { element("SidebarSettingsMenu") }
+    private var instanceName: XCUIElement { element("SidebarSettings") }
     private var settingsPages: XCUIElement { element("SettingsPageList") }
 
     override func setUp() async throws {
@@ -30,13 +30,13 @@ final class SidebarNavigationTests: XCTestCase {
             XCTAssertFalse(sidebarText(title).exists, "\(title) is not in the sidebar")
         }
         XCTAssertTrue(instanceName.exists)
-        XCTAssertTrue(element("SidebarSettingsMenu").exists, "the foot holds the settings menu")
+        XCTAssertTrue(element("SidebarSettings").exists, "the foot holds the settings cog")
         XCTAssertFalse(element("NewItemToolbar").exists, "the foot has no New Item button")
         XCTAssertTrue(element("SidebarNew").exists, "New is a row of the top block")
         XCTAssertTrue(element("SidebarSearch").exists, "Search is a row of the top block")
         XCTAssertFalse(sidebarText("Browse").exists, "the top block has no heading")
-        XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is in the instance menu")
-        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in the instance menu")
+        XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is the foot's cog")
+        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is a Settings page")
         for title in ["Sources", "Collections"] {
             let row = sidebar.outlineRows.containing(NSPredicate(format: "label == %@ OR value == %@", title, title)).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -85,18 +85,16 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.exists, "Items opens in the gallery, which spans the window")
     }
 
-    func testTheInstanceMenuListsConsoleSettingsAndRecentlyDeleted() {
+    func testTheCogOpensSettingsWithNoMenu() {
         instanceName.click()
-        for title in ["Console", "Settings", "Recently Deleted"] {
-            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the instance menu")
-        }
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(window.menuItems["Recently Deleted"].firstMatch.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
+        XCTAssertFalse(window.menuItems["Settings"].firstMatch.exists, "the cog opens Settings directly")
+        XCTAssertTrue(element("SettingsPage-recentlyDeleted").exists)
+        XCTAssertTrue(element("SettingsConsole").exists)
     }
 
-    func testTheInstanceMenuOpensSettingsInTheWindowAndAPlaceLeavesIt() {
+    func testTheCogOpensSettingsInTheWindowAndAPlaceLeavesIt() {
         instanceName.click()
-        window.menuItems["Settings"].firstMatch.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(list.exists, "the pages take the list's column")
         XCTAssertTrue(sidebar.exists, "the sidebar stays")
