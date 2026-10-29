@@ -257,7 +257,7 @@ struct ItemPropertyRow: View {
     }
 
     private func focus() async {
-        // A link's field is in the tree one turn after the row asks for it.
+        // The field for a link, or for a value of the person's own, is in the tree one turn after the row asks for it.
         await Task.yield()
         isFocused = true
     }
