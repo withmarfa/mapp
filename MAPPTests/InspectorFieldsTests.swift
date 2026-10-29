@@ -194,12 +194,9 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.relationships(groups).map(\.field) == ["child-of"], "incoming links are Linked From's, once")
     }
 
-    @Test func aYesNoPropertyThatWasNeverSetIsNotNo() {
-        #expect(InspectorFields.yesNo(.bool(true)) == .yes)
-        #expect(InspectorFields.yesNo(.bool(false)) == .no)
-        #expect(InspectorFields.yesNo(nil) == .unset, "cleared")
-        #expect(InspectorFields.yesNo(.null) == .unset)
-        #expect(InspectorFields.yesNo(.string("yes")) == .unset, "text is not a yes")
+    @Test func onlyATrueValueReadsAsChecked() {
+        #expect(InspectorFields.isYes(.bool(true)))
+        for value: PropertyValue? in [.bool(false), nil, .null, .string("yes")] { #expect(!InspectorFields.isYes(value)) }
     }
 
     @Test func aUrlOrEmailValueIsALinkOnlyToAWebOrMailAddress() {

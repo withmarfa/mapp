@@ -91,7 +91,9 @@ struct NoteWindow: View {
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.
-        .onDisappear {
+        .onDisappear { [library] in
+            // What was typed in the inspector goes to the library it was typed for, or back to the person.
+            details.handOffProperties(in: library, undoManager: nil)
             // A window that never showed a note made no editor.
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()

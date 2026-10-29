@@ -1,9 +1,10 @@
 import MarfaIcons
 import SwiftUI
 
-/// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a chip with the
-/// item's type icon, which opens it, and a quiet row to add another where the relationship takes several. An
-/// editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the context menu.
+/// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a light row with
+/// the item's type icon, which opens it, and a small plus at the end of its name where the relationship takes
+/// several. An editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the
+/// context menu.
 struct ItemRelationshipGroup: View {
     let relationship: ItemRelationship
     /// The icon of the type of the item a target points at.
@@ -18,27 +19,34 @@ struct ItemRelationshipGroup: View {
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
     @State private var rejected = false
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
+                Spacer(minLength: 0)
+                if relationship.isEditable && relationship.allowsMultiple {
+                    InspectorPlusButton(
+                        accessibilityLabel: "Add to \(ItemTypeInfo.Field.displayLabel(relationship.label))",
+                        identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
+                }
+            }
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
             ForEach(links.shown) { target in
-                ItemTargetChip(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
+                ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
                     rejected = !onRemove(id)
                 }
             }
             if links.hidden > 0 {
                 ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
             }
-            if relationship.isEditable && relationship.allowsMultiple {
-                InspectorAddRow(title: "Add", identifier: "RelationshipAddRow.\(relationship.field)", action: onEdit)
-            }
             if rejected {
                 Text("The connection could not be removed.")
                     .interfaceFont(.caption).foregroundStyle(.red)
             }
         }
+        .onHover { hovering = $0 }
         .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
     }
 }
@@ -57,9 +65,9 @@ struct InspectorSubheading: View {
     }
 }
 
-/// One item a relationship reaches, as a chip across the width: the type's icon and the title, which opens the
-/// item. Where a relationship can be changed, the chip shows a menu while the pointer is over it.
-struct ItemTargetChip: View {
+/// One item a relationship reaches, as a row across the width: the type's icon and the title, which opens the item.
+/// Where a relationship can be changed, the row shows a menu while the pointer is over it.
+struct ItemTargetRow: View {
     let target: ItemRelationshipTarget
     let relationship: ItemRelationship
     var typeIcon: (ItemID) -> String? = { _ in nil }
@@ -69,7 +77,7 @@ struct ItemTargetChip: View {
     @State private var hovering = false
 
     var body: some View {
-        ItemChip(target: target, typeIcon: typeIcon, onOpen: onOpen, trailingInset: relationship.isEditable && hovering ? 22 : 0)
+        InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen, trailingInset: relationship.isEditable && hovering ? 22 : 0)
             .overlay(alignment: .trailing) {
                 if relationship.isEditable && hovering {
                     actions.padding(.trailing, 6)
@@ -113,59 +121,64 @@ struct ItemShowMoreButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button("Show \(count) More", action: action)
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .inspectorMinimumHeight()
-            .inspectorValue()
-            .accessibilityIdentifier(identifier)
+        Button(action: action) {
+            Text("Show \(count) More")
+                .interfaceFont(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(InspectorRowButtonStyle())
+        .accessibilityIdentifier(identifier)
     }
 }
 
-/// An item as a chip across the width, with its type's icon. A link to an item the library does not hold, or that
-/// cannot be opened, says why instead.
-struct ItemChip: View {
+/// An item as a light row across the width, with its type's icon. A link to an item the library does not hold, or
+/// that cannot be opened, says why instead.
+struct InspectorItemRow: View {
     let target: ItemRelationshipTarget
     var typeIcon: (ItemID) -> String? = { _ in nil }
     let onOpen: (ItemID) -> Void
-    /// Room kept at the end of the chip for a control laid over it.
+    /// Room kept at the end of the row for a control laid over it.
     var trailingInset: CGFloat = 0
 
     var body: some View {
-        if let id = target.itemID, target.isOpenable {
-            Button { onOpen(id) } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    TypeIcon(name: typeIcon(id))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(target.title)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                        if target.isDeleted {
-                            Label("Deleted", systemImage: "trash")
-                                .interfaceFont(.caption).foregroundStyle(.secondary)
+        Group {
+            if let id = target.itemID, target.isOpenable {
+                Button { onOpen(id) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        TypeIcon(name: typeIcon(id))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(target.title)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            if target.isDeleted {
+                                Label("Deleted", systemImage: "trash")
+                                    .interfaceFont(.caption).foregroundStyle(.secondary)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .padding(.trailing, trailingInset)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.trailing, trailingInset)
+                .buttonStyle(InspectorRowButtonStyle())
+                .foregroundStyle(.primary)
+                .help(target.title)
+                .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    // A link to an item the library does not hold has no title to show.
+                    if !target.title.isEmpty {
+                        Text(target.title).lineLimit(2)
+                    }
+                    Label(resolutionLabel, systemImage: "exclamationmark.triangle")
+                        .interfaceFont(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(InspectorChipStyle())
-            .foregroundStyle(.primary)
-            .help(target.title)
-            .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
-        } else {
-            VStack(alignment: .leading, spacing: 2) {
-                // A link to an item the library does not hold has no title to show.
-                if !target.title.isEmpty {
-                    Text(target.title).lineLimit(2)
-                }
-                Label(resolutionLabel, systemImage: "exclamationmark.triangle")
-                    .interfaceFont(.caption).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .inspectorChip()
         }
+        .interfaceFont(.callout)
     }
 
     private var resolutionLabel: String {
@@ -181,25 +194,18 @@ struct ItemChip: View {
 
 /// The last control of the Relationships section: the relationships the item can still take, each opening the
 /// chooser. It offers one only when it is empty or takes several, since a single one that is set is changed from
-/// its own chip.
+/// its own row.
 struct ItemAddRelationshipButton: View {
     let options: [ItemRelationship]
     let onEdit: (ItemRelationship) -> Void
 
     var body: some View {
-        Menu {
+        InspectorAddMenu(title: "Add Relationship", identifier: "RelationshipAddMenu") {
             ForEach(options) { option in
                 Button(ItemTypeInfo.Field.displayLabel(option.label)) { onEdit(option) }
                     .accessibilityIdentifier("RelationshipAdd.\(option.field)")
             }
-        } label: {
-            Label("Add Relationship", systemImage: "plus")
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
-        .accessibilityIdentifier("RelationshipAddMenu")
     }
 }
 

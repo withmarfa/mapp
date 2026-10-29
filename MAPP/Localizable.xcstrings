@@ -4,6 +4,51 @@
     "A collection’s contents always stay on its page." : {
       "extractionState" : "manual"
     },
+    "Keep My Edit" : {
+      "extractionState" : "manual"
+    },
+    "This item can no longer be edited. Your change wasn’t saved." : {
+      "extractionState" : "manual"
+    },
+    "The value could not be saved." : {
+      "extractionState" : "manual"
+    },
+    "Property Not Saved" : {
+      "extractionState" : "manual"
+    },
+    "The item can no longer be edited." : {
+      "extractionState" : "manual"
+    },
+    "The value changed while you were editing it." : {
+      "extractionState" : "manual"
+    },
+    "The value isn’t a number." : {
+      "extractionState" : "manual"
+    },
+    "Use Current Value" : {
+      "extractionState" : "manual"
+    },
+    "Add to %@" : {
+      "extractionState" : "manual"
+    },
+    "Collapses the section" : {
+      "extractionState" : "manual"
+    },
+    "Expands the section" : {
+      "extractionState" : "manual"
+    },
+    "Writes to this address" : {
+      "extractionState" : "manual"
+    },
+    "Opens this address" : {
+      "extractionState" : "manual"
+    },
+    "Opens a calendar" : {
+      "extractionState" : "manual"
+    },
+    "This value changed while you were editing. Your edit hasn’t been saved." : {
+      "extractionState" : "manual"
+    },
     "Add Relationship" : {
       "extractionState" : "manual"
     },
@@ -31,16 +76,10 @@
     "In the Inspector" : {
       "extractionState" : "manual"
     },
-    "Open This Address" : {
-      "extractionState" : "manual"
-    },
     "On the Page" : {
       "extractionState" : "manual"
     },
     "Show on Page" : {
-      "extractionState" : "manual"
-    },
-    "Write to This Address" : {
       "extractionState" : "manual"
     },
     "Use Defaults" : {
