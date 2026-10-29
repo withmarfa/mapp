@@ -25,10 +25,10 @@ struct PageCustomizationTests {
             modified: .distantPast)
     }
 
-    @Test func anEventsPageDrawsItsOwnTimeAndStatus() {
+    @Test func anEventsPageDrawsItsOwnTimeButListsItsStatusAmongTheRows() {
         let event = Self.item("core.event", ["starts_at": .string("2026-10-30T10:00:00Z")])
         let type = Self.catalogue.itemTypes[event.type]
-        #expect(PageCustomization.fields(of: event, type: type, hidden: ["title"], catalogue: Self.catalogue).map(\.key) == ["location"])
+        #expect(PageCustomization.fields(of: event, type: type, hidden: ["title"], catalogue: Self.catalogue).map(\.key) == ["location", "status"])
     }
 
     @Test func anEventThePageCannotPlaceKeepsItsFieldsToChoose() {
