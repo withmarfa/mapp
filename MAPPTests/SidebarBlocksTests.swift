@@ -1,18 +1,10 @@
-#if DEBUG
 import Foundation
 import Testing
 
 @testable import MAPP
 
 @MainActor
-struct SidebarExperimentTests {
-    // MARK: Switch
-
-    @Test func theSwitchStartsOnTheCurrentSidebar() {
-        #expect(SidebarStyle.knob.initial == .option("current"))
-        #expect(SidebarStyle.allCases.map(\.rawValue) == ["current", "experiment"])
-    }
-
+struct SidebarBlocksTests {
     // MARK: Blocks
 
     private func library() -> FakeItemLibrary {
@@ -25,10 +17,10 @@ struct SidebarExperimentTests {
     private let viewTwo = ItemID("view-2")
 
     @Test func everyBlockShowsByDefault() {
-        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: SidebarLayout()))
-        #expect(blocks.top == [.all, .sources, .collections])
-        #expect(blocks.builtInViews == [.inbox, .recents, .favorites])
-        #expect(blocks.savedViews.map(\.id) == [viewOne, viewTwo])
+        let blocks = SidebarPlan(library(), layout: SidebarLayout())
+        #expect(blocks.shownDestinations == [.all, .sources, .collections])
+        #expect(blocks.shownBuiltInViews == [.inbox, .recents, .favorites])
+        #expect(blocks.shownSavedViews.map(\.id) == [viewOne, viewTwo])
         #expect(blocks.showsTypes)
         #expect(blocks.showsViews)
     }
@@ -37,31 +29,31 @@ struct SidebarExperimentTests {
         var layout = SidebarLayout()
         layout.setHidden(.recents, true)
         layout.setHidden(.sources, true)
-        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
-        #expect(blocks.builtInViews == [.inbox, .favorites])
-        #expect(blocks.top == [.all, .collections])
-        #expect(blocks.savedViews.count == 2)
+        let blocks = SidebarPlan(library(), layout: layout)
+        #expect(blocks.shownBuiltInViews == [.inbox, .favorites])
+        #expect(blocks.shownDestinations == [.all, .collections])
+        #expect(blocks.shownSavedViews.count == 2)
     }
 
     @Test func theViewsBlockStaysOnSavedViewsOnceAllThreeBuiltInsAreOff() {
         var layout = SidebarLayout()
         for place in [SidebarPlace.inbox, .recents, .favorites] { layout.setHidden(place, true) }
-        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
-        #expect(blocks.builtInViews.isEmpty)
+        let blocks = SidebarPlan(library(), layout: layout)
+        #expect(blocks.shownBuiltInViews.isEmpty)
         #expect(blocks.showsViews)
     }
 
     @Test func theViewsBlockStaysOnBuiltInsWhenShowViewsIsOffOrThereAreNoSavedViews() {
         var layout = SidebarLayout()
         layout.setHidden(.views, true)
-        var blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
-        #expect(blocks.savedViews.isEmpty)
-        #expect(blocks.builtInViews == [.inbox, .recents, .favorites])
+        var blocks = SidebarPlan(library(), layout: layout)
+        #expect(blocks.shownSavedViews.isEmpty)
+        #expect(blocks.shownBuiltInViews == [.inbox, .recents, .favorites])
         #expect(blocks.showsViews)
 
         let bare = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
-        blocks = ExperimentBlocks(SidebarPlan(bare, layout: SidebarLayout()))
-        #expect(blocks.savedViews.isEmpty)
+        blocks = SidebarPlan(bare, layout: SidebarLayout())
+        #expect(blocks.shownSavedViews.isEmpty)
         #expect(blocks.showsViews)
     }
 
@@ -69,24 +61,24 @@ struct SidebarExperimentTests {
         var layout = SidebarLayout()
         for place in [SidebarPlace.inbox, .recents, .favorites] { layout.setHidden(place, true) }
         layout.setHidden(.view(viewOne), true)
-        #expect(ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+        #expect(SidebarPlan(library(), layout: layout).showsViews)
         layout.setHidden(.view(viewTwo), true)
-        #expect(!ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+        #expect(!SidebarPlan(library(), layout: layout).showsViews)
 
         // Show Views off with the built-ins off as well leaves nothing.
         layout.setHidden(.view(viewOne), false)
         layout.setHidden(.view(viewTwo), false)
         layout.setHidden(.views, true)
-        #expect(!ExperimentBlocks(SidebarPlan(library(), layout: layout)).showsViews)
+        #expect(!SidebarPlan(library(), layout: layout).showsViews)
     }
 
     @Test func theTypesBlockFollowsItsSwitchAndSavedViewsKeepTheirOrder() {
         var layout = SidebarLayout()
         layout.setHidden(.types, true)
         layout.move([SidebarPlace.view(viewOne), .view(viewTwo)], fromOffsets: IndexSet(integer: 1), toOffset: 0)
-        let blocks = ExperimentBlocks(SidebarPlan(library(), layout: layout))
+        let blocks = SidebarPlan(library(), layout: layout)
         #expect(!blocks.showsTypes)
-        #expect(blocks.savedViews.map(\.id) == [viewTwo, viewOne])
+        #expect(blocks.shownSavedViews.map(\.id) == [viewTwo, viewOne])
     }
 
     // MARK: Six types
@@ -102,22 +94,22 @@ struct SidebarExperimentTests {
 
     @Test func sixTypesOrFewerShowInFullWithNothingToExpand() {
         let all = rows((1...6).map { node("t\($0)") })
-        let result = ExperimentTypeLimit.rows(all, showsAll: false)
+        let result = SidebarPlan.limited(all, showsAll: false)
         #expect(result.rows.map(\.id) == all.map(\.id))
         #expect(!result.hasMore)
-        #expect(!ExperimentTypeLimit.rows([], showsAll: false).hasMore)
+        #expect(!SidebarPlan.limited([], showsAll: false).hasMore)
     }
 
     @Test func moreThanSixTypesShowSixUntilShowMore() {
         let all = rows((1...9).map { node("t\($0)") })
-        let result = ExperimentTypeLimit.rows(all, showsAll: false)
+        let result = SidebarPlan.limited(all, showsAll: false)
         #expect(result.rows.map(\.id) == (1...6).map { "t\($0)" })
         #expect(result.hasMore)
     }
 
     @Test func showMoreRevealsTheRestAndStillOffersShowLess() {
         let all = rows((1...9).map { node("t\($0)") })
-        let result = ExperimentTypeLimit.rows(all, showsAll: true)
+        let result = SidebarPlan.limited(all, showsAll: true)
         #expect(result.rows.count == 9)
         #expect(result.hasMore)
     }
@@ -125,7 +117,7 @@ struct SidebarExperimentTests {
     @Test func aTypeKeepsItsSubtypeRowsAndTheyDoNotCountTowardsSix() {
         let kids = [node("a.1"), node("a.2"), node("a.3")]
         let all = rows([node("a", children: kids)] + (2...8).map { node("t\($0)") })
-        let result = ExperimentTypeLimit.rows(all, showsAll: false)
+        let result = SidebarPlan.limited(all, showsAll: false)
         // Six top-level types: a and t2 to t6, with a's three subtypes under it.
         #expect(result.rows.map(\.id) == ["a", "a.1", "a.2", "a.3", "t2", "t3", "t4", "t5", "t6"])
         #expect(result.hasMore)
@@ -136,7 +128,7 @@ struct SidebarExperimentTests {
         var all = rows([node("a", children: kids)] + (2...7).map { node("t\($0)") })
         all.removeAll { $0.depth > 0 }
         all[0] = SidebarPlan.TypeRow(node: all[0].node, depth: 0, isExpanded: false)
-        let result = ExperimentTypeLimit.rows(all, showsAll: false)
+        let result = SidebarPlan.limited(all, showsAll: false)
         #expect(result.rows.map(\.id) == ["a", "t2", "t3", "t4", "t5", "t6"])
         #expect(result.hasMore)
     }
@@ -152,44 +144,44 @@ struct SidebarExperimentTests {
 
     @Test func theRowOfChipsStandsAboveItemsInALayoutThatSpansTheWindow() {
         for mode in [ItemViewMode.gallery, .table, .board, .timeline] {
-            #expect(browser(.allNotes, mode: mode).offersExperimentLanding)
+            #expect(browser(.allNotes, mode: mode).offersNewItemChips)
         }
-        #expect(!browser(.allNotes, mode: .list).offersExperimentLanding)
+        #expect(!browser(.allNotes, mode: .list).offersNewItemChips)
     }
 
     @Test func theRowOfChipsStandsAboveTheSourcesAndCollectionsIndexes() {
-        #expect(browser(.sources, mode: .list).offersExperimentLanding)
-        #expect(browser(.collections, mode: .gallery).offersExperimentLanding)
+        #expect(browser(.sources, mode: .list).offersNewItemChips)
+        #expect(browser(.collections, mode: .gallery).offersNewItemChips)
     }
 
     @Test func theRowOfChipsLeavesWhenAnItemOpensOrAnotherPlaceShows() {
         let items = browser(.allNotes, mode: .gallery)
         items.isCollectionItemPresented = true
-        #expect(!items.offersExperimentLanding)
+        #expect(!items.offersNewItemChips)
         items.returnToCollection()
-        #expect(items.offersExperimentLanding)
-        #expect(!browser(.recents, mode: .gallery).offersExperimentLanding)
-        #expect(!browser(.itemType("core.note"), mode: .table).offersExperimentLanding)
+        #expect(items.offersNewItemChips)
+        #expect(!browser(.recents, mode: .gallery).offersNewItemChips)
+        #expect(!browser(.itemType("core.note"), mode: .table).offersNewItemChips)
     }
 
     @Test func settingsHasNoRowOfChips() {
         let items = browser(.allNotes, mode: .gallery)
         items.showSettings()
-        #expect(!items.offersExperimentLanding)
+        #expect(!items.offersNewItemChips)
         items.leaveSettings()
-        #expect(items.offersExperimentLanding)
+        #expect(items.offersNewItemChips)
     }
 
     @Test func choosingItemsMovesAWindowOnTheListToTheGalleryAndLeavesAnotherLayoutBe() {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
         let onList = browser(.recents, mode: .list)
-        onList.showItemsLanding(in: library, order: NoteOrder())
+        onList.choose(.allNotes, in: library, order: NoteOrder())
         #expect(onList.item == .allNotes)
         #expect(onList.viewMode == .gallery)
         let onTable = browser(.recents, mode: .table)
-        onTable.showItemsLanding(in: library, order: NoteOrder())
+        onTable.choose(.allNotes, in: library, order: NoteOrder())
         #expect(onTable.viewMode == .table)
-        #expect(onTable.offersExperimentLanding)
+        #expect(onTable.offersNewItemChips)
     }
 
     // MARK: Chips
@@ -198,15 +190,41 @@ struct SidebarExperimentTests {
 
     @Test func chipsLeadWithTheTypesHeldMostAndFillUpFromTheRest() {
         let options = ["a", "b", "c", "d", "e", "f"].map(option)
-        let split = ExperimentChips.split(options, usedMost: [TypeID("e"), TypeID("c"), TypeID("zzz")], limit: 4)
+        let split = NewItemChips.split(options, usedMost: [TypeID("e"), TypeID("c"), TypeID("zzz")], limit: 4)
         #expect(split.shown.map(\.label) == ["e", "c", "a", "b"])
         #expect(split.more.map(\.label) == ["d", "f"])
     }
 
     @Test func fewerTypesThanChipsLeavesNothingUnderMore() {
-        let split = ExperimentChips.split([option("a")], usedMost: [])
+        let split = NewItemChips.split([option("a")], usedMost: [])
         #expect(split.shown.map(\.label) == ["a"])
         #expect(split.more.isEmpty)
     }
+
+    // MARK: Places
+
+    @Test func theSixPlacesEachOpenSomethingWithAMark() {
+        let places = SidebarPlace.destinations + SidebarPlace.builtInViews
+        #expect(places.compactMap(\.item) == [.allNotes, .sources, .collections, .inbox, .recents, .favorites])
+        #expect(places.allSatisfy { $0.symbol != nil })
+        #expect(Set(places.compactMap(\.symbol)).count == places.count)
+    }
+
+    @Test func aBlockOrATypeOpensNothingAndASavedViewOpensItself() {
+        #expect(SidebarPlace.types.item == nil)
+        #expect(SidebarPlace.views.item == nil)
+        #expect(SidebarPlace.type("core.note").item == nil)
+        #expect(SidebarPlace.type("core.note").symbol == nil)
+        #expect(SidebarPlace.view(viewOne).item == .view(viewOne))
+        #expect(SidebarPlace.view(viewOne).symbol == SidebarPlace.viewSymbol)
+    }
+
+    @Test func onlyItemsInboxAndFavoritesCarryACount() {
+        let counted = (SidebarPlace.destinations + SidebarPlace.builtInViews).filter(\.showsCount)
+        #expect(counted == [.all, .inbox, .favorites])
+    }
+
+    @Test func theViewsBlockComesBeforeTheTypesBlock() {
+        #expect(SidebarPlan(library(), layout: SidebarLayout()).library == [.views, .types])
+    }
 }
-#endif
