@@ -12,7 +12,8 @@ import SwiftUI
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
-        case ready(Data)
+        /// The document with its pictures pointed at the app, and the encoding to read it in.
+        case ready(Data, String.Encoding)
         /// The library has no file for the item.
         case unavailable
         /// The library has one but could not get it.
@@ -69,8 +70,8 @@ struct WebPageItemPage: View {
         switch content {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .ready(let html):
-            WebPageView(html: html, pictures: pictures, runsScripts: runsScripts)
+        case .ready(let html, let encoding):
+            WebPageView(html: html, encoding: encoding, pictures: pictures, runsScripts: runsScripts)
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
         case .unavailable:
@@ -129,7 +130,7 @@ struct WebPageItemPage: View {
                 }.value
                 guard !Task.isCancelled else { return }
                 pictures.show(rewritten.addresses, version: version)
-                content = .ready(rewritten.html)
+                content = .ready(rewritten.html, rewritten.encoding)
             } catch {
                 guard !Task.isCancelled else { return }
                 content = .failed

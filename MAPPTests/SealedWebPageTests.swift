@@ -294,6 +294,35 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         #expect(await eventually { probe.count > 0 })
     }
 
+    private func read(_ html: Data) async throws -> (encoding: String?, text: String?) {
+        let page = try await SealedWebPage.make(runsScripts: false)
+        try await page.show(html)
+        return (
+            try await page.page.callJavaScript("return document.characterSet") as? String,
+            try await page.page.callJavaScript("return document.body.textContent") as? String
+        )
+    }
+
+    @Test func aDocumentThatIsNotUTF8IsReadInTheEncodingItDeclares() async throws {
+        let words = "日本語の記事、です。"
+        let declared = try #require(#"<html><head><meta charset="shift_jis"></head><body>\#(words)</body></html>"#.data(using: .shiftJIS))
+        let pragma = try #require(
+            #"<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1251"></head><body>Привет</body></html>"#
+                .data(using: .windowsCP1251))
+        let undeclared = Data(Array("<html><body>caf".utf8) + [0xE9] + Array("</body></html>".utf8))
+        let unknown = Data(Array("<html><head><meta charset=no-such-encoding></head><body>caf".utf8) + [0xE9] + Array("</body></html>".utf8))
+
+        let japanese = try await read(declared)
+        #expect(japanese.encoding == "Shift_JIS")
+        #expect(japanese.text == words)
+        let russian = try await read(pragma)
+        #expect(russian.encoding == "windows-1251")
+        #expect(russian.text == "Привет")
+        #expect(try await read(undeclared) == ("windows-1252", "café"))
+        #expect(try await read(unknown) == ("windows-1252", "café"))
+        #expect(try await read(Data("<html><body>café</body></html>".utf8)) == ("UTF-8", "café"))
+    }
+
     @Test func aLaterDocumentReplacesTheFirst() async throws {
         let page = try await SealedWebPage.make(runsScripts: true)
         try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8))

@@ -13,19 +13,23 @@ import Foundation
 /// The scan follows the HTML tokenizer's rules for what matters here: comments, the text of `script`, `style` and the
 /// other raw-text elements, quoted and unquoted attribute values and character references. Everything else is copied
 /// byte for byte. The scan reads only ASCII markup, so it works on the document's own bytes in any encoding that keeps
-/// ASCII as ASCII, and the page that shows it chooses the encoding (`SealedWebPage.show`).
+/// ASCII as ASCII. It reads attribute values in the encoding the page is to read the document in (`HTMLEncoding`),
+/// decided on the document as written, so an address names what the page would ask for.
 nonisolated enum SealedPictureRewrite {
     struct Result: Sendable {
         /// The document in its own encoding, with its pictures pointed at the app.
         let html: Data
         /// The web addresses of its pictures, each once, in the order they first appear.
         let addresses: [URL]
+        /// The encoding to read `html` in, decided before the rewrite could move a declaration past where it is read.
+        let encoding: String.Encoding
     }
 
     static func rewrite(_ data: Data, item: ItemID, version: Int) -> Result {
-        var scanner = Scanner(bytes: Array(data), item: item, version: version)
+        let encoding = HTMLEncoding.of(data)
+        var scanner = Scanner(bytes: Array(data), item: item, version: version, encoding: encoding)
         scanner.run()
-        return Result(html: Data(scanner.output), addresses: scanner.addresses)
+        return Result(html: Data(scanner.output), addresses: scanner.addresses, encoding: encoding)
     }
 
     /// Elements whose content the tokenizer reads as text up to their end tag, so a tag-like string inside them is not
@@ -44,15 +48,17 @@ nonisolated enum SealedPictureRewrite {
         let bytes: [UInt8]
         let item: ItemID
         let version: Int
+        let encoding: String.Encoding
         var output: [UInt8] = []
         var addresses: [URL] = []
         private var seen: Set<URL> = []
         private var index = 0
 
-        init(bytes: [UInt8], item: ItemID, version: Int) {
+        init(bytes: [UInt8], item: ItemID, version: Int, encoding: String.Encoding) {
             self.bytes = bytes
             self.item = item
             self.version = version
+            self.encoding = encoding
             output.reserveCapacity(bytes.count + bytes.count / 8)
         }
 
@@ -105,13 +111,13 @@ nonisolated enum SealedPictureRewrite {
                         let valueStart = after + 1
                         var valueEnd = valueStart
                         while valueEnd < bytes.count, bytes[valueEnd] != quote { valueEnd += 1 }
-                        value = Self.decode(bytes[valueStart..<valueEnd])
+                        value = decode(bytes[valueStart..<valueEnd])
                         position = min(valueEnd + 1, bytes.count)
                     } else {
                         let valueStart = after
                         var valueEnd = valueStart
                         while valueEnd < bytes.count, !isSpace(bytes[valueEnd]), bytes[valueEnd] != UInt8(ascii: ">") { valueEnd += 1 }
-                        value = Self.decode(bytes[valueStart..<valueEnd])
+                        value = decode(bytes[valueStart..<valueEnd])
                         position = valueEnd
                     }
                 }
@@ -216,10 +222,10 @@ nonisolated enum SealedPictureRewrite {
 
         private static let named: [String: String] = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{A0}"]
 
-        /// An attribute value with its character references read. Only the named references an address can hold are
-        /// known; any other is left as written.
-        static func decode(_ raw: ArraySlice<UInt8>) -> String {
-            let text = String(decoding: raw, as: UTF8.self)
+        /// An attribute value, read in the document's encoding, with its character references read. Only the named
+        /// references an address can hold are known; any other is left as written.
+        func decode(_ raw: ArraySlice<UInt8>) -> String {
+            let text = String(bytes: raw, encoding: encoding) ?? String(decoding: raw, as: UTF8.self)
             guard text.contains("&") else { return text }
             var result = ""
             var rest = Substring(text)
@@ -234,7 +240,7 @@ nonisolated enum SealedPictureRewrite {
                     } else if body.hasPrefix("#") {
                         replacement = UInt32(body.dropFirst()).flatMap(Unicode.Scalar.init).map { String(Character($0)) }
                     } else {
-                        replacement = named[String(body)]
+                        replacement = Self.named[String(body)]
                     }
                     if let replacement {
                         result += replacement

@@ -7,14 +7,17 @@ import WebKit
 /// place that shows another item's document gives it a view of its own.
 struct WebPageView: View {
     private let html: Data
+    private let encoding: String.Encoding?
     private let pictures: SealedPictures?
     private let runsScripts: Bool
     @State private var sealed: SealedWebPage?
     @State private var failure: String?
 
-    /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so.
-    init(html: Data, pictures: SealedPictures? = nil, runsScripts: Bool) {
+    /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so. It is read in
+    /// `encoding`, or where none is given, in the one its bytes declare (`SealedWebPage.show`).
+    init(html: Data, encoding: String.Encoding? = nil, pictures: SealedPictures? = nil, runsScripts: Bool) {
         self.html = html
+        self.encoding = encoding
         self.pictures = pictures
         self.runsScripts = runsScripts
     }
@@ -53,7 +56,7 @@ struct WebPageView: View {
         do {
             let page: SealedWebPage
             if let sealed { page = sealed } else { page = try await SealedWebPage.make(pictures: pictures, runsScripts: runsScripts) }
-            try await page.show(html)
+            try await page.show(html, encoding: encoding)
             sealed = page
         } catch is CancellationError {
         } catch {

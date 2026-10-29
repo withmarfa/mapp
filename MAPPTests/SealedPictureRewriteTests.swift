@@ -89,4 +89,15 @@ struct SealedPictureRewriteTests {
         #expect(html.hasPrefix("<p>\(words)</p><img alt=\"写真\" src=\"\(SealedPictures.scheme):"))
         #expect(requested(in: html) == ["https://example.com/a.png"])
     }
+
+    /// The address is read in the encoding the page reads the document in (`HTMLEncoding`), so it names the same file
+    /// as the picture saved from it.
+    @Test func anAddressIsReadInTheDocumentsEncoding() throws {
+        let latin = Data(Array(#"<p>caf"#.utf8) + [0xE9] + Array(#"</p><img src="https://example.com/caf"#.utf8) + [0xE9] + Array(#".jpg">"#.utf8))
+        let japanese = try #require(#"<meta charset="shift_jis"><img src="https://example.com/写真.jpg">"#.data(using: .shiftJIS))
+
+        #expect(SealedPictureRewrite.rewrite(latin, item: item, version: 3).addresses.map(\.absoluteString) == ["https://example.com/caf%C3%A9.jpg"])
+        #expect(SealedPictureRewrite.rewrite(japanese, item: item, version: 3).addresses.map(\.absoluteString)
+            == ["https://example.com/%E5%86%99%E7%9C%9F.jpg"])
+    }
 }
