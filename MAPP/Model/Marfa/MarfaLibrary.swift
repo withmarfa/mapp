@@ -883,8 +883,9 @@ import Observation
     }
 
     func attachments(of id: ItemID) -> [ItemID] {
-        // The index is not observed. A file attached, taken off or changed is an item changing.
-        _ = contentRevision
+        // The index is not observed. A file attached or taken off changes an edge; a change to the file itself is
+        // followed through its own record, which a reader of the list reads with `item(_:)`.
+        _ = linksRevision
         return index.links(to: id, type: MarfaMapping.attachmentEdge).map(\.source)
     }
 }
