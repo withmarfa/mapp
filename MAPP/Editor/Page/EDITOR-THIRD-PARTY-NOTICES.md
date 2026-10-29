@@ -2,7 +2,7 @@
 
 The app bundles dependencies which contain the following licenses:
 
-## @aicayzer/inkkit - 0.4.0 (MIT)
+## @aicayzer/inkkit - 0.4.1 (MIT)
 
 MIT License
 
