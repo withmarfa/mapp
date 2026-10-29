@@ -89,6 +89,43 @@ import WebKit
         #expect(pictures.waitingCount == 0)
     }
 
+    @Test func aPictureSavedWhileItWaitedNoLongerWaits() async throws {
+        let (address, requests) = served()
+        let pictures = pictures()
+        pictures.show([address], version: pictures.version)
+        #expect(await reply(pictures, address) == "placeholder")
+        #expect(pictures.waitingCount == 1)
+
+        try saved(from: address)
+        pictures.redraw()
+        #expect(await reply(pictures, address) == "file")
+        #expect(pictures.waitingCount == 0)
+        #expect(requests() == 0)
+    }
+
+    @Test func loadingThePicturesWaitingLeavesANewVersionsPicturesToAsk() async {
+        let (first, firstRequests) = served()
+        let (added, addedRequests) = served()
+        let pictures = pictures()
+        pictures.show([first], version: pictures.version)
+        #expect(await reply(pictures, first) == "placeholder")
+        pictures.loadWaiting()
+        #expect(await reply(pictures, first) == "file")
+
+        // A new version of the document, as when its file changes while the page is open.
+        pictures.show([first, added], version: pictures.version)
+        #expect(await reply(pictures, first) == "file")
+        #expect(await reply(pictures, added) == "placeholder")
+        #expect(pictures.waitingCount == 1)
+        #expect(firstRequests() == 1)
+        #expect(addedRequests() == 0)
+
+        pictures.loadWaiting()
+        #expect(await reply(pictures, added) == "file")
+        #expect(addedRequests() == 1)
+        #expect(pictures.waitingCount == 0)
+    }
+
     @Test func underNeverNothingWaitsAndNothingIsFetched() async {
         set(.never)
         let (address, requests) = served()

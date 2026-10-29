@@ -24,8 +24,9 @@ import WebKit
     /// The addresses of the document shown last.
     private var shown: [URL] = []
     private var waiting: Set<URL> = []
-    /// Whether the person chose to load the pictures waiting.
-    private(set) var chosen = false
+    /// The addresses that waited when the person chose to load them. A later version of the document can name new
+    /// ones, which wait to be asked for as the first ones did.
+    private(set) var chosen: Set<URL> = []
     /// Changed each time the page is to ask for its pictures again. Only an answer to a request of this version
     /// counts a picture as waiting, so an answer under a setting since changed is not counted.
     private(set) var version = 0
@@ -43,7 +44,7 @@ import WebKit
     }
 
     /// How many of the document's pictures wait for the person to load them.
-    var waitingCount: Int { chosen ? 0 : shown.count { waiting.contains($0) } }
+    var waitingCount: Int { shown.count { waiting.contains($0) && !chosen.contains($0) } }
 
     /// The addresses of a document about to be shown, whose pictures were written with `version`
     /// (`SealedPictureRewrite`).
@@ -53,9 +54,9 @@ import WebKit
         documentVersion = version
     }
 
-    /// The person chose to load the pictures waiting.
+    /// The person chose to load the pictures waiting, those the callout counts.
     func loadWaiting() {
-        chosen = true
+        chosen.formUnion(shown.filter(waiting.contains))
         redraw()
     }
 
@@ -76,15 +77,23 @@ import WebKit
         guard let url, let request = Self.request(in: url), request.item == item, allowed.contains(request.address)
         else { return .refused }
         let address = request.address
+        // Only an answer to a request of the current version says whether the picture waits now.
+        func settle(waits: Bool) {
+            guard request.version == version else { return }
+            if waits { waiting.insert(address) } else { waiting.remove(address) }
+        }
         switch await saved(address) {
-        case .file(let file): return .file(file)
-        case .unavailable: return .placeholder
-        case .none: break
+        case .file(let file):
+            settle(waits: false)
+            return .file(file)
+        case .unavailable:
+            settle(waits: false)
+            return .placeholder
+        case .none:
+            break
         }
-        let answer = await pictures.answer(address, ask: chosen ? .chosen : .drawing, inFeed: inFeed())
-        if request.version == version {
-            if answer == .waiting { waiting.insert(address) } else { waiting.remove(address) }
-        }
+        let answer = await pictures.answer(address, ask: chosen.contains(address) ? .chosen : .drawing, inFeed: inFeed())
+        settle(waits: answer == .waiting)
         guard case .loaded = answer, let file = await pictures.openKept(address) else { return .placeholder }
         return .file(file)
     }
