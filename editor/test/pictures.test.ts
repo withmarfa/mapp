@@ -99,6 +99,15 @@ test('with Ask, a picture at a web address is a card named by its alt text, and 
   })
 })
 
+test('a picture with no alt text is named for its website, whatever characters the host holds', async () => {
+  app(() => ({ state: 'waiting' }))
+  await withNote('![](https://a$&b.com/a.png)\n', async () => {
+    await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+    await settled()
+    expect(labels()).toEqual(['Picture from a$&b.com'])
+  })
+})
+
 test('choosing a waiting picture asks the app to load it, and the card becomes the picture', async () => {
   const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   await withNote(picture, async () => {

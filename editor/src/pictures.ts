@@ -106,7 +106,8 @@ export class WebPictures {
         // The callout above the text says the picture waits; the card only says what the picture is.
         return {
           kind: 'file',
-          label: alt || (this.words.pictureFrom ?? 'Picture from %@').replace('%@', host),
+          // A function, so a `$` in the host is not read as a replacement pattern.
+          label: alt || (this.words.pictureFrom ?? 'Picture from %@').replace('%@', () => host),
         }
     }
   }
