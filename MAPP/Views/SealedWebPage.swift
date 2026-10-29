@@ -2,8 +2,9 @@ import Foundation
 import SwiftUI
 import WebKit
 
-/// A web page that can show one HTML document and nothing else. The document is untrusted: it may run its own scripts,
-/// but it reaches no network, loads nothing from outside itself, submits no form and leaves no trace.
+/// A web page that can show one HTML document and nothing else. The document is untrusted: it may run its own scripts
+/// where the page allows them, but it reaches no network, loads nothing but what it holds and the pictures the app gives
+/// it, submits no form and leaves no trace.
 ///
 /// Each document gets a page of its own, sealed the same way, and `page` changes to it once it has loaded. A document
 /// can start a navigation at any moment, and one it starts while a load into its own page still waits for that load's
@@ -21,8 +22,8 @@ import WebKit
 /// - A script that runs before the document's own, in every frame, removes WebRTC and media devices. A content rule
 ///   governs resource loads and never sees a STUN or ICE datagram, and WebKit has no public setting that turns WebRTC
 ///   off, so the interfaces that could send one are not there.
-/// - The page keeps its data in memory (`WKWebsiteDataStore.nonPersistent()`), has no script message handler or other
-///   bridge to the app, and loads no subresource a rule would let through.
+/// - The page keeps its data in memory (`WKWebsiteDataStore.nonPersistent()`), has no script message handler, and has
+///   no bridge to the app but the picture scheme, which answers only the pictures its document was found to name.
 ///
 /// A page made with `runsScripts` false runs none of the document's scripts; the app's own run in a world of their own
 /// that the document cannot reach.
