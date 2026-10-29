@@ -27,8 +27,32 @@ nonisolated final class MetricsListener: Sendable {
 
     private static let logger = Telemetry.logger(.launch)
 
+    /// What a metric report says of launch and hangs, for the report sent to WithMarfa: samples and the slowest
+    /// bucket of each, never a signpost name or a call stack.
+    nonisolated struct Summary: Sendable, Equatable {
+        nonisolated struct Metric: Sendable, Equatable {
+            var samples = 0
+            var slowestMilliseconds = 0
+        }
+
+        var intervalSeconds = 0
+        var hang = Metric()
+        var firstDraw = Metric()
+        var launch = Metric()
+    }
+
     static func log(_ report: MetricReport) {
         let entries = report.stateEntries.flatMap(\.values) + report.intervalEntries.flatMap(\.values)
+        var summarized = Summary(intervalSeconds: Int(report.timeRange.duration.rounded()))
+        for entry in entries {
+            switch entry {
+            case .hangTime(let metric): summarized.hang = bucketSummary(metric.histogram)
+            case .timeToFirstDraw(let metric): summarized.firstDraw = bucketSummary(metric.histogram)
+            case .extendedLaunch(let metric): summarized.launch = bucketSummary(metric.histogram)
+            default: break
+            }
+        }
+        Telemetry.metricsSummarized(summarized)
         let lines = entries.compactMap(summary)
         logger.notice("""
             MetricKit report for \(report.timeRange.duration.rounded(), privacy: .public) s: \
@@ -45,8 +69,10 @@ nonisolated final class MetricsListener: Sendable {
                 MetricKit hang of \(milliseconds(hang.hangDuration), privacy: .public) ms over \(interval, privacy: .public) s; \
                 signposts then: \(signposts.joined(separator: ", "), privacy: .public)
                 """)
+            Telemetry.metricsHang(milliseconds: milliseconds(hang.hangDuration), intervalSeconds: Int(interval))
         case .appLaunch(let launch):
             logger.notice("MetricKit slow launch of \(milliseconds(launch.launchDuration), privacy: .public) ms over \(interval, privacy: .public) s")
+            Telemetry.metricsSlowLaunch(milliseconds: milliseconds(launch.launchDuration), intervalSeconds: Int(interval))
         case .crash:
             logger.error("MetricKit crash over \(interval, privacy: .public) s")
         case .cpuException:
@@ -69,6 +95,12 @@ nonisolated final class MetricsListener: Sendable {
             "\(metric.signpostCategory)/\(metric.signpostName) x\(metric.totalCount): \(summary(metric.signpostDuration))"
         default: nil
         }
+    }
+
+    private static func bucketSummary(_ histogram: Histogram<UnitDuration>) -> Summary.Metric {
+        let filled = histogram.buckets.filter { $0.count > 0 }
+        guard let slowest = filled.max(by: { $0.upperBound < $1.upperBound }) else { return Summary.Metric() }
+        return Summary.Metric(samples: filled.reduce(0) { $0 + $1.count }, slowestMilliseconds: milliseconds(slowest.upperBound))
     }
 
     private static func summary(_ histogram: Histogram<UnitDuration>) -> String {

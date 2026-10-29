@@ -10,6 +10,7 @@
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 		331000093066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000A3066ED47005D07A2 /* MarfaAPI */; };
+		3310000D3066ED47005D07A2 /* MarfaTelemetry in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000E3066ED47005D07A2 /* MarfaTelemetry */; };
 		3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000C3066ED47005D07A2 /* MarfaIcons */; };
 /* End PBXBuildFile section */
 
@@ -81,6 +82,7 @@
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000093066ED47005D07A2 /* MarfaAPI in Frameworks */,
 				3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */,
+				3310000D3066ED47005D07A2 /* MarfaTelemetry in Frameworks */,
 				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
 			);
 		};
@@ -147,6 +149,7 @@
 				331000053066ED47005D07A2 /* Marfa */,
 				3310000A3066ED47005D07A2 /* MarfaAPI */,
 				3310000C3066ED47005D07A2 /* MarfaIcons */,
+				3310000E3066ED47005D07A2 /* MarfaTelemetry */,
 				331000083066ED47005D07A2 /* MarfaTesting */,
 			);
 			productName = MAPP;
@@ -716,7 +719,7 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.39;
+				minimumVersion = 0.0.42;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -736,6 +739,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = MarfaIcons;
+		};
+		3310000E3066ED47005D07A2 /* MarfaTelemetry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaTelemetry;
 		};
 		331000083066ED47005D07A2 /* MarfaTesting */ = {
 			isa = XCSwiftPackageProductDependency;

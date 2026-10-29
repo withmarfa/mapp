@@ -1,4 +1,10 @@
 // A checkout builds and signs to run locally without a developer account. To sign with your own team, put
 // `DEVELOPMENT_TEAM = <your team ID>` in Config/Local.xcconfig, which git ignores.
 DEVELOPMENT_TEAM =
+
+// Where a build reports its errors and timings. Empty here, so a build from this source sends nothing; a build
+// made by WithMarfa carries both in Config/Local.xcconfig. MAPP/Info.plist reads them under these names. In
+// Local.xcconfig write the host's `://` as `:/$()/`, since an xcconfig reads `//` as a comment.
+MARFA_POSTHOG_HOST =
+MARFA_POSTHOG_PROJECT_TOKEN =
 #include? "Local.xcconfig"

@@ -106,10 +106,12 @@ nonisolated final class QuitTrace: Sendable {
         }.joined(separator: "; ")
     }
 
-    /// Logs the diagnosis of a flush that ran out of time.
-    func logTimeout(after limit: Duration) {
+    /// Logs the diagnosis of a flush that ran out of time, and reports the stage it did not finish.
+    func logTimeout(after limit: Duration, reporting: Reporting = .shared) {
         let text = diagnosis()
         log.error("quit timed out after \(limit.inMilliseconds, privacy: .public) ms: \(text, privacy: .public)")
+        let waiting = stages.withLock { $0[.queue]?.activity }?.snapshot().waiting
+        Telemetry.quitTimedOut(unfinished: unfinished, limit: limit, engineWaiting: waiting, reporting: reporting)
     }
 }
 

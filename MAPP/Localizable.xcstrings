@@ -2025,6 +2025,9 @@
     "Priority" : {
       "extractionState" : "manual"
     },
+    "Privacy" : {
+
+    },
     "Problems" : {
 
     },
@@ -2118,6 +2121,9 @@
     "Selected" : {
       "extractionState" : "manual"
     },
+    "Send Error Reports" : {
+
+    },
     "Sending %lld changes" : {
       "localizations" : {
         "en" : {
@@ -2139,6 +2145,9 @@
           }
         }
       }
+    },
+    "Sends errors and timings to WithMarfa to help fix problems. Never includes your items, their text, your server’s address or anything you type." : {
+
     },
     "Session" : {
       "extractionState" : "manual"
