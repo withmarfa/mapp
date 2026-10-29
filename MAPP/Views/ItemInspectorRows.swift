@@ -14,7 +14,7 @@ enum InspectorMetrics {
     /// The space between a section's heading and what it holds.
     static let headingGap: CGFloat = 6
     static let chipRadius: CGFloat = 7
-    /// What a chip adds to the width of its text: its padding on both sides.
+    /// A chip's horizontal padding, both sides together.
     static let chipPadding: CGFloat = 16
     /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
     static let rowInset: CGFloat = 6

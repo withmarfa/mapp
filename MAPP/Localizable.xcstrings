@@ -61,16 +61,10 @@
     "In the Inspector" : {
       "extractionState" : "manual"
     },
-    "Open This Address" : {
-      "extractionState" : "manual"
-    },
     "On the Page" : {
       "extractionState" : "manual"
     },
     "Show on Page" : {
-      "extractionState" : "manual"
-    },
-    "Write to This Address" : {
       "extractionState" : "manual"
     },
     "Use Defaults" : {

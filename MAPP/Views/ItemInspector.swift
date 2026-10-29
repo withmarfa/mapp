@@ -119,7 +119,7 @@ struct ItemInspector: View {
     var drawnByPage: Set<String> = []
     /// The items that link to this one, when the person placed Linked From in the inspector.
     var linked: [LinkedItem] = []
-    /// The icon of the type of the item with this identifier, for the chips that name an item.
+    /// The icon of the type of the item with this identifier, for the rows that name an item.
     var typeIcon: (ItemID) -> String? = { _ in nil }
     /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
     @State private var ownPresentation = DetailsPresentation()
