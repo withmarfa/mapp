@@ -660,10 +660,10 @@ extension EditorController: WKNavigationDelegate {
     /// retried, since it would only fail again.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard isReady, let pageURL else {
-            log.error("web content process ended before the editor was ready")
+            Telemetry.editorProcessEnded(wasReady: false)
             return
         }
-        log.error("web content process ended; reloading")
+        Telemetry.editorProcessEnded(wasReady: true)
         cancelLinkRequest()
         isReady = false
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())

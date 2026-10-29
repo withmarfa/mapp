@@ -10,6 +10,7 @@ enum Launch {
             return
         }
         #endif
+        Reporting.shared.start(isTestHost: false)
         MAPPApp.main()
     }
 }
@@ -23,7 +24,7 @@ enum TestHost {
     /// unit tests. The UI tests' app never has one: its tests run in the separate runner process, which drives the app
     /// from outside, so no test bundle loads into it. The environment cannot tell the two apart, since Xcode may pass
     /// XCTest variables to either (`XCUIApplication.launchEnvironment`).
-    static var isRequested: Bool {
+    nonisolated static var isRequested: Bool {
         Bundle.allBundles.contains { $0.bundleURL.pathExtension == "xctest" }
     }
 
@@ -151,6 +152,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 alert.informativeText = notice.message
                 alert.runModal()
             }
+            // Reports queued for this run go out within the SDK's short deadline, after the editors' flush and only
+            // once the quit is going ahead.
+            if told { await Reporting.shared.flush() }
             NSApp.reply(toApplicationShouldTerminate: told)
         }
         return .terminateLater

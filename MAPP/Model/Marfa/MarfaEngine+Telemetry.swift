@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import os
 
 extension MarfaEngine {
     /// The way into the engine's stream. It counts each event told, so `EngineActivity` can say how many wait, and
@@ -24,18 +23,6 @@ extension MarfaEngine {
 
         func finish() {
             continuation.finish()
-        }
-    }
-
-    /// An event the engine took longer than `Telemetry.slow` over logs a notice, one longer than `Telemetry.stalled`
-    /// an error. Kinds and durations only.
-    static func reportIfSlow(_ kind: StaticString, _ elapsed: Duration) {
-        guard elapsed >= Telemetry.slow else { return }
-        let log = Telemetry.logger(.engine)
-        if elapsed >= Telemetry.stalled {
-            log.error("engine event \(kind, privacy: .public) took \(elapsed.inMilliseconds, privacy: .public) ms")
-        } else {
-            log.notice("engine event \(kind, privacy: .public) took \(elapsed.inMilliseconds, privacy: .public) ms")
         }
     }
 }

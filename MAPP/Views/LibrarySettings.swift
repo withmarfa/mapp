@@ -26,6 +26,7 @@ struct LibrarySettings: View {
                 LibraryDownloads(files: files)
                     .id(ObjectIdentifier(library))
             }
+            if Reporting.carriesDestination { ErrorReportSettings() }
         }
         .settingsForm()
         .accessibilityIdentifier("LibrarySettings")

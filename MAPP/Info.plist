@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>MARFA_POSTHOG_HOST</key>
+	<string>$(MARFA_POSTHOG_HOST)</string>
+	<key>MARFA_POSTHOG_PROJECT_TOKEN</key>
+	<string>$(MARFA_POSTHOG_PROJECT_TOKEN)</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

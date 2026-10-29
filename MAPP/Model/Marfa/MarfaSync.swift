@@ -9,6 +9,13 @@ import os
 actor MarfaSync {
     private nonisolated enum Retry {
         case refresh, drain
+
+        var operation: StaticString {
+            switch self {
+            case .refresh: "refresh"
+            case .drain: "drain"
+            }
+        }
     }
 
     /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
@@ -132,6 +139,7 @@ actor MarfaSync {
     /// Rows the copy could not read, found by a read: the copy replaces them on a hydration, which keeps its queue.
     func unreadable(_ ids: Set<String>) {
         guard rehydration.ask(about: ids) else { return }
+        Telemetry.rowsUnreadable(count: ids.count)
         wantsRefresh = true
         work()
     }
@@ -449,6 +457,7 @@ actor MarfaSync {
             case .network, .io, .unnamed, .redirected, .rateLimited, .closed, .invalid, .canceled, .noServer:
                 break
             default:
+                Telemetry.binUnreadable(error)
                 _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
             }
             return
@@ -510,7 +519,7 @@ actor MarfaSync {
     private func failed(_ error: any Error, retrying kind: Retry) async {
         guard !stopped, let error = error as? MarfaError else {
             if !stopped {
-                Self.log.error("sync stopped on a failure of a kind the package does not name")
+                Telemetry.syncStoppedUnnamed(during: kind.operation)
                 hub.set(.stopped(code: "failed", message: error.localizedDescription))
             }
             return
@@ -538,7 +547,7 @@ actor MarfaSync {
             // The copy was changing its key or moved during the call; the package asks for it again.
             schedule(kind)
         default:
-            Self.log.error("sync stopped on a failure it does not retry")
+            Telemetry.syncStopped(error, during: kind.operation)
             hub.set(.stopped(code: error.code(), message: error.message))
             guard !told else { return }
             told = true

@@ -488,9 +488,12 @@ import Observation
             case .denied: throw .noKey
             case .otherVersion(let unsent): throw .otherVersion(unsent: unsent)
             case .inUse: throw .inUse
-            case .missing, .failed: throw .unavailable(message: failure.message)
+            case .missing, .failed:
+                Telemetry.libraryNotOpened(nil)
+                throw .unavailable(message: failure.message)
             }
         } catch {
+            Telemetry.libraryNotOpened(error as? MarfaError)
             throw .unavailable(message: Self.message(error))
         }
     }

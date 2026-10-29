@@ -43,26 +43,35 @@ nonisolated final class LaunchTrace: Sendable {
     /// Records a milestone the first time it is reached; later ones are ignored. `note` is a kind, never a name.
     func mark(_ milestone: Milestone, note: StaticString? = nil, at now: Date = .now) {
         let since = Self.processStart.map { Duration.seconds(now.timeIntervalSince($0)) } ?? .zero
-        let (first, line): (Bool, String?) = state.withLock { state in
+        let (first, finished): (Bool, Finished?) = state.withLock { state in
             guard state.marks[milestone] == nil else { return (false, nil) }
             state.marks[milestone] = (since, note)
-            return (true, Self.completed(state) ? Self.line(&state) : nil)
+            return (true, Self.completed(state) ? Self.finish(&state) : nil)
         }
         guard first else { return }
-        milestone.signpost()
-        if let line {
-            Telemetry.logger(.launch).notice("\(line, privacy: .public)")
-        }
+        Telemetry.event(.launch, milestone.word)
+        finished?.tell()
     }
 
     /// The copy ended without a library to load, as with no server set or a key refused, so `windowShown` alone
     /// completes the launch.
     func settleWithoutLibrary() {
-        let line: String? = state.withLock { state in
+        let finished: Finished? = state.withLock { state in
             state.nothingToLoad = true
-            return Self.completed(state) ? Self.line(&state) : nil
+            return Self.completed(state) ? Self.finish(&state) : nil
         }
-        if let line { Telemetry.logger(.launch).notice("\(line, privacy: .public)") }
+        finished?.tell()
+    }
+
+    /// A launch that has completed: its log line and its milestones, told once.
+    nonisolated private struct Finished {
+        let line: String
+        let marks: [(milestone: Milestone, at: Duration, note: StaticString?)]
+
+        func tell() {
+            Telemetry.logger(.launch).notice("\(line, privacy: .public)")
+            Telemetry.launched(marks)
+        }
     }
 
     private static func completed(_ state: State) -> Bool {
@@ -70,23 +79,27 @@ nonisolated final class LaunchTrace: Sendable {
         return state.marks[.firstLoaded] != nil || state.nothingToLoad
     }
 
-    private static func line(_ state: inout State) -> String {
+    private static func finish(_ state: inout State) -> Finished {
         state.logged = true
-        let parts = state.marks.sorted { $0.value.at < $1.value.at }.map { milestone, mark in
+        let sorted = state.marks.sorted { $0.value.at < $1.value.at }
+        let parts = sorted.map { milestone, mark in
             "\(milestone.rawValue)\(mark.note.map { " (\($0.description))" } ?? "") \(mark.at.inMilliseconds) ms"
         }
-        return "launch since process start: " + parts.joined(separator: ", ")
+        return Finished(
+            line: "launch since process start: " + parts.joined(separator: ", "),
+            marks: sorted.map { ($0.key, $0.value.at, $0.value.note) })
     }
 }
 
-private extension LaunchTrace.Milestone {
-    nonisolated func signpost() {
+extension LaunchTrace.Milestone {
+    /// The milestone's name as a signpost and a report give it.
+    nonisolated var word: StaticString {
         switch self {
-        case .appInit: Telemetry.event(.launch, "appInit")
-        case .librariesInit: Telemetry.event(.launch, "librariesInit")
-        case .copyOpened: Telemetry.event(.launch, "copyOpened")
-        case .firstLoaded: Telemetry.event(.launch, "firstLoaded")
-        case .windowShown: Telemetry.event(.launch, "windowShown")
+        case .appInit: "appInit"
+        case .librariesInit: "librariesInit"
+        case .copyOpened: "copyOpened"
+        case .firstLoaded: "firstLoaded"
+        case .windowShown: "windowShown"
         }
     }
 }

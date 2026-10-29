@@ -233,7 +233,7 @@ actor MarfaEngine {
         await apply(event)
         let elapsed = interval.end()
         hub.activity.end()
-        Self.reportIfSlow(kind, elapsed)
+        Telemetry.engineEventTook(kind, elapsed)
     }
 
     private func apply(_ event: Event) async {
