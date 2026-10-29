@@ -17,6 +17,29 @@ nonisolated enum InspectorFields {
         }
     }
 
+    /// Where a value is a link to: a web address of a url field, or a mail address of an email field. Only http,
+    /// https and mailto are ever opened, so a stored `javascript:` or file address stays text.
+    static func link(of field: ItemTypeInfo.Field, value: PropertyValue?) -> URL? {
+        guard case .string(let raw)? = value else { return nil }
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch field.format {
+        case .url?:
+            guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+                  url.host(percentEncoded: false)?.isEmpty == false
+            else { return nil }
+            return url
+        case .email?:
+            let parts = text.split(separator: "@", omittingEmptySubsequences: false)
+            guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }), !text.contains(where: { $0.isWhitespace }) else { return nil }
+            var components = URLComponents()
+            components.scheme = "mailto"
+            components.path = text
+            return components.url
+        case nil:
+            return nil
+        }
+    }
+
     /// What a yes/no property's checkbox shows: a value that was never set, or has been cleared, is neither yes nor
     /// no, so it is not drawn as an unticked box.
     enum YesNo: Equatable {

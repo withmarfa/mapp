@@ -42,6 +42,12 @@ struct ItemPropertyRow: View {
                             .accessibilityIdentifier("ItemProperty.\(definition.key)")
                         Spacer(minLength: 0)
                     }
+                } else if let link {
+                    Link(destination: link) { Text((value?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)) }
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("ItemProperty.\(definition.key)")
                 } else if let readOnlyText {
                     // A value that cannot be changed reads as a Details row does, not as a dimmed control.
                     readOnlyText
@@ -192,7 +198,18 @@ struct ItemPropertyRow: View {
                 choiceMenu(allowsOther: true)
             }
         case .text, .number:
-            textField
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                textField
+                    .foregroundStyle(link != nil && !isFocused ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+                if let link {
+                    let action: LocalizedStringKey = link.scheme == "mailto" ? "Write to This Address" : "Open This Address"
+                    Link(destination: link) { Image(systemName: "arrow.up.right") }
+                        .buttonStyle(.borderless)
+                        .help(action)
+                        .accessibilityLabel(action)
+                        .accessibilityIdentifier("ItemPropertyOpen.\(definition.key)")
+                }
+            }
         // A list or an object is shown as written, since a text field would replace it with a string.
         case .other:
             if let value {
@@ -202,6 +219,9 @@ struct ItemPropertyRow: View {
             }
         }
     }
+
+    /// Where the value links to, if it is a web or mail address.
+    private var link: URL? { InspectorFields.link(of: definition, value: value) }
 
     /// The value as written, for a row that cannot be changed and has no shape of its own.
     private var readOnlyText: Text? {

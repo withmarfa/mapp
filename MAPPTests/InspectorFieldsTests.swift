@@ -202,6 +202,24 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.yesNo(.string("yes")) == .unset, "text is not a yes")
     }
 
+    @Test func aUrlOrEmailValueIsALinkOnlyToAWebOrMailAddress() {
+        func link(_ format: ItemTypeInfo.Field.TextFormat?, _ text: String) -> String? {
+            let field = ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: format)
+            return InspectorFields.link(of: field, value: .string(text))?.absoluteString
+        }
+        #expect(link(.url, "https://example.com/a?b=1") == "https://example.com/a?b=1")
+        #expect(link(.url, " HTTP://Example.com ") == "HTTP://Example.com")
+        #expect(link(.url, "javascript:alert(1)") == nil)
+        #expect(link(.url, "file:///etc/passwd") == nil)
+        #expect(link(.url, "example.com") == nil, "the page leaves an address with no scheme as text")
+        #expect(link(.url, "https://") == nil)
+        #expect(link(.email, "ada@example.com") == "mailto:ada@example.com")
+        #expect(link(.email, "not an address") == nil)
+        #expect(link(.email, "a@b.co\nc@d.co") == nil)
+        #expect(link(nil, "https://example.com") == nil, "a plain text field is text")
+        #expect(InspectorFields.link(of: ItemTypeInfo.Field(key: "k", label: "K", kind: .text, declaredBy: TypeID("aic.x"), format: .url), value: nil) == nil)
+    }
+
     // MARK: Only what has a value
 
     @Test func propertiesListOnlyWhatHasAValueInTheCataloguesOrder() {
