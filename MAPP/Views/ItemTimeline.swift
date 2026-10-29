@@ -17,6 +17,7 @@ struct ItemTimeline: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         timeline(groups)
+        .toolbarScrollEdge()
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {

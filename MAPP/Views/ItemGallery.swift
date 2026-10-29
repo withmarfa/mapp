@@ -33,6 +33,7 @@ struct ItemGallery: View {
         let ids = sections.flatMap { $0.items.map(\.id) }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         keyboardCollection(sections, ids: ids)
+        .toolbarScrollEdge()
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {

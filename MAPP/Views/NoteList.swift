@@ -78,7 +78,7 @@ struct NoteList: View {
             return .handled
         }
         .searchStatus(browser)
-        .bandsToolbar()
+        .toolbarScrollEdge()
         .toolbar { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {

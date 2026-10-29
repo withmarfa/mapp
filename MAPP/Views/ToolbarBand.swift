@@ -2,10 +2,10 @@ import SwiftUI
 
 /// A band of blurred material over the toolbar, ended by a hairline, for content that scrolls under it, in the
 /// manner of the system's hard scroll edge effect. The window hides its toolbar's background (`MAPPApp`), the
-/// page's web view is not a SwiftUI scroll view, and WebKit's own scroll edge is not public API, so the app draws
-/// the band itself: it is absent while nothing is behind the toolbar and appears once something is. The list
-/// always draws it. A note's or item's page draws it unless Show Toolbar Background When Scrolling is off
-/// (`InterfaceKey.showsPageToolbarBackground`, read by `NotePage`).
+/// page's web view is not a SwiftUI scroll view, and WebKit's own scroll edge is not public API, so the page, and
+/// only the page, draws the band itself: it is absent while nothing is behind the toolbar and appears once something
+/// is, unless Show Toolbar Background When Scrolling is off (`InterfaceKey.showsPageToolbarBackground`, read by
+/// `NotePage`). Every SwiftUI scroll view uses the system's edge instead (`toolbarScrollEdge`).
 struct ToolbarBand: View {
     /// The toolbar's height, which the band covers entirely and ends at, with no fade below it.
     let toolbarHeight: CGFloat
@@ -38,27 +38,20 @@ struct ToolbarBand: View {
 }
 
 extension View {
-    /// Gives a list or other scroll view the same toolbar edge as the page: a `ToolbarBand` over the toolbar once
-    /// the content has scrolled beneath it. The system's own edge for the scroll view is hidden, so only one draws.
-    func bandsToolbar() -> some View {
-        modifier(BandsToolbar())
+    /// Gives a scroll view the system's hard scroll edge effect under the toolbar: nothing while nothing is beneath
+    /// it, and the blurred edge once content scrolls under. Every layout that scrolls in SwiftUI uses it, so they
+    /// share one edge. Show Toolbar Background When Scrolling (`InterfaceKey.showsPageToolbarBackground`) turns it off.
+    func toolbarScrollEdge() -> some View {
+        modifier(ToolbarScrollEdge())
     }
 }
 
-private struct BandsToolbar: ViewModifier {
-    @State private var isUnderToolbar = false
+private struct ToolbarScrollEdge: ViewModifier {
+    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
 
     func body(content: Content) -> some View {
         content
-            // At rest the content starts exactly below the toolbar, which the scroll geometry reports as an inset.
-            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in
-                isUnderToolbar = new
-            }
-            .scrollEdgeEffectHidden(true, for: .top)
-            .overlay(alignment: .top) {
-                GeometryReader { proxy in
-                    ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: isUnderToolbar)
-                }
-            }
+            .scrollEdgeEffectStyle(.hard, for: .top)
+            .scrollEdgeEffectHidden(!showsBackground, for: .top)
     }
 }
