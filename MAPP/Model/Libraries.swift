@@ -176,9 +176,15 @@ import os
         {
             let suite = "MAPP.SampleMarfa"
             let defaults = UserDefaults(suiteName: suite) ?? .standard
-            defaults.removePersistentDomain(forName: suite)
             let root = URL.temporaryDirectory.appending(path: "Sample Marfa", directoryHint: .isDirectory)
-            try? FileManager.default.removeItem(at: root)
+            // A run against a test server may ask to keep the copy the last run left (`-MAPPKeepTestStore`), so the
+            // speed tests can time a launch on a copy that is already there.
+            let keepsCopy = environment["MAPP_TEST_MARFA_URL"] != nil
+                && ProcessInfo.processInfo.arguments.contains("-MAPPKeepTestStore")
+            if !keepsCopy {
+                defaults.removePersistentDomain(forName: suite)
+                try? FileManager.default.removeItem(at: root)
+            }
             guard SampleLibrary.isRequested, !SampleLibrary.startsUnconfigured else {
                 // The unit tests, previews and `-MAPPSampleUnconfigured` start with no server, as a first launch does.
                 let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore(), location: location(root: root))

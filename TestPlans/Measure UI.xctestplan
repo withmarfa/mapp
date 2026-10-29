@@ -1,0 +1,27 @@
+{
+  "configurations" : [
+    {
+      "id" : "7A1D2C64-5B0E-4E57-9C58-137000000002",
+      "name" : "Measure UI",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "SpeedMeasureTests"
+      ],
+      "target" : {
+        "containerPath" : "container:MAPP.xcodeproj",
+        "identifier" : "3303FE323066ED47005D07A2",
+        "name" : "MAPPUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
