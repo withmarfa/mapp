@@ -16,8 +16,9 @@ import Testing
     /// waits on the copy. Its server is never reached, so a drain happens only when a test runs one.
     private nonisolated final class Reads: MarfaReading, MarfaRefreshing {
         let read: MarfaRead
-        /// How many times the engine listed every row.
+        /// How many times the engine listed every row, and how many rows it read the edges of one by one.
         let wholeReads = Mutex(0)
+        let rowReads = Mutex(0)
         private let gate = Mutex((closed: false, waiting: [CheckedContinuation<Void, Never>]()))
 
         init(copy: WorkingCopy) { read = MarfaRead(copy: copy) }
@@ -65,6 +66,7 @@ import Testing
         func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
 
         func edges(touching id: String) async throws -> [Marfa.Edge] {
+            rowReads.withLock { $0 += 1 }
             await pass()
             return try await read.edges(touching: id)
         }
@@ -93,6 +95,8 @@ import Testing
 
         var copy: WorkingCopy { fake.copy }
         var wholeReads: Int { reads.wholeReads.withLock { $0 } }
+        var rowReads: Int { reads.rowReads.withLock { $0 } }
+        var binReads: Int { get async { await source.engine.sync.binReads } }
         var shown: SourceSnapshot? { log.current.snapshot }
 
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.
@@ -122,6 +126,17 @@ import Testing
             fake.verdict = { _ in .accepted }
             _ = try await copy.queue.drain()
             _ = try await copy.queue.forgetAnswered()
+        }
+
+        /// Makes `id`, one of `makeDoomed`'s rows, leave the copy as a row deleted on another device does, and
+        /// hears it as one batch. The fake keeps a row deleted through it in its bin, so the row is refused instead.
+        func deleteElsewhere(_ id: String) async throws {
+            fake.verdict = { write in write.itemId == id ? .refused(Refusal(reason: "deleted elsewhere")) : nil }
+            _ = try await copy.queue.drain()
+            for write in try await copy.queue.all() where write.itemId == id { _ = try await copy.queue.discard(write.id) }
+            #expect(try await copy.items.get(id) == nil, "a row deleted elsewhere stayed in the copy")
+            hearServer(id, event: "item.deleted")
+            await source.engineTook()
         }
 
         func item(_ id: String) -> MAPP.Item? { shown?.items.first { $0.id.rawValue == id } }
@@ -381,6 +396,30 @@ import Testing
 
     // MARK: Whole reads
 
+    @Test func aBatchNamingMoreThanAQuarterOfTheRowsReadsTheCopyWholeOnceAndNoRowAlone() async throws {
+        let scene = try await Self.open(Self.fake((0..<400).map { Self.row("kept-\($0)", title: "Kept \($0)") }))
+        await scene.source.engineTook()
+        let painted = scene.wholeReads
+        try await scene.holdEngine(reading: "kept-399")
+        let named = scene.rowReads
+
+        // 150 of 400 rows: past `readsWhole`'s floor of 64 and a quarter of the rows, and far below `rereadLimit`.
+        for index in 0..<150 {
+            _ = try await scene.copy.items.update("kept-\(index)", Edit(properties: ["title": .string("Edited \(index)")], baseVersion: 1))
+        }
+        try await scene.drainAccepting()
+        for index in 0..<150 { scene.hearServer("kept-\(index)") }
+        scene.letGo()
+        await scene.source.engineTook()
+        #expect(scene.wholeReads == painted + 1, "the batch read the copy whole \(scene.wholeReads - painted) times")
+        #expect(scene.rowReads == named, "the batch read \(scene.rowReads - named) rows one by one")
+        #expect(scene.item("kept-149")?.title == "Edited 149")
+
+        let differences = try await Self.differencesFromAFreshRead(scene)
+        #expect(differences.isEmpty, "\(differences)")
+        await scene.close()
+    }
+
     @Test func aHydrationHeardInABatchReadsTheCopyWholeOnce() async throws {
         let scene = try await Self.open(Self.fake([Self.row("one", title: "One"), Self.row("two", title: "Two")]))
         let painted = scene.wholeReads
@@ -417,6 +456,50 @@ import Testing
         await step(.complete, listed: 4000)
         #expect(scene.source.syncReport.fill == LibraryFill(state: .complete, listed: 4000, expected: 4000))
         #expect(scene.wholeReads == filling + 1)
+        await scene.close()
+    }
+
+    // MARK: The bin
+
+    @Test func rowsDeletedElsewhereInSeparateBatchesReadTheBinOnceTheChangesPause() async throws {
+        let fake = Self.fake([Self.row("kept", title: "Kept")])
+        let doomed = try await Self.makeDoomed(5, in: fake)
+        let scene = try await Self.open(fake)
+        await scene.source.engineTook()
+        let quiet = Duration.milliseconds(500)
+        await scene.source.engine.sync.setBinWait(quiet: quiet, longest: .seconds(30))
+        let before = await scene.binReads
+
+        for id in doomed { try await scene.deleteElsewhere(id) }
+        try #require(try await eventuallyAsking { await scene.binReads > before }, "the bin was never read")
+        // Waits past another pause, to see that no deletion of the five reads the bin again.
+        try await Task.sleep(for: quiet * 2)
+        let read = await scene.binReads - before
+        #expect(read == 1, "five deletions read the bin \(read) times")
+        await scene.close()
+    }
+
+    @Test func aFloodOfDeletionsThatNeverPausesReadsTheBinWithinTheLongestWait() async throws {
+        let fake = Self.fake([Self.row("kept", title: "Kept")])
+        let doomed = try await Self.makeDoomed(60, in: fake)
+        let scene = try await Self.open(fake)
+        await scene.source.engineTook()
+        let quiet = Duration.milliseconds(400)
+        let longest = Duration.milliseconds(1500)
+        await scene.source.engine.sync.setBinWait(quiet: quiet, longest: longest)
+        let before = await scene.binReads
+
+        // A deletion every 100 milliseconds for twice the longest wait, so the changes never pause for `quiet`.
+        let start = ContinuousClock.now
+        var index = 0
+        while ContinuousClock.now - start < longest * 2, index < 60 {
+            try await scene.deleteElsewhere(doomed[index])
+            index += 1
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let read = await scene.binReads - before
+        #expect(read >= 1, "a flood of \(index) deletions over \(ContinuousClock.now - start) never read the bin")
+        #expect(read <= 3, "a flood of \(index) deletions read the bin \(read) times")
         await scene.close()
     }
 

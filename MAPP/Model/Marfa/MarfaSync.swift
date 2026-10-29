@@ -68,6 +68,8 @@ actor MarfaSync {
     private(set) var drains = 0
     /// How many times it has hydrated, for the tests.
     private(set) var hydrations = 0
+    /// How many times it has read the bin, for the tests.
+    private(set) var binReads = 0
     private(set) var lastHydration: HydrateReport?
     /// Rows the copy could not read, which only a hydration replaces.
     private var rehydration = Rehydration()
@@ -148,8 +150,15 @@ actor MarfaSync {
     }
 
     /// How long the bin's changes are let settle before it is read, and the longest a read waits for them to.
-    nonisolated static let binQuiet = Duration.seconds(1)
-    nonisolated static let binLongest = Duration.seconds(5)
+    private(set) var binQuiet = Duration.seconds(1)
+    private(set) var binLongest = Duration.seconds(5)
+
+    #if DEBUG
+    func setBinWait(quiet: Duration, longest: Duration) {
+        binQuiet = quiet
+        binLongest = longest
+    }
+    #endif
 
     /// An item may have gone to or left the server's bin, which the copy does not say. The bin is read from the
     /// server whole, so a flood of server changes reads it once they pause, and at least every `binLongest`.
@@ -159,7 +168,7 @@ actor MarfaSync {
         let first = binAsked ?? now
         binAsked = first
         binTimer?.cancel()
-        let due = min(now + Self.binQuiet, first + Self.binLongest)
+        let due = min(now + binQuiet, first + binLongest)
         binTimer = Task {
             try? await Task.sleep(until: due)
             guard !Task.isCancelled else { return }
@@ -464,6 +473,7 @@ actor MarfaSync {
     /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
     /// reached leaves the bin as it was, shown from what the engine last held, and is asked again when it can.
     private func runBin() async {
+        binReads += 1
         var found: [Marfa.Item] = []
         var cursor: String?
         var complete = false
