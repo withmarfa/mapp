@@ -18,7 +18,7 @@ struct RecentlyDeletedSettings: View {
                 } else {
                     List(items, selection: $selection) { item in
                         HStack {
-                            Text(item.title.isEmpty ? String(localized: "Untitled") : item.title).lineLimit(1)
+                            Text(item.displayTitle).lineLimit(1)
                             Spacer(minLength: 8)
                             Text(item.modified, format: .dateTime.day().month().year())
                                 .foregroundStyle(.secondary)

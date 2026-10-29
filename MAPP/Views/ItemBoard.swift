@@ -225,7 +225,7 @@ private struct BoardCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 7 : 10) {
-            Text(verbatim: item.title)
+            Text(verbatim: item.displayTitle)
                 .interfaceFont(.headline)
                 .foregroundStyle(.primary)
                 .lineLimit(compact ? 2 : 3)

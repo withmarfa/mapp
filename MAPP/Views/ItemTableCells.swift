@@ -66,9 +66,9 @@ struct ItemTableCell: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
-            Text(row.item.title.isEmpty ? String(localized: "Untitled") : row.item.title)
+            Text(row.item.displayTitle)
                 .fontWeight(.medium)
-                .foregroundStyle(row.item.title.isEmpty ? .secondary : .primary)
+                .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
                 .truncationMode(.tail)
             if row.item.isFavorite {
                 Image(systemName: "star.fill")

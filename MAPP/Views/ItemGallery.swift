@@ -219,7 +219,7 @@ private struct GalleryCell: View {
             browser.openCollectionSelection()
         })
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.title)
+        .accessibilityLabel(item.displayTitle)
         .accessibilityValue(isSelected ? Text("Selected") : Text(""))
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
