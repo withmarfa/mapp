@@ -101,6 +101,20 @@ import Testing
         #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note") == false })
     }
 
+    @Test func linkedFromIsSentOnlyWhereTheTypePlacesItOnThePage() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(F.snapshot))
+        try #require(await eventually { library.isLoaded })
+        let drafts = DetailsPresentation()
+        let byDefault = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: PagePlacements()))
+        #expect(byDefault.linked.isEmpty, "an ordinary type keeps Linked From in the inspector")
+        var placements = PagePlacements()
+        placements.setLinkedFrom(.page, of: F.project)
+        let onPage = try #require(ItemPageHeader.header(of: F.p1, in: library, drafts: drafts, placements: placements))
+        #expect(onPage.linked.map(\.title).contains("Plain note"))
+    }
+
     @Test func aLinkingItemThatIsRemovedIsGone() async throws {
         let page = try await Page.opening(F.p1)
         #expect(page.editor.header?.linked.map(\.title).contains("Plain note") == true)
