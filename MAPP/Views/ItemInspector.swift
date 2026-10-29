@@ -189,13 +189,11 @@ struct ItemInspector: View {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(shownRelationships) { relationship in
                     let group = LinkGroup(item: item.id, field: relationship.field)
-                    // What points at the item is not a row of the page, which lists it as Linked From.
-                    let isIncoming = relationship.field.hasPrefix("inverse:")
                     ItemRelationshipGroup(
                         relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
                         onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
                         onRemove: { onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
-                        onShowOnPage: isIncoming ? nil : showOnPage(relationship.field))
+                        onShowOnPage: showOnPage(relationship.field))
                 }
                 if !mentions.isEmpty { contentLinks }
             }
@@ -311,7 +309,7 @@ struct ItemInspector: View {
     }
 
     private var shownRelationships: [ItemRelationship] {
-        relationships.filter { !$0.targets.isEmpty }
+        InspectorFields.relationships(relationships)
     }
 
     private var addable: [ItemRelationship] {

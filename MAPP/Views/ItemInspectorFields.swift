@@ -39,6 +39,12 @@ nonisolated enum InspectorFields {
         }
     }
 
+    /// The relationship groups the inspector lists under Relationships: those the item holds. What points at it is
+    /// Linked From's, wherever that is placed, so it is not listed twice.
+    static func relationships(_ relationships: [ItemRelationship]) -> [ItemRelationship] {
+        relationships.filter { !$0.targets.isEmpty && !$0.field.hasPrefix("inverse:") }
+    }
+
     /// Every property the inspector lists elsewhere or never: what the type names, what is hidden, and the
     /// bookkeeping Marfa adds to an item.
     static func accountedFor(type: ItemTypeInfo?, hidden: Set<String>) -> Set<String> {

@@ -181,6 +181,19 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.addable(of: item, type: Self.task, hidden: hidden).map(\.key) == ["status", "priority"])
     }
 
+    @Test func theRelationshipsListLeavesOutWhatLinksToTheItem() {
+        func target(_ title: String) -> ItemRelationshipTarget {
+            ItemRelationshipTarget(title: title, itemID: ItemID(title), resolution: .resolved(ItemID(title)))
+        }
+        let groups = [
+            ItemRelationship(field: "child-of", label: "Parent", targets: [target("a")], isEditable: true, allowsMultiple: false),
+            ItemRelationship(field: "inverse:parent-of", label: "Children", targets: [target("b")], isEditable: false, allowsMultiple: true),
+            ItemRelationship(field: "inverse:references", label: "Referenced By", targets: [target("c")], isEditable: false, allowsMultiple: true),
+            ItemRelationship(field: "about", label: "About", targets: [], isEditable: true, allowsMultiple: true),
+        ]
+        #expect(InspectorFields.relationships(groups).map(\.field) == ["child-of"], "incoming links are Linked From's, once")
+    }
+
     // MARK: Only what has a value
 
     @Test func propertiesListOnlyWhatHasAValueInTheCataloguesOrder() {
