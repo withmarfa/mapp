@@ -727,12 +727,11 @@ body[data-text='none'] #editor {
   line-height: calc(var(--step) * 5);
 }
 
-/* A page for reading: the source above the title, a narrower serif column, the description under the title. */
+/* A page for reading: the source above the title, a serif column at the page width the person chose, the description under the title. */
 body[data-header='reading'] {
   --inkkit-font-family: 'New York', ui-serif, Georgia, serif;
   --inkkit-font-size: 1.125rem;
   --inkkit-line-height: 1.65;
-  --inkkit-reading-width: calc(min(var(--page-width), 40rem) + 6rem);
 }
 
 #item-header[data-kind='reading'] .item-byline {
