@@ -171,6 +171,8 @@ struct SidebarPlan {
     let layout: SidebarLayout
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
+        let started = ContinuousClock.now
+        defer { Cost.record(.sidebarPlan, since: started) }
         self.layout = layout
         destinations = layout.ordered(SidebarPlace.destinations)
         builtInViews = layout.ordered(SidebarPlace.builtInViews)

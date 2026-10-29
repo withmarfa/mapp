@@ -31,6 +31,7 @@ struct Sidebar: View {
     }
 
     var body: some View {
+        let _ = Cost.record(.sidebarBody, since: .now)
         let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
         let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order)
         List(selection: selection) {

@@ -12,6 +12,7 @@ struct SidebarTypesSection: View {
     @Binding var choosingIcon: TypeIconRequest?
 
     var body: some View {
+        let _ = Cost.record(.sidebarBody, since: .now)
         let limited = SidebarPlan.limited(plan.typeRows, showsAll: showsAll)
         let rows = limited.rows
         let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)

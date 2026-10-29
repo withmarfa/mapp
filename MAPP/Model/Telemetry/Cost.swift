@@ -26,6 +26,12 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case headerIcons
     /// Drawing one symbol or type icon as a picture.
     case iconDraw
+    /// One `SidebarPlan` made: the type tree, with its counts, ordered and laid out.
+    case sidebarPlan
+    /// One pass over the catalogue for the types that hold items (`itemTypeCounts`).
+    case typeCounts
+    /// One run of a sidebar view's body, the sidebar's list and each part of it.
+    case sidebarBody
 
     private static let signposter = Telemetry.signposter(.navigation)
 

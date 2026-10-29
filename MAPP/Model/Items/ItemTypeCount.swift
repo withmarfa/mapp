@@ -144,6 +144,8 @@ extension ItemLibrary {
     /// the first time the library holds one. The count is `count(in:)` of the type's own place, which lists the
     /// type's items and no subtype's.
     var itemTypeCounts: [ItemTypeCount] {
+        let started = ContinuousClock.now
+        defer { Cost.record(.typeCounts, since: started) }
         let catalogue = catalogue
         let held = catalogue.itemTypes.keys.compactMap { type -> (TypeID, Int)? in
             guard !catalogue.isFileType(type) else { return nil }
