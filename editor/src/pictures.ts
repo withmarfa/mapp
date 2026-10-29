@@ -140,7 +140,9 @@ export class WebPictures {
       const remembered = ask !== 'cached' || state.kind === 'loaded'
       if (this.item === forItem && this.asking.get(key) === pending) {
         this.asking.delete(key)
-        if (remembered) this.states.set(address, state)
+        // A picture the person has chosen since is loading, whatever an earlier question now answers.
+        if (remembered && (ask === 'chosen' || this.states.get(address)?.kind !== 'loading'))
+          this.states.set(address, state)
         this.schedule()
       }
       return state
@@ -203,12 +205,20 @@ export class WebPictures {
     const again = [...this.live.keys()].filter(
       (address) => wants(address) && !this.choosing(address),
     )
-    for (const address of again) this.states.delete(address)
     // An answer still on its way for any other address is kept: dropping a chosen picture's answer would leave its card
     // waiting although it was fetched.
     for (const key of [...this.asking.keys()])
       if (again.includes(key.slice(key.indexOf('\n') + 1))) this.asking.delete(key)
-    if (again.length) this.redraw(again)
+    const forItem = this.item
+    const ask = this.cacheOnly ? 'cached' : 'drawing'
+    for (const address of again) {
+      // The card and the count keep what they show until the new answer is here, so neither flickers between.
+      const before = this.states.get(address)
+      void this.request(forItem, address, ask).then((state) => {
+        if (this.item !== forItem || sameState(before, this.states.get(address) ?? state)) return
+        this.redraw([address])
+      })
+    }
   }
 
   private choosing(address: string): boolean {
@@ -287,6 +297,10 @@ export function sameAddress(address: string): string {
     return Number(port) === (scheme === 'https' ? 443 : 80) && port !== '' ? '' : `:${port}`
   })
   return `${scheme}://${authority}${path || '/'}${query}`
+}
+
+function sameState(a: PictureState | undefined, b: PictureState | undefined): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 function hostOf(address: string): string {

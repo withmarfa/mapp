@@ -261,6 +261,36 @@ test('a changed setting asks again about pictures that waited or were off, and n
   )
 })
 
+test('a card keeps what it showed, and the bar its count, until the answer to asking again arrives', async () => {
+  let delayed = false
+  let answer: PictureAnswer = { state: 'waiting' }
+  const { asked } = app((request) => {
+    if (!delayed || request.ask === 'chosen') return answer
+    return new Promise<PictureAnswer>((resolve) =>
+      setTimeout(() => resolve(answer), 30),
+    ) as unknown as PictureAnswer
+  })
+  await withNote(picture, async (editor) => {
+    await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+    delayed = true
+    asked.length = 0
+    editor.picturesChanged()
+    editor.savedPicturesChanged(['https://example.com/a.png'])
+    // Fixed time for the two questions to be on their way and for a bar that would hide to do so.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(labels()).toEqual(['A picture'])
+    await vi.waitFor(() => expect(asked.length).toBeGreaterThan(0))
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(bar.map((entry) => entry.count)).toEqual([1])
+
+    // The answer, when it comes, is what the card shows.
+    answer = { state: 'off' }
+    editor.picturesChanged()
+    await vi.waitFor(() => expect(labels()).toEqual(['example.com: Remote Pictures Are Off']))
+    expect(bar.at(-1)?.count).toBe(0)
+  })
+})
+
 test('a picture saved as a file on the item is asked about again, loaded or not, but not one being chosen', async () => {
   let saved = false
   let finish: (answer: PictureAnswer) => void = () => {}
