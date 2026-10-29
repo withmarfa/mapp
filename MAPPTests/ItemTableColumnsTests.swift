@@ -130,8 +130,10 @@ struct ItemTableColumnsTests {
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
+        // The layout already differs from the default, since it shows Created, so wait for the width itself.
+        let shown = layout()
         created.width = 160
-        try #require(await eventually { layout() != .init() })
+        try #require(await eventually { layout() != shown })
 
         store { $0[visibility: "created"] = .hidden }
         try #require(await eventually { first.tableColumns.count == expected.count })
