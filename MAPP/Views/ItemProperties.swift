@@ -74,7 +74,7 @@ struct ItemPropertyRow: View {
                 }
             }
         }
-        .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
+        .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage, clear: clearsFromMenu ? { input.rejected = !onChange(nil) } : nil)
         .onAppear { if !input.isDirty { seed(value) } }
         .task { if startsEditing { await beginEditing() } }
         // The action may run on an earlier copy of this view, so it takes the value from the change itself.
@@ -140,11 +140,18 @@ struct ItemPropertyRow: View {
         return InspectorFit(text: text, extra: text.contains(where: \.isNewline) ? 10_000 : 0)
     }
 
+    /// A yes/no value has no empty state of its own, so the row's menu clears it.
+    private var clearsFromMenu: Bool { definition.kind == .boolean && isEditable && InspectorFields.yesNo(value) != .unset }
+
     private var checkbox: some View {
-        let current: Bool = if case .bool(let selected) = value { selected } else { false }
-        return Toggle(isOn: Binding { current } set: { selected in
-            input.rejected = !onChange(.bool(selected))
-        }) {
+        let state = InspectorFields.yesNo(value)
+        let write = { (selected: Bool) in input.rejected = !onChange(.bool(selected)) }
+        // A value that is not set is drawn as the checkbox's mixed state, which the system shows for sources that
+        // disagree; clicking it sets yes.
+        let sources: [Binding<Bool>] = state == .unset
+            ? [Binding { false } set: { write($0) }, Binding { true } set: { _ in }]
+            : [Binding { state == .yes } set: { write($0) }]
+        return Toggle(sources: sources, isOn: \.self) {
             Text(LocalizedStringKey(definition.displayLabel))
         }
         .labelsHidden()

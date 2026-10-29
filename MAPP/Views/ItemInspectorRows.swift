@@ -359,10 +359,14 @@ struct ShowOnPageMenu: View {
 }
 
 extension View {
-    /// Offers Show on Page on the view, where the inspector can change it.
-    @ViewBuilder func showOnPageMenu(isShown: Bool, onChange: ((Bool) -> Void)?) -> some View {
-        if let onChange {
-            contextMenu { ShowOnPageMenu(isShown: isShown, onChange: onChange) }
+    /// Offers Show on Page on the view, where the inspector can change it, and `clear` where the row holds a value
+    /// that can be taken away.
+    @ViewBuilder func showOnPageMenu(isShown: Bool, onChange: ((Bool) -> Void)?, clear: (() -> Void)? = nil) -> some View {
+        if onChange != nil || clear != nil {
+            contextMenu {
+                if let onChange { ShowOnPageMenu(isShown: isShown, onChange: onChange) }
+                if let clear { Button("Clear", action: clear).accessibilityIdentifier("ItemPropertyClear") }
+            }
         } else {
             self
         }

@@ -17,6 +17,16 @@ nonisolated enum InspectorFields {
         }
     }
 
+    /// What a yes/no property's checkbox shows: a value that was never set, or has been cleared, is neither yes nor
+    /// no, so it is not drawn as an unticked box.
+    enum YesNo: Equatable {
+        case yes, no, unset
+    }
+
+    static func yesNo(_ value: PropertyValue?) -> YesNo {
+        if case .bool(let flag)? = value { flag ? .yes : .no } else { .unset }
+    }
+
     /// The type's fields the inspector lists under Properties, in the catalogue's order: those with a value, and
     /// those `revealed`, which the person added or cleared while the inspector showed this item, so a row does not
     /// jump away while they work on it.
