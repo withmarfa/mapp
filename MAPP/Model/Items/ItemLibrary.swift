@@ -104,8 +104,8 @@ protocol ItemLibrary: AnyObject, Observable {
     func fileURL(of id: ItemID) async throws -> URL?
 
     /// The file items attached to `id`, in any state: those with an `attached-to` edge to it. Observed, so a file
-    /// attached or taken off is told to whoever read this, and no other change in the library is; read each file with
-    /// `item(_:)` to follow its own changes.
+    /// attached or taken off is told to whoever read this. It follows changes to links only, not to the files
+    /// themselves, so read each file with `item(_:)` to follow those.
     func attachments(of id: ItemID) -> [ItemID]
 
     // MARK: Writing

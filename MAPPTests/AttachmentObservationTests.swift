@@ -4,8 +4,8 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
-/// An item's page reads its attachments to choose its layout, so that read follows the files attached to the item and
-/// nothing else: an edit elsewhere in the library does not draw every page again.
+/// An item's page reads its attachments to choose its layout, so that read follows the item's links and its attached
+/// files: an edit to another item that changes no link does not draw every page again.
 @MainActor
 @Suite(.hangLimit) struct AttachmentObservationTests {
     private typealias F = LibraryFixture
