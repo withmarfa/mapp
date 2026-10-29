@@ -79,11 +79,10 @@ These hold across the app. The nested files say how the library keeps them.
   xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS' -derivedDataPath build test
   ```
 
-- Time the window on a test instance's library, with the screen and keyboard to itself and no other UI run active. The test makes one note for the typing and deletes it (to Recently Deleted). The Debug-only `-MAPPKeepTestStore` flag keeps the copy the last launch left, which is how a warm launch is timed; add `SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule` to the build for numbers close to a release's:
+- Time the window on a test instance's library, with the screen and keyboard to itself and no other UI run active. The `Measure UI` plan's tests print what UI testing saw; the app's own signposts, launch milestones and slow events come from the unified log, which a sandboxed UI test cannot read, so `Scripts/measure-ui.sh` records the log around the run and prints those lines too. The one write is a note made for the typing step and deleted (to Recently Deleted). The Debug-only `-MAPPKeepTestStore` flag keeps the copy the last launch left, which is how a warm launch is timed; add `SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule` for numbers close to a release's. UI testing's own queries of a library this size take seconds, so the tests click by coordinate and use shortcuts, and the signposts are the finer number:
 
   ```sh
-  TEST_RUNNER_MAPP_MEASURE_UI=1 TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> \
-    xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -testPlan 'Measure UI' -destination 'platform=macOS' -derivedDataPath build test
+  TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> Scripts/measure-ui.sh build
   ```
 
 - Before a release, run the `Live` plan against a Marfa test instance, never a server that holds a person's data. Its tests create, edit and delete items there. Pass the instance's address and a key for it through xcodebuild's `TEST_RUNNER_` prefix, which hands them to the tests without it:

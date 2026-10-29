@@ -88,13 +88,12 @@ final class SpeedMeasureTests: XCTestCase {
         let places = [items, sidebarText("Inbox")] + types.map(sidebarElement) + [items]
         // The window's title starts with the place's name, which is how a choice is seen to have landed.
         let titles = places.map(\.placeName)
+        let spots = places.map(spot)
         try begin("places")
         measure(metrics: [signpost("place.choose"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
-            for (place, title) in zip(places, titles) {
-                time("choose") {
-                    place.click()
-                    XCTAssertTrue(waitUntil { self.window.title.hasPrefix(title) }, "the window shows \(title)")
-                }
+            for (spot, title) in zip(spots, titles) {
+                time("choose") { spot.click() }
+                XCTAssertTrue(waitUntil { self.window.title.hasPrefix(title) }, "the window shows \(title)")
             }
         }
     }
@@ -106,11 +105,9 @@ final class SpeedMeasureTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 20))
         try begin("layout")
         measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
-            for (mode, shown) in [("Gallery", self.element("ItemGallery")), ("List", self.list)] {
-                time(mode.lowercased()) {
-                    self.chooseViewMode(mode)
-                    XCTAssertTrue(self.waitUntil { shown.exists }, "\(mode) showed")
-                }
+            for (mode, key, shown) in [("gallery", "2", self.element("ItemGallery")), ("list", "1", self.list)] {
+                time(mode) { self.app.typeKey(key, modifierFlags: .command) }
+                XCTAssertTrue(self.waitUntil { shown.exists }, "\(mode) showed")
             }
         }
     }
@@ -121,14 +118,13 @@ final class SpeedMeasureTests: XCTestCase {
         sidebarElement(place).click()
         XCTAssertTrue(list.waitForExistence(timeout: 20))
         XCTAssertTrue(list.outlineRows.element(boundBy: 4).waitForExistence(timeout: 20), "the place holds five items")
+        let rows = (0..<5).map { list.outlineRows.element(boundBy: $0) }
+        let spots = rows.map(spot)
         try begin("items")
         measure(metrics: [signpost("item.open"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
-            for index in 0..<5 {
-                let row = self.list.outlineRows.element(boundBy: index)
-                time("open") {
-                    row.click()
-                    XCTAssertTrue(waitUntil { row.isSelected }, "the item was selected")
-                }
+            for (row, spot) in zip(rows, spots) {
+                time("open") { spot.click() }
+                XCTAssertTrue(waitUntil { row.isSelected }, "the item was selected")
             }
         }
     }
@@ -140,12 +136,12 @@ final class SpeedMeasureTests: XCTestCase {
         try begin("quickAdd")
         let field = element("QuickAddTitle")
         measure(metrics: [signpost("quickAdd.open"), XCTClockMetric()], options: options) {
+            // Both calls return once the app is idle, so a letter typed before the field had the keyboard would be lost.
             time("ready") {
-                element("SidebarNew").click()
-                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                app.typeKey("n", modifierFlags: .command)
                 app.typeText("a")
-                XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the title field took the keyboard")
             }
+            XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the title field took the keyboard")
             // Leave the draft empty, so the next iteration starts as the first did.
             app.typeKey("a", modifierFlags: .command)
             app.typeKey(.delete, modifierFlags: [])
@@ -160,11 +156,10 @@ final class SpeedMeasureTests: XCTestCase {
         let field = element("CommandPaletteField")
         measure(metrics: [XCTClockMetric()], options: options) {
             time("ready") {
-                element("SidebarSearch").click()
-                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                app.typeKey("p", modifierFlags: [.command, .shift])
                 app.typeText("a")
-                XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the palette's field took the keyboard")
             }
+            XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the palette's field took the keyboard")
             app.typeKey(.escape, modifierFlags: [])
             XCTAssertTrue(field.waitForNonExistence(timeout: 5))
         }
@@ -173,26 +168,21 @@ final class SpeedMeasureTests: XCTestCase {
     // MARK: Typing
 
     /// Makes a note, types forty characters into its page one key at a time, and deletes the note. A keystroke's time
-    /// runs from the key event to the character showing in the page's accessibility value, so it holds one UI
-    /// testing round trip too; the total is the sum.
+    /// runs from the key event until the app is idle again; the page reports no echo to wait on, and reading its
+    /// accessibility value costs more than a keystroke, so the text is checked once at the end. The total is the sum.
     func testTypingInANote() throws {
         try launchWarm()
         try begin("typing")
         let title = "Speed measure \(UUID().uuidString.prefix(8))"
-        window.quickAdd(type: "Note", title: title)
+        element("SidebarNew").click()
+        window.completeQuickAdd(type: "Note", title: title)
         let editor = window.itemPageBody
         XCTAssertTrue(editor.waitForExistence(timeout: 10))
         editor.click()
         let text = String(repeating: "the quick brown fox jumps over ", count: 2).prefix(40)
-        var typed = ""
-        for character in text {
-            typed.append(character)
-            time("key") {
-                app.typeText(String(character))
-                XCTAssertTrue(waitUntil(timeout: 10) { (editor.value as? String)?.hasSuffix(typed) == true }, "\(typed) showed")
-            }
-        }
+        for character in text { time("key") { app.typeText(String(character)) } }
         samples["total"] = [samples["key", default: []].reduce(0, +)]
+        XCTAssertTrue(waitUntil { (editor.value as? String)?.hasSuffix(String(text)) == true }, "the text showed in the page")
         window.descendants(matching: .any).matching(identifier: "MoreToolbar").firstMatch.click()
         window.menuItems["Delete"].firstMatch.click()
     }
@@ -282,9 +272,12 @@ final class SpeedMeasureTests: XCTestCase {
         sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
     }
 
-    private func chooseViewMode(_ mode: String) {
-        app.menuBars.menuBarItems["View"].click()
-        app.menuBars.menuItems["as \(mode)"].click()
+    /// Where the element's middle is, as a point of the window, so a click on it needs no query of the tree. UI
+    /// testing's own queries of a library this size take seconds, which would be counted as the app's time.
+    private func spot(_ element: XCUIElement) -> XCUICoordinate {
+        let frame = element.frame
+        let origin = window.frame.origin
+        return window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX - origin.x, dy: frame.midY - origin.y))
     }
 }
 
