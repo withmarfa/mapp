@@ -77,6 +77,9 @@ struct AppCommands: Commands {
                 .keyboardShortcut("k")
         }
 
+        // The dividers here are drawn whether or not the views between them render anything, and the system adds its
+        // own around the toolbar and tab groups, so the menu can open with two in a row. `MenuSeparatorTidy` hides
+        // the surplus as the menu opens; write a divider wherever one belongs and leave that to it.
         CommandGroup(before: .sidebar) {
             Button("Recently Deleted", systemImage: "trash") {
                 if let library { browser?.show(.recentlyDeleted, in: library, order: order) }
