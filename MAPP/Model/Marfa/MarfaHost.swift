@@ -174,8 +174,16 @@ import Observation
         report.lastSynced ?? connection.flatMap { syncedDates[$0.address.absoluteString] }
     }
 
-    /// Whether the connection is to a server, as against the sample library, which has none to sync with.
-    var hasServer: Bool { connection.map { $0 != SampleLibrary.connection } ?? false }
+    /// Whether the connection is to a server, as against the sample library, which has none to sync with. Only a
+    /// debug build holds the sample, so a release build's connection is always a server.
+    var hasServer: Bool {
+        guard let connection else { return false }
+        #if DEBUG
+        return connection != SampleLibrary.connection
+        #else
+        return true
+        #endif
+    }
 
     /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing, and a key the
     /// server has not refused. A server that cannot be reached still counts, so the person can try again at once
