@@ -605,6 +605,48 @@ test('a phone number is a link that dials its digits', () => {
   expect(root.querySelector('.item-prop-value a')).toBeNull()
 })
 
+test('a text value is drawn in a span of its own, so it can shrink to its column and wrap', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
+    ],
+  })
+  const value = root.querySelector('.item-prop-value')!
+  expect(value.children).toHaveLength(1)
+  expect(value.children[0]!.tagName).toBe('SPAN')
+  expect(value.textContent).toBe('plain')
+})
+
+test('rows first drawn where the page has no width are drawn again once it has one', () => {
+  const properties: HeaderModel['properties'] = [
+    { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
+  ]
+  const width = window.innerWidth
+  try {
+    window.innerWidth = 0
+    const narrow = new ItemHeader(
+      document.createElement('header'),
+      document.createElement('footer'),
+    )
+    narrow.set({ ...ticket, properties })
+    const row = narrow.root.querySelector('.item-prop')!
+    window.dispatchEvent(new Event('resize'))
+    expect(narrow.root.querySelector('.item-prop')).toBe(row)
+
+    window.innerWidth = 700
+    window.dispatchEvent(new Event('resize'))
+    const drawn = narrow.root.querySelector('.item-prop')!
+    expect(drawn).not.toBe(row)
+    expect(drawn.textContent).toContain('plain')
+
+    window.dispatchEvent(new Event('resize'))
+    expect(narrow.root.querySelector('.item-prop')).toBe(drawn)
+  } finally {
+    window.innerWidth = width
+  }
+})
+
 test('a page for reading puts the source and reading time in the byline, with no type', () => {
   header.set({
     ...ticket,

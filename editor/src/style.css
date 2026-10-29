@@ -467,9 +467,16 @@ body[data-text='none'] #editor {
   gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
   padding-block: calc(var(--step) / 2);
   color: var(--label-primary);
-  /* Not `anywhere`: WebKit keeps the row height of a first layout at no width, where that value breaks a value
-     after every character, and the row stays that tall once the page has its width. */
+  /* Not `anywhere` here: it breaks a value after every character in a first layout at no width, and WebKit keeps
+     that row height once the page has its width. The header is also drawn again then (`ItemHeader`). */
   overflow-wrap: break-word;
+}
+
+/* `break-word` leaves a flex item as wide as its longest unbroken run, so a long address or word would run past the
+   column. Each value shrinks to the column and breaks inside itself. A tag keeps its fixed height. A first layout at
+   no width breaks it after every character, which is why the header is drawn again once the page has a width. */
+.item-prop-value > :not(.item-chip) {
+  min-width: 0;
 }
 
 /* A symbol the app drew, quiet in the secondary color. */

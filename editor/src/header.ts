@@ -403,6 +403,17 @@ export class ItemHeader {
       this.editing = this.model.item
       postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
     })
+    // The app sends the header before the window has sized the page. WebKit keeps the row heights of that first
+    // layout at no width, where a shrinking value breaks after every character, so the rows are drawn anew once the
+    // page has a width.
+    let width = window.innerWidth
+    window.addEventListener('resize', () => {
+      const had = width
+      width = window.innerWidth
+      if (had > 0 || width === 0) return
+      this.drawn = ''
+      this.redraw()
+    })
   }
 
   /** Inserts the text with its line breaks as spaces, if it has any; whether it did. */
@@ -739,7 +750,7 @@ export class ItemHeader {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href))
           this.link(value, href, () => postToHost({ type: 'openLink', href }), href)
-        else value.textContent = href
+        else element('span', '', value).textContent = href
         break
       }
       case 'email': {
@@ -752,7 +763,7 @@ export class ItemHeader {
         const number = row.text ?? ''
         // A number is dialed as its digits and a leading plus, whatever spacing it is written with.
         const dialed = number.replace(/(?!^\+)[^\d]/g, '')
-        if (dialed.replace('+', '') === '') value.textContent = number
+        if (dialed.replace('+', '') === '') element('span', '', value).textContent = number
         else
           this.link(
             value,
@@ -763,7 +774,7 @@ export class ItemHeader {
         break
       }
       default:
-        value.textContent = row.text ?? ''
+        element('span', '', value).textContent = row.text ?? ''
     }
     return entry
   }
