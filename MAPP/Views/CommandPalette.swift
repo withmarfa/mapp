@@ -260,6 +260,16 @@ struct CommandPalette: View {
             if let host, host.canRefresh {
                 add(String(localized: "Refresh"), "arrow.clockwise", "⌘R") { host.refresh() }
             }
+            // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
+            let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
+            let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
+            if zoom.size(after: .bigger, from: size) != nil {
+                add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+") { zoom.apply(.bigger) }
+            }
+            if zoom.size(after: .smaller, from: size) != nil {
+                add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-") { zoom.apply(.smaller) }
+            }
+            add(String(localized: "Actual Size"), "textformat.size", "⌘0") { zoom.apply(.actual) }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)

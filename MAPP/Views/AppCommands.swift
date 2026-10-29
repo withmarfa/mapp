@@ -128,6 +128,8 @@ struct AppCommands: Commands {
             Divider()
             PageWidthOptions()
             Divider()
+            TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+            Divider()
             // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
             // while it has the keyboard the menu items give the keys up (the items still work from the menu).
