@@ -38,7 +38,8 @@ import Observation
     private(set) var contentRevision = 0
     /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
     private var membershipRevision = 0
-    /// Bumped only when an edge comes, goes or changes, which is all that changes what points at an item. A read of
+    /// Bumped when an edge comes, goes or changes, and when the index is built again, which is all that changes what
+    /// points at an item. A read of
     /// an item's relationships follows this and the records of the items it names, never `contentRevision`.
     private(set) var linksRevision = 0
     private var searchRevision = 0
