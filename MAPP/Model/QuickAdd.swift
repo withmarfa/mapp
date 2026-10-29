@@ -343,6 +343,8 @@ extension Browser {
     /// otherwise the kind is `remembered`, the last one added, then the place's own type (a collection type in the
     /// Collections index), then a note.
     func openQuickAdd(typeID: String? = nil, remembered: String? = nil, in library: any ItemLibrary) {
+        let interval = Telemetry.begin(.navigation, "quickAdd.open")
+        defer { interval.end() }
         leaveSettings()
         palette = nil
         let types = QuickAdd.types(in: library).map(\.id.rawValue)
@@ -411,6 +413,8 @@ extension Browser {
             }
             return nil
         }
+        let interval = Telemetry.begin(.navigation, "quickAdd.save")
+        defer { interval.end() }
         let catalogue = library.catalogue
         let isFile = QuickAdd.isFile(draft.typeID, in: catalogue)
         let id: ItemID?

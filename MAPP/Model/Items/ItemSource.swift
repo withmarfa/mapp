@@ -99,6 +99,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func deleteView(_ view: ItemID, idempotencyKey: String) async throws
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
     func queueSubmitted() async
+    /// What the source's engine is doing, for a quit that runs out of time to say what it waited on; nil where
+    /// the source has no engine.
+    var engineActivity: EngineActivity? { get }
     func close() async
 
     // MARK: The server
@@ -129,6 +132,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 }
 
 nonisolated extension ItemSource {
+    var engineActivity: EngineActivity? { nil }
+
     var downloadedFiles: (any DownloadedFiles)? { nil }
 
     @discardableResult

@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import struct MarfaCore.BinPage
 import struct MarfaCore.KeptFetch
+import os
 
 /// Hydrating, catching up and draining run in order apart from the engine, so writes reach the queue at once.
 /// Attachment downloads run separately so they cannot hold up a drain or flush.
@@ -22,6 +23,9 @@ actor MarfaSync {
         status.hydration != .complete || status.sliceTier != .all || Set(status.sliceTypes) != Set(slice)
             || Set(status.sliceEdgeTypes) != Set(sliceEdgeTypes)
     }
+
+    /// Only our own words go in: what stopped the lane and when it tries again, never an error's message.
+    private static let log = Telemetry.logger(.sync)
 
     private let copy: WorkingCopy
     private let downloads: MarfaDownloads
@@ -195,6 +199,7 @@ actor MarfaSync {
     }
 
     func stop() {
+        Self.log.info("sync closed with the source")
         stopped = true
         retry?.cancel()
         working?.cancel()
@@ -256,6 +261,7 @@ actor MarfaSync {
             return .accepted
         } catch let error as MarfaError where Self.refusesKey(error) {
             if case .copyExpired = error { refreshed = false }
+            Self.log.error("sync stopped: the server refused the key")
             hub.set(.keyRefused)
             return .refused
         } catch {
@@ -488,6 +494,7 @@ actor MarfaSync {
         failures += 1
         retry?.cancel()
         let delay = Self.delay(after: failures)
+        Self.log.notice("sync will \(kind == .refresh ? "refresh" : "drain", privacy: .public) again in \(delay.inMilliseconds / 1000, privacy: .public) s, after \(self.failures, privacy: .public) failures")
         retry = Task {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
@@ -502,7 +509,10 @@ actor MarfaSync {
 
     private func failed(_ error: any Error, retrying kind: Retry) async {
         guard !stopped, let error = error as? MarfaError else {
-            if !stopped { hub.set(.stopped(code: "failed", message: error.localizedDescription)) }
+            if !stopped {
+                Self.log.error("sync stopped on a failure of a kind the package does not name")
+                hub.set(.stopped(code: "failed", message: error.localizedDescription))
+            }
             return
         }
         switch error {
@@ -518,6 +528,7 @@ actor MarfaSync {
         case .copyExpired:
             // The server asks for a new hydration, which keeps the queue. The follow that stopped for it runs
             // outside the loop, so the work starts here.
+            Self.log.notice("sync restarts: the copy expired, so it hydrates again")
             refreshed = false
             wantsRefresh = true
             work()
@@ -527,6 +538,7 @@ actor MarfaSync {
             // The copy was changing its key or moved during the call; the package asks for it again.
             schedule(kind)
         default:
+            Self.log.error("sync stopped on a failure it does not retry")
             hub.set(.stopped(code: error.code(), message: error.message))
             guard !told else { return }
             told = true

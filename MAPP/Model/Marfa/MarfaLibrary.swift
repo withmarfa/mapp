@@ -76,6 +76,8 @@ import Observation
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
+    /// From the person's text being submitted to the engine having taken or answered it.
+    @ObservationIgnored private var textSaves: [WriteID: Telemetry.Interval] = [:]
     /// Text writes the copy has not yet taken and read back, by item, so what it bound in the text may be older.
     @ObservationIgnored private var unreadText: [ItemID: Set<WriteID>] = [:]
     /// The version of the text the person's last save of each item was typed on. Only the first save typed on a
@@ -318,6 +320,8 @@ import Observation
     // MARK: Following the source
 
     private func take(_ change: SourceChange) async {
+        let interval = Telemetry.begin(.library, change.kind, ("items", change.itemCount))
+        defer { interval.end() }
         switch change {
         case .loaded(let snapshot):
             let bodies = await readBodies(Set(snapshot.items.map(\.id)))
@@ -333,9 +337,11 @@ import Observation
         case .bodyChanged(let id, _):
             hold(await readBodies([id]))
         case .answered(let id, let outcome):
+            textSaves.removeValue(forKey: id)?.end()
             read(id)
             await answered(id, outcome)
         case .taken(let id):
+            textSaves.removeValue(forKey: id)?.end()
             read(id)
         case .catalogue(let catalogue):
             self.catalogue = holdingChosenIcons(catalogue)
@@ -381,6 +387,7 @@ import Observation
         hold(bodies)
         reindex()
         isLoaded = true
+        LaunchTrace.shared.mark(.firstLoaded)
     }
 
     private func upsert(_ items: [Item], bodies: [ItemBody]) {
@@ -451,6 +458,8 @@ import Observation
     }
 
     private func reindex() {
+        let interval = Telemetry.begin(.library, "reindex", ("items", records.count))
+        defer { interval.end() }
         index = MarfaItemIndex()
         for record in records.values { index.insert(record.item, catalogue: catalogue) }
         contentRevision += 1
@@ -585,6 +594,7 @@ import Observation
         // A save held on a local create's version 0 is on version 1 once the answer lands, as `readAt` now is.
         let saved = savedOn[id].map { ItemVersion(MarfaEngine.version(read: $0.rawValue, holding: held.rawValue)) }
         let merge: BodyMerge = saved == readAt ? .following : .asRead
+        let saving = Telemetry.begin(.library, "text.save")
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
         // Every write the engine takes ends in `.taken` or `.answered`; only one the source refuses to take, as it
         // has closed, gets neither, so nothing waits on it.
@@ -593,6 +603,9 @@ import Observation
             unreadText[id, default: []].insert(write)
             textWrites[write] = id
             lastTyped[id] = (write, text)
+            textSaves[write] = saving
+        } else {
+            saving.end()
         }
         guard readAt == held else { return }
         savedOn[id] = readAt

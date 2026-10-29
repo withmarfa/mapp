@@ -11,6 +11,7 @@ nonisolated struct MarfaEdgeTable {
 
     subscript(id: String) -> Marfa.Edge? { byID[id] }
     var all: [Marfa.Edge] { Array(byID.values) }
+    var count: Int { byID.count }
 
     /// The identifiers of the edges touching a row.
     func ids(touching item: String) -> Set<String> { byItem[item] ?? [] }

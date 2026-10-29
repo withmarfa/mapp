@@ -60,7 +60,7 @@ nonisolated final class MarfaSource: ItemSource {
     let downloadedFiles: (any DownloadedFiles)?
     private let hub = MarfaHub()
     let engine: MarfaEngine
-    let events: AsyncStream<MarfaEngine.Event>.Continuation
+    let events: MarfaEngine.Events
 
     init(copy: WorkingCopy, connection: MarfaConnection,
          reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil) {
@@ -68,7 +68,8 @@ nonisolated final class MarfaSource: ItemSource {
         let downloads = MarfaDownloads(copy: copy)
         downloadedFiles = downloads
         self.connection = connection
-        let (stream, events) = AsyncStream<MarfaEngine.Event>.makeStream()
+        let (stream, continuation) = AsyncStream<MarfaEngine.Event>.makeStream()
+        let events = MarfaEngine.Events(continuation, activity: hub.activity)
         self.events = events
         embeds = MarfaEmbeds(events: events)
         engine = MarfaEngine(copy: copy, hub: hub, downloads: downloads, reading: reading, refreshing: refreshing, tell: { event in
@@ -407,6 +408,8 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    var engineActivity: EngineActivity? { hub.activity }
+
     /// Returns once every write submitted before it is in the queue, or refused, without waiting on the network,
     /// so a quit while offline keeps every write and does not wait for a server.
     func queueSubmitted() async {
@@ -464,7 +467,7 @@ nonisolated final class MarfaSource: ItemSource {
 /// Attaches files through the engine, which asks the package to queue each one's upload, its file item and its
 /// edge to the item, and says what to write in the text to embed it. A file added on its own goes the same way.
 nonisolated struct MarfaEmbeds: EmbedResolver {
-    let events: AsyncStream<MarfaEngine.Event>.Continuation
+    let events: MarfaEngine.Events
 
     func attach(_ file: URL, to item: ItemID) async throws -> Embed {
         let result = await withCheckedContinuation { continuation in
@@ -494,6 +497,8 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     private let state = Mutex(State())
+    /// What the engine is doing, readable without awaiting it.
+    let activity = EngineActivity()
     private let keyChange = Mutex((changing: false, count: 0))
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())

@@ -3,6 +3,7 @@ import SwiftUI
 @main
 enum Launch {
     static func main() {
+        LaunchTrace.shared.mark(.appInit)
         #if DEBUG
         if TestHost.isRequested {
             TestHost.run()
@@ -98,6 +99,7 @@ struct MAPPApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()
     private let separators = MenuSeparatorTidy()
+    private var metrics: MetricsListener?
 
     override init() {
         #if DEBUG
@@ -117,6 +119,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         separators.start()
+        #if DEBUG
+        let sampled = SampleLibrary.isRequested
+        #else
+        let sampled = false
+        #endif
+        // The sample library and the tests have no use of the system's reports of this app's real use.
+        if !sampled { metrics = MetricsListener() }
         // The saved server's copy opens and paints before the network is asked anything.
         Task { await libraries.launch() }
     }
