@@ -120,7 +120,7 @@ final class WindowTests: XCTestCase {
     }
 
     func testRecentlyDeletedFromTheInstanceMenuRestoresANote() {
-        let instanceName = window.descendants(matching: .any).matching(identifier: "SidebarLibrary").element(boundBy: 0)
+        let instanceName = window.descendants(matching: .any).matching(identifier: "SidebarSettingsMenu").element(boundBy: 0)
         XCTAssertTrue(instanceName.waitForExistence(timeout: 3))
         instanceName.click()
         let recentlyDeleted = window.menuItems["Recently Deleted"].firstMatch

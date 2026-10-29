@@ -6,7 +6,7 @@ final class SidebarNavigationTests: XCTestCase {
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["NoteList"] }
-    private var instanceName: XCUIElement { element("SidebarLibrary") }
+    private var instanceName: XCUIElement { element("SidebarSettingsMenu") }
     private var settingsPages: XCUIElement { element("SettingsPageList") }
 
     override func setUp() async throws {
@@ -30,7 +30,8 @@ final class SidebarNavigationTests: XCTestCase {
             XCTAssertFalse(sidebarText(title).exists, "\(title) is not in the sidebar")
         }
         XCTAssertTrue(instanceName.exists)
-        XCTAssertTrue(element("NewItemToolbar").exists, "the foot holds the New Item button")
+        XCTAssertTrue(element("SidebarSettingsMenu").exists, "the foot holds the settings menu")
+        XCTAssertFalse(element("NewItemToolbar").exists, "the foot has no New Item button")
         XCTAssertTrue(element("SidebarNew").exists, "New is a row of the top block")
         XCTAssertTrue(element("SidebarSearch").exists, "Search is a row of the top block")
         XCTAssertFalse(sidebarText("Browse").exists, "the top block has no heading")
@@ -106,8 +107,8 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(settingsPages.exists)
     }
 
-    func testTheFootsNewItemButtonOpensQuickAdd() {
-        element("NewItemToolbar").click()
+    func testTheNewRowOpensQuickAdd() {
+        element("SidebarNew").click()
         XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
     }

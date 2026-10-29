@@ -55,8 +55,8 @@ struct SidebarTypesSection: View {
         }
     }
 
-    /// A row of text under the types. A depth-0 type row puts its mark at the list's own leading content edge, so this
-    /// text, with no mark of its own, starts there too: the same inset at any text size, with subtype icons on or off.
+    /// A row of text under the types, starting where the marks of the type rows above it do. A mark sits a little
+    /// inside the list's own leading content edge, measured from the sidebar's screenshot.
     private var showMoreRow: some View {
         Button {
             withAnimation(.snappy(duration: 0.2)) { showsAll.toggle() }
@@ -66,6 +66,7 @@ struct SidebarTypesSection: View {
             }
             .interfaceFont(.body)
             .foregroundStyle(.secondary)
+            .padding(.leading, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
         }

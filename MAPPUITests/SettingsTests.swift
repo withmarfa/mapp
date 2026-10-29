@@ -11,8 +11,8 @@ final class SettingsTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     /// Settings' pages, which take the list's column while Settings is the place.
     private var settings: XCUIElement { element("SettingsPageList") }
-    /// The instance's name at the sidebar's foot, which opens the menu that holds Settings.
-    private var instanceMenu: XCUIElement { element("SidebarLibrary") }
+    /// The cog at the sidebar's foot, which opens the menu that holds Settings.
+    private var instanceMenu: XCUIElement { element("SidebarSettingsMenu") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -212,7 +212,7 @@ final class SettingsTests: XCTestCase {
         let typeText = sidebar.staticTexts["SidebarType-core.note"]
         XCTAssertTrue(typeText.waitForExistence(timeout: 3))
         let originalTypeHeight = typeText.frame.height
-        XCTAssertEqual(list.frame.width, 340, accuracy: 2, "a fresh window starts with a 340-point list")
+        XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
         XCTAssertTrue(instanceMenu.exists)
         XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
         instanceMenu.click()
@@ -258,7 +258,7 @@ final class SettingsTests: XCTestCase {
             XCTAssertTrue(instanceMenu.waitForExistence(timeout: 3))
             XCTAssertTrue(instanceMenu.isHittable, "the sidebar's instance menu is reachable at \(points) points")
             XCTAssertTrue(instanceMenu.isEnabled)
-            XCTAssertTrue(element("NewItemToolbar").isHittable, "the foot's New Item button is reachable at \(points) points")
+            XCTAssertTrue(element("SidebarSettingsMenu").isHittable, "the foot's settings menu is reachable at \(points) points")
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.textFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))

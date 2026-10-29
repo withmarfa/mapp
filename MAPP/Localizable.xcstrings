@@ -2645,12 +2645,6 @@
     "Expand %@" : {
       "extractionState" : "manual"
     },
-    "Instance Menu" : {
-      "extractionState" : "manual"
-    },
-    "Opens Refresh, the Console, Settings and Recently Deleted" : {
-
-    },
     "Refresh" : {
 
     },
@@ -2696,6 +2690,30 @@
     },
     "Default Column Widths" : {
       "extractionState" : "manual"
+    },
+    "Make Text Bigger" : {
+
+    },
+    "Make Text Smaller" : {
+
+    },
+    "Actual Size" : {
+
+    },
+    "Use Current Widths" : {
+
+    },
+    "Settings Menu" : {
+
+    },
+    "Console, Settings and Recently Deleted" : {
+
+    },
+    "Open a window to use its column widths." : {
+
+    },
+    "Make the widths this window shows the defaults for new windows." : {
+
     },
     "Reset Widths" : {
       "extractionState" : "manual"

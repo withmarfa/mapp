@@ -223,6 +223,7 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
+        .focusedSceneValue(\.columnWidthReader, { [measuredWidths] column in measuredWidths.width(of: column) })
         .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
@@ -363,6 +364,14 @@ private final class ColumnWidths {
     var sidebar = ColumnWidth.sidebar.stored()
     var list = ColumnWidth.list.stored()
     var settings = ColumnWidth.settings.stored()
+
+    func width(of column: ColumnWidth) -> CGFloat {
+        switch column {
+        case .sidebar: sidebar
+        case .list: list
+        case .settings: settings
+        }
+    }
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every
