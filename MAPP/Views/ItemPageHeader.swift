@@ -126,7 +126,8 @@ struct ItemPageHeader: ViewModifier {
         )
     }
 
-    /// Carries out what the page asks, for the item it names, which may be one the page has just left.
+    /// Carries out what the page asks, for the item it names, which may be one the page has just left: a title draft
+    /// is kept for it, but a menu is only for the item on the page now.
     private var handler: (PageHeaderEvent) -> Void {
         let library = library, drafts = drafts, undoManager = undoManager
         let choosingParent = $choosingParent
@@ -154,7 +155,7 @@ struct ItemPageHeader: ViewModifier {
                 draft.isDirty = false
                 draft.rejected = false
             case .menu(.status, let id, let rect):
-                guard let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
+                guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 let menu = NSMenu()
                 for choice in Self.statusChoices(of: item, in: status) {
                     let entry = actionItem(Self.localized(ItemTypeInfo.Field.label(ofOption: choice))) {
@@ -168,7 +169,7 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.noteID == id, let type = library.item(id)?.type else { return }
                 PagePlacements.update { $0.set(false, row: row, of: type) }
             case .menu(.parent, let id, let rect):
-                guard let parent = Self.parent(of: id, in: library) else { return }
+                guard editor.noteID == id, let parent = Self.parent(of: id, in: library) else { return }
                 guard let target = parent.targets.first else {
                     if parent.isEditable { choosingParent.wrappedValue = rect }
                     return
