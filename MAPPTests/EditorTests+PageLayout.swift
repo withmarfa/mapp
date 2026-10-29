@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Marfa
 import Testing
 import WebKit
 @testable import MAPP
@@ -79,5 +80,38 @@ extension EditorTests {
         }
         #expect(measured[8] == measured[9], "the page is no wider than its window: \(measured[8]) against \(measured[9])")
         #expect(measured[7] <= 64, "a short value stays one line, not \(measured[7]) points tall")
+    }
+
+    @Test func anEventsDetailLineWrapsOnANarrowPageAndStaysBesideItsCalendarTile() async throws {
+        let page = try await Page()
+        try await page.load("A note.\n")
+        var header = Self.header("A meeting")
+        header.item = try #require(page.editor.noteID).rawValue
+        header.kind = .event
+        let item = MAPP.Item(
+            id: ItemID("10000000-0000-0000-0000-000000000002"), type: TypeID("core.event"), title: "A meeting", titleRule: .property("title"),
+            properties: [
+                Property(key: "starts_at", value: .string("2027-04-29T09:00:00Z")), Property(key: "ends_at", value: .string("2027-04-29T10:00:00Z")),
+                Property(key: "timezone", value: .string("Pacific/Auckland")),
+            ], version: ItemVersion(1), created: .distantPast, modified: .distantPast)
+        header.event = try #require(EventHeader(item: item, now: Date()))
+        page.editor.setHeader(header)
+        let window = try await Self.show(page, width: 260)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        // Whether the detail line is cut off, and how far its tile's middle is from the middle of the two lines.
+        let measured = try #require(try await settle(page.editor, """
+            (() => {
+              const detail = document.querySelector('.item-when-detail')
+              const text = document.querySelector('.item-when-text')
+              const tile = document.querySelector('.item-calendar')
+              if (!detail || !text || !tile || !detail.textContent) return null
+              const middle = rect => rect.top + rect.height / 2
+              return [detail.scrollWidth - detail.clientWidth, Math.round(Math.abs(middle(text.getBoundingClientRect()) - middle(tile.getBoundingClientRect()))),
+                      document.documentElement.scrollWidth - innerWidth]
+            })()
+            """, as: [Int].self) { $0?.count == 3 })
+        #expect(measured[0] <= 0, "the detail line is cut off by \(measured[0]) points instead of wrapping")
+        #expect(measured[1] <= 1, "the tile is \(measured[1]) points off the middle of the text beside it")
+        #expect(measured[2] <= 0, "the page is \(measured[2]) points wider than its window")
     }
 }
