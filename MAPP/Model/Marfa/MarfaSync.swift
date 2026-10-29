@@ -48,6 +48,9 @@ actor MarfaSync {
     private var wantsDrain = false
     /// The bin is read from the server alone, so it is read again when something may have changed it.
     private var wantsBin = false
+    /// A read of the bin asked for and not yet due, and when the first ask of it came.
+    private var binTimer: Task<Void, Never>?
+    private var binAsked: ContinuousClock.Instant?
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
     private var refreshed = false
     /// Set when a drain threw as an answer expired the copy. The answers wait in the queue until the copy is
@@ -144,8 +147,29 @@ actor MarfaSync {
         work()
     }
 
-    /// An item may have gone to or left the server's bin, which the copy does not say.
+    /// How long the bin's changes are let settle before it is read, and the longest a read waits for them to.
+    nonisolated static let binQuiet = Duration.seconds(1)
+    nonisolated static let binLongest = Duration.seconds(5)
+
+    /// An item may have gone to or left the server's bin, which the copy does not say. The bin is read from the
+    /// server whole, so a flood of server changes reads it once they pause, and at least every `binLongest`.
     func binChanged() {
+        guard !stopped else { return }
+        let now = ContinuousClock.now
+        let first = binAsked ?? now
+        binAsked = first
+        binTimer?.cancel()
+        let due = min(now + Self.binQuiet, first + Self.binLongest)
+        binTimer = Task {
+            try? await Task.sleep(until: due)
+            guard !Task.isCancelled else { return }
+            self.binDue()
+        }
+    }
+
+    private func binDue() {
+        binAsked = nil
+        binTimer = nil
         wantsBin = true
         work()
     }
@@ -210,6 +234,7 @@ actor MarfaSync {
         Self.log.info("sync closed with the source")
         stopped = true
         retry?.cancel()
+        binTimer?.cancel()
         working?.cancel()
         fetching?.cancel()
         for flusher in flushers + draining { flusher.resume() }

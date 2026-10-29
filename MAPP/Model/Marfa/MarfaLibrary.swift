@@ -76,6 +76,8 @@ import Observation
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
+    /// The source's latest text of each item while the person's own text is unsettled, held once it settles.
+    @ObservationIgnored private var sourceText: [ItemID: ItemBody] = [:]
     /// From the person's text being submitted to the engine having taken or answered it.
     @ObservationIgnored private var textSaves: [WriteID: Telemetry.Interval] = [:]
     /// Text writes the copy has not yet taken and read back, by item, so what it bound in the text may be older.
@@ -324,22 +326,13 @@ import Observation
         defer { interval.end() }
         switch change {
         case .loaded(let snapshot):
-            let bodies = await readBodies(Set(snapshot.items.map(\.id)))
-            load(snapshot, bodies: bodies)
-        case .upserted(let items):
-            // A body is read before an item whose version moved is shown, so the version and the text the page
-            // reads agree; a local write keeps the version, and its text comes with `.bodyChanged`.
-            let moved = items.filter { item in records[item.id].map { $0.item.version != item.version } ?? true }
-            let bodies = moved.isEmpty ? [] : await readBodies(Set(moved.map(\.id)))
-            upsert(items, bodies: bodies)
-        case .removed(let ids):
-            remove(ids)
-        case .bodyChanged(let id, _):
-            hold(await readBodies([id]))
+            load(snapshot)
+        case .changed(let changes):
+            take(changes)
         case .answered(let id, let outcome):
             textSaves.removeValue(forKey: id)?.end()
             read(id)
-            await answered(id, outcome)
+            answered(id, outcome)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             read(id)
@@ -359,17 +352,8 @@ import Observation
         }
     }
 
-    private func readBodies(_ ids: Set<ItemID>) async -> [ItemBody] {
-        do {
-            return try await source.bodies(of: ids)
-        } catch {
-            notices.tell(String(localized: "Can’t Read This Library"), error.localizedDescription)
-            return []
-        }
-    }
-
     /// Keeps the records the views already observe, so a second load tells each of them what changed.
-    private func load(_ snapshot: SourceSnapshot, bodies: [ItemBody]) {
+    private func load(_ snapshot: SourceSnapshot) {
         catalogue = holdingChosenIcons(snapshot.catalogue)
         take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
@@ -384,17 +368,26 @@ import Observation
                 records[item.id] = ItemRecord(item)
             }
         }
-        hold(bodies)
+        hold(Array(snapshot.bodies.values))
         reindex()
         isLoaded = true
         LaunchTrace.shared.mark(.firstLoaded)
     }
 
-    private func upsert(_ items: [Item], bodies: [ItemBody]) {
+    /// One step of the source, taken in at once, so each revision moves at most once for it.
+    private func take(_ changes: ItemChanges) {
         var changed = false
         var moved = false
         var relinked = false
-        for item in items {
+        for id in changes.removed {
+            guard let record = records.removeValue(forKey: id) else { continue }
+            index.remove(record.item)
+            record.isHeld = false
+            changed = true
+            moved = true
+            if !record.item.edgesOut.isEmpty { relinked = true }
+        }
+        for item in changes.upserted {
             if let record = records[item.id] {
                 let old = record.item
                 guard old != item else { continue }
@@ -411,25 +404,9 @@ import Observation
             }
             changed = true
         }
-        hold(bodies)
+        hold(changes.bodies)
         if changed { contentRevision += 1 }
         if moved { membershipRevision += 1 }
-        if relinked { linksRevision += 1 }
-    }
-
-    private func remove(_ ids: [ItemID]) {
-        var changed = false
-        var relinked = false
-        for id in ids {
-            guard let record = records.removeValue(forKey: id) else { continue }
-            index.remove(record.item)
-            record.isHeld = false
-            changed = true
-            if !record.item.edgesOut.isEmpty { relinked = true }
-        }
-        guard changed else { return }
-        contentRevision += 1
-        membershipRevision += 1
         if relinked { linksRevision += 1 }
     }
 
@@ -437,7 +414,11 @@ import Observation
     /// taken in is a new read: the page follows `body(of:)` and shows it, so the next save starts from it, and
     /// where the server kept its own text over the person's, the page shows the server's.
     private func hold(_ bodies: [ItemBody]) {
-        for body in bodies where unsettledText[body.id] == nil {
+        for body in bodies {
+            guard unsettledText[body.id] == nil else {
+                sourceText[body.id] = body
+                continue
+            }
             guard let record = records[body.id], record.body != body else { continue }
             record.body = body
         }
@@ -472,7 +453,7 @@ import Observation
             || old.edgesOut != new.edgesOut
     }
 
-    private func answered(_ id: WriteID, _ outcome: WriteOutcome) async {
+    private func answered(_ id: WriteID, _ outcome: WriteOutcome) {
         let refusal = refusals.removeValue(forKey: id)
         let typed = textWrites[id].flatMap { item in lastTyped[item].flatMap { $0.write == id ? $0.text : nil } }
         if let item = textWrites[id], lastTyped[item]?.write == id { lastTyped[item] = nil }
@@ -502,8 +483,9 @@ import Observation
         unsettledText[item]?.remove(id)
         guard unsettledText[item]?.isEmpty == true else { return }
         unsettledText[item] = nil
-        // The server may have merged the text, or kept its own and put the person's on a copy.
-        hold(await readBodies([item]))
+        // The server may have merged the text, or kept its own and put the person's on a copy: the source tells
+        // what the copy holds in the change that follows the answer, and this is what it last told.
+        if let body = sourceText.removeValue(forKey: item) { hold([body]) }
     }
 
     // MARK: Writing through the source
@@ -599,6 +581,7 @@ import Observation
         // Every write the engine takes ends in `.taken` or `.answered`; only one the source refuses to take, as it
         // has closed, gets neither, so nothing waits on it.
         if refusals[write] != nil {
+            if unsettledText[id] == nil { sourceText[id] = records[id]?.body }
             unsettledText[id, default: []].insert(write)
             unreadText[id, default: []].insert(write)
             textWrites[write] = id

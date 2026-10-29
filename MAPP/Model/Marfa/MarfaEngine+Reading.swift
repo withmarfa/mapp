@@ -7,15 +7,138 @@ extension MarfaEngine {
     func paint() async {
         await reload()
         guard following == nil else { return }
-        following = MarfaFollow.start(copy.changes(), next: { [copy] in copy.changes() }, tell: tell)
+        following = MarfaFollow.start(copy.changes(), next: { [copy] in copy.changes() }, into: heard, tell: tell)
         await sync.start()
     }
 
+    /// The most rows a batch of changes reads one by one; more read the copy whole (`reload`), which costs a list
+    /// of every row rather than a read and an edge read for each.
+    nonisolated static let rereadLimit = 2000
+
+    /// Whether reading `count` rows one by one would cost more than reading all of `held` again.
+    nonisolated static func readsWhole(_ count: Int, of held: Int) -> Bool {
+        count > rereadLimit || (count > 64 && count * 4 > held)
+    }
+
+    /// What a batch of the follow's changes asks the engine to read again.
+    private struct Batch {
+        var ids: Set<String> = []
+        /// Ids the server named, and edges, whose attachments may now be in the copy.
+        var serverIDs: Set<String> = []
+        var serverEdges: Set<String> = []
+        /// Rows the server destroyed, already let go, which the reads that follow tell readers of.
+        var purged: Set<String> = []
+        var reload = false
+        var views = false
+        var queue = false
+        var refresh = false
+        var changes = 0
+    }
+
+    /// Takes everything the follow heard since the last take, in order. The server's word on reachability, the
+    /// queue and the follow is acted on in place; the rows the changes name are read once each, after all of them,
+    /// since what the copy holds now already reflects every change heard, so reading a row after a later change
+    /// to it costs a read and tells nothing new.
+    func takeHeard() async {
+        let entries = heard.take()
+        guard !entries.isEmpty else { return }
+        var batch = Batch()
+        // A server change says the server spoke, which `sync.heard()` takes as being online; it is told once for
+        // each run of them, in its place among the reachability changes.
+        var spoke = false
+        for entry in entries {
+            batch.changes += 1
+            guard case .change(let change) = entry else {
+                // What changed between the two streams was heard by neither.
+                batch.reload = true
+                batch.refresh = true
+                continue
+            }
+            switch change.origin {
+            // This engine makes every local write and hears every drain's answers from `MarfaSync`.
+            case .local, .answered, .refreshed(.drained): continue
+            case .serverReachable: await sync.reachable()
+            case .serverUnreachable(let error): await sync.unreachable(error.message)
+            // The copy drains what waited when the server is back; its answers are taken as a drain of the sync lane's.
+            case .queueDrained(let report):
+                if !report.verdicts.isEmpty { await answer(report) }
+                await sync.drainedByFollow(report)
+            case .queueNotDrained(let error): await sync.drainStopped(error, answersTaken: await takeAnswers(after: error))
+            case .stopped(let error): await sync.stopped(error)
+            case .server:
+                if !spoke { await sync.heard() }
+                spoke = true
+                name(change, in: &batch)
+                if let id = change.itemId { batch.serverIDs.insert(id) }
+                if let id = change.edgeId { batch.serverEdges.insert(id) }
+                continue
+            case .refreshed(.purged):
+                guard let id = change.itemId else {
+                    batch.reload = true
+                    continue
+                }
+                // An item the server destroyed leaves the copy and the bin.
+                rows[id] = nil
+                binned[id] = nil
+                restoring[id] = nil
+                batch.purged.insert(id)
+                batch.ids.insert(id)
+                continue
+            // A view written through the server changes the views alone.
+            case .refreshed(.viewWritten): batch.views = true; continue
+            // The copy forgot answers it held, which changes what each item shows of its writes and nothing else.
+            case .refreshed(.forgotten): batch.queue = true; continue
+            case .refreshed(.pinned), .refreshed(.unpinned):
+                if let id = change.itemId { batch.ids.insert(id) } else { batch.reload = true }
+                continue
+            // A folder holds a device's sync settings and places no item.
+            case .refreshed(.folderWritten): continue
+            case .saved, .refreshed: batch.reload = true; continue
+            }
+            spoke = false
+        }
+        let taking = Telemetry.begin(.engine, "heard.batch", ("changes", batch.changes))
+        let whole = batch.reload || Self.readsWhole(batch.ids.count, of: rows.count)
+        defer { taking.end(("changes", batch.changes), ("ids", batch.ids.count), ("reload", whole ? 1 : 0)) }
+        if whole {
+            await reload(publishing: batch.purged)
+        } else if !batch.ids.isEmpty {
+            await reread(batch.ids)
+        } else if batch.queue {
+            await readQueue()
+            publish([])
+        }
+        if batch.views, !whole { await readViews() }
+        // Reachability precedes replay. Fetch again once the copy holds the arriving attachment or its item.
+        let arrived = batch.serverIDs.flatMap { edges.edges(touching: $0) } + batch.serverEdges.compactMap { edges[$0] }
+        if arrived.contains(where: { $0.edgeType == MarfaMapping.attachmentEdge }) { await sync.fetchAttachments() }
+        if batch.refresh { await sync.refresh() }
+    }
+
+    /// Adds the rows a server change names: its item, and both ends of its edge as the engine holds it. An edge
+    /// the engine does not hold names no row it knows, so with no item named the copy is read whole.
+    private func name(_ change: Marfa.Change, in batch: inout Batch) {
+        if let id = change.itemId { batch.ids.insert(id) }
+        guard let edgeID = change.edgeId else { return }
+        if let edge = edges[edgeID] {
+            batch.ids.formUnion([edge.sourceId, edge.targetId])
+        } else if change.itemId == nil {
+            batch.reload = true
+        }
+    }
+
     /// Reads the catalogue, every row in every state, their edges and the queue, and publishes what differs. A
-    /// copy that cannot be read keeps showing what it last held, and says why.
-    func reload() async {
+    /// copy that cannot be read keeps showing what it last held, and says why. What an item's text names is read
+    /// again only where the item or its edges changed, or a name in it was not yet bound to an item. `also` names
+    /// rows already let go, whose readers are told with the rest.
+    func reload(publishing also: Set<String> = []) async {
         let reloading = Telemetry.begin(.engine, "reload")
-        defer { reloading.end(("rows", self.rows.count), ("edges", self.edges.count), ("bodyLinks", self.bodyLinks.count)) }
+        var published = 0
+        defer {
+            reloading.end(
+                ("rows", self.rows.count), ("edges", self.edges.count), ("bodyLinks", self.bodyLinks.count),
+                ("published", published))
+        }
         let rows: [String: Marfa.Item]
         let edges: [Marfa.Edge]
         let catalogue: Catalogue
@@ -51,26 +174,55 @@ extension MarfaEngine {
             }
         } catch {
             readFailed(error)
-            publish([])
+            publish(also.map { ItemID($0) })
             return
         }
-        let gone = Set(self.rows.keys).subtracting(rows.keys)
-        let departed = self.rows.filter { gone.contains($0.key) }.values
+        let previousRows = self.rows
+        let previousEdges = self.edges
+        let previousBinned = binned
+        let previousLinks = bodyLinks
+        let everything = !painted || catalogue != self.catalogue
         self.catalogue = catalogue
         self.rows = rows
         await sync.unreadable(Set(rows.values.filter { $0.unreadableProperties != nil }.map(\.id)))
         self.edges.removeAll()
         for edge in edges { self.edges.insert(edge) }
         binned = binned.filter { rows[$0.key] == nil }
-        for row in departed { await left(row) }
-        bodyLinks = [:]
+        let gone = Set(previousRows.keys).subtracting(rows.keys)
+        var binChanged = false
+        for id in gone {
+            if let row = previousRows[id], left(row) { binChanged = true }
+        }
+        if binChanged { await sync.binChanged() }
+
+        // The rows whose item may map differently: changed, come or gone, at either end of an edge that changed,
+        // or at the other end of an edge whose row came or went, since an edge shows only where both ends are held.
+        var touched = also.union(gone)
+        for (id, row) in rows where previousRows[id] != row { touched.insert(id) }
+        for edge in edges where previousEdges[edge.id] != edge {
+            touched.formUnion([edge.sourceId, edge.targetId])
+            if let old = previousEdges[edge.id] { touched.formUnion([old.sourceId, old.targetId]) }
+        }
+        for edge in previousEdges.all where self.edges[edge.id] == nil { touched.formUnion([edge.sourceId, edge.targetId]) }
+        for id in gone.union(rows.keys.filter { previousRows[$0] == nil }) {
+            for edge in previousEdges.edges(touching: id) + self.edges.edges(touching: id) {
+                touched.formUnion([edge.sourceId, edge.targetId])
+            }
+        }
+
         let linking = Telemetry.begin(.engine, "reload.links")
         var linkReads = 0
-        for row in rows.values where Self.mayName(row, catalogue: catalogue) {
+        for (id, row) in rows where Self.mayName(row, catalogue: catalogue) {
+            if !everything, !touched.contains(id), let links = previousLinks[id], Self.allBound(links) { continue }
             linkReads += 1
             await readLinks(of: row)
         }
+        for id in Set(bodyLinks.keys).subtracting(rows.keys) { bodyLinks[id] = nil }
+        for (id, row) in rows where bodyLinks[id] != nil && !Self.mayName(row, catalogue: catalogue) { bodyLinks[id] = nil }
         linking.end(("read", linkReads), ("kept", bodyLinks.count))
+        touched.formUnion(Set(previousLinks.keys).union(bodyLinks.keys).filter { previousLinks[$0] != bodyLinks[$0] })
+        touched.formUnion(Set(previousBinned.keys).union(binned.keys).filter { previousBinned[$0] != binned[$0] })
+
         let conflicts = Telemetry.begin(.engine, "reload.conflicts")
         await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
         conflicts.end()
@@ -81,10 +233,18 @@ extension MarfaEngine {
         await readViews()
         viewing.end()
         let publishing = Telemetry.begin(.engine, "reload.publish")
-        publish(Set(rows.keys).union(gone).union(binned.keys).map { ItemID($0) }, catalogueChanged: true)
-        publishing.end()
+        let ids = everything ? Set(rows.keys).union(gone).union(binned.keys).union(also) : touched
+        published = ids.count
+        publish(ids.map { ItemID($0) }, catalogueChanged: true)
+        publishing.end(("ids", published))
         // Held undos are judged on what this read found, so they wait until it found the copy whole.
         if whole { await releaseHeld() }
+    }
+
+    /// Whether every name in an item's text is bound to an item, so it reads the same until the item or its edges
+    /// change. A name not yet bound may be bound by a drain, a catch-up or another item arriving.
+    nonisolated static func allBound(_ links: BodyLinks) -> Bool {
+        (links.links + links.embeds).allSatisfy(\.target.isItem)
     }
 
     /// Reads the views the copy holds, and tells readers once they differ. One view this build cannot read refuses
@@ -115,12 +275,13 @@ extension MarfaEngine {
 
     /// A row that left the copy: one in the bin went there with its delete answered, so Recently Deleted keeps it,
     /// as the copy last held it, until the server's bin is read; any other was deleted elsewhere or fell out of the
-    /// slice, which may have put it in the bin, so the bin is read again.
-    private func left(_ row: Marfa.Item) async {
+    /// slice, which may have put it in the bin, so the bin is read again: true where it should be. The caller
+    /// asks once for all the rows it read.
+    private func left(_ row: Marfa.Item) -> Bool {
         bodyLinks[row.id] = nil
-        guard restoring[row.id] == nil else { return }
+        guard restoring[row.id] == nil else { return false }
         if row.state == .trashed { binned[row.id] = row }
-        await sync.binChanged()
+        return true
     }
 
     /// Whether an item's text can hold a link or an embed: a `[[link]]` or an `![](embed)`. The package reads each
@@ -166,18 +327,27 @@ extension MarfaEngine {
         defer { interval.end(("ids", ids.count), ("affected", affected.count)) }
         var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
+            var found: [String: Marfa.Item] = [:]
+            var missing: [String] = []
             for id in ids {
-                let (row, held) = try await Self.asking(hub) {
-                    var row = try await copy.items.get(id)
-                    if row == nil {
-                        row = try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id }
-                    }
-                    let held: [Marfa.Edge]
-                    do { held = row == nil ? [] : try await reading.edges(touching: id) }
-                    catch MarfaError.hydrationIncomplete {
-                        held = edges.ids(touching: id).compactMap { edges[$0] }
-                    }
-                    return (row, held)
+                if let row = try await Self.asking(hub, { try await copy.items.get(id) }) { found[id] = row } else { missing.append(id) }
+            }
+            // A row the copy keeps only until its delete is answered is listed among the copy's trashed rows,
+            // listed once for all of them.
+            if !missing.isEmpty {
+                let wanted = Set(missing)
+                let trashed = try await Self.asking(hub) { try await copy.items.list(ListFilters(state: .trashed)) }
+                for row in trashed where wanted.contains(row.id) { found[row.id] = row }
+            }
+            for id in ids {
+                guard let row = found[id] else {
+                    read.append((nil, id, []))
+                    continue
+                }
+                let held: [Marfa.Edge]
+                do { held = try await Self.asking(hub) { try await reading.edges(touching: id) } }
+                catch MarfaError.hydrationIncomplete {
+                    held = edges.edges(touching: id)
                 }
                 read.append((row, id, held))
             }
@@ -194,6 +364,7 @@ extension MarfaEngine {
             entry.row.map(MarfaMapping.isLibraryItem) == false ? (row: nil, id: entry.id, held: []) : entry
         }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
+        var binChanged = false
         for (row, id, _) in read {
             let previous = rows[id]
             rows[id] = row
@@ -202,12 +373,13 @@ extension MarfaEngine {
                 await readLinks(of: row)
             } else {
                 bodyLinks[id] = nil
-                if let previous { await left(previous) }
+                if let previous, left(previous) { binChanged = true }
             }
             for edgeID in edges.ids(touching: id) {
                 if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
             }
         }
+        if binChanged { await sync.binChanged() }
         for (_, _, held) in read {
             for edge in held {
                 insert(edge)
@@ -263,15 +435,6 @@ extension MarfaEngine {
         publish(changed.map { ItemID($0) })
     }
 
-    /// An item the server destroyed leaves the copy and the bin.
-    private func purged(_ id: String?) async {
-        guard let id else { return await reload() }
-        rows[id] = nil
-        binned[id] = nil
-        restoring[id] = nil
-        await reread([id])
-    }
-
     /// A queue that cannot be read leaves each item's sync as it was, rather than settling it.
     func readQueue() async {
         do {
@@ -322,21 +485,20 @@ extension MarfaEngine {
         edges.remove(id)
     }
 
-    /// Maps `ids` again and tells readers what differs: the first time, everything as `.loaded`. Failures gathered
-    /// on the way follow as `.unavailable`.
+    /// Maps `ids` again and tells readers what differs, in one change: the first time, everything as `.loaded`.
+    /// An item's text goes with it where the item is new, its version moved or its text changed, so a page never
+    /// shows a version with older text. Failures gathered on the way follow as `.unavailable`.
     func publish(_ ids: some Sequence<ItemID>, catalogueChanged: Bool = false) {
         hub.setBinned(binned)
         let copies = conflictedCopies()
         settleConflicts(copies)
         let ids = Set(ids).union(changedSync)
         changedSync = []
-        if catalogueChanged, painted, hub.snapshot?.catalogue != catalogue { hub.publish(.catalogue(catalogue)) }
-        var upserted: [Item] = []
-        var removed: [ItemID] = []
-        var bodyChanged: [(ItemID, ItemVersion)] = []
+        if catalogueChanged, painted, hub.catalogue != catalogue { hub.publish(.catalogue(catalogue)) }
+        var changes = ItemChanges()
         for id in ids {
             guard let row = rows[id.rawValue] ?? binned[id.rawValue] else {
-                if items.removeValue(forKey: id) != nil { removed.append(id) }
+                if items.removeValue(forKey: id) != nil { changes.removed.append(id) }
                 bodies[id] = nil
                 continue
             }
@@ -344,54 +506,29 @@ extension MarfaEngine {
             let item = MarfaMapping.item(
                 row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled, bodyLinks: bodyLinks[row.id],
                 isHeld: { self.rows[$0] != nil })
-            let body = MarfaMapping.body(of: row, catalogue: catalogue)?.hashValue ?? 0
-            if let previous = bodies[id], previous != body { bodyChanged.append((id, item.version)) }
-            bodies[id] = body
-            if items[id] != item {
+            let text = MarfaMapping.body(of: row, catalogue: catalogue)
+            let hash = text?.hashValue ?? 0
+            let previous = items[id]
+            if let text, previous?.version != item.version || bodies[id] != hash {
+                changes.bodies.append(ItemBody(id: id, text: text, version: item.version))
+            }
+            bodies[id] = hash
+            if previous != item {
                 items[id] = item
-                upserted.append(item)
+                changes.upserted.append(item)
             }
         }
         if !painted {
             painted = true
-            let ordered = items.values.sorted { $0.created > $1.created }
-            hub.publish(.loaded(SourceSnapshot(items: ordered, catalogue: catalogue, views: views)))
-        } else {
-            if !removed.isEmpty { hub.publish(.removed(removed)) }
-            if !upserted.isEmpty { hub.publish(.upserted(upserted)) }
-            for (id, version) in bodyChanged { hub.publish(.bodyChanged(id, version)) }
+            hub.publish(.loaded(SourceSnapshot(
+                items: items.values.sorted(by: MarfaHub.newestFirst), catalogue: catalogue, views: views,
+                bodies: Dictionary(changes.bodies.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }))))
+        } else if !changes.isEmpty {
+            hub.publish(.changed(changes))
         }
         for failure in failures { hub.publish(.unavailable(failure)) }
         failures = []
         publishReport(copies)
-    }
-
-    func handle(_ change: Marfa.Change) async {
-        switch change.origin {
-        // This engine makes every local write and hears every drain's answers from `MarfaSync`.
-        case .local, .answered, .refreshed(.drained): break
-        case .serverReachable: await sync.reachable()
-        case .serverUnreachable(let error): await sync.unreachable(error.message)
-        // The copy drains what waited when the server is back; its answers are taken as a drain of the sync lane's.
-        case .queueDrained(let report):
-            if !report.verdicts.isEmpty { await answer(report) }
-            await sync.drainedByFollow(report)
-        case .queueNotDrained(let error): await sync.drainStopped(error, answersTaken: await takeAnswers(after: error))
-        case .server:
-            await sync.heard()
-            await reread(change)
-            // Reachability precedes replay. Fetch again once the copy holds the arriving attachment or its item.
-            let changedEdges = change.itemId.map { edges.edges(touching: $0) } ?? []
-            let namedEdge = change.edgeId.flatMap { edges[$0] }
-            if (changedEdges + [namedEdge].compactMap { $0 }).contains(where: { $0.edgeType == MarfaMapping.attachmentEdge }) {
-                await sync.fetchAttachments()
-            }
-        case .refreshed(.purged): await purged(change.itemId)
-        // A view written through the server changes the views alone.
-        case .refreshed(.viewWritten): await readViews()
-        case .saved, .refreshed: await reload()
-        case .stopped(let error): await sync.stopped(error)
-        }
     }
 
     /// A drain that stops on an error has recorded the answers it got and tells none of them. They are read from the
@@ -404,18 +541,5 @@ extension MarfaEngine {
         let report = MarfaSync.report(answeredIn: queued)
         if !report.verdicts.isEmpty { await answer(report) }
         return true
-    }
-
-    func reread(_ change: Marfa.Change) async {
-        var ids = Set(change.itemId.map { [$0] } ?? [])
-        if let edgeID = change.edgeId {
-            guard let edge = edges[edgeID] else {
-                // An edge the copy did not hold names no item to read again.
-                if ids.isEmpty { await reload() } else { await reread(ids) }
-                return
-            }
-            ids.formUnion([edge.sourceId, edge.targetId])
-        }
-        if !ids.isEmpty { await reread(ids) }
     }
 }

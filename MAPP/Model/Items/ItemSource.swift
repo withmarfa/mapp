@@ -5,6 +5,18 @@ nonisolated struct SourceSnapshot: Hashable, Sendable {
     var catalogue: Catalogue
     /// The views saved on the server, which are no items of the library.
     var views: [LibraryView] = []
+    /// The text of each item that has any, read with the rows, so a page never shows a version with older text.
+    var bodies: [ItemID: ItemBody] = [:]
+}
+
+/// What one step of the source changed among the items, told together so a library takes it in once.
+nonisolated struct ItemChanges: Hashable, Sendable {
+    var upserted: [Item] = []
+    var removed: [ItemID] = []
+    /// The text of each item whose text or version moved, or that is new, read in the same step as its row.
+    var bodies: [ItemBody] = []
+
+    var isEmpty: Bool { upserted.isEmpty && removed.isEmpty && bodies.isEmpty }
 }
 
 nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
@@ -31,9 +43,7 @@ nonisolated struct SourceFailure: LocalizedError, Hashable, Sendable {
 nonisolated enum SourceChange: Hashable, Sendable {
     /// Replaces everything held; always the first change.
     case loaded(SourceSnapshot)
-    case upserted([Item])
-    case removed([ItemID])
-    case bodyChanged(ItemID, ItemVersion)
+    case changed(ItemChanges)
     case answered(WriteID, WriteOutcome)
     /// The write is in the copy, and every item it changed has been read again and sent before this.
     case taken(WriteID)
@@ -79,8 +89,6 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     @discardableResult
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool
     func body(of item: ItemID) async throws -> ItemBody
-    /// The text of each item named that has any, read together, since a library reads every body as it loads.
-    func bodies(of items: Set<ItemID>) async throws -> [ItemBody]
     func fileURL(of item: ItemID) async throws -> URL
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.
@@ -97,7 +105,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64, idempotencyKey: String) async throws -> LibraryView
     /// Deletes the view for good, for every app; a view has no bin.
     func deleteView(_ view: ItemID, idempotencyKey: String) async throws
-    /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network.
+    /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network
+    /// or on the source's other work.
     func queueSubmitted() async
     /// What the source's engine is doing, for a quit that runs out of time to say what it waited on; nil where
     /// the source has no engine.
