@@ -106,7 +106,20 @@ extension DetailsPresentation {
     /// is gone for good: the item switched, the window closed or the app is quitting. A section folded, or an
     /// inspector hidden, does not come here, so a held-back edit is still there when it shows again.
     func handOffProperties(of itemID: ItemID? = nil, in library: any ItemLibrary, undoManager: UndoManager?) {
-        for (id, key, draft) in unsavedProperties(of: itemID) {
+        handOff(unsavedProperties(of: itemID), in: library, undoManager: undoManager)
+    }
+
+    /// Hands back the property drafts of every item but `shown`, the one the inspector lists. The selection changing
+    /// comes here whether or not the inspector is on screen, so a draft held back while it was hidden is not left
+    /// waiting unseen.
+    func handOffProperties(except shown: ItemID?, in library: any ItemLibrary, undoManager: UndoManager?) {
+        handOff(unsavedProperties().filter { $0.item != shown }, in: library, undoManager: undoManager)
+    }
+
+    private func handOff(
+        _ drafts: [(item: ItemID, key: String, draft: ItemPropertyDraft)], in library: any ItemLibrary, undoManager: UndoManager?
+    ) {
+        for (id, key, draft) in drafts {
             guard let field = draft.field else { continue }
             let item = library.item(id)
             draft.handOff(
