@@ -155,7 +155,7 @@ body[data-text='none'] #editor {
   font-weight: 600;
   color: var(--inkkit-text-color);
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   outline: none;
   cursor: text;
   -webkit-user-select: text;
@@ -422,7 +422,9 @@ body[data-text='none'] #editor {
   gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
   padding-block: calc(var(--step) / 2);
   color: var(--label-primary);
-  overflow-wrap: anywhere;
+  /* Not `anywhere`: WebKit keeps the row height of a first layout at no width, where that value breaks a value
+     after every character, and the row stays that tall once the page has its width. */
+  overflow-wrap: break-word;
 }
 
 /* A symbol the app drew, quiet in the secondary color. */
