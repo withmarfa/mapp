@@ -109,16 +109,30 @@ import Testing
 /// The pictures the header's pins use, drawn once and kept.
 @MainActor
 @Suite(.hangLimit) struct PageHeaderIconsTests {
+    // A picture drawn again has the same bytes, so only the tally of drawings can show one was kept. Each test runs
+    // on the main actor without a suspension, so no other drawing reaches the tally meanwhile.
     @Test func theSamePicturesComeBackWithoutBeingDrawnAgain() throws {
         let first = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        #if DEBUG
+        Cost.resetTallies()
+        #endif
         let again = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        #if DEBUG
+        #expect(Cost.tallies[.iconDraw] == nil)
+        #endif
         #expect(first.parent.url == again.parent.url)
         #expect(first.symbols.mapValues(\.url) == again.symbols.mapValues(\.url))
     }
 
     @Test func aTypeIconThatAppearsLaterJoinsTheOnesAlreadyDrawn() throws {
         let one = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        #if DEBUG
+        Cost.resetTallies()
+        #endif
         let both = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder", "bug"]))
+        #if DEBUG
+        #expect(Cost.tallies[.iconDraw]?.count == 1)
+        #endif
         #expect(both.symbols.count == one.symbols.count + 1)
         for (key, icon) in one.symbols { #expect(both.symbols[key]?.url == icon.url) }
     }
