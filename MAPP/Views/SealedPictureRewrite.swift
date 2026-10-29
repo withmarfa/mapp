@@ -12,18 +12,18 @@ import Foundation
 ///
 /// The scan follows the HTML tokenizer's rules for what matters here: comments, the text of `script`, `style` and the
 /// other raw-text elements, quoted and unquoted attribute values and character references. Everything else is copied
-/// byte for byte.
+/// byte for byte. The scan reads only ASCII markup, so it works on the document's own bytes in any encoding that keeps
+/// ASCII as ASCII, and the page that shows it chooses the encoding (`SealedWebPage.show`).
 nonisolated enum SealedPictureRewrite {
     struct Result: Sendable {
-        /// The document as UTF-8.
+        /// The document in its own encoding, with its pictures pointed at the app.
         let html: Data
         /// The web addresses of its pictures, each once, in the order they first appear.
         let addresses: [URL]
     }
 
     static func rewrite(_ data: Data, item: ItemID, version: Int) -> Result {
-        let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? ""
-        var scanner = Scanner(bytes: Array(text.utf8), item: item, version: version)
+        var scanner = Scanner(bytes: Array(data), item: item, version: version)
         scanner.run()
         return Result(html: Data(scanner.output), addresses: scanner.addresses)
     }
