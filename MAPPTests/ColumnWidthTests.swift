@@ -54,3 +54,54 @@ struct ColumnWidthTests {
         for column in ColumnWidth.allCases { #expect(InterfaceKey.all.contains(column.key)) }
     }
 }
+
+@MainActor
+struct ColumnWidthTrackerTests {
+    private func tracker() -> ColumnWidthTracker {
+        let suite = "ColumnWidthTrackerTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        return ColumnWidthTracker(defaults: defaults)
+    }
+
+    @Test func aNewWindowStartsEachColumnAtItsDefault() {
+        let tracker = tracker()
+        for column in ColumnWidth.allCases { #expect(tracker.width(of: column) == column.defaultWidth) }
+    }
+
+    @Test func theNarrowLayoutOfABuiltSplitViewIsNotKept() {
+        let tracker = tracker()
+        tracker.record(280, for: .list)
+        tracker.record(200, for: .settings)
+        #expect(tracker.width(of: .list) == 350)
+        #expect(tracker.width(of: .settings) == 290)
+    }
+
+    @Test func aSettledWidthIsKeptAndABelowLimitOneIsNot() {
+        let tracker = tracker()
+        tracker.endSettling()
+        tracker.record(410, for: .list)
+        tracker.record(12, for: .list)
+        tracker.record(.nan, for: .list)
+        #expect(tracker.width(of: .list) == 410)
+    }
+
+    @Test func buildingTheSplitViewAgainSettlesAgain() {
+        let tracker = tracker()
+        tracker.endSettling()
+        tracker.beginSettling()
+        tracker.record(300, for: .sidebar)
+        #expect(tracker.width(of: .sidebar) == 230)
+    }
+
+    @Test func onlyTheWindowInFrontIsRead() {
+        let registry = ColumnWidthRegistry()
+        let first = tracker(), second = tracker()
+        registry.windowBecame(active: true, tracker: first)
+        registry.windowBecame(active: true, tracker: second)
+        registry.windowBecame(active: false, tracker: first)
+        #expect(registry.front === second)
+        registry.windowBecame(active: false, tracker: second)
+        #expect(registry.front == nil)
+    }
+}

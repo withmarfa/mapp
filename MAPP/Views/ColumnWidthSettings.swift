@@ -42,7 +42,7 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
 /// Settings for the width a column starts at in a new window. A width dragged in a window is that window's own and
 /// never changes these.
 struct ColumnWidthOptions: View {
-    @FocusedValue(\.columnWidthReader) private var measure
+    private var registry = ColumnWidthRegistry.shared
 
     var body: some View {
         ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
@@ -52,13 +52,13 @@ struct ColumnWidthOptions: View {
             }
             .accessibilityIdentifier("ColumnWidthsReset")
             Button("Use Current Widths") {
-                guard let measure else { return }
+                guard let front = registry.front else { return }
                 for column in ColumnWidth.allCases {
-                    UserDefaults.standard.set(Double(column.resolved(Double(measure(column)))), forKey: column.key)
+                    UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
                 }
             }
-            .disabled(measure == nil)
-            .help(measure == nil ? "Open a window to use its column widths." : "Make the widths this window shows the defaults for new windows.")
+            .disabled(registry.front == nil)
+            .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths this window shows the defaults for new windows.")
             .accessibilityIdentifier("ColumnWidthsUseCurrent")
         }
     }
@@ -97,7 +97,40 @@ private struct ColumnWidthRow: View {
     }
 }
 
-extension FocusedValues {
-    /// Reads a column's width in the main window in front; nil while no main window is.
-    @Entry var columnWidthReader: ((ColumnWidth) -> CGFloat)?
+/// What one main window knows of its columns' widths. Each starts at the width set in Settings; a width measured
+/// in the window replaces it. The split view lays out narrow for a moment whenever it is built, so a measurement is
+/// kept only once the layout has settled; one taken earlier would be copied back as the column's ideal width and the
+/// column would open at its minimum.
+@MainActor
+final class ColumnWidthTracker {
+    private var widths: [ColumnWidth: CGFloat]
+    private(set) var isSettling = true
+
+    init(defaults: UserDefaults = .standard) {
+        widths = Dictionary(uniqueKeysWithValues: ColumnWidth.allCases.map { ($0, $0.stored(in: defaults)) })
+    }
+
+    func width(of column: ColumnWidth) -> CGFloat { widths[column] ?? column.defaultWidth }
+
+    func record(_ width: CGFloat, for column: ColumnWidth) {
+        guard !isSettling, width.isFinite, width >= column.range.lowerBound else { return }
+        widths[column] = width
+    }
+
+    /// Called as the split view is built again; measurements are ignored until `endSettling`.
+    func beginSettling() { isSettling = true }
+    func endSettling() { isSettling = false }
+}
+
+/// The tracker of the main window in front, which Settings reads for Use Current Widths. It holds the tracker weakly,
+/// so a closed window leaves it empty.
+@MainActor @Observable
+final class ColumnWidthRegistry {
+    static let shared = ColumnWidthRegistry()
+    weak var front: ColumnWidthTracker?
+
+    /// Makes this window's tracker the front one; a window that stops being in front gives it up only if it still holds it.
+    func windowBecame(active: Bool, tracker: ColumnWidthTracker) {
+        if active { front = tracker } else if front === tracker { front = nil }
+    }
 }
