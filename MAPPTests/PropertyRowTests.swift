@@ -126,6 +126,17 @@ struct PropertyRowTests {
         #expect(rows[1].value == .items([PropertyRow.Target(title: "Ship it", item: ItemID("a")), PropertyRow.Target(title: "Test it", item: ItemID("b"))]))
     }
 
+    @Test func aLinkCarriesTheIconOfTheItemItOpens() {
+        let blocks = Self.relationship("blocks", "blocks", [("Ship it", "a"), ("Test it", "b")])
+        let rows = PropertyRow.rows(
+            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", tags: [],
+            icon: { $0 == ItemID("a") ? "rocket" : nil })
+        #expect(rows[1].value == .items([
+            PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "rocket"),
+            PropertyRow.Target(title: "Test it", item: ItemID("b"), icon: nil),
+        ]))
+    }
+
     @Test func aLinkThatOpensNothingIsLeftOut() {
         let missing = ItemRelationship(
             field: "blocks", label: "Blocks",

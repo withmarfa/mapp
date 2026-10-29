@@ -286,7 +286,7 @@ final class EditorController: NSObject {
 
     private func sendHeader() {
         if let size = header?.interfaceTextSize {
-            let needed = Set(((header?.contents ?? []) + (header?.linked ?? [])).map(\.icon)).union(header.map { [$0.icon.name] } ?? [])
+            let needed = header?.typeIconNames ?? []
             if size != headerIconSize || !needed.isSubset(of: headerTypeIcons) {
                 let typeIcons = needed.union(size == headerIconSize ? headerTypeIcons : [])
                 if let icons = Cost.measure(.headerIcons, { PageHeaderIcons(textSize: size, typeIcons: typeIcons) }) {
@@ -579,6 +579,8 @@ final class EditorController: NSObject {
             onHeaderEvent(.titleDiscard(item))
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .propertyMenu(let row, let item, let rect, let viewportHeight):
+            onHeaderEvent(.rowMenu(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
             if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto", "tel"].contains(scheme) {
                 NSWorkspace.shared.open(url)

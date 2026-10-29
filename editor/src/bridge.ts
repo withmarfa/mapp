@@ -40,6 +40,13 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  | {
+      type: 'propertyMenu'
+      item: string
+      row: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }

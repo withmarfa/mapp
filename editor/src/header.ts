@@ -25,7 +25,7 @@ export interface HeaderRow {
   kind: 'status' | 'parent' | 'items' | 'tags' | 'date' | 'url' | 'email' | 'phone' | 'text'
   text?: string
   texts?: string[]
-  items?: { title: string; item: string }[]
+  items?: { title: string; item: string; symbol: string }[]
 }
 
 /** An item that links to the one on the page. */
@@ -185,10 +185,16 @@ class LinkedSection {
     className: string,
     private readonly changed: () => void,
     private readonly glyph: (name: string, parent: HTMLElement) => void,
+    menu?: (toggle: HTMLElement) => void,
   ) {
     this.root = element('section', `item-linked ${className}`, parent)
     this.toggle = element('button', 'item-linked-toggle', this.root)
     this.toggle.type = 'button'
+    if (menu)
+      this.toggle.addEventListener('contextmenu', (event) => {
+        event.preventDefault()
+        menu(this.toggle)
+      })
     this.toggle.addEventListener('click', () => {
       this.open = !this.open
       this.changed()
@@ -343,7 +349,16 @@ export class ItemHeader {
     const redraw = () => this.redraw()
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
     this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
-    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph)
+    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph, (toggle) =>
+      this.openRowMenu('#linked', toggle),
+    )
+    // Any row of the property block offers to leave itself off the page; the inspector still lists it.
+    this.properties.addEventListener('contextmenu', (event) => {
+      const entry = (event.target as Element).closest<HTMLElement>('.item-prop')
+      if (!entry?.dataset.row) return
+      event.preventDefault()
+      this.openRowMenu(entry.dataset.row, entry)
+    })
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -431,6 +446,11 @@ export class ItemHeader {
 
   get isEditingTitle(): boolean {
     return document.activeElement === this.title
+  }
+
+  /** Whether the footer holds anything, so the text above it can end where the text does. */
+  get hasFooterItems(): boolean {
+    return !!this.model && (this.model.contents.length > 0 || this.model.linked.length > 0)
   }
 
   get isHidden(): boolean {
@@ -622,9 +642,22 @@ export class ItemHeader {
     node.style.maskImage = `url("${icon.url}")`
   }
 
-  private link(parent: HTMLElement, text: string, open: () => void, href?: string): void {
-    const link = element(href ? 'a' : 'button', 'item-link', parent)
-    link.textContent = text
+  private link(
+    parent: HTMLElement,
+    text: string,
+    open: () => void,
+    href?: string,
+    symbol?: string,
+  ): void {
+    const link = element(
+      href ? 'a' : 'button',
+      symbol ? 'item-link item-link-chip' : 'item-link',
+      parent,
+    )
+    if (symbol) {
+      this.glyph(symbol, link)
+      element('span', 'item-link-text', link).textContent = text
+    } else link.textContent = text
     if (link instanceof HTMLButtonElement) link.type = 'button'
     else {
       link.href = href!
@@ -728,6 +761,7 @@ export class ItemHeader {
 
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
     const entry = element('div', 'item-prop')
+    entry.dataset.row = row.id
     const term = element('dt', 'item-prop-label', entry)
     this.glyph(row.symbol, term)
     element('span', 'item-prop-name', term).textContent = row.label
@@ -741,7 +775,13 @@ export class ItemHeader {
         break
       case 'items':
         for (const target of row.items ?? [])
-          this.link(value, target.title, () => postToHost({ type: 'openItem', item: target.item }))
+          this.link(
+            value,
+            target.title,
+            () => postToHost({ type: 'openItem', item: target.item }),
+            undefined,
+            target.symbol,
+          )
         break
       case 'tags':
         for (const tag of row.texts ?? []) element('span', 'item-chip', value).textContent = tag
@@ -777,6 +817,19 @@ export class ItemHeader {
         element('span', '', value).textContent = row.text ?? ''
     }
     return entry
+  }
+
+  /** Asks the app for the context menu of a row of the property block or of Linked From. */
+  private openRowMenu(row: string, target: HTMLElement) {
+    if (!this.model) return
+    const rect = target.getBoundingClientRect()
+    postToHost({
+      type: 'propertyMenu',
+      item: this.model.item,
+      row,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
   }
 
   private openMenu(pin: HTMLElement, menu: HeaderMenu) {

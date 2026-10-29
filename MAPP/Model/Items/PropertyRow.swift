@@ -8,6 +8,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     struct Target: Hashable, Sendable {
         let title: String
         let item: ItemID
+        /// The icon of the item's type, a Lucide name, which the page draws before the title.
+        var icon: String?
     }
 
     enum Value: Hashable, Sendable {
@@ -72,7 +74,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// it has a value.
     static func rows(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String,
-        tags: [String], placement: PagePlacement = .standard
+        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
@@ -92,7 +94,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField && placement.showsOnPage(relationship.field) {
             let targets = relationship.targets.compactMap { target -> Target? in
                 guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
-                return Target(title: target.title, item: id)
+                return Target(title: target.title, item: id, icon: icon(id))
             }
             if !targets.isEmpty {
                 rows.append(PropertyRow(id: relationship.field, label: ItemTypeInfo.Field.displayLabel(relationship.label), value: .items(targets)))

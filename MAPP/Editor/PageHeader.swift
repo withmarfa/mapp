@@ -90,6 +90,14 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var propertyRejected: Bool
     var parentRejected: Bool
     var interfaceTextSize: Int
+
+    /// The icons of the types the header names, which the page draws as images.
+    var typeIconNames: Set<String?> {
+        var names: Set<String?> = [icon.name]
+        names.formUnion((contents + linked).map(\.icon))
+        for case .items(let targets) in properties.map(\.value) { names.formUnion(targets.map(\.icon)) }
+        return names
+    }
 }
 
 extension PropertyRow: Encodable {
@@ -97,6 +105,7 @@ extension PropertyRow: Encodable {
     private struct Link: Encodable {
         let title: String
         let item: String
+        let symbol: String
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -109,7 +118,7 @@ extension PropertyRow: Encodable {
         case .parent: try container.encode("parent", forKey: .kind)
         case .items(let targets):
             try container.encode("items", forKey: .kind)
-            try container.encode(targets.map { Link(title: $0.title, item: $0.item.rawValue) }, forKey: .items)
+            try container.encode(targets.map { Link(title: $0.title, item: $0.item.rawValue, symbol: TypeIconKey.value(for: $0.icon)) }, forKey: .items)
         case .tags(let tags):
             try container.encode("tags", forKey: .kind)
             try container.encode(tags, forKey: .texts)
@@ -141,6 +150,9 @@ enum PageHeaderEvent {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, under the pin's frame in the editor's container.
     case menu(PageHeaderMenu, ItemID, CGRect)
+    /// A row of the property block, or Linked From, was opened with the context menu: the row's identifier
+    /// (`PagePlacement`) and its frame in the editor's container.
+    case rowMenu(row: String, ItemID, CGRect)
 }
 
 /// SF Symbols the header's pins show, drawn here because the page cannot draw them itself. The page uses each

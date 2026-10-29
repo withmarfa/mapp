@@ -1520,6 +1520,9 @@
     "Hide Details" : {
       "extractionState" : "manual"
     },
+    "Hide from Page" : {
+
+    },
     "Hide from Sidebar" : {
 
     },

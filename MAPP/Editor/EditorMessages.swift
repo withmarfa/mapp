@@ -45,6 +45,9 @@ nonisolated enum EditorMessage: Sendable {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
+    /// A row of the property block, or Linked From, was opened with the context menu: the row's identifier, as
+    /// `PagePlacement` names it, with its frame and the page window's height as for `headerMenu`.
+    case propertyMenu(row: String, ItemID, CGRect, viewportHeight: Double)
     case openLink(String)
     /// A link in the item's property block or its linked items was clicked.
     case openItem(ItemID)
@@ -117,6 +120,12 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "propertyMenu":
+            guard let item = dict["item"] as? String, let row = dict["row"] as? String, !row.isEmpty,
+                  let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
+            else { return nil }
+            self = .propertyMenu(row: row, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
         case "copy":
             guard let text = dict["text"] as? String else { return nil }
             self = .copy(text)

@@ -424,6 +424,28 @@ extension EditorTests {
         #expect(menus[0].2.minY > 52 - 30, "the pin lies below the covered top, less what has scrolled")
     }
 
+    @Test func aContextClickOnARowAsksForItsMenuWithTheRowAndItsFrame() async throws {
+        let page = try await Page()
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = page.editor.container
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        try await page.load("Some text.\n")
+        let id = try #require(page.editor.noteID)
+        var header = Self.header("Review the findings", id: id)
+        header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/mapp")))
+        page.editor.setHeader(header)
+        var rows: [(String, ItemID, CGRect)] = []
+        page.editor.onHeaderEvent = { if case .rowMenu(let row, let item, let rect) = $0 { rows.append((row, item, rect)) } }
+        try #require(await eventuallyAsking { (try? await Self.rect("[data-row='repo']", in: page)) != nil })
+        try await page.run("document.querySelector('[data-row=\"repo\"] .item-prop-value').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))")
+        try await page.wait { rows.count == 1 }
+        #expect(rows[0].0 == "repo")
+        #expect(rows[0].1 == id)
+        #expect(rows[0].2.width > 0 && rows[0].2.height > 0)
+    }
+
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.
     @Observable final class Shown {
         var id: ItemID
