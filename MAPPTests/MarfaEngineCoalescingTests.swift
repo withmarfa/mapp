@@ -251,6 +251,28 @@ import Testing
         return doomed
     }
 
+    // MARK: A paint
+
+    /// A large paint maps its rows on several threads at once (`MarfaEngine.mapped`); each must still come out as
+    /// its own row, with its own text, and the person's write waiting in the queue must show as waiting.
+    @Test func aLargePaintShowsEveryRowAsItsOwn() async throws {
+        let count = MarfaEngine.serialMapping * 3 + 7
+        let fake = Self.fake((0..<count).map { Self.row("kept-\($0)", title: "Kept \($0)", body: "Body *\($0)*") })
+        _ = try await fake.copy.items.update("kept-5", Edit(properties: ["title": .string("Waiting 5")], baseVersion: 1))
+        let scene = try await Self.open(fake)
+        let shown = try #require(scene.shown)
+        #expect(shown.items.count == count)
+        for index in 0..<count {
+            let id = "kept-\(index)"
+            let item = try #require(scene.item(id), "\(id) was not shown")
+            #expect(item.title == (index == 5 ? "Waiting 5" : "Kept \(index)"))
+            #expect(item.preview == "Body \(index)")
+            #expect(shown.bodies[item.id]?.text == "Body *\(index)*")
+            #expect((item.sync == .settled) == (index != 5), "\(id) is \(item.sync)")
+        }
+        await scene.close()
+    }
+
     // MARK: A flood
 
     @Test(.timeLimit(.minutes(5)))
