@@ -164,13 +164,9 @@ struct ItemPageHeader: ViewModifier {
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
-            case .rowMenu(let row, let id, let rect):
-                guard let type = library.item(id)?.type else { return }
-                let menu = NSMenu()
-                menu.addItem(actionItem(String(localized: "Hide from Page")) {
-                    PagePlacements.update { $0.set(false, row: row, of: type) }
-                })
-                editor.popUpMenu(menu, under: rect)
+            case .hideFromPage(let row, let id):
+                guard editor.noteID == id, let type = library.item(id)?.type else { return }
+                PagePlacements.update { $0.set(false, row: row, of: type) }
             case .menu(.parent, let id, let rect):
                 guard let parent = Self.parent(of: id, in: library) else { return }
                 guard let target = parent.targets.first else {

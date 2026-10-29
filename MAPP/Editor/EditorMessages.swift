@@ -45,9 +45,6 @@ nonisolated enum EditorMessage: Sendable {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
-    /// A row of the property block, or Linked From, was opened with the context menu: the row's identifier, as
-    /// `PagePlacement` names it, with its frame and the page window's height as for `headerMenu`.
-    case propertyMenu(row: String, ItemID, CGRect, viewportHeight: Double)
     case openLink(String)
     /// A link in the item's property block or its linked items was clicked.
     case openItem(ItemID)
@@ -59,6 +56,9 @@ nonisolated enum EditorMessage: Sendable {
     /// The context menu is opening over an embedded file, or over anything else when nil, with whether the
     /// app said it may be opened.
     case embedMenu((item: ItemID, reference: EmbedReference, opens: Bool)?)
+    /// The same menu is opening over a row of the property block, or Linked From, or over none when nil: the row's
+    /// identifier as `PagePlacement` names it, and the item the header was showing.
+    case rowMenu((item: ItemID, row: String)?)
     /// A `[[link]]` to a note was command-clicked in the note `item`.
     case openNote(ItemID, NoteLink)
     case find(FindState)
@@ -120,12 +120,6 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
-        case "propertyMenu":
-            guard let item = dict["item"] as? String, let row = dict["row"] as? String, !row.isEmpty,
-                  let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),
-                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
-            else { return nil }
-            self = .propertyMenu(row: row, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
         case "copy":
             guard let text = dict["text"] as? String else { return nil }
             self = .copy(text)
@@ -138,6 +132,13 @@ nonisolated enum EditorMessage: Sendable {
             self = .openEmbed(item, reference)
         case "embedMenu":
             self = .embedMenu(EmbedReference.request(dict["embed"]).map { ($0.item, $0.reference, dict["opens"] as? Bool ?? false) })
+        case "rowMenu":
+            if let row = dict["row"] as? [String: Any], let item = row["item"] as? String, !item.isEmpty,
+               let name = row["row"] as? String, !name.isEmpty {
+                self = .rowMenu((ItemID(item), name))
+            } else {
+                self = .rowMenu(nil)
+            }
         case "openNote":
             guard let item = dict["item"] as? String, !item.isEmpty, let link = NoteLink(page: dict) else { return nil }
             self = .openNote(ItemID(item), link)

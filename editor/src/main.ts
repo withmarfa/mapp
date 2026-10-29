@@ -144,9 +144,14 @@ window.addEventListener(
   { capture: true },
 )
 
+// WebKit opens its own menu, which the app adds to: it hears which embed and which header row the pointer is
+// over just before. Heard first on the window, so a menu over neither clears what the last one named.
 window.addEventListener(
   'contextmenu',
-  () => postToHost({ type: 'embedMenu', embed: null, opens: false }),
+  (event) => {
+    postToHost({ type: 'embedMenu', embed: null, opens: false })
+    postToHost({ type: 'rowMenu', row: header.rowAt(event.target) })
+  },
   { capture: true },
 )
 

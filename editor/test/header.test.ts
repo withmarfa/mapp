@@ -426,7 +426,7 @@ test('an item a row links to is a chip with the icon of its type before the titl
   expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
 })
 
-test('a context click on a row asks the app for the row menu with the row id', () => {
+test('a row under the pointer is named, and the context menu is left to WebKit', () => {
   header.set({
     ...ticket,
     properties: [{ id: 'repo', label: 'Repo', symbol: 'link', kind: 'text', text: 'x' }],
@@ -434,22 +434,18 @@ test('a context click on a row asks the app for the row menu with the row id', (
   posted = []
   const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
   root.querySelector('.item-prop-value')!.dispatchEvent(event)
-  expect(event.defaultPrevented).toBe(true)
-  expect(posted).toHaveLength(1)
-  expect(posted[0]).toMatchObject({ type: 'propertyMenu', item: 'ticket', row: 'repo' })
+  expect(event.defaultPrevented).toBe(false)
+  expect(posted).toEqual([])
+  expect(header.rowAt(event.target)).toEqual({ item: 'ticket', row: 'repo' })
+  expect(header.rowAt(document.body)).toBeNull()
 })
 
-test('a context click on the Linked From heading asks for the menu of its row', () => {
+test('the Linked From heading is a row the menu can name', () => {
   const mention = { item: 'm', title: 'Mention', symbol: 'link', type: 'Note', date: 'Today' }
   header.set({ ...ticket, linked: [mention] })
   expect(header.hasFooterItems).toBe(true)
-  posted = []
-  footer
-    .querySelector('.item-linked-from .item-linked-toggle')!
-    .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
-  expect(posted).toMatchObject([{ type: 'propertyMenu', row: '#linked' }])
-  header.set({ ...ticket, linked: [] })
-  expect(header.hasFooterItems).toBe(false)
+  const toggle = footer.querySelector('.item-linked-from .item-linked-toggle')!
+  expect(header.rowAt(toggle)).toEqual({ item: 'ticket', row: '#linked' })
 })
 
 test('a URL that is not web is shown as text, not as a link', () => {

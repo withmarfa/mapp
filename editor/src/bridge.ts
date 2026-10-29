@@ -40,13 +40,6 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
-  | {
-      type: 'propertyMenu'
-      item: string
-      row: string
-      rect: [number, number, number, number]
-      viewportHeight: number
-    }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }
@@ -54,6 +47,7 @@ export type EditorMessage =
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
+  | { type: 'rowMenu'; row: { item: string; row: string } | null }
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 

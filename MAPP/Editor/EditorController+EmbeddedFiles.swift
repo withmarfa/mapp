@@ -192,6 +192,12 @@ extension EditorController {
         defer { menuEmbed = nil }
         return menuEmbed
     }
+
+    /// The header row the context menu opening now is over, heard from the page just before; each menu takes it once.
+    func takeMenuRow() -> (item: ItemID, row: String)? {
+        defer { menuRow = nil }
+        return menuRow
+    }
 }
 
 extension EditorController {

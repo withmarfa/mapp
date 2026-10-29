@@ -185,16 +185,12 @@ class LinkedSection {
     className: string,
     private readonly changed: () => void,
     private readonly glyph: (name: string, parent: HTMLElement) => void,
-    menu?: (toggle: HTMLElement) => void,
+    row?: string,
   ) {
     this.root = element('section', `item-linked ${className}`, parent)
     this.toggle = element('button', 'item-linked-toggle', this.root)
     this.toggle.type = 'button'
-    if (menu)
-      this.toggle.addEventListener('contextmenu', (event) => {
-        event.preventDefault()
-        menu(this.toggle)
-      })
+    if (row) this.toggle.dataset.row = row
     this.toggle.addEventListener('click', () => {
       this.open = !this.open
       this.changed()
@@ -349,16 +345,7 @@ export class ItemHeader {
     const redraw = () => this.redraw()
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
     this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
-    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph, (toggle) =>
-      this.openRowMenu('#linked', toggle),
-    )
-    // Any row of the property block offers to leave itself off the page; the inspector still lists it.
-    this.properties.addEventListener('contextmenu', (event) => {
-      const entry = (event.target as Element).closest<HTMLElement>('.item-prop')
-      if (!entry?.dataset.row) return
-      event.preventDefault()
-      this.openRowMenu(entry.dataset.row, entry)
-    })
+    this.linked = new LinkedSection(footer, 'item-linked-from', redraw, glyph, '#linked')
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -819,17 +806,11 @@ export class ItemHeader {
     return entry
   }
 
-  /** Asks the app for the context menu of a row of the property block or of Linked From. */
-  private openRowMenu(row: string, target: HTMLElement) {
-    if (!this.model) return
-    const rect = target.getBoundingClientRect()
-    postToHost({
-      type: 'propertyMenu',
-      item: this.model.item,
-      row,
-      rect: [rect.left, rect.top, rect.width, rect.height],
-      viewportHeight: window.innerHeight,
-    })
+  /** The row of the property block, or Linked From, that an event's target is in, for the app to add Hide from
+   *  Page to the menu WebKit is opening there; the inspector still lists it. */
+  rowAt(target: EventTarget | null): { item: string; row: string } | null {
+    const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
+    return this.model && row ? { item: this.model.item, row } : null
   }
 
   private openMenu(pin: HTMLElement, menu: HeaderMenu) {

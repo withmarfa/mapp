@@ -424,7 +424,7 @@ extension EditorTests {
         #expect(menus[0].2.minY > 52 - 30, "the pin lies below the covered top, less what has scrolled")
     }
 
-    @Test func aContextClickOnARowAsksForItsMenuWithTheRowAndItsFrame() async throws {
+    @Test func theContextMenuOverARowKnowsWhichRowAndLeavesTheMenuToWebKit() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -436,14 +436,22 @@ extension EditorTests {
         var header = Self.header("Review the findings", id: id)
         header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/mapp")))
         page.editor.setHeader(header)
-        var rows: [(String, ItemID, CGRect)] = []
-        page.editor.onHeaderEvent = { if case .rowMenu(let row, let item, let rect) = $0 { rows.append((row, item, rect)) } }
+        var events = 0
+        page.editor.onHeaderEvent = { _ in events += 1 }
         try #require(await eventuallyAsking { (try? await Self.rect("[data-row='repo']", in: page)) != nil })
-        try await page.run("document.querySelector('[data-row=\"repo\"] .item-prop-value').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))")
-        try await page.wait { rows.count == 1 }
-        #expect(rows[0].0 == "repo")
-        #expect(rows[0].1 == id)
-        #expect(rows[0].2.width > 0 && rows[0].2.height > 0)
+        let prevented = try await page.editor.webView.evaluateJavaScript("""
+            (() => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+              document.querySelector('[data-row="repo"] .item-prop-value').dispatchEvent(e); return e.defaultPrevented })()
+            """) as? Bool
+        #expect(prevented == false, "WebKit's own menu opens")
+        try await page.wait { page.editor.menuRow != nil }
+        #expect(page.editor.menuRow?.item == id)
+        #expect(page.editor.menuRow?.row == "repo")
+        _ = page.editor.takeMenuRow()
+        try await page.run("document.querySelector('p').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))")
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.menuRow == nil, "a menu elsewhere offers no row")
+        #expect(events == 0, "the menu itself needs nothing from the header")
     }
 
     /// An item's page as the app shows it: the native view, reading the item from the library, over the page.

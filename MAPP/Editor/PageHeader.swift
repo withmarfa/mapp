@@ -150,9 +150,9 @@ enum PageHeaderEvent {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, under the pin's frame in the editor's container.
     case menu(PageHeaderMenu, ItemID, CGRect)
-    /// A row of the property block, or Linked From, was opened with the context menu: the row's identifier
-    /// (`PagePlacement`) and its frame in the editor's container.
-    case rowMenu(row: String, ItemID, CGRect)
+    /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
+    /// identifier (`PagePlacement`) and the item the header was showing.
+    case hideFromPage(row: String, ItemID)
 }
 
 /// SF Symbols the header's pins show, drawn here because the page cannot draw them itself. The page uses each
