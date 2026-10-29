@@ -86,11 +86,12 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 const loaded: PictureAnswer = { state: 'loaded', url: 'mapp-embed://picture/?address=x&v=1' }
 const picture = '![A picture](https://example.com/a.png)\n'
 
-test('with Ask, a picture at a web address is a card naming its website, and nothing is fetched', async () => {
+test('with Ask, a picture at a web address is a card named by its alt text, and nothing is fetched', async () => {
   const { asked, embeds } = app(() => ({ state: 'waiting' }))
   await withNote(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     await settled()
+    expect(labels()).toEqual(['A picture'])
     expect(asked).toEqual([{ item: 'note', address: 'https://example.com/a.png', ask: 'drawing' }])
     expect(embeds).toEqual([])
     expect(opened).toEqual([])
