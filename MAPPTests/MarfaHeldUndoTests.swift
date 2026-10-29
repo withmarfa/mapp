@@ -180,6 +180,31 @@ import Testing
         await finish(scene)
     }
 
+    @Test func aHeldUndoWaitsForAWholeReadNotARereadOfWhatItTouches() async throws {
+        let scene = try await makeScene()
+        scene.unlink(as: UndoGroup())
+        try #require(try await eventuallyAsking { await scene.held() == 1 })
+
+        // The copy is whole again, but a server change reads only the item: what the step touches may still be
+        // arriving elsewhere, so only a read of the whole copy may make it.
+        scene.reads.whole.withLock { $0 = true }
+        scene.source.hear(Change(origin: .server(event: "item.updated", cursor: "1"), itemId: scene.item.id.rawValue, edgeId: nil))
+        await scene.source.engineTook()
+        #expect(await scene.held() == 1)
+        #expect(try await scene.links() == 1)
+
+        // A whole read of a copy still filling does not make it either.
+        scene.reads.whole.withLock { $0 = false }
+        scene.source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+        await scene.source.engineTook()
+        #expect(await scene.held() == 1)
+
+        scene.becomeWhole()
+        try #require(try await eventuallyAsking { try await scene.links() == 0 })
+        #expect(await scene.held() == 0)
+        await finish(scene)
+    }
+
     @Test func anUndoOfAnItemThatChangedMeanwhileIsNotMadeAndIsAnswered() async throws {
         let scene = try await makeScene()
         let id = scene.unlink(as: UndoGroup())
