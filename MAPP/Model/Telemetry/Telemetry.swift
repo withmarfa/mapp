@@ -41,7 +41,7 @@ nonisolated enum Telemetry {
         var elapsed: Duration { ContinuousClock.now - start }
 
         @discardableResult
-        func end(_ counts: (String, Int)...) -> Duration {
+        func end(_ counts: (StaticString, Int)...) -> Duration {
             let elapsed = elapsed
             if counts.isEmpty {
                 signposter.endInterval(name, state)
@@ -54,7 +54,7 @@ nonisolated enum Telemetry {
         }
     }
 
-    static func begin(_ category: Category, _ name: StaticString, _ counts: (String, Int)...) -> Interval {
+    static func begin(_ category: Category, _ name: StaticString, _ counts: (StaticString, Int)...) -> Interval {
         let signposter = signposter(category)
         let id = signposter.makeSignpostID()
         let state: OSSignpostIntervalState
@@ -67,7 +67,7 @@ nonisolated enum Telemetry {
     }
 
     /// A point in time with no length, such as a window opening.
-    static func event(_ category: Category, _ name: StaticString, _ counts: (String, Int)...) {
+    static func event(_ category: Category, _ name: StaticString, _ counts: (StaticString, Int)...) {
         let signposter = signposter(category)
         guard signposter.isEnabled else { return }
         if counts.isEmpty {
@@ -77,25 +77,8 @@ nonisolated enum Telemetry {
         }
     }
 
-    @discardableResult
-    static func measure<Result>(_ category: Category, _ name: StaticString, _ work: () throws -> Result) rethrows -> Result {
-        let interval = begin(category, name)
-        defer { interval.end() }
-        return try work()
-    }
-
-    @discardableResult
-    static func measure<Result>(
-        _ category: Category, _ name: StaticString, isolation: isolated (any Actor)? = #isolation,
-        _ work: () async throws -> Result
-    ) async rethrows -> Result {
-        let interval = begin(category, name)
-        defer { interval.end() }
-        return try await work()
-    }
-
-    fileprivate static func summary(_ counts: [(String, Int)]) -> String {
-        counts.map { "\($0.0)=\($0.1)" }.joined(separator: " ")
+    fileprivate static func summary(_ counts: [(StaticString, Int)]) -> String {
+        counts.map { "\($0.0.description)=\($0.1)" }.joined(separator: " ")
     }
 }
 

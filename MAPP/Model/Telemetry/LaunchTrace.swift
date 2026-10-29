@@ -23,7 +23,7 @@ nonisolated final class LaunchTrace: Sendable {
     static let shared = LaunchTrace()
 
     nonisolated private struct State {
-        var marks: [Milestone: (at: Duration, note: String?)] = [:]
+        var marks: [Milestone: (at: Duration, note: StaticString?)] = [:]
         var nothingToLoad = false
         var logged = false
     }
@@ -41,7 +41,7 @@ nonisolated final class LaunchTrace: Sendable {
     }()
 
     /// Records a milestone the first time it is reached; later ones are ignored. `note` is a kind, never a name.
-    func mark(_ milestone: Milestone, note: String? = nil, at now: Date = .now) {
+    func mark(_ milestone: Milestone, note: StaticString? = nil, at now: Date = .now) {
         let since = Self.processStart.map { Duration.seconds(now.timeIntervalSince($0)) } ?? .zero
         let (first, line): (Bool, String?) = state.withLock { state in
             guard state.marks[milestone] == nil else { return (false, nil) }
@@ -73,7 +73,7 @@ nonisolated final class LaunchTrace: Sendable {
     private static func line(_ state: inout State) -> String {
         state.logged = true
         let parts = state.marks.sorted { $0.value.at < $1.value.at }.map { milestone, mark in
-            "\(milestone.rawValue)\(mark.note.map { " (\($0))" } ?? "") \(mark.at.inMilliseconds) ms"
+            "\(milestone.rawValue)\(mark.note.map { " (\($0.description))" } ?? "") \(mark.at.inMilliseconds) ms"
         }
         return "launch since process start: " + parts.joined(separator: ", ")
     }
