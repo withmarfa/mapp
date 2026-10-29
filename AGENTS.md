@@ -97,7 +97,7 @@ These hold across the app. The nested files say how the library keeps them.
 - A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
 - To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. How a contributor keeps that line is their own; the repository holds no tool for it.
 - Never commit a team identifier.
-- **Error reports.** `Config/Signing.xcconfig` leaves `MARFA_POSTHOG_HOST` and `MARFA_POSTHOG_PROJECT_TOKEN` empty, and `Info.plist` carries them into the build. A build with both sends the app's errors and timings (`MAPP/Model/Telemetry/Reporting.swift`); a build from this source sends nothing. Write them into `Config/Local.xcconfig` the same way as the team, and never commit either. In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes them from the workflow secrets `MAPP_POSTHOG_HOST` and `MAPP_POSTHOG_PROJECT_TOKEN` when the workflow sets both.
+- **Error reports.** `Config/Signing.xcconfig` leaves `MARFA_POSTHOG_HOST` and `MARFA_POSTHOG_PROJECT_TOKEN` empty, and `Info.plist` carries them into the build. A build with both sends the app's errors and timings (`MAPP/Model/Telemetry/Reporting.swift`); a build from this source sends nothing. Write them into `Config/Local.xcconfig` the same way as the team, and never commit either. In the cloud checkout, `ci_scripts/ci_post_clone.sh` writes them from the workflow secrets `MAPP_POSTHOG_HOST` and `MAPP_POSTHOG_PROJECT_TOKEN` when the workflow sets both, and stops the build when it sets only one or either is not an `https` host or a `phc_` token.
 
 ## Versions and releases
 
