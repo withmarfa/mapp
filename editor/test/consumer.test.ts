@@ -55,6 +55,38 @@ for (const name of readdirSync(corpus).filter((name) => name.endsWith('.md'))) {
     }),
   )
 }
+test('formatting that opens with a link is saved once after an edit inside it', async () =>
+  withEditor('~~[x](u)b~~\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    const text = engine.textSnapshot(1)
+    const at = text.text.indexOf('b') + 1
+    engine.selectTextRange({ snapshotId: text.snapshotId, from: at, to: at })
+    engine.insertText('c', 1)
+    expect(editor.snapshot().text).toBe('~~[x](u)bc~~\n')
+  }))
+test('a diagram draws with Pele, and an unsupported or refused one keeps its source', async () => {
+  const source =
+    '```mermaid\nflowchart LR\n A-->B\n```\n\n' +
+    '```mermaid\nnotadiagram foo\n```\n\n' +
+    '```mermaid\nflowchart LR\n A-->B\n click A "https://example.com"\n```\n'
+  await withEditor(source, async (editor) => {
+    const previews = () => [...document.querySelectorAll('.inkkit-mermaid-preview')]
+    await vi.waitFor(() =>
+      expect(previews().map((preview) => preview.getAttribute('data-state'))).toEqual([
+        'ready',
+        'error',
+        'error',
+      ]),
+    )
+    const [drawn, unsupported, refused] = previews()
+    expect(drawn?.querySelector('svg.pele-flowchart')).not.toBeNull()
+    expect(unsupported?.querySelector('svg')).toBeNull()
+    expect(unsupported?.textContent).toContain('not supported')
+    expect(refused?.querySelector('svg')).toBeNull()
+    expect(refused?.textContent).toContain('disabled')
+    expect(editor.snapshot().text).toBe(source)
+  })
+})
 test('native readable ranges reject stale generations and preserve formatted replacement history', async () =>
   withEditor('A **bold** line.\n', (editor) => {
     editor.findReplace(2, 6, 'strong', 1)
