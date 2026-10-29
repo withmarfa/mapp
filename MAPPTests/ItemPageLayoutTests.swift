@@ -65,4 +65,11 @@ import UniformTypeIdentifiers
         #expect(library.pageLayout(of: binned) == .text, "a document in the bin does not count")
         #expect(library.pageLayout(of: unmarked) == .text, "only a resource kind of html counts")
     }
+
+    @Test func aDocumentMarkedHTMLThatIsNotHTMLIsNotShown() {
+        let article = library.add("An article\n")
+        file("article.pdf", type: .pdf, kind: "html", attachedTo: article.id)
+
+        #expect(library.pageLayout(of: article) == .text, "the page would only say the file isn't an HTML page")
+    }
 }

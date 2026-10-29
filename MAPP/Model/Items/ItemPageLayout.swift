@@ -27,8 +27,9 @@ extension ItemLibrary {
     ///   picture the HTML points to without asking. A file the library does not know the type of is judged by its
     ///   title's extension.
     /// - Any other file opens in its preview.
-    /// - An item that is not a file, but has a file attached that is not in the bin and whose `resource_kind` is
-    ///   `html`, opens to that document under the item's own title and byline. Of several, the oldest is shown.
+    /// - An item that is not a file, but has a file attached that is not in the bin, whose `resource_kind` is `html`
+    ///   and whose type the web page can show (`WebPageFile.isHTML`), opens to that document under the item's own
+    ///   title and byline. Of several, the oldest is shown.
     /// - Every other item opens to its text.
     func pageLayout(of item: Item) -> ItemPageLayout {
         if item.isFile {
@@ -39,6 +40,7 @@ extension ItemLibrary {
             .filter { file in
                 file.isFile && file.state != .trashed
                     && file.value(of: ItemPageLayout.resourceKindField)?.string == ItemPageLayout.htmlResource
+                    && WebPageFile.isHTML(file.fileType)
             }
             .sorted { ($0.created, $0.id.rawValue) < ($1.created, $1.id.rawValue) }
         if let document = documents.first { return .webPage(document: document.id, runsScripts: false) }
