@@ -702,9 +702,6 @@
     "Sources appear here when items identify where they came from." : {
       "extractionState" : "manual"
     },
-    "Browse" : {
-      "extractionState" : "manual"
-    },
     "Show All" : {
       "extractionState" : "manual"
     },
@@ -1757,9 +1754,6 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "New types appear here automatically." : {
-
-    },
     "New Window" : {
 
     },
@@ -1927,9 +1921,6 @@
       "extractionState" : "manual"
     },
     "Place" : {
-
-    },
-    "Places" : {
 
     },
     "Plain Text" : {
@@ -2120,9 +2111,6 @@
 
     },
     "Show Types" : {
-
-    },
-    "Show Views" : {
 
     },
     "Showing what’s on this Mac while MAPP reaches the server." : {
@@ -2651,6 +2639,27 @@
         "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld more" } },
         "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld more" } }
       } } } }
+    },
+    "New" : {
+
+    },
+    "Show More" : {
+
+    },
+    "Make something new" : {
+
+    },
+    "Go" : {
+
+    },
+    "Show Saved Views" : {
+
+    },
+    "Saved views come from your Marfa server." : {
+
+    },
+    "The sidebar lists the first six types and keeps the rest under Show More. New types appear here automatically." : {
+
     }
   },
   "version" : "1.1"
