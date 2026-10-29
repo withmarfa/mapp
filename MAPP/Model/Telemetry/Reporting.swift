@@ -68,8 +68,8 @@ nonisolated final class Reporting: Sendable {
             carriesDestination && !isTestHost && !isPreview && !usesSampleLibrary && switchIsOn
         }
 
-        /// The sample library stands for a library, so it does not report; run against a test server by hand
-        /// (`MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY`), the isolated app has a real one and does.
+        /// The isolated host never reports, whether it holds the sample library or a test server: every UI and
+        /// measurement run uses it, and each would otherwise add test noise to the real project.
         static func current(
             info: [String: Any]? = Bundle.main.infoDictionary,
             arguments: [String] = ProcessInfo.processInfo.arguments,
@@ -77,13 +77,11 @@ nonisolated final class Reporting: Sendable {
             defaults: UserDefaults = .standard,
             isTestHost: Bool
         ) -> Gate {
-            let sampled = arguments.contains(SampleLibrary.flag) && !arguments.contains("-MAPPSampleUnconfigured")
-            let hasTestServer = ["MAPP_TEST_MARFA_URL", "MAPP_TEST_MARFA_KEY"].allSatisfy { !(environment[$0] ?? "").isEmpty }
             return Gate(
                 carriesDestination: destination(in: info) != nil,
                 isTestHost: isTestHost,
                 isPreview: environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1",
-                usesSampleLibrary: arguments.contains(SampleLibrary.flag) && !(sampled && hasTestServer),
+                usesSampleLibrary: arguments.contains(SampleLibrary.flag),
                 switchIsOn: Reporting.switchIsOn(in: defaults))
         }
     }

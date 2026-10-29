@@ -45,11 +45,9 @@ struct ReportingTests {
         #expect(!gate(arguments: [SampleLibrary.flag, "-MAPPSampleUnconfigured"]).sends)
     }
 
-    @Test func theSampleLibraryPointedAtATestServerIsARealLibraryAndSends() {
+    @Test func theIsolatedHostNeverSendsEvenOnATestServer() {
         let server = ["MAPP_TEST_MARFA_URL": "https://test.example.com", "MAPP_TEST_MARFA_KEY": "key"]
-        #expect(gate(arguments: [SampleLibrary.flag], environment: server).sends)
-        #expect(!gate(arguments: [SampleLibrary.flag, "-MAPPSampleUnconfigured"], environment: server).sends)
-        #expect(!gate(arguments: [SampleLibrary.flag], environment: ["MAPP_TEST_MARFA_URL": "https://test.example.com"]).sends)
+        #expect(!gate(arguments: [SampleLibrary.flag], environment: server).sends)
     }
 
     @Test func theSwitchOffStopsSendingAndTheDefaultIsOn() {
