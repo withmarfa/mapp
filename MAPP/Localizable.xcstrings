@@ -7,7 +7,10 @@
     "Keep My Edit" : {
       "extractionState" : "manual"
     },
-    "Opens the choices" : {
+    "This item can no longer be edited. Your change wasn’t saved." : {
+      "extractionState" : "manual"
+    },
+    "The value could not be saved." : {
       "extractionState" : "manual"
     },
     "Property Not Saved" : {
@@ -26,9 +29,6 @@
       "extractionState" : "manual"
     },
     "Add to %@" : {
-      "extractionState" : "manual"
-    },
-    "Edits this value" : {
       "extractionState" : "manual"
     },
     "Collapses the section" : {

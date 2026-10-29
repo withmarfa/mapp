@@ -21,6 +21,17 @@ nonisolated enum PropertyLoss: Equatable {
     case notANumber
     /// The item can no longer be edited.
     case notEditable
+    /// The library refused the write: the item is gone, or no longer has the property.
+    case notSaved
+
+    var reason: String {
+        switch self {
+        case .conflict: String(localized: "The value changed while you were editing it.")
+        case .notANumber: String(localized: "The value isn’t a number.")
+        case .notEditable: String(localized: "The item can no longer be edited.")
+        case .notSaved: String(localized: "The value could not be saved.")
+        }
+    }
 }
 
 extension ItemPropertyDraft {
@@ -49,7 +60,7 @@ extension ItemPropertyDraft {
     /// else keeps. Nil where leaving loses nothing, because the text is written, is already the item's, or was never
     /// typed.
     func loss(as kind: ItemTypeInfo.Field.Kind, current: String, isEditable: Bool) -> PropertyLoss? {
-        guard isDirty, text != current else { return nil }
+        guard isDirty, text != current, text != base else { return nil }
         guard isEditable else { return .notEditable }
         switch commit(as: kind, current: current) {
         case .conflict: return .conflict
@@ -58,11 +69,50 @@ extension ItemPropertyDraft {
         }
     }
 
+    /// Leaves nothing the person typed behind. A draft that can be written is written; one that cannot goes back to
+    /// the person through `notices`, which puts it on the clipboard, and is dropped so it is told once. Nothing is
+    /// told for a draft the item already holds, or that is back at what it began from.
+    func handOff(
+        label: String, as kind: ItemTypeInfo.Field.Kind, current: String, isEditable: Bool,
+        write: (PropertyValue?) -> Bool, to notices: Notices
+    ) {
+        guard isDirty else { return }
+        if isEditable, case .write(let value) = commit(as: kind, current: current) {
+            rejected = !write(value)
+            if !rejected {
+                isDirty = false
+                return
+            }
+        }
+        guard let loss = loss(as: kind, current: current, isEditable: isEditable) ?? (rejected && text != current && text != base ? .notSaved : nil) else {
+            discard(toMatch: current)
+            return
+        }
+        notices.notKept(String(localized: "Property Not Saved"), text: "\(label): \(text)", reason: loss.reason)
+        discard(toMatch: current)
+    }
+
     /// Starts again from the text the item holds now, dropping what was typed.
     func discard(toMatch current: String) {
         text = current
         base = current
         isDirty = false
         rejected = false
+    }
+}
+
+extension DetailsPresentation {
+    /// Writes or hands back the property drafts held for `itemID`, or for every item, since the row that showed them
+    /// is gone for good: the item switched, the window closed or the app is quitting. A section folded, or an
+    /// inspector hidden, does not come here, so a held-back edit is still there when it shows again.
+    func handOffProperties(of itemID: ItemID? = nil, in library: any ItemLibrary, undoManager: UndoManager?) {
+        for (id, key, draft) in unsavedProperties(of: itemID) {
+            guard let field = draft.field else { continue }
+            let item = library.item(id)
+            draft.handOff(
+                label: field.displayLabel, as: field.kind, current: item?.value(of: key).map(ItemValueText.string) ?? "",
+                isEditable: item?.isEditable ?? false,
+                write: { library.setItemProperty(id, key: key, value: $0, undoManager: undoManager) }, to: library.notices)
+        }
     }
 }

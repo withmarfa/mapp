@@ -49,6 +49,17 @@ final class DetailsPresentation {
     private(set) var expandedLinks: Set<LinkGroup> = []
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
+    init() { Self.open.add(self) }
+
+    /// Every window's presentation, so a quit can reach the drafts each holds.
+    private static let open = NSHashTable<DetailsPresentation>.weakObjects()
+
+    /// Hands every window's unsaved property drafts to `library`, as the app quits.
+    static func handOffAllProperties(in library: (any ItemLibrary)?) {
+        guard let library else { return }
+        for presentation in open.allObjects { presentation.handOffProperties(in: library, undoManager: nil) }
+    }
+
     func expandLinks(_ group: LinkGroup) { expandedLinks.insert(group) }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
@@ -61,6 +72,18 @@ final class DetailsPresentation {
     /// The items whose title the person typed and has not saved, in a steady order.
     var unsavedTitles: [ItemID] {
         drafts.filter { $0.value["title"]?.isDirty == true }.map(\.key).sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// The property drafts the person typed and has not saved, for `itemID` or for every item, in a steady order. The
+    /// title and the new tag have homes of their own.
+    func unsavedProperties(of itemID: ItemID? = nil) -> [(item: ItemID, key: String, draft: ItemPropertyDraft)] {
+        drafts.filter { itemID == nil || $0.key == itemID }
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+            .flatMap { item, keyed in
+                keyed.filter { $0.value.isDirty && $0.value.field != nil }
+                    .sorted { $0.key < $1.key }
+                    .map { (item, $0.key, $0.value) }
+            }
     }
 
     /// Saves the title typed for the item, if there is one; whether the title the page shows is saved.
@@ -107,4 +130,7 @@ final class ItemPropertyDraft {
     var rejected = false
     /// The stored text the draft started from, to tell whether the item changed under it.
     var base: String?
+    /// The property the draft is for, set by its row, so a draft left behind can be written or handed back without
+    /// the row.
+    var field: ItemTypeInfo.Field?
 }

@@ -77,15 +77,10 @@ enum InspectorSection: CaseIterable {
         case .linkedFrom: "ItemInspectorLinkedFrom"
         }
     }
-
-    /// A section is open until the person folds it.
-    static func isOpen(_ section: InspectorSection, in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: section.key) as? Bool ?? true
-    }
 }
 
-/// A section: a heading with a chevron at its end that folds what the section holds. The heading is one button, so
-/// VoiceOver and the keyboard reach the chevron by it.
+/// A section: a heading with a chevron at its end that folds what the section holds, open until the person folds it.
+/// The heading is one button, so VoiceOver and the keyboard reach the chevron by it.
 struct InspectorSectionView<Content: View>: View {
     @AppStorage private var isOpen: Bool
     let section: InspectorSection
@@ -94,7 +89,7 @@ struct InspectorSectionView<Content: View>: View {
     @ViewBuilder let content: Content
 
     init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil, @ViewBuilder content: () -> Content) {
-        _isOpen = AppStorage(wrappedValue: InspectorSection.isOpen(section), section.key)
+        _isOpen = AppStorage(wrappedValue: true, section.key)
         self.section = section
         self.title = title
         self.count = count
@@ -357,59 +352,28 @@ extension View {
     }
 }
 
-// MARK: Keyboard
-
-extension View {
-    /// Makes a value at rest act like a button the keyboard reaches. A plain `Button` is skipped by Tab unless the
-    /// person turned on full keyboard access; a focusable view is always reached, and Return or Space starts
-    /// `action`, as a click does. VoiceOver still reads a button. `isFocused` reports the focus, for a control that
-    /// shows itself only then.
-    /// `keyboard` replaces `action` for Return and Space, for a value a click opens but the keyboard edits.
-    func inspectorActivates(isFocused: Binding<Bool>? = nil, keyboard: (() -> Void)? = nil, perform action: @escaping () -> Void) -> some View {
-        modifier(InspectorActivation(isFocusedOutside: isFocused, action: action, keyboard: keyboard ?? action))
-    }
-}
-
-private struct InspectorActivation: ViewModifier {
-    let isFocusedOutside: Binding<Bool>?
-    let action: () -> Void
-    let keyboard: () -> Void
-    @FocusState private var isFocused: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .contentShape(.rect)
-            .onTapGesture(perform: action)
-            .focusable()
-            .focused($isFocused)
-            .onKeyPress(keys: [.return, .space], phases: .down) { _ in
-                keyboard()
-                return .handled
-            }
-            .onChange(of: isFocused) { isFocusedOutside?.wrappedValue = isFocused }
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction(.default, action)
-    }
-}
-
 /// The small plus at the end of a relationship's name row, which adds to it. It shows while the pointer is over the
-/// row or the plus has the keyboard, and VoiceOver reaches it always.
+/// row or the plus has the keyboard. Hidden, it is drawn in the clear color rather than faded to nothing, so it
+/// stays a button in the accessibility tree and VoiceOver reaches it always.
 struct InspectorPlusButton: View {
     let accessibilityLabel: LocalizedStringKey
     let identifier: String
     let isRowHovered: Bool
     let action: () -> Void
-    @State private var isFocused = false
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 20, height: 20)
-            .inspectorActivates(isFocused: $isFocused, perform: action)
-            .opacity(isRowHovered || isFocused ? 1 : 0)
-            .help(accessibilityLabel)
-            .accessibilityLabel(accessibilityLabel)
-            .accessibilityIdentifier(identifier)
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isRowHovered || isFocused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.clear))
+                .frame(width: 20, height: 20)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .focused($isFocused)
+        .help(accessibilityLabel)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(identifier)
     }
 }

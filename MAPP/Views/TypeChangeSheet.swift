@@ -37,7 +37,7 @@ struct TypeChangeSheet: View {
                             ItemPropertyRow(definition: field, value: values[field.key], isEditable: true, onChange: { value in
                                 values[field.key] = value
                                 return true
-                            }, retainedDraft: draft(for: field.key))
+                            }, retainedDraft: draft(for: field.key), handsOffOnLeave: false)
                         }
                     }
                 }

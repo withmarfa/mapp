@@ -60,6 +60,11 @@ struct ItemInspectorHost: View {
                 }
             }
         }
+        // Only a row going for good gives back what was typed: the item changing here, the window closing and the app
+        // quitting do; folding a section or hiding the inspector keep the draft for when it shows again.
+        .onChange(of: selectedID) { old, _ in
+            if let old { details.handOffProperties(of: old, in: library, undoManager: undoManager) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemInspector")
     }
@@ -170,6 +175,8 @@ struct ItemInspector: View {
                                     onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
                                     retainedDraft: drafts?.draft(for: item.id, key: field.key),
                                     startsEditing: adding == field.key,
+                                    // The window holds the draft, so folding this section does not give it back.
+                                    handsOffOnLeave: drafts == nil,
                                     isStatus: field.key == type?.statusField?.key,
                                     shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key))
                 }

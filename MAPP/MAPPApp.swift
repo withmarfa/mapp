@@ -127,6 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// not kept that no window has told, as when no window is open, is told here, so its text reaches the clipboard.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task { [libraries] in
+            // A property typed in an inspector is written, or handed back, before the library finishes its writes.
+            DetailsPresentation.handOffAllProperties(in: libraries.current)
             let kept = await libraries.flushEditors(within: .seconds(5))
             // A draft in quick add, or a view's title not yet saved, has no other home once its window goes, so it
             // is told with the rest.

@@ -40,13 +40,9 @@ nonisolated enum InspectorFields {
         }
     }
 
-    /// A yes/no property's value: one that was never set, or has been cleared, is neither yes nor no.
-    enum YesNo: Equatable {
-        case yes, no, unset
-    }
-
-    static func yesNo(_ value: PropertyValue?) -> YesNo {
-        if case .bool(let flag)? = value { flag ? .yes : .no } else { .unset }
+    /// Whether a yes/no property reads as checked: one that was never set, or has been cleared, is unchecked.
+    static func isYes(_ value: PropertyValue?) -> Bool {
+        if case .bool(true)? = value { true } else { false }
     }
 
     /// The type's fields the inspector lists under Properties, in the catalogue's order: those with a value, and
