@@ -40,8 +40,34 @@ struct PagePlacementsTests {
         #expect(comment.showsOnPage("#tags"))
         #expect(comment.showsOnPage("child-of"))
         #expect(!comment.showsOnPage("github_id"))
-        // The link field is each type's own, never an inherited or sibling's: a type that names none shows it.
-        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("github_id"))
+        // The link field is each type's own, never an inherited or sibling's. A type that names none still keeps
+        // a connector's identifier off the page, as bookkeeping.
+        #expect(!placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("github_id"))
+    }
+
+    @Test func aConnectorsIdentifiersAndChecksumsStayOffThePageByDefault() {
+        let rows = ["entry_id", "feed_hash", "github_id", "blob_sha", "todoist_id", "ical_uid", "etag"]
+        let catalogue = Catalogue(itemTypes: [
+            MarfaMapping.itemType(ItemType(
+                id: "rss.entry", label: "RSS Entry",
+                fields: rows.map { Self.field($0, "rss.entry") } + ["feed_origin", "number", "title", "author", "repository", "private", "url", "reader_reading_progress"]
+                    .map { Self.field($0, "rss.entry") } + [Self.field("source_id", "core.bookmark")],
+                titleField: "title"))
+        ])
+        let placement = PagePlacements().placement(of: TypeID("rss.entry"), in: catalogue)
+        for row in rows { #expect(!placement.showsOnPage(row), "\(row) is bookkeeping") }
+        for row in ["feed_origin", "number", "title", "author", "repository", "private", "url", "reader_reading_progress"] {
+            #expect(placement.showsOnPage(row), "\(row) is for a person to read")
+        }
+        // A core type declares its own fields as content, even one whose key ends the same way.
+        #expect(placement.showsOnPage("source_id"))
+        // Show on Page and Customize Page override the default either way.
+        var chosen = PagePlacements()
+        chosen.setShown(true, row: "feed_hash", of: TypeID("rss.entry"))
+        chosen.setShown(false, row: "url", of: TypeID("rss.entry"))
+        let overridden = chosen.placement(of: TypeID("rss.entry"), in: catalogue)
+        #expect(overridden.showsOnPage("feed_hash"))
+        #expect(!overridden.showsOnPage("url"))
     }
 
     @Test func linkedFromGoesToTheInspectorExceptForAPersonAndACollection() {
