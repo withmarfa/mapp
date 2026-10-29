@@ -13,8 +13,8 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
     var defaultWidth: CGFloat {
         switch self {
         case .sidebar: 230
-        case .list: 340
-        case .settings: 260
+        case .list: 350
+        case .settings: 290
         }
     }
 
@@ -42,12 +42,25 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
 /// Settings for the width a column starts at in a new window. A width dragged in a window is that window's own and
 /// never changes these.
 struct ColumnWidthOptions: View {
+    @FocusedValue(\.columnWidthReader) private var measure
+
     var body: some View {
         ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
-        Button("Reset Widths") {
-            for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
+        HStack {
+            Button("Reset Widths") {
+                for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
+            }
+            .accessibilityIdentifier("ColumnWidthsReset")
+            Button("Use Current Widths") {
+                guard let measure else { return }
+                for column in ColumnWidth.allCases {
+                    UserDefaults.standard.set(Double(column.resolved(Double(measure(column)))), forKey: column.key)
+                }
+            }
+            .disabled(measure == nil)
+            .help(measure == nil ? "Open a window to use its column widths." : "Make the widths this window shows the defaults for new windows.")
+            .accessibilityIdentifier("ColumnWidthsUseCurrent")
         }
-        .accessibilityIdentifier("ColumnWidthsReset")
     }
 }
 
@@ -82,4 +95,9 @@ private struct ColumnWidthRow: View {
         }
         .accessibilityIdentifier("ColumnWidth-\(column.rawValue)")
     }
+}
+
+extension FocusedValues {
+    /// Reads a column's width in the main window in front; nil while no main window is.
+    @Entry var columnWidthReader: ((ColumnWidth) -> CGFloat)?
 }

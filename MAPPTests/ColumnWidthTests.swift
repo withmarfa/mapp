@@ -6,8 +6,8 @@ import Testing
 struct ColumnWidthTests {
     @Test func builtInDefaultsAreTheAgreedWidths() {
         #expect(ColumnWidth.sidebar.defaultWidth == 230)
-        #expect(ColumnWidth.list.defaultWidth == 340)
-        #expect(ColumnWidth.settings.defaultWidth == 260)
+        #expect(ColumnWidth.list.defaultWidth == 350)
+        #expect(ColumnWidth.settings.defaultWidth == 290)
     }
 
     @Test func everyDefaultLiesInsideItsColumnsLimits() {
@@ -46,7 +46,7 @@ struct ColumnWidthTests {
         defaults.set("wide", forKey: ColumnWidth.settings.key)
         #expect(ColumnWidth.sidebar.stored(in: defaults) == 300)
         #expect(ColumnWidth.list.stored(in: defaults) == 480)
-        #expect(ColumnWidth.settings.stored(in: defaults) == 260)
+        #expect(ColumnWidth.settings.stored(in: defaults) == 290)
     }
 
     @Test func eachColumnHasItsOwnKeyAndResetClearsThemWithTheInterfaceKeys() {
