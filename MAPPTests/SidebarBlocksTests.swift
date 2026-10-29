@@ -25,6 +25,18 @@ struct SidebarBlocksTests {
         #expect(blocks.showsViews)
     }
 
+    @Test func showMoreStaysOpenForTheWindowAndClosesForAnotherLibrary() {
+        let first = library()
+        let second = library()
+        let browser = Browser()
+        browser.adopt(first)
+        browser.sidebarShowsAllTypes = true
+        browser.adopt(first)
+        #expect(browser.sidebarShowsAllTypes)
+        browser.adopt(second)
+        #expect(!browser.sidebarShowsAllTypes)
+    }
+
     @Test func aBuiltInViewSwitchedOffLeavesTheBlock() {
         var layout = SidebarLayout()
         layout.setHidden(.recents, true)

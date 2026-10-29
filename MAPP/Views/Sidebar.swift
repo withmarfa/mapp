@@ -7,7 +7,6 @@ struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
-    @State private var showsAllTypes = false
     @State private var choosingIcon: TypeIconRequest?
     let browser: Browser
     let order: NoteOrder
@@ -27,6 +26,10 @@ struct Sidebar: View {
         }
     }
 
+    private var showsAllTypes: Binding<Bool> {
+        Binding { browser.sidebarShowsAllTypes } set: { browser.sidebarShowsAllTypes = $0 }
+    }
+
     var body: some View {
         let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
         let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order)
@@ -43,7 +46,7 @@ struct Sidebar: View {
             }
             if plan.showsViews { viewsSection(plan) }
             if plan.showsTypes {
-                SidebarTypesSection(plan: plan, folding: folding, showsAll: $showsAllTypes, choosingIcon: $choosingIcon)
+                SidebarTypesSection(plan: plan, folding: folding, showsAll: showsAllTypes,choosingIcon: $choosingIcon)
             }
         }
         .listStyle(.sidebar)
@@ -63,7 +66,7 @@ struct Sidebar: View {
     private func selectionRows(_ plan: SidebarPlan) -> [String] {
         plan.shownBuiltInViews.map(\.key) + plan.shownDestinations.map(\.key) + plan.shownLibrary.map(\.key)
             + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
-            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue) + [String(showsAllTypes)]
+            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue) + [String(browser.sidebarShowsAllTypes)]
     }
 
     // MARK: Rows
