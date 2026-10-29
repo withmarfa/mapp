@@ -2,13 +2,10 @@ import SwiftUI
 
 /// The instance at the foot of the sidebar, below its places, types and views: its name with a line under it saying
 /// how the library stands with its server, a Refresh that shows while the pointer is over them, and a cog that opens
-/// a menu of the Console, Settings and Recently Deleted.
+/// Settings.
 struct SidebarFoot: View {
     @Environment(Libraries.self) private var libraries
     @Environment(MarfaHost.self) private var host: MarfaHost?
-    @CurrentLibrary private var library
-    @Environment(\.openURL) private var openURL
-    @StoredOrder private var order
     let browser: Browser
 
     var body: some View {
@@ -23,18 +20,14 @@ struct SidebarFoot: View {
     }
 
     private func row(_ name: String, line: SyncFootLine?, canRefresh: Bool, refresh: @escaping () -> Void) -> some View {
-        let address = libraries.host.connection?.address
-        return SidebarFootRow(
+        SidebarFootRow(
             name: name, line: line, canRefresh: canRefresh,
             refresh: refresh,
-            openConsole: address.map { address in { openURL(address) } },
-            openSettings: { browser.showSettings() },
-            showRecentlyDeleted: { browser.show(.recentlyDeleted, in: library, order: order) })
+            openSettings: { browser.showSettings() })
     }
 }
 
-/// The foot's row, given what it shows and what its menu does. Refresh is disabled where it has nothing to do, and
-/// the Console while it has no address, which is until a server is set.
+/// The foot's row, given what it shows and what its controls do. Refresh is disabled where it has nothing to do.
 ///
 /// The controls are plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the
 /// keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches both. Refresh is only
@@ -48,12 +41,12 @@ struct SidebarFootRow: View {
     let line: SyncFootLine?
     let canRefresh: Bool
     let refresh: () -> Void
-    let openConsole: (() -> Void)?
     let openSettings: () -> Void
-    let showRecentlyDeleted: () -> Void
 
     private enum Control: Hashable { case refresh, settings }
 
+    /// The name in the primary label color and the quieter parts in the secondary one; all step back with the window.
+    private var nameStyle: AnyShapeStyle { appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary) }
     private var tint: AnyShapeStyle { appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary) }
 
     var body: some View {
@@ -61,7 +54,7 @@ struct SidebarFootRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                     .interfaceFont(.body)
-                    .foregroundStyle(tint)
+                    .foregroundStyle(nameStyle)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .accessibilityIdentifier("SidebarLibrary")
@@ -70,26 +63,19 @@ struct SidebarFootRow: View {
             .contentShape(.rect)
             .onHover { isHovering = $0 }
             Spacer(minLength: 0)
-            Menu {
-                Button("Console") { openConsole?() }
-                    .disabled(openConsole == nil)
-                Button("Settings", action: openSettings)
-                Button("Recently Deleted", action: showRecentlyDeleted)
-            } label: {
+            Button(action: openSettings) {
                 Image(systemName: "gearshape")
                     .interfaceFont(.body)
                     .imageScale(.large)
                     .foregroundStyle(tint)
                     .contentShape(.rect)
             }
-            .menuIndicator(.hidden)
             .buttonStyle(.plain)
-            .fixedSize()
             .focused($focus, equals: .settings)
             .simultaneousGesture(TapGesture().onEnded { focus = nil })
-            .help("Console, Settings and Recently Deleted")
-            .accessibilityLabel(Text("Settings Menu"))
-            .accessibilityIdentifier("SidebarSettingsMenu")
+            .help("Settings")
+            .accessibilityLabel(Text("Settings"))
+            .accessibilityIdentifier("SidebarSettings")
         }
         .onChange(of: appearsActive) { if !appearsActive { focus = nil } }
         .padding(.leading, 20)
@@ -131,7 +117,7 @@ struct SidebarFootRow: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .interfaceFont(.subheadline)
-            .foregroundStyle(appearsActive ? AnyShapeStyle(asksForAction ? .secondary : .tertiary) : AnyShapeStyle(.quaternary))
+            .foregroundStyle(asksForAction ? nameStyle : tint)
             .help(line.help ?? "")
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(line.text))

@@ -9,7 +9,7 @@ final class SidebarSizeTests: XCTestCase {
             app.launch()
             let window = app.windows.firstMatch
             XCTAssertTrue(window.outlines["Sidebar"].waitForExistence(timeout: 10))
-            let instance = window.descendants(matching: .any).matching(identifier: "SidebarSettingsMenu").element(boundBy: 0)
+            let instance = window.descendants(matching: .any).matching(identifier: "SidebarSettings").element(boundBy: 0)
             XCTAssertTrue(instance.waitForExistence(timeout: 3))
             XCTAssertTrue(instance.isHittable, "the instance menu is reachable at sidebar size \(size)")
             let newItem = window.descendants(matching: .any).matching(identifier: "SidebarNew").element(boundBy: 0)

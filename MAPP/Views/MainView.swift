@@ -13,10 +13,8 @@ struct MainView: View {
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
-    @State private var sidebarWidth = ColumnWidth.sidebar.stored()
-    @State private var listWidth = ColumnWidth.list.stored()
-    @State private var settingsWidth = ColumnWidth.settings.stored()
-    @State private var measuredWidths = ColumnWidths()
+    @State private var measuredWidths = ColumnWidthTracker()
+    @Environment(\.appearsActive) private var appearsActive
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -52,10 +50,10 @@ struct MainView: View {
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
         dialogsWindow.id(workspacePresentation)
         .onChange(of: workspacePresentation) {
-            sidebarWidth = measuredWidths.sidebar
-            listWidth = measuredWidths.list
-            settingsWidth = measuredWidths.settings
             editor.flush()
+        }
+        .onChange(of: appearsActive, initial: true) {
+            ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
         }
         .onChange(of: browser.showsCollection) {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
@@ -90,17 +88,10 @@ struct MainView: View {
                     NoteList(browser: browser, order: order, pane: $pane)
                 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-                guard $0.isFinite else { return }
-                if browser.showsSettings {
-                    if $0 >= ColumnWidth.settings.range.lowerBound { measuredWidths.settings = $0 }
-                } else if $0 >= ColumnWidth.list.range.lowerBound {
-                    measuredWidths.list = $0
-                }
-            }
-            // The page list is about as wide as the sidebar; each keeps its own width.
+            // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
+            // only as it is built, so it comes from the tracker as it stands then.
             .navigationSplitViewColumnWidth(
-                min: activeListColumn.range.lowerBound, ideal: browser.showsSettings ? settingsWidth : listWidth,
+                min: activeListColumn.range.lowerBound, ideal: measuredWidths.width(of: activeListColumn),
                 max: activeListColumn.range.upperBound)
         } detail: {
             if browser.showsSettings {
@@ -116,6 +107,9 @@ struct MainView: View {
         }
     }
 
+    /// Only the three-column split has a list column to measure.
+    private var hasListColumn: Bool { workspacePresentation == .list || workspacePresentation == .settings }
+
     private var activeListColumn: ColumnWidth { browser.showsSettings ? .settings : .list }
 
     private var sidebarColumn: some View {
@@ -124,11 +118,16 @@ struct MainView: View {
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
-            if $0.isFinite, $0 >= ColumnWidth.sidebar.range.lowerBound { measuredWidths.sidebar = $0 }
+        .onSplitViewDividerDrag(placing: {
+            hasListColumn
+                ? [measuredWidths.width(of: .sidebar), measuredWidths.width(of: activeListColumn)]
+                : [measuredWidths.width(of: .sidebar)]
+        }) { widths in
+            if let sidebar = widths.first { measuredWidths.record(sidebar, for: .sidebar) }
+            if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: activeListColumn) }
         }
         .navigationSplitViewColumnWidth(
-            min: ColumnWidth.sidebar.range.lowerBound, ideal: sidebarWidth, max: ColumnWidth.sidebar.range.upperBound)
+            min: ColumnWidth.sidebar.range.lowerBound, ideal: measuredWidths.width(of: .sidebar), max: ColumnWidth.sidebar.range.upperBound)
     }
 
     private var itemPage: some View {
@@ -193,7 +192,7 @@ struct MainView: View {
         workspace
         .safeAreaBar(edge: .bottom, spacing: 0) {
             if !browser.showsSettings, browser.item == .recentlyDeleted {
-                RecentlyDeletedActions(browser: browser)
+                RecentlyDeletedActions(chosen: browser.selectedItems(in: library))
             }
         }
         .focusedSceneValue(\.detailsPresentation, details)
@@ -223,7 +222,6 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.columnWidthReader, { [measuredWidths] column in measuredWidths.width(of: column) })
         .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
@@ -356,22 +354,6 @@ struct MainView: View {
 
 private enum WorkspacePresentation: Hashable {
     case list, collection, settings, index
-}
-
-// Measuring a drag must not invalidate the view and reapply its preferred column widths.
-// Each starts at the width set in Settings; a width dragged in this window replaces it for the window's life.
-private final class ColumnWidths {
-    var sidebar = ColumnWidth.sidebar.stored()
-    var list = ColumnWidth.list.stored()
-    var settings = ColumnWidth.settings.stored()
-
-    func width(of column: ColumnWidth) -> CGFloat {
-        switch column {
-        case .sidebar: sidebar
-        case .list: list
-        case .settings: settings
-        }
-    }
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

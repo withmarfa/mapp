@@ -50,8 +50,10 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        // The system's scroll edge shows the foot over a material only while rows pass beneath it.
-        .safeAreaInset(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
+        // The foot is a bar on the list's bottom edge, so the system draws its scroll edge effect there: nothing while
+        // no row is beneath it, and the soft material once rows pass under.
+        .safeAreaBar(edge: .bottom, spacing: 0) { SidebarFoot(browser: browser) }
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.

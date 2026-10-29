@@ -54,3 +54,64 @@ struct ColumnWidthTests {
         for column in ColumnWidth.allCases { #expect(InterfaceKey.all.contains(column.key)) }
     }
 }
+
+@MainActor
+struct ColumnWidthTrackerTests {
+    private func tracker() -> ColumnWidthTracker {
+        let suite = "ColumnWidthTrackerTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        return ColumnWidthTracker(defaults: defaults)
+    }
+
+    @Test func aNewWindowStartsEachColumnAtItsDefault() {
+        let tracker = tracker()
+        for column in ColumnWidth.allCases { #expect(tracker.width(of: column) == column.defaultWidth) }
+    }
+
+    @Test func aDraggedWidthIsKeptAndOneOutsideTheLimitsIsNot() {
+        let tracker = tracker()
+        tracker.record(410, for: .list)
+        tracker.record(12, for: .list)
+        tracker.record(900, for: .list)
+        tracker.record(.nan, for: .list)
+        #expect(tracker.width(of: .list) == 410)
+    }
+
+    @Test func eachColumnKeepsItsOwnDraggedWidth() {
+        let tracker = tracker()
+        tracker.record(300, for: .settings)
+        #expect(tracker.width(of: .settings) == 300)
+        #expect(tracker.width(of: .list) == 350)
+        #expect(tracker.width(of: .sidebar) == 230)
+    }
+
+    @Test func columnWidthsComeFromTheDividerPositions() {
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: [230, 580, 1700]) == [230, 350, 1120])
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: [-230, 350, 1700]) == [0, 350, 1350])
+        #expect(ColumnWidthTracker.columnWidths(rightEdges: []).isEmpty)
+    }
+
+    @Test func dividersAreSetForTheVisibleColumnsOnly() {
+        let both = DividerDragView.dividerPositions(widths: [230, 350], hidden: [false, false, false])
+        #expect(both.map(\.index) == [0, 1])
+        #expect(both.map(\.position) == [230, 580])
+        let noSidebar = DividerDragView.dividerPositions(widths: [230, 350], hidden: [true, false, false])
+        #expect(noSidebar.map(\.index) == [1])
+        #expect(noSidebar.map(\.position) == [350])
+        let twoColumns = DividerDragView.dividerPositions(widths: [230], hidden: [false, false])
+        #expect(twoColumns.map(\.index) == [0])
+        #expect(DividerDragView.dividerPositions(widths: [230, 350], hidden: [false, false]).map(\.index) == [0])
+    }
+
+    @Test func onlyTheWindowInFrontIsRead() {
+        let registry = ColumnWidthRegistry()
+        let first = tracker(), second = tracker()
+        registry.windowBecame(active: true, tracker: first)
+        registry.windowBecame(active: true, tracker: second)
+        registry.windowBecame(active: false, tracker: first)
+        #expect(registry.front === second)
+        registry.windowBecame(active: false, tracker: second)
+        #expect(registry.front == nil)
+    }
+}

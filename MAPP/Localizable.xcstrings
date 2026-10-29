@@ -2706,7 +2706,16 @@
     "Settings Menu" : {
 
     },
-    "Console, Settings and Recently Deleted" : {
+    "Nothing is in Recently Deleted." : {
+
+    },
+    "Open a library to see what was deleted from it." : {
+
+    },
+    "Open the server’s console in the browser" : {
+
+    },
+    "Opens in the browser" : {
 
     },
     "Open a window to use its column widths." : {

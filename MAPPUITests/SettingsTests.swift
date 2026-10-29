@@ -12,7 +12,7 @@ final class SettingsTests: XCTestCase {
     /// Settings' pages, which take the list's column while Settings is the place.
     private var settings: XCUIElement { element("SettingsPageList") }
     /// The cog at the sidebar's foot, which opens the menu that holds Settings.
-    private var instanceMenu: XCUIElement { element("SidebarSettingsMenu") }
+    private var instanceMenu: XCUIElement { element("SidebarSettings") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -70,8 +70,8 @@ final class SettingsTests: XCTestCase {
         app.typeKey("s", modifierFlags: [.command, .control])
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
         let pages = [("editor", "Editor"), ("sidebar", "Sidebar"), ("library", "Library"),
-                     ("thisMarfa", "This Marfa"), ("about", "About"), ("appearance", "Appearance")]
-        XCTAssertFalse(element("SettingsPage-recentlyDeleted").exists, "Recently Deleted is a workspace destination")
+                     ("thisMarfa", "This Marfa"), ("recentlyDeleted", "Recently Deleted"), ("about", "About"), ("appearance", "Appearance")]
+        XCTAssertTrue(element("SettingsConsole").exists, "Console is a row after the pages, not a page")
         for (page, title) in pages {
             let row = element("SettingsPage-\(page)")
             XCTAssertTrue(row.exists, "\(title) is a page")
@@ -216,7 +216,6 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(instanceMenu.exists)
         XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
         instanceMenu.click()
-        app.menuItems["Settings"].click()
         let size = window.popUpButtons["InterfaceTextSize"]
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         size.click()
@@ -256,9 +255,9 @@ final class SettingsTests: XCTestCase {
             leaveSettings()
             XCTAssertTrue(sidebar.waitForExistence(timeout: 3))
             XCTAssertTrue(instanceMenu.waitForExistence(timeout: 3))
-            XCTAssertTrue(instanceMenu.isHittable, "the sidebar's instance menu is reachable at \(points) points")
+            XCTAssertTrue(instanceMenu.isHittable, "the foot's settings button is reachable at \(points) points")
             XCTAssertTrue(instanceMenu.isEnabled)
-            XCTAssertTrue(element("SidebarSettingsMenu").isHittable, "the foot's settings menu is reachable at \(points) points")
+            XCTAssertTrue(element("SidebarSettings").isHittable, "the foot's settings menu is reachable at \(points) points")
             app.typeKey("f", modifierFlags: [.command, .option])
             let search = window.textFields["ColumnSearch"]
             XCTAssertTrue(search.waitForExistence(timeout: 3))
