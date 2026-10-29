@@ -118,16 +118,19 @@ struct MarfaDrainAnswersTests {
         let report = MarfaSync.report(answeredIn: try await source.copy.queue.all())
 
         let holding = LiveMarfa.Flag()
+        let (held, release) = AsyncStream<Void>.makeStream()
+        defer { release.finish() }
         await source.engine.whenAnswering {
             holding.set()
-            // Holds the engine in this event, as a slow one would be held.
-            try? await Task.sleep(for: .seconds(1))
+            // Holds the engine in this event, as a slow one would be held, until the test has made its checks.
+            for await _ in held {}
         }
         source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
         #expect(await LiveMarfa.until { holding.isSet })
         #expect(activity.snapshot().step == "change.queueDrained")
         async let behind: Void = source.queueSubmitted()
         #expect(await LiveMarfa.until { activity.snapshot().waiting >= 1 }, "the event told behind the slow one is not counted as waiting")
+        release.finish()
         await behind
         await source.engine.whenAnswering(nil)
         #expect(await LiveMarfa.until { activity.snapshot().step == nil })
