@@ -60,6 +60,7 @@ export function splitLabels(all: AppLabels): {
   const {
     linkToNote,
     pictureFrom,
+    loadNamedPicture,
     loadingPicture,
     picturesOff,
     loadOnePicture,
@@ -79,6 +80,7 @@ export function splitLabels(all: AppLabels): {
     words: {
       linkToNote,
       pictureFrom,
+      loadNamedPicture,
       loadingPicture,
       picturesOff,
       loadOnePicture,
@@ -316,7 +318,10 @@ export class NoteEditor {
             const address = webAddress(reference.target)
             if (address) {
               if (host.pictures.opensInBrowser(address)) return events.openLink(address)
-              void host.pictures.choose(address)
+              // A picture that waits is loaded with the page's others, as the callout's button does; one
+              // that was refused and can be tried again, alone.
+              if (host.pictures.isWaiting(address)) host.pictures.chooseAll()
+              else void host.pictures.choose(address)
               return
             }
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })

@@ -47,7 +47,8 @@ extension EditorController {
             "diagramUnavailable": String(localized: "Diagram unavailable:"),
             "footnote": String(localized: "Footnote"),
             // The page puts the website in place of the placeholder, so the word is sent as the catalog holds it.
-            "pictureFrom": String(localized: "Picture from %@"),
+            "pictureFrom": String(localized: "Load Picture from %@"),
+            "loadNamedPicture": String(localized: "Load Picture: %@"),
             "loadingPicture": String(localized: "Loading Picture…"),
             "picturesOff": String(localized: "Remote Pictures Are Off"),
             "loadOnePicture": String(localized: "Load Picture"),
