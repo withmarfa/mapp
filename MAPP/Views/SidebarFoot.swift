@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The instance at the foot of the sidebar, below its places, types and views: its name with a chevron, which opens
-/// a menu of Refresh, the Console, Settings and Recently Deleted, with a line under the name saying how the library
-/// stands with its server; and the button that makes a new item.
+/// The instance at the foot of the sidebar, below its places, types and views: its name with a line under it saying
+/// how the library stands with its server, a Refresh that shows while the pointer is over them, and a cog that opens
+/// a menu of the Console, Settings and Recently Deleted.
 struct SidebarFoot: View {
     @Environment(Libraries.self) private var libraries
     @Environment(MarfaHost.self) private var host: MarfaHost?
@@ -25,7 +25,7 @@ struct SidebarFoot: View {
     private func row(_ name: String, line: SyncFootLine?, canRefresh: Bool, refresh: @escaping () -> Void) -> some View {
         let address = libraries.host.connection?.address
         return SidebarFootRow(
-            name: name, line: line, canRefresh: canRefresh, browser: browser,
+            name: name, line: line, canRefresh: canRefresh,
             refresh: refresh,
             openConsole: address.map { address in { openURL(address) } },
             openSettings: { browser.showSettings() },
@@ -33,70 +33,63 @@ struct SidebarFoot: View {
     }
 }
 
-/// The foot's row, given what it shows and what its menu does. Refresh is dimmed in the menu where it has nothing to
-/// do, and the Console while it has no address, which is until a server is set.
+/// The foot's row, given what it shows and what its menu does. Refresh is disabled where it has nothing to do, and
+/// the Console while it has no address, which is until a server is set.
 ///
-/// Both controls are plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the
-/// keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches both.
+/// The controls are plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the
+/// keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches both. Refresh is only
+/// drawn while the pointer is over the name or the keyboard is on it, but it stays in the accessibility tree.
 struct SidebarFootRow: View {
     @Environment(\.appearsActive) private var appearsActive
     @FocusState private var focus: Control?
+    @State private var isHovering = false
     let name: String
     /// Nil where there is no server to sync with, as in the sample library.
     let line: SyncFootLine?
     let canRefresh: Bool
-    let browser: Browser?
     let refresh: () -> Void
     let openConsole: (() -> Void)?
     let openSettings: () -> Void
     let showRecentlyDeleted: () -> Void
 
-    private enum Control: Hashable { case menu, newItem }
+    private enum Control: Hashable { case refresh, settings }
+
+    private var tint: AnyShapeStyle { appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary) }
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
-                // The system's menu, with its own indicator hidden for the chevron beside the name.
-                Menu {
-                    Button("Refresh", action: refresh)
-                        .disabled(!canRefresh)
-                    Divider()
-                    Button("Console") { openConsole?() }
-                        .disabled(openConsole == nil)
-                    Button("Settings", action: openSettings)
-                    Button("Recently Deleted", action: showRecentlyDeleted)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(name)
-                            .interfaceFont(.body)
-                            .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Image(systemName: "chevron.down")
-                            .interfaceFont(.caption.weight(.semibold))
-                            .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                            .fixedSize()
-                    }
-                    .contentShape(.rect)
-                }
-                .menuIndicator(.hidden)
-                .buttonStyle(.plain)
-                .focused($focus, equals: .menu)
-                .simultaneousGesture(TapGesture().onEnded { focus = nil })
-                .help("Instance Menu")
-                .accessibilityLabel(Text(name))
-                .accessibilityHint(Text("Opens Refresh, the Console, Settings and Recently Deleted"))
-                .accessibilityIdentifier("SidebarLibrary")
-                if let line { syncLine(line) }
+                Text(name)
+                    .interfaceFont(.body)
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .accessibilityIdentifier("SidebarLibrary")
+                if let line { syncRow(line) }
             }
+            .contentShape(.rect)
+            .onHover { isHovering = $0 }
             Spacer(minLength: 0)
-            NewItemButton(browser: browser)
-                .buttonStyle(.plain)
-                .interfaceFont(.body)
-                .imageScale(.large)
-                .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                .focused($focus, equals: .newItem)
-                .simultaneousGesture(TapGesture().onEnded { focus = nil })
+            Menu {
+                Button("Console") { openConsole?() }
+                    .disabled(openConsole == nil)
+                Button("Settings", action: openSettings)
+                Button("Recently Deleted", action: showRecentlyDeleted)
+            } label: {
+                Image(systemName: "gearshape")
+                    .interfaceFont(.body)
+                    .imageScale(.large)
+                    .foregroundStyle(tint)
+                    .contentShape(.rect)
+            }
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .fixedSize()
+            .focused($focus, equals: .settings)
+            .simultaneousGesture(TapGesture().onEnded { focus = nil })
+            .help("Console, Settings and Recently Deleted")
+            .accessibilityLabel(Text("Settings Menu"))
+            .accessibilityIdentifier("SidebarSettingsMenu")
         }
         .onChange(of: appearsActive) { if !appearsActive { focus = nil } }
         .padding(.leading, 20)
@@ -105,25 +98,44 @@ struct SidebarFootRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// One quiet line, a step below the name. Where the person has to act it is as strong as the name.
-    private func syncLine(_ line: SyncFootLine) -> some View {
-        let asksForAction = line.kind == .failed || line.kind == .needsAttention
-        return HStack(spacing: 4) {
+    /// One quiet line, a step below the name, and the small Refresh after it. Where the person has to act the line is
+    /// as strong as the name.
+    private func syncRow(_ line: SyncFootLine) -> some View {
+        HStack(spacing: 4) {
+            syncLine(line)
             if line.showsSpinner {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityHidden(true)
             }
-            Text(line.text)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            Button(action: refresh) {
+                Image(systemName: "arrow.clockwise")
+                    .interfaceFont(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canRefresh)
+            .focused($focus, equals: .refresh)
+            .simultaneousGesture(TapGesture().onEnded { focus = nil })
+            .opacity(isHovering || focus == .refresh ? 1 : 0)
+            .help("Refresh")
+            .accessibilityLabel(Text("Refresh"))
+            .accessibilityIdentifier("SidebarRefresh")
         }
-        .interfaceFont(.subheadline)
-        .foregroundStyle(appearsActive ? AnyShapeStyle(asksForAction ? .secondary : .tertiary) : AnyShapeStyle(.quaternary))
-        .help(line.help ?? "")
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(line.text))
-        .accessibilityHint(Text(line.help ?? ""))
-        .accessibilityIdentifier("SyncStatus")
+    }
+
+    private func syncLine(_ line: SyncFootLine) -> some View {
+        let asksForAction = line.kind == .failed || line.kind == .needsAttention
+        return Text(line.text)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .interfaceFont(.subheadline)
+            .foregroundStyle(appearsActive ? AnyShapeStyle(asksForAction ? .secondary : .tertiary) : AnyShapeStyle(.quaternary))
+            .help(line.help ?? "")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(line.text))
+            .accessibilityHint(Text(line.help ?? ""))
+            .accessibilityIdentifier("SyncStatus")
     }
 }
