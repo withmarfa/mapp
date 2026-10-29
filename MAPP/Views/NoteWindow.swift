@@ -49,7 +49,7 @@ struct NoteWindow: View {
 
     var body: some View {
         Group {
-            if let item, !item.isFile {
+            if let item, library.pageLayout(of: item) == .text {
                 NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .navigationTitle(item.title)
                     .toolbar(removing: .title)

@@ -38,7 +38,7 @@ Each `AGENTS.md` has a `CLAUDE.md` symlink beside it, because Claude Code reads 
 - With the gallery or the table showing, the editor stays mounted but hidden. Menu commands get no focused editor then (`MainView`), but the palette holds the editor directly, so offer an editor command there only when `hasVisibleEditor`.
 - Every user-facing string goes through the String Catalog. `MAPP/Localizable.xcstrings` is updated by building in Xcode; `xcodebuild` alone does not update it.
 - `MainView` mounts one `NavigationSplitView` at a time (the three-column list, or the two-column split the gallery and the table share), and changes the workspace's identity when it switches between them, which is also what moving from the gallery or the table to Settings does: Settings is a place in the three-column split, with its pages in the content column and the page in the detail column, so macOS releases the outgoing toolbar. Never change the column count of a split view that is already mounted. Browser, editor, undo, and column state live above that boundary.
-- App Sandbox and the hardened runtime stay on. The sandbox allows outgoing connections for three reasons: WebKit's page process needs them, the library talks to its Marfa server, and the app fetches the pictures at web addresses that a note's page asks for (`PictureFetcher`). The editor page itself loads nothing from the network.
+- App Sandbox and the hardened runtime stay on. The sandbox allows outgoing connections for three reasons: WebKit's page process needs them, the library talks to its Marfa server, and the app fetches the pictures at web addresses that a note's page or a sealed web page asks for (`PictureFetcher`). Neither page loads anything from the network itself.
 
 ## Data rules
 

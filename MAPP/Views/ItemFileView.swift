@@ -82,15 +82,16 @@ struct ItemFileView: View {
     }
 }
 
-/// A file item's page: a Web Page has its own, and every other file is previewed.
+/// The page of an item that is not shown as text (`ItemLibrary.pageLayout(of:)`): an HTML document in the sealed web
+/// page, under the item's title and byline, or any other file in its preview.
 struct FileItemPage: View {
     @CurrentLibrary private var library
     let item: Item
     var onResolved: (URL?) -> Void = { _ in }
 
     var body: some View {
-        if library.isWebPage(item) {
-            WebPageItemPage(item: item, onResolved: onResolved)
+        if case .webPage(let document, let runsScripts) = library.pageLayout(of: item) {
+            WebPageItemPage(item: item, document: document, runsScripts: runsScripts, onResolved: onResolved)
         } else {
             ItemFileView(id: item.id, onResolved: onResolved)
         }

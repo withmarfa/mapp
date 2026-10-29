@@ -2,15 +2,24 @@ import SwiftUI
 import WebKit
 
 /// An HTML document shown as it was written, in a page that can reach nothing outside it (`SealedWebPage`). It draws
-/// no header, border or other chrome; the place that shows it decides what goes around.
+/// no header, border or other chrome; the place that shows it decides what goes around. Its pictures come from
+/// `pictures`, once `SealedPictureRewrite` has pointed them there; the page it was first shown with keeps answering, so a
+/// place that shows another item's document gives it a view of its own.
 struct WebPageView: View {
     private let html: Data
+    private let encoding: String.Encoding?
+    private let pictures: SealedPictures?
+    private let runsScripts: Bool
     @State private var sealed: SealedWebPage?
     @State private var failure: String?
 
-    /// An HTML document already in hand.
-    init(html: Data) {
+    /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so. It is read in
+    /// `encoding`, or where none is given, in the one its bytes declare (`SealedWebPage.show`).
+    init(html: Data, encoding: String.Encoding? = nil, pictures: SealedPictures? = nil, runsScripts: Bool) {
         self.html = html
+        self.encoding = encoding
+        self.pictures = pictures
+        self.runsScripts = runsScripts
     }
 
     var body: some View {
@@ -36,14 +45,18 @@ struct WebPageView: View {
         }
         .accessibilityIdentifier("WebPageView")
         .task(id: html) { await load() }
+        .onChange(of: pictures?.version) { _, version in
+            guard let version, let sealed else { return }
+            Task { await sealed.redrawPictures(version: version) }
+        }
     }
 
     private func load() async {
         failure = nil
         do {
             let page: SealedWebPage
-            if let sealed { page = sealed } else { page = try await SealedWebPage.make() }
-            try await page.show(html)
+            if let sealed { page = sealed } else { page = try await SealedWebPage.make(pictures: pictures, runsScripts: runsScripts) }
+            try await page.show(html, encoding: encoding)
             sealed = page
         } catch is CancellationError {
         } catch {
