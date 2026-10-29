@@ -256,6 +256,28 @@ struct InspectorEditingTests {
         #expect(library.notices.waiting.count == 1)
     }
 
+    @Test func aSelectionChangeHandsBackEveryDraftButTheShownItemsWhetherOrNotTheInspectorShows() throws {
+        let library = FakeItemLibrary()
+        let shown = ItemID.mint()
+        let left = ItemID.mint()
+        let presentation = Self.presentation(typing: "kept", into: shown)
+        let draft = presentation.draft(for: left, key: "assignee")
+        draft.field = Self.field
+        draft.base = ""
+        draft.text = "held back"
+        draft.isDirty = true
+        presentation.handOffProperties(except: shown, in: library, undoManager: nil)
+        #expect(presentation.unsavedProperties(of: shown).count == 1)
+        #expect(presentation.unsavedProperties(of: left).isEmpty)
+        #expect(try #require(library.notices.waiting.first).text == "Assignee: held back")
+        // Again, as the next change of selection would: a draft is told once.
+        presentation.handOffProperties(except: shown, in: library, undoManager: nil)
+        #expect(library.notices.waiting.count == 1)
+        // With nothing shown, the rest goes too.
+        presentation.handOffProperties(except: nil, in: library, undoManager: nil)
+        #expect(presentation.unsavedProperties().isEmpty)
+    }
+
     @Test func quittingHandsBackTheDraftsOfEveryWindow() throws {
         let library = FakeItemLibrary()
         let one = Self.presentation(typing: "one", into: ItemID.mint())

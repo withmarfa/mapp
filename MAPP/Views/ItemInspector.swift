@@ -60,11 +60,6 @@ struct ItemInspectorHost: View {
                 }
             }
         }
-        // Only a row going for good gives back what was typed: the item changing here, the window closing and the app
-        // quitting do; folding a section or hiding the inspector keep the draft for when it shows again.
-        .onChange(of: selectedID) { old, _ in
-            if let old { details.handOffProperties(of: old, in: library, undoManager: undoManager) }
-        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemInspector")
     }

@@ -239,6 +239,11 @@ struct MainView: View {
         .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.placeRemoved(in: library, order: order) }
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
+        // A draft the inspector held back is given back when the selection moves off its item, shown or not. Folding
+        // a section or hiding the inspector keep it, and the item still shown keeps its own.
+        .onChange(of: browser.selection) {
+            details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
+        }
         .onChange(of: browser.snapshot()) { _, snapshot in
             if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
         }
