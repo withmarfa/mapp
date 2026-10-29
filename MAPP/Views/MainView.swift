@@ -118,7 +118,11 @@ struct MainView: View {
                 // In SwiftUI's focus system, so the sidebar's own keys (Return, Delete) reach it.
                 .focused($pane, equals: .sidebar)
         }
-        .onSplitViewDividerDrag { widths in
+        .onSplitViewDividerDrag(placing: {
+            hasListColumn
+                ? [measuredWidths.width(of: .sidebar), measuredWidths.width(of: activeListColumn)]
+                : [measuredWidths.width(of: .sidebar)]
+        }) { widths in
             if let sidebar = widths.first { measuredWidths.record(sidebar, for: .sidebar) }
             if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: activeListColumn) }
         }
