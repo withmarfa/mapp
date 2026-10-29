@@ -43,7 +43,7 @@ nonisolated enum NoteText {
         var lines: [String] = []
         var count = 0
         var inFence = false
-        for line in body.split(whereSeparator: \.isNewline) {
+        for line in Lines(body) {
             if lines.count >= limit || count >= characters { break }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.first == "`" || trimmed.first == "~", trimmed.wholeMatch(of: fence) != nil {
@@ -83,17 +83,70 @@ nonisolated enum NoteText {
                 .joined(separator: "  ")
         }
         // A control character reads as a space, and has no place in a title or a name.
-        let readable = String(String.UnicodeScalarView(inlineText(text).unicodeScalars.map {
-            $0.properties.generalCategory == .control ? " " : $0
-        }))
+        var readable = inlineText(text)
+        if mayHoldControl(readable) {
+            readable = String(String.UnicodeScalarView(readable.unicodeScalars.map {
+                $0.properties.generalCategory == .control ? " " : $0
+            }))
+        }
         return readable.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Whether the text may hold a control character (U+0000 to U+001F, U+007F to U+009F), read from its bytes: the
+    /// lead byte 0xC2 also starts other characters, which only runs the full check.
+    private static func mayHoldControl(_ text: String) -> Bool {
+        text.utf8.contains { $0 < 0x20 || $0 == 0x7F || $0 == 0xC2 }
+    }
+
+    /// A text's lines, split where `Character.isNewline` splits them, with empty lines left out, read from the
+    /// bytes and only as far as the reader goes: a preview needs a few lines of a body, not all of them. Every
+    /// newline is a character of its own, so the byte where one starts is always where a character starts.
+    struct Lines: Sequence, IteratorProtocol {
+        private let text: String
+        private var position: String.Index
+
+        init(_ text: String) {
+            self.text = text
+            position = text.startIndex
+        }
+
+        mutating func next() -> Substring? {
+            let bytes = text.utf8
+            while position < bytes.endIndex {
+                let start = position
+                var index = start
+                var separator: Int?
+                while index < bytes.endIndex {
+                    separator = Self.newline(in: bytes, at: index)
+                    if separator != nil { break }
+                    index = bytes.index(after: index)
+                }
+                position = separator.map { bytes.index(index, offsetBy: $0) } ?? bytes.endIndex
+                if index > start { return text[start..<index] }
+            }
+            return nil
+        }
+
+        /// The length in bytes of the newline that starts at `index`, if one does: LF, VT, FF, CR, NEL, LS or PS.
+        private static func newline(in bytes: String.UTF8View, at index: String.Index) -> Int? {
+            let byte = bytes[index]
+            if (0x0A...0x0D).contains(byte) { return 1 }
+            guard byte == 0xC2 || byte == 0xE2 else { return nil }
+            func after(_ offset: Int) -> UInt8? {
+                guard let next = bytes.index(index, offsetBy: offset, limitedBy: bytes.endIndex), next < bytes.endIndex
+                else { return nil }
+                return bytes[next]
+            }
+            if byte == 0xC2 { return after(1) == 0x85 ? 2 : nil }
+            return after(1) == 0x80 && (after(2) == 0xA8 || after(2) == 0xA9) ? 3 : nil
+        }
     }
 
     /// Code spans keep their contents as written; everything around them loses links and emphasis.
     private static func inlineText(_ text: String) -> String {
         var result = ""
         var rest = text[...]
-        while rest.contains("`"), let span = rest.firstMatch(of: codeSpan) {
+        while holds(rest, "`"), let span = rest.firstMatch(of: codeSpan) {
             result += unescaped(stripInline(String(rest[..<span.range.lowerBound])))
             result += span.output.1
             rest = rest[span.range.upperBound...]
@@ -104,7 +157,7 @@ nonisolated enum NoteText {
     /// Text as markdown means it: a backslash before punctuation is only there to keep the punctuation plain,
     /// and a character reference such as `&amp;` or `&#x20;` stands for its character.
     static func unescaped(_ text: String) -> String {
-        guard text.contains("\\") || text.contains("&") else { return text }
+        guard holds(text, "\\") || holds(text, "&") else { return text }
         var text = text.replacing(backslashEscape) { String($0.output.1) }
         text.replace(characterReference) { match in
             let (whole, name) = match.output
@@ -132,12 +185,12 @@ nonisolated enum NoteText {
     private static func stripInline(_ text: String) -> String {
         var text = text
         let authored = text
-        if text.contains("<") {
+        if holds(text, "<") {
             text.replace(htmlBreak) { match in
                 isEscaped(at: match.range.lowerBound, in: authored) ? String(match.output) : " "
             }
         }
-        if text.contains("[") {
+        if holds(text, "[") {
             let linked = text
             text.replace(wikiReference) { match in
                 let (whole, embedded, content) = match.output
@@ -153,10 +206,18 @@ nonisolated enum NoteText {
             text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
             text.replace(link) { String($0.output.1) }
         }
-        let starred = text.contains("*") || text.contains("_")
-        if starred || text.contains("~") { text.replace(strongOrStrike) { String($0.output.2) } }
+        let starred = holds(text, "*") || holds(text, "_")
+        if starred || holds(text, "~") { text.replace(strongOrStrike) { String($0.output.2) } }
         if starred { text.replace(emphasis) { String($0.output.1) + String($0.output.2) } }
         return text
+    }
+
+    /// Whether the text holds an ASCII character, read from its bytes: `StringProtocol.contains` with a string
+    /// searches through Foundation, which costs more than the patterns it guards. A byte that is part of a larger
+    /// character still answers true, which only runs the pattern, as it would run with no check.
+    static func holds(_ text: some StringProtocol, _ character: Unicode.Scalar) -> Bool {
+        let byte = UInt8(character.value)
+        return text.utf8.contains(byte)
     }
 
     private static func isEscaped(at index: String.Index, in text: String) -> Bool {

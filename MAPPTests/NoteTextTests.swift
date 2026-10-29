@@ -103,4 +103,15 @@ struct NoteTextTests {
     @Test func aPreviewReadsAsWrittenWhateverTheEditorEscaped() {
         #expect(preview("R\\&D: plan\n\nsnake\\_case", title: "R&D: plan") == "snake_case")
     }
+
+    @Test func linesSplitWhereEveryNewlineDoes() {
+        let texts = [
+            "one\ntwo\r\nthree\rfour", "\n\nlead and trail\n\n", "vertical\u{0B}tab\u{0C}feed",
+            "next\u{85}line\u{2028}separator\u{2029}paragraph", "café\u{301}\n👩‍👩‍👧 family",
+            "quotes “like” these — and – dashes … ‘too’", "Â non-break\u{A0}space ©", "", "\r\n", "no break",
+        ]
+        for text in texts {
+            #expect(Array(NoteText.Lines(text)) == text.split(whereSeparator: \.isNewline), "\(text.debugDescription)")
+        }
+    }
 }

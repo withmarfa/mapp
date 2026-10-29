@@ -21,7 +21,7 @@ nonisolated enum ItemPreview {
 
     private static func plain(_ body: String, title: String) -> String {
         var text = String(body.prefix(reach))
-        if text.contains("<!--") {
+        if NoteText.holds(text, "<"), text.contains("<!--") {
             text.replace(comment, with: " ")
             text.replace(unfinishedComment, with: " ")
         }
