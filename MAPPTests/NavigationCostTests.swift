@@ -234,6 +234,17 @@ struct NavigationCostTests {
         }
     }
 
+    /// Opening items one after another in the list, so each move builds a page's header and the inspector.
+    @Test func aHostedWindowMovingBetweenItemsInTheList() async throws {
+        try await hosted { browser, library, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("open item \(index + 1)") { browser.selection = [id] }
+            }
+        }
+    }
+
     /// The table of every item with no grouping, then the move between two places that stays on the table.
     @Test func aHostedWindowOnAnUngroupedTable() async throws {
         try await hosted { browser, _, step in
@@ -246,6 +257,86 @@ struct NavigationCostTests {
             try await step("tasks (ungrouped table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
             try await step("all items (ungrouped table) again") { browser.sidebarItem = .allNotes }
             try await step("list") { browser.viewMode = .list }
+        }
+    }
+
+    /// An editor whose page has loaded, showing the header of `id` as the item page does, and the drafts it reads.
+    private func openPage(_ id: ItemID, in library: MarfaLibrary) async throws -> (EditorController, DetailsPresentation) {
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: id, in: library, drafts: drafts) } }
+        return (editor, drafts)
+    }
+
+    /// Prints what ran since the last reset, for `what`, and how long the main actor was busy with it.
+    private func report(_ what: String, wallMilliseconds: Double) {
+        #if DEBUG
+        let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.2f", $0.value.milliseconds))ms" }.joined(separator: " ")
+        print("PAGE|\(what)|\(counts)|wall=\(String(format: "%.2f", wallMilliseconds))ms")
+        #endif
+    }
+
+    /// Runs `work`, then lets the editor's pending header readings run, and reports the cost.
+    private func measurePage(_ what: String, _ work: () -> Void) async throws {
+        #if DEBUG
+        try await Task.sleep(for: .milliseconds(300))
+        Cost.resetTallies()
+        let start = ContinuousClock.now
+        work()
+        try await Task.sleep(for: .milliseconds(100))
+        let elapsed = ContinuousClock.now - start - .milliseconds(100)
+        report(what, wallMilliseconds: Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15)
+        #endif
+    }
+
+    /// Opening one item page: an epic, which holds the most links to read and list.
+    @Test func openingAnItemPage() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let epic = ItemID("\(BigLibrary.epic.rawValue)-0")
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        try await measurePage("open an epic") {
+            editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: epic, in: library, drafts: drafts) } }
+        }
+        // A second window opens its own page for the same item.
+        let second = EditorController(library: library)
+        try #require(await eventually { second.isReady })
+        try await measurePage("open the same epic in a second window") {
+            second.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: epic, in: library, drafts: drafts) } }
+        }
+    }
+
+    /// Moving from one item page to the next, twenty times, as arrowing down the list does.
+    @Test func movingBetweenTwentyItemPages() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let ids = library.items(in: .allNotes).prefix(20).map(\.id)
+        let editor = EditorController(library: library)
+        try #require(await eventually { editor.isReady })
+        let drafts = DetailsPresentation()
+        try await measurePage("move between 20 items") {
+            for id in ids {
+                editor.showHeader { Cost.measure(.pageHeader) { ItemPageHeader.header(of: id, in: library, drafts: drafts) } }
+            }
+        }
+    }
+
+    /// Another item edited while a page stays open, as a connector or another window does all day.
+    @Test func anUnrelatedEditWhileAPageIsOpen() async throws {
+        let (library, source) = try await BigLibrary.loaded()
+        let epic = ItemID("\(BigLibrary.epic.rawValue)-0")
+        let (editor, _) = try await openPage(epic, in: library)
+        _ = editor
+        let unrelated = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+        try await measurePage("edit 10 unrelated items with an epic open") {
+            for index in 0..<10 {
+                var edited = unrelated
+                edited.title = "Edited \(index)"
+                edited.modified = Date(timeIntervalSince1970: 2_000_000 + Double(index))
+                source.send(.upserted([edited]))
+            }
         }
     }
 

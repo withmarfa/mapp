@@ -38,6 +38,10 @@ import Observation
     private(set) var contentRevision = 0
     /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
     private var membershipRevision = 0
+    /// Bumped when an edge comes, goes or changes, and when the index is built again, which is all that changes what
+    /// points at an item. A read of
+    /// an item's relationships follows this and the records of the items it names, never `contentRevision`.
+    private(set) var linksRevision = 0
     private var searchRevision = 0
     private var viewRevision = 0
 
@@ -382,6 +386,7 @@ import Observation
     private func upsert(_ items: [Item], bodies: [ItemBody]) {
         var changed = false
         var moved = false
+        var relinked = false
         for item in items {
             if let record = records[item.id] {
                 let old = record.item
@@ -390,29 +395,35 @@ import Observation
                 record.item = item
                 index.insert(item, catalogue: catalogue)
                 if Self.placesDiffer(old, item) { moved = true }
+                if old.edgesOut != item.edgesOut { relinked = true }
             } else {
                 records[item.id] = ItemRecord(item)
                 index.insert(item, catalogue: catalogue)
                 moved = true
+                if !item.edgesOut.isEmpty { relinked = true }
             }
             changed = true
         }
         hold(bodies)
         if changed { contentRevision += 1 }
         if moved { membershipRevision += 1 }
+        if relinked { linksRevision += 1 }
     }
 
     private func remove(_ ids: [ItemID]) {
         var changed = false
+        var relinked = false
         for id in ids {
             guard let record = records.removeValue(forKey: id) else { continue }
             index.remove(record.item)
             record.isHeld = false
             changed = true
+            if !record.item.edgesOut.isEmpty { relinked = true }
         }
         guard changed else { return }
         contentRevision += 1
         membershipRevision += 1
+        if relinked { linksRevision += 1 }
     }
 
     /// Text read while the person's own text is still on its way is older than what the library holds. Text
@@ -444,6 +455,7 @@ import Observation
         for record in records.values { index.insert(record.item, catalogue: catalogue) }
         contentRevision += 1
         membershipRevision += 1
+        linksRevision += 1
     }
 
     private static func placesDiffer(_ old: Item, _ new: Item) -> Bool {
