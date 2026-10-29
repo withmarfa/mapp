@@ -6,6 +6,10 @@ import Observation
 @Observable
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes
+    /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
+    /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
+    /// this is kept here, where Show More stays open through that.
+    var sidebarShowsAllTypes = false
     var selection: Set<ItemID> = [] {
         didSet {
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
@@ -444,6 +448,7 @@ final class Browser {
         history = SelectionHistory()
         isCollectionItemPresented = false
         sidebarItem = .allNotes
+        sidebarShowsAllTypes = false
         searchText = ""
         searchesPlace = false
         isSearchExpanded = false
