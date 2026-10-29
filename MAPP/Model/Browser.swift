@@ -79,7 +79,11 @@ final class Browser {
     /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note. One panel is out at a time,
     /// so the palette puts quick add away, keeping its draft.
     var palette: Palette? {
-        didSet { if palette != nil { quickAdd.isPresented = false } }
+        didSet {
+            guard palette != nil else { return }
+            Telemetry.event(.navigation, "palette.open")
+            quickAdd.isPresented = false
+        }
     }
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
@@ -395,6 +399,8 @@ final class Browser {
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
+        let interval = Telemetry.begin(.navigation, "place.choose")
+        defer { interval.end() }
         leaveSettings()
         isCollectionItemPresented = false
         searchText = ""

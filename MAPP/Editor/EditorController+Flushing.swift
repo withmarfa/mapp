@@ -83,13 +83,16 @@ extension EditorController {
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
     /// capture does, since it would otherwise be lost; where they stay, as when a note is deleted, it waits.
-    static func flushAll(leaving: Bool = true, then done: @escaping (Bool) -> Void) {
+    static func flushAll(leaving: Bool = true, trace: QuitTrace? = nil, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)
         // One refusal is told, from the window that holds it, since that window comes forward and only one can.
         var told = false
         for editor in editors {
-            guard editor.saveTitles(tellingRefusal: leaving && !told) || !leaving else {
+            trace?.begin(.titles)
+            let titlesSaved = editor.saveTitles(tellingRefusal: leaving && !told)
+            trace?.end(.titles)
+            guard titlesSaved || !leaving else {
                 told = true
                 gate.arrive(false)
                 continue

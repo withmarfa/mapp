@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// The library the windows read: the connected Marfa server's, and none until a server is set and its copy is
 /// open. The app owns one of these, with the connection under it.
@@ -33,26 +34,30 @@ import Observation
 
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
     /// the real one waits on every page in the process, those of tests running beside it too.
-    private let handOverPages: (@escaping (Bool) -> Void) -> Void
+    private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
 
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
-        handOverPages: @escaping (@escaping (Bool) -> Void) -> Void = { EditorController.flushAll(then: $0) }
+        handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil
     ) {
         self.host = host
-        self.handOverPages = handOverPages
+        self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
+            ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         instanceSettings.onRenamed = { [host] in host.refreshName() }
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
+        LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
     func launch() async {
         await host.launch()
         isLaunching = false
+        LaunchTrace.shared.mark(.copyOpened, note: host.library == nil ? "no copy" : "copy open")
+        if host.library == nil { LaunchTrace.shared.settleWithoutLibrary() }
     }
 
     var mode: Mode {
@@ -95,8 +100,19 @@ import Observation
     /// and before quitting.
     @discardableResult
     func flushEditors() async -> Bool {
-        guard await flush() else { return false }
-        await host.library?.finish()
+        await flushEditors(tracing: QuitTrace(activity: host.library?.engineActivity))
+    }
+
+    private func flushEditors(tracing trace: QuitTrace) async -> Bool {
+        guard await flush(tracing: trace) else { return false }
+        // The library may have closed since the flush began; then it holds nothing to wait for.
+        guard let library = host.library else {
+            trace.skip(.queue, because: "no library is open")
+            return true
+        }
+        trace.begin(.queue)
+        await library.finish()
+        trace.end(.queue)
         return true
     }
 
@@ -104,14 +120,20 @@ import Observation
     /// that cannot be handed over has told the person already; a library still keeping its writes is told here.
     func flushEditors(within limit: Duration) async -> Bool {
         let first = FirstOf()
+        let trace = QuitTrace(activity: host.library?.engineActivity)
+        let interval = Telemetry.begin(.quit, "quit.flush")
         return await withCheckedContinuation { continuation in
             Task {
-                let kept = await flushEditors()
-                first.resume(continuation, with: kept)
+                let kept = await flushEditors(tracing: trace)
+                let elapsed = interval.end()
+                if first.resume(continuation, with: kept) {
+                    Telemetry.logger(.quit).info("quit flush \(kept ? "kept" : "refused", privacy: .public) after \(elapsed.inMilliseconds, privacy: .public) ms")
+                }
             }
             Task { [host] in
                 try? await Task.sleep(for: limit)
                 guard first.resume(continuation, with: false) else { return }
+                trace.logTimeout(after: limit)
                 host.notices.tell(
                     String(localized: "Couldn’t Quit"),
                     String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment."))
@@ -134,9 +156,11 @@ import Observation
     }
 
     /// The pages first, since an edit still in a page reaches a library only by being handed over.
-    private func flush() async -> Bool {
-        await withCheckedContinuation { continuation in
-            handOverPages { continuation.resume(returning: $0) }
+    private func flush(tracing trace: QuitTrace) async -> Bool {
+        trace.begin(.editors)
+        defer { trace.end(.editors) }
+        return await withCheckedContinuation { continuation in
+            handOverPages(trace) { continuation.resume(returning: $0) }
         }
     }
 

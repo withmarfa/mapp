@@ -102,6 +102,39 @@ struct MarfaDrainAnswersTests {
     }
 
     @Test
+    func theEngineNamesTheEventItIsTakingWhileItRunsAndNoneAfter() async throws {
+        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        let location = MarfaStoreLocation(root: root)
+        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
+        let log = ChangeLog(source)
+        _ = try #require(await log.wait { $0.snapshot != nil })
+        let activity = try #require(source.engineActivity)
+        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "First", body: "First")), as: WriteID())
+        await source.queueSubmitted()
+        let accepted = try #require(try await source.copy.queue.all().first)
+        try Self.recordAccepted(accepted.id, at: location.store(for: connection))
+        let report = MarfaSync.report(answeredIn: try await source.copy.queue.all())
+
+        let holding = LiveMarfa.Flag()
+        await source.engine.whenAnswering {
+            holding.set()
+            // Holds the engine in this event, as a slow one would be held.
+            try? await Task.sleep(for: .seconds(1))
+        }
+        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        #expect(await LiveMarfa.until { holding.isSet })
+        #expect(activity.snapshot().step == "change.queueDrained")
+        async let behind: Void = source.queueSubmitted()
+        #expect(await LiveMarfa.until { activity.snapshot().waiting >= 1 }, "the event told behind the slow one is not counted as waiting")
+        await behind
+        await source.engine.whenAnswering(nil)
+        #expect(await LiveMarfa.until { activity.snapshot().step == nil })
+        await source.close()
+    }
+
+    @Test
     func anAnswerRecordedAfterTheQueueWasReadSurvivesTheForgetting() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

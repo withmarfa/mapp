@@ -8,7 +8,7 @@ import Synchronization
 /// window shows and the library has either loaded or had nothing to load.
 nonisolated final class LaunchTrace: Sendable {
     nonisolated enum Milestone: String, CaseIterable, Sendable {
-        /// `MAPPApp.init`, the first of the app's own code that runs once the system has set the process up.
+        /// `Launch.main`, the first of the app's own code that runs once the system has set the process up.
         case appInit
         /// `Libraries` has chosen its mode: whether a server is set, so whether a copy is to be opened.
         case librariesInit

@@ -4,7 +4,7 @@ import OSLog
 import UniformTypeIdentifiers
 import WebKit
 
-private let log = Logger(subsystem: "com.withmarfa.mapp", category: "editor")
+private let log = Telemetry.logger(.editor)
 
 /// One window's editor: a web page running the formatted markdown editor, loaded when the window opens so
 /// the first note shows without a wait, and reused for every note the window shows.
@@ -244,7 +244,11 @@ final class EditorController: NSObject {
         if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
         let request = loadRequest
+        // From the request to the host having handed the note to the page; the page has no callback for its first
+        // paint, so how long the page takes to draw it is not here.
+        let interval = Telemetry.begin(.navigation, "item.open")
         let present = { [self] in
+            defer { interval.end() }
             guard request == loadRequest else { return }
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
@@ -497,11 +501,11 @@ final class EditorController: NSObject {
     func call(_ function: String, _ arguments: String...) {
         webView.evaluateJavaScript("window.editor.\(function)(\(arguments.joined(separator: ", ")))") { result, error in
             if let rejected = result as? [String: Any], let message = rejected["message"] as? String, rejected["commandError"] != nil {
-                log.notice("\(function, privacy: .public) rejected: \(message, privacy: .public)")
+                log.notice("\(function, privacy: .public) rejected: \(message)")
             }
             if let error {
                 let detail = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String ?? error.localizedDescription
-                log.error("\(function, privacy: .public): \(detail, privacy: .public)")
+                log.error("\(function, privacy: .public): \(detail)")
             }
         }
     }
@@ -607,9 +611,9 @@ final class EditorController: NSObject {
             guard state.generation == generation else { return }
             pageFinder.update(state)
         case .diagnostic(let message):
-            log.notice("preview diagnostic: \(message, privacy: .public)")
+            log.notice("preview diagnostic: \(message)")
         case .error(let message):
-            log.error("page error: \(message, privacy: .public)")
+            log.error("page error: \(message)")
             library?.notices.tell(String(localized: "Editor Couldn’t Complete the Action"), message)
         }
     }
@@ -645,11 +649,11 @@ extension EditorController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-        log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
+        log.error("navigation failed: \(error.localizedDescription)")
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
-        log.error("load failed: \(error.localizedDescription, privacy: .public)")
+        log.error("load failed: \(error.localizedDescription)")
     }
 
     /// A page that crashes after working comes back with the note it held. One that never got going is not

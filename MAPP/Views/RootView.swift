@@ -20,6 +20,7 @@ struct RootView: View {
         .environment(\.library, libraries.current)
         .focusedSceneValue(\.browser, browser)
         .onAppear {
+            LaunchTrace.shared.mark(.windowShown)
             if settingsRequest.isPending {
                 settingsRequest.isPending = false
                 browser.showSettings(settingsRequest.page)
