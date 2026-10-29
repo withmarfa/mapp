@@ -516,12 +516,13 @@ test('an item nothing links to has no Linked From section', () => {
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
 
-test('an event shows its calendar block, its time and its status together', () => {
+test('an event shows its calendar block and its time, and keeps its status among the rows', () => {
   header.set({
     ...ticket,
     kind: 'event',
     type: 'Event',
-    properties: [],
+    status: { label: 'Confirmed', enabled: true, empty: false, opensMenu: true },
+    properties: [{ id: 'status', label: 'Status', symbol: 'circle', kind: 'status' as const }],
     event: {
       month: 'OCT',
       day: '29',
@@ -539,7 +540,8 @@ test('an event shows its calendar block, its time and its status together', () =
   expect(when.querySelector('.item-when-detail')!.textContent).toBe(
     'ThursdayLondon time (BST)in 2 days',
   )
-  expect(when.contains(pin('ItemStatusPin'))).toBe(true)
+  expect(when.contains(pin('ItemStatusPin'))).toBe(false)
+  expect(root.querySelector('.item-prop')!.contains(pin('ItemStatusPin'))).toBe(true)
   expect(root.dataset.kind).toBe('event')
 
   header.set({ ...ticket, kind: 'general' })
@@ -603,6 +605,48 @@ test('a phone number is a link that dials its digits', () => {
   expect(root.querySelector('.item-prop-value a')).toBeNull()
 })
 
+test('a text value is drawn in a span of its own, so it can shrink to its column and wrap', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
+    ],
+  })
+  const value = root.querySelector('.item-prop-value')!
+  expect(value.children).toHaveLength(1)
+  expect(value.children[0]!.tagName).toBe('SPAN')
+  expect(value.textContent).toBe('plain')
+})
+
+test('rows first drawn where the page has no width are drawn again once it has one', () => {
+  const properties: HeaderModel['properties'] = [
+    { id: 'note', label: 'Note', symbol: 'text.alignleft', kind: 'text', text: 'plain' },
+  ]
+  const width = window.innerWidth
+  try {
+    window.innerWidth = 0
+    const narrow = new ItemHeader(
+      document.createElement('header'),
+      document.createElement('footer'),
+    )
+    narrow.set({ ...ticket, properties })
+    const row = narrow.root.querySelector('.item-prop')!
+    window.dispatchEvent(new Event('resize'))
+    expect(narrow.root.querySelector('.item-prop')).toBe(row)
+
+    window.innerWidth = 700
+    window.dispatchEvent(new Event('resize'))
+    const drawn = narrow.root.querySelector('.item-prop')!
+    expect(drawn).not.toBe(row)
+    expect(drawn.textContent).toContain('plain')
+
+    window.dispatchEvent(new Event('resize'))
+    expect(narrow.root.querySelector('.item-prop')).toBe(drawn)
+  } finally {
+    window.innerWidth = width
+  }
+})
+
 test('a page for reading puts the source and reading time in the byline, with no type', () => {
   header.set({
     ...ticket,
@@ -629,4 +673,20 @@ test('the byline draws the icon of the item type, and none for a type with no ic
   expect(node().style.width).toBe('13px')
   header.set({ ...ticket, icon: 'type:' })
   expect(node().hidden).toBe(true)
+})
+
+test('an item titled by its text draws no title, and one with a title of its own does', () => {
+  header.set({ ...ticket, showsTitle: false, editable: false })
+  expect(root.querySelector<HTMLElement>('.item-title')!.hidden).toBe(true)
+  expect(root.dataset.title).toBe('derived')
+  expect(root.querySelector<HTMLElement>('.item-byline')).not.toBeNull()
+  header.set(ticket)
+  expect(root.querySelector<HTMLElement>('.item-title')!.hidden).toBe(false)
+  expect(root.dataset.title).toBe('own')
+})
+
+test('a title read from the text still ends where the header ends, so the toolbar names the item as it scrolls', () => {
+  header.set({ ...ticket, showsTitle: false, editable: false })
+  expect(header.bottom).toBe(root.offsetTop + root.offsetHeight)
+  expect(header.isEditingTitle).toBe(false)
 })

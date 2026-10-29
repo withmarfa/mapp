@@ -148,7 +148,18 @@ nonisolated enum MarfaMapping {
         ItemTypeInfo.Field(
             key: field.name, label: label(forField: field.name), kind: kind(of: field),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
-            format: field.type == "url" ? .url : field.type == "email" ? .email : nil)
+            format: format(of: field))
+    }
+
+    /// A field is a web or mail address when its kind says so or, as a text field's `format` refines it, when its
+    /// definition does: the server stores such a field as that kind, but a catalogue can still carry it as `string`.
+    static func format(of field: Marfa.TypeField) -> ItemTypeInfo.Field.TextFormat? {
+        let name = field.type == "string" ? field.definition["format"]?.string : field.type
+        switch name {
+        case "url": return .url
+        case "email": return .email
+        default: return nil
+        }
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {

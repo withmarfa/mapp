@@ -94,6 +94,15 @@ struct InspectorFieldsTests {
         #expect(header?.status?.opensMenu == true)
     }
 
+    @MainActor @Test func theHeaderDrawsATitleOnlyForAnItemWhoseTitleIsItsOwn() {
+        let titled = Self.item("aic.ticket.task")
+        let fromText = Self.item("core.note", id: "10000000-0000-0000-0000-000000000003", rule: .firstLine)
+        let library = FakeItemLibrary(items: [titled, fromText])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        #expect(ItemPageHeader.header(of: titled.id, in: library, drafts: DetailsPresentation())?.showsTitle == true)
+        #expect(ItemPageHeader.header(of: fromText.id, in: library, drafts: DetailsPresentation())?.showsTitle == false)
+    }
+
     @MainActor @Test func aStatusWithNoValueIsAnEmptyPinAndATypeWithoutOneHasNone() {
         let library = FakeItemLibrary(items: [Self.item("aic.ticket.task"), Self.item("core.file", id: "10000000-0000-0000-0000-000000000002")])
         library.catalogue = Catalogue(itemTypes: [Self.task, Self.file])
@@ -267,6 +276,29 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.properties(of: empty, type: list, hidden: []).isEmpty)
         let full = Self.item("aic.x", properties: [Property(key: "tags", value: .array([.string("a")]))])
         #expect(InspectorFields.properties(of: full, type: list, hidden: []).map(\.key) == ["tags"])
+    }
+
+    @Test func aWebAddressShowsAsALinkHoweverTheCatalogueSpellsItsKind() {
+        let type = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [
+            Self.field("home", "url"),
+            Self.field("site", "string", definition: ["format": "url"]),
+            Self.field("contact", "email"),
+            Self.field("mail", "string", definition: ["format": "email"]),
+            Self.field("notes", "string", definition: ["format": "bcp47"]),
+        ]))
+        let item = Self.item("aic.x", properties: [
+            Property(key: "home", value: .string("https://example.com/a")),
+            Property(key: "site", value: .string(" https://example.com/b ")),
+            Property(key: "contact", value: .string("a@example.com")),
+            Property(key: "mail", value: .string("b@example.com")),
+            Property(key: "notes", value: .string("en-GB")),
+        ])
+        let values = Dictionary(uniqueKeysWithValues: type.fields.map { ($0.key, PropertyRow.value(of: $0, in: item)) })
+        #expect(values["home"] == .url("https://example.com/a"))
+        #expect(values["site"] == .url("https://example.com/b"))
+        #expect(values["contact"] == .email("a@example.com"))
+        #expect(values["mail"] == .email("b@example.com"))
+        #expect(values["notes"] == .text("en-GB"))
     }
 
     // MARK: Labels for other properties

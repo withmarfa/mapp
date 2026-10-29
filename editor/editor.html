@@ -11,7 +11,13 @@
   </head>
   <body>
     <header id="item-header"></header>
-    <div id="picture-bar" hidden><button type="button"></button></div>
+    <div id="picture-bar" hidden>
+      <div class="picture-callout">
+        <span class="picture-icon" aria-hidden="true" hidden></span>
+        <span class="picture-sentence"></span>
+        <button type="button"></button>
+      </div>
+    </div>
     <div id="editor"></div>
     <footer id="item-footer"></footer>
     <script type="module" src="/src/main.ts"></script>

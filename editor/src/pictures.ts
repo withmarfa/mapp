@@ -1,14 +1,19 @@
 import { InkKitError, type FilePresentation } from '@aicayzer/inkkit'
 import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 
-/** The words a picture's card and the bar above the text use. The app supplies them in the person's language. */
+/** The words a picture's card and the callout above the text use. The app supplies them in the person's language. */
 export interface PictureWords {
-  loadPicture?: string
+  /** Has `%@` where the picture's website goes. */
+  pictureFrom?: string
   loadingPicture?: string
   picturesOff?: string
+  /** The callout's button for one waiting picture, and for several. */
   loadOnePicture?: string
-  /** Has `%lld` where the number of pictures goes. */
   loadPictures?: string
+  /** The callout's sentence for one waiting picture. */
+  pictureNotLoaded?: string
+  /** The callout's sentence for several, with `%lld` where the number of pictures goes. */
+  picturesNotLoaded?: string
 }
 
 /** A picture at a web address `http` or `https`, which is the only kind of embed whose target is one. */
@@ -45,7 +50,7 @@ export class WebPictures {
     /** Draws these addresses' cards again. */
     private redraw: (addresses: string[]) => void,
     /** Hears how many pictures wait for the person to load them, whenever that changes. */
-    private waitingChanged: (count: number, label: string) => void,
+    private waitingChanged: (count: number, sentence: string, button: string) => void,
     private ask: Ask = askPicture,
   ) {}
 
@@ -66,14 +71,20 @@ export class WebPictures {
   ): Promise<FilePresentation> {
     this.track(address, context.signal)
     const shown = label ?? address
+    const alt = label?.trim()
     let state = this.states.get(address)
     if (!state)
       state = await this.request(context.documentId, address, this.cacheOnly ? 'cached' : 'drawing')
     if (context.signal.aborted) return { kind: 'file', label: shown }
-    return this.card(address, shown, state)
+    return this.card(address, shown, alt, state)
   }
 
-  private card(address: string, shown: string, state: PictureState): FilePresentation {
+  private card(
+    address: string,
+    shown: string,
+    alt: string | undefined,
+    state: PictureState,
+  ): FilePresentation {
     if (state.kind === 'loaded') return { kind: 'image', url: state.url, label: shown }
     // A printed note names the picture; it says nothing of what the person could choose.
     if (this.cacheOnly) return { kind: 'file', label: shown }
@@ -92,7 +103,12 @@ export class WebPictures {
       case 'refused':
         return { kind: 'file', label: `${host}: ${state.reason}` }
       default:
-        return { kind: 'file', label: `${host}: ${this.words.loadPicture ?? 'Load Picture'}` }
+        // The callout above the text says the picture waits; the card only says what the picture is.
+        return {
+          kind: 'file',
+          // A function, so a `$` in the host is not read as a replacement pattern.
+          label: alt || (this.words.pictureFrom ?? 'Picture from %@').replace('%@', () => host),
+        }
     }
   }
 
@@ -124,7 +140,9 @@ export class WebPictures {
       const remembered = ask !== 'cached' || state.kind === 'loaded'
       if (this.item === forItem && this.asking.get(key) === pending) {
         this.asking.delete(key)
-        if (remembered) this.states.set(address, state)
+        // A picture the person has chosen since is loading, whatever an earlier question now answers.
+        if (remembered && (ask === 'chosen' || this.states.get(address)?.kind !== 'loading'))
+          this.states.set(address, state)
         this.schedule()
       }
       return state
@@ -187,12 +205,20 @@ export class WebPictures {
     const again = [...this.live.keys()].filter(
       (address) => wants(address) && !this.choosing(address),
     )
-    for (const address of again) this.states.delete(address)
     // An answer still on its way for any other address is kept: dropping a chosen picture's answer would leave its card
     // waiting although it was fetched.
     for (const key of [...this.asking.keys()])
       if (again.includes(key.slice(key.indexOf('\n') + 1))) this.asking.delete(key)
-    if (again.length) this.redraw(again)
+    const forItem = this.item
+    const ask = this.cacheOnly ? 'cached' : 'drawing'
+    for (const address of again) {
+      // The card and the count keep what they show until the new answer is here, so neither flickers between.
+      const before = this.states.get(address)
+      void this.request(forItem, address, ask).then((state) => {
+        if (this.item !== forItem || sameState(before, this.states.get(address) ?? state)) return
+        this.redraw([address])
+      })
+    }
   }
 
   private choosing(address: string): boolean {
@@ -233,11 +259,17 @@ export class WebPictures {
     const count = this.waiting().length
     if (count === this.announced) return
     this.announced = count
-    const label =
+    this.waitingChanged(
+      count,
       count === 1
-        ? (this.words.loadOnePicture ?? 'Load 1 Picture')
-        : (this.words.loadPictures ?? 'Load %lld Pictures').replace('%lld', String(count))
-    this.waitingChanged(count, label)
+        ? (this.words.pictureNotLoaded ?? '1 picture from another website isn’t loaded.')
+        : (
+            this.words.picturesNotLoaded ?? '%lld pictures from other websites aren’t loaded.'
+          ).replace('%lld', String(count)),
+      count === 1
+        ? (this.words.loadOnePicture ?? 'Load Picture')
+        : (this.words.loadPictures ?? 'Load Pictures'),
+    )
   }
 }
 
@@ -265,6 +297,10 @@ export function sameAddress(address: string): string {
     return Number(port) === (scheme === 'https' ? 443 : 80) && port !== '' ? '' : `:${port}`
   })
   return `${scheme}://${authority}${path || '/'}${query}`
+}
+
+function sameState(a: PictureState | undefined, b: PictureState | undefined): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 function hostOf(address: string): string {

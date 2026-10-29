@@ -46,12 +46,15 @@ extension EditorController {
             "diagramRendering": String(localized: "Rendering diagram…"),
             "diagramUnavailable": String(localized: "Diagram unavailable:"),
             "footnote": String(localized: "Footnote"),
-            "loadPicture": String(localized: "Load Picture"),
+            // The page puts the website in place of the placeholder, so the word is sent as the catalog holds it.
+            "pictureFrom": String(localized: "Picture from %@"),
             "loadingPicture": String(localized: "Loading Picture…"),
             "picturesOff": String(localized: "Remote Pictures Are Off"),
-            "loadOnePicture": String(localized: "Load 1 Picture"),
-            // The page puts the count in place of the placeholder, so the word is sent as the catalog holds it.
-            "loadPictures": String(localized: "Load %lld Pictures"),
+            "loadOnePicture": String(localized: "Load Picture"),
+            "loadPictures": String(localized: "Load Pictures"),
+            "pictureNotLoaded": String(localized: "1 picture from another website isn’t loaded."),
+            // The page puts the count in place of the placeholder.
+            "picturesNotLoaded": String(localized: "%lld pictures from other websites aren’t loaded."),
             "fileLoading": String(localized: "Loading file…"),
             "fileError": String(localized: "File could not be loaded"),
             "filePreviewUnavailable": String(localized: "Preview unavailable"),

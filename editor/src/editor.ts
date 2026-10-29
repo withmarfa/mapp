@@ -59,11 +59,13 @@ export function splitLabels(all: AppLabels): {
 } {
   const {
     linkToNote,
-    loadPicture,
+    pictureFrom,
     loadingPicture,
     picturesOff,
     loadOnePicture,
     loadPictures,
+    pictureNotLoaded,
+    picturesNotLoaded,
     ...rest
   } = all
   const header: Partial<HeaderLabels> = {}
@@ -74,7 +76,16 @@ export function splitLabels(all: AppLabels): {
   return {
     editor: rest,
     header,
-    words: { linkToNote, loadPicture, loadingPicture, picturesOff, loadOnePicture, loadPictures },
+    words: {
+      linkToNote,
+      pictureFrom,
+      loadingPicture,
+      picturesOff,
+      loadOnePicture,
+      loadPictures,
+      pictureNotLoaded,
+      picturesNotLoaded,
+    },
   }
 }
 
@@ -157,9 +168,9 @@ export interface EditorEvents {
   find(state: FindState): void
   openLink(href: string): void
   copy(text: string): void
-  /** How many pictures at web addresses wait for the person to load them, and the words for the button that loads
-   *  them together. */
-  picturesWaiting?(count: number, label: string): void
+  /** How many pictures at web addresses wait for the person to load them, the sentence that says so and the words
+   *  for the button that loads them together. */
+  picturesWaiting?(count: number, sentence: string, button: string): void
 }
 const tables: Partial<Record<FormatCommand, TableCommand>> = {
   table: 'insert',
@@ -224,7 +235,7 @@ export class NoteEditor {
     host.pictures = new WebPictures(
       words,
       (addresses) => host.drawLinksAgain(addresses),
-      (count, label) => events.picturesWaiting?.(count, label),
+      (count, sentence, button) => events.picturesWaiting?.(count, sentence, button),
     )
     host.engine = await InkKitEditor.mount(
       root,

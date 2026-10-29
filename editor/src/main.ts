@@ -71,7 +71,17 @@ const headerRoot = document.getElementById('item-header')
 const footerRoot = document.getElementById('item-footer')
 const pictureBar = document.getElementById('picture-bar')
 const pictureButton = pictureBar?.querySelector('button')
-if (!root || !headerRoot || !footerRoot || !pictureBar || !pictureButton)
+const pictureSentence = pictureBar?.querySelector<HTMLElement>('.picture-sentence')
+const pictureIcon = pictureBar?.querySelector<HTMLElement>('.picture-icon')
+if (
+  !root ||
+  !headerRoot ||
+  !footerRoot ||
+  !pictureBar ||
+  !pictureButton ||
+  !pictureSentence ||
+  !pictureIcon
+)
   throw new Error('editor root missing')
 const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
 
@@ -94,9 +104,10 @@ const editor = await NoteEditor.mount(
       postToHost({ type: 'copy', text })
     },
     // Above the text, so a note with pictures that wait can load them all at once.
-    picturesWaiting(count, label) {
+    picturesWaiting(count, sentence, button) {
       pictureBar.hidden = count === 0
-      pictureButton.textContent = label
+      pictureSentence.textContent = sentence
+      pictureButton.textContent = button
     },
   },
   labels.editor,
@@ -285,7 +296,16 @@ window.editor = {
     if (model) pictureBar.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     checkHeaderScrolledAway()
   },
-  setHeaderIcons: (icons) => header.setIcons(icons),
+  setHeaderIcons: (icons) => {
+    header.setIcons(icons)
+    const photo = icons.symbols?.photo
+    pictureIcon.hidden = !photo
+    if (!photo) return
+    pictureIcon.style.width = `${photo.width}px`
+    pictureIcon.style.height = `${photo.height}px`
+    pictureIcon.style.setProperty('-webkit-mask-image', `url("${photo.url}")`)
+    pictureIcon.style.maskImage = `url("${photo.url}")`
+  },
 }
 
 postToHost({ type: 'ready' })

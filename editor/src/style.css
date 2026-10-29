@@ -115,10 +115,12 @@ body {
   user-select: none;
 }
 
-/* Above the text while pictures at web addresses wait for the person: one button loads them all. */
+/* Above the text while pictures at web addresses wait for the person: a callout on the text's margins, whose
+   button loads them all. */
 #picture-bar {
   --interface-text-size: 13px;
-  padding: 0 var(--inkkit-column-inset) 8px;
+  --step: calc(var(--interface-text-size) * 4 / 13);
+  padding: 0 var(--inkkit-column-inset) calc(var(--step) * 3);
   font-family: -apple-system, system-ui, sans-serif;
   font-size: var(--interface-text-size);
   line-height: normal;
@@ -130,13 +132,42 @@ body {
   display: none;
 }
 
-#picture-bar button {
-  padding: 4px 10px;
-  border: 0;
-  border-radius: 6px;
+.picture-callout {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 2.5);
+  padding: calc(var(--step) * 2.5) calc(var(--step) * 3);
+  border-radius: calc(var(--step) * 2.5);
   background: var(--label-quinary);
-  color: var(--link);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+}
+
+.picture-icon {
+  flex: none;
+  background: var(--label-secondary);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.picture-icon[hidden] {
+  display: none;
+}
+
+.picture-sentence {
+  flex: 1;
+  min-width: 0;
+  color: var(--label-secondary);
+}
+
+#picture-bar button {
+  flex: none;
+  padding: calc(var(--step) * 0.75) calc(var(--step) * 2.5);
+  border: 0.5px solid var(--separator);
+  border-radius: calc(var(--step) * 1.5);
+  background: transparent;
+  color: var(--label-primary);
   font: inherit;
+  font-weight: 500;
   cursor: default;
 }
 
@@ -155,11 +186,25 @@ body[data-text='none'] #editor {
   font-weight: 600;
   color: var(--inkkit-text-color);
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   outline: none;
   cursor: text;
   -webkit-user-select: text;
   user-select: text;
+}
+
+.item-title[hidden] {
+  display: none;
+}
+
+/* A title read from the text is not drawn, so nothing is left to tuck the byline under. */
+#item-header[data-title='derived'] .item-byline {
+  margin-top: 0;
+}
+
+#item-header[data-title='derived']
+  .item-lead:has(.item-avatar[hidden]):has(.item-subtitle[hidden]) {
+  display: none;
 }
 
 .item-title[contenteditable='false'] {
@@ -422,7 +467,16 @@ body[data-text='none'] #editor {
   gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
   padding-block: calc(var(--step) / 2);
   color: var(--label-primary);
-  overflow-wrap: anywhere;
+  /* Not `anywhere` here: it breaks a value after every character in a first layout at no width, and WebKit keeps
+     that row height once the page has its width. The header is also drawn again then (`ItemHeader`). */
+  overflow-wrap: break-word;
+}
+
+/* `break-word` leaves a flex item as wide as its longest unbroken run, so a long address or word would run past the
+   column. Each value shrinks to the column and breaks inside itself. A tag keeps its fixed height. A first layout at
+   no width breaks it after every character, which is why the header is drawn again once the page has a width. */
+.item-prop-value > :not(.item-chip) {
+  min-width: 0;
 }
 
 /* A symbol the app drew, quiet in the secondary color. */
@@ -634,11 +688,11 @@ body[data-text='none'] #editor {
   object-fit: cover;
 }
 
-/* An event: a calendar block, then the time and what places it. */
+/* An event: a calendar tile of one fixed height, with its two lines of text centered against it. */
 .item-when {
   align-self: stretch;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: calc(var(--step) * 4);
   margin-top: calc(var(--step) * 1);
 }
@@ -651,8 +705,9 @@ body[data-text='none'] #editor {
   flex: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  box-sizing: border-box;
   width: calc(var(--step) * 16);
+  height: calc(var(--step) * 16);
   overflow: hidden;
   border-radius: calc(var(--step) * 2);
   box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -660,30 +715,29 @@ body[data-text='none'] #editor {
 }
 
 .item-calendar-month {
-  align-self: stretch;
-  padding-block: calc(var(--step) * 0.5);
+  flex: none;
+  height: calc(var(--step) * 5);
   background: var(--status-red);
   color: white;
   font-size: calc(var(--interface-text-size) * 10 / 13);
   font-weight: 600;
   letter-spacing: 0.06em;
+  line-height: calc(var(--step) * 5);
   text-align: center;
 }
 
 .item-calendar-day {
-  padding-block: calc(var(--step) * 1);
+  flex: 1;
+  display: grid;
+  place-items: center;
   color: var(--inkkit-text-color);
   font-size: calc(var(--interface-text-size) * 24 / 13);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .item-when-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: calc(var(--step) * 1);
   min-width: 0;
 }
 
@@ -697,27 +751,28 @@ body[data-text='none'] #editor {
   font-size: calc(var(--interface-text-size) * 17 / 13);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  line-height: calc(var(--step) * 6);
 }
 
+/* One line of text that wraps as a whole where the page is narrow, the tile staying centered against it. */
 .item-when-detail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 calc(var(--step) * 2);
+  overflow-wrap: break-word;
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 13 / 13);
+  line-height: calc(var(--step) * 5);
 }
 
-.item-when-status {
-  margin-top: calc(var(--step) * 1);
+.item-when-detail .item-byline-dot {
+  display: inline-block;
+  margin-inline: calc(var(--step) * 2);
+  vertical-align: middle;
 }
 
-/* A page for reading: the source above the title, a narrower serif column, the description under the title. */
+/* A page for reading: the source above the title, a serif column at the page width the person chose, the description under the title. */
 body[data-header='reading'] {
   --inkkit-font-family: 'New York', ui-serif, Georgia, serif;
   --inkkit-font-size: 1.125rem;
   --inkkit-line-height: 1.65;
-  --inkkit-reading-width: calc(min(var(--page-width), 40rem) + 6rem);
 }
 
 #item-header[data-kind='reading'] .item-byline {

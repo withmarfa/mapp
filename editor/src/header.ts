@@ -67,6 +67,8 @@ export interface HeaderModel {
   /** Why the title was refused, in the words of the library the item is in. */
   titleRefusal: string
   editable: boolean
+  /** False where the item is titled by the first line of its text, which the page already shows as its text. */
+  showsTitle?: boolean
   type: string | null
   /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name. */
   icon?: string | null
@@ -401,6 +403,17 @@ export class ItemHeader {
       this.editing = this.model.item
       postToHost({ type: 'titleInput', item: this.model.item, text: this.text })
     })
+    // The app sends the header before the window has sized the page. WebKit keeps the row heights of that first
+    // layout at no width, where a shrinking value breaks after every character, so the rows are drawn anew once the
+    // page has a width.
+    let width = window.innerWidth
+    window.addEventListener('resize', () => {
+      const had = width
+      width = window.innerWidth
+      if (had > 0 || width === 0) return
+      this.drawn = ''
+      this.redraw()
+    })
   }
 
   /** Inserts the text with its line breaks as spaces, if it has any; whether it did. */
@@ -454,6 +467,8 @@ export class ItemHeader {
     document.body.dataset.header = model.hidden ? 'general' : model.kind
     this.subtitle.textContent = model.subtitle ?? ''
     this.subtitle.hidden = !model.subtitle
+    this.title.hidden = model.showsTitle === false
+    this.root.dataset.title = model.showsTitle === false ? 'derived' : 'own'
     const editable = model.editable ? 'plaintext-only' : 'false'
     if (this.title.getAttribute('contenteditable') !== editable) {
       this.title.setAttribute('contenteditable', editable)
@@ -709,8 +724,6 @@ export class ItemHeader {
       if (index > 0) element('span', 'item-byline-dot', details).setAttribute('aria-hidden', 'true')
       element('span', '', details).textContent = part
     })
-    // The status the event is in sits with its time rather than among the properties.
-    if (model.status) element('div', 'item-when-status', text).append(this.statusPin)
   }
 
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
@@ -737,7 +750,7 @@ export class ItemHeader {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href))
           this.link(value, href, () => postToHost({ type: 'openLink', href }), href)
-        else value.textContent = href
+        else element('span', '', value).textContent = href
         break
       }
       case 'email': {
@@ -750,7 +763,7 @@ export class ItemHeader {
         const number = row.text ?? ''
         // A number is dialed as its digits and a leading plus, whatever spacing it is written with.
         const dialed = number.replace(/(?!^\+)[^\d]/g, '')
-        if (dialed.replace('+', '') === '') value.textContent = number
+        if (dialed.replace('+', '') === '') element('span', '', value).textContent = number
         else
           this.link(
             value,
@@ -761,7 +774,7 @@ export class ItemHeader {
         break
       }
       default:
-        value.textContent = row.text ?? ''
+        element('span', '', value).textContent = row.text ?? ''
     }
     return entry
   }
