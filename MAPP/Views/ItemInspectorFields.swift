@@ -40,8 +40,7 @@ nonisolated enum InspectorFields {
         }
     }
 
-    /// What a yes/no property's checkbox shows: a value that was never set, or has been cleared, is neither yes nor
-    /// no, so it is not drawn as an unticked box.
+    /// A yes/no property's value: one that was never set, or has been cleared, is neither yes nor no.
     enum YesNo: Equatable {
         case yes, no, unset
     }

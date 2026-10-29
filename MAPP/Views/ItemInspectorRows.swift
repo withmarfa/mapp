@@ -207,7 +207,8 @@ struct InspectorRow<Value: View>: View {
 }
 
 /// A value drawn as plain text. A value with no space in it (a link, an ID, a hash) takes one line and is cut in the
-/// middle, where its ends say most; a date takes one line and is cut at its end; a value of words wraps to three lines. The whole value is its help.
+/// middle, where its ends say most; a date takes one line and is cut at its end; a value of words wraps to three
+/// lines. The whole value is its help.
 struct InspectorText: View {
     let text: String
     var style: AnyShapeStyle = AnyShapeStyle(.primary)
@@ -287,7 +288,7 @@ extension View {
     }
 }
 
-/// The label of every control that adds something to a section: a plus and the words, a fixed gap apart.
+/// The label of a section's Add button or menu: a plus and the words, a fixed gap apart.
 struct InspectorAddLabel: View {
     let title: LocalizedStringKey
 
@@ -300,7 +301,7 @@ struct InspectorAddLabel: View {
     }
 }
 
-/// The one control that adds something to a section: a filled, rounded button with a plus.
+/// A section's Add button: a filled, rounded button with a plus.
 struct InspectorAddButton: View {
     let title: LocalizedStringKey
     let identifier: String

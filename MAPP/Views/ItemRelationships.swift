@@ -2,8 +2,9 @@ import MarfaIcons
 import SwiftUI
 
 /// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a light row with
-/// the item's type icon, which opens it, and a small plus at the end of its name where the relationship takes several. An editable
-/// one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the context menu.
+/// the item's type icon, which opens it, and a small plus at the end of its name where the relationship takes
+/// several. An editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the
+/// context menu.
 struct ItemRelationshipGroup: View {
     let relationship: ItemRelationship
     /// The icon of the type of the item a target points at.

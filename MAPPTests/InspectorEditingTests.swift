@@ -71,8 +71,7 @@ struct InspectorEditingTests {
 
     @Test func typingAndDeletingBackToTheBaseIsNoConflict() {
         // The person typed, then deleted back to what they started from, while the item changed elsewhere: there
-        // is no edit left to hold back,
-        // and the stale base is never written over their change.
+        // is no edit left to hold back, and the stale base is never written over the other change.
         let draft = Self.draft(base: "a", typed: "a")
         #expect(!draft.conflicts(with: "theirs"))
         #expect(draft.commit(as: .text, current: "theirs") == .alreadyCurrent)

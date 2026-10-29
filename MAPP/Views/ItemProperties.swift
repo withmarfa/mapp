@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One property of an item as a row of the inspector. Its value reads as plain text, and a click turns it into
-/// what edits it: a field, a menu or a calendar. Each row keeps unfinished input until it is committed; unrelated
+/// what edits it: a field, a list of choices or a calendar. Each row keeps unfinished input until it is committed; unrelated
 /// inspector updates do not replace it, and a change made elsewhere meanwhile is never written over silently.
 struct ItemPropertyRow: View {
     let definition: ItemTypeInfo.Field
@@ -25,7 +25,7 @@ struct ItemPropertyRow: View {
     @State private var choosingOption = false
     /// Whether a text value is being edited, as opposed to read.
     @State private var editing = false
-    /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
+    /// A field that recommends values is a list of them; Other… swaps it for a text field for a value of the
     /// person's own, until the person is done typing it.
     @State private var typingOwnValue = false
     @FocusState private var isFocused: Bool
