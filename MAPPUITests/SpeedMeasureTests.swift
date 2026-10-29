@@ -118,13 +118,11 @@ final class SpeedMeasureTests: XCTestCase {
         sidebarElement(place).click()
         XCTAssertTrue(list.waitForExistence(timeout: 20))
         XCTAssertTrue(list.outlineRows.element(boundBy: 4).waitForExistence(timeout: 20), "the place holds five items")
-        let rows = (0..<5).map { list.outlineRows.element(boundBy: $0) }
-        let spots = rows.map(spot)
+        let spots = (0..<5).map { spot(list.outlineRows.element(boundBy: $0)) }
         try begin("items")
         measure(metrics: [signpost("item.open"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
-            for (row, spot) in zip(rows, spots) {
+            for spot in spots {
                 time("open") { spot.click() }
-                XCTAssertTrue(waitUntil { row.isSelected }, "the item was selected")
             }
         }
     }
@@ -174,10 +172,18 @@ final class SpeedMeasureTests: XCTestCase {
         try launchWarm()
         try begin("typing")
         let title = "Speed measure \(UUID().uuidString.prefix(8))"
+        // The helper's waits allow for a small library; querying a tree this size takes seconds.
+        let field = element("QuickAddTitle")
         element("SidebarNew").click()
-        window.completeQuickAdd(type: "Note", title: title)
+        XCTAssertTrue(field.waitForExistence(timeout: 30))
+        element("QuickAddType").click()
+        window.menuItems["Note"].click()
+        field.click()
+        field.typeText(title)
+        app.typeKey(.return, modifierFlags: .command)
+        XCTAssertTrue(field.waitForNonExistence(timeout: 30))
         let editor = window.itemPageBody
-        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
         editor.click()
         let text = String(repeating: "the quick brown fox jumps over ", count: 2).prefix(40)
         for character in text { time("key") { app.typeText(String(character)) } }

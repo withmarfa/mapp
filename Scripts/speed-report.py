@@ -30,39 +30,45 @@ def main(path):
     milestones = {}  # phase -> milestone -> [ms]
     slow = {}  # phase -> count
     order = []
+    events = []
     with open(path) as handle:
         for text in handle:
             try:
-                event = json.loads(text)
+                events.append(json.loads(text))
             except ValueError:
                 continue
-            kind, category = event.get("eventType"), event.get("category")
-            message = event.get("eventMessage", "")
-            if category == "phase" and kind == "logEvent":
-                action, _, name = message.partition(" ")
-                phase = name if action == "begin" else None
-                if action == "begin":
-                    order.append(name)
-                continue
-            if phase is None:
-                continue
-            if kind == "signpostEvent":
-                key = (event.get("processID"), category, event.get("signpostName"), event.get("signpostID"))
-                if event.get("signpostType") == "begin":
-                    begun[key] = seconds(event)
-                elif event.get("signpostType") == "end" and key in begun:
-                    ms = (seconds(event) - begun.pop(key)) * 1000
-                    intervals.setdefault(phase, {}).setdefault((category, key[2]), []).append(ms)
-            elif kind == "logEvent":
-                if category == "launch" and message.startswith("launch since process start:"):
-                    for name, ms in MILESTONE.findall(message):
-                        milestones.setdefault(phase, {}).setdefault(name, []).append(float(ms))
-                elif category == "engine" and message.startswith("engine event"):
-                    slow[phase] = slow.get(phase, 0) + 1
+    # The stream hands over events from different processes in batches, so put them in the order they happened.
+    events.sort(key=seconds)
+    for event in events:
+        kind, category = event.get("eventType"), event.get("category")
+        message = event.get("eventMessage", "")
+        if category == "phase" and kind == "logEvent":
+            action, _, name = message.partition(" ")
+            phase = name if action == "begin" else None
+            if action == "begin":
+                order.append(name)
+            continue
+        if phase is None:
+            continue
+        if kind == "signpostEvent":
+            key = (event.get("processID"), category, event.get("signpostName"), event.get("signpostID"))
+            if event.get("signpostType") == "begin":
+                begun[key] = seconds(event)
+            elif event.get("signpostType") == "end" and key in begun:
+                ms = (seconds(event) - begun.pop(key)) * 1000
+                intervals.setdefault(phase, {}).setdefault((category, key[2]), []).append(ms)
+        elif kind == "logEvent":
+            if category == "launch" and message.startswith("launch since process start:"):
+                for name, ms in MILESTONE.findall(message):
+                    milestones.setdefault(phase, {}).setdefault(name, []).append(float(ms))
+            elif category == "engine" and message.startswith("engine event"):
+                slow[phase] = slow.get(phase, 0) + 1
     for phase in order:
         found = intervals.get(phase, {})
         for (category, name), values in sorted(found.items()):
             print(line(f"{phase}.signpost.{category}.{name}", values))
+            if category == "navigation" and name != "work":
+                print(f"UI|{phase}.signpost.{category}.{name}.count|{len(values)}|{len(values)}|intervals")
         for name, values in sorted(milestones.get(phase, {}).items()):
             print(line(f"{phase}.launch.{name}", values))
         main_actor = [ms for (category, name), values in found.items() if category == "navigation" or name.startswith("take.") for ms in values]
@@ -77,3 +83,4 @@ def main(path):
 
 if __name__ == "__main__":
     main(sys.argv[1])
+
