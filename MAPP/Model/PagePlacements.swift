@@ -101,14 +101,17 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     let linkField: String?
     let choice: PagePlacements.Choice
     private let defaultLinkedFrom: LinkedFromPlace
+    /// The keys of the type's fields that only a connector's bookkeeping needs (`isBookkeeping`).
+    private let bookkeeping: Set<String>
 
     /// Every row on the page, as before any choice was made.
     static let standard = PagePlacement(linkField: nil, choice: .init(), defaultLinkedFrom: .inspector)
 
-    init(linkField: String?, choice: PagePlacements.Choice, defaultLinkedFrom: LinkedFromPlace) {
+    init(linkField: String?, choice: PagePlacements.Choice, defaultLinkedFrom: LinkedFromPlace, bookkeeping: Set<String> = []) {
         self.linkField = linkField
         self.choice = choice
         self.defaultLinkedFrom = defaultLinkedFrom
+        self.bookkeeping = bookkeeping
     }
 
     init(type: TypeID, catalogue: Catalogue, choice: PagePlacements.Choice) {
@@ -117,7 +120,19 @@ nonisolated struct PagePlacement: Equatable, Sendable {
         let kind = PageHeaderKind.of(type, in: catalogue)
         self.init(
             linkField: catalogue.itemTypes[type]?.linkField, choice: choice,
-            defaultLinkedFrom: kind == .person || catalogue.isCollection(type) ? .page : .inspector)
+            defaultLinkedFrom: kind == .person || catalogue.isCollection(type) ? .page : .inspector,
+            bookkeeping: Set((catalogue.itemTypes[type]?.fields ?? []).filter(Self.isBookkeeping).map(\.key)))
+    }
+
+    /// Whether a field is a connector's bookkeeping, which says nothing to a person reading the page: one that a
+    /// connector's type declares (a core type's fields are Marfa's own vocabulary and always read as content), whose
+    /// key names an identifier or a checksum of what the connector synced from (`entry_id`, `feed_hash`,
+    /// `github_id`, `blob_sha`, `ical_uid`, `etag`). A catalogue says no more of a type than who declares its
+    /// fields, so a field of a type a person made with such a key is read the same way; the choice overrides it.
+    static func isBookkeeping(_ field: ItemTypeInfo.Field) -> Bool {
+        guard !field.declaredBy.rawValue.hasPrefix("core.") else { return false }
+        let key = field.key
+        return key == "etag" || ["_id", "_hash", "_sha", "_uid"].contains { key.hasSuffix($0) }
     }
 
     func showsOnPage(_ row: String) -> Bool { choice.rows[row] ?? defaultShows(row) }
@@ -127,5 +142,5 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     var linkedFromPlace: LinkedFromPlace { choice.linkedFrom ?? defaultLinkedFrom }
 
-    private func defaultShows(_ row: String) -> Bool { row != linkField }
+    private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }
 }

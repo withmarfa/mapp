@@ -64,7 +64,10 @@
     "Load Pictures" : {
 
     },
-    "Picture from %@" : {
+    "Load Picture from %@" : {
+      "extractionState" : "manual"
+    },
+    "Load Picture: %@" : {
       "extractionState" : "manual"
     },
     "Load Picture" : {

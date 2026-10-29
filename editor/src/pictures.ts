@@ -5,6 +5,7 @@ import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 export interface PictureWords {
   /** Has `%@` where the picture's website goes. */
   pictureFrom?: string
+  loadNamedPicture?: string
   loadingPicture?: string
   picturesOff?: string
   /** The callout's button for one waiting picture, and for several. */
@@ -103,11 +104,13 @@ export class WebPictures {
       case 'refused':
         return { kind: 'file', label: `${host}: ${state.reason}` }
       default:
-        // The callout above the text says the picture waits; the card only says what the picture is.
+        // The card says what activating it does, and which picture it is: its description, or else its website.
+        // A function replaces the placeholder, so a `$` in the text is not read as a replacement pattern.
         return {
           kind: 'file',
-          // A function, so a `$` in the host is not read as a replacement pattern.
-          label: alt || (this.words.pictureFrom ?? 'Picture from %@').replace('%@', () => host),
+          label: alt
+            ? (this.words.loadNamedPicture ?? 'Load Picture: %@').replace('%@', () => alt)
+            : (this.words.pictureFrom ?? 'Load Picture from %@').replace('%@', () => host),
         }
     }
   }
@@ -168,6 +171,11 @@ export class WebPictures {
   /** Every picture of the note that waits for the person, chosen together. */
   chooseAll() {
     for (const address of this.waiting()) void this.choose(address)
+  }
+
+  /** Whether the picture at an address waits for the person to load it. */
+  isWaiting(address: string): boolean {
+    return this.states.get(address)?.kind === 'waiting'
   }
 
   /** Whether a card's Open should open the address in the browser, which it does for a picture that is not waiting
