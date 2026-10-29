@@ -4,8 +4,8 @@ import Testing
 
 struct ColumnSearchMetricsTests {
     @Test func theFieldTakesAShareOfTheRoomBesideTheOptions() {
-        // 340 - 54 = 286 of room, and 85% of that.
-        #expect(ColumnSearchMetrics.fieldWidth(inColumn: ColumnWidth.list.defaultWidth) == 243)
+        // 350 - 54 = 296 of room, and 85% of that.
+        #expect(ColumnSearchMetrics.fieldWidth(inColumn: ColumnWidth.list.defaultWidth) == 252)
         #expect(ColumnSearchMetrics.fieldWidth(inColumn: 480) == 362)
     }
 
