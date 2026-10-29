@@ -85,8 +85,9 @@ struct ItemInspectorHost: View {
 }
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable. It reads as
-/// a property sheet: the item's details first, then the type's properties, the item's relationships and tags, and
-/// the items that link to it where the person placed that list here. Every section folds. Every property is listed
+/// a property sheet: the item's details first, then the type's properties, the item's relationships (the links it
+/// makes, the links in its content and, where the person placed the list here, the items that link to it) and tags.
+/// Every section folds. Every property is listed
 /// here; a context menu on one says whether the page shows it too.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
@@ -128,6 +129,8 @@ struct ItemInspector: View {
     @State private var revealed: Set<String> = []
     /// The property just added, whose row opens ready to edit.
     @State private var adding: String?
+    /// Whether the Tags heading's plus has opened the field for a new tag.
+    @State private var addingTag = false
 
     var body: some View {
         ScrollView {
@@ -140,7 +143,6 @@ struct ItemInspector: View {
                 if hasProperties { properties }
                 if hasRelationships { relationshipSection }
                 if hasTags { tagSection }
-                if !linked.isEmpty { linkedSection }
             }
             .sharesInspectorNameColumn()
             .padding(.horizontal, 16)
@@ -162,7 +164,16 @@ struct ItemInspector: View {
     // MARK: Sections
 
     private var properties: some View {
-        InspectorSectionView(.properties, title: "Properties") {
+        InspectorSectionView(.properties, title: "Properties", add: { hovering in
+            if !emptyFields.isEmpty {
+                InspectorPlusMenu(accessibilityLabel: "Add Property", identifier: "ItemInspectorAddProperty", isRowHovered: hovering) {
+                    ForEach(emptyFields) { field in
+                        Button(field.displayLabel) { add(field) }
+                            .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
+                    }
+                }
+            }
+        }) {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(fields) { field in
                     ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
@@ -176,20 +187,20 @@ struct ItemInspector: View {
                                     shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key))
                 }
             }
-            if !emptyFields.isEmpty {
-                InspectorAddMenu(title: "Add Property", identifier: "ItemInspectorAddProperty") {
-                    ForEach(emptyFields) { field in
-                        Button(field.displayLabel) { add(field) }
-                            .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
-                    }
-                }
-                .padding(.top, 4)
-            }
         }
     }
 
     private var relationshipSection: some View {
-        InspectorSectionView(.relationships, title: "Relationships") {
+        InspectorSectionView(.relationships, title: "Relationships", add: { hovering in
+            if !addable.isEmpty {
+                InspectorPlusMenu(accessibilityLabel: "Add Relationship", identifier: "RelationshipAddMenu", isRowHovered: hovering) {
+                    ForEach(addable) { option in
+                        Button(ItemTypeInfo.Field.displayLabel(option.label)) { onEdit(option) }
+                            .accessibilityIdentifier("RelationshipAdd.\(option.field)")
+                    }
+                }
+            }
+        }) {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(shownRelationships) { relationship in
                     let group = LinkGroup(item: item.id, field: relationship.field)
@@ -200,10 +211,7 @@ struct ItemInspector: View {
                         onShowOnPage: showOnPage(relationship.field))
                 }
                 if !mentions.isEmpty { contentLinks }
-            }
-            if !addable.isEmpty {
-                ItemAddRelationshipButton(options: addable, onEdit: onEdit)
-                    .padding(.top, 4)
+                if !linked.isEmpty { linkedGroup }
             }
         }
     }
@@ -225,28 +233,34 @@ struct ItemInspector: View {
     }
 
     private var tagSection: some View {
-        InspectorSectionView(.tags, title: "Tags") {
+        InspectorSectionView(.tags, title: "Tags", add: { hovering in
+            if item.canEditTags {
+                InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering) { addingTag = true }
+            }
+        }) {
             ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
-                            onAdd: onAddTag, onRemove: onRemoveTag)
+                            onAdd: onAddTag, onRemove: onRemoveTag, isAdding: $addingTag)
         }
         .showOnPageMenu(isShown: placement.showsOnPage(PagePlacement.tags), onChange: showOnPage(PagePlacement.tags))
     }
 
-    private var linkedSection: some View {
+    /// The items that link to this one, as a group after the links the item makes.
+    private var linkedGroup: some View {
         let group = LinkGroup(item: item.id, field: "#linked")
         let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
-        return InspectorSectionView(.linkedFrom, title: "Linked From", count: linked.count) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(links.shown, id: \.item) { link in
-                    LinkedItemRow(link: link, onOpen: onOpen)
-                }
-                if links.hidden > 0 {
-                    ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
-                        presentation.expandLinks(group)
-                    }
+        return VStack(alignment: .leading, spacing: 0) {
+            InspectorSubheading(title: String(localized: "Linked From"), count: linked.count)
+            ForEach(links.shown, id: \.item) { link in
+                LinkedItemRow(link: link, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
+                    presentation.expandLinks(group)
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ItemInspectorLinkedFrom")
         .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
     }
 
@@ -293,7 +307,7 @@ struct ItemInspector: View {
 
     private var hasProperties: Bool { !fields.isEmpty || !emptyFields.isEmpty }
 
-    private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty }
+    private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty || !linked.isEmpty }
 
     /// An item that can take a tag shows the section for adding one; one that can't shows it only if it has tags.
     private var hasTags: Bool { item.canEditTags || !tags.isEmpty }
@@ -345,7 +359,7 @@ private struct InspectorDetailRow: View {
     var isDate = false
 
     var body: some View {
-        InspectorRow(verbatimName: name, isCompact: true) {
+        InspectorRow(verbatimName: name) {
             InspectorText(text: value, keepsOneLine: isDate)
         }
         .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
@@ -364,9 +378,9 @@ private struct LinkedItemRow: View {
                 Text(verbatim: link.title).lineLimit(1)
                 Spacer(minLength: 6)
                 Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1)
-                    .interfaceFont(.caption)
+                    .interfaceFont(.callout)
             }
-            .interfaceFont(.callout)
+            .interfaceFont(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(InspectorRowButtonStyle())

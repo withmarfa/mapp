@@ -155,9 +155,8 @@ extension ItemLibrary {
     }
 }
 
-/// The inspector's Tags section: the item's tags, each with a button that removes it, and the Add Tag control, which
-/// opens a field.
-/// An item that can't be changed lists its tags with neither.
+/// The inspector's Tags section: the item's tags, each with a button that removes it, and the field that the Tags
+/// heading's plus opens. An item that can't be changed lists its tags with neither.
 struct ItemTagsSection: View {
     let tags: [String]
     let isEditable: Bool
@@ -168,7 +167,7 @@ struct ItemTagsSection: View {
     @State private var localDraft = ItemPropertyDraft()
     @State private var refusal: ItemTag.Refusal?
     /// Whether the person has asked to add a tag, which opens the field until they leave it empty.
-    @State private var isAdding = false
+    @Binding var isAdding: Bool
 
     private var drafts: ItemPropertyDraft { retainedDraft ?? localDraft }
 
@@ -188,8 +187,6 @@ struct ItemTagsSection: View {
                                   held: tags, identifier: "ItemTagField", isInline: true, takesFocus: isAdding,
                                   onEnd: { if drafts.text.isEmpty { isAdding = false } },
                                   refusal: $refusal, onAdd: onAdd)
-                } else {
-                    InspectorAddButton(title: "Add Tag", identifier: "ItemTagAdd") { isAdding = true }
                 }
             }
         }
@@ -222,7 +219,7 @@ private struct TagChip: View {
                 .accessibilityIdentifier("ItemTagRemove.\(tag)")
             }
         }
-        .interfaceFont(.callout)
+        .interfaceFont(.body)
         .inspectorChip()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemTag.\(tag)")

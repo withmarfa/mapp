@@ -2,8 +2,8 @@ import MarfaIcons
 import SwiftUI
 
 /// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a light row with
-/// the item's type icon, which opens it, and a small plus at the end of its name where the relationship takes
-/// several. An editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the
+/// the item's type icon, which opens it, and a small plus in the trailing column at its name where the relationship
+/// takes several. An editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the
 /// context menu.
 struct ItemRelationshipGroup: View {
     let relationship: ItemRelationship
@@ -30,6 +30,7 @@ struct ItemRelationshipGroup: View {
                     InspectorPlusButton(
                         accessibilityLabel: "Add to \(ItemTypeInfo.Field.displayLabel(relationship.label))",
                         identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
+                        .inspectorTrailingColumn()
                 }
             }
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
@@ -54,14 +55,21 @@ struct ItemRelationshipGroup: View {
 /// The small heading of a group inside a section: the name of a relationship.
 struct InspectorSubheading: View {
     let title: String
+    var count: Int?
 
     var body: some View {
-        Text(verbatim: title)
-            .interfaceFont(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .padding(.bottom, 2)
-            .accessibilityAddTraits(.isHeader)
+        HStack(spacing: 6) {
+            Text(verbatim: title)
+            if let count {
+                Text(count, format: .number).monospacedDigit()
+            }
+        }
+        .interfaceFont(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .padding(.bottom, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -74,14 +82,18 @@ struct ItemTargetRow: View {
     let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
     let onRemove: (ItemID) -> Void
+    @Environment(\.interfaceTextSize) private var textSize
     @State private var hovering = false
 
     var body: some View {
-        InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen, trailingInset: relationship.isEditable && hovering ? 22 : 0)
+        let scale = InterfaceStyle.scale(for: textSize)
+        // The row of an item that opens reaches past the headings by `rowInset`, which the menu's column allows for.
+        let reach = target.itemID != nil && target.isOpenable ? InspectorMetrics.rowInset : 0
+        let shows = relationship.isEditable && hovering
+        InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen,
+                         trailingInset: shows ? (InspectorMetrics.trailingColumn + InspectorMetrics.foldColumn) * scale : 0)
             .overlay(alignment: .trailing) {
-                if relationship.isEditable && hovering {
-                    actions.padding(.trailing, 6)
-                }
+                if shows { actions.inspectorTrailingColumn(extra: reach) }
             }
             .onHover { hovering = $0 }
             .contextMenu { menuItems }
@@ -91,7 +103,9 @@ struct ItemTargetRow: View {
         Menu {
             menuItems
         } label: {
-            Image(systemName: "ellipsis")
+            Label("Connection Actions", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
+                .frame(width: InspectorMetrics.trailingColumn * InterfaceStyle.scale(for: textSize))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -123,7 +137,7 @@ struct ItemShowMoreButton: View {
     var body: some View {
         Button(action: action) {
             Text("Show \(count) More")
-                .interfaceFont(.callout)
+                .interfaceFont(.body)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -178,7 +192,7 @@ struct InspectorItemRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .interfaceFont(.callout)
+        .interfaceFont(.body)
     }
 
     private var resolutionLabel: String {
@@ -188,23 +202,6 @@ struct InspectorItemRow: View {
         case .pending: String(localized: "Not looked up yet")
         case .refused: String(localized: "The server refused this link")
         case .resolved: String(localized: "Item unavailable")
-        }
-    }
-}
-
-/// The last control of the Relationships section: the relationships the item can still take, each opening the
-/// chooser. It offers one only when it is empty or takes several, since a single one that is set is changed from
-/// its own row.
-struct ItemAddRelationshipButton: View {
-    let options: [ItemRelationship]
-    let onEdit: (ItemRelationship) -> Void
-
-    var body: some View {
-        InspectorAddMenu(title: "Add Relationship", identifier: "RelationshipAddMenu") {
-            ForEach(options) { option in
-                Button(ItemTypeInfo.Field.displayLabel(option.label)) { onEdit(option) }
-                    .accessibilityIdentifier("RelationshipAdd.\(option.field)")
-            }
         }
     }
 }
@@ -308,11 +305,9 @@ struct ItemRelationshipPicker: View {
             .init(title: "Field notes", itemID: id, resolution: .resolved(id)),
             .init(title: "Interview with the site manager", itemID: nil, resolution: .missing)
         ], isEditable: true, allowsMultiple: true)
-    let supersedes = ItemRelationship(field: "supersedes", label: names["supersedes"]?.label ?? "", targets: [], isEditable: true, allowsMultiple: false)
     VStack(alignment: .leading, spacing: 12) {
         ItemRelationshipGroup(relationship: parent, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
         ItemRelationshipGroup(relationship: about, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
-        ItemAddRelationshipButton(options: [supersedes, about], onEdit: { _ in })
     }
     .padding(16)
     .interfaceTextStyle()

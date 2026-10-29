@@ -331,4 +331,22 @@ struct InspectorEditingTests {
         let roles = found.compactMap { Self.answer($0, "accessibilityRole") as? String }
         #expect(labels.contains("Add to Related") && roles.contains("AXButton"))
     }
+
+    @Test func theHiddenPlusMenuStaysInTheAccessibilityTree() throws {
+        let view = InspectorPlusMenu(accessibilityLabel: "Add to Related", identifier: "Plus", isRowHovered: false) { Button("Item") {} }
+            .frame(width: 100, height: 40)
+        // SwiftUI builds its accessibility elements only once an assistive client is attached.
+        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXManualAccessibility"))
+        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 40), styleMask: [.borderless], backing: .buffered, defer: true)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        var found: [NSObject] = []
+        Self.descendants(of: host, into: &found)
+        // A menu's button takes its name from the system when drawn, so it is found by role and identifier.
+        let roles = found.compactMap { Self.answer($0, "accessibilityRole") as? String }
+        let identifiers = found.compactMap { Self.answer($0, "accessibilityIdentifier") as? String }
+        #expect(roles.contains("AXMenuButton") && identifiers.contains("Plus"))
+    }
 }
