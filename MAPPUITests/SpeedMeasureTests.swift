@@ -1,0 +1,302 @@
+import os
+import XCTest
+
+/// Times what a person feels in the window, on a library held by a real Marfa test instance: launching to a usable
+/// window, choosing a place, opening an item, New and Search answering, and typing. It gates nothing: every
+/// iteration that completes passes, and the numbers are for a person to read.
+///
+/// It runs only in the `Measure UI` plan with `MAPP_MEASURE_UI` set and the instance's address and key given as
+/// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
+/// skipped. The one write is a note it makes for the typing and deletes.
+///
+/// Each test prints `UI|<name>|<median>|<max>|<unit>` lines after XCTest's own report, for the time the test itself
+/// saw, from the action to the result it waited for. That includes UI testing's own query cost, so it bounds what a
+/// person feels from above. The app's own measure of the same work, its signposts, launch line and slow events, is in
+/// the unified log, which a sandboxed test cannot read: `Scripts/measure-ui.sh` records it around the run and prints
+/// the same kind of lines per test, between the `phase` markers each test logs (`MAPP/Model/AGENTS.md`, "Logs and
+/// signposts").
+@MainActor
+final class SpeedMeasureTests: XCTestCase {
+    private static let subsystem = "com.withmarfa.mapp.debug"
+    private static let iterations = 5
+    /// Marks where each test's measured part begins and ends in the log, for `Scripts/measure-ui.sh`.
+    private static let phases = Logger(subsystem: "com.withmarfa.mapp.speedtest", category: "phase")
+    /// Whether this run has left a complete copy of the instance for a warm launch to open.
+    private static var hasCopy = false
+
+    private var address = ""
+    private var key = ""
+    private var app: XCUIApplication!
+    private var window: XCUIElement { app.windows.firstMatch }
+    private var sidebar: XCUIElement { window.outlines["Sidebar"] }
+    private var list: XCUIElement { window.outlines["NoteList"] }
+    private var label = ""
+    private var samples: [String: [Double]] = [:]
+
+    private var options: XCTMeasureOptions {
+        let options = XCTMeasureOptions()
+        options.iterationCount = Self.iterations
+        return options
+    }
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        try XCTSkipUnless(environment["MAPP_MEASURE_UI"] != nil, "MAPP_MEASURE_UI is not set")
+        address = try XCTUnwrap(environment["MARFA_API_URL"], "A test instance's address is needed (MARFA_API_URL)")
+        key = try XCTUnwrap(environment["MARFA_API_KEY"], "A key for the test instance is needed (MARFA_API_KEY)")
+    }
+
+    override func tearDown() async throws {
+        app?.terminate()
+        guard !label.isEmpty else { return }
+        Self.phases.notice("end \(self.label, privacy: .public)")
+        for (name, values) in samples.sorted(by: { $0.key < $1.key }) {
+            let sorted = values.sorted()
+            let median = (sorted[(sorted.count - 1) / 2] + sorted[sorted.count / 2]) / 2
+            print("UI|\(label).\(name)|\(String(format: "%.1f", median))|\(String(format: "%.1f", sorted.last ?? 0))|ms")
+        }
+    }
+
+    // MARK: Launch
+
+    func testLaunchCold() throws {
+        try begin("launch.cold")
+        app = makeApp(keepingCopy: false)
+        measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)], options: options) {
+            launchAndWait()
+        }
+        Self.hasCopy = true
+    }
+
+    func testLaunchWarm() throws {
+        try seedCopy()
+        try begin("launch.warm")
+        app = makeApp(keepingCopy: true)
+        measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)], options: options) {
+            launchAndWait()
+        }
+    }
+
+    // MARK: Moving about
+
+    func testChoosingPlaces() throws {
+        try launchWarm()
+        let types = typeRows().prefix(2)
+        try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
+        let items = sidebarElement("SidebarPlace-all")
+        let places = [items, sidebarText("Inbox")] + types.map(sidebarElement) + [items]
+        // The window's title starts with the place's name, which is how a choice is seen to have landed.
+        let titles = places.map(\.placeName)
+        try begin("places")
+        measure(metrics: [signpost("place.choose"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for (place, title) in zip(places, titles) {
+                time("choose") {
+                    place.click()
+                    XCTAssertTrue(waitUntil { self.window.title.hasPrefix(title) }, "the window shows \(title)")
+                }
+            }
+        }
+    }
+
+    func testMovingBetweenListAndGallery() throws {
+        try launchWarm()
+        let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
+        sidebarElement(place).click()
+        XCTAssertTrue(list.waitForExistence(timeout: 20))
+        try begin("layout")
+        measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for (mode, shown) in [("Gallery", self.element("ItemGallery")), ("List", self.list)] {
+                time(mode.lowercased()) {
+                    self.chooseViewMode(mode)
+                    XCTAssertTrue(self.waitUntil { shown.exists }, "\(mode) showed")
+                }
+            }
+        }
+    }
+
+    func testOpeningItems() throws {
+        try launchWarm()
+        let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")
+        sidebarElement(place).click()
+        XCTAssertTrue(list.waitForExistence(timeout: 20))
+        XCTAssertTrue(list.outlineRows.element(boundBy: 4).waitForExistence(timeout: 20), "the place holds five items")
+        try begin("items")
+        measure(metrics: [signpost("item.open"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for index in 0..<5 {
+                let row = self.list.outlineRows.element(boundBy: index)
+                time("open") {
+                    row.click()
+                    XCTAssertTrue(waitUntil { row.isSelected }, "the item was selected")
+                }
+            }
+        }
+    }
+
+    // MARK: Panels
+
+    func testNewOpensQuickAdd() throws {
+        try launchWarm()
+        try begin("quickAdd")
+        let field = element("QuickAddTitle")
+        measure(metrics: [signpost("quickAdd.open"), XCTClockMetric()], options: options) {
+            time("ready") {
+                element("SidebarNew").click()
+                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                app.typeText("a")
+                XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the title field took the keyboard")
+            }
+            // Leave the draft empty, so the next iteration starts as the first did.
+            app.typeKey("a", modifierFlags: .command)
+            app.typeKey(.delete, modifierFlags: [])
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        }
+    }
+
+    func testSearchOpensThePalette() throws {
+        try launchWarm()
+        try begin("palette")
+        let field = element("CommandPaletteField")
+        measure(metrics: [XCTClockMetric()], options: options) {
+            time("ready") {
+                element("SidebarSearch").click()
+                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                app.typeText("a")
+                XCTAssertTrue(waitUntil { (field.value as? String) == "a" }, "the palette's field took the keyboard")
+            }
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        }
+    }
+
+    // MARK: Typing
+
+    /// Makes a note, types forty characters into its page one key at a time, and deletes the note. A keystroke's time
+    /// runs from the key event to the character showing in the page's accessibility value, so it holds one UI
+    /// testing round trip too; the total is the sum.
+    func testTypingInANote() throws {
+        try launchWarm()
+        try begin("typing")
+        let title = "Speed measure \(UUID().uuidString.prefix(8))"
+        window.quickAdd(type: "Note", title: title)
+        let editor = window.itemPageBody
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        editor.click()
+        let text = String(repeating: "the quick brown fox jumps over ", count: 2).prefix(40)
+        var typed = ""
+        for character in text {
+            typed.append(character)
+            time("key") {
+                app.typeText(String(character))
+                XCTAssertTrue(waitUntil(timeout: 10) { (editor.value as? String)?.hasSuffix(typed) == true }, "\(typed) showed")
+            }
+        }
+        samples["total"] = [samples["key", default: []].reduce(0, +)]
+        window.descendants(matching: .any).matching(identifier: "MoreToolbar").firstMatch.click()
+        window.menuItems["Delete"].firstMatch.click()
+    }
+
+    // MARK: Helpers
+
+    private func begin(_ name: String) throws {
+        label = name
+        samples = [:]
+        Self.phases.notice("begin \(name, privacy: .public)")
+    }
+
+    private func makeApp(keepingCopy: Bool) -> XCUIApplication {
+        let app = XCUIApplication.sample(flags: keepingCopy ? ["-MAPPKeepTestStore"] : [])
+        app.launchEnvironment["MAPP_TEST_MARFA_URL"] = address
+        app.launchEnvironment["MAPP_TEST_MARFA_KEY"] = key
+        return app
+    }
+
+    /// One unmeasured cold launch, so a warm launch has a complete copy to open.
+    private func seedCopy() throws {
+        guard !Self.hasCopy else { return }
+        app = makeApp(keepingCopy: false)
+        launchAndWait()
+        app.terminate()
+        Self.hasCopy = true
+    }
+
+    private func launchWarm() throws {
+        try seedCopy()
+        app = makeApp(keepingCopy: true)
+        launchAndWait()
+    }
+
+    /// Launches and waits for the window to show the library, filled from the copy and the server. It is the time a
+    /// person waits, seen from outside.
+    private func launchAndWait() {
+        if app.state != .notRunning { app.terminate() }
+        time("shown") {
+            app.launch()
+            XCTAssertTrue(waitUntil(timeout: 300) { self.showsLibrary }, "the library showed")
+        }
+    }
+
+    /// The sidebar lists the library's types, which it can only do once the copy has loaded, and the fill is done.
+    private var showsLibrary: Bool {
+        let type = sidebar.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
+        return type.firstMatch.exists && !element("LibraryFillProgress").exists
+    }
+
+    private func signpost(_ name: String) -> XCTOSSignpostMetric {
+        XCTOSSignpostMetric(subsystem: Self.subsystem, category: "navigation", name: name)
+    }
+
+    private func time(_ name: String, _ work: () -> Void) {
+        let start = ContinuousClock.now
+        work()
+        samples[name, default: []].append((ContinuousClock.now - start).milliseconds)
+    }
+
+    /// Polls as fast as UI testing's own queries allow, since a sleep between them would be counted as the app's time.
+    private func waitUntil(timeout: TimeInterval = 20, _ condition: () -> Bool) -> Bool {
+        let deadline = ContinuousClock.now + .seconds(timeout)
+        while ContinuousClock.now < deadline {
+            if condition() { return true }
+        }
+        return false
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        window.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
+    }
+
+    private func sidebarText(_ title: String) -> XCUIElement {
+        sidebar.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@", title, title)).element(boundBy: 0)
+    }
+
+    /// The identifiers of the sidebar's type rows, in order, once each.
+    private func typeRows() -> [String] {
+        var seen: [String] = []
+        let rows = sidebar.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'SidebarType-'"))
+        for row in rows.allElementsBoundByIndex where !seen.contains(row.identifier) { seen.append(row.identifier) }
+        return seen
+    }
+
+    private func sidebarElement(_ identifier: String) -> XCUIElement {
+        sidebar.descendants(matching: .any).matching(identifier: identifier).element(boundBy: 0)
+    }
+
+    private func chooseViewMode(_ mode: String) {
+        app.menuBars.menuBarItems["View"].click()
+        app.menuBars.menuItems["as \(mode)"].click()
+    }
+}
+
+private extension XCUIElement {
+    /// The name a place shows in the window's title: its label, or for a type its value before the count.
+    var placeName: String {
+        let text = label.isEmpty ? (value as? String ?? "") : label
+        return String(text.prefix { $0 != "," })
+    }
+}
+
+private extension Duration {
+    var milliseconds: Double { Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15 }
+}
+

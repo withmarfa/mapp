@@ -13,6 +13,9 @@
   },
   "testTargets" : [
     {
+      "skippedTests" : [
+        "SpeedMeasureTests"
+      ],
       "target" : {
         "containerPath" : "container:MAPP.xcodeproj",
         "identifier" : "3303FE323066ED47005D07A2",
