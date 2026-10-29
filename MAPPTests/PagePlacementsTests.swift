@@ -70,6 +70,18 @@ struct PagePlacementsTests {
         #expect(placements.placement(of: Self.person, in: Self.catalogue).linkedFromPlace == .inspector)
     }
 
+    @Test func showingLinkedFromOnThePageMovesItThereAndHidingItMovesItBack() {
+        var placements = PagePlacements()
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket)
+        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .page)
+        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket)
+        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
+        // A property row is a row of its own and never changes where Linked From is.
+        placements.set(false, row: "repo", of: Self.ticket)
+        #expect(!placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo"))
+        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
+    }
+
     @Test func aChoiceForOneTypeLeavesEveryOtherTypeAlone() {
         var placements = PagePlacements()
         placements.setShown(false, row: "repo", of: Self.ticket)

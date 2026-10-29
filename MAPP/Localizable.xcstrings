@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A collection’s contents always stay on its page." : {
+      "extractionState" : "manual"
+    },
+    "Add Relationship" : {
+      "extractionState" : "manual"
+    },
     "Always" : {
 
     },
@@ -9,6 +15,27 @@
     },
     "Ask" : {
 
+    },
+    "Choose what the page shows. The inspector always lists everything." : {
+      "extractionState" : "manual"
+    },
+    "Customize %@ Pages" : {
+      "extractionState" : "manual"
+    },
+    "Customize Page…" : {
+      "extractionState" : "manual"
+    },
+    "In the Inspector" : {
+      "extractionState" : "manual"
+    },
+    "On the Page" : {
+      "extractionState" : "manual"
+    },
+    "Show on Page" : {
+      "extractionState" : "manual"
+    },
+    "Use Defaults" : {
+      "extractionState" : "manual"
     },
     "“%@” couldn’t be attached. %@" : {
       "extractionState" : "manual"

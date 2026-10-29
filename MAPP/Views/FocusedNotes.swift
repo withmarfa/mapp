@@ -36,6 +36,8 @@ final class DetailsPresentation {
     var typeChange: TypeChangeRequest?
     /// The item the window's Version History sheet is open for.
     var history: VersionHistoryRequest?
+    /// The item whose type the window's Customize Page sheet is open for.
+    var pageCustomization: PageCustomizationRequest?
     /// The items the window's Add to Collection sheet is open for.
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag sheet is open for.
