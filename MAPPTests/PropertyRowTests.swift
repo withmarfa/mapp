@@ -107,8 +107,13 @@ struct PropertyRowTests {
         let type = MarfaMapping.itemType(ItemType(id: "aic.note", label: "Note", fields: [Self.field("title")], titleField: "title"))
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: type, hidden: ["title"],
-            relationships: [Self.relationship("child-of", "Parent", [])], parentField: "child-of", tags: [])
+            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", tags: [])
         #expect(rows.map(\.value) == [.parent])
+    }
+
+    @Test func anItemWithNoParentHasNoParentRow() {
+        let rows = Self.rows([:], relationships: [Self.relationship("child-of", "Parent", [])])
+        #expect(rows.map(\.id) == ["status"])
     }
 
     @Test func otherRelationshipsShowAsLinksAndIncomingOnesDoNot() {

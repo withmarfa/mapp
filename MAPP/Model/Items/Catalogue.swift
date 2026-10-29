@@ -43,6 +43,9 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     var roles: [String] = []
     /// The types this one claims to be a structural superset of.
     var compatibleWith: [TypeID] = []
+    /// The field that holds each item's own identity at the connector that writes the type, such as a GitHub issue's
+    /// node ID. It is a fact for the connector, not something to read, so the page leaves it out until asked.
+    var linkField: String?
 
     func declares(_ key: String) -> Bool { fields.contains { $0.key == key } }
 
