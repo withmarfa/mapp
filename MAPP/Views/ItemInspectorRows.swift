@@ -136,6 +136,8 @@ struct InspectorRowLayout: Layout {
     let minHeight: CGFloat
     /// The space between a name and the value under it.
     private var stackGap: CGFloat { 2 }
+    /// The air above and below a stacked row, which has no minimum height to keep it from its neighbours.
+    private var stackInset: CGFloat { 5 }
 
     private func isStacked(width: CGFloat, subviews: Subviews) -> Bool {
         let needed = subviews[2].sizeThatFits(.unspecified).width
@@ -151,7 +153,7 @@ struct InspectorRowLayout: Layout {
         if isStacked(width: width, subviews: subviews) {
             let name = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil))
             let value = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil))
-            return CGSize(width: width, height: name.height + stackGap + max(value.height, minHeight - name.height))
+            return CGSize(width: width, height: stackInset * 2 + name.height + stackGap + value.height)
         }
         let arrangement = inline(width: width, subviews: subviews)
         return CGSize(width: width, height: arrangement.height)
@@ -163,9 +165,11 @@ struct InspectorRowLayout: Layout {
         if isStacked(width: bounds.width, subviews: subviews) {
             let name = subviews[0].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
             let value = subviews[1].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
-            subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: name.height))
+            subviews[0].place(
+                at: CGPoint(x: bounds.minX, y: bounds.minY + stackInset), anchor: .topLeading,
+                proposal: ProposedViewSize(width: bounds.width, height: name.height))
             subviews[1].place(
-                at: CGPoint(x: bounds.minX, y: bounds.minY + name.height + stackGap), anchor: .topLeading,
+                at: CGPoint(x: bounds.minX, y: bounds.minY + stackInset + name.height + stackGap), anchor: .topLeading,
                 proposal: ProposedViewSize(width: bounds.width, height: value.height))
             return
         }
