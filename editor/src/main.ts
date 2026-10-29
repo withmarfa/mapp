@@ -189,10 +189,13 @@ window.addEventListener('resize', () => {
 let surround = -1
 const surroundObserver = new ResizeObserver(() => {
   const height = headerRoot.offsetHeight + pictureBar.offsetHeight + footerRoot.offsetHeight
-  if (height === surround) return
-  surround = height
+  // With linked items the text ends where it ends and they follow it; with none, the text fills the window.
+  const follows = header.hasFooterItems
+  const key = follows ? -2 - height : height
+  if (key === surround) return
+  surround = key
   requestAnimationFrame(() => {
-    root.style.setProperty('--inkkit-min-height', `calc(100vh - ${height}px)`)
+    root.style.setProperty('--inkkit-min-height', follows ? '0px' : `calc(100vh - ${height}px)`)
     editor.invalidateFindGeometry()
     checkHeaderScrolledAway()
   })

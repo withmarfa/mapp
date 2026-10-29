@@ -251,7 +251,8 @@ body[data-text='none'] #editor {
   max-width: 100%;
 }
 
-/* One shape for every pin: a hairline edge, no fill, a symbol in the secondary color. Only hover fills. */
+/* One shape for every pin: a quiet fill with no edge, so a pin and an item chip read as one family, and a symbol
+   in the secondary color. An empty pin has no fill to show, only a dashed edge asking to be filled. */
 .item-pin {
   box-sizing: border-box;
   display: inline-flex;
@@ -262,10 +263,9 @@ body[data-text='none'] #editor {
   height: calc(var(--interface-text-size) * 24 / 13);
   margin: 0;
   padding: 0 calc(var(--interface-text-size) * 8 / 13);
-  border: 0;
-  border-radius: calc(var(--interface-text-size) * 6 / 13);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--separator);
+  border: 1px solid transparent;
+  border-radius: calc(var(--step) * 2);
+  background: var(--label-quinary);
   color: var(--label-primary);
   font:
     500 calc(var(--interface-text-size) * 12 / 13) / normal -apple-system,
@@ -287,12 +287,17 @@ body[data-text='none'] #editor {
 }
 
 .item-menu-pin:enabled:hover {
-  background: var(--label-quinary);
+  background: color-mix(in srgb, var(--label-quinary) 70%, var(--label-secondary));
 }
 
 .item-menu-pin.empty {
+  border: 1px dashed var(--separator);
+  background: transparent;
   color: var(--label-secondary);
-  box-shadow: inset 0 0 0 1px var(--label-quinary);
+}
+
+.item-menu-pin.empty:enabled:hover {
+  background: var(--label-quinary);
 }
 
 .item-menu-pin:disabled {
@@ -403,7 +408,8 @@ body[data-text='none'] #editor {
 .item-byline .item-pin {
   height: auto;
   padding: 0;
-  box-shadow: none;
+  border: 0;
+  background: transparent;
   color: inherit;
   font: inherit;
 }
@@ -510,10 +516,36 @@ body[data-text='none'] #editor {
   align-items: center;
   height: calc(var(--step) * 5);
   padding: 0 calc(var(--step) * 2);
-  border-radius: calc(var(--step) * 1.5);
+  border-radius: calc(var(--step) * 2);
   background: var(--label-quinary);
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 12 / 13);
+}
+
+/* An item a row links to is a chip too, with the icon of its type before its title. */
+.item-link-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--step) * 1.5);
+  max-width: 100%;
+  height: calc(var(--step) * 5);
+  padding: 0 calc(var(--step) * 2);
+  border-radius: calc(var(--step) * 2);
+  background: var(--label-quinary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+}
+
+.item-link-chip:hover {
+  background: color-mix(in srgb, var(--label-quinary) 70%, var(--label-secondary));
+  text-decoration: none;
+}
+
+.item-link-text {
+  overflow: hidden;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .item-more {
