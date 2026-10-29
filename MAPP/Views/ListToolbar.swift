@@ -41,6 +41,6 @@ struct NewItemButton: View {
         .labelStyle(.iconOnly)
         .help("New Item")
         .accessibilityIdentifier("NewItemToolbar")
-        .disabled(browser == nil || !library.isLoaded || QuickAdd.types(in: library).isEmpty)
+        .disabled(browser == nil || !QuickAdd.isAvailable(in: library))
     }
 }

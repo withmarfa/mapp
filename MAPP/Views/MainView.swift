@@ -142,9 +142,7 @@ struct MainView: View {
                     sidebarColumn
                 } detail: {
                     SidebarIndex(browser: browser, order: order, showsCreation: !isSidebarVisible)
-                        #if DEBUG
-                        .experimentLanding(browser)
-                        #endif
+                        .newItemChips(browser)
                 }
             } else if usesCollectionLayout {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
@@ -172,9 +170,7 @@ struct MainView: View {
                                 }
                         }
                     }
-                    #if DEBUG
-                    .experimentLanding(browser)
-                    #endif
+                    .newItemChips(browser)
                     .modifier(itemInspector)
                     .toolbar {
                         GalleryToolbar(

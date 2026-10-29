@@ -1,14 +1,13 @@
-#if DEBUG
 import MarfaIcons
 import SwiftUI
 
 extension View {
-    /// The experiment's landing: a row of chips to make something new, above a page the app already has. The page is
-    /// the ordinary gallery, table, board, timeline or index, with its own toolbar, layout switcher and view options;
-    /// the row shows only in the experiment style, and only where `Browser.offersExperimentLanding`.
-    func experimentLanding(_ browser: Browser) -> some View {
+    /// A row of chips to make something new, above a page the app already has. The page is the ordinary gallery,
+    /// table, board, timeline or index, with its own toolbar, layout switcher and view options; the row shows only
+    /// where `Browser.offersNewItemChips`.
+    func newItemChips(_ browser: Browser) -> some View {
         safeAreaBar(edge: .top, spacing: 0) {
-            if SidebarStyle.selected == .experiment, browser.offersExperimentLanding {
+            if browser.offersNewItemChips {
                 MakeSomethingNew(browser: browser)
             }
         }
@@ -16,7 +15,7 @@ extension View {
 }
 
 /// "Make something new": the four types with most items as chips, then a More menu with the rest. A chip opens quick
-/// add on that type. Its text is not localized.
+/// add on that type.
 private struct MakeSomethingNew: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -25,10 +24,10 @@ private struct MakeSomethingNew: View {
     fileprivate static let corner: CGFloat = 14
 
     var body: some View {
-        let split = ExperimentChips.split(QuickAdd.types(in: library), usedMost: library.itemTypeCounts.map(\.id))
+        let split = NewItemChips.split(QuickAdd.types(in: library), usedMost: library.itemTypeCounts.map(\.id))
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
-                Text(verbatim: "Make something new")
+                Text("Make something new")
                     .interfaceFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.trailing, 4)
@@ -37,7 +36,7 @@ private struct MakeSomethingNew: View {
                         ChipLabel(title: option.label, icon: .type(option.icon))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("ExperimentMake-\(option.id.rawValue)")
+                    .accessibilityIdentifier("MakeSomethingNew-\(option.id.rawValue)")
                 }
                 if !split.more.isEmpty {
                     Menu {
@@ -47,13 +46,13 @@ private struct MakeSomethingNew: View {
                             }
                         }
                     } label: {
-                        ChipLabel(title: "More", icon: .symbol("plus"))
+                        ChipLabel(title: String(localized: "More"), icon: .symbol("plus"))
                     }
                     .menuStyle(.button)
                     .buttonStyle(.plain)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .accessibilityIdentifier("ExperimentMakeMore")
+                    .accessibilityIdentifier("MakeSomethingNewMore")
                 }
             }
             .padding(.horizontal, 24)
@@ -61,7 +60,7 @@ private struct MakeSomethingNew: View {
         }
         .scrollIndicators(.hidden)
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("ExperimentLanding")
+        .accessibilityIdentifier("MakeSomethingNew")
     }
 }
 
@@ -74,7 +73,7 @@ private struct ChipLabel: View {
     var body: some View {
         HStack(spacing: 8) {
             RowIconImage(icon: icon).foregroundStyle(.secondary)
-            Text(verbatim: title)
+            Text(title)
         }
         .interfaceFont(.body)
         .padding(.horizontal, 14)
@@ -87,4 +86,3 @@ private struct ChipLabel: View {
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: MakeSomethingNew.corner, style: .continuous) }
 }
-#endif
