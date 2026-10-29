@@ -25,7 +25,6 @@ struct ItemBoard: View {
                 else { EmptyState("No Items") }
             }
         }
-        .toolbarScrollEdge()
         .searchStatus(browser)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
@@ -54,6 +53,7 @@ struct ItemBoard: View {
                 }
                 .padding(20)
             }
+            .bandsToolbar()
             .focusable()
             .focusEffectDisabled()
             .focused(pane, equals: .list)

@@ -10,7 +10,6 @@ struct MainView: View {
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
     @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
-    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
     @State private var isSidebarVisible = true
@@ -131,16 +130,8 @@ struct MainView: View {
             min: ColumnWidth.sidebar.range.lowerBound, ideal: measuredWidths.width(of: .sidebar), max: ColumnWidth.sidebar.range.upperBound)
     }
 
-    /// The page as its column shows it. Once the page's header has scrolled away, the item's title becomes the
-    /// column's own title, which the system leads and truncates within that column's part of the toolbar, so it never
-    /// reaches over the list column's controls. The item window, which has one column, puts it in its toolbar instead.
     private var itemPage: some View {
-        let notes = browser.selectedItems(in: library).filter { !$0.isFile }
-        let title = showsScrolledTitle && !browser.showsCollection && editor.isHeaderScrolledAway && notes.count == 1
-            ? notes[0].title : ""
-        return NoteDetail(browser: browser, editor: editor, details: details)
-            .navigationTitle(title)
-            .toolbar(removing: title.isEmpty ? .title : nil)
+        NoteDetail(browser: browser, editor: editor, details: details)
     }
 
     private var workspace: some View {
