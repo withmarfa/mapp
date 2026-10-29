@@ -34,7 +34,8 @@ struct WebPageItemPage: View {
     /// The file that holds the HTML.
     let document: ItemID
     let runsScripts: Bool
-    /// Told where the file is once it is, and nil when it is not, so the window can share it and open it in a browser.
+    /// Told where the item's file is once it is, and nil when it is not, so the window can share it and open it in a
+    /// browser. Never told of a document attached to the item.
     var onResolved: (URL?) -> Void = { _ in }
 
     @State private var loader = ItemFileLoader()
@@ -118,14 +119,16 @@ struct WebPageItemPage: View {
         case .failed:
             content = .failed
         case .ready(let url):
-            onResolved(url)
+            // The file of an item that is itself a file is the item; a document attached to one is not, so the item
+            // shares and opens as it would without it.
+            if document == item.id { onResolved(url) }
             let (item, version) = (item.id, pictures.version)
             do {
                 let rewritten = try await Task.detached(priority: .userInitiated) {
                     SealedPictureRewrite.rewrite(try Data(contentsOf: url), item: item, version: version)
                 }.value
                 guard !Task.isCancelled else { return }
-                pictures.show(rewritten.addresses)
+                pictures.show(rewritten.addresses, version: version)
                 content = .ready(rewritten.html)
             } catch {
                 guard !Task.isCancelled else { return }

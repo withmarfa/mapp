@@ -67,7 +67,7 @@ import WebKit
         let (address, requests) = served()
         try saved(from: address)
         let pictures = pictures()
-        pictures.show([address])
+        pictures.show([address], version: pictures.version)
 
         #expect(await reply(pictures, address) == "file")
         #expect(requests() == 0)
@@ -77,7 +77,7 @@ import WebKit
     @Test func underAskAPictureWaitsUntilThePersonChoosesToLoadIt() async {
         let (address, requests) = served()
         let pictures = pictures()
-        pictures.show([address])
+        pictures.show([address], version: pictures.version)
 
         #expect(await reply(pictures, address) == "placeholder")
         #expect(pictures.waitingCount == 1)
@@ -93,7 +93,7 @@ import WebKit
         set(.never)
         let (address, requests) = served()
         let pictures = pictures()
-        pictures.show([address])
+        pictures.show([address], version: pictures.version)
 
         #expect(await reply(pictures, address) == "placeholder")
         #expect(pictures.waitingCount == 0)
@@ -105,12 +105,12 @@ import WebKit
         let (address, _) = served()
         let (notShown, requests) = served()
         let pictures = pictures()
-        pictures.show([address])
+        pictures.show([address], version: pictures.version)
 
         #expect(await reply(pictures, address, item: ItemID("another-item")) == "refused")
         #expect(await reply(pictures, notShown) == "refused", "an address the document did not name")
         #expect(await refused(pictures, address), "a web address itself")
-        #expect(await refused(pictures, URL(string: "mapp-picture://picture/?item=\(note.rawValue)&address=file:///etc/hosts&v=0")))
+        #expect(await refused(pictures, URL(string: "\(SealedPictures.scheme)://picture/?item=\(note.rawValue)&address=file:///etc/hosts&v=0")))
         #expect(await refused(pictures, nil))
         #expect(requests() == 0)
     }
@@ -132,7 +132,7 @@ import WebKit
         let document = SealedPictureRewrite.rewrite(
             Data(#"<html><body><img src="\#(kept.absoluteString)"><img data-src="\#(waiting.absoluteString)"></body></html>"#.utf8),
             item: note, version: pictures.version)
-        pictures.show(document.addresses)
+        pictures.show(document.addresses, version: 0)
         try await page.show(document.html)
 
         #expect(try await eventuallyAsking { try await images(on: page).first == 5 })
@@ -145,10 +145,25 @@ import WebKit
         #expect(waitingRequests() == 1)
     }
 
+    @Test func picturesWaitingAreCountedWhenTheSettingChangedWhileThePageLoaded() async throws {
+        let (address, requests) = served()
+        let pictures = pictures()
+        let page = try await SealedWebPage.make(pictures: pictures, runsScripts: false)
+        let document = SealedPictureRewrite.rewrite(
+            Data(#"<html><body><img src="\#(address.absoluteString)"></body></html>"#.utf8), item: note, version: pictures.version)
+        pictures.show(document.addresses, version: 0)
+        // As when the Remote Pictures setting or a saved picture changes after the rewrite and before the page draws.
+        pictures.redraw()
+        try await page.show(document.html)
+
+        #expect(await eventually { pictures.waitingCount == 1 })
+        #expect(requests() == 0)
+    }
+
     @Test func aPageWithPicturesStillReachesNoServer() async throws {
         let probe = try await Probe()
         let pictures = pictures()
-        let page = try await SealedWebPage.make(pictures: pictures)
+        let page = try await SealedWebPage.make(pictures: pictures, runsScripts: true)
         try await page.show(Data("""
             <html><body><script>
             window.results = {};

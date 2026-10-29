@@ -13,7 +13,7 @@ struct SealedPictureRewriteTests {
 
     /// The addresses the rewritten document asks the app for, read back as the page would read its `src` values.
     private func requested(in html: String) -> [String] {
-        html.matches(of: /src="(mapp-picture:[^"]*)"/).compactMap { match in
+        html.matches(of: /src="([a-z-]+:[^"]*)"/).compactMap { match in
             let url = URL(string: String(match.1).replacingOccurrences(of: "&amp;", with: "&"))
             return url.flatMap(SealedPictures.request).map { request in
                 #expect(request.item == item)
@@ -28,7 +28,7 @@ struct SealedPictureRewriteTests {
 
         #expect(addresses == ["https://example.com/a.png", "http://example.com/b.gif"])
         #expect(requested(in: html) == addresses)
-        #expect(html.hasPrefix(#"<p>One</p><IMG alt="a" width=40 src="mapp-picture:"#))
+        #expect(html.hasPrefix(#"<p>One</p><IMG alt="a" width=40 src="\#(SealedPictures.scheme):"#))
         #expect(!html.localizedCaseInsensitiveContains("src=\"http"))
         #expect(!html.contains("src='http"))
     }
@@ -72,5 +72,21 @@ struct SealedPictureRewriteTests {
 
         #expect(addresses.isEmpty)
         #expect(html == written)
+    }
+
+    /// Shift_JIS lead bytes such as 0x81 are neither UTF-8 nor Windows-1252, so a rewrite that read the document as text
+    /// first would have nothing to give the page.
+    @Test func aDocumentInAnotherEncodingKeepsItsBytes() throws {
+        let words = "日本語の記事、です。"
+        let written = try #require("<p>\(words)</p><img alt=\"写真\" src=\"https://example.com/a.png\">".data(using: .shiftJIS))
+        try #require(String(data: written, encoding: .utf8) == nil)
+        try #require(String(data: written, encoding: .windowsCP1252) == nil)
+
+        let result = SealedPictureRewrite.rewrite(written, item: item, version: 3)
+        let html = try #require(String(data: result.html, encoding: .shiftJIS))
+
+        #expect(result.addresses.map(\.absoluteString) == ["https://example.com/a.png"])
+        #expect(html.hasPrefix("<p>\(words)</p><img alt=\"写真\" src=\"\(SealedPictures.scheme):"))
+        #expect(requested(in: html) == ["https://example.com/a.png"])
     }
 }

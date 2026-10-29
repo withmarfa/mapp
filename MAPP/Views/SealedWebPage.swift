@@ -52,7 +52,7 @@ import WebKit
 
     /// A page whose documents draw their pictures from `pictures`, and run their own scripts only where `runsScripts`
     /// says so. Without `pictures`, a picture of the app's scheme is not answered.
-    static func make(pictures: SealedPictures? = nil, runsScripts: Bool = true) async throws -> SealedWebPage {
+    static func make(pictures: SealedPictures? = nil, runsScripts: Bool) async throws -> SealedWebPage {
         let (page, gate) = try await blank(pictures: pictures, runsScripts: runsScripts)
         return SealedWebPage(page: page, gate: gate, pictures: pictures, runsScripts: runsScripts)
     }
@@ -74,6 +74,9 @@ import WebKit
     /// keeps the page it had, which for the first document is the page that document loads into. Throws
     /// `CancellationError` when the task is cancelled or a later call starts before this one's document has loaded,
     /// since a document shown over a newer one would be out of date. Its relative links resolve against nothing.
+    ///
+    /// Where the pictures' version moved on while the document loaded, as when the setting changed, the page asks
+    /// for its pictures again at the version now current, since only those answers count what waits for the person.
     func show(_ html: Data) async throws {
         shows += 1
         let call = shows
@@ -95,6 +98,12 @@ import WebKit
         try Task.checkCancellation()
         guard call == shows else { throw CancellationError() }
         page = next
+        guard let pictures else { return }
+        var drawn = pictures.documentVersion
+        while drawn != pictures.version, call == shows {
+            drawn = pictures.version
+            await redrawPictures(version: drawn)
+        }
     }
 
     static let base = URL(string: "about:blank")!

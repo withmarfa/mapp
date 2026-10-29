@@ -136,7 +136,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
 
     @Test func aPageThatReachesOutReachesNothing() async throws {
         let probe = try await Probe()
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         // A later document runs in a page of its own, which is sealed the same way as the first.
         try await page.show(Data("<html><body></body></html>".utf8))
         try await page.show(hostile(port: probe.port))
@@ -199,7 +199,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
 
     @Test func aPageCannotOpenAPeerConnection() async throws {
         let probe = try await DatagramProbe()
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         try await page.show(Data("<html><body></body></html>".utf8))
         try await page.show(peerConnecting(udpPort: probe.port))
         let results = try await results(of: page)
@@ -249,7 +249,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     /// never returned. The suite's hang limit makes that a failure rather than a run that never ends.
     @Test func aNavigationTheLastDocumentLeftPendingGoesNowhere() async throws {
         let probe = try await Probe()
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         // A message loop, which no timer throttling slows, starts a navigation at every turn of the page's event loop,
         // so one is always starting while the next load waits for its policy decision.
         try await page.show(Data("""
@@ -272,7 +272,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
 
     @Test func whatTheDocumentHoldsItselfStillLoads() async throws {
         let gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         try await page.show(Data("""
             <html><body><script>
             window.results = {};
@@ -295,14 +295,14 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     }
 
     @Test func aLaterDocumentReplacesTheFirst() async throws {
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8))
         try await page.show(Data("<html><body><script>window.results = {n: '2'}; window.done = true;</script></body></html>".utf8))
         #expect(try await results(of: page) == ["n": "2"])
     }
 
     @Test func aCancelledShowLeavesTheEarlierDocumentShowing() async throws {
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8))
         let shown = page.page
         let later = Task { try await page.show(Data("<html><body><script>window.results = {n: '2'}; window.done = true;</script></body></html>".utf8)) }
@@ -313,7 +313,7 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     }
 
     @Test func aShowThatAnotherStartedBeforeItFinishedThrowsAndLeavesTheNewerDocument() async throws {
-        let page = try await SealedWebPage.make()
+        let page = try await SealedWebPage.make(runsScripts: true)
         // Both start before either load can finish, since the first reaches its load and waits for WebKit before the
         // second runs, so the first is the older whichever load ends first.
         let older = Task { try await page.show(Data("<html><body><script>window.results = {n: '1'}; window.done = true;</script></body></html>".utf8)) }
@@ -326,10 +326,10 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
     @Test func aPageKeepsNothingBetweenOpens() async throws {
         let write = "try { localStorage.setItem('k', 'v') } catch (e) {} document.cookie = 'a=b'; window.results = {}; window.done = true;"
         let read = "let k = 'denied'; try { k = String(localStorage.getItem('k')) } catch (e) {} window.results = {k: k, c: document.cookie}; window.done = true;"
-        let first = try await SealedWebPage.make()
+        let first = try await SealedWebPage.make(runsScripts: true)
         try await first.show(Data("<html><body><script>\(write)</script></body></html>".utf8))
         _ = try await results(of: first)
-        let second = try await SealedWebPage.make()
+        let second = try await SealedWebPage.make(runsScripts: true)
         try await second.show(Data("<html><body><script>\(read)</script></body></html>".utf8))
         let kept = try await results(of: second)
         #expect(kept["c"] == "")

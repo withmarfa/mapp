@@ -13,7 +13,7 @@ struct WebPageView: View {
     @State private var failure: String?
 
     /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so.
-    init(html: Data, pictures: SealedPictures? = nil, runsScripts: Bool = true) {
+    init(html: Data, pictures: SealedPictures? = nil, runsScripts: Bool) {
         self.html = html
         self.pictures = pictures
         self.runsScripts = runsScripts

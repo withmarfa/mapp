@@ -94,7 +94,7 @@ import WebKit
         let html = try document(for: escape, udpPort: probe.port)
         let page: WebPage
         if sealed {
-            let made = try await SealedWebPage.make()
+            let made = try await SealedWebPage.make(runsScripts: true)
             try await made.show(html)
             page = made.page
         } else {

@@ -2,15 +2,16 @@ import Foundation
 import UniformTypeIdentifiers
 import WebKit
 
-/// The pictures of the HTML document shown for one item in the sealed web page, answered by the app through a URL
-/// scheme of its own, as the note page's are (`PictureRequests`), so the page itself fetches nothing.
+/// The pictures of the HTML document shown for one item in the sealed web page, answered by the app as the note page's
+/// are (`PictureRequests`), so the page itself fetches nothing. They use the editor's scheme and URLs for a picture
+/// saved in an item (`EmbeddedFiles`), which in a sealed page only `SealedPictureScheme` answers.
 ///
 /// `SealedPictureRewrite` points each picture at this scheme, and only the addresses it found are answered, for this
 /// item alone. A picture saved as a file attached to the item from the same address comes first, under every setting,
 /// with no request to the website (`ItemLibrary.openSavedPicture`); then the Remote Pictures setting answers
 /// (`WebPictures.answer`), as for a note. Whatever is not loaded is drawn as an empty picture that keeps its place.
 @MainActor @Observable final class SealedPictures {
-    nonisolated static let scheme = "mapp-picture"
+    nonisolated static let scheme = EmbeddedFiles.scheme
 
     let item: ItemID
     @ObservationIgnored private let pictures: WebPictures
@@ -25,8 +26,11 @@ import WebKit
     private var waiting: Set<URL> = []
     /// Whether the person chose to load the pictures waiting.
     private(set) var chosen = false
-    /// Changed each time the page is to ask for its pictures again.
+    /// Changed each time the page is to ask for its pictures again. Only an answer to a request of this version
+    /// counts a picture as waiting, so an answer under a setting since changed is not counted.
     private(set) var version = 0
+    /// The version the document shown last was written with, which `version` may have passed while it loaded.
+    @ObservationIgnored private(set) var documentVersion = 0
 
     init(
         item: ItemID, pictures: WebPictures, inFeed: @escaping () -> Bool,
@@ -41,10 +45,12 @@ import WebKit
     /// How many of the document's pictures wait for the person to load them.
     var waitingCount: Int { chosen ? 0 : shown.count { waiting.contains($0) } }
 
-    /// The addresses of a document about to be shown.
-    func show(_ addresses: [URL]) {
+    /// The addresses of a document about to be shown, whose pictures were written with `version`
+    /// (`SealedPictureRewrite`).
+    func show(_ addresses: [URL], version: Int) {
         allowed.formUnion(addresses)
         shown = addresses
+        documentVersion = version
     }
 
     /// The person chose to load the pictures waiting.
@@ -85,29 +91,18 @@ import WebKit
 
     // MARK: URLs
 
-    private nonisolated static let valueAllowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+#?"))
-
-    /// Where the page draws the picture at `address` in `item`'s document from.
+    /// Where the page draws the picture at `address` in `item`'s document from: the editor's URL for a picture saved
+    /// in an item (`EmbeddedFiles.pictureURL(for:version:savedIn:)`), answered here by this type instead.
     nonisolated static func url(for address: URL, in item: ItemID, version: Int) -> URL {
-        var components = URLComponents()
-        components.scheme = scheme
-        components.host = "picture"
-        components.path = "/"
-        components.percentEncodedQueryItems = [("item", item.rawValue), ("address", address.absoluteString), ("v", String(version))].map {
-            URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: valueAllowed))
-        }
-        return components.url!
+        EmbeddedFiles.pictureURL(for: address, version: version, savedIn: item)
     }
 
     nonisolated static func request(in url: URL) -> (item: ItemID, address: URL, version: Int)? {
-        guard url.scheme == scheme, url.host == "picture",
-              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQueryItems
+        guard let (item, address) = EmbeddedFiles.savedPicture(in: url),
+              let version = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                  .first(where: { $0.name == "v" })?.value.flatMap(Int.init)
         else { return nil }
-        func value(_ name: String) -> String? { items.first { $0.name == name }?.value?.removingPercentEncoding }
-        guard let item = value("item"), !item.isEmpty, let text = value("address"), let address = URL(string: text),
-              ["http", "https"].contains(address.scheme?.lowercased()), let version = value("v").flatMap(Int.init)
-        else { return nil }
-        return (ItemID(item), address, version)
+        return (item, address, version)
     }
 
     /// An empty picture with the shape of a photograph, which takes the size the document gives the `img`, or the width
