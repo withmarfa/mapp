@@ -47,8 +47,14 @@ import Testing
             }
         }
 
+        /// The copy's hydration and how many rows it has listed of those expected, as the engine reads them.
+        let fill = Mutex((hydration: Hydration.complete, listed: UInt64?.none, expected: UInt64?.none))
+
         func status() async throws -> Status {
-            Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)
+            let fill = fill.withLock { $0 }
+            return Status(
+                sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes,
+                hydration: fill.hydration, itemsExpected: fill.expected, itemsListed: fill.listed)
         }
 
         func items() async throws -> Rows<Marfa.Item> {
@@ -390,6 +396,27 @@ import Testing
         await scene.source.engineTook()
         #expect(scene.wholeReads == painted + 1)
         #expect(scene.item("one")?.title == "One again")
+        await scene.close()
+    }
+
+    @Test func aHydrationsStepsTellTheFillEachTimeAndReadTheCopyWholeRarely() async throws {
+        let scene = try await Self.open(Self.fake((0..<200).map { Self.row("row\($0)", title: "Row \($0)") }))
+        await scene.source.engineTook()
+        let painted = scene.wholeReads
+        func step(_ hydration: Hydration, listed: UInt64) async {
+            scene.reads.fill.withLock { $0 = (hydration: hydration, listed: listed, expected: 4000) }
+            await withCheckedContinuation { done in _ = scene.source.events.yield(.fillProgress(done)) }
+        }
+        for listed in stride(from: UInt64(100), through: 4000, by: 100) {
+            await step(.inProgress, listed: listed)
+            #expect(scene.source.syncReport.fill == LibraryFill(state: .filling, listed: listed, expected: 4000))
+        }
+        // The first step may read the copy whole, and a slow runner may pass `fillReadSpacing` once.
+        #expect(scene.wholeReads - painted <= 2)
+        let filling = scene.wholeReads
+        await step(.complete, listed: 4000)
+        #expect(scene.source.syncReport.fill == LibraryFill(state: .complete, listed: 4000, expected: 4000))
+        #expect(scene.wholeReads == filling + 1)
         await scene.close()
     }
 

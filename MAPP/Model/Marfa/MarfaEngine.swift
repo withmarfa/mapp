@@ -175,6 +175,8 @@ actor MarfaEngine {
     var sentAsRead: Set<String> = []
     var following: Task<Void, Never>?
     var painted = false
+    /// When a hydration's progress may next read the copy whole (`takeFillProgress`).
+    var fillReadAllowed = ContinuousClock.now
     private var closed = false
 
     #if DEBUG
@@ -263,13 +265,7 @@ actor MarfaEngine {
         switch event {
         case .paint: await paint()
         case .fillProgress(let done):
-            if let status = try? await reading.status() {
-                let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
-                                        status.hydration == .complete ? .complete : .partial)
-                if hub.report.value.fill != fill {
-                    await reload()
-                }
-            }
+            await takeFillProgress()
             done.resume()
         case .write(let write, let id): await perform(write, as: id)
         case .undo(let write, let id, let group): await perform(write, as: id, holding: group)

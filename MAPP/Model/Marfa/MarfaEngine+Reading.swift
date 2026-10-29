@@ -11,6 +11,29 @@ extension MarfaEngine {
         await sync.start()
     }
 
+    /// The least time between a hydration's whole reads while it runs.
+    nonisolated static let fillReadSpacing = Duration.seconds(3)
+
+    /// A step of a hydration under way. The fill is told at every step, so the window's word that the library is
+    /// still loading stays true. The copy is read whole again only once `fillReadSpacing`, and four times as long
+    /// as the last such read took, have passed, since each lists every row the copy holds and a hydration steps
+    /// every half second. A fill that is complete is read at once, so the report never says complete before the
+    /// library holds every row; the copy's own word that the hydration ended reads it whole again besides.
+    func takeFillProgress() async {
+        guard let status = try? await reading.status() else { return }
+        let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
+                                status.hydration == .complete ? .complete : .partial)
+        guard hub.report.value.fill != fill else { return }
+        guard fill.state == .complete || ContinuousClock.now >= fillReadAllowed else {
+            hub.report.update { $0.fill = fill }
+            return
+        }
+        let start = ContinuousClock.now
+        await reload()
+        let end = ContinuousClock.now
+        fillReadAllowed = end + max(Self.fillReadSpacing, (end - start) * 4)
+    }
+
     /// The most rows a batch of changes reads one by one; more read the copy whole (`reload`), which costs a list
     /// of every row rather than a read and an edge read for each.
     nonisolated static let rereadLimit = 2000
