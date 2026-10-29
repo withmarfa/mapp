@@ -220,7 +220,7 @@ struct ItemInspector: View {
         let group = LinkGroup.content(of: item.id)
         let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
         return VStack(alignment: .leading, spacing: 0) {
-            InspectorSubheading(title: String(localized: "Links in Content"))
+            InspectorSubheading(title: String(localized: "Links in Content")).padding(.bottom, 2)
             ForEach(links.shown) { target in
                 InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
             }
@@ -249,7 +249,7 @@ struct ItemInspector: View {
         let group = LinkGroup(item: item.id, field: "#linked")
         let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
         return VStack(alignment: .leading, spacing: 0) {
-            InspectorSubheading(title: String(localized: "Linked From"), count: linked.count)
+            InspectorSubheading(title: String(localized: "Linked From"), count: linked.count).padding(.bottom, 2)
             ForEach(links.shown, id: \.item) { link in
                 LinkedItemRow(link: link, onOpen: onOpen)
             }
@@ -385,7 +385,6 @@ private struct LinkedItemRow: View {
         }
         .buttonStyle(InspectorRowButtonStyle())
         .foregroundStyle(.primary)
-        .help(link.title)
         .accessibilityIdentifier("LinkedFrom.\(link.item.rawValue)")
     }
 }

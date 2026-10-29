@@ -25,6 +25,7 @@ struct ItemTable: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         table(columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+            .toolbarScrollEdge()
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {

@@ -25,6 +25,7 @@ struct ItemBoard: View {
                 else { EmptyState("No Items") }
             }
         }
+        .toolbarScrollEdge()
         .searchStatus(browser)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))

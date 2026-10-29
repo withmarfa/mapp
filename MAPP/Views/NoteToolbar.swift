@@ -29,7 +29,9 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!showsScrolledTitle || !editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.showsCollection == true)
+        // The main window shows the title as its page column's own title (`MainView`); only the item window, which
+        // has no columns, puts it in the toolbar.
+        .hidden(!showsScrolledTitle || !editor.isHeaderScrolledAway || tools.notes.count != 1 || browser != nil)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
             .defaultCustomization(.hidden)
@@ -118,7 +120,6 @@ struct DetailsToggle: View {
 /// columns (`ListToolbar`, `NoteToolbar`). Opened on an item, Search, Filter and View Options give way.
 struct GalleryToolbar: ToolbarContent {
     @CurrentLibrary private var library
-    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     @Bindable var browser: Browser
     let items: [Item]
     let editor: EditorController
@@ -129,12 +130,6 @@ struct GalleryToolbar: ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
         if showsCreation {
             ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
-        }
-        if showsScrolledTitle, !browser.showsCollection, editor.isHeaderScrolledAway, tools.notes.count == 1 {
-            ToolbarItem(placement: .navigation) {
-                ScrolledItemTitle(title: tools.notes.first?.title ?? "")
-            }
-            .sharedBackgroundVisibility(.hidden)
         }
         ToolbarSpacer(.flexible)
         if browser.showsCollection {

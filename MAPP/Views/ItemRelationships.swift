@@ -33,6 +33,8 @@ struct ItemRelationshipGroup: View {
                         .inspectorTrailingColumn()
                 }
             }
+            // Below the heading's row, not inside it, so the plus is centered on the heading.
+            .padding(.bottom, 2)
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
             ForEach(links.shown) { target in
                 ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
@@ -67,7 +69,6 @@ struct InspectorSubheading: View {
         .interfaceFont(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
         .lineLimit(1)
-        .padding(.bottom, 2)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -87,16 +88,16 @@ struct ItemTargetRow: View {
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
-        // The row of an item that opens reaches past the headings by `rowInset`, which the menu's column allows for.
-        let reach = target.itemID != nil && target.isOpenable ? InspectorMetrics.rowInset : 0
         let shows = relationship.isEditable && hovering
         InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen,
                          trailingInset: shows ? (InspectorMetrics.trailingColumn + InspectorMetrics.foldColumn) * scale : 0)
             .overlay(alignment: .trailing) {
-                if shows { actions.inspectorTrailingColumn(extra: reach) }
+                if shows { actions.inspectorTrailingColumn() }
             }
             .onHover { hovering = $0 }
             .contextMenu { menuItems }
+            // Space between rows. The menu is centered on the row itself, so it stays level with a row of two lines.
+            .padding(.vertical, 2)
     }
 
     private var actions: some View {
@@ -105,7 +106,8 @@ struct ItemTargetRow: View {
         } label: {
             Label("Connection Actions", systemImage: "ellipsis")
                 .labelStyle(.iconOnly)
-                .frame(width: InspectorMetrics.trailingColumn * InterfaceStyle.scale(for: textSize))
+                .frame(width: InspectorMetrics.trailingColumn * InterfaceStyle.scale(for: textSize),
+                       height: InspectorMetrics.trailingColumn * InterfaceStyle.scale(for: textSize))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -177,7 +179,6 @@ struct InspectorItemRow: View {
                 }
                 .buttonStyle(InspectorRowButtonStyle())
                 .foregroundStyle(.primary)
-                .help(target.title)
                 .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
             } else {
                 VStack(alignment: .leading, spacing: 2) {

@@ -141,7 +141,7 @@ struct InspectorFoldHeading<Add: View>: View {
                     .accessibilityHidden(true)
             }
             .interfaceFont(.title3.weight(.semibold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(.secondary)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -382,18 +382,15 @@ struct InspectorPlusMenu<Content: View>: View {
 
 private struct InspectorTrailingColumn: ViewModifier {
     @Environment(\.interfaceTextSize) private var textSize
-    /// Room kept beyond the column, where the control sits in a row that reaches past the headings.
-    var extra: CGFloat = 0
-
     func body(content: Content) -> some View {
         let scale = InterfaceStyle.scale(for: textSize)
         content
             .frame(width: InspectorMetrics.trailingColumn * scale)
-            .padding(.trailing, InspectorMetrics.foldColumn * scale + extra)
+            .padding(.trailing, InspectorMetrics.foldColumn * scale)
     }
 }
 
 extension View {
     /// Puts the view in the inspector's trailing column, where every add plus and row menu lines up.
-    func inspectorTrailingColumn(extra: CGFloat = 0) -> some View { modifier(InspectorTrailingColumn(extra: extra)) }
+    func inspectorTrailingColumn() -> some View { modifier(InspectorTrailingColumn()) }
 }
