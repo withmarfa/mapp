@@ -55,6 +55,45 @@ for (const name of readdirSync(corpus).filter((name) => name.endsWith('.md'))) {
     }),
   )
 }
+test('formatting that opens with a link is saved once after an edit inside it', async () =>
+  withEditor('~~[x](u)b~~\n', (editor) => {
+    const engine = (editor as unknown as { engine: import('@aicayzer/inkkit').InkKitEditor }).engine
+    const text = engine.textSnapshot(1)
+    const at = text.text.indexOf('b') + 1
+    engine.selectTextRange({ snapshotId: text.snapshotId, from: at, to: at })
+    engine.insertText('c', 1)
+    expect(editor.snapshot().text).toBe('~~[x](u)bc~~\n')
+  }))
+test('a diagram draws with Pele and a refused diagram keeps its source', async () => {
+  const source = '```mermaid\nflowchart LR\n A-->B\n```\n\n```mermaid\nnotadiagram foo\n```\n'
+  const root = document.createElement('div')
+  document.body.append(root)
+  const editor = await NoteEditor.mount(root, {
+    find() {},
+    changed() {},
+    stateChanged() {},
+    openLink() {},
+    copy() {},
+  })
+  try {
+    editor.setItem('note')
+    editor.load(source, 1)
+    await vi.waitFor(() => {
+      const previews = [...root.querySelectorAll('.inkkit-mermaid-preview')]
+      expect(previews.map((preview) => preview.getAttribute('data-state'))).toEqual([
+        'ready',
+        'error',
+      ])
+    })
+    const [drawn, refused] = [...root.querySelectorAll('.inkkit-mermaid-preview')]
+    expect(drawn?.querySelector('svg.pele-flowchart')).not.toBeNull()
+    expect(refused?.querySelector('svg')).toBeNull()
+    expect(editor.snapshot().text).toBe(source)
+  } finally {
+    await editor.destroy()
+    root.remove()
+  }
+})
 test('native readable ranges reject stale generations and preserve formatted replacement history', async () =>
   withEditor('A **bold** line.\n', (editor) => {
     editor.findReplace(2, 6, 'strong', 1)
