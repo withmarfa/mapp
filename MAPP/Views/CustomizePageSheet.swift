@@ -60,7 +60,8 @@ struct CustomizePageSheet: View {
     @ViewBuilder
     private func propertySection(of item: Item, placement: PagePlacement) -> some View {
         let hidden = library.hiddenPropertyKeys(of: item)
-        let fields = (library.catalogue.itemTypes[item.type]?.fields ?? []).filter { !hidden.contains($0.key) }
+        let fields = PageCustomization.fields(
+            of: item, type: library.catalogue.itemTypes[item.type], hidden: hidden, catalogue: library.catalogue)
         if !fields.isEmpty {
             Section("Properties") {
                 ForEach(fields, id: \.key) { field in
@@ -111,6 +112,6 @@ struct CustomizePageButton: View {
         Button("Customize Page…", systemImage: "slider.horizontal.3") {
             if let id = ids.first { details?.pageCustomization = PageCustomizationRequest(item: id) }
         }
-        .disabled(details == nil || ids.count != 1 || ids.first.flatMap { library.item($0) } == nil)
+        .disabled(details == nil || ids.count != 1 || !PageCustomization.isAvailable(for: ids.first.flatMap { library.item($0) }))
     }
 }

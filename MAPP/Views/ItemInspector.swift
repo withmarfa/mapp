@@ -42,7 +42,8 @@ struct ItemInspectorHost: View {
                     onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
                     drafts: details,
                     placement: placement,
-                    onPlace: { row, shown in placements.set(shown, row: row, of: item.type) },
+                    onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type) } : nil,
+                    drawnByPage: PageCustomization.drawnKeys(of: item, in: library.catalogue),
                     linked: placement.linkedFromPlace == .inspector ? linked(to: item, in: relationships) : [],
                     typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }
                 )
@@ -114,6 +115,8 @@ struct ItemInspector: View {
     /// Show on Page menu.
     var placement: PagePlacement = .standard
     var onPlace: ((String, Bool) -> Void)?
+    /// The properties the page's header draws itself, which no choice of where to show them changes.
+    var drawnByPage: Set<String> = []
     /// The items that link to this one, when the person placed Linked From in the inspector.
     var linked: [LinkedItem] = []
     /// The icon of the type of the item with this identifier, for the chips that name an item.
@@ -153,7 +156,8 @@ struct ItemInspector: View {
 
     /// The change a row's Show on Page menu makes, where the inspector has one to make.
     private func showOnPage(_ row: String) -> ((Bool) -> Void)? {
-        onPlace.map { place in { place(row, $0) } }
+        if drawnByPage.contains(row) { return nil }
+        return onPlace.map { place in { place(row, $0) } }
     }
 
     // MARK: Sections

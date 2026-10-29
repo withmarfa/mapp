@@ -323,7 +323,7 @@ struct CommandPalette: View {
                 details.history = VersionHistoryRequest(item: only.id, undoManager: undoManager)
             }
         }
-        if let details, selected.count == 1, let only = selected.first {
+        if let details, let only = one, PageCustomization.isAvailable(for: only) {
             add(String(localized: "Customize Page…"), "slider.horizontal.3") {
                 details.pageCustomization = PageCustomizationRequest(item: only.id)
             }
