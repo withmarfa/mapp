@@ -19,8 +19,10 @@ struct ItemPropertyRow: View {
     var onShowOnPage: ((Bool) -> Void)?
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.openURL) private var openURL
+    @Environment(\.library) private var library
     @State private var localDraft = ItemPropertyDraft()
     @State private var choosingDate = false
+    @State private var choosingOption = false
     /// Whether a text value is being edited, as opposed to read.
     @State private var editing = false
     /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
@@ -51,7 +53,7 @@ struct ItemPropertyRow: View {
             typingOwnValue = false
             if !input.isDirty { editing = false }
         }
-        .onDisappear { commit() }
+        .onDisappear(perform: leave)
     }
 
     // MARK: Value
@@ -63,9 +65,9 @@ struct ItemPropertyRow: View {
             textField
         } else if isEditable {
             switch definition.kind {
-            case .choice: choiceMenu()
+            case .choice: choiceValue()
             case .date: dateButton
-            case .text where definition.isPicked: choiceMenu(allowsOther: true)
+            case .text where definition.isPicked: choiceValue(allowsOther: true)
             case .text, .number: restingText(opens: link == nil ? .edit : .link)
             case .other: plain
             case .boolean: EmptyView()
@@ -79,31 +81,27 @@ struct ItemPropertyRow: View {
 
     private enum Click { case edit, link }
 
-    /// The value as plain text. A link opens on a click, in the accent color; anything else is edited by one.
+    /// The value as plain text. A link opens on a click, in the accent color; anything else is edited by one. The
+    /// keyboard reaches either, and Return or Space edits a value that can be edited, a link included.
     @ViewBuilder private func restingText(opens click: Click) -> some View {
         switch click {
         case .link:
             if let link {
                 let hint: LocalizedStringKey = link.scheme == "mailto" ? "Writes to this address" : "Opens this address"
-                Button { openURL(link) } label: {
-                    InspectorText(text: shownText, style: AnyShapeStyle(Color.accentColor))
-                }
-                .buttonStyle(.plain)
-                .pointerStyle(.link)
-                .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
-                .accessibilityValue(shownText)
-                .accessibilityHint(hint)
-                .accessibilityIdentifier("ItemProperty.\(definition.key)")
+                InspectorText(text: shownText, style: AnyShapeStyle(Color.accentColor))
+                    .inspectorActivates(keyboard: isEditable ? { beginTextEdit() } : nil) { openURL(link) }
+                    .pointerStyle(.link)
+                    .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+                    .accessibilityValue(shownText)
+                    .accessibilityHint(hint)
+                    .accessibilityIdentifier("ItemProperty.\(definition.key)")
             }
         case .edit:
-            Button { beginTextEdit() } label: {
-                Group {
-                    if shownText.isEmpty { InspectorPlaceholder(text: "None") } else { InspectorText(text: shownText) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
+            Group {
+                if shownText.isEmpty { InspectorPlaceholder(text: "None") } else { InspectorText(text: shownText) }
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .inspectorActivates { beginTextEdit() }
             .pointerStyle(.horizontalText)
             .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
             .accessibilityValue(shownText.isEmpty ? String(localized: "Not Set") : shownText)
@@ -115,7 +113,7 @@ struct ItemPropertyRow: View {
     /// A value nothing here changes, read as a Details row is.
     @ViewBuilder private var plain: some View {
         if definition.kind.isDate, let dateText {
-            InspectorText(text: dateText).accessibilityIdentifier("ItemProperty.\(definition.key)")
+            InspectorText(text: dateText, keepsOneLine: true).accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if isStatus, let text = value?.string {
             statusLabel(Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: text))))
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -148,30 +146,32 @@ struct ItemPropertyRow: View {
     }
 
     /// A choice or a date at rest: its text, or what stands for none.
-    @ViewBuilder private func choiceLabel(_ text: Text?, placeholder: LocalizedStringKey) -> some View {
+    @ViewBuilder private func choiceLabel(_ text: Text?, placeholder: LocalizedStringKey, oneLine: Bool = false) -> some View {
         if isStatus {
             statusLabel(text)
         } else if let text {
-            text.lineLimit(2).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
+            text.lineLimit(oneLine ? 1 : 2).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
         } else {
             InspectorPlaceholder(text: placeholder)
         }
     }
 
+    /// A yes or no is the system's checkbox; a value that is not set reads as unchecked, and Clear in the menu unsets it.
     private var checkbox: some View {
-        let state = InspectorFields.yesNo(value)
+        let isYes = InspectorFields.yesNo(value) == .yes
         let write = { (selected: Bool) in input.rejected = !onChange(.bool(selected)) }
-        // A value that is not set is drawn as the checkbox's mixed state, which the system shows for sources that
-        // disagree; clicking it sets yes.
-        let sources: [Binding<Bool>] = state == .unset
-            ? [Binding { false } set: { write($0) }, Binding { true } set: { _ in }]
-            : [Binding { state == .yes } set: { write($0) }]
-        return Toggle(sources: sources, isOn: \.self) {
+        return Toggle(isOn: Binding { isYes } set: { write($0) }) {
             Text(LocalizedStringKey(definition.displayLabel))
         }
         .labelsHidden()
         .toggleStyle(.checkbox)
         .disabled(!isEditable)
+        // A checkbox is skipped by Tab unless full keyboard access is on.
+        .focusable(isEditable)
+        .onKeyPress(keys: [.return, .space], phases: .down) { _ in
+            write(!isYes)
+            return .handled
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -270,54 +270,45 @@ struct ItemPropertyRow: View {
         }
     }
 
-    private func choiceMenu(allowsOther: Bool = false) -> some View {
+    /// The options of a choice, opened from the value by a click, Return or Space.
+    private func choiceValue(allowsOther: Bool = false) -> some View {
         let current = value?.string
         let text = current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }
-        return Menu {
-            Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
-                current ?? ""
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
-            }) {
-                Text("Not Set").tag("")
-                ForEach(definition.options(including: current), id: \.self) {
-                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0)
-                }
+        return choiceLabel(text, placeholder: "Choose")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .inspectorActivates { choosingOption = true }
+            .popover(isPresented: $choosingOption, arrowEdge: .bottom) {
+                InspectorChoiceList(
+                    entries: [.init(id: "", label: "Not Set")]
+                        + definition.options(including: current).map { .init(id: $0, label: LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) },
+                    selected: current ?? "", allowsOther: allowsOther,
+                    onPick: { selected in
+                        choosingOption = false
+                        input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
+                    },
+                    onOther: {
+                        choosingOption = false
+                        typingOwnValue = true
+                        Task { await focus() }
+                    })
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
-            if allowsOther {
-                Divider()
-                Button("Other…") { typingOwnValue = true; Task { await focus() } }
-                    .accessibilityIdentifier("ItemPropertyOther.\(definition.key)")
-            }
-        } label: {
-            choiceLabel(text, placeholder: "Choose")
-        }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .fixedSize()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
-        .accessibilityValue(text ?? Text("Not Set"))
-        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+            .accessibilityValue(text ?? Text("Not Set"))
+            .accessibilityHint("Opens the choices")
+            .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
     /// The value reads as a person writes a date, and changes only through the calendar, so what is stored is
     /// always one of the forms Marfa takes.
     private var dateButton: some View {
-        Button { choosingDate = true } label: {
-            choiceLabel(dateText.map { Text(verbatim: $0) }, placeholder: "None")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
-        .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
-        .accessibilityHint("Opens a calendar")
-        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+        choiceLabel(dateText.map { Text(verbatim: $0) }, placeholder: "None", oneLine: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .inspectorActivates { choosingDate = true }
+            .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
+            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+            .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
+            .accessibilityHint("Opens a calendar")
+            .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
     /// Where the value links to, if it is a web or mail address.
@@ -425,14 +416,33 @@ struct ItemPropertyRow: View {
         input.rejected = false
     }
 
+    /// Leaves nothing the person typed behind: text that cannot be written goes back to them through `Notices`, which
+    /// puts it on the clipboard, and the draft is dropped so it is told once.
+    private func leave() {
+        guard let loss = input.loss(as: definition.kind, current: currentText, isEditable: isEditable) else {
+            commit()
+            return
+        }
+        let reason = switch loss {
+        case .conflict: String(localized: "The value changed while you were editing it.")
+        case .notANumber: String(localized: "The value isn’t a number.")
+        case .notEditable: String(localized: "The item can no longer be edited.")
+        }
+        library?.notices.notKept(
+            String(localized: "Property Not Saved"), text: "\(definition.displayLabel): \(input.text)", reason: reason)
+        input.discard(toMatch: currentText)
+        editing = false
+        typingOwnValue = false
+    }
+
     private func commit(overwriting: Bool = false) {
         guard isEditable else { return }
         switch input.commit(as: definition.kind, current: currentText, overwriting: overwriting) {
         case .unchanged, .conflict:
             break
         case .alreadyCurrent:
-            input.isDirty = false
-            input.base = currentText
+            // The edit was undone by hand, or the item already holds it; the item's own text stands.
+            input.discard(toMatch: currentText)
         case .invalid:
             input.rejected = true
         case .write(let written):

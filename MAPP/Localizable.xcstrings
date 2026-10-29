@@ -7,6 +7,21 @@
     "Keep My Edit" : {
       "extractionState" : "manual"
     },
+    "Opens the choices" : {
+      "extractionState" : "manual"
+    },
+    "Property Not Saved" : {
+      "extractionState" : "manual"
+    },
+    "The item can no longer be edited." : {
+      "extractionState" : "manual"
+    },
+    "The value changed while you were editing it." : {
+      "extractionState" : "manual"
+    },
+    "The value isn’t a number." : {
+      "extractionState" : "manual"
+    },
     "Use Current Value" : {
       "extractionState" : "manual"
     },

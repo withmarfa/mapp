@@ -69,6 +69,38 @@ struct InspectorEditingTests {
         #expect(!Self.draft(base: "a", typed: "b").conflicts(with: "a"))
     }
 
+    @Test func typingAndDeletingBackToTheBaseIsNoConflict() {
+        // The person typed, then deleted back to what they started from, while the item changed elsewhere: there
+        // is no edit left to hold back,
+        // and the stale base is never written over their change.
+        let draft = Self.draft(base: "a", typed: "a")
+        #expect(!draft.conflicts(with: "theirs"))
+        #expect(draft.commit(as: .text, current: "theirs") == .alreadyCurrent)
+    }
+
+    // MARK: Leaving the screen
+
+    @Test func aHeldBackEditThatLeavesIsHandedOffNotDropped() {
+        let draft = Self.draft(base: "a", typed: "mine")
+        #expect(draft.loss(as: .text, current: "theirs", isEditable: true) == .conflict)
+    }
+
+    @Test func anEditOnAnItemThatStoppedBeingEditableIsHandedOff() {
+        let draft = Self.draft(base: "a", typed: "mine")
+        #expect(draft.loss(as: .text, current: "a", isEditable: false) == .notEditable)
+        #expect(draft.loss(as: .text, current: "theirs", isEditable: false) == .notEditable)
+    }
+
+    @Test func aNumberThatIsNotOneIsHandedOffWhenItLeaves() {
+        #expect(Self.draft(base: "5", typed: "7 apples").loss(as: .number, current: "5", isEditable: true) == .notANumber)
+    }
+
+    @Test func nothingIsLostWhereTheEditCanBeWrittenOrIsAlreadyThere() {
+        #expect(Self.draft(base: "a", typed: "mine").loss(as: .text, current: "a", isEditable: true) == nil)
+        #expect(Self.draft(base: "a", typed: "same").loss(as: .text, current: "same", isEditable: false) == nil)
+        #expect(ItemPropertyDraft().loss(as: .text, current: "a", isEditable: false) == nil)
+    }
+
     // MARK: Folding
 
     @Test func everySectionHasItsOwnStoredKeyAndIsResetWithTheRest() {
@@ -85,5 +117,20 @@ struct InspectorEditingTests {
         defaults.set(false, forKey: InspectorSection.tags.key)
         #expect(!InspectorSection.isOpen(.tags, in: defaults))
         #expect(InspectorSection.isOpen(.properties, in: defaults))
+    }
+
+    // MARK: Values
+
+    @Test func aDateIsNeverBrokenBetweenDayAndTime() {
+        #expect(InspectorText.lineLimit(for: "29 Oct 2026 at 11:54 am", keepsOneLine: true) == 1)
+        #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false) == 3)
+        #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false) == 1)
+    }
+
+    @Test func theNameColumnFitsTheLongestNameWithinItsShare() {
+        #expect(InspectorMetrics.nameColumn(longest: 60, fallback: 96, available: 300) == 60)
+        #expect(InspectorMetrics.nameColumn(longest: 200, fallback: 96, available: 300) == 120)
+        #expect(InspectorMetrics.nameColumn(longest: nil, fallback: 96, available: 300) == 96)
+        #expect(InspectorMetrics.nameColumn(longest: nil, fallback: 96, available: 200) == 80)
     }
 }
