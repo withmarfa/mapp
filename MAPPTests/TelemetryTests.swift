@@ -11,10 +11,10 @@ struct TelemetryTests {
         activity.tell()
         activity.tell()
         activity.begin("change.server", at: began)
-        let trace = QuitTrace(activity: activity)
+        let trace = QuitTrace(purpose: .quit)
         trace.begin(.editors)
         trace.end(.editors)
-        trace.begin(.queue)
+        trace.begin(.queue, activity: activity)
 
         let text = trace.diagnosis(at: began + .milliseconds(3000))
         #expect(text.contains("queue did not finish"))
@@ -24,7 +24,7 @@ struct TelemetryTests {
 
     @Test
     func aQuitStuckInTheEditorsNamesThemAndNotTheQueue() {
-        let trace = QuitTrace(activity: EngineActivity())
+        let trace = QuitTrace(purpose: .quit)
         trace.begin(.editors)
 
         let text = trace.diagnosis()
@@ -36,15 +36,15 @@ struct TelemetryTests {
     func anEngineThatTookNoEventStillSaysItIsIdleWithEventsWaiting() {
         let activity = EngineActivity()
         activity.tell()
-        let trace = QuitTrace(activity: activity)
-        trace.begin(.queue)
+        let trace = QuitTrace(purpose: .quit)
+        trace.begin(.queue, activity: activity)
 
         #expect(trace.diagnosis().contains("engine idle, 1 waiting"))
     }
 
     @Test
     func aLibraryThatClosedSkipsTheQueueStage() {
-        let trace = QuitTrace(activity: nil)
+        let trace = QuitTrace(purpose: .quit)
         trace.skip(.queue, because: "no library is open")
 
         #expect(trace.unfinished.isEmpty)

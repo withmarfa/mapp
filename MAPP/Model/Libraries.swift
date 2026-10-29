@@ -100,7 +100,7 @@ import os
     /// and before quitting.
     @discardableResult
     func flushEditors() async -> Bool {
-        await flushEditors(tracing: QuitTrace(activity: host.library?.engineActivity))
+        await flushEditors(tracing: QuitTrace(purpose: .libraryChange))
     }
 
     private func flushEditors(tracing trace: QuitTrace) async -> Bool {
@@ -110,7 +110,7 @@ import os
             trace.skip(.queue, because: "no library is open")
             return true
         }
-        trace.begin(.queue)
+        trace.begin(.queue, activity: library.engineActivity)
         await library.finish()
         trace.end(.queue)
         return true
@@ -120,7 +120,7 @@ import os
     /// that cannot be handed over has told the person already; a library still keeping its writes is told here.
     func flushEditors(within limit: Duration) async -> Bool {
         let first = FirstOf()
-        let trace = QuitTrace(activity: host.library?.engineActivity)
+        let trace = QuitTrace(purpose: .quit)
         let interval = Telemetry.begin(.quit, "quit.flush")
         return await withCheckedContinuation { continuation in
             Task {
