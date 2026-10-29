@@ -88,41 +88,38 @@ struct InspectorSectionView<Content: View, Add: View>: View {
     @AppStorage private var isOpen: Bool
     let section: InspectorSection
     let title: LocalizedStringKey
-    var count: Int?
     /// The plus control, given whether the heading is hovered.
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
 
-    init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil,
+    init(_ section: InspectorSection, title: LocalizedStringKey,
          @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
         _isOpen = AppStorage(wrappedValue: true, section.key)
         self.section = section
         self.title = title
-        self.count = count
         self.add = add
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: section.identifier, add: add)
+            InspectorFoldHeading(title: title, isOpen: $isOpen, identifier: section.identifier, add: add)
             if isOpen { content }
         }
     }
 }
 
 extension InspectorSectionView where Add == EmptyView {
-    init(_ section: InspectorSection, title: LocalizedStringKey, count: Int? = nil, @ViewBuilder content: () -> Content) {
-        self.init(section, title: title, count: count, add: { _ in EmptyView() }, content: content)
+    init(_ section: InspectorSection, title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
+        self.init(section, title: title, add: { _ in EmptyView() }, content: content)
     }
 }
 
-/// A section's heading: the system's title with the disclosure at its end, a count where the section lists things,
-/// and the plus, in the trailing column, where the section takes something new.
+/// A section's heading: the system's title with the disclosure at its end, and the plus, in the trailing column,
+/// where the section takes something new.
 struct InspectorFoldHeading<Add: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
     let title: LocalizedStringKey
-    var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
     let add: (Bool) -> Add
@@ -135,9 +132,6 @@ struct InspectorFoldHeading<Add: View>: View {
         } label: {
             HStack(spacing: 6) {
                 Text(title)
-                if let count {
-                    Text(count, format: .number).foregroundStyle(.secondary).monospacedDigit()
-                }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10 * scale, weight: .semibold))
