@@ -7,8 +7,8 @@ import SwiftUI
 /// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the item's title and properties are not edited on the
 /// page; the inspector shows them.
 ///
-/// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout above
-/// the page says how many and loads them, as on a note's page.
+/// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
+/// top of the page says how many and loads them, as on a note's page.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
@@ -43,20 +43,26 @@ struct WebPageItemPage: View {
     @State private var content = Content.loading
     @State private var shownID: ItemID?
     @State private var pictures: SealedPictures?
+    @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
+
+    /// One step of the callout's spacing, as on the note page.
+    private var calloutGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
 
     var body: some View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
                 WebPageHeader(item: item, inset: inset)
-                if let pictures, pictures.waitingCount > 0 {
-                    PicturesWaitingCallout(count: pictures.waitingCount) { pictures.loadWaiting() }
-                        .padding(.horizontal, inset)
-                        .padding(.bottom, 12)
-                }
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
+                // At the top of the page, clearly further from the header than from the text it belongs to.
+                if let pictures, pictures.waitingCount > 0 {
+                    PicturesWaitingCallout(count: pictures.waitingCount) { pictures.loadWaiting() }
+                        .padding(.horizontal, inset)
+                        .padding(.top, calloutGap * 2)
+                        .padding(.bottom, calloutGap * 0.75)
+                }
                 pageBody
             }
         }
@@ -139,16 +145,20 @@ struct WebPageItemPage: View {
     }
 }
 
-/// Above the page while some of its pictures wait for the person, in the words of the callout on a note's page: how
-/// many are not loaded, and a button that loads them.
-private struct PicturesWaitingCallout: View {
+/// At the top of the page while some of its pictures wait for the person, in the words and the look of the callout on a
+/// note's page, which follows Mail's mailing-list banner: how many are not loaded, and a pill button that loads them.
+/// Its measures are the note page's, in steps of 4/13 of the interface text size (4 points at 13).
+struct PicturesWaitingCallout: View {
+    @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
     let load: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        let size = CGFloat(textSize)
+        let step = size * 4 / 13
+        HStack(spacing: step * 3) {
             Image(systemName: "photo")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tint)
                 .accessibilityHidden(true)
             Group {
                 if count == 1 {
@@ -157,18 +167,36 @@ private struct PicturesWaitingCallout: View {
                     Text("\(count) pictures from other websites aren’t loaded.")
                 }
             }
-            .foregroundStyle(.secondary)
+            .fontWeight(.medium)
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: load) {
                 if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
             }
+            .buttonStyle(PicturePillStyle(step: step))
         }
-        .interfaceFont(.callout)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .font(.system(size: size))
+        .padding(.horizontal, step * 3)
+        .padding(.vertical, step * 2.5)
+        .background(.quinary, in: RoundedRectangle(cornerRadius: step * 3.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("PicturesWaitingCallout")
+    }
+}
+
+/// A tinted pill with no border, brighter under the pointer.
+private struct PicturePillStyle: ButtonStyle {
+    let step: CGFloat
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.medium)
+            .foregroundStyle(.tint)
+            .padding(.horizontal, step * 3)
+            .padding(.vertical, step)
+            .background(.tint.opacity(hovering || configuration.isPressed ? 0.26 : 0.16), in: Capsule())
+            .onHover { hovering = $0 }
     }
 }
 
