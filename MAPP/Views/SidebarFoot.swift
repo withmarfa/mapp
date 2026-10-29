@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The instance at the foot of the sidebar, below its places, types and views: its name with a chevron, which opens
-/// a menu of the Console, Settings and Recently Deleted; a dot where the server is not reached; and the button that
-/// makes a new item.
+/// a menu of Refresh, the Console, Settings and Recently Deleted, with a line under the name saying how the library
+/// stands with its server; and the button that makes a new item.
 struct SidebarFoot: View {
     @Environment(Libraries.self) private var libraries
     @Environment(MarfaHost.self) private var host: MarfaHost?
@@ -14,26 +14,27 @@ struct SidebarFoot: View {
     var body: some View {
         let name = LibraryDescription.name(libraries)
         if let host, host.source != nil {
-            SyncStatusReading(host: host) { status in
-                row(name, dot: SidebarStatusDot(host.state), status: status)
+            SyncFootReading(host: host) { line in
+                row(name, line: line, canRefresh: host.canRefresh, refresh: host.refresh)
             }
         } else {
-            row(name, dot: nil, status: nil)
+            row(name, line: nil, canRefresh: false, refresh: {})
         }
     }
 
-    private func row(_ name: String, dot: SidebarStatusDot?, status: SyncStatus?) -> some View {
+    private func row(_ name: String, line: SyncFootLine?, canRefresh: Bool, refresh: @escaping () -> Void) -> some View {
         let address = libraries.host.connection?.address
         return SidebarFootRow(
-            name: name, dot: dot, status: status, browser: browser,
+            name: name, line: line, canRefresh: canRefresh, browser: browser,
+            refresh: refresh,
             openConsole: address.map { address in { openURL(address) } },
             openSettings: { browser.showSettings() },
             showRecentlyDeleted: { browser.show(.recentlyDeleted, in: library, order: order) })
     }
 }
 
-/// The foot's row, given what it shows and what its menu does. The Console is dimmed in the menu while it has no
-/// address, which is until a server is set.
+/// The foot's row, given what it shows and what its menu does. Refresh is dimmed in the menu where it has nothing to
+/// do, and the Console while it has no address, which is until a server is set.
 ///
 /// Both controls are plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the
 /// keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches both.
@@ -41,9 +42,11 @@ struct SidebarFootRow: View {
     @Environment(\.appearsActive) private var appearsActive
     @FocusState private var focus: Control?
     let name: String
-    let dot: SidebarStatusDot?
-    let status: SyncStatus?
+    /// Nil where there is no server to sync with, as in the sample library.
+    let line: SyncFootLine?
+    let canRefresh: Bool
     let browser: Browser?
+    let refresh: () -> Void
     let openConsole: (() -> Void)?
     let openSettings: () -> Void
     let showRecentlyDeleted: () -> Void
@@ -52,36 +55,40 @@ struct SidebarFootRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
-            // The system's menu, with its own indicator hidden for the chevron beside the name.
-            Menu {
-                Button("Console") { openConsole?() }
-                    .disabled(openConsole == nil)
-                Button("Settings", action: openSettings)
-                Button("Recently Deleted", action: showRecentlyDeleted)
-            } label: {
-                HStack(spacing: 4) {
-                    Text(name)
-                        // A step above the rows' text, since it names the instance the rows belong to.
-                        .interfaceFont(.title3)
-                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Image(systemName: "chevron.down")
-                        .interfaceFont(.caption.weight(.semibold))
-                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                        .fixedSize()
+            VStack(alignment: .leading, spacing: 1) {
+                // The system's menu, with its own indicator hidden for the chevron beside the name.
+                Menu {
+                    Button("Refresh", action: refresh)
+                        .disabled(!canRefresh)
+                    Divider()
+                    Button("Console") { openConsole?() }
+                        .disabled(openConsole == nil)
+                    Button("Settings", action: openSettings)
+                    Button("Recently Deleted", action: showRecentlyDeleted)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(name)
+                            .interfaceFont(.body)
+                            .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Image(systemName: "chevron.down")
+                            .interfaceFont(.caption.weight(.semibold))
+                            .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                            .fixedSize()
+                    }
+                    .contentShape(.rect)
                 }
-                .contentShape(.rect)
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .focused($focus, equals: .menu)
+                .simultaneousGesture(TapGesture().onEnded { focus = nil })
+                .help("Instance Menu")
+                .accessibilityLabel(Text(name))
+                .accessibilityHint(Text("Opens Refresh, the Console, Settings and Recently Deleted"))
+                .accessibilityIdentifier("SidebarLibrary")
+                if let line { syncLine(line) }
             }
-            .menuIndicator(.hidden)
-            .buttonStyle(.plain)
-            .focused($focus, equals: .menu)
-            .simultaneousGesture(TapGesture().onEnded { focus = nil })
-            .help("Instance Menu")
-            .accessibilityLabel(Text(name))
-            .accessibilityHint(Text("Opens the Console, Settings and Recently Deleted"))
-            .accessibilityIdentifier("SidebarLibrary")
-            if let dot { statusDot(dot) }
             Spacer(minLength: 0)
             NewItemButton(browser: browser)
                 .buttonStyle(.plain)
@@ -98,14 +105,25 @@ struct SidebarFootRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func statusDot(_ dot: SidebarStatusDot) -> some View {
-        let detail = status?.primary?.detail ?? String(localized: "Connecting to the server.")
-        return Circle()
-            .fill(dot == .trouble ? Color.red : Color.orange)
-            .frame(width: 7, height: 7)
-            .help(detail)
-            .accessibilityLabel(status?.primary?.title ?? String(localized: "Connecting…"))
-            .accessibilityHint(detail)
-            .accessibilityIdentifier("SyncStatus")
+    /// One quiet line, a step below the name. Where the person has to act it is as strong as the name.
+    private func syncLine(_ line: SyncFootLine) -> some View {
+        let asksForAction = line.kind == .failed || line.kind == .needsAttention
+        return HStack(spacing: 4) {
+            if line.showsSpinner {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+            }
+            Text(line.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .interfaceFont(.subheadline)
+        .foregroundStyle(appearsActive ? AnyShapeStyle(asksForAction ? .secondary : .tertiary) : AnyShapeStyle(.quaternary))
+        .help(line.help ?? "")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(line.text))
+        .accessibilityHint(Text(line.help ?? ""))
+        .accessibilityIdentifier("SyncStatus")
     }
 }

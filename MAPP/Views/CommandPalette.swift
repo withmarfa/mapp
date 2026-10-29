@@ -10,6 +10,7 @@ struct CommandPalette: View {
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(MarfaHost.self) private var host: MarfaHost?
     @StoredOrder private var order
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
@@ -255,6 +256,9 @@ struct CommandPalette: View {
                 if browser.canGoForward(in: library) {
                     add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
                 }
+            }
+            if let host, host.canRefresh {
+                add(String(localized: "Refresh"), "arrow.clockwise", "⌘R") { host.refresh() }
             }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {

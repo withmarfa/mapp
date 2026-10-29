@@ -32,9 +32,11 @@ extension MarfaEngine {
         hub.report.update { current in
             let phase = current.phase
             let fill = current.fill
+            let lastSynced = current.lastSynced
             current = report
             current.phase = phase
             current.fill = fill
+            current.lastSynced = lastSynced
         }
     }
 

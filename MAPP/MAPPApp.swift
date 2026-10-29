@@ -52,7 +52,7 @@ struct MAPPApp: App {
         }
         .defaultSize(width: 1100, height: 720)
         .commands {
-            AppCommands(library: libraries.current)
+            AppCommands(library: libraries.current, host: libraries.host)
             PlaceCommands(library: libraries.current)
             FindCommands()
             FormatCommands()
@@ -97,6 +97,7 @@ struct MAPPApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()
+    private let separators = MenuSeparatorTidy()
 
     override init() {
         #if DEBUG
@@ -115,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        separators.start()
         // The saved server's copy opens and paints before the network is asked anything.
         Task { await libraries.launch() }
     }

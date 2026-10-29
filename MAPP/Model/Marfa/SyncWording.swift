@@ -115,6 +115,10 @@ nonisolated enum Words {
         String(localized: "Sending \(count) changes")
     }
 
+    static func waitingToSend(_ count: Int) -> String {
+        String(localized: "\(count) changes waiting to send")
+    }
+
     static func needAttentionLine(_ count: Int) -> String {
         String(localized: "\(count) changes need attention")
     }

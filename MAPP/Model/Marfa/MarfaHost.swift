@@ -103,6 +103,9 @@ import Observation
     private static let discardedKey = "MarfaDiscardedCopies"
     /// The last name each server gave itself, by address, so a launch and an offline window show it.
     private static let namesKey = "MarfaInstanceNames"
+    /// When each server's copy last finished a sync without an error, by address, so a launch says how old what it
+    /// paints is before the server has been asked.
+    private static let syncedKey = "MarfaLastSynced"
 
     private let defaults: UserDefaults
     let keys: any KeyStore
@@ -127,6 +130,7 @@ import Observation
     private var watching: [Task<Void, Never>] = []
     private var reading: Task<Void, Never>?
     private var instanceNames: [String: String]
+    private var syncedDates: [String: Date]
     /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
@@ -155,11 +159,48 @@ import Observation
         self.configurer = configurer
         self.iconKeeper = iconKeeper
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
+        syncedDates = defaults.dictionary(forKey: Self.syncedKey) as? [String: Date] ?? [:]
     }
 
     /// The name the server at `connection` last gave itself, nil until one has been read.
     func instanceName(for connection: MarfaConnection) -> String? {
         instanceNames[connection.address.absoluteString]
+    }
+
+    /// The last time the copy of the server connected to finished a sync with it without an error, which is more than
+    /// hearing from it: the copy was brought up to date, or a change the server made reached it. This launch's is
+    /// the copy's own report; until a sync finishes, the one kept by the launch before, for that address.
+    var lastSynced: Date? {
+        report.lastSynced ?? connection.flatMap { syncedDates[$0.address.absoluteString] }
+    }
+
+    /// Whether the connection is to a server, as against the sample library, which has none to sync with. Only a
+    /// debug build holds the sample, so a release build's connection is always a server.
+    var hasServer: Bool {
+        guard let connection else { return false }
+        #if DEBUG
+        return connection != SampleLibrary.connection
+        #else
+        return true
+        #endif
+    }
+
+    /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing, and a key the
+    /// server has not refused. A server that cannot be reached still counts, so the person can try again at once
+    /// rather than wait for the copy's next try.
+    var canRefresh: Bool {
+        guard hasServer, source != nil, report.phase == .current else { return false }
+        switch state {
+        case .online, .connecting, .offline: return true
+        case .disconnected, .keyRefused, .unavailable, .otherVersion, .inUse: return false
+        }
+    }
+
+    /// Pulls what the server has changed since the copy last looked, then sends the changes waiting in the copy and
+    /// reads the bin again: the sync a launch and a return of the server run.
+    func refresh() {
+        guard canRefresh else { return }
+        source?.refresh()
     }
 
     /// The server the app is set to read from: the one connected to, or the one saved by an earlier launch before
@@ -234,6 +275,7 @@ import Observation
         }
         detach()
         forgetName(of: connection)
+        forgetSync(of: connection)
         await MarfaSource.removeKeptCopies()
         await PictureCache.removeAll()
         // The address goes first, so a quit while the key and the copy are removed never opens this server again
@@ -354,6 +396,7 @@ import Observation
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
+        forgetSync(of: old)
         if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
     }
 
@@ -454,7 +497,9 @@ import Observation
 
     private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
-        let library = MarfaLibrary(source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys))
+        let library = MarfaLibrary(
+            source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys),
+            didSync: { [weak self] date in self?.recordSync(date, for: connection) })
         self.library = library
         if let notice = connection.server(key: "").takePlainHTTPNotice() {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))
@@ -496,6 +541,18 @@ import Observation
             self.instanceNames[connection.address.absoluteString] = name
             self.defaults.set(self.instanceNames, forKey: Self.namesKey)
         }
+    }
+
+    private func recordSync(_ date: Date, for connection: MarfaConnection) {
+        // A library that has been left may still be told once more.
+        guard self.connection == connection else { return }
+        syncedDates[connection.address.absoluteString] = date
+        defaults.set(syncedDates, forKey: Self.syncedKey)
+    }
+
+    private func forgetSync(of connection: MarfaConnection) {
+        guard syncedDates.removeValue(forKey: connection.address.absoluteString) != nil else { return }
+        defaults.set(syncedDates, forKey: Self.syncedKey)
     }
 
     private func forgetName(of connection: MarfaConnection) {

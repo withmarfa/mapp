@@ -5,6 +5,7 @@ import SwiftUI
 struct AppCommands: Commands {
     /// Nil while no library is open: before a server is set, or while a server's copy opens.
     let library: (any ItemLibrary)?
+    let host: MarfaHost
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedNotes) private var notes
     @FocusedValue(\.editor) private var editor
@@ -26,6 +27,11 @@ struct AppCommands: Commands {
                 openWindow(id: "main")
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
+            Divider()
+            // Pulls what the server has changed and sends what waits; the sidebar's instance menu and the palette have it too.
+            Button("Refresh", systemImage: "arrow.clockwise") { host.refresh() }
+                .keyboardShortcut("r")
+                .disabled(!host.canRefresh)
         }
 
         // The note commands sit with the File menu's making and opening, above Close, as Notes has them.
@@ -77,6 +83,9 @@ struct AppCommands: Commands {
                 .keyboardShortcut("k")
         }
 
+        // The dividers here are drawn whether or not the views between them render anything, and the system adds its
+        // own around the toolbar and tab groups, so the menu can open with two in a row. `MenuSeparatorTidy` hides
+        // the surplus as the menu opens; write a divider wherever one belongs and leave that to it.
         CommandGroup(before: .sidebar) {
             Button("Recently Deleted", systemImage: "trash") {
                 if let library { browser?.show(.recentlyDeleted, in: library, order: order) }
