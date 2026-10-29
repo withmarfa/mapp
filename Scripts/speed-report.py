@@ -39,11 +39,17 @@ def main(path):
                 continue
     # The stream hands over events from different processes in batches, so put them in the order they happened.
     events.sort(key=seconds)
+    # Another debug build running on the machine logs to the same subsystem, so only the processes the test launched count.
+    pids = {int(e["eventMessage"].split()[1]) for e in events if e.get("category") == "phase" and e.get("eventMessage", "").startswith("pid ")}
     for event in events:
         kind, category = event.get("eventType"), event.get("category")
         message = event.get("eventMessage", "")
+        if category != "phase" and event.get("processID") not in pids:
+            continue
         if category == "phase" and kind == "logEvent":
             action, _, name = message.partition(" ")
+            if action == "pid":
+                continue
             phase = name if action == "begin" else None
             if action == "begin":
                 order.append(name)

@@ -19,7 +19,8 @@ import XCTest
 final class SpeedMeasureTests: XCTestCase {
     private static let subsystem = "com.withmarfa.mapp.debug"
     private static let iterations = 5
-    /// Marks where each test's measured part begins and ends in the log, for `Scripts/measure-ui.sh`.
+    /// Marks where each test's measured part begins and ends, and which process the app is, in the log, for
+    /// `Scripts/measure-ui.sh`; another session's debug build shares the subsystem.
     private static let phases = Logger(subsystem: "com.withmarfa.mapp.speedtest", category: "phase")
     /// Whether this run has left a complete copy of the instance for a warm launch to open.
     private static var hasCopy = false
@@ -229,6 +230,7 @@ final class SpeedMeasureTests: XCTestCase {
         if app.state != .notRunning { app.terminate() }
         time("shown") {
             app.launch()
+            Self.phases.notice("pid \(self.app.processIdentifier)")
             XCTAssertTrue(waitUntil(timeout: 300) { self.showsLibrary }, "the library showed")
         }
     }
