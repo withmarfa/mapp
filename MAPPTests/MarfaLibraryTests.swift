@@ -389,6 +389,43 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.count == 2)
     }
 
+    /// The copy took the person's text, so text told before it was taken is older than what it holds: where the read
+    /// after the write fails, the answer leaves the person's text on the page until a read tells the copy's.
+    @Test func aSaveWhoseReadBackFailedKeepsThePersonsTextOnceAnswered() async throws {
+        let (library, source) = try await loaded()
+        library.updateBody(of: F.n1, to: "Typed")
+        let write = try #require(source.submitted.first?.id)
+        source.send(.unavailable(SourceFailure(kind: .failed, message: "The copy could not be read.")))
+        source.send(.taken(write))
+        source.send(.answered(write, .accepted))
+        source.send(.upserted([F.item(F.n2, F.note, "Answered", age: 5, tier: .feed)]))
+        #expect(await eventually { library.item(F.n2)?.title == "Answered" })
+        #expect(library.body(of: F.n1) == ItemBody(id: F.n1, text: "Typed", version: ItemVersion(1)))
+
+        // The next save is typed on the person's own text, so it follows the write the copy took.
+        library.updateBody(of: F.n1, to: "Typed again")
+        #expect(source.writes.last == .editBody(F.n1, "Typed again", base: ItemVersion(1), merge: .following))
+
+        // A read that lands tells the copy's text, which stands once the save is answered.
+        source.setBody("Typed again", of: F.n1, version: 3)
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        source.sendBody(of: F.n1)
+        source.send(.answered(try #require(source.submitted.last?.id), .accepted))
+        #expect(await eventually { library.body(of: F.n1)?.version == ItemVersion(3) })
+        library.updateBody(of: F.n1, to: "Third")
+        #expect(source.writes.last == .editBody(F.n1, "Third", base: ItemVersion(3), merge: .asRead))
+    }
+
+    /// A save refused before it was queued left the copy as it was, so the page goes back to the copy's text.
+    @Test func aSaveRefusedBeforeItWasQueuedShowsTheCopysText() async throws {
+        let (library, source) = try await loaded()
+        let before = try #require(library.body(of: F.n1))
+        library.updateBody(of: F.n1, to: "Typed while the copy was brought up to date")
+        let write = try #require(source.submitted.last?.id)
+        source.send(.answered(write, .refused(SyncProblem(code: "copy_expired", message: "Try again in a moment.", notQueued: true))))
+        #expect(await eventually { library.body(of: F.n1) == before })
+    }
+
     @Test func aTitleIsTheTypesTitleFieldAndUndoesAtTheCurrentVersion() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()

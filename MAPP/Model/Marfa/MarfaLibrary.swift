@@ -76,8 +76,11 @@ import Observation
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
     @ObservationIgnored private var textWrites: [WriteID: ItemID] = [:]
-    /// The source's latest text of each item while the person's own text is unsettled, held once it settles.
+    /// What the copy holds of each item's text while the person's own text is unsettled, held once it settles: the
+    /// text before the first save, the typed text of each save the copy took, or a body the source told after.
     @ObservationIgnored private var sourceText: [ItemID: ItemBody] = [:]
+    /// The text each save put on the page, until the copy takes the save.
+    @ObservationIgnored private var typedText: [WriteID: ItemBody] = [:]
     /// From the person's text being submitted to the engine having taken or answered it.
     @ObservationIgnored private var textSaves: [WriteID: Telemetry.Interval] = [:]
     /// Text writes the copy has not yet taken and read back, by item, so what it bound in the text may be older.
@@ -331,10 +334,12 @@ import Observation
             take(changes)
         case .answered(let id, let outcome):
             textSaves.removeValue(forKey: id)?.end()
+            typedText[id] = nil
             read(id)
             answered(id, outcome)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
+            took(id)
             read(id)
         case .catalogue(let catalogue):
             self.catalogue = holdingChosenIcons(catalogue)
@@ -484,7 +489,7 @@ import Observation
         guard unsettledText[item]?.isEmpty == true else { return }
         unsettledText[item] = nil
         // The server may have merged the text, or kept its own and put the person's on a copy: the source tells
-        // what the copy holds in the change that follows the answer, and this is what it last told.
+        // what the copy holds in the change that follows the answer, and this is what it held before that.
         if let body = sourceText.removeValue(forKey: item) { hold([body]) }
     }
 
@@ -578,21 +583,32 @@ import Observation
         let merge: BodyMerge = saved == readAt ? .following : .asRead
         let saving = Telemetry.begin(.library, "text.save")
         let write = submit(.editBody(id, text, base: readAt, merge: merge), failing: title)
+        let typed = readAt == held ? ItemBody(id: id, text: text, version: readAt) : nil
         // Every write the engine takes ends in `.taken` or `.answered`; only one the source refuses to take, as it
         // has closed, gets neither, so nothing waits on it.
         if refusals[write] != nil {
+            // Until a write is taken, the copy holds the text it held before, which a save refused before queueing
+            // leaves on the page.
             if unsettledText[id] == nil { sourceText[id] = records[id]?.body }
             unsettledText[id, default: []].insert(write)
             unreadText[id, default: []].insert(write)
             textWrites[write] = id
+            typedText[write] = typed
             lastTyped[id] = (write, text)
             textSaves[write] = saving
         } else {
             saving.end()
         }
-        guard readAt == held else { return }
+        guard let typed else { return }
         savedOn[id] = readAt
-        records[id]?.body = ItemBody(id: id, text: text, version: readAt)
+        records[id]?.body = typed
+    }
+
+    /// The copy holds the text the person typed once it takes their write, so text told before is older: the page
+    /// keeps the typed text at the answer unless a read after the write tells the copy's.
+    private func took(_ write: WriteID) {
+        guard let typed = typedText.removeValue(forKey: write), unsettledText[typed.id] != nil else { return }
+        sourceText[typed.id] = typed
     }
 
     // MARK: Reading
