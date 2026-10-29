@@ -56,6 +56,13 @@ struct ReportingTests {
         #expect(Reporting.switchIsOn(in: defaults()))
     }
 
+    /// A run that starts with the switch off is still configured, so turning the switch on needs no relaunch.
+    @Test func theSwitchDoesNotDecideWhetherARunMayReport() {
+        #expect(gate(switchOn: false).mayReport)
+        #expect(!gate(switchOn: false, isTestHost: true).mayReport)
+        #expect(!gate(info: [:], switchOn: true).mayReport)
+    }
+
     @Test func aQuitThatTimedOutReportsOnlyTheFixedTypeSentenceAndStage() {
         let activity = EngineActivity()
         activity.tell()

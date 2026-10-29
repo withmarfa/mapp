@@ -493,7 +493,8 @@ import Observation
                 throw .unavailable(message: failure.message)
             }
         } catch {
-            Telemetry.libraryNotOpened(error as? MarfaError)
+            // An open given up because the person moved on, as when switching servers quickly, is no fault.
+            if !(error is CancellationError) { Telemetry.libraryNotOpened(error as? MarfaError) }
             throw .unavailable(message: Self.message(error))
         }
     }

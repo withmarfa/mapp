@@ -64,9 +64,12 @@ nonisolated final class Reporting: Sendable {
         var usesSampleLibrary: Bool
         var switchIsOn: Bool
 
-        var sends: Bool {
-            carriesDestination && !isTestHost && !isPreview && !usesSampleLibrary && switchIsOn
+        /// Whether this run may report at all, whatever the switch says.
+        var mayReport: Bool {
+            carriesDestination && !isTestHost && !isPreview && !usesSampleLibrary
         }
+
+        var sends: Bool { mayReport && switchIsOn }
 
         /// The isolated host never reports, whether it holds the sample library or a test server: every UI and
         /// measurement run uses it, and each would otherwise add test noise to the real project.
@@ -77,11 +80,17 @@ nonisolated final class Reporting: Sendable {
             defaults: UserDefaults = .standard,
             isTestHost: Bool
         ) -> Gate {
+            // The isolated host is a Debug build's alone; Release has no sample library to be asked for.
+            #if DEBUG
+            let usesSampleLibrary = arguments.contains(SampleLibrary.flag)
+            #else
+            let usesSampleLibrary = false
+            #endif
             return Gate(
                 carriesDestination: destination(in: info) != nil,
                 isTestHost: isTestHost,
                 isPreview: environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1",
-                usesSampleLibrary: arguments.contains(SampleLibrary.flag),
+                usesSampleLibrary: usesSampleLibrary,
                 switchIsOn: Reporting.switchIsOn(in: defaults))
         }
     }
@@ -90,20 +99,21 @@ nonisolated final class Reporting: Sendable {
         defaults.object(forKey: switchKey) as? Bool ?? true
     }
 
-    /// Configures and turns on the SDK if this run may report. Called once, at launch.
+    /// Configures the SDK if this run may report, and turns it on as the switch says, so turning the switch on later
+    /// needs no relaunch. Called once, at launch.
     func start(isTestHost: Bool) {
         let info = Bundle.main.infoDictionary
-        guard Gate.current(info: info, isTestHost: isTestHost).sends, let destination = Self.destination(in: info)
-        else { return }
+        let gate = Gate.current(info: info, isTestHost: isTestHost)
+        guard gate.mayReport, let destination = Self.destination(in: info) else { return }
         SDKReporter.shared.configure(
             SDKReporter.Configuration(destination: destination, serviceName: "mapp", serviceVersion: Self.version(info)))
-        SDKReporter.shared.isEnabled = true
+        SDKReporter.shared.isEnabled = gate.switchIsOn
     }
 
     /// The Settings switch changed: off stops reporting at once and drops what waits.
     func switchChanged(to isOn: Bool) {
         guard Self.carriesDestination else { return }
-        SDKReporter.shared.isEnabled = isOn && Gate.current(isTestHost: Self.isTestHost).sends
+        SDKReporter.shared.isEnabled = isOn && Gate.current(isTestHost: Self.isTestHost).mayReport
     }
 
     private static var isTestHost: Bool {
