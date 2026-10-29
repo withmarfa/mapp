@@ -76,7 +76,7 @@ body {
   --inkkit-reading-width: calc(var(--page-width) + 6rem);
   --inkkit-padding-top: 22px;
   --inkkit-padding-inline: 3rem;
-  --inkkit-padding-bottom: 48px;
+  --inkkit-padding-bottom: 3rem;
   /* The reading column's margins, which Inkkit's text uses and the header, outside its root, follows. */
   --inkkit-column-inset: max(
     var(--inkkit-padding-inline),
