@@ -46,12 +46,13 @@ nonisolated enum NoteText {
         for line in body.split(whereSeparator: \.isNewline) {
             if lines.count >= limit || count >= characters { break }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.wholeMatch(of: fence) != nil {
+            if trimmed.first == "`" || trimmed.first == "~", trimmed.wholeMatch(of: fence) != nil {
                 inFence.toggle()
                 continue
             }
-            if skippingHeadings, !inFence, trimmed.replacing(quoteMarkers, with: "").firstMatch(of: headingMarker) != nil {
-                continue
+            if skippingHeadings, !inFence {
+                let unquoted = trimmed.first == ">" ? trimmed.replacing(quoteMarkers, with: "") : trimmed
+                if unquoted.first == "#", unquoted.firstMatch(of: headingMarker) != nil { continue }
             }
             let text = inFence ? trimmed : plainText(of: line)
             if !text.isEmpty {
@@ -64,13 +65,15 @@ nonisolated enum NoteText {
 
     /// One line of markdown as it reads on screen: block markers, table pipes and inline syntax removed.
     static func plainText(of line: Substring) -> String {
+        // Each pattern runs only on a line holding a character it needs: a match that fails scans the whole line,
+        // and across a library's previews most lines hold none.
         var text = line.trimmingCharacters(in: .whitespaces)
-        if text.wholeMatch(of: structuralLine) != nil { return "" }
+        if let first = text.first, "-*_=|:".contains(first), text.wholeMatch(of: structuralLine) != nil { return "" }
 
-        text.replace(quoteMarkers, with: "")
-        if text.firstMatch(of: headingMarker) != nil {
+        if text.first == ">" { text.replace(quoteMarkers, with: "") }
+        if text.first == "#", text.firstMatch(of: headingMarker) != nil {
             text.replace(headingMarker, with: "")
-        } else {
+        } else if let first = text.first, "-*+".contains(first) || first.isNumber {
             text.replace(listMarker, with: "")
         }
         if text.hasPrefix("|") || text.hasSuffix("|") {
@@ -90,7 +93,7 @@ nonisolated enum NoteText {
     private static func inlineText(_ text: String) -> String {
         var result = ""
         var rest = text[...]
-        while let span = rest.firstMatch(of: codeSpan) {
+        while rest.contains("`"), let span = rest.firstMatch(of: codeSpan) {
             result += unescaped(stripInline(String(rest[..<span.range.lowerBound])))
             result += span.output.1
             rest = rest[span.range.upperBound...]
@@ -129,25 +132,30 @@ nonisolated enum NoteText {
     private static func stripInline(_ text: String) -> String {
         var text = text
         let authored = text
-        text.replace(htmlBreak) { match in
-            isEscaped(at: match.range.lowerBound, in: authored) ? String(match.output) : " "
-        }
-        let linked = text
-        text.replace(wikiReference) { match in
-            let (whole, embedded, content) = match.output
-            guard !isEscaped(at: match.range.lowerBound, in: linked) else { return String(whole) }
-            let alias = firstUnescaped("|", in: content)
-            let target = content[..<(alias ?? content.endIndex)]
-            if !embedded.isEmpty {
-                return String(target[..<(firstUnescaped("#", in: target) ?? target.endIndex)])
+        if text.contains("<") {
+            text.replace(htmlBreak) { match in
+                isEscaped(at: match.range.lowerBound, in: authored) ? String(match.output) : " "
             }
-            return alias.map { String(content[content.index(after: $0)...]) } ?? String(content)
         }
-        // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
-        text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
-        text.replace(link) { String($0.output.1) }
-        text.replace(strongOrStrike) { String($0.output.2) }
-        text.replace(emphasis) { String($0.output.1) + String($0.output.2) }
+        if text.contains("[") {
+            let linked = text
+            text.replace(wikiReference) { match in
+                let (whole, embedded, content) = match.output
+                guard !isEscaped(at: match.range.lowerBound, in: linked) else { return String(whole) }
+                let alias = firstUnescaped("|", in: content)
+                let target = content[..<(alias ?? content.endIndex)]
+                if !embedded.isEmpty {
+                    return String(target[..<(firstUnescaped("#", in: target) ?? target.endIndex)])
+                }
+                return alias.map { String(content[content.index(after: $0)...]) } ?? String(content)
+            }
+            // An image's width rides in its alt text, as `name|400`; the name alone is what it says.
+            text.replace(image) { String($0.output.1).replacing(/\\?\|\d{1,5}$/, with: "") }
+            text.replace(link) { String($0.output.1) }
+        }
+        let starred = text.contains("*") || text.contains("_")
+        if starred || text.contains("~") { text.replace(strongOrStrike) { String($0.output.2) } }
+        if starred { text.replace(emphasis) { String($0.output.1) + String($0.output.2) } }
         return text
     }
 

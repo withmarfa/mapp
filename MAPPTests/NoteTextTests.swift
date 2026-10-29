@@ -42,6 +42,10 @@ struct NoteTextTests {
         #expect(preview("Title\n\n![Dusk|320](Attachments/Dusk.png) and ![Photo\\|400](a.png)", title: "Title") == "Dusk and Photo")
     }
 
+    @Test func previewSkipsAQuotedHeading() {
+        #expect(preview("> ## Aside\n> what was said") == "what was said")
+    }
+
     @Test func previewOfATitleOnlyNoteIsEmpty() {
         #expect(preview("# Just a title") == "")
     }
@@ -58,8 +62,12 @@ struct NoteTextTests {
         ("keep snake_case intact", "keep snake_case intact"),
         ("ls *.swift and *.md", "ls *.swift and *.md"),
         ("~~struck~~ and **strong** and _light_", "struck and strong and light"),
+        ("2) Second step", "Second step"),
+        ("+ [x] Packed", "Packed"),
+        ("2026 was long, 3 > 2 and a - b", "2026 was long, 3 > 2 and a - b"),
         ("===", ""),
         ("| --- | :---: |", ""),
+        (":--- | ---:", ""),
         ("R\\&D budget", "R&D budget"),
         ("\\[Draft\\] plan", "[Draft] plan"),
         ("\\#work and 5 \\* 3", "#work and 5 * 3"),
