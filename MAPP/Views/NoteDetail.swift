@@ -14,7 +14,7 @@ struct NoteDetail: View {
                 .accessibilityIdentifier("MultipleSelectionPrompt")
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
-            if item.isFile {
+            if library.pageLayout(of: item) != .text {
                 FileItemPage(item: item) { browser.fileFetched(id, at: $0) }
                     .onAppear { editor.close() }
             } else {

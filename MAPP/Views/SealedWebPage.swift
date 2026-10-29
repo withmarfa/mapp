@@ -12,7 +12,9 @@ import WebKit
 ///
 /// The seal has four parts, each of which holds in every page without the others:
 /// - A content rule list blocks every load but `data:`, `blob:` and `about:`, which cover only what the document holds
-///   itself. It applies to images, scripts, styles, `fetch`, XHR, WebSockets and frames alike.
+///   itself, and the app's own picture scheme (`SealedPictures`), which the app answers from what it holds or what the
+///   Remote Pictures setting lets it fetch. It applies to images, scripts, styles, `fetch`, XHR, WebSockets and frames
+///   alike.
 /// - A navigation decider cancels every navigation of the main frame but the one this type starts, so a link, a form
 ///   submission, `location` and a redirect go nowhere. Frames the document builds for itself (`about:`, `data:`, `blob:`)
 ///   are allowed, and nothing else.
@@ -21,6 +23,9 @@ import WebKit
 ///   off, so the interfaces that could send one are not there.
 /// - The page keeps its data in memory (`WKWebsiteDataStore.nonPersistent()`), has no script message handler or other
 ///   bridge to the app, and loads no subresource a rule would let through.
+///
+/// A page made with `runsScripts` false runs none of the document's scripts; the app's own run in a world of their own
+/// that the document cannot reach.
 ///
 /// Links do nothing. A document from a file in someone's library is not a page to browse from; a link that opened the
 /// browser would be the document choosing where the person goes.
@@ -33,22 +38,31 @@ import WebKit
     /// Counts the calls to `show`, so a load that finishes after a later one started is not shown over it.
     @ObservationIgnored private var shows = 0
 
-    private init(page: WebPage, gate: NavigationGate) {
+    /// Answers the document's pictures, where it has any to answer.
+    @ObservationIgnored private let pictures: SealedPictures?
+    @ObservationIgnored private let runsScripts: Bool
+
+    private init(page: WebPage, gate: NavigationGate, pictures: SealedPictures?, runsScripts: Bool) {
         self.page = page
         unused = gate
+        self.pictures = pictures
+        self.runsScripts = runsScripts
     }
 
-    static func make() async throws -> SealedWebPage {
-        let (page, gate) = try await blank()
-        return SealedWebPage(page: page, gate: gate)
+    /// A page whose documents draw their pictures from `pictures`, and run their own scripts only where `runsScripts`
+    /// says so. Without `pictures`, a picture of the app's scheme is not answered.
+    static func make(pictures: SealedPictures? = nil, runsScripts: Bool = true) async throws -> SealedWebPage {
+        let (page, gate) = try await blank(pictures: pictures, runsScripts: runsScripts)
+        return SealedWebPage(page: page, gate: gate, pictures: pictures, runsScripts: runsScripts)
     }
 
     /// A sealed page that has held no document. Compiles the rules the first time and reuses them after.
-    private static func blank() async throws -> (WebPage, NavigationGate) {
+    private static func blank(pictures: SealedPictures?, runsScripts: Bool) async throws -> (WebPage, NavigationGate) {
         let rules = try await ruleList()
         var configuration = WebPage.Configuration()
         configuration.websiteDataStore = .nonPersistent()
-        configuration.defaultNavigationPreferences.allowsContentJavaScript = true
+        configuration.defaultNavigationPreferences.allowsContentJavaScript = runsScripts
+        if let pictures { configuration.urlSchemeHandlers[URLScheme(SealedPictures.scheme)!] = SealedPictureScheme(pictures: pictures) }
         configuration.userContentController.add(rules)
         configuration.userContentController.addUserScript(WKUserScript(source: Self.lockdown, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let gate = NavigationGate()
@@ -70,7 +84,7 @@ import WebKit
             unused = nil
             (next, nextGate) = (page, gate)
         } else {
-            (next, nextGate) = try await Self.blank()
+            (next, nextGate) = try await Self.blank(pictures: pictures, runsScripts: runsScripts)
             guard call == shows else { throw CancellationError() }
         }
         nextGate.allow(Self.base)
@@ -83,6 +97,21 @@ import WebKit
     }
 
     static let base = URL(string: "about:blank")!
+
+    /// Has the document ask for its pictures again, from the URLs of `version`, without loading it again, so the place
+    /// the person has read to is kept. The script runs in a world of its own, which works whether or not the
+    /// document's scripts run.
+    func redrawPictures(version: Int) async {
+        _ = try? await page.callJavaScript(Self.redraw, arguments: ["version": String(version)], contentWorld: Self.world)
+    }
+
+    private static let world = WKContentWorld.world(name: "MAPPSealedPictures")
+
+    nonisolated static let redraw = """
+        for (const img of document.querySelectorAll('img[src^="\(SealedPictures.scheme):"]')) {
+          img.setAttribute('src', img.getAttribute('src').replace(/([?&]v=)\\d+/, '$1' + version));
+        }
+        """
 
     /// Runs at the start of every document in every frame, `about:blank` and `srcdoc` frames included, each of which has
     /// a realm of its own and gets the script before any page script runs.
@@ -104,7 +133,8 @@ import WebKit
           {"trigger": {"url-filter": ".*"}, "action": {"type": "block"}},
           {"trigger": {"url-filter": "^data:"}, "action": {"type": "ignore-previous-rules"}},
           {"trigger": {"url-filter": "^blob:"}, "action": {"type": "ignore-previous-rules"}},
-          {"trigger": {"url-filter": "^about:"}, "action": {"type": "ignore-previous-rules"}}
+          {"trigger": {"url-filter": "^about:"}, "action": {"type": "ignore-previous-rules"}},
+          {"trigger": {"url-filter": "^\(SealedPictures.scheme):"}, "action": {"type": "ignore-previous-rules"}}
         ]
         """
 
