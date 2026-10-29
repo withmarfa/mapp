@@ -203,7 +203,7 @@ struct SidebarPlan {
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
 
     /// A shown type row as the list draws it: one line, with how deep it sits and whether it is folded open.
-    struct TypeRow: Identifiable {
+    nonisolated struct TypeRow: Identifiable, Equatable {
         let node: TypeNode
         let depth: Int
         let isExpanded: Bool

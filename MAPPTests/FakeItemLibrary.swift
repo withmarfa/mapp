@@ -7,13 +7,14 @@ import UniformTypeIdentifiers
 /// `ItemLibrary` alone. It keeps items and bodies as given and answers the places by their plain meaning.
 @Observable
 final class FakeItemLibrary: ItemLibrary {
-    var items: [Item] { didSet { contentRevision += 1 } }
+    var items: [Item] { didSet { contentRevision += 1; membershipRevision += 1 } }
     private(set) var contentRevision = 0
+    private(set) var membershipRevision = 0
     var bodies: [ItemID: String]
     var isLoaded = true
     let notices = Notices()
     var notesToPurge: Set<ItemID> = []
-    var catalogue = FakeItemLibrary.testCatalogue { didSet { contentRevision += 1 } }
+    var catalogue = FakeItemLibrary.testCatalogue { didSet { contentRevision += 1; membershipRevision += 1 } }
     var views: [LibraryView] = []
     /// What each view lists, by view.
     var viewMembers: [ItemID: [ItemID]] = [:]

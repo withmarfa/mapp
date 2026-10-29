@@ -208,7 +208,9 @@ final class QuickAdd {
 
     /// Whether New Item can open the panel: the library is read and offers a kind to make.
     static func isAvailable(in library: any ItemLibrary) -> Bool {
-        library.isLoaded && !types(in: library).isEmpty
+        guard library.isLoaded else { return false }
+        let catalogue = library.catalogue
+        return catalogue.itemTypes[.file] != nil || catalogue.itemTypes.keys.contains(where: catalogue.isCreatable)
     }
 
     /// The kinds of item the panel offers, by label, with File after them where the catalogue has files.
