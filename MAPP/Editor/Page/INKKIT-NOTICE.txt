@@ -25,16 +25,16 @@ The published package bundles Milkdown, ProseMirror and other packages. Each
 keeps its own license. dist/THIRD-PARTY-NOTICES.txt lists their versions,
 licenses and notice texts for both entries, including the core entry.
 
-The full entry also imports Mermaid. dist/THIRD-PARTY-NOTICES-FULL.txt adds
-Mermaid and the dependencies included when bundling it with the release
-lockfile. It is a reference for that dependency tree, not for every host's
-resolved tree. Mermaid includes code under MIT, Apache-2.0, BSD, EPL-2.0
-and other licenses; check the generated list for the versions shipped.
+The main entry bundles Pele and DOMPurify. The generated third-party
+notices include Pele's complete license file and its Lucide ISC notice.
+dist/THIRD-PARTY-NOTICES-FULL.txt contains the same notices and remains
+available for existing host build recipes. The core entry includes neither
+Pele nor DOMPurify.
 
 When distributing an inlined page, carry Inkkit's LICENSE, this NOTICE and
 dist/THIRD-PARTY-NOTICES.txt alongside the page. Also generate notices from
-the host's bundle to cover Mermaid and any other host dependencies. Making
-one HTML file does not remove the dependencies' license requirements.
+the host's bundle for any other host dependencies. Making one HTML file
+does not remove the dependencies' license requirements.
 Review the license terms, including any applicable source obligations;
 a list of notices alone does not establish compliance.
 
