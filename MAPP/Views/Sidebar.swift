@@ -101,7 +101,9 @@ private struct SidebarList: View {
         .listStyle(.sidebar)
         // The foot is a bar on the list's bottom edge that draws the toolbar's band mirrored, and only while rows pass
         // under it. The system's soft edge is hidden, since the list's own background would count as content.
-        .bandsFoot { SidebarFoot(browser: browser) }
+        .bandsFoot(memory: browser.sidebarMemory) { SidebarFoot(browser: browser) }
+        // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
+        .remembersScroll(in: browser.sidebarMemory)
         .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.
