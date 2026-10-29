@@ -218,7 +218,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.body(of: F.p1) == ItemBody(id: F.p1, text: "Edited elsewhere", version: ItemVersion(2)))
 
         source.setBody("Changed in place", of: F.p1, version: 2)
-        source.send(.bodyChanged(F.p1, ItemVersion(2)))
+        source.sendBody(of: F.p1)
         #expect(await eventually { library.body(of: F.p1)?.text == "Changed in place" })
     }
 
@@ -367,7 +367,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // A read that raced the write gives older text, which the library does not take.
         source.setBody("Note bod", of: F.n1)
-        source.send(.bodyChanged(F.n1, ItemVersion(1)))
+        source.sendBody(of: F.n1)
         source.send(.upserted([F.item(F.n1, F.note, "Plain note", age: 4, tags: [ItemTag.favorite])]))
         #expect(await eventually { library.item(F.n1)?.edgesOut.isEmpty == true })
         #expect(library.body(of: F.n1)?.text == "Typed")

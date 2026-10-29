@@ -123,7 +123,7 @@ import Testing
         func becomeWhole() {
             reads.whole.withLock { $0 = true }
             reads.missing.withLock { $0 = [] }
-            source.events.yield(.change(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil)))
+            source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         }
 
         func held() async -> Int { await source.engine.held.count }

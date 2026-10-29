@@ -48,16 +48,16 @@ struct MarfaDrainAnswersTests {
         let remaining = try #require(queued.last)
         // The drain recorded the first answer, then stopped on a full store.
         try Self.recordAccepted(accepted.id, at: location.store(for: connection))
-        source.events.yield(.change(Change(origin: .queueNotDrained(.storageFull(message: "full")), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .queueNotDrained(.storageFull(message: "full")), itemId: nil, edgeId: nil))
+        await source.engineTook()
         _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         #expect(log.current.answer(to: second) == nil)
 
         // A later drain reports only the write it answered.
         try Self.recordAccepted(remaining.id, at: location.store(for: connection))
         let report = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == remaining.id })
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        await source.engineTook()
         _ = try #require(await log.wait { $0.answer(to: second) == .accepted })
         #expect(try await source.copy.queue.all().isEmpty)
         #expect(log.current.answer(to: first) == .accepted, "the first write was forgotten without being answered")
@@ -89,12 +89,12 @@ struct MarfaDrainAnswersTests {
             // Holds the engine while it takes the first report, as a slow one would be held.
             try? await Task.sleep(for: .milliseconds(500))
         }
-        source.events.yield(.change(Change(origin: .queueDrained(firstReport), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(firstReport), itemId: nil, edgeId: nil))
         #expect(await LiveMarfa.until { holding.isSet })
         // The copy's next drain can record answers while the engine is still taking the earlier report.
         try Self.recordAccepted(remaining.id, at: location.store(for: connection))
-        source.events.yield(.change(Change(origin: .queueNotDrained(.copyExpired(reason: "read_view_changed", message: "expired")), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .queueNotDrained(.copyExpired(reason: "read_view_changed", message: "expired")), itemId: nil, edgeId: nil))
+        await source.engineTook()
         _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         #expect(log.current.answer(to: second) == nil)
         #expect(try await source.copy.queue.all().contains { $0.id == remaining.id }, "the earlier report forgot the later answer before it could be taken")
@@ -102,7 +102,7 @@ struct MarfaDrainAnswersTests {
     }
 
     @Test
-    func theEngineNamesTheEventItIsTakingWhileItRunsAndNoneAfter() async throws {
+    func theEngineNamesTheEventItIsTakingAndAQuitWaitsForWritesAlone() async throws {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
@@ -125,13 +125,21 @@ struct MarfaDrainAnswersTests {
             // Holds the engine in this event, as a slow one would be held, until the test has made its checks.
             for await _ in held {}
         }
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         #expect(await LiveMarfa.until { holding.isSet })
-        #expect(activity.snapshot().step == "change.queueDrained")
+        #expect(activity.snapshot().step == "heard")
+        // With no write told, a quit does not wait behind the slow read.
+        await source.queueSubmitted()
+        #expect(activity.snapshot().step == "heard", "the quit waited for a read of the copy")
+        let second = ItemID.mint()
+        source.submit(.create(id: second, ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second")), as: WriteID())
+        #expect(activity.snapshot().waiting >= 1, "the write told behind the slow event is not counted as waiting")
+        #expect(activity.snapshot().writes == 1)
         async let behind: Void = source.queueSubmitted()
-        #expect(await LiveMarfa.until { activity.snapshot().waiting >= 1 }, "the event told behind the slow one is not counted as waiting")
         release.finish()
         await behind
+        #expect(activity.snapshot().writes == 0)
+        #expect(try await source.copy.queue.all().contains { $0.itemId == second.rawValue }, "the write was not queued once the quit's wait ended")
         await source.engine.whenAnswering(nil)
         #expect(await LiveMarfa.until { activity.snapshot().step == nil })
         await source.close()
@@ -159,16 +167,16 @@ struct MarfaDrainAnswersTests {
 
         // The copy's next drain records an answer after the engine read the queue and before it forgets.
         await source.engine.whenForgetting { try? Self.recordAccepted(remaining.id, at: location.store(for: connection)) }
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
-        await source.queueSubmitted()
+        await source.engineTook()
         let kept = try await source.copy.queue.all()
         #expect(kept.map(\.id) == [remaining.id], "the answer recorded after the read was forgotten with the others")
         #expect(kept.first?.verdict == .accepted)
         await source.engine.whenForgetting(nil)
 
         // Its own report then takes it.
-        source.events.yield(.change(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: second) == .accepted })
         #expect(try await source.copy.queue.all().isEmpty)
         await source.close()
@@ -198,8 +206,8 @@ struct MarfaDrainAnswersTests {
         // The first report is of a write blocked on a spent key, which stays in the queue.
         try Self.recordBlocked(blocked.id, at: store)
         let blockedReport = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == blocked.id })
-        source.events.yield(.change(Change(origin: .queueDrained(blockedReport), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .queueDrained(blockedReport), itemId: nil, edgeId: nil))
+        await source.engineTook()
         #expect(try await source.copy.queue.all().first { $0.id == blocked.id }?.verdict != nil)
 
         // It is released and sent again, and its new answer is recorded while another report is cleaned up.
@@ -207,17 +215,17 @@ struct MarfaDrainAnswersTests {
         try Self.recordAccepted(remaining.id, at: store)
         let report = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == remaining.id })
         await source.engine.whenForgetting { try? Self.recordAccepted(blocked.id, at: store) }
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: other) == .accepted })
-        await source.queueSubmitted()
+        await source.engineTook()
         await source.engine.whenForgetting(nil)
         let kept = try await source.copy.queue.all()
         #expect(kept.map(\.id) == [blocked.id], "the released write's new answer was forgotten before it was taken")
         #expect(kept.first?.verdict == .accepted)
 
         // Its own report then takes it.
-        source.events.yield(.change(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil))
+        await source.engineTook()
         #expect(try await source.copy.queue.all().isEmpty)
         await source.close()
     }

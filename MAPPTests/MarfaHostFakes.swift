@@ -72,7 +72,6 @@ nonisolated final class FakeMarfaSource: ItemSource {
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool { true }
     func body(of item: ItemID) async throws -> ItemBody { throw SourceFailure(kind: .missing, message: "") }
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
-    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] { [] }
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch { SourceSearch() }
     func items(inView view: ItemID) async throws -> [ItemID] { [] }
 

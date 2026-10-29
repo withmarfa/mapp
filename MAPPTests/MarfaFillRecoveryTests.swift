@@ -269,7 +269,7 @@ private actor FillServer: MarfaRefreshing {
         await server.observeAttachments(in: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), refreshing: server)
         source.events.yield(.paint)
-        await source.queueSubmitted()
+        await source.engineTook()
         await source.engine.sync.refresh()
         await source.engine.sync.flush()
         try await wait { await server.calls.count == 2 }
@@ -278,9 +278,9 @@ private actor FillServer: MarfaRefreshing {
         let earlyFetch = KeptFetch(fetched: 0, fetchedBytes: 0, attachments: Attachments(
             held: 0, heldBytes: 0, partialBytes: 0, notHeld: 0, notHeldBytes: 0, notHeldByReason: []))
         await server.report(earlyFetch)
-        source.events.yield(.change(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil)))
-        source.events.yield(.change(Change(origin: .serverReachable, itemId: nil, edgeId: nil)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
+        source.hear(Change(origin: .serverReachable, itemId: nil, edgeId: nil))
+        await source.engineTook()
         try await wait { await source.engine.sync.lastKeptFetch == earlyFetch }
         #expect(await server.fetchedAttachments.isEmpty)
 
@@ -290,9 +290,9 @@ private actor FillServer: MarfaRefreshing {
         let attached = try await copy.items.attach(to: noteID, file: file)
         let fileID = try #require(attached.item.itemId)
         let edgeID = try #require(attached.edge.edgeId)
-        source.events.yield(.change(Change(origin: .server(event: "edge.created", cursor: "replayed"),
-                                          itemId: nil, edgeId: edgeID)))
-        await source.queueSubmitted()
+        source.hear(Change(origin: .server(event: "edge.created", cursor: "replayed"),
+                           itemId: nil, edgeId: edgeID))
+        await source.engineTook()
         try await wait { await server.fetchedAttachments == [fileID] }
         #expect(await source.engine.sync.drains == drains)
         #expect(await server.calls == ["catchUp", "attachments", "attachments", "attachments"])

@@ -80,13 +80,13 @@ import Testing
         // changes under test are read.
         _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.events.yield(.change(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil)))
-        source.events.yield(.change(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
+        source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         let item = try #require(painted.item(titled: "Arrived"))
         #expect(source.connectionState == .offline(reason: "offline"))
         source.submit(.editBody(item.id, "Kept", base: item.version, merge: .asRead), as: WriteID())
-        await source.queueSubmitted()
+        await source.engineTook()
         #expect(try await copy.items.get(try #require(created.itemId))?.body == "Kept")
         await source.close()
     }
@@ -113,8 +113,8 @@ import Testing
 
         reads.hydrating.withLock { $0 = true }
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.events.yield(.change(Change(origin: .server(event: "item.created", cursor: "arrived"),
-                                          itemId: try #require(created.itemId), edgeId: nil)))
+        source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
+                           itemId: try #require(created.itemId), edgeId: nil))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         #expect(reads.refused.withLock { $0 } > 0, "the change was read while the copy refused edge reads")
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })
