@@ -4,7 +4,7 @@ import Synchronization
 /// What the engine is doing, readable from anywhere without awaiting the engine: the kind of event it is in and
 /// since when, and how many events were told and not yet taken. A quit that times out reads this to name the step
 /// it is stuck behind, which the engine's own actor could not answer while it is busy. It also counts the person's
-/// writes told and taken, so a quit waits for those alone and not for a read the engine is busy with.
+/// writes told and taken, so a quit waits for those alone and not for what was told after them.
 nonisolated final class EngineActivity: Sendable {
     nonisolated struct Snapshot: Sendable, Equatable {
         /// The kind of the event being taken; nil when the engine is between events.

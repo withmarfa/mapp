@@ -106,7 +106,7 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// Deletes the view for good, for every app; a view has no bin.
     func deleteView(_ view: ItemID, idempotencyKey: String) async throws
     /// Returns once every write submitted before it is in the source's own keeping, never waiting on the network
-    /// or on the source's other work.
+    /// or on what the source was told after them.
     func queueSubmitted() async
     /// What the source's engine is doing, for a quit that runs out of time to say what it waited on; nil where
     /// the source has no engine.
