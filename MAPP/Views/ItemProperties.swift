@@ -196,7 +196,7 @@ struct ItemPropertyRow: View {
         }
     }
 
-    /// The value as the control would show it: a choice by its label, a Boolean as Yes or No, anything else as written.
+    /// The value as written, for a row that cannot be changed and has no shape of its own.
     private var readOnlyText: Text? {
         guard let value else { return nil }
         return Text(ItemValueText.string(value))
