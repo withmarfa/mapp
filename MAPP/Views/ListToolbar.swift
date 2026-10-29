@@ -11,9 +11,8 @@ struct ListToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         let stacks = browser.stackableType(in: library) != nil
-        if stacks {
-            ToolbarItem(id: "listSubtypes") { IncludeSubtypesButton(browser: browser) }
-        }
+        ToolbarItem(id: "listSubtypes") { IncludeSubtypesButton(browser: browser) }
+            .hidden(!stacks)
         ColumnSearch(
             isExpanded: $browser.isSearchExpanded,
             text: $browser.searchText,

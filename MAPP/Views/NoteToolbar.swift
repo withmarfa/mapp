@@ -125,46 +125,57 @@ struct GalleryToolbar: ToolbarContent {
     let details: DetailsPresentation
     var showsCreation = true
 
+    // Every item but the navigation ones stays in the toolbar and is hidden when it does not apply, as the page's
+    // toolbar does (`NoteToolbar`). The toolbar then keeps its shape as a place or a layout changes, instead of being
+    // rebuilt.
     var body: some ToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
-        if showsCreation {
-            ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
-        }
-        if showsScrolledTitle, !browser.showsCollection, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+        ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
+            .hidden(!showsCreation)
+        // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
+        if !browser.showsCollection {
             ToolbarItem(placement: .navigation) {
-                ScrolledItemTitle(title: tools.notes.first?.title ?? "")
+                Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
+                    .accessibilityIdentifier("BackToGallery")
             }
-            .sharedBackgroundVisibility(.hidden)
+            if showsScrolledTitle, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+                ToolbarItem(placement: .navigation) {
+                    ScrolledItemTitle(title: tools.notes.first?.title ?? "")
+                }
+                .sharedBackgroundVisibility(.hidden)
+            }
         }
         ToolbarSpacer(.flexible)
-        if browser.showsCollection {
-            ColumnSearch(
-                isExpanded: $browser.isSearchExpanded,
-                text: $browser.searchText,
-                prompt: String(localized: "Search"),
-                layout: .item,
-                focusRequests: browser.searchFocusRequests,
-                onDown: { browser.focusRequest = .list }
-            ) {
-                if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
-                ViewOptionsMenu(browser: browser)
-            }
-            ToolbarSpacer(.fixed)
+        ColumnSearch(
+            isExpanded: $browser.isSearchExpanded,
+            text: $browser.searchText,
+            prompt: String(localized: "Search"),
+            layout: .item,
+            focusRequests: browser.searchFocusRequests,
+            onDown: { browser.focusRequest = .list }
+        ) {
+            if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
+            ViewOptionsMenu(browser: browser)
         }
+        .hidden(!browser.showsCollection)
+        ToolbarSpacer(.fixed)
+            .hidden(!browser.showsCollection)
         ToolbarItem(id: "collectionViewMode") { ViewModeMenu(browser: browser) }
         // Keep the controls in place when selection clears. They move above an open inspector.
-        if !details.isPresented {
-            ToolbarSpacer(.fixed)
-            ToolbarItemGroup {
-                tools.shareLink
-                tools.moreMenu
-                    .disabled(browser.selection.isEmpty)
-            }
-            ToolbarSpacer(.fixed)
-            ToolbarItem {
-                tools.detailsButton
-            }
+        ToolbarSpacer(.fixed)
+            .hidden(details.isPresented)
+        ToolbarItemGroup {
+            tools.shareLink
+            tools.moreMenu
+                .disabled(browser.selection.isEmpty)
         }
+        .hidden(details.isPresented)
+        ToolbarSpacer(.fixed)
+            .hidden(details.isPresented)
+        ToolbarItem {
+            tools.detailsButton
+        }
+        .hidden(details.isPresented)
     }
 }
 
