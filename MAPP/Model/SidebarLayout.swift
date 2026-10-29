@@ -7,15 +7,19 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case inbox, recents, all, favorites, sources
     /// The index of items other items are filed under.
     case collections
-    /// The section that holds the library's types.
+    /// The block that holds the library's types.
     case types
-    /// The section that lists the views saved on the server; hiding it hides every view.
+    /// The saved views in the Views block; hiding it hides every saved view and leaves Inbox, Recents and Favorites.
     case views
-    case files
     /// A type's row, or a group of types by its stem (`TypeNode.id`).
     case type(String)
     /// One saved view's row, by its item ID.
     case view(ItemID)
+
+    /// The places under New and Search, in their default order.
+    static let destinations: [SidebarPlace] = [.all, .sources, .collections]
+    /// The built-in views at the top of the Views block, in their default order.
+    static let builtInViews: [SidebarPlace] = [.inbox, .recents, .favorites]
 
     /// Every saved view's symbol: a view is a filtered list, whatever it lists.
     static let viewSymbol = "square.stack.3d.up"
@@ -30,11 +34,43 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .collections: "collections"
         case .types: "types"
         case .views: "views"
-        case .files: "files"
         case .type(let id): "type:" + id
         case .view(let id): "view:" + id.rawValue
         }
     }
+
+    /// The mark of a place that is drawn by symbol; a type draws its own, from the catalogue.
+    var symbol: String? {
+        switch self {
+        case .inbox: "tray"
+        case .recents: "clock"
+        case .all: "square.grid.2x2"
+        case .favorites: "heart"
+        case .sources: "antenna.radiowaves.left.and.right"
+        case .collections: "square.stack"
+        case .types: "rectangle.3.group"
+        case .views, .view: Self.viewSymbol
+        case .type: nil
+        }
+    }
+
+    /// What the place opens, where it opens something of its own: the six places and a saved view.
+    var item: SidebarItem? {
+        switch self {
+        case .inbox: .inbox
+        case .recents: .recents
+        case .all: .allNotes
+        case .favorites: .favorites
+        case .sources: .sources
+        case .collections: .collections
+        case .view(let id): .view(id)
+        case .types, .views, .type: nil
+        }
+    }
+
+    /// Whether the row carries a count. Recents always holds the same number, so it says nothing, and the indexes and
+    /// a saved view list what the copy holds on their own.
+    var showsCount: Bool { self == .all || self == .inbox || self == .favorites }
 }
 
 /// What one library's person chose for the sidebar: the places hidden, the sections collapsed, and the order of the rest. A place the layout
@@ -118,15 +154,16 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// The places above the first heading: Inbox, Recents and Favorites.
-    let top: [SidebarPlace]
-    /// The Browse section: every item, the sources they came from, and the collections they are filed under. Files
-    /// are included in Items.
-    let browse: [SidebarPlace]
-    /// The Types section, where the library holds any types, then the Views section, where the server has saved any
-    /// views the library can read.
+    /// The places under New and Search: every item, the sources they came from, and the collections they are filed
+    /// under. Files are included in Items.
+    let destinations: [SidebarPlace]
+    /// The built-in views at the top of the Views block: Inbox, Recents and Favorites. They are places, not saved
+    /// views, and no data model sits behind the grouping.
+    let builtInViews: [SidebarPlace]
+    /// The saved views in the Views block, where the server has saved any views the library can read, then the Types
+    /// block, where the library holds any types.
     let library: [SidebarPlace]
-    /// The types the Types section lists, nested. The person orders the top rows; the rows under one keep the order
+    /// The types the Types block lists, nested. The person orders the top rows; the rows under one keep the order
     /// of their items.
     let types: [TypeNode]
     /// The saved views, in the person's order, hidden ones included. Views the person never placed follow by title.
@@ -135,20 +172,30 @@ struct SidebarPlan {
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         self.layout = layout
-        top = layout.ordered([.inbox, .recents, .favorites])
-        browse = layout.ordered([.all, .sources, .collections])
+        destinations = layout.ordered(SidebarPlace.destinations)
+        builtInViews = layout.ordered(SidebarPlace.builtInViews)
         views = layout.ordered(library.views, by: { SidebarPlace.view($0.id).key })
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
-        self.library = (types.isEmpty ? [] : [.types]) + (library.views.isEmpty ? [] : [.views])
+        self.library = (library.views.isEmpty ? [] : [.views]) + (types.isEmpty ? [] : [.types])
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
 
-    var shownTop: [SidebarPlace] { top.filter(isShown) }
-    var shownBrowse: [SidebarPlace] { browse.filter(isShown) }
-    /// The Views section is absent once every view in it is hidden, as it is when there are none.
+    var shownDestinations: [SidebarPlace] { destinations.filter(isShown) }
+    var shownBuiltInViews: [SidebarPlace] { builtInViews.filter(isShown) }
+    /// The blocks of `library` that show. The saved views are absent once every one of them is hidden, as they are
+    /// when there are none.
     var shownLibrary: [SidebarPlace] { library.filter { isShown($0) && ($0 != .views || !shownViews.isEmpty) } }
     var shownViews: [LibraryView] { views.filter { isShown(.view($0.id)) } }
+
+    /// The saved views the Views block lists after the built-in ones, in the person's order.
+    var shownSavedViews: [LibraryView] { shownLibrary.contains(.views) ? shownViews : [] }
+
+    /// The Views block shows while any built-in view or saved view is switched on.
+    var showsViews: Bool { !shownBuiltInViews.isEmpty || !shownSavedViews.isEmpty }
+
+    /// The Types block shows where the library has types and Show Types is on.
+    var showsTypes: Bool { shownLibrary.contains(.types) }
 
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
@@ -228,6 +275,25 @@ struct SidebarPlan {
             return [TypeRow(node: node, depth: depth, isExpanded: isExpanded)]
                 + (isExpanded ? rows(node.children, depth: depth + 1, layout: layout) : [])
         }
+    }
+
+    /// The Types block shows this many types, with their subtypes, until Show More.
+    static let shownTypeCount = 6
+
+    /// The first `limit` types of `rows`, each with the subtype rows folded open under it, and whether more types
+    /// follow. With `showsAll` every row stays. A type's subtypes are never cut off from it, and do not count.
+    static func limited(
+        _ rows: [TypeRow], showsAll: Bool, limit: Int = shownTypeCount
+    ) -> (rows: [TypeRow], hasMore: Bool) {
+        let topLevel = rows.filter { $0.depth == 0 }.count
+        guard topLevel > limit else { return (rows, false) }
+        guard !showsAll else { return (rows, true) }
+        var seen = 0
+        let kept = rows.prefix { row in
+            if row.depth == 0 { seen += 1 }
+            return seen <= limit
+        }
+        return (Array(kept), true)
     }
 
     private static func shown(_ nodes: [TypeNode], by plan: SidebarPlan) -> [TypeNode] {

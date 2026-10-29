@@ -63,7 +63,7 @@ struct SidebarFootRow: View {
                     Text(name)
                         // A step above the rows' text, since it names the instance the rows belong to.
                         .interfaceFont(.title3)
-                        .foregroundStyle(appearsActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Image(systemName: "chevron.down")

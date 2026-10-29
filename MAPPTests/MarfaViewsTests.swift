@@ -121,7 +121,7 @@ struct MarfaViewsTests {
     @Test func theSidebarListsTheViewsAfterTypesAndNoneWithoutThem() async throws {
         let (library, source) = try await Self.loaded(views: [Self.planning, Self.reading])
         let plan = SidebarPlan(library, layout: SidebarLayout())
-        #expect(plan.library == [.types, .views])
+        #expect(plan.library == [.views, .types])
         #expect(library.views.map(\.title) == ["Planning", "Reading"])
         #expect(library.name(of: .view(Self.reading.id)) == "Reading")
 

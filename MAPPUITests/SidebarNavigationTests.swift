@@ -21,8 +21,8 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarListsTopPlacesThenTypesAndViews() {
-        let destinations = ["Inbox", "Recents", "Favorites", "Browse", "Items", "Sources", "Collections", "Types", "Views", "Recent Notes"]
+    func testSidebarListsTheTopBlockThenViewsAndTypes() {
+        let destinations = ["New", "Search", "Items", "Sources", "Collections", "Views", "Inbox", "Recents", "Favorites", "Recent Notes", "Types"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
@@ -31,7 +31,9 @@ final class SidebarNavigationTests: XCTestCase {
         }
         XCTAssertTrue(instanceName.exists)
         XCTAssertTrue(element("NewItemToolbar").exists, "the foot holds the New Item button")
-        XCTAssertFalse(element("SidebarSearch").exists, "Search is the palette's, not the foot's")
+        XCTAssertTrue(element("SidebarNew").exists, "New is a row of the top block")
+        XCTAssertTrue(element("SidebarSearch").exists, "Search is a row of the top block")
+        XCTAssertFalse(sidebarText("Browse").exists, "the top block has no heading")
         XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is in the instance menu")
         XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is in the instance menu")
         for title in ["Sources", "Collections"] {
@@ -57,11 +59,29 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Garden ideas")).firstMatch.exists)
     }
 
-    func testSearchOpensFromTheKeyboardWithNoSearchButtonAtTheFoot() {
+    func testSearchOpensFromTheKeyboardAndFromItsRow() {
         app.typeKey("p", modifierFlags: [.command, .shift])
         XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(element("CommandPaletteField").waitForNonExistence(timeout: 2))
+        element("SidebarSearch").click()
+        XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func testTheNewRowOpensQuickAddAndTakesNoSelection() {
+        element("SidebarNew").click()
+        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
+        XCTAssertTrue(list.exists, "the window stays where it was")
+    }
+
+    func testChoosingItemsFromAnotherPlaceOpensTheGalleryUnderTheMakeSomethingNewRow() {
+        sidebarText("Inbox").click()
+        sidebarText("Items").click()
+        XCTAssertTrue(element("MakeSomethingNew").waitForExistence(timeout: 3))
+        XCTAssertFalse(list.exists, "Items opens in the gallery, which spans the window")
     }
 
     func testTheInstanceMenuListsConsoleSettingsAndRecentlyDeleted() {
@@ -104,6 +124,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(sidebarText("Favorites").exists)
         XCTAssertTrue(sidebarText("Types").exists)
         sidebarText("Items").click()
+        app.typeKey("1", modifierFlags: .command)
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.rightClick()

@@ -45,7 +45,7 @@ final class WindowTests: XCTestCase {
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
-        case "Favorites": "SidebarFavorites"
+        case "Favorites": "SidebarPlace-favorites"
         case "Types": "SidebarTypes"
         case "Note": "SidebarType-core.note"
         default: nil
@@ -138,6 +138,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
         XCTAssertTrue(row(titled: "Draft agenda").exists, "only the one restored leaves")
         sidebarItem("Items").click()
+        app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
     }
 

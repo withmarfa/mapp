@@ -390,11 +390,10 @@ struct CommandPalette: View {
     }
 
     private var places: [Entry] {
-        var items: [(SidebarItem, RowIcon, String?)] = [
-            (.inbox, .symbol("tray"), nil), (.recents, .symbol("clock"), nil), (.allNotes, .symbol("note.text"), nil),
-            (.sources, .symbol("antenna.radiowaves.left.and.right"), nil), (.collections, .symbol("square.stack"), nil),
-            (.favorites, .symbol("heart"), nil), (.recentlyDeleted, .symbol("trash"), nil),
-        ]
+        var items: [(SidebarItem, RowIcon, String?)] = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
+            place.item.flatMap { item in place.symbol.map { (item, .symbol($0), nil) } }
+        }
+        items.append((.recentlyDeleted, .symbol("trash"), nil))
         items += library.sourceCounts.map { (.source($0.name), .symbol("antenna.radiowaves.left.and.right"), $0.name) }
         items += library.collections.map { (.collection($0.id), .type(library.catalogue.icon(for: $0.type)), $0.title) }
         // The types the sidebar shows, under the names it gives them.
@@ -402,7 +401,7 @@ struct CommandPalette: View {
         items += library.views.map { (.view($0.id), .symbol(SidebarPlace.viewSymbol), $0.title) }
         return items.map { item, icon, title in
             Entry(id: "place:\(item)", title: title ?? library.name(of: item), detail: String(localized: "Show"), icon: icon) {
-                browser.show(item, in: library, order: order)
+                browser.choose(item, in: library, order: order)
                 browser.focusRequest = .list
             }
         }
