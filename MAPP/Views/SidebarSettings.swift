@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// The Sidebar page of Settings: every place the open library's sidebar can show, each with a switch to show or
-/// hide it, in the order the sidebar uses. A row moves within its group by dragging, by Move Up and Move Down in
-/// its context menu, or by the same two accessibility actions. The choices belong to the library that is open, so
-/// each library keeps its own sidebar.
+/// The Sidebar page of Settings: what the open library's sidebar shows, in the sidebar's own order and under its own
+/// names, each with a switch. The first group is Items, Sources and Collections under New and Search. The Views block
+/// has its built-in views (Inbox, Recents and Favorites), a switch for the saved views and one for each of them. The
+/// Types block has a switch for itself and one for each type. A row moves within its group by dragging, by Move Up
+/// and Move Down in its context menu, or by the same two accessibility actions. The choices belong to the library
+/// that is open, so each library keeps its own sidebar.
 struct SidebarSettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
@@ -22,20 +24,33 @@ struct SidebarSettings: View {
     private func content(_ library: any ItemLibrary, plan: SidebarPlan) -> some View {
         let topTypes = plan.types.map { SidebarPlace.type($0.id) }
         return Form {
-            Section("Places") {
-                group(plan.top, in: library, plan: plan)
+            Section {
+                group(plan.destinations, in: library, plan: plan)
             }
-            Section("Browse") {
-                group(plan.browse, in: library, plan: plan)
+            Section {
+                group(plan.builtInViews, in: library, plan: plan)
+                if plan.library.contains(.views) {
+                    row(.views, title: String(localized: "Show Saved Views"), in: library, plan: plan, among: [])
+                    let places = plan.views.map { SidebarPlace.view($0.id) }
+                    ForEach(plan.views) { view in
+                        row(.view(view.id), in: library, plan: plan, among: places)
+                            .disabled(plan.layout.isHidden(.views))
+                    }
+                    .onMove { source, destination in
+                        libraries.updateSidebarLayout { $0.move(places, fromOffsets: source, toOffset: destination) }
+                    }
+                }
+            } header: {
+                Text("Views")
+            } footer: {
+                Text("Saved views come from your Marfa server.")
             }
             if plan.library.contains(.types) {
                 Section {
+                    row(.types, title: String(localized: "Show Types"), in: library, plan: plan, among: [])
                     Toggle("Show Icons on Subtypes", isOn: $showsSubtypeIcons)
                         .toggleStyle(.switch)
                         .accessibilityIdentifier("SidebarSubtypeIcons")
-                }
-                Section {
-                    row(.types, title: String(localized: "Show Types"), in: library, plan: plan, among: [])
                     ForEach(plan.types) { node in
                         row(.type(node.id), in: library, plan: plan, among: topTypes)
                             .disabled(plan.layout.isHidden(.types))
@@ -47,20 +62,7 @@ struct SidebarSettings: View {
                 } header: {
                     Text("Types")
                 } footer: {
-                    Text("New types appear here automatically.")
-                }
-            }
-            if plan.library.contains(.views) {
-                Section("Views") {
-                    row(.views, title: String(localized: "Show Views"), in: library, plan: plan, among: [])
-                    let places = plan.views.map { SidebarPlace.view($0.id) }
-                    ForEach(plan.views) { view in
-                        row(.view(view.id), in: library, plan: plan, among: places)
-                            .disabled(plan.layout.isHidden(.views))
-                    }
-                    .onMove { source, destination in
-                        libraries.updateSidebarLayout { $0.move(places, fromOffsets: source, toOffset: destination) }
-                    }
+                    Text("The sidebar lists the first six types and keeps the rest under Show More. New types appear here automatically.")
                 }
             }
         }
@@ -126,34 +128,17 @@ struct SidebarSettings: View {
 
     private func title(_ place: SidebarPlace, in library: any ItemLibrary, plan: SidebarPlan) -> String {
         switch place {
-        case .inbox: library.name(of: .inbox)
-        case .recents: library.name(of: .recents)
-        case .all: library.name(of: .allNotes)
-        case .favorites: library.name(of: .favorites)
-        case .sources: String(localized: "Sources")
-        case .collections: String(localized: "Collections")
-        case .types: String(localized: "Types")
-        case .views: String(localized: "Views")
-        case .files: library.name(of: .files)
         case .type(let id): Self.typeNode(id, in: plan.types)?.label ?? id
         case .view(let id): plan.views.first { $0.id == id }?.title ?? id.rawValue
+        case .types: String(localized: "Types")
+        case .views: String(localized: "Views")
+        default: place.item.map(library.name(of:)) ?? place.key
         }
     }
 
     private func icon(_ place: SidebarPlace, plan: SidebarPlan) -> RowIcon {
-        switch place {
-        case .inbox: .symbol("tray")
-        case .recents: .symbol("clock")
-        case .all: .symbol("note.text")
-        case .favorites: .symbol("heart")
-        case .sources: .symbol("antenna.radiowaves.left.and.right")
-        case .collections: .symbol("square.stack")
-        case .types: .symbol("square.grid.2x2")
-        case .views: .symbol(SidebarPlace.viewSymbol)
-        case .files: .symbol("doc")
-        case .type(let id): .type(Self.typeNode(id, in: plan.types)?.icon)
-        case .view: .symbol(SidebarPlace.viewSymbol)
-        }
+        if case .type(let id) = place { return .type(Self.typeNode(id, in: plan.types)?.icon) }
+        return .symbol(place.symbol ?? "circle")
     }
 
     private static func typeNode(_ id: String, in nodes: [TypeNode]) -> TypeNode? {
