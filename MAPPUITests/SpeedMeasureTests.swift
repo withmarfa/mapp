@@ -7,7 +7,7 @@ import XCTest
 ///
 /// It runs only in the `Measure UI` plan with `MAPP_MEASURE_UI` set and the instance's address and key given as
 /// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
-/// skipped. The one write is a note it makes for the typing and deletes.
+/// skipped. The one write is a note it makes for the typing; `Scripts/measure-ui.sh` removes it afterwards.
 ///
 /// Each test prints `UI|<name>|<median>|<max>|<unit>` lines after XCTest's own report, for the time the test itself
 /// saw, from the action to the result it waited for. That includes UI testing's own query cost, so it bounds what a
@@ -166,9 +166,10 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Typing
 
-    /// Makes a note, types forty characters into its page one key at a time, and deletes the note. A keystroke's time
-    /// runs from the key event until the app is idle again; the page reports no echo to wait on, and reading its
-    /// accessibility value costs more than a keystroke, so the text is checked once at the end. The total is the sum.
+    /// Makes a note and types forty characters into its page one key at a time; `Scripts/measure-ui.sh` removes the
+    /// note afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
+    /// echo to wait on, and reading its accessibility value costs more than a keystroke, so the text is checked once
+    /// at the end. The total is the sum.
     func testTypingInANote() throws {
         try launchWarm()
         try begin("typing")
@@ -190,8 +191,6 @@ final class SpeedMeasureTests: XCTestCase {
         for character in text { time("key") { app.typeText(String(character)) } }
         samples["total"] = [samples["key", default: []].reduce(0, +)]
         XCTAssertTrue(waitUntil { (editor.value as? String)?.hasSuffix(String(text)) == true }, "the text showed in the page")
-        window.descendants(matching: .any).matching(identifier: "MoreToolbar").firstMatch.click()
-        window.menuItems["Delete"].firstMatch.click()
     }
 
     // MARK: Helpers
@@ -230,7 +229,8 @@ final class SpeedMeasureTests: XCTestCase {
         if app.state != .notRunning { app.terminate() }
         time("shown") {
             app.launch()
-            Self.phases.notice("pid \(self.app.processIdentifier)")
+            // XCUIApplication does not publish its process ID; the key is private but long-standing.
+            if let pid = self.app.value(forKey: "processID") as? Int32 { Self.phases.notice("pid \(pid)") }
             XCTAssertTrue(waitUntil(timeout: 300) { self.showsLibrary }, "the library showed")
         }
     }
