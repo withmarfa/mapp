@@ -64,35 +64,28 @@ test('formatting that opens with a link is saved once after an edit inside it', 
     engine.insertText('c', 1)
     expect(editor.snapshot().text).toBe('~~[x](u)bc~~\n')
   }))
-test('a diagram draws with Pele and a refused diagram keeps its source', async () => {
-  const source = '```mermaid\nflowchart LR\n A-->B\n```\n\n```mermaid\nnotadiagram foo\n```\n'
-  const root = document.createElement('div')
-  document.body.append(root)
-  const editor = await NoteEditor.mount(root, {
-    find() {},
-    changed() {},
-    stateChanged() {},
-    openLink() {},
-    copy() {},
-  })
-  try {
-    editor.setItem('note')
-    editor.load(source, 1)
-    await vi.waitFor(() => {
-      const previews = [...root.querySelectorAll('.inkkit-mermaid-preview')]
-      expect(previews.map((preview) => preview.getAttribute('data-state'))).toEqual([
+test('a diagram draws with Pele, and an unsupported or refused one keeps its source', async () => {
+  const source =
+    '```mermaid\nflowchart LR\n A-->B\n```\n\n' +
+    '```mermaid\nnotadiagram foo\n```\n\n' +
+    '```mermaid\nflowchart LR\n A-->B\n click A "https://example.com"\n```\n'
+  await withEditor(source, async (editor) => {
+    const previews = () => [...document.querySelectorAll('.inkkit-mermaid-preview')]
+    await vi.waitFor(() =>
+      expect(previews().map((preview) => preview.getAttribute('data-state'))).toEqual([
         'ready',
         'error',
-      ])
-    })
-    const [drawn, refused] = [...root.querySelectorAll('.inkkit-mermaid-preview')]
+        'error',
+      ]),
+    )
+    const [drawn, unsupported, refused] = previews()
     expect(drawn?.querySelector('svg.pele-flowchart')).not.toBeNull()
+    expect(unsupported?.querySelector('svg')).toBeNull()
+    expect(unsupported?.textContent).toContain('not supported')
     expect(refused?.querySelector('svg')).toBeNull()
+    expect(refused?.textContent).toContain('disabled')
     expect(editor.snapshot().text).toBe(source)
-  } finally {
-    await editor.destroy()
-    root.remove()
-  }
+  })
 })
 test('native readable ranges reject stale generations and preserve formatted replacement history', async () =>
   withEditor('A **bold** line.\n', (editor) => {
