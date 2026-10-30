@@ -172,7 +172,7 @@ final class SidebarNavigationTests: XCTestCase {
     func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
-        XCTAssertLessThan(sidebarText("Favorites").frame.maxY, sidebarText("Sources").frame.minY)
+        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the top block, above Views")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         sidebarText("Collections").click()
         let index = element("SidebarIndex")
