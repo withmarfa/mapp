@@ -18,7 +18,7 @@ declare global {
       load(markdown: string, generation: number, editable: boolean): void
       reload(markdown: string, generation: number, editable: boolean): void
       markdown(): string | null
-      flush(expected?: number): string | null
+      flush(expected?: number): string | null | { commandError: string; message: string }
       format(command: FormatCommand, arg?: string | number, expected?: number): void
       focus(): void
       focusTitle(item: string): void
@@ -236,7 +236,7 @@ window.editor = {
     editor.reload(markdown, nextGeneration, editable)
   },
   markdown: () => editor.markdown(),
-  flush: (expected) => editor.flush(expected),
+  flush: (expected) => guardedCommand(() => editor.flush(expected)),
   format: (command, arg, expected) =>
     guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
   focus: () => {

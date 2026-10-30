@@ -134,4 +134,18 @@ import Testing
         #expect(libraries.current == nil)
         #expect(libraries.host.state == .keyRefused)
     }
+
+    /// A page's hand-over can wait its turn behind another, so a quit can run out of time while the editors are still
+    /// handing over; it then says it is the typing that is still being saved, not the library.
+    @Test func aQuitThatRunsOutOfTimeInTheEditorsSaysTheTypingIsStillBeingSaved() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "LibrariesTests-\(UUID().uuidString)"))
+        var handOver: ((Bool) -> Void)?
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { handOver = $0 })
+        // Returns at all only because the limit ends the wait, which the editors never would.
+        #expect(await libraries.flushEditors(within: .milliseconds(200)) == false)
+        #expect(libraries.host.notices.waiting.last?.title == "Couldn’t Quit")
+        #expect(libraries.host.notices.waiting.last?.message == "MAPP is still saving what you last typed. Try again in a moment.")
+        handOver?(true)
+    }
 }

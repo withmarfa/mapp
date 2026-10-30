@@ -15,6 +15,11 @@ final class EditorController: NSObject {
     @ObservationIgnored private var hasLoadedPage = false
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
+    /// How long a flush waits for the page before giving it up (`flush`). Only a test changes it.
+    @ObservationIgnored var flushLimit = Duration.seconds(2)
+    /// Whether a flush has its turn with the page, and the flushes waiting for theirs (`flush`).
+    @ObservationIgnored var isFlushing = false
+    @ObservationIgnored var waitingFlushes: [(Bool) -> Void] = []
     private(set) var isPresented = false
     /// Whether the page has the keyboard, so the Format menu applies.
     var isFocused = false {

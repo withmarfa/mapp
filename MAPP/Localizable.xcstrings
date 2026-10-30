@@ -641,6 +641,9 @@
     "MAPP is still saving your changes on this Mac. Try again in a moment." : {
 
     },
+    "MAPP is still saving what you last typed. Try again in a moment." : {
+
+    },
     "MAPP kept the copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },
@@ -682,6 +685,9 @@
     },
     "The copy in the folder “%@” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it." : {
       "extractionState" : "manual"
+    },
+    "The editor ran into a problem (“%@”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+
     },
     "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
