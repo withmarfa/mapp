@@ -589,8 +589,7 @@ final class Browser {
         }
     }
 
-    /// A place that is gone can no longer be shown, so the window moves to All Items: a collection no longer
-    /// active, a type that no longer holds an item, or a view deleted elsewhere.
+    /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.
     func placeRemoved(in library: any ItemLibrary, order: NoteOrder) {
         if let place = placeFallback(in: library) { show(place, in: library, order: order) }
     }

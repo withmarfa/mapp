@@ -36,7 +36,7 @@ import Observation
 
     /// Bumped when any item changes, for the lists and search.
     private(set) var contentRevision = 0
-    /// Bumped only when an item comes, goes or changes which places hold it, for the counts.
+    /// Bumped only when an item comes, goes or changes which places hold it, or the catalogue changes, for the counts.
     private(set) var membershipRevision = 0
     /// Bumped when an edge comes, goes or changes, and when the index is built again, which is all that changes what
     /// points at an item. A read of

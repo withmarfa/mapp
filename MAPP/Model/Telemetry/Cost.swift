@@ -32,7 +32,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case typeCounts
     /// The command palette's places and items, listed and sorted (`Browser.paletteIndex`).
     case paletteIndex
-    /// One run of a sidebar view's body, the sidebar's list and each part of it.
+    /// One run of the body of `Sidebar` or of its Types section.
     case sidebarBody
 
     private static let signposter = Telemetry.signposter(.navigation)

@@ -21,9 +21,7 @@ private struct PlaceWatch: View {
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-            .onChange(of: browser.placeFallback(in: library)) { _, place in
-                if let place { browser.show(place, in: library, order: order) }
-            }
+            .onChange(of: browser.placeFallback(in: library)) { browser.placeRemoved(in: library, order: order) }
             // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
             .onChange(of: collectionItemIDs) { old, new in
                 guard browser.usesCollection else { return }
