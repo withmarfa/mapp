@@ -80,8 +80,8 @@ extension EditorController {
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
-        watchdog = Task { [weak self] in
-            try? await Task.sleep(for: Self.flushLimit)
+        watchdog = Task { [weak self, flushLimit] in
+            try? await Task.sleep(for: flushLimit)
             guard !finished else { return }
             guard let self else {
                 preconditionFailure("An unfinished flush's pending reply or retry holds its editor.")
@@ -103,8 +103,6 @@ extension EditorController {
         let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
         library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
     }
-
-    static let flushLimit = Duration.seconds(2)
 
     private static var replacedReason: String {
         String(localized: "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again.")

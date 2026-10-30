@@ -54,11 +54,13 @@ extension EditorTests {
         Self.savingEdits(of: page)
         try await page.show(first.id)
         let leaving = try await Self.holdingAnEdit("First, typed\n", in: page)
+        // So the page is never given up on while it is held, however slowly the machine runs.
+        page.editor.flushLimit = waitLimit
         try await page.run("window.held = true")
         page.editor.select(try #require(library.item(second.id)))
         var kept: Bool?
         page.editor.flush { kept = $0 }
-        // Time for the held page to be asked again more than once, well inside `flushLimit`.
+        // Time for the held page to be asked again more than once.
         try await Task.sleep(for: .milliseconds(300))
         #expect(kept == nil, "the flush waits while the hand-over is held")
         #expect(page.editor.noteID == first.id)

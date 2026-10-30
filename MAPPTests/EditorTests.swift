@@ -381,6 +381,9 @@ struct EditorTests {
     @Test func aPageThatStopsAnsweringIsGivenUpOnAndTold() async throws {
         let page = try await Page()
         try await page.load("Original\n")
+        // The page stays busy many times longer than the limit, so its late reply never beats the limit on a loaded
+        // machine.
+        page.editor.flushLimit = .milliseconds(250)
         try await page.run("window.editor.flush = () => { const end = Date.now() + 4000; while (Date.now() < end) {} }")
         let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
         #expect(!kept)
