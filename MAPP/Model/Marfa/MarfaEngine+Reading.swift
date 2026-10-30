@@ -373,7 +373,7 @@ extension MarfaEngine {
         var viewsChanged = false
         var binChanged = false
         var present: [Marfa.Item] = []
-        // A purged row went, which the copy names no change to.
+        // A purged row went. The engine let it go on hearing the purge, so `gone` below finds it no longer held.
         var moved = purged.ids
         var came: Set<String> = []
         var files = purged.rows.values.contains { isFile($0) }
@@ -592,9 +592,10 @@ extension MarfaEngine {
     }
 
     /// Asks the package what each row's text names, many rows at a time. A row in the bin is left out of such a
-    /// read, so it is asked for alone. One row the package cannot read fails the whole read, so a read that fails
-    /// asks again row by row, and only that row goes without. A row whose links cannot be read shows the edges it
-    /// holds, and no more: links read before may name what its text no longer does.
+    /// read, so it is asked for alone. Such a read also leaves out a row the copy does not hold or whose stored
+    /// properties it cannot read, so it fails only as a whole; one that fails other than for a hydration is asked
+    /// again row by row. A row whose links cannot be read
+    /// shows the edges it holds, and no more: links read before may name what its text no longer does.
     @discardableResult
     private func readLinks(of rows: [Marfa.Item]) async -> LinksRead {
         var named: [Marfa.Item] = []
@@ -700,7 +701,8 @@ extension MarfaEngine {
             entry.row.map(MarfaMapping.isLibraryItem) == false ? (row: nil, id: entry.id, held: []) : entry
         }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
-        // A purged row went, which the copy names no change to, even where a hydration under way left it unread.
+        // A purged row went, even where a hydration under way left it unread. The engine let it go on hearing the
+        // purge, so the row it held is taken from `purged`.
         var moved = purged.ids
         var came = false
         var files = purged.rows.values.contains { isFile($0) }

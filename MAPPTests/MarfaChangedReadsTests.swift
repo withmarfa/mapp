@@ -574,8 +574,8 @@ import Testing
         await finish(scene)
     }
 
-    /// A read of many rows' links that fails is asked again row by row, so one row the package cannot read does
-    /// not leave every other row showing only its edges.
+    /// A read of many rows' links that fails is asked again row by row, so a read that fails once does not leave
+    /// every row showing only its edges.
     @Test func aLinkReadThatFailsIsAskedRowByRow() async throws {
         let scene = try await makeScene()
         let whole = scene.reads.whole
