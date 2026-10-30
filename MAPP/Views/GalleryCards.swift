@@ -42,7 +42,7 @@ enum GalleryKind: Equatable {
 
 /// What a card derives from its item, the catalogue and the files its text embeds: its shape, what decides its
 /// picture and its type's icon. It is read when the card's own inputs change, never for another card's selection.
-struct GalleryCardFacts: Equatable {
+struct GalleryCardFacts {
     let kind: GalleryKind
     let basis: GalleryArtworkCache.Basis
     let icon: String?

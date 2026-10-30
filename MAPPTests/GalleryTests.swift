@@ -62,16 +62,29 @@ struct GalleryTests {
         #expect(browser.showsCollection)
     }
 
-    @Test func aCardsFactsFollowItsShapeAndNotItsTitle() {
+    @Test func aCardsFactsFollowItsShape() {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        let facts = GalleryCardFacts(of: newer, in: library)
-        #expect(facts.kind == .note)
-        var renamed = newer
-        renamed.title = "Renamed"
-        #expect(GalleryCardFacts(of: renamed, in: library) == facts, "a title does not decide the picture, so the card keeps its facts")
+        #expect(GalleryCardFacts(of: newer, in: library).kind == .note)
         var file = newer
         file.content = .file(.png, byteCount: 10)
         #expect(GalleryCardFacts(of: file, in: library).kind == .file(.png))
-        #expect(GalleryCardFacts(of: file, in: library) != facts)
+    }
+
+    @Test func aCardIsRedrawnForItsOwnItemAndNotForTheSelection() {
+        let (library, _, newer, other) = BrowserTests().makeFakeLibrary()
+        let browser = Browser()
+        func card(_ item: Item, width: CGFloat = 200) -> GalleryCard {
+            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, width: width)
+        }
+        let before = card(newer)
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.selection = [newer.id]
+        #expect(before == card(newer), "a selection that moves leaves the card alone")
+        browser.selection = [other.id]
+        #expect(before == card(newer), "so does another card's selection")
+        var renamed = newer
+        renamed.title = "Renamed"
+        #expect(before != card(renamed), "its own item changing redraws it")
+        #expect(before != card(newer, width: 240), "so does its width")
     }
 }
