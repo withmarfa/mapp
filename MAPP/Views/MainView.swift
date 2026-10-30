@@ -232,8 +232,8 @@ struct MainView: View {
         .onChange(of: browser.selection) {
             details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
         }
-        .onChange(of: browser.snapshot()) { _, snapshot in
-            if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
+        .onChange(of: browser.snapshotParts) {
+            if restoresWindow { storedBrowser = try? JSONEncoder().encode(browser.snapshot()) }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do. The library is the one this view showed, so a

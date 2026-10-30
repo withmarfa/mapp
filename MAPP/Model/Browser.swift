@@ -732,6 +732,16 @@ final class Browser {
         Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
     }
 
+    /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may
+    /// hold every item.
+    struct SnapshotParts: Equatable {
+        var place: SidebarItem
+        var selection: Set<ItemID>
+        var viewMode: ItemViewMode
+    }
+
+    var snapshotParts: SnapshotParts { SnapshotParts(place: item, selection: selection, viewMode: viewMode) }
+
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
     /// leaves the window at its default.
     func restore(from data: Data?, in library: any ItemLibrary, order: NoteOrder) {

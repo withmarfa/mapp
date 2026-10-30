@@ -6,7 +6,7 @@ struct NoteList: View, Equatable {
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
-    @Bindable var browser: Browser
+    let browser: Browser
     let order: NoteOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
@@ -16,6 +16,7 @@ struct NoteList: View, Equatable {
     static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
 
     var body: some View {
+        let _ = Cost.record(.listBody, since: .now)
         // Reading the counter ties the dates and sections to the day changing, so "Today" moves at midnight.
         let _ = daysSeen
         let now = library.now()
@@ -27,7 +28,7 @@ struct NoteList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        List(selection: $browser.selection) {
+        SelectableList(browser: browser) {
             // The list reads every line's traits (whether it can be selected, its separators, its drag) each time
             // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
@@ -80,7 +81,7 @@ struct NoteList: View, Equatable {
         .dragContainer(for: NoteReference.self) { ids in
             ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
         }
-        .dragContainerSelection(Array(browser.selection))
+        .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
             browser.keepSelection(from: old, to: new)
         }
@@ -185,6 +186,18 @@ struct ItemMetaLine: View {
             }
         }
         .interfaceFont(.caption)
+    }
+}
+
+/// The list, apart from the note list's body: a list reads its selection as it is made, so a change of selection
+/// runs this body rather than the note list's, which lists every item the place holds, and hands the list the same
+/// rows as before, which SwiftUI does not go through again.
+private struct SelectableList<Content: View>: View {
+    @Bindable var browser: Browser
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        List(selection: $browser.selection) { content }
     }
 }
 

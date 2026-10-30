@@ -59,7 +59,7 @@ struct ItemGallery: View {
         .dragContainer(for: NoteReference.self) { ids in
             ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
         }
-        .modifier(GalleryDragSelection(browser: browser))
+        .dragsSelection(of: browser)
     }
 
     private func collection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
@@ -174,15 +174,6 @@ struct ItemGallery: View {
     private func deleteSelection() {
         let ids = browser.selection
         library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
-    }
-}
-
-/// Lets the selected cards be dragged together. It reads the selection in its own body, so the gallery's does not.
-private struct GalleryDragSelection: ViewModifier {
-    let browser: Browser
-
-    func body(content: Content) -> some View {
-        content.dragContainerSelection(Array(browser.selection))
     }
 }
 
