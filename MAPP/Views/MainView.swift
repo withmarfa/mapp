@@ -161,12 +161,6 @@ struct MainView: View {
                             }
                         } else {
                             itemPage
-                                .toolbar {
-                                    ToolbarItem(placement: .navigation) {
-                                        Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
-                                            .accessibilityIdentifier("BackToGallery")
-                                    }
-                                }
                         }
                     }
                     .newItemChips(browser)
@@ -230,12 +224,7 @@ struct MainView: View {
 
     private var lifecycleWindow: some View {
         activeWindow
-        // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
-        .onChange(of: galleryItemIDs) { old, new in
-            guard browser.usesCollection else { return }
-            browser.keepSelection(from: old, to: new)
-        }
-        .onChange(of: library.items(in: .allNotes).map(\.id)) { browser.placeRemoved(in: library, order: order) }
+        .watchesPlace(browser, order: order)
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)
         // A draft the inspector held back is given back when the selection moves off its item, shown or not. Folding
@@ -270,15 +259,9 @@ struct MainView: View {
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
             }
         }
+        .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
         // A window restores what it showed once the library has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it.
-        // A layout the place cannot show (Board with no choice fields) is not offered, and a window left on one
-        // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
-        .onChange(of: browser.availableViewModes(in: library), initial: true) { browser.fallBackToListIfUnavailable(in: library) }
-        .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
-        // A place whose layouts match the last one's raises no change above, so a move to it is checked here.
-        .onChange(of: browser.item) { browser.fallBackToListIfUnavailable(in: library) }
-        .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
@@ -306,11 +289,6 @@ struct MainView: View {
             if let id = launchSelection, library.item(id) != nil { browser.selection = [id] }
         }
         #endif
-    }
-
-    private var galleryItemIDs: [ItemID] {
-        guard browser.usesCollection else { return [] }
-        return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 
     private var dialogsWindow: some View {

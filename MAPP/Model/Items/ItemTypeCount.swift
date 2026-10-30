@@ -111,6 +111,11 @@ nonisolated extension Catalogue {
         type == .file || isSubtype(type, ofAnyOf: [.file])
     }
 
+    /// Whether a new item can be of `type`: any but the file types, which are made by adding a file, and the system's.
+    func isCreatable(_ type: TypeID) -> Bool {
+        !isFileType(type) && !type.rawValue.hasPrefix("system.")
+    }
+
     /// The label each of `types` goes by. A label two of them share gets its parent's label in parentheses,
     /// "Task (Ticket)", so the rows can be told apart.
     func displayLabels(for types: some Collection<TypeID>) -> [TypeID: String] {
@@ -144,6 +149,8 @@ extension ItemLibrary {
     /// the first time the library holds one. The count is `count(in:)` of the type's own place, which lists the
     /// type's items and no subtype's.
     var itemTypeCounts: [ItemTypeCount] {
+        let started = ContinuousClock.now
+        defer { Cost.record(.typeCounts, since: started) }
         let catalogue = catalogue
         let held = catalogue.itemTypes.keys.compactMap { type -> (TypeID, Int)? in
             guard !catalogue.isFileType(type) else { return nil }
@@ -168,7 +175,7 @@ extension ItemLibrary {
     /// adding a file.
     var creatableTypes: [ItemTypeOption] {
         let catalogue = catalogue
-        let types = catalogue.itemTypes.keys.filter { !catalogue.isFileType($0) && !$0.rawValue.hasPrefix("system.") }
+        let types = catalogue.itemTypes.keys.filter(catalogue.isCreatable)
         let labels = catalogue.displayLabels(for: types)
         return types.map { type in
             ItemTypeOption(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type))

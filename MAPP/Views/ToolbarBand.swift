@@ -58,8 +58,11 @@ extension View {
     /// Gives a sidebar list a foot that draws as the toolbar's band does, mirrored, only while rows pass under it:
     /// the content's end lies below the top of the foot. Otherwise the foot sits on
     /// the plain sidebar, with no fill and no line. The list's own background is not content, so it never counts.
-    func bandsFoot<Foot: View>(@ViewBuilder _ foot: () -> Foot) -> some View {
-        modifier(BandsFoot(foot: foot()))
+    ///
+    /// The foot's measures are read from `memory` and written back to it, where a list is mounted afresh with the same
+    /// foot, so the first frame already draws the band or not as the last one did.
+    func bandsFoot<Foot: View>(memory: SidebarMemory? = nil, @ViewBuilder _ foot: () -> Foot) -> some View {
+        modifier(BandsFoot(foot: foot(), memory: memory))
     }
 }
 
@@ -84,8 +87,16 @@ private struct BandsToolbar: ViewModifier {
 
 private struct BandsFoot<Foot: View>: ViewModifier {
     let foot: Foot
-    @State private var footHeight: CGFloat = 0
-    @State private var hiddenBelow: CGFloat = 0
+    let memory: SidebarMemory?
+    @State private var footHeight: CGFloat
+    @State private var hiddenBelow: CGFloat
+
+    init(foot: Foot, memory: SidebarMemory?) {
+        self.foot = foot
+        self.memory = memory
+        _footHeight = State(initialValue: memory?.footHeight ?? 0)
+        _hiddenBelow = State(initialValue: memory?.hiddenBelow ?? 0)
+    }
 
     /// Rows are under the foot once the content's end lies below the top of the foot, that is, when it reaches more
     /// than the foot's height above the scroll view's bottom edge. Content that ends just above the foot is not under it.
@@ -96,6 +107,7 @@ private struct BandsFoot<Foot: View>: ViewModifier {
             // The content's end less the scroll view's bottom edge, which the foot covers. Whole points, so the sidebar is not redrawn for every pixel of a scroll.
             .onScrollGeometryChange(for: CGFloat.self) { ($0.contentSize.height - $0.bounds.maxY).rounded() } action: { _, new in
                 hiddenBelow = new
+                memory?.hiddenBelow = new
             }
             .scrollEdgeEffectHidden(true, for: .bottom)
             .safeAreaBar(edge: .bottom, spacing: 0) {
@@ -103,7 +115,10 @@ private struct BandsFoot<Foot: View>: ViewModifier {
                     .background(alignment: .bottom) {
                         ToolbarBand(toolbarHeight: footHeight, isShown: isUnderFoot, edge: .bottom)
                     }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                        footHeight = $0
+                        memory?.footHeight = $0
+                    }
             }
     }
 }

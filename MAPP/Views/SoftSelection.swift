@@ -38,6 +38,13 @@ struct SoftSelection: NSViewRepresentable {
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+        override func layout() {
+            super.layout()
+            // A list the window has just mounted gets its table in this pass, and its first frame should not show
+            // the system's highlight for the turn it takes the soft marks to arrive.
+            if !isDismantled, window != nil, table == nil { attach() }
+        }
+
         func refresh() {
             guard !isDismantled, window != nil else { return }
             if table == nil || table?.window !== window { attach() }
@@ -74,28 +81,6 @@ struct SoftSelection: NSViewRepresentable {
             table = nil
             marks = nil
             originalHighlightStyle = nil
-        }
-
-        /// The table this probe sits behind: the first, going outwards, whose scroll view covers the probe's centre.
-        private func nearestTable() -> NSTableView? {
-            let centre = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
-            var ancestor = superview
-            while let view = ancestor {
-                if let table = Self.tables(in: view).first(where: { table in
-                    let area = table.enclosingScrollView ?? table
-                    return area.convert(area.bounds, to: nil).contains(centre)
-                }) {
-                    return table
-                }
-                ancestor = view.superview
-            }
-            return nil
-        }
-
-        private static func tables(in view: NSView) -> [NSTableView] {
-            view.subviews.flatMap { subview in
-                (subview as? NSTableView).map { [$0] } ?? tables(in: subview)
-            }
         }
     }
 
@@ -201,6 +186,30 @@ struct SoftSelection: NSViewRepresentable {
             case .inset: return frame.insetBy(dx: 10, dy: 0)
             default: return frame
             }
+        }
+    }
+}
+
+extension NSView {
+    /// The table a background view sits behind: the first, going outwards, whose scroll view covers the view's centre.
+    func nearestTable() -> NSTableView? {
+        let centre = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
+        var ancestor = superview
+        while let view = ancestor {
+            if let table = Self.tables(in: view).first(where: { table in
+                let area = table.enclosingScrollView ?? table
+                return area.convert(area.bounds, to: nil).contains(centre)
+            }) {
+                return table
+            }
+            ancestor = view.superview
+        }
+        return nil
+    }
+
+    private static func tables(in view: NSView) -> [NSTableView] {
+        view.subviews.flatMap { subview in
+            (subview as? NSTableView).map { [$0] } ?? tables(in: subview)
         }
     }
 }

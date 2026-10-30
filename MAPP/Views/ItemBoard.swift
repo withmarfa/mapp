@@ -14,7 +14,7 @@ struct ItemBoard: View {
 
     var body: some View {
         let items = browser.items(in: library)
-        let fields = ItemBoardLayout.availableFields(items: items, catalogue: library.catalogue)
+        let fields = browser.boardFieldChoices(in: library)
         let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {

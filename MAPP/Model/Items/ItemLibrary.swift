@@ -37,6 +37,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Counts the changes to the items and the catalogue. Reading it is observed, so a view that works something out
     /// from the items, and keeps it, is told when to work it out again.
     var contentRevision: Int { get }
+    /// Counts only the changes that move an item between places or change the catalogue: an item coming, going, or
+    /// changing its state, tier, tags, type or links. What a place holds, and so what its counts and layouts are, can
+    /// change only when this does. Reading it is observed.
+    var membershipRevision: Int { get }
     func item(_ id: ItemID) -> Item?
     func items(in place: SidebarItem) -> [Item]
     /// What the library's own search finds for `query` in `scope`, best match first: the items not deleted, the

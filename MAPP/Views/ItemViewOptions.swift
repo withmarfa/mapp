@@ -104,7 +104,7 @@ struct ItemBoardOptions: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let fields = ItemBoardLayout.availableFields(items: browser.items(in: library), catalogue: library.catalogue)
+        let fields = browser.boardFieldChoices(in: library)
         let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
         Picker("Group By", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
             browser.boardFields[browser.item] = $0
@@ -131,7 +131,7 @@ struct ItemTimelineOptions: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let fields = ItemTimelineLayout.fields(for: browser.items(in: library), catalogue: library.catalogue)
+        let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
             browser.timelineFields[browser.item] = $0

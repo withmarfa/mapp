@@ -7,13 +7,14 @@ import UniformTypeIdentifiers
 /// `ItemLibrary` alone. It keeps items and bodies as given and answers the places by their plain meaning.
 @Observable
 final class FakeItemLibrary: ItemLibrary {
-    var items: [Item] { didSet { contentRevision += 1 } }
+    var items: [Item] { didSet { contentRevision += 1; membershipRevision += 1 } }
     private(set) var contentRevision = 0
+    private(set) var membershipRevision = 0
     var bodies: [ItemID: String]
     var isLoaded = true
     let notices = Notices()
     var notesToPurge: Set<ItemID> = []
-    var catalogue = FakeItemLibrary.testCatalogue { didSet { contentRevision += 1 } }
+    var catalogue = FakeItemLibrary.testCatalogue { didSet { contentRevision += 1; membershipRevision += 1 } }
     var views: [LibraryView] = []
     /// What each view lists, by view.
     var viewMembers: [ItemID: [ItemID]] = [:]
@@ -113,7 +114,11 @@ final class FakeItemLibrary: ItemLibrary {
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
 
+    /// How often a place's items were listed, for tests of what is kept rather than asked for again.
+    @ObservationIgnored private(set) var placeReads = 0
+
     func items(in place: SidebarItem) -> [Item] {
+        placeReads += 1
         if place == .recents { return Self.recent(items) }
         return items.filter { item in
             switch place {

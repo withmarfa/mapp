@@ -6,8 +6,68 @@ import SwiftUI
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    let browser: Browser
+    let order: NoteOrder
+
+    /// Works out what the list draws once, from what the sidebar depends on and nothing else: the library's
+    /// membership, its saved views and catalogue, and the person's layout. A click, a selection or an edit that
+    /// moves none of them never runs it, and its parts are handed down as values, so a row whose own input is the
+    /// same is not drawn again.
+    var body: some View {
+        let _ = Cost.record(.sidebarBody, since: .now)
+        SidebarList(content: SidebarContent(library: library, layout: libraries.sidebarLayout), browser: browser, order: order)
+    }
+}
+
+/// What the sidebar's list draws, worked out from the library and the person's layout.
+struct SidebarContent {
+    let plan: SidebarPlan
+    let canCreate: Bool
+    let destinations: [SidebarPlaceRowData]
+    let builtInViews: [SidebarPlaceRowData]
+    /// Every shown type row, folded open as the person left them, before Show More cuts them short.
+    let typeRows: [SidebarPlan.TypeRow]
+    /// Everything the rows' look depends on, so the soft selection redraws when any of it changes.
+    let marksSignature: Int
+
+    init(library: any ItemLibrary, layout: SidebarLayout) {
+        let plan = SidebarPlan(library, layout: layout)
+        self.plan = plan
+        canCreate = QuickAdd.isAvailable(in: library)
+        func row(_ place: SidebarPlace) -> SidebarPlaceRowData? {
+            guard let item = place.item, let symbol = place.symbol else { return nil }
+            return SidebarPlaceRowData(
+                place: place, item: item, title: library.name(of: item), symbol: symbol, count: place.showsCount ? library.count(in: item) : 0)
+        }
+        destinations = plan.shownDestinations.compactMap(row)
+        builtInViews = plan.shownBuiltInViews.compactMap(row)
+        typeRows = plan.typeRows
+        var hasher = Hasher()
+        hasher.combine(plan.shownBuiltInViews.map(\.key) + plan.shownDestinations.map(\.key) + plan.shownLibrary.map(\.key))
+        hasher.combine(layout.collapsed.sorted() + layout.hidden.sorted())
+        hasher.combine(plan.types.map(\.id))
+        hasher.combine(plan.views.map(\.id))
+        marksSignature = hasher.finalize()
+    }
+}
+
+/// A place's row: its mark, its name and the count the row says, if any.
+nonisolated struct SidebarPlaceRowData: Equatable {
+    let place: SidebarPlace
+    /// What choosing the row opens.
+    let item: SidebarItem
+    let title: String
+    let symbol: String
+    let count: Int
+}
+
+/// The list itself. It reads the selection and nothing else that changes as a person clicks, so a click runs only
+/// this body, which builds the rows from values they compare, and the rows stay as they are.
+private struct SidebarList: View {
+    @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     @State private var choosingIcon: TypeIconRequest?
+    let content: SidebarContent
     let browser: Browser
     let order: NoteOrder
 
@@ -26,54 +86,67 @@ struct Sidebar: View {
         }
     }
 
-    private var showsAllTypes: Binding<Bool> {
-        Binding { browser.sidebarShowsAllTypes } set: { browser.sidebarShowsAllTypes = $0 }
-    }
-
     var body: some View {
-        let plan = SidebarPlan(library, layout: libraries.sidebarLayout)
-        let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order)
+        let plan = content.plan
+        let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order, plan: plan)
         List(selection: selection) {
-            Section {
-                actionRow(String(localized: "New"), symbol: "square.and.pencil", identifier: "SidebarNew") {
-                    browser.openQuickAdd(remembered: lastType, in: library)
-                }
-                .disabled(!QuickAdd.isAvailable(in: library))
-                actionRow(String(localized: "Search"), symbol: "magnifyingglass", identifier: "SidebarSearch") {
-                    browser.palette = .search
-                }
-                ForEach(plan.shownDestinations, id: \.key) { placeRow($0) }
+            SidebarTopSection(canCreate: content.canCreate, destinations: content.destinations, browser: browser)
+            if plan.showsViews {
+                SidebarViewsSection(builtIn: content.builtInViews, plan: plan, browser: browser)
             }
-            if plan.showsViews { viewsSection(plan) }
             if plan.showsTypes {
-                SidebarTypesSection(plan: plan, folding: folding, showsAll: showsAllTypes,choosingIcon: $choosingIcon)
+                SidebarTypesSection(rows: content.typeRows, showsAll: browser.sidebarShowsAllTypes, folding: folding, browser: browser, choosingIcon: $choosingIcon)
             }
         }
         .listStyle(.sidebar)
         // The foot is a bar on the list's bottom edge that draws the toolbar's band mirrored, and only while rows pass
         // under it. The system's soft edge is hidden, since the list's own background would count as content.
-        .bandsFoot { SidebarFoot(browser: browser) }
-        .softSelection(rows: selectionRows(plan), selection: browser.sidebarItem)
+        .bandsFoot(memory: browser.sidebarMemory) { SidebarFoot(browser: browser) }
+        // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
+        .remembersScroll(in: browser.sidebarMemory)
+        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: browser.sidebarItem)
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.
         .onKeyPress(.rightArrow, phases: [.down, .repeat]) { folding.press(.right, $0) }
         .onKeyPress(.leftArrow, phases: [.down, .repeat]) { folding.press(.left, $0) }
-        .onChange(of: library.items(in: .favorites).map(\.id)) { browser.placeRemoved(in: library, order: order) }
-        .onChange(of: library.views.map(\.id)) { browser.placeRemoved(in: library, order: order) }
         .sheet(item: $choosingIcon) { TypeIconPicker(request: $0, library: library) }
     }
+}
 
-    /// Everything the rows' look depends on, so the soft selection redraws when any of it changes.
-    private func selectionRows(_ plan: SidebarPlan) -> [String] {
-        plan.shownBuiltInViews.map(\.key) + plan.shownDestinations.map(\.key) + plan.shownLibrary.map(\.key)
-            + libraries.sidebarLayout.collapsed.sorted() + libraries.sidebarLayout.hidden.sorted()
-            + library.itemTypeCounts.map { $0.id.rawValue } + library.views.map(\.id.rawValue) + [String(browser.sidebarShowsAllTypes)]
+/// New and Search act, then Items, Sources and Collections open.
+private struct SidebarTopSection: View, Equatable {
+    @CurrentLibrary private var library
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    let canCreate: Bool
+    let destinations: [SidebarPlaceRowData]
+    let browser: Browser
+
+    static func == (a: Self, b: Self) -> Bool { a.canCreate == b.canCreate && a.destinations == b.destinations }
+
+    var body: some View {
+        Section {
+            SidebarActionRow(title: String(localized: "New"), symbol: "square.and.pencil", identifier: "SidebarNew") {
+                browser.openQuickAdd(remembered: lastType, in: library)
+            }
+            .disabled(!canCreate)
+            SidebarActionRow(title: String(localized: "Search"), symbol: "magnifyingglass", identifier: "SidebarSearch") {
+                browser.palette = .search
+            }
+            ForEach(destinations, id: \.place.key) { data in
+                SidebarPlaceRow(data: data).tag(data.item)
+            }
+        }
     }
+}
 
-    // MARK: Rows
+/// A row that does something instead of opening a place, so it never takes the selection.
+private struct SidebarActionRow: View {
+    let title: String
+    let symbol: String
+    let identifier: String
+    let action: () -> Void
 
-    /// A row that does something instead of opening a place, so it never takes the selection.
-    private func actionRow(_ title: String, symbol: String, identifier: String, action: @escaping () -> Void) -> some View {
+    var body: some View {
         Button(action: action) {
             SidebarLabel(title: title, icon: .symbol(symbol)).contentShape(.rect)
         }
@@ -81,26 +154,40 @@ struct Sidebar: View {
         .selectionDisabled()
         .accessibilityIdentifier(identifier)
     }
+}
 
-    /// One of the six places. Recents has no count since it always holds the same number, and the indexes list what
-    /// the copy holds on their own.
-    @ViewBuilder private func placeRow(_ place: SidebarPlace) -> some View {
-        if let item = place.item, let symbol = place.symbol {
-            let count = place.showsCount ? library.count(in: item) : 0
-            SidebarLabel(title: library.name(of: item), icon: .symbol(symbol))
-                .badge(count > 0 ? Text(count, format: .number).monospacedDigit() : nil)
-                .tag(item)
-                .contextMenu { SidebarHideButtons(place: place) }
-                .accessibilityIdentifier("SidebarPlace-\(place.key)")
-        }
+/// One of the six places. Recents has no count since it always holds the same number, and the indexes list what
+/// the copy holds on their own.
+private struct SidebarPlaceRow: View, Equatable {
+    let data: SidebarPlaceRowData
+
+    var body: some View {
+        SidebarLabel(title: data.title, icon: .symbol(data.symbol))
+            .badge(data.count > 0 ? Text(data.count, format: .number).monospacedDigit() : nil)
+            .contextMenu { SidebarHideButtons(place: data.place) }
+            .accessibilityIdentifier("SidebarPlace-\(data.place.key)")
+    }
+}
+
+/// One block under the Views heading: the built-in views, then the saved ones, which the person can rename, hide
+/// and reorder. The built-ins are places drawn here, not stored views. A saved view lists what the copy holds of
+/// its items, read on its own, so its row has no count.
+private struct SidebarViewsSection: View, Equatable {
+    @Environment(Libraries.self) private var libraries
+    let builtIn: [SidebarPlaceRowData]
+    let plan: SidebarPlan
+    let browser: Browser
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.builtIn == b.builtIn && a.plan.views == b.plan.views && a.plan.shownSavedViews == b.plan.shownSavedViews
+            && a.plan.shownViews == b.plan.shownViews
     }
 
-    /// One block under the Views heading: the built-in views, then the saved ones, which the person can rename, hide
-    /// and reorder. The built-ins are places drawn here, not stored views. A saved view lists what the copy holds of
-    /// its items, read on its own, so its row has no count.
-    private func viewsSection(_ plan: SidebarPlan) -> some View {
+    var body: some View {
         Section {
-            ForEach(plan.shownBuiltInViews, id: \.key) { placeRow($0) }
+            ForEach(builtIn, id: \.place.key) { data in
+                SidebarPlaceRow(data: data).tag(data.item)
+            }
             ForEach(plan.shownSavedViews) { view in
                 SidebarLabel(title: view.title, icon: .symbol(SidebarPlace.viewSymbol))
                     .tag(SidebarItem.view(view.id))

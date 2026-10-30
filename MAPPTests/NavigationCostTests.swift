@@ -207,7 +207,7 @@ struct NavigationCostTests {
     /// before the window was still again, and how long the main actor spent on it all. The editor's web view is
     /// part of the window, so the wall time here includes whatever the window does besides these costs.
     @Test func aHostedWindowAcrossTheMovesAPersonMakes() async throws {
-        try await hosted { browser, library, step in
+        try await hosted { browser, library, _, step in
             try await step("open decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
             try await step("table") { browser.viewMode = .table }
             try await step("select a row") { browser.selection = [library.items(in: .itemType("aic.decision"))[3].id] }
@@ -224,7 +224,7 @@ struct NavigationCostTests {
 
     /// Moving between places while the list stays, which is what a person does most.
     @Test func aHostedWindowMovingBetweenPlacesInTheList() async throws {
-        try await hosted { browser, _, step in
+        try await hosted { browser, _, _, step in
             try await step("all items (list)") { browser.sidebarItem = .allNotes }
             try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
             try await step("tasks (list)") { browser.sidebarItem = .itemType("aic.ticket.task") }
@@ -236,7 +236,7 @@ struct NavigationCostTests {
 
     /// Opening items one after another in the list, so each move builds a page's header and the inspector.
     @Test func aHostedWindowMovingBetweenItemsInTheList() async throws {
-        try await hosted { browser, library, step in
+        try await hosted { browser, library, _, step in
             try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
             let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
             for (index, id) in ids.enumerated() {
@@ -247,7 +247,7 @@ struct NavigationCostTests {
 
     /// The table of every item with no grouping, then the move between two places that stays on the table.
     @Test func aHostedWindowOnAnUngroupedTable() async throws {
-        try await hosted { browser, _, step in
+        try await hosted { browser, _, _, step in
             for place in [SidebarItem.allNotes, .itemType("aic.decision"), .itemType("aic.ticket.task")] {
                 browser.tableOptions[place, default: .init()].grouping = .none
             }
@@ -343,10 +343,10 @@ struct NavigationCostTests {
     /// Hosts the real window on 650 items and hands `script` the browser, the library and `step`, which runs one move
     /// and prints what it cost.
     private func hosted(
-        _ script: (Browser, MarfaLibrary, (String, () -> Void) async throws -> Void) async throws -> Void
+        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
-        let (library, _) = try await BigLibrary.loaded()
+        let (library, source) = try await BigLibrary.loaded()
         let browser = Browser()
         let libraries = ItemPreviewFixtures.libraries(named: "MAPP.NavigationCost")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1280, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -382,8 +382,43 @@ struct NavigationCostTests {
             print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)")
         }
 
-        try await script(browser, library, step)
+        try await script(browser, library, source, step)
         #endif
+    }
+
+    /// The sidebar while items change, as a connector or another window changes them all day: an edit that moves no
+    /// item between places, a new item, and a favorite. Each is its own move, so the counts are for one change.
+    @Test func aHostedWindowWhileItemsChange() async throws {
+        try await hosted { browser, library, source, step in
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            let edited = try #require(library.items(in: .itemType(BigLibrary.note.rawValue)).first)
+            for index in 0..<3 {
+                try await step("edit an item's title \(index + 1)") {
+                    var item = edited
+                    item.title = "Edited \(index)"
+                    item.modified = Date(timeIntervalSince1970: 2_000_000 + Double(index))
+                    source.send(.upserted([item]))
+                }
+            }
+            try await step("a new item") {
+                let item = LibraryFixture.item(
+                    ItemID("added-item"), BigLibrary.note, "Added", age: 0, properties: [Property(key: "title", value: .string("Added"))])
+                source.send(.upserted([item]))
+            }
+            try await step("a favorite") {
+                var item = edited
+                item.tags.insert(ItemTag.favorite)
+                item.modified = Date(timeIntervalSince1970: 3_000_000)
+                source.send(.upserted([item]))
+            }
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("edit an item in the place") {
+                var item = library.items(in: .itemType("aic.decision"))[2]
+                item.title = "Edited here"
+                item.modified = Date(timeIntervalSince1970: 4_000_000)
+                source.send(.upserted([item]))
+            }
+        }
     }
 
     /// The row counts of every table the window holds, found in its view tree.

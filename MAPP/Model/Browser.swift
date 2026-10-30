@@ -10,6 +10,8 @@ final class Browser {
     /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
     /// this is kept here, where Show More stays open through that.
     var sidebarShowsAllTypes = false
+    /// The rest of what the sidebar keeps through that: its scroll position and its foot's measures.
+    @ObservationIgnored let sidebarMemory = SidebarMemory()
     var selection: Set<ItemID> = [] {
         didSet {
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
@@ -32,14 +34,73 @@ final class Browser {
     var isCollectionItemPresented = false
 
     /// The layouts the current place can show. Search is left out, so a search with no results keeps the layout.
-    /// A type's own place counts the type even while it holds no items.
+    /// A type's own place counts the type even while it holds no items. The last answer stands until the library's
+    /// membership, the place or its stacking changes, since the window asks on every click and edit.
     func availableViewModes(in library: any ItemLibrary) -> [ItemViewMode] {
         guard library.isLoaded else { return ItemViewMode.allCases }
-        return Cost.measure(.viewModes) {
+        let membership = library.membershipRevision
+        // A saved view lists what the library reads for it, later, and without a membership change.
+        let key = ViewModesKey(
+            library: ObjectIdentifier(library), membership: membership, place: item, stacked: stacksType,
+            viewItems: isViewPlace ? placeItems(in: library).map(\.id) : nil)
+        if let held = viewModesMemo, held.key == key { return held.modes }
+        let modes = Cost.measure(.viewModes) {
             var types = Set(placeItems(in: library).map(\.type))
             if case .itemType(let type) = item { types.insert(TypeID(type)) }
             return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
         }
+        viewModesMemo = (key, modes)
+        return modes
+    }
+
+    private struct ViewModesKey: Equatable {
+        let library: ObjectIdentifier
+        let membership: Int
+        let place: SidebarItem
+        let stacked: Bool
+        let viewItems: [ItemID]?
+    }
+
+    /// The lanes a board of the place's items can group by, kept like the layouts above: the fields come from the
+    /// types the items have, which change only with the library's membership or catalogue, so an edit asks nothing
+    /// of the items. The View menu, the palette and a saved view's draft all ask here.
+    func boardFieldChoices(in library: any ItemLibrary) -> [ItemBoardField] {
+        let derived = fieldsKey(in: library)
+        if let held = fieldsMemo, held.key == derived.key, let fields = held.board { return fields }
+        let fields = ItemBoardLayout.availableFields(items: derived.items ?? items(in: library), catalogue: library.catalogue)
+        fieldsMemo = FieldsMemo(key: derived.key, board: fields, timeline: fieldsMemo?.key == derived.key ? fieldsMemo?.timeline : nil)
+        return fields
+    }
+
+    /// The date fields a timeline of the place's items can place them on, kept as `boardFieldChoices` is.
+    func timelineFieldChoices(in library: any ItemLibrary) -> [ItemTypeInfo.Field] {
+        let derived = fieldsKey(in: library)
+        if let held = fieldsMemo, held.key == derived.key, let fields = held.timeline { return fields }
+        let fields = ItemTimelineLayout.fields(for: derived.items ?? items(in: library), catalogue: library.catalogue)
+        fieldsMemo = FieldsMemo(key: derived.key, board: fieldsMemo?.key == derived.key ? fieldsMemo?.board : nil, timeline: fields)
+        return fields
+    }
+
+    private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {
+        let listed = isSearching || isViewPlace ? items(in: library) : nil
+        let key = FieldsKey(
+            library: ObjectIdentifier(library), membership: library.membershipRevision, place: item, stacked: stacksType,
+            ids: listed?.map(\.id))
+        return (key, listed)
+    }
+
+    private struct FieldsKey: Equatable {
+        let library: ObjectIdentifier
+        let membership: Int
+        let place: SidebarItem
+        let stacked: Bool
+        let ids: [ItemID]?
+    }
+
+    private struct FieldsMemo {
+        let key: FieldsKey
+        var board: [ItemBoardField]?
+        var timeline: [ItemTypeInfo.Field]?
     }
 
     /// A window left on a layout its place cannot show goes back to the list without saying so. The indexes of
@@ -55,6 +116,11 @@ final class Browser {
     private var pagingState: (key: TablePagingKey, paging: TablePaging)?
     @ObservationIgnored private var tableMemo: (key: TableKey, content: ItemTableContent)?
     @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [NoteSection])?
+    @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
+    @ObservationIgnored private var fieldsMemo: FieldsMemo?
+    @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?
+    /// Held by `paletteIndex(in:)`.
+    @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
     var boardFields: [SidebarItem: String] = [:]
     var compactBoards: [SidebarItem: Bool] = [:]
     var timelineFields: [SidebarItem: String] = [:]
@@ -231,8 +297,18 @@ final class Browser {
     /// The type whose list could also show its subtypes: the open place when it is a type that has subtypes holding
     /// items.
     func stackableType(in library: any ItemLibrary) -> String? {
-        guard case .itemType(let type) = item, !library.subtypesHoldingItems(of: type).isEmpty else { return nil }
-        return type
+        guard case .itemType(let type) = item else { return nil }
+        let key = StackableKey(library: ObjectIdentifier(library), membership: library.membershipRevision, type: type)
+        if let held = stackableMemo, held.key == key { return held.type }
+        let stackable = library.subtypesHoldingItems(of: type).isEmpty ? nil : type
+        stackableMemo = (key, stackable)
+        return stackable
+    }
+
+    private struct StackableKey: Equatable {
+        let library: ObjectIdentifier
+        let membership: Int
+        let type: String
     }
 
     /// Whether the open place lists its subtypes' items with its own.
@@ -263,10 +339,10 @@ final class Browser {
     /// one section, in the order given. The window's views ask for them as often as they are drawn, so the last
     /// answer stands until the items, the order, the day or the place change.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
-        let items = items(in: library)
-        let key = SectionsKey(
-            derived: derivedKey(in: library, items: items), order: order, day: Calendar.current.startOfDay(for: now))
+        let derived = derivedKey(in: library)
+        let key = SectionsKey(derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now))
         if let held = sectionsMemo, held.key == key { return held.sections }
+        let items = derived.items ?? items(in: library)
         let sections = Cost.measure(.sections) { sectionsUnmeasured(of: items, order: order, now: now) }
         sectionsMemo = (key, sections)
         return sections
@@ -289,13 +365,13 @@ final class Browser {
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
     /// the selection, so a selection never makes it again.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
-        let items = items(in: library)
         var keyed = tableOptions[item] ?? ItemTableOptions()
         // A page size never changes the rows, so it does not make them again.
         keyed.pageSize = .standard
-        let key = TableKey(derived: derivedKey(in: library, items: items), options: keyed)
+        let derived = derivedKey(in: library)
+        let key = TableKey(derived: derived.key, options: keyed)
         if let held = tableMemo, held.key == key { return held.content }
-        let content = ItemTableContent(browser: self, library: library, items: items)
+        let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
         return content
     }
@@ -352,19 +428,35 @@ final class Browser {
     }
 
     /// What everything worked out from a place's items depends on: which library and how often it changed, the
-    /// place, the items listed (a search answering changes them without the library changing) and how the window
-    /// orders them. Reading it observes the library's revision, so a view that asks is told of the next change.
-    private func derivedKey(in library: any ItemLibrary, items: [Item]) -> DerivedKey {
-        DerivedKey(
-            library: ObjectIdentifier(library), revision: library.contentRevision, place: item, ids: items.map(\.id),
-            byRelevance: ordersByRelevance, keepsPlaceOrder: keepsPlaceOrder, favoritesFirst: !isSearching && !showsOnlyFavorites)
+    /// place and how the window orders them. The items themselves are listed only where they can change without the
+    /// library's revisions doing so, which is a search answering and a saved view's list arriving, and are handed
+    /// back so the caller does not list them twice. Reading it observes the library's revisions, so a view that asks
+    /// is told of the next change.
+    private func derivedKey(in library: any ItemLibrary) -> (key: DerivedKey, items: [Item]?) {
+        let listed = isSearching || isViewPlace ? items(in: library) : nil
+        let key = DerivedKey(
+            library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
+            place: item, stacked: stacksType, ids: listed?.map(\.id), byRelevance: ordersByRelevance,
+            keepsPlaceOrder: keepsPlaceOrder, favoritesFirst: !isSearching && !showsOnlyFavorites)
+        return (key, listed)
+    }
+
+    private var isViewPlace: Bool {
+        if case .view = item { true } else { false }
+    }
+
+    /// Whether the open place is a type the person has stacked, which lists its subtypes' items too.
+    private var stacksType: Bool {
+        if case .itemType(let type) = item { stackedTypes.contains(type) } else { false }
     }
 
     private struct DerivedKey: Equatable {
         let library: ObjectIdentifier
-        let revision: Int
+        let content: Int
+        let membership: Int
         let place: SidebarItem
-        let ids: [ItemID]
+        let stacked: Bool
+        let ids: [ItemID]?
         let byRelevance: Bool
         let keepsPlaceOrder: Bool
         let favoritesFirst: Bool
@@ -440,6 +532,10 @@ final class Browser {
         pagingState = nil
         tableMemo = nil
         sectionsMemo = nil
+        viewModesMemo = nil
+        fieldsMemo = nil
+        stackableMemo = nil
+        paletteMemo = nil
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         tableOptions = [:]
@@ -455,6 +551,7 @@ final class Browser {
         isCollectionItemPresented = false
         sidebarItem = .allNotes
         sidebarShowsAllTypes = false
+        sidebarMemory.forget()
         searchText = ""
         searchesPlace = false
         isSearchExpanded = false
@@ -496,22 +593,31 @@ final class Browser {
         }
     }
 
-    /// A place that is gone can no longer be shown, so the window moves to All Items: a collection no longer
-    /// active, a type that no longer holds an item, or a view deleted elsewhere.
+    /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.
     func placeRemoved(in library: any ItemLibrary, order: NoteOrder) {
-        if case .collection(let id) = sidebarItem, library.item(id)?.state != .active {
-            show(.allNotes, in: library, order: order)
-        }
+        if let place = placeFallback(in: library) { show(place, in: library, order: order) }
+    }
+
+    /// Where the window should go instead, when the place it shows has gone; nil while the place stands. Reading it
+    /// observes what a place's existence depends on (membership and the saved views), so a view that only asks this
+    /// is told when the answer may have changed, and reads no list of the library's items to find out.
+    func placeFallback(in library: any ItemLibrary) -> SidebarItem? {
+        guard library.isLoaded else { return nil }
+        switch sidebarItem {
+        case .collection(let id):
+            // A collection's state is part of membership, which `item(_:)` follows only once the item is missing.
+            _ = library.membershipRevision
+            return library.item(id)?.state != .active ? .allNotes : nil
         // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
-        if case .itemType(let type) = sidebarItem, library.isLoaded, library.count(in: .itemType(type)) == 0 {
-            show(.allNotes, in: library, order: order)
-        }
-        if case .view(let id) = sidebarItem, library.isLoaded, !library.views.contains(where: { $0.id == id }) {
-            show(.allNotes, in: library, order: order)
-        }
-        if case .favoriteItem(let id) = sidebarItem,
-           library.item(id).map({ $0.state == .active && $0.isFavorite }) != true {
-            show(.favorites, in: library, order: order)
+        case .itemType(let type):
+            return library.count(in: .itemType(type)) == 0 ? .allNotes : nil
+        case .view(let id):
+            return library.views.contains { $0.id == id } ? nil : .allNotes
+        case .favoriteItem(let id):
+            _ = library.membershipRevision
+            return library.item(id).map({ $0.state == .active && $0.isFavorite }) == true ? nil : .favorites
+        default:
+            return nil
         }
     }
 
