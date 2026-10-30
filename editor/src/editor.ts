@@ -173,6 +173,8 @@ export interface EditorEvents {
   /** How many pictures at web addresses wait for the person to load them, the sentence that says so and the words
    *  for the button that loads them together. */
   picturesWaiting?(count: number, sentence: string, button: string): void
+  /** A loaded document has had its first frame: said once for each `load`, after the browser has drawn it. */
+  painted?(generation: number): void
 }
 const tables: Partial<Record<FormatCommand, TableCommand>> = {
   table: 'insert',
@@ -467,6 +469,15 @@ export class NoteEditor {
     if (pending.generation === this.generation) this.reported = pending.text
     this.events.changed(pending.text, pending.generation)
   }
+  /** The second frame callback runs after the frame that drew the document has been handed over. */
+  private reportPainted(generation: number) {
+    if (!this.events.painted) return
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (generation === this.generation) this.events.painted?.(generation)
+      }),
+    )
+  }
   private replacement = 0
   get loadedGeneration() {
     return this.generation
@@ -492,6 +503,7 @@ export class NoteEditor {
         this.original = text
         if (!reload) window.scrollTo(0, 0)
         this.invalidateFindGeometry()
+        if (!reload) this.reportPainted(generation)
       } catch (error) {
         if (
           error instanceof InkKitError &&

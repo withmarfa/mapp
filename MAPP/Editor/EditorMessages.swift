@@ -34,6 +34,8 @@ nonisolated enum EditorMessage: Sendable {
     case ready
     case changed(String, generation: Int)
     case state(CaretState)
+    /// A loaded note has had its first frame, said once for each load.
+    case painted(generation: Int)
     /// The item's header has gone under the toolbar, or come back; said only when it changes.
     case headerScrolledAway(Bool, generation: Int)
     /// The page has scrolled, so some of it is under the toolbar; said only when it changes.
@@ -94,6 +96,9 @@ nonisolated enum EditorMessage: Sendable {
         case "openItem":
             guard let item = dict["item"] as? String, !item.isEmpty else { return nil }
             self = .openItem(ItemID(item))
+        case "painted":
+            guard let generation = dict["generation"] as? Int else { return nil }
+            self = .painted(generation: generation)
         case "headerScrolledAway":
             guard let away = dict["away"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
             self = .headerScrolledAway(away, generation: generation)

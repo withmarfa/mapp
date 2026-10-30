@@ -238,6 +238,35 @@ struct EditorTests {
         #expect(source == "Second\n")
     }
 
+    @Test func changesToTheNoteBeingOpenedWaitForTheOpenInsteadOfStartingAnother() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        try await page.show(first.id)
+        try await page.run("window.flushes = 0; const flush = window.editor.flush.bind(window.editor); window.editor.flush = generation => { window.flushes++; return flush(generation) }")
+        page.editor.select(try #require(library.item(second.id)))
+        // What SwiftUI delivers in the same pass as the selection: the note's text and version changed too.
+        library.updateBody(of: second.id, to: "Second, edited\n")
+        page.editor.noteChanged(try #require(library.item(second.id)))
+        try await page.wait { page.editor.noteID == second.id }
+        #expect(try await page.shownText(until: "Second, edited") == "Second, edited")
+        #expect(try await page.editor.webView.evaluateJavaScript("window.flushes") as? Int == 1, "the first note is handed over once")
+    }
+
+    @Test func anOpenEndsWhenThePageReportsItsFirstFrame() async throws {
+        let library = FakeItemLibrary()
+        let note = library.add("Drawn\n")
+        let page = try await Page(library: library)
+        page.editor.select(try #require(library.item(note.id)))
+        let open = try #require(page.editor.opening, "the open waits for the page's first frame")
+        // A page with no window draws no frames, so the page's report is sent as it would send it.
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'painted', generation: \(open.generation + 1) })")
+        #expect(page.editor.opening != nil, "a report for another load ends nothing")
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'painted', generation: \(open.generation) })")
+        try await page.wait { page.editor.opening == nil }
+    }
+
     @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Original\n")
