@@ -15,21 +15,17 @@ actor MarfaEngine {
     nonisolated enum Event: Sendable {
         case paint
         case fillProgress(CheckedContinuation<Void, Never>)
-        /// The copy's changes have a new stream after the last one ended, so what changed between them was not heard.
-        case resumed
         case write(ItemWrite, WriteID)
         /// A write of an undo or a redo, held where the copy refuses it for being brought up to date (`MarfaEngine+Holding`).
         case undo(ItemWrite, WriteID, UndoGroup)
         /// The time a held undo may wait has passed.
         case holdExpired(UndoGroup)
-        case change(Marfa.Change)
+        /// The follow heard changes of the copy, kept in `heard` until they are taken together.
+        case heard
         /// Resumed once the answers are taken and forgotten.
         case drained(DrainReport, CheckedContinuation<Void, Never>)
         case failed(SourceFailure)
         case flush(CheckedContinuation<Void, Never>)
-        /// Resumed once every event before it is taken, so each write submitted before it is in the queue or
-        /// refused; it never waits on the network, so quitting offline does not wait for a server.
-        case queued(CheckedContinuation<Void, Never>)
         case close(CheckedContinuation<Void, Never>)
         /// Takes a refused write, and those refused only for it, out of the queue.
         case discard(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
@@ -110,6 +106,8 @@ actor MarfaEngine {
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
+    /// What the follow heard and this engine has not yet taken.
+    nonisolated let heard = MarfaFollow.Heard()
     var catalogue = Catalogue()
     /// The library's rows: every row the copy holds but the `system.*` ones (`MarfaMapping.isLibraryItem`).
     var rows: [String: Marfa.Item] = [:]
@@ -177,6 +175,8 @@ actor MarfaEngine {
     var sentAsRead: Set<String> = []
     var following: Task<Void, Never>?
     var painted = false
+    /// When a hydration's progress may next read the copy whole (`takeFillProgress`).
+    var fillReadAllowed = ContinuousClock.now
     private var closed = false
 
     #if DEBUG
@@ -222,6 +222,7 @@ actor MarfaEngine {
         // Finished only once the events that came after the close are answered, so a write made too late is told
         // to its library rather than dropped unseen.
         hub.finish()
+        hub.activity.finish()
     }
 
     /// One event, timed and recorded on the hub as the step the engine is in, which anyone can read without
@@ -232,6 +233,7 @@ actor MarfaEngine {
         let interval = Telemetry.begin(.engine, kind)
         await apply(event)
         let elapsed = interval.end()
+        if event.isWrite { hub.activity.tookWrite() }
         hub.activity.end()
         Telemetry.engineEventTook(kind, elapsed)
     }
@@ -245,7 +247,6 @@ actor MarfaEngine {
                 hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
             }
             if case .flush(let done) = event { done.resume() }
-            if case .queued(let done) = event { done.resume() }
             if case .fillProgress(let done) = event { done.resume() }
             if case .close(let done) = event { done.resume() }
             if case .drained(_, let taken) = event { taken.resume() }
@@ -264,23 +265,12 @@ actor MarfaEngine {
         switch event {
         case .paint: await paint()
         case .fillProgress(let done):
-            if let status = try? await reading.status() {
-                let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
-                                        status.hydration == .complete ? .complete : .partial)
-                if hub.report.value.fill != fill {
-                    await reload()
-                }
-            }
+            await takeFillProgress()
             done.resume()
-        case .resumed:
-            await reload()
-            // The follow of the server is new with the stream, so the copy is brought up to date, which also
-            // sets the library right again after a fault.
-            await sync.refresh()
         case .write(let write, let id): await perform(write, as: id)
         case .undo(let write, let id, let group): await perform(write, as: id, holding: group)
         case .holdExpired(let group): expire(group)
-        case .change(let change): await handle(change)
+        case .heard: await takeHeard()
         case .binned(let found, let complete): take(bin: found, complete: complete)
         case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
         case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
@@ -297,7 +287,6 @@ actor MarfaEngine {
                 await sync.flush()
                 done.resume()
             }
-        case .queued(let done): done.resume()
         case .discard(let id, let done): done.resume(returning: await discard(id))
         case .release(let id, let done): done.resume(returning: await release(id))
         case .unsent(let done):

@@ -4,14 +4,19 @@ import Synchronization
 import Testing
 @testable import MAPP
 
-/// The streams the core hands out, which it finishes when a fault ends them, and what the engine is told.
+/// The streams the core hands out, which it finishes when a fault ends them, and what the engine takes. An engine
+/// told `.heard` takes everything heard at once, unless the test holds it, as a busy engine would be held.
 private nonisolated final class Streams: Sendable {
     private struct State {
         var pending: [AsyncStream<Change>] = []
         var taken = 0
-        var told: [MarfaEngine.Event] = []
+        var told: [MarfaFollow.Heard.Entry] = []
+        var tells = 0
+        var holding = false
         var waits: [Duration] = []
     }
+
+    let inbox = MarfaFollow.Heard()
 
     private let state = Mutex(State())
 
@@ -27,8 +32,23 @@ private nonisolated final class Streams: Sendable {
     }
 
     func tell(_ event: MarfaEngine.Event) -> Bool {
-        state.withLock { $0.told.append(event) }
+        guard case .heard = event else { return true }
+        let holding = state.withLock { state in
+            state.tells += 1
+            return state.holding
+        }
+        if !holding { take() }
         return true
+    }
+
+    func hold(_ holding: Bool) {
+        state.withLock { $0.holding = holding }
+    }
+
+    /// Takes what was heard, as the engine does in its step.
+    func take() {
+        let entries = inbox.take()
+        state.withLock { $0.told += entries }
     }
 
     func wait(_ delay: Duration) async {
@@ -37,6 +57,7 @@ private nonisolated final class Streams: Sendable {
 
     var taken: Int { state.withLock { $0.taken } }
     var waits: [Duration] { state.withLock { $0.waits } }
+    var tells: Int { state.withLock { $0.tells } }
     var heard: [Change] {
         state.withLock { $0.told.compactMap { if case .change(let change) = $0 { change } else { nil } } }
     }
@@ -57,7 +78,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
     @Test func aStreamTheCoreEndedOnAFaultIsReplacedAndTheCopyIsReadAgain() async {
         let streams = Streams([finished(saved, stopped), finished(saved, stopped), finished(saved)])
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         await task.value
 
         #expect(streams.heard == [saved, stopped, saved, stopped, saved], "every stream's changes reach the engine, in order")
@@ -68,7 +89,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
     @Test func aNewStreamIsAskedForOnlyAfterAWait() async {
         let streams = Streams([finished(stopped), finished(stopped), finished(stopped)])
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         #expect(await eventually { streams.waits.count >= 3 })
         task.cancel()
 
@@ -79,7 +100,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
     @Test func aStreamThatToldAChangeStartsTheWaitOver() async {
         let streams = Streams([finished(stopped), finished(stopped), finished(saved, stopped), finished(stopped)])
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         #expect(await eventually { streams.waits.count >= 4 })
         task.cancel()
 
@@ -95,7 +116,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
             continuation.yield(saved)
         }
         let streams = Streams([])
-        let task = MarfaFollow.start(open, next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+        let task = MarfaFollow.start(open, next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         #expect(await eventually { streams.heard.count >= 2 })
         task.cancel()
 
@@ -107,9 +128,9 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         let streams = Streams([finished(saved)])
         let ended = Mutex(false)
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) },
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox,
             tell: { event in
-                if case .change = event { ended.withLock { $0 = true }; return false }
+                if case .heard = event { ended.withLock { $0 = true }; return false }
                 return streams.tell(event)
             })
         await task.value
@@ -122,7 +143,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         let streams = Streams([finished(stopped)])
         let task = MarfaFollow.start(
             streams.next(), next: { streams.next() }, wait: { _ in try? await Task.sleep(for: .seconds(60)) },
-            tell: { streams.tell($0) })
+            into: streams.inbox, tell: { streams.tell($0) })
         #expect(await eventually { streams.heard.count >= 1 })
         task.cancel()
         await task.value
@@ -133,7 +154,7 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
     @Test func aStreamThatFinishesWithoutStoppedIsTheCopyClosingAndEndsTheFollow() async {
         let streams = Streams([finished(saved)])
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         await task.value
 
         #expect(streams.heard == [saved])
@@ -146,10 +167,33 @@ private nonisolated let saved = Change(origin: .local(.updateItem), itemId: "a",
         // `changes()` on a closed copy answers a stream that is finished and told nothing.
         let streams = Streams([finished(stopped), finished()])
         let task = MarfaFollow.start(
-            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, tell: { streams.tell($0) })
+            streams.next(), next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox, tell: { streams.tell($0) })
         await task.value
 
         #expect(streams.taken == 2)
         #expect(streams.waits.count == 1, "the follow waited once, for the stream that was replaced")
+    }
+
+    /// A server that sends thousands of changes would queue as many events, each a read of the copy; while the
+    /// engine has not taken what it was told of, what is heard joins it.
+    @Test func changesHeardBeforeTheEngineTakesThemAreToldOnce() async {
+        let flood = (0..<500).map { Change(origin: .server(event: "item.updated", cursor: "\($0)"), itemId: "a\($0)", edgeId: nil) }
+        let stream = AsyncStream<Change> { continuation in
+            for change in flood { continuation.yield(change) }
+            continuation.finish()
+        }
+        let streams = Streams([])
+        streams.hold(true)
+        let task = MarfaFollow.start(
+            stream, next: { streams.next() }, wait: { await streams.wait($0) }, into: streams.inbox,
+            tell: { streams.tell($0) })
+        await task.value
+        #expect(streams.tells == 1, "the engine was told again before it took what it was told of")
+
+        streams.take()
+        #expect(streams.heard == flood, "every change reaches the engine, in order")
+        let next = Change(origin: .server(event: "item.updated", cursor: "next"), itemId: "b", edgeId: nil)
+        _ = streams.inbox.add(.change(next)) { streams.tell($0) }
+        #expect(streams.tells == 2, "a change heard after the engine took the rest is told")
     }
 }

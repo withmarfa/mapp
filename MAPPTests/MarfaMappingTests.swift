@@ -9,6 +9,7 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
+@Suite(.hangLimit)
 struct MarfaMappingTests {
     private static func field(_ name: String, _ type: String = "string", by owner: String, definition: JSONObject = [:])
         -> TypeField
@@ -419,16 +420,31 @@ struct MarfaMappingTests {
         #expect(states[ItemID("f")] == conflict)
     }
 
-    @Test func aSnapshotTakesEachChangeInTurn() {
+    /// The hub keeps what each change left, so a reader that starts late is told it as one `.loaded`, text too.
+    @Test func aLateReaderStartsFromWhatEveryChangeLeft() async {
+        let hub = MarfaHub()
         let first = Self.item(Self.row("1")), second = Self.item(Self.row("2"))
-        var snapshot = SourceSnapshot(items: [first], catalogue: Catalogue())
+        hub.publish(.loaded(SourceSnapshot(items: [first], catalogue: Catalogue())))
         var edited = first
         edited.title = "Edited"
-        snapshot.apply(.upserted([edited, second]))
-        #expect(snapshot.items.map(\.title) == ["Edited", "Title"])
-        snapshot.apply(.removed([first.id]))
-        #expect(snapshot.items.map(\.id) == [second.id])
-        snapshot.apply(.catalogue(Self.catalogue))
-        #expect(snapshot.catalogue == Self.catalogue)
+        let text = ItemBody(id: second.id, text: "Text", version: second.version)
+        hub.publish(.changed(ItemChanges(upserted: [edited, second], bodies: [text])))
+        hub.publish(.catalogue(Self.catalogue))
+        let late = await Self.loaded(from: hub)
+        #expect(Set(late?.items.map(\.title) ?? []) == ["Edited", "Title"])
+        #expect(late?.bodies[second.id] == text)
+        #expect(late?.catalogue == Self.catalogue)
+
+        hub.publish(.changed(ItemChanges(removed: [second.id])))
+        let later = await Self.loaded(from: hub)
+        #expect(later?.items.map(\.id) == [first.id])
+        #expect(later?.bodies[second.id] == nil)
+    }
+
+    /// What a reader starting now is told first.
+    private static func loaded(from hub: MarfaHub) async -> SourceSnapshot? {
+        var changes = hub.changes().makeAsyncIterator()
+        guard case .loaded(let snapshot) = await changes.next() else { return nil }
+        return snapshot
     }
 }

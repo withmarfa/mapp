@@ -3,9 +3,7 @@ extension SourceChange {
     nonisolated var kind: StaticString {
         switch self {
         case .loaded: "take.loaded"
-        case .upserted: "take.upserted"
-        case .removed: "take.removed"
-        case .bodyChanged: "take.bodyChanged"
+        case .changed: "take.changed"
         case .answered: "take.answered"
         case .taken: "take.taken"
         case .catalogue: "take.catalogue"
@@ -18,9 +16,7 @@ extension SourceChange {
     nonisolated var itemCount: Int {
         switch self {
         case .loaded(let snapshot): snapshot.items.count
-        case .upserted(let items): items.count
-        case .removed(let ids): ids.count
-        case .bodyChanged: 1
+        case .changed(let changes): Set(changes.upserted.map(\.id) + changes.removed + changes.bodies.map(\.id)).count
         case .views(let views): views.count
         case .answered, .taken, .catalogue, .unavailable: 0
         }

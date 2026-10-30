@@ -173,7 +173,7 @@ struct MarfaSourceOfflineTests {
             id: queued.id, kind: queued.kind, itemId: queued.itemId, idempotencyKey: queued.idempotencyKey,
             verdict: .accepted, queuedAt: queued.queuedAt)
         let report = MarfaSync.report(answeredIn: [answered])
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
         await source.close()
     }
@@ -425,7 +425,7 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
 
         await source.copy.close()
-        source.events.yield(.change(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         let failed = try #require(await log.wait { state in
             state.changes.contains { if case .unavailable = $0 { true } else { false } }
         })
@@ -480,21 +480,21 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let fault = Change(origin: .stopped(.store(message: "the store failed")), itemId: nil, edgeId: nil)
 
-        source.events.yield(.change(fault))
+        source.hear(fault)
         _ = try #require(await log.wait { unavailable($0) == 1 })
         #expect(await waitForConnection(source) { if case .stopped = $0 { true } else { false } })
 
-        source.events.yield(.change(fault))
-        source.events.yield(.resumed)
+        source.hear(fault)
+        source.hearResumed()
         // The refresh is made against a server nothing answers, so it ends offline: the library left "stopped".
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         #expect(unavailable(log.current) == 1, "a fault told again before anything succeeded is not told again")
 
         // Something succeeded: the next fault is news.
         let report = DrainReport(answered: 1)
-        source.events.yield(.change(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         #expect(await waitForConnection(source) { $0 == .online })
-        source.events.yield(.change(fault))
+        source.hear(fault)
         _ = try #require(await log.wait { unavailable($0) == 2 })
         await source.close()
     }
@@ -558,7 +558,7 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         #expect(source.connectionState == .connecting)
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .stopped(expired), itemId: nil, edgeId: nil))
         // Hydrating again against a closed port fails at once, which shows the hydration was tried.
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         await source.close()
@@ -770,7 +770,7 @@ struct MarfaSourceOfflineTests {
 
         // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        source.events.yield(.change(Change(origin: .stopped(expired), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .stopped(expired), itemId: nil, edgeId: nil))
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         let after = try await source.copy.queue.all()
         #expect(Set(after.map(\.id)) == Set(queued.map(\.id)))
@@ -887,7 +887,7 @@ extension LiveMarfaTests {
         private func hydrated(_ source: MarfaSource) async throws {
             source.refresh()
             try #require(await eventually { LiveMarfa.isWhole(source.syncReport) && source.connectionState == .online })
-            await source.queueSubmitted()
+            await source.engineTook()
         }
 
         /// Runs `body` with a fresh copy, already refreshed, and purges every id it mints, however it ends.

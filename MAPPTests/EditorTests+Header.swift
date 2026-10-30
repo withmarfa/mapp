@@ -266,7 +266,7 @@ extension EditorTests {
             item.version = ItemVersion(2)
             source.send(.upserted([item]))
         } else {
-            source.send(.bodyChanged(item.id, ItemVersion(2)))
+            source.sendBody(of: item.id)
         }
         try #require(await eventually { library.body(of: item.id)?.text == "Recovered body\n" })
         editor.noteChanged(try #require(library.item(item.id)))
@@ -292,14 +292,14 @@ extension EditorTests {
         } else {
             let other = try #require(library.items(in: .allNotes).first { $0.id != item.id && !$0.isFile })
             source.setBody("Other body\n", of: other.id)
-            source.send(.bodyChanged(other.id, other.version))
+            source.sendBody(of: other.id)
             try #require(await eventually { library.body(of: other.id) != nil })
             editor.load(other)
             try #require(await eventually { editor.noteID == other.id })
         }
         let selected = editor.noteID
         source.setBody("Recovered body\n", of: item.id)
-        source.send(.bodyChanged(item.id, item.version))
+        source.sendBody(of: item.id)
         try #require(await eventually { library.body(of: item.id) != nil })
         editor.noteChanged(item)
         _ = try await editor.webView.evaluateJavaScript("1")

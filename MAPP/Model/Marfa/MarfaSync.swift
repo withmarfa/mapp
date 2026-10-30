@@ -48,6 +48,9 @@ actor MarfaSync {
     private var wantsDrain = false
     /// The bin is read from the server alone, so it is read again when something may have changed it.
     private var wantsBin = false
+    /// A read of the bin asked for and not yet due, and when the first ask of it came.
+    private var binTimer: Task<Void, Never>?
+    private var binAsked: ContinuousClock.Instant?
     /// Until a refresh succeeds, a retry or a return of the server refreshes rather than only drains.
     private var refreshed = false
     /// Set when a drain threw as an answer expired the copy. The answers wait in the queue until the copy is
@@ -65,6 +68,8 @@ actor MarfaSync {
     private(set) var drains = 0
     /// How many times it has hydrated, for the tests.
     private(set) var hydrations = 0
+    /// How many times it has read the bin, for the tests.
+    private(set) var binReads = 0
     private(set) var lastHydration: HydrateReport?
     /// Rows the copy could not read, which only a hydration replaces.
     private var rehydration = Rehydration()
@@ -144,8 +149,36 @@ actor MarfaSync {
         work()
     }
 
-    /// An item may have gone to or left the server's bin, which the copy does not say.
+    /// How long the bin's changes are let settle before it is read, and the longest a read waits for them to.
+    private(set) var binQuiet = Duration.seconds(1)
+    private(set) var binLongest = Duration.seconds(5)
+
+    #if DEBUG
+    func setBinWait(quiet: Duration, longest: Duration) {
+        binQuiet = quiet
+        binLongest = longest
+    }
+    #endif
+
+    /// An item may have gone to or left the server's bin, which the copy does not say. The bin is read from the
+    /// server whole, so a flood of server changes reads it once they pause, and at least every `binLongest`.
     func binChanged() {
+        guard !stopped else { return }
+        let now = ContinuousClock.now
+        let first = binAsked ?? now
+        binAsked = first
+        binTimer?.cancel()
+        let due = min(now + binQuiet, first + binLongest)
+        binTimer = Task {
+            try? await Task.sleep(until: due)
+            guard !Task.isCancelled else { return }
+            self.binDue()
+        }
+    }
+
+    private func binDue() {
+        binAsked = nil
+        binTimer = nil
         wantsBin = true
         work()
     }
@@ -210,6 +243,7 @@ actor MarfaSync {
         Self.log.info("sync closed with the source")
         stopped = true
         retry?.cancel()
+        binTimer?.cancel()
         working?.cancel()
         fetching?.cancel()
         for flusher in flushers + draining { flusher.resume() }
@@ -439,6 +473,7 @@ actor MarfaSync {
     /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
     /// reached leaves the bin as it was, shown from what the engine last held, and is asked again when it can.
     private func runBin() async {
+        binReads += 1
         var found: [Marfa.Item] = []
         var cursor: String?
         var complete = false

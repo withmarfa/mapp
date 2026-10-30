@@ -29,7 +29,8 @@ nonisolated final class FakeEmbeds: EmbedResolver {
 }
 
 /// A source the test drives: it tells its one reader the changes the test sends, answers bodies and searches
-/// from what the test gives it, and keeps every write it is handed without applying any.
+/// from what the test gives it, and keeps every write it is handed without applying any. A change sent without
+/// bodies carries the text set for each item that is new or whose version moved, as the engine's do.
 nonisolated final class FakeItemSource: ItemSource {
     nonisolated struct Submitted: Hashable, Sendable {
         let write: ItemWrite
@@ -61,6 +62,8 @@ nonisolated final class FakeItemSource: ItemSource {
     let queuing = Mutex(false)
     let isClosed = Mutex(false)
     private let held = Mutex<[ItemID: ItemBody]>([:])
+    /// The version of each item last sent, to tell which items a change moved.
+    private let sent = Mutex<[ItemID: ItemVersion]>([:])
     private let written = Mutex<[Submitted]>([])
     private let stream: AsyncStream<SourceChange>
     private let continuation: AsyncStream<SourceChange>.Continuation
@@ -73,7 +76,42 @@ nonisolated final class FakeItemSource: ItemSource {
     var writes: [ItemWrite] { submitted.map(\.write) }
 
     func send(_ change: SourceChange) {
-        continuation.yield(change)
+        continuation.yield(withBodies(change))
+    }
+
+    /// Tells the reader the text set for the item, as the engine does once the item's text changes.
+    func sendBody(of id: ItemID) {
+        guard let body = held.withLock({ $0[id] }) else { return }
+        continuation.yield(.changed(ItemChanges(bodies: [body])))
+    }
+
+    private func withBodies(_ change: SourceChange) -> SourceChange {
+        switch change {
+        case .loaded(var snapshot):
+            sent.withLock { sent in sent = Dictionary(snapshot.items.map { ($0.id, $0.version) }, uniquingKeysWith: { _, last in last }) }
+            if snapshot.bodies.isEmpty {
+                let held = held.withLock { $0 }
+                for item in snapshot.items { snapshot.bodies[item.id] = held[item.id] }
+            }
+            return .loaded(snapshot)
+        case .changed(var changes):
+            let moved = sent.withLock { sent in
+                var moved: [ItemID] = []
+                for id in changes.removed { sent[id] = nil }
+                for item in changes.upserted where sent[item.id] != item.version {
+                    moved.append(item.id)
+                    sent[item.id] = item.version
+                }
+                return moved
+            }
+            if changes.bodies.isEmpty {
+                let held = held.withLock { $0 }
+                changes.bodies = moved.compactMap { held[$0] }
+            }
+            return .changed(changes)
+        default:
+            return change
+        }
     }
 
     func setBody(_ text: String, of id: ItemID, version: Int64 = 1) {
@@ -106,10 +144,6 @@ nonisolated final class FakeItemSource: ItemSource {
     func body(of item: ItemID) async throws -> ItemBody {
         guard let body = held.withLock({ $0[item] }) else { throw SourceFailure(kind: .missing, message: "No text.") }
         return body
-    }
-
-    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] {
-        held.withLock { held in items.compactMap { held[$0] } }
     }
 
     func fileURL(of item: ItemID) async throws -> URL {

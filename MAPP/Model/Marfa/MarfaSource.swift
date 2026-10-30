@@ -217,32 +217,6 @@ nonisolated final class MarfaSource: ItemSource {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
-    /// A few rows are read one by one; more are read in one list of the copy rather than a read each.
-    func bodies(of items: Set<ItemID>) async throws -> [ItemBody] {
-        guard !items.isEmpty else { return [] }
-        let rows: [Marfa.Item]
-        do {
-            rows = try await MarfaEngine.asking(hub) { () async throws -> [Marfa.Item] in
-                if items.count <= 12 {
-                    var rows: [Marfa.Item] = []
-                    for id in items { if let row = try await copy.items.get(id.rawValue) { rows.append(row) } }
-                    return rows
-                }
-                return try await copy.items.list(ListFilters(allStates: true)).filter { items.contains(ItemID($0.id)) }
-            }
-        } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
-        }
-        let catalogue = hub.catalogue
-        // An item in the server's bin is not in the copy, so its text is what the bin read gave.
-        let held = Set(rows.map(\.id))
-        let binned = items.compactMap { id in held.contains(id.rawValue) ? nil : hub.binnedRow(id.rawValue) }
-        return (rows + binned).compactMap { row in
-            MarfaMapping.body(of: row, catalogue: catalogue)
-                .map { ItemBody(id: ItemID(row.id), text: $0, version: ItemVersion(row.version)) }
-        }
-    }
-
     func fileURL(of item: ItemID) async throws -> URL {
         let row = try await self.row(item)
         guard let hash = row.properties[MarfaMapping.blobField]?.string else {
@@ -411,11 +385,10 @@ nonisolated final class MarfaSource: ItemSource {
     var engineActivity: EngineActivity? { hub.activity }
 
     /// Returns once every write submitted before it is in the queue, or refused, without waiting on the network,
-    /// so a quit while offline keeps every write and does not wait for a server.
+    /// so a quit while offline keeps every write and does not wait for a server. It waits for those writes alone,
+    /// never behind a read of the copy told after them.
     func queueSubmitted() async {
-        await withCheckedContinuation { continuation in
-            if case .terminated = events.yield(.queued(continuation)) { continuation.resume() }
-        }
+        await hub.activity.writesTaken()
     }
 
     /// The writes not sent once every write submitted before this call is in the queue; nil where the queue
@@ -491,9 +464,52 @@ nonisolated struct MarfaEmbeds: EmbedResolver {
 /// Keeps what every reader of the source has been told, so one that arrives late starts from `.loaded` with it.
 nonisolated final class MarfaHub: Sendable {
     private struct State {
-        var snapshot: SourceSnapshot?
+        /// What readers were told, by item; nil until the first `.loaded`.
+        var held: Held?
         var readers: [UUID: AsyncStream<SourceChange>.Continuation] = [:]
         var finished = false
+    }
+
+    /// Kept by ID, so a change costs what it names rather than the whole library; a late reader's `.loaded` is
+    /// put in order only when it is asked for.
+    private struct Held {
+        var items: [ItemID: Item]
+        var bodies: [ItemID: ItemBody]
+        var catalogue: Catalogue
+        var views: [LibraryView]
+
+        init(_ snapshot: SourceSnapshot) {
+            items = Dictionary(snapshot.items.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+            bodies = snapshot.bodies
+            catalogue = snapshot.catalogue
+            views = snapshot.views
+        }
+
+        var snapshot: SourceSnapshot {
+            SourceSnapshot(
+                items: items.values.sorted(by: MarfaHub.newestFirst), catalogue: catalogue, views: views, bodies: bodies)
+        }
+
+        mutating func apply(_ change: SourceChange) {
+            switch change {
+            case .loaded(let snapshot): self = Held(snapshot)
+            case .changed(let changes):
+                for id in changes.removed {
+                    items[id] = nil
+                    bodies[id] = nil
+                }
+                for item in changes.upserted { items[item.id] = item }
+                for body in changes.bodies { bodies[body.id] = body }
+            case .catalogue(let catalogue): self.catalogue = catalogue
+            case .views(let views): self.views = views
+            case .answered, .taken, .unavailable: break
+            }
+        }
+    }
+
+    /// The order of `.loaded`: newest first, by ID where two were made together, so every reader is told one order.
+    nonisolated static func newestFirst(_ lhs: Item, _ rhs: Item) -> Bool {
+        lhs.created != rhs.created ? lhs.created > rhs.created : lhs.id.rawValue < rhs.id.rawValue
     }
 
     private let state = Mutex(State())
@@ -529,19 +545,11 @@ nonisolated final class MarfaHub: Sendable {
         bin.withLock { $0[id] }
     }
 
-    var catalogue: Catalogue { state.withLock { $0.snapshot?.catalogue ?? Catalogue() } }
+    var catalogue: Catalogue { state.withLock { $0.held?.catalogue ?? Catalogue() } }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {
-        state.withLock { state in
-            let items = state.snapshot?.items ?? []
-            return (
-                Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }),
-                state.snapshot?.catalogue ?? Catalogue()
-            )
-        }
+        state.withLock { ($0.held?.items ?? [:], $0.held?.catalogue ?? Catalogue()) }
     }
-
-    var snapshot: SourceSnapshot? { state.withLock { $0.snapshot } }
 
     func changes() -> AsyncStream<SourceChange> {
         let (stream, continuation) = AsyncStream<SourceChange>.makeStream()
@@ -549,7 +557,7 @@ nonisolated final class MarfaHub: Sendable {
         continuation.onTermination = { [weak self] _ in self?.state.withLock { _ = $0.readers.removeValue(forKey: token) } }
         let finished = state.withLock { state in
             guard !state.finished else { return true }
-            if let snapshot = state.snapshot { continuation.yield(.loaded(snapshot)) }
+            if let held = state.held { continuation.yield(.loaded(held.snapshot)) }
             state.readers[token] = continuation
             return false
         }
@@ -565,10 +573,10 @@ nonisolated final class MarfaHub: Sendable {
     func publish(_ change: SourceChange) {
         let readers = state.withLock { state -> [AsyncStream<SourceChange>.Continuation] in
             switch change {
-            case .loaded(let snapshot): state.snapshot = snapshot
+            case .loaded(let snapshot): state.held = Held(snapshot)
             default:
-                guard state.snapshot != nil else { return [] }
-                state.snapshot?.apply(change)
+                guard state.held != nil else { return [] }
+                state.held?.apply(change)
             }
             return Array(state.readers.values)
         }
@@ -588,29 +596,5 @@ nonisolated final class MarfaHub: Sendable {
         for reader in readers { reader.finish() }
         connectionState.finish()
         report.finish()
-    }
-}
-
-extension SourceSnapshot {
-    nonisolated mutating func apply(_ change: SourceChange) {
-        switch change {
-        case .loaded(let snapshot): self = snapshot
-        case .upserted(let changed):
-            var index = Dictionary(items.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
-            for item in changed {
-                if let position = index[item.id] {
-                    items[position] = item
-                } else {
-                    index[item.id] = items.count
-                    items.append(item)
-                }
-            }
-        case .removed(let ids):
-            let gone = Set(ids)
-            items.removeAll { gone.contains($0.id) }
-        case .catalogue(let catalogue): self.catalogue = catalogue
-        case .views(let views): self.views = views
-        case .bodyChanged, .answered, .taken, .unavailable: break
-        }
     }
 }

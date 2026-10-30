@@ -9,7 +9,7 @@ nonisolated final class LoopProbe: Sendable {
     struct Sample: Sendable {
         /// When the probe was asked, from the probe's start.
         let at: Duration
-        /// How long `queueSubmitted()` took to return.
+        /// How long the engine took to answer, which is how far behind its loop was.
         let wait: Duration
     }
 
@@ -26,7 +26,7 @@ nonisolated final class LoopProbe: Sendable {
         let task = Task.detached {
             while !Task.isCancelled {
                 let asked = ContinuousClock.now
-                await source.queueSubmitted()
+                await source.engineTook()
                 let answered = ContinuousClock.now
                 held.samples.withLock { $0.append(Sample(at: asked - origin, wait: answered - asked)) }
                 try? await Task.sleep(for: interval)
@@ -274,7 +274,7 @@ struct EngineCostTests {
     private func openWhole(_ bench: Bench) async throws -> Open {
         let opened = try await open(bench)
         try #require(await eventually { opened.library.isLoaded && whole(opened.library) })
-        await opened.source.queueSubmitted()
+        await opened.source.engineTook()
         return opened
     }
 
@@ -288,7 +288,7 @@ struct EngineCostTests {
         line("\(label)_first_loaded_items", Double(opened.library.count(in: .allNotes)), "count")
         try #require(await eventually { self.whole(opened.library) })
         line("\(label)_to_complete", ContinuousClock.now - start)
-        await opened.source.queueSubmitted()
+        await opened.source.engineTook()
         line("\(label)_to_engine_idle", ContinuousClock.now - start)
         line("\(label)_library_items", Double(opened.library.count(in: .allNotes)), "count")
         return opened
@@ -321,7 +321,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             var reloads: [Double] = []
             for _ in 0..<3 {
-                await opened.source.queueSubmitted()
+                await opened.source.engineTook()
                 let start = ContinuousClock.now
                 await opened.source.engine.reload()
                 reloads.append(Self.ms(ContinuousClock.now - start))
@@ -386,7 +386,7 @@ struct EngineCostTests {
                 }
                 totals.append(Self.ms(total))
                 try #require(await eventually { library.item(id)?.sync == .settled })
-                await opened.source.queueSubmitted()
+                await opened.source.engineTook()
             }
             // Only the places that hold items are listed one by one; the rest are in the totals.
             for (name, place) in places where name == "all_items" || name == "inbox" || library.count(in: place) > 0 {
@@ -410,12 +410,12 @@ struct EngineCostTests {
                 typeID: "core.note", title: "MAPPTEST write", body: "First", properties: [:], parentID: nil, in: .allNotes, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
-            await source.queueSubmitted()
+            await source.engineTook()
 
             var rest: [Double] = []
             for _ in 0..<20 {
                 let start = ContinuousClock.now
-                await source.queueSubmitted()
+                await source.engineTook()
                 rest.append(Self.ms(ContinuousClock.now - start))
                 try await Task.sleep(for: .milliseconds(50))
             }
@@ -466,7 +466,7 @@ struct EngineCostTests {
             var samples = await probe.stop()
             line("flood_create_probe_longest_wait", samples.longest)
             line("flood_create_seconds_over_5s_behind", Self.ms(samples.behind(by: .seconds(5))) / 1000, "s")
-            await source.queueSubmitted()
+            await source.engineTook()
             line("flood_create_to_engine_idle", ContinuousClock.now - start)
 
             probe = LoopProbe(source, every: .milliseconds(250))
@@ -483,7 +483,7 @@ struct EngineCostTests {
             line("flood_delete_probes", Double(samples.count), "count")
             line("flood_delete_probe_longest_wait", samples.longest)
             line("flood_delete_seconds_over_5s_behind", Self.ms(samples.behind(by: .seconds(5))) / 1000, "s")
-            await source.queueSubmitted()
+            await source.engineTook()
             line("flood_delete_to_engine_idle", ContinuousClock.now - start)
             line("flood_main_actor_busy", meter.busy)
             line("flood_main_actor_longest_block", meter.longest)

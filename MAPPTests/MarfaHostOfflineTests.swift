@@ -56,7 +56,7 @@ struct MarfaHostOfflineTests {
         let source = try #require(host.source as? MarfaSource)
         #expect(await eventually { if case .offline = host.state { true } else { false } })
         let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
-        source.events.yield(.change(Change(origin: .stopped(ended), itemId: nil, edgeId: nil)))
+        source.hear(Change(origin: .stopped(ended), itemId: nil, edgeId: nil))
         #expect(await eventually { host.state == .keyRefused })
         // Time for a reconnection the refused key should not set off.
         try await Task.sleep(for: .seconds(1))

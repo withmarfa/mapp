@@ -10,7 +10,7 @@ struct TelemetryTests {
         let began = ContinuousClock.now
         activity.tell()
         activity.tell()
-        activity.begin("change.server", at: began)
+        activity.begin("heard", at: began)
         let trace = QuitTrace(purpose: .quit)
         trace.begin(.editors)
         trace.end(.editors)
@@ -18,7 +18,7 @@ struct TelemetryTests {
 
         let text = trace.diagnosis(at: began + .milliseconds(3000))
         #expect(text.contains("queue did not finish"))
-        #expect(text.contains("engine busy with change.server for 3000 ms, 1 waiting"))
+        #expect(text.contains("engine busy with heard for 3000 ms, 1 waiting"))
         #expect(trace.unfinished == [.queue])
     }
 
