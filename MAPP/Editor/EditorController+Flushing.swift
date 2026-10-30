@@ -12,7 +12,29 @@ extension EditorController {
     ///
     /// Outside text reloading the note mid-flush leaves the note the one being flushed, so the flush goes ahead. A
     /// flush whose note was replaced on the page stops, and the person is told why.
+    ///
+    /// Flushes take turns, and what one does once its edit is in is part of its turn: a selection's hand-over puts
+    /// the next note on the page, and leaving the note empties it. So a flush asked for meanwhile, as when the window
+    /// closes or the app quits just after a selection, waits and then hands over whatever is on the page, instead of
+    /// finding its note replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
+    /// were waiting on the edit it could not keep, and the person has been told once.
     func flush(then done: @escaping (Bool) -> Void = { _ in }) {
+        guard !isFlushing else { return waitingFlushes.append(done) }
+        isFlushing = true
+        handOver { [self] kept in
+            isFlushing = false
+            let waiting = waitingFlushes
+            waitingFlushes = []
+            done(kept)
+            guard kept else { return waiting.forEach { $0(false) } }
+            // `done` may have started a flush of its own, which keeps its turn.
+            waitingFlushes = waiting + waitingFlushes
+            if !isFlushing, !waitingFlushes.isEmpty { flush(then: waitingFlushes.removeFirst()) }
+        }
+    }
+
+    /// One turn of `flush`: asks the page for its last edit and answers once.
+    private func handOver(then done: @escaping (Bool) -> Void) {
         guard let noteID else { return done(true) }
         let generation = generation
         // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
@@ -33,11 +55,19 @@ extension EditorController {
             // Asked for the generation the flush began on even after outside text reloaded the note: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
             // has moved past it reported that text as it moved, and answers nil.
-            webView.evaluateJavaScript("window.editor.flush(\(generation))") { [self] result, error in
+            // Caught in the page, since an uncaught throw also reaches the page's error listener, which would tell the
+            // person that the editor failed each time a busy page is asked again.
+            let script = """
+                (() => {
+                  try { return { text: window.editor.flush(\(generation)) } } catch { return { busy: true } }
+                })()
+                """
+            webView.evaluateJavaScript(script) { [self] result, error in
+                let answer = result as? [String: Any]
                 // A reply that comes after the page was given up on still holds the person's latest text.
-                if error == nil, let markdown = result as? String { report(markdown, of: generation) }
+                if let markdown = answer?["text"] as? String { report(markdown, of: generation) }
                 guard !finished else { return }
-                guard error == nil else {
+                guard error == nil, answer?["busy"] == nil else {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
                 }
