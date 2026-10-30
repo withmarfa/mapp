@@ -86,7 +86,10 @@ final class SpeedMeasureTests: XCTestCase {
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
         let items = sidebarElement("SidebarPlace-all")
-        let places = [items, sidebarText("Inbox")] + types.map(sidebarElement) + [items]
+        // Each place differs from the one before it, and the last from the first, so a repeat of the measured block
+        // never clicks the place the window is already on, which would time a click that does nothing. The window
+        // opens on the items.
+        let places = [sidebarText("Inbox")] + types.map(sidebarElement) + [items]
         // The window's title starts with the place's name, which is how a choice is seen to have landed.
         let titles = places.map(\.placeName)
         let spots = places.map(spot)
@@ -119,7 +122,8 @@ final class SpeedMeasureTests: XCTestCase {
         let types = typeRows().prefix(2)
         try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
         let items = sidebarElement("SidebarPlace-all")
-        let places = [items] + types.map(sidebarElement) + [items]
+        // The window is on the items; see testChoosingPlaces for why no place repeats the one before it.
+        let places = types.map(sidebarElement) + [items]
         let titles = places.map(\.placeName)
         let spots = places.map(spot)
         items.click()
@@ -141,12 +145,32 @@ final class SpeedMeasureTests: XCTestCase {
         app.typeKey("3", modifierFlags: .command)
         let table = element("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 60), "the table showed")
-        // Keys go to the table once it is the focused pane; a click on its empty space would also do that.
-        spot(table).click()
+        // Keys go to the table once it is the focused pane. The click lands on the table's leading edge, where no
+        // cell is, so it neither edits one nor depends on where the rows are.
+        table.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).click()
         try begin("table.select")
         measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
             for _ in 0..<5 { time("select") { app.typeKey(.downArrow, modifierFlags: []) } }
             for _ in 0..<5 { time("select") { app.typeKey(.upArrow, modifierFlags: []) } }
+        }
+    }
+
+    /// Select All on the whole library, then scrolling, which asks the soft selection's marks for every selected row
+    /// and checks them again after each scroll.
+    func testSelectingAllInTheTable() throws {
+        try launchWarm()
+        sidebarElement("SidebarPlace-all").click()
+        app.typeKey("3", modifierFlags: .command)
+        let table = element("ItemTable")
+        XCTAssertTrue(table.waitForExistence(timeout: 60), "the table showed")
+        table.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).click()
+        try begin("table.selectAll")
+        measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            time("selectAll") { app.typeKey("a", modifierFlags: .command) }
+            for _ in 0..<5 { time("scroll") { app.typeKey(.pageDown, modifierFlags: []) } }
+            // Back to one row at the top, so the next iteration selects all again.
+            app.typeKey(.downArrow, modifierFlags: [])
+            app.typeKey(.home, modifierFlags: [])
         }
     }
 
