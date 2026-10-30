@@ -195,10 +195,14 @@ final class WindowTests: XCTestCase {
     /// key and from the Edit menu.
     func testSelectAllInTheListSelectsEveryItem() {
         sidebarItem("Items").click()
+        // Items opens in the gallery; Command-1 shows it as the list.
+        app.typeKey("1", modifierFlags: .command)
         let total = count(of: "Items")
         XCTAssertGreaterThan(total, 1)
+        XCTAssertTrue(row(titled: "Bike service").waitForExistence(timeout: 2))
         row(titled: "Bike service").click()
-        let prompt = window.staticTexts["\(total) items selected"]
+        let selected = "\(total) items selected"
+        let prompt = window.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", selected, selected)).firstMatch
         app.typeKey("a", modifierFlags: .command)
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "Command-A selects every item in the list")
         row(titled: "Bike service").click()
