@@ -23,7 +23,7 @@ private struct PlaceWatch: View {
             .accessibilityHidden(true)
             .onChange(of: browser.placeFallback(in: library)) { browser.placeRemoved(in: library, order: order) }
             // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
-            .onChange(of: collectionItemIDs) { old, new in
+            .onChange(of: browser.collectionItemIDs(in: library, order: order)) { old, new in
                 guard browser.usesCollection else { return }
                 browser.keepSelection(from: old, to: new)
             }
@@ -33,10 +33,5 @@ private struct PlaceWatch: View {
             .onChange(of: browser.viewMode) { browser.fallBackToListIfUnavailable(in: library) }
             // A place whose layouts match the last one's raises no change above, so a move to it is checked here.
             .onChange(of: browser.item) { browser.fallBackToListIfUnavailable(in: library) }
-    }
-
-    private var collectionItemIDs: [ItemID] {
-        guard browser.usesCollection else { return [] }
-        return browser.sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
     }
 }

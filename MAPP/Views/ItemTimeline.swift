@@ -62,8 +62,9 @@ struct ItemTimeline: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: browser.selection)
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: { browser.selection })
         .focused(pane, equals: .list)
+        .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityLabel("Timeline")
         .accessibilityIdentifier("ItemTimeline")
         .contextMenu(forSelectionType: ItemID.self) { ids in

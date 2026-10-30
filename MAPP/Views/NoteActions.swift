@@ -15,19 +15,23 @@ struct NoteActions: View {
     var body: some View {
         NoteOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
         CollectionActions(selection: ids, details: details, undoManager: undoManager)
-        if inMenuBar || !NoteActionContext(library: library, ids: ids, keepsPlace: false).items.isEmpty { Divider() }
+        if inMenuBar || ids.contains(where: { library.item($0) != nil }) { Divider() }
         NoteRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
     }
 }
 
 /// How the actions on notes read in the menu that shows them.
 private struct NoteActionContext {
-    let library: any ItemLibrary
-    let ids: Set<ItemID>
+    /// Every selected item, files too: a command that suits only some of them leaves the rest alone and says so.
+    /// Looked up once, since a selection can hold every item in the library.
+    let items: [Item]
     let keepsPlace: Bool
 
-    /// Every selected item, files too: a command that suits only some of them leaves the rest alone and says so.
-    var items: [Item] { ids.compactMap { library.item($0) } }
+    init(library: any ItemLibrary, ids: Set<ItemID>, keepsPlace: Bool) {
+        items = ids.compactMap { library.item($0) }
+        self.keepsPlace = keepsPlace
+    }
+
     var allDeleted: Bool { !items.isEmpty && items.allSatisfy { $0.state == .trashed } }
     /// Nothing to act on and nowhere to keep the items in place, as the context menu has none.
     var isEmpty: Bool { items.isEmpty && !keepsPlace }

@@ -355,7 +355,7 @@ struct CommandPalette: View {
                     details.tagRequest = TagRequest(ids: ids, undoManager: undoManager)
                 }
             }
-            if let details, !library.typeChangeOptions(for: ids).isEmpty {
+            if let details, library.offersTypeChange(for: ids) {
                 add(String(localized: "Change Type…"), "square.on.square") {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }

@@ -85,7 +85,7 @@ struct MainView: View {
                 if browser.showsSettings {
                     SettingsPageList(browser: browser)
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane)
+                    NoteList(browser: browser, order: order, pane: $pane).equatable()
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -232,8 +232,8 @@ struct MainView: View {
         .onChange(of: browser.selection) {
             details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
         }
-        .onChange(of: browser.snapshot()) { _, snapshot in
-            if restoresWindow { storedBrowser = try? JSONEncoder().encode(snapshot) }
+        .onChange(of: browser.snapshotParts) {
+            if restoresWindow { storedBrowser = try? JSONEncoder().encode(browser.snapshot()) }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do. The library is the one this view showed, so a

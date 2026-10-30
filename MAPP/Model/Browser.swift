@@ -514,6 +514,21 @@ final class Browser {
         selection = ids
     }
 
+    /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
+    /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
+    /// timeline's in the list's order. The table's come from its own content, so a move between its places sorts no list.
+    func collectionItemIDs(in library: any ItemLibrary, order: NoteOrder) -> [ItemID] {
+        guard usesCollection else { return [] }
+        guard viewMode == .table else {
+            return sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
+        }
+        let content = tableContent(in: library)
+        // A grouped table shows its rows group by group, not in the sort's order across groups.
+        let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
+        let isShown = Set(shown)
+        return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
+    }
+
     /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
     func keepSelection(from old: [ItemID], to new: [ItemID]) {
         let kept = Self.selection(selection, keptFrom: old, in: new)
@@ -731,6 +746,16 @@ final class Browser {
     func snapshot() -> Snapshot {
         Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
     }
+
+    /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may
+    /// hold every item.
+    struct SnapshotParts: Equatable {
+        var place: SidebarItem
+        var selection: Set<ItemID>
+        var viewMode: ItemViewMode
+    }
+
+    var snapshotParts: SnapshotParts { SnapshotParts(place: item, selection: selection, viewMode: viewMode) }
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
     /// leaves the window at its default.

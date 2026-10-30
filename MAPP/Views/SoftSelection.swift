@@ -5,10 +5,18 @@ extension View {
     /// Selects in a soft grey mark, inset and rounded, the same whether or not the window is active, in place of
     /// the system's accent fill, which reads as too loud across a whole list. Apply it to a `List` or `Table`,
     /// with `rows`, the identifiers it shows, and `selection`, so the marks follow rows that move and every change
-    /// of selection, however it is made.
-    func softSelection(rows: some Hashable, selection: some Hashable) -> some View {
-        background(SoftSelection(rows: rows.hashValue, selection: selection.hashValue))
+    /// of selection, however it is made. The selection is read by the marks alone, so a change of selection does not
+    /// run the body of the view that holds the list, which would have the list look at every row again.
+    func softSelection(rows: some Hashable, selection: @escaping () -> some Hashable) -> some View {
+        background(SoftSelectionReader(rows: rows.hashValue, selection: selection))
     }
+}
+
+private struct SoftSelectionReader<Selection: Hashable>: View {
+    let rows: Int
+    let selection: () -> Selection
+
+    var body: some View { SoftSelection(rows: rows, selection: selection().hashValue) }
 }
 
 /// SwiftUI cannot style a list's selection, which the `NSTableView` behind it draws. This finds that table, turns

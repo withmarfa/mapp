@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 /// Types laid out as Marfa's built-in ones are: titles and text under different keys, a type titled by its first
@@ -199,5 +200,21 @@ nonisolated enum TypeChangeFixture {
         // An item that can't become a type is skipped, so the type is still offered for the rest.
         #expect(library.typeChangeOptions(for: [note.id, empty.id]).map(\.id).contains(F.entity))
         #expect(!library.typeChangeOptions(for: [note.id]).map(\.id).contains(MarfaMapping.fileType))
+    }
+
+    @Test func offersAChangeWhereAnyItemCanBecomeAnotherType() throws {
+        let library = library()
+        let note = library.add("Ada\n\nNotes about her")
+        let empty = library.add("")
+        let file = library.add("Scan")
+        let index = try #require(library.items.firstIndex { $0.id == file.id })
+        library.items[index].content = .file(.png, byteCount: 10)
+        #expect(library.offersTypeChange(for: [note.id]))
+        #expect(library.offersTypeChange(for: [file.id, note.id, empty.id]))
+        #expect(!library.offersTypeChange(for: []))
+        #expect(!library.offersTypeChange(for: [ItemID("gone")]))
+        for ids: Set<ItemID> in [[note.id], [empty.id], [file.id], [file.id, note.id], [], [ItemID("gone")]] {
+            #expect(library.offersTypeChange(for: ids) == !library.typeChangeOptions(for: ids).isEmpty)
+        }
     }
 }

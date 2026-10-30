@@ -81,10 +81,11 @@ struct ItemTable: View {
             }
         }
         .tableStyle(.inset)
-        .softSelection(rows: pages.shownIDs + collapsed.sorted(), selection: browser.selection)
+        .softSelection(rows: pages.shownIDs + collapsed.sorted(), selection: { browser.selection })
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .focused(pane, equals: .list)
+        .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityIdentifier("ItemTable")
         .contextMenu(forSelectionType: ItemID.self) { ids in
             if !ids.isEmpty {

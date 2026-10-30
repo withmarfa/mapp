@@ -246,13 +246,31 @@ struct NavigationCostTests {
         }
     }
 
-    /// Select All on about ten thousand items in the list, which the table does by itself, then the list scrolled: the soft selection's marks
-    /// should follow the rows in view, not all of those selected.
+    /// Select All on about ten thousand items in the list, sent as the Edit menu sends it, then the list scrolled and one
+    /// row chosen. Select All goes through the list's binding (`SelectAllRoute`), so no row's view is made for it; the
+    /// soft selection's marks should follow the rows in view, not all of those selected.
     @Test func aHostedWindowSelectingEveryItemInTheList() async throws {
-        try await hosted(scale: 15) { browser, _, _, step in
+        try await hosted(scale: 15) { browser, library, _, step in
             try await step("all items (list)") { browser.sidebarItem = .allNotes }
-            try await step("select every item") { Self.longestTable()?.selectAll(nil) }
+            try await step("select every item") {
+                #expect(NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: Self.longestTable(), from: nil))
+            }
+            let table = try #require(Self.longestTable())
+            let items = browser.items(in: library)
+            #expect(browser.selection == Set(items.map(\.id)))
             for index in 1...3 { try await step("scroll \(index)") { Self.scrollList(by: 1500) } }
+            let visible = table.rows(in: table.visibleRect)
+            let row = visible.location + visible.length / 2
+            // The table shows the selection on the rows it has made, here the ones scrolled to.
+            #expect(table.isRowSelected(row))
+            try await step("deselect one row") { table.deselectRow(row) }
+            #expect(browser.selection.count == items.count - 1)
+            try await step("extend by one row") { table.selectRowIndexes([row], byExtendingSelection: true) }
+            #expect(browser.selection.count == items.count)
+            try await step("choose one row") {
+                table.selectRowIndexes([row], byExtendingSelection: false)
+            }
+            #expect(browser.selection.count == 1)
         }
     }
 
@@ -297,6 +315,19 @@ struct NavigationCostTests {
             try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
             try await step("all items (table)") { browser.sidebarItem = .allNotes }
             try await step("decisions (table) again") { browser.sidebarItem = .itemType("aic.decision") }
+        }
+    }
+
+    /// The moves between places that stay on the table, on about ten thousand items, as a test instance holds.
+    @Test func aHostedWindowMovingBetweenTablePlacesOnALargeLibrary() async throws {
+        try await hosted(scale: 15) { browser, _, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("all items (table)") { browser.viewMode = .table }
+            for round in 1...3 {
+                try await step("decisions (table) \(round)") { browser.sidebarItem = .itemType("aic.decision") }
+                try await step("tasks (table) \(round)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+                try await step("all items (table) \(round)") { browser.sidebarItem = .allNotes }
+            }
         }
     }
 

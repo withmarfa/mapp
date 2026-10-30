@@ -74,6 +74,39 @@ import Testing
         #expect(browser.tableContent(in: library) !== pending)
     }
 
+    /// What a selection follows as items change: the table's rows as shown, then the rows its filters hide, so a
+    /// selection hidden by a filter is still held. The gallery follows the list's order.
+    @Test func theSelectionFollowsTheTableInTheOrderItShowsThenTheHiddenRows() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let browser = browser(showing: tasks)
+        browser.tableOptions[tasks] = ItemTableOptions(
+            sort: [ItemTableComparator(column: .title, order: .reverse)], filters: ["field.status": ["todo"]])
+        let content = browser.tableContent(in: library)
+        let ids = browser.collectionItemIDs(in: library, order: NoteOrder())
+        #expect(!content.rows.isEmpty && content.rows.count < content.allRows.count)
+        #expect(Array(ids.prefix(content.rows.count)) == content.rows.map(\.id))
+        #expect(ids.count == content.allRows.count)
+        #expect(Set(ids) == Set(content.allRows.map(\.id)))
+
+        browser.viewMode = .gallery
+        #expect(browser.collectionItemIDs(in: library, order: NoteOrder())
+            == browser.sections(in: library, order: NoteOrder(), now: library.now()).flatMap { $0.items.map(\.id) })
+        browser.viewMode = .list
+        #expect(browser.collectionItemIDs(in: library, order: NoteOrder()).isEmpty)
+    }
+
+    /// A place with statuses is grouped by status, so the selection follows the rows group by group, as they show.
+    @Test func theSelectionFollowsAGroupedTableGroupByGroup() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let browser = browser(showing: tasks)
+        browser.tableOptions[tasks] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .forward)])
+        let content = browser.tableContent(in: library)
+        try #require(content.grouping != nil && content.groups.count > 1)
+        let grouped = content.groups.flatMap(\.rows).map(\.id)
+        #expect(grouped != content.rows.map(\.id), "the sort's order across groups differs from the order shown")
+        #expect(Array(browser.collectionItemIDs(in: library, order: NoteOrder()).prefix(grouped.count)) == grouped)
+    }
+
     @Test func aPlaceWithNoItemsHasEmptyContent() async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = browser(showing: .itemType("aic.nothing"))
