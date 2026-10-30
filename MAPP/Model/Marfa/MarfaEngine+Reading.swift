@@ -336,6 +336,7 @@ extension MarfaEngine {
         var present: [Marfa.Item] = []
         var moved: Set<String> = []
         var came: Set<String> = []
+        var files = false
         var gone = Set(named.removedItems)
         let foundIDs = Set(found.map(\.id))
         // A row named but not found left the copy after it was named.
@@ -348,11 +349,17 @@ extension MarfaEngine {
             }
             let previous = rows[row.id]
             if previous == nil { came.insert(row.id) }
-            if Self.movesNames(previous, row, catalogue: catalogue) { moved.insert(row.id) }
+            if Self.movesNames(previous, row, catalogue: catalogue) {
+                moved.insert(row.id)
+                if isFile(previous) || isFile(row) { files = true }
+            }
             present.append(row)
         }
         gone.subtract(present.map(\.id))
-        for id in gone where rows[id] != nil { moved.insert(id) }
+        for id in gone where rows[id] != nil {
+            moved.insert(id)
+            if isFile(rows[id]) { files = true }
+        }
         if views.contains(where: { gone.contains($0.id.rawValue) }) { viewsChanged = true }
 
         // Taken before the edges change, as the edges after are taken once they have.
@@ -384,7 +391,7 @@ extension MarfaEngine {
 
         await sync.unreadable(Set(present.filter { $0.unreadableProperties != nil }.map(\.id)))
         if binChanged { await sync.binChanged() }
-        let linking = linkers(of: moved, ends: ends).subtracting(present.map(\.id))
+        let linking = linkers(of: moved, came: !came.isEmpty, files: files, ends: ends).subtracting(present.map(\.id))
         let before = linking.reduce(into: [String: BodyLinks]()) { before, id in before[id] = bodyLinks[id] }
         await readLinks(of: present + linking.compactMap { rows[$0] })
         affected.formUnion(linking.filter { before[$0] != bodyLinks[$0] })
@@ -414,22 +421,31 @@ extension MarfaEngine {
     }
 
     /// The rows held whose links may read differently because the rows `moved` came, went or changed how they are
-    /// named, which the copy names no change to (`WorkingCopy.changes(since:most:)`): the rows at the other end of
-    /// their edges (`ends`), the rows whose links name one of them, and, where one is held now, every row with a
-    /// link that names no item yet, which it may now name.
-    private func linkers(of moved: Set<String>, ends: Set<String>) -> Set<String> {
+    /// named, which the copy names no change to (`WorkingCopy.changes(since:most:)`). The package reads a link from
+    /// the edges at its host, which put the host among the `ends`, or from an ID the copy holds, so a link that names
+    /// no item yet may name one only once a row `came`; and it reads an embed from its host's attachments, or from
+    /// every file held, so an embed that names no item may read differently once a file moved (`files`). So: the
+    /// rows at the other end of their edges, the rows whose links or embeds name one of them, and those rows with a
+    /// link or embed that names no item.
+    private func linkers(of moved: Set<String>, came: Bool, files: Bool, ends: Set<String>) -> Set<String> {
         guard !moved.isEmpty else { return [] }
-        let arrived = moved.contains { rows[$0] != nil }
-        var found = ends
-        for (id, links) in bodyLinks {
-            let names = links.links + links.embeds
-            if names.contains(where: { name in
-                if case .item(let target) = name.target { moved.contains(target) } else { arrived }
-            }) {
-                found.insert(id)
+        func reads(_ names: [Marfa.BodyName], unbound: Bool) -> Bool {
+            names.contains { name in
+                if case .item(let target) = name.target { moved.contains(target) } else { unbound }
             }
         }
+        var found = ends
+        for (id, links) in bodyLinks where reads(links.links, unbound: came) || reads(links.embeds, unbound: files) {
+            found.insert(id)
+        }
         return found.filter { rows[$0] != nil }
+    }
+
+    /// Whether a row is a file, which an embed may name by its title wherever it is held.
+    private func isFile(_ row: Marfa.Item?) -> Bool {
+        guard let row else { return false }
+        let type = TypeID(row.type)
+        return type == MarfaMapping.fileType || catalogue.isSubtype(type, ofAnyOf: [MarfaMapping.fileType])
     }
 
     /// Whether every name in an item's text is bound to an item, so it reads the same until the item or its edges
@@ -569,7 +585,10 @@ extension MarfaEngine {
             entry.row.map(MarfaMapping.isLibraryItem) == false ? (row: nil, id: entry.id, held: []) : entry
         }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
-        let moved = Set(read.filter { Self.movesNames(rows[$0.id], $0.row, catalogue: catalogue) }.map(\.id))
+        let moving = read.filter { Self.movesNames(rows[$0.id], $0.row, catalogue: catalogue) }
+        let moved = Set(moving.map(\.id))
+        let came = moving.contains { rows[$0.id] == nil }
+        let files = moving.contains { isFile(rows[$0.id]) || isFile($0.row) }
         var ends: Set<String> = []
         var binChanged = false
         for (row, id, _) in read {
@@ -597,7 +616,7 @@ extension MarfaEngine {
             }
         }
         let present = read.compactMap(\.row)
-        let linking = linkers(of: moved, ends: ends).subtracting(present.map(\.id))
+        let linking = linkers(of: moved, came: came, files: files, ends: ends).subtracting(present.map(\.id))
         let before = linking.reduce(into: [String: BodyLinks]()) { before, id in before[id] = bodyLinks[id] }
         await readLinks(of: present + linking.compactMap { rows[$0] })
         affected.formUnion(linking.filter { before[$0] != bodyLinks[$0] })

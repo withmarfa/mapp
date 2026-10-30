@@ -26,6 +26,8 @@ import Testing
         let gone = Mutex<Set<String>>([])
         /// How many rereads fail before one succeeds.
         let failures = Mutex(0)
+        /// Each row whose links were asked for.
+        let linksAsked = Mutex<[String]>([])
         private let gate = Mutex((closed: false, waiting: [CheckedContinuation<Void, Never>]()))
 
         init(copy: WorkingCopy) { read = MarfaRead(copy: copy) }
@@ -98,8 +100,15 @@ import Testing
 
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
-        func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
-        func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
+        func links(in ids: [String]) async throws -> [String: BodyLinks] {
+            linksAsked.withLock { $0 += ids }
+            return try await read.links(in: ids)
+        }
+
+        func links(in id: String) async throws -> BodyLinks {
+            linksAsked.withLock { $0.append(id) }
+            return try await read.links(in: id)
+        }
 
         func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
             try refuseWhileFilling()
@@ -351,6 +360,23 @@ import Testing
         try await scene.wait("the link bound") {
             $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
         }
+        await finish(scene)
+    }
+
+    /// A link that names no item is read from its host's own edges or an ID the copy holds, so a retitled item
+    /// that is neither leaves it as it was, and a save of one item's text reads no other item's links.
+    @Test func aRetitledItemDoesNotReadAnUnrelatedLinkAgain() async throws {
+        let scene = try await makeScene()
+        let host = try await scene.note("Host", body: "See [[Nowhere]]")
+        scene.caughtUp()
+        try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        scene.reads.linksAsked.withLock { $0 = [] }
+
+        let first = try #require(scene.shown("First")).id.rawValue
+        try await scene.rename(first, to: "Nowhere")
+        scene.caughtUp()
+        try await scene.wait("the new title") { $0.item(titled: "Nowhere") != nil }
+        #expect(!scene.reads.linksAsked.withLock { $0 }.contains(host))
         await finish(scene)
     }
 }
