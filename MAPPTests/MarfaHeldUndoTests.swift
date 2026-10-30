@@ -212,7 +212,7 @@ import Testing
         await scene.engineSettled()
 
         // The copy is whole again, but a server change reads only the item: what the step touches may still be
-        // arriving elsewhere, so only a read of the whole copy may make it.
+        // arriving elsewhere, so only a whole read or a read of what changed, which finds the copy whole, may make it.
         scene.reads.whole.withLock { $0 = true }
         scene.source.hear(Change(origin: .server(event: "item.updated", cursor: "1"), itemId: scene.item.id.rawValue, edgeId: nil))
         await scene.source.engineTook()

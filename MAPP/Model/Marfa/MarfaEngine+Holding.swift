@@ -30,9 +30,10 @@ nonisolated struct Held {
 
 /// An undo or a redo pressed while the copy is brought up to date is not lost. The package refuses a write to an
 /// edge, or to a row it does not hold yet, until the copy is whole, and the undo manager has already taken the step
-/// off its stack, so the engine keeps the write and makes it once the copy has been read whole again: exactly once,
-/// and only if what it touches is as it was when the person pressed Undo. Otherwise it is given back as refused
-/// (`heldChangedCode`, `heldTimeoutCode`) and the library tells the person and keeps the step on the undo stack.
+/// off its stack, so the engine keeps the write and makes it once a whole read or a read of what changed finds the
+/// copy whole again: exactly once, and only if what it touches is as it was when the person pressed Undo. Otherwise
+/// it is given back as refused (`heldChangedCode`, `heldTimeoutCode`) and the library tells the person and keeps the
+/// step on the undo stack.
 extension MarfaEngine {
     nonisolated static func isBeingBroughtUpToDate(_ error: MarfaError) -> Bool {
         switch error {
@@ -77,9 +78,9 @@ extension MarfaEngine {
         held.removeAll { $0.group == group }
     }
 
-    /// Called once a read found the copy whole. Every held write is judged against what was just read before any is
-    /// made, so one that follows another (an undo and its redo) is judged as the person saw it, not as the one before
-    /// it leaves things. A group with any write whose items changed is given back whole.
+    /// Called once a whole read or a read of what changed found the copy whole. Every held write is judged against
+    /// what was just read before any is made, so one that follows another (an undo and its redo) is judged as the
+    /// person saw it, not as the one before it leaves things. A group with any write whose items changed is given back whole.
     func releaseHeld() async {
         guard !held.isEmpty else { return }
         let waiting = held
