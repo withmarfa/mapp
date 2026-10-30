@@ -260,7 +260,7 @@ struct NavigationCostTests {
         }
     }
 
-    /// The gallery, then a selection that moves from card to card, which must not make a card's derived values again.
+    /// The gallery, then a selection that moves from card to card, which should make no card's derived values again.
     @Test func aHostedWindowOnTheGallery() async throws {
         try await hosted { browser, library, step in
             try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }

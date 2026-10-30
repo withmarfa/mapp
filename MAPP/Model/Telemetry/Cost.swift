@@ -14,7 +14,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case tableContent
     case tableRows
     case tableGroups
-    /// One run of the gallery's own body, which lists every item the place holds.
+    /// One run of the gallery's own body, timed over its listing of every item the place holds.
     case galleryBody
     /// What one gallery card derives from its item, the catalogue and the files it embeds (`GalleryCardFacts`).
     case galleryCard

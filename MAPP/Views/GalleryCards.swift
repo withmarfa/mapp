@@ -68,7 +68,7 @@ struct GalleryEventDate: Equatable {
 
 /// One item in the gallery: a thumbnail, then its title and a line about it below, as Finder's icon view and the
 /// Notes gallery lay it out. It takes only its own inputs and compares by them, so a selection that moves, or
-/// another card's change, leaves its body alone; the selection ring is drawn around it (`GalleryCell`).
+/// another card's change, leaves its body alone; the selection ring (`GalleryRing`) reads the selection itself.
 struct GalleryCard: View, Equatable {
     @CurrentLibrary private var library
     let item: Item
