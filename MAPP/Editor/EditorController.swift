@@ -109,7 +109,11 @@ final class EditorController: NSObject {
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// note still reaches that note rather than the one now showing, and an edit typed before the page took in
     /// newer text says it was typed on the older text.
-    @ObservationIgnored var generation = 0
+    @ObservationIgnored var generation = 0 {
+        // Any other generation on the page (a newer open, a reload, an emptied page, a page process that started
+        // again) means the frame an open waits for will never be reported, so the open is dropped with no sample.
+        didSet { if opening?.generation != generation { opening = nil } }
+    }
     @ObservationIgnored private var shown: [Int: Shown] = [:]
 
     private struct Shown {
@@ -244,20 +248,39 @@ final class EditorController: NSObject {
         if pendingHeading?.note != item.id { pendingHeading = nil }
         loadRequest += 1
         let request = loadRequest
-        // From the request to the host having handed the note to the page; the page has no callback for its first
-        // paint, so how long the page takes to draw it is not here.
+        // `item.open` runs from the request to the page's first frame (`EditorMessage.painted`), `item.handoff` to the
+        // host having handed the note to the page. An open that never reaches its first frame is dropped unended,
+        // so it leaves no sample.
         let interval = Telemetry.begin(.navigation, "item.open")
+        let handoff = Telemetry.begin(.navigation, "item.handoff")
+        loading = item.id
         let present = { [self] in
-            defer { interval.end() }
+            defer { handoff.end() }
             guard request == loadRequest else { return }
+            loading = nil
+            // What changed while the last note was handed over is read now, so it is not loaded a second time.
+            let item = library?.item(item.id) ?? item
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
             show(item, as: "load")
+            if isReady, isPresented, noteID == item.id { opening = (generation, interval) }
         }
         if noteID != nil, noteID != item.id {
-            flush { kept in if kept { present() } else { interval.end() } }
+            flush { [self] kept in
+                if kept { return present() }
+                if request == loadRequest { loading = nil }
+                handoff.end()
+            }
         } else { present() }
     }
+
+    /// The note a `load` is still handing the last note over for. A change to it meanwhile waits for that load, which
+    /// reads the note as it is then, instead of starting another and handing the last note over twice.
+    @ObservationIgnored private var loading: ItemID?
+
+    /// The open waiting for its note's first frame, which only the page's `painted` for its generation ends. Leaving
+    /// the note, or another generation on the page, drops it unended.
+    @ObservationIgnored private(set) var opening: (generation: Int, interval: Telemetry.Interval)?
 
     @ObservationIgnored private var headerSource: () -> PageHeader? = { nil }
     /// Only the latest reading of the header follows changes, so readings never pile up.
@@ -329,7 +352,7 @@ final class EditorController: NSObject {
         // SwiftUI can deliver a change from the page just left after another item has loaded.
         // Only an explicit selection or load may navigate; an old update must not take the page back.
         guard item.id == requestedNoteID else { return }
-        guard item.id == noteID, isPresented else { return load(item) }
+        guard item.id == noteID, isPresented else { return loading == item.id ? () : load(item) }
         guard let body = library?.body(of: item.id) else { return }
         guard body.text != markdown || item.isWritable != isEditable else {
             // The page already holds this text, so what is typed next is typed on this version of it.
@@ -373,6 +396,8 @@ final class EditorController: NSObject {
     }
 
     private func hide() {
+        loading = nil
+        opening = nil
         cancelLinkRequest()
         wantsFocus = nil
         pendingHeading = nil
@@ -561,6 +586,10 @@ final class EditorController: NSObject {
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
+        case .painted(let generation):
+            guard let open = opening, open.generation == generation else { return }
+            open.interval.end()
+            opening = nil
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }

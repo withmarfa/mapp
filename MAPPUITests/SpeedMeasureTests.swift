@@ -186,6 +186,54 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
+    /// Opens the first item of the place just chosen, the moment the window shows the place: the list is still filling
+    /// and the page has just been left, which is when an open was seen to cost most.
+    func testOpeningRightAfterAPlaceChange() throws {
+        try launchWarm()
+        let types = typeRows().prefix(2)
+        try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
+        var firsts: [(place: XCUICoordinate, title: String, first: XCUICoordinate)] = []
+        for identifier in types {
+            let place = sidebarElement(identifier)
+            let spot = spot(place)
+            let title = place.placeName
+            spot.click()
+            XCTAssertTrue(list.outlineRows.element(boundBy: 0).waitForExistence(timeout: 20), "\(title) lists an item")
+            firsts.append((spot, title, self.spot(list.outlineRows.element(boundBy: 0))))
+        }
+        try begin("itemsAfterPlace")
+        measure(metrics: [signpost("item.open"), signpost("item.handoff"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for (place, title, first) in firsts + firsts.reversed() {
+                place.click()
+                XCTAssertTrue(waitUntil { self.window.title.hasPrefix(title) }, "the window shows \(title)")
+                time("open") { first.click() }
+            }
+        }
+    }
+
+    /// Opens the items `Scripts/measure-ui.sh` makes on the instance: a long article, one with forty pictures at web
+    /// addresses, and one with a very long field, each between two short ones, so every open replaces a different page.
+    func testOpeningLargeItems() throws {
+        try launchWarm()
+        let place = try XCTUnwrap(typeRows().first { $0.hasSuffix("core.media.article") }, "The instance shows the Article type in the sidebar")
+        sidebarElement(place).click()
+        XCTAssertTrue(list.waitForExistence(timeout: 20))
+        let titles = ["Speed open short", "Speed open long", "Speed open pictures", "Speed open long field"]
+        var rows: [String: XCUICoordinate] = [:]
+        for title in titles {
+            let row = list.outlineRows.containing(NSPredicate(format: "value CONTAINS %@", title)).element(boundBy: 0)
+            try XCTSkipUnless(row.waitForExistence(timeout: 30), "The instance holds no item titled \(title); Scripts/measure-ui.sh makes them")
+            rows[title] = spot(row)
+        }
+        try begin("itemsLarge")
+        measure(metrics: [signpost("item.open"), signpost("item.handoff"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for title in titles.dropFirst() {
+                inPhase("itemsLarge.short") { time("open") { rows["Speed open short"]?.click() } }
+                inPhase("itemsLarge.\(title.dropFirst("Speed open ".count))") { time(title) { rows[title]?.click() } }
+            }
+        }
+    }
+
     // MARK: Panels
 
     func testNewOpensQuickAdd() throws {
@@ -257,6 +305,14 @@ final class SpeedMeasureTests: XCTestCase {
         label = name
         samples = [:]
         Self.phases.notice("begin \(name, privacy: .public)")
+    }
+
+    /// Marks the log for the work inside as a phase of its own, so the signposts of just that work are reported
+    /// apart from the rest of the test, as the test's own label does for the whole.
+    private func inPhase(_ name: String, _ work: () -> Void) {
+        Self.phases.notice("begin \(name, privacy: .public)")
+        work()
+        Self.phases.notice("end \(name, privacy: .public)")
     }
 
     private func makeApp(keepingCopy: Bool) -> XCUIApplication {

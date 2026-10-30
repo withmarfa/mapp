@@ -454,6 +454,57 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
   }
 })
 
+test('a loaded note reports its first frame once, and not when another load has replaced it', async () => {
+  const root = document.createElement('div')
+  document.body.append(root)
+  const painted: number[] = []
+  const editor = await NoteEditor.mount(root, {
+    find() {},
+    changed() {},
+    stateChanged() {},
+    openLink() {},
+    copy() {},
+    painted: (generation) => painted.push(generation),
+  })
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback))
+  const drawFrame = () => frames.splice(0).forEach((callback) => callback(0))
+  try {
+    editor.setItem('note')
+    editor.load('First\n', 1)
+    await Promise.resolve()
+    drawFrame()
+    expect(painted).toEqual([])
+    drawFrame()
+    expect(painted).toEqual([1])
+    editor.load('Second\n', 2)
+    await Promise.resolve()
+    editor.load('Third\n', 3)
+    await Promise.resolve()
+    drawFrame()
+    drawFrame()
+    expect(painted).toEqual([1, 3])
+    editor.reload('Third, edited\n', 4)
+    await Promise.resolve()
+    drawFrame()
+    drawFrame()
+    expect(painted).toEqual([1, 3])
+    // A reload in the two frames after a load gives the page another generation, so the load reports nothing.
+    editor.load('Fourth\n', 5)
+    await Promise.resolve()
+    drawFrame()
+    editor.reload('Fourth, edited\n', 6)
+    await Promise.resolve()
+    drawFrame()
+    drawFrame()
+    expect(painted).toEqual([1, 3])
+  } finally {
+    await editor.destroy()
+    root.remove()
+    vi.restoreAllMocks()
+  }
+})
+
 test("the words the app sends mount Inkkit, with the app's own kept out of its labels", async () => {
   const swift = readFileSync(
     resolve(import.meta.dirname, '../../MAPP/Editor/EditorController+PageSettings.swift'),

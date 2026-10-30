@@ -27,6 +27,7 @@ export type EditorMessage =
   | { type: 'error' | 'diagnostic'; message: string }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
+  | { type: 'painted'; generation: number }
   | { type: 'headerScrolledAway'; away: boolean; generation: number }
   | { type: 'contentUnderToolbar'; under: boolean; generation: number }
   | { type: 'titleFocus'; focused: boolean }

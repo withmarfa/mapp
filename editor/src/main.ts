@@ -103,6 +103,9 @@ const editor = await NoteEditor.mount(
     copy(text) {
       postToHost({ type: 'copy', text })
     },
+    painted(generation) {
+      postToHost({ type: 'painted', generation })
+    },
     // Above the text, so a note with pictures that wait can load them all at once.
     picturesWaiting(count, sentence, button) {
       pictureBar.hidden = count === 0

@@ -51,20 +51,21 @@ def main(path):
             if action == "pid":
                 continue
             phase = name if action == "begin" else None
-            if action == "begin":
+            if action == "begin" and name not in order:
                 order.append(name)
             continue
-        if phase is None:
-            continue
         if kind == "signpostEvent":
+            # An interval belongs to the phase it began in, since a page's first frame can land just after the phase ends.
             key = (event.get("processID"), category, event.get("signpostName"), event.get("signpostID"))
-            if event.get("signpostType") == "begin":
+            if event.get("signpostType") == "begin" and phase is not None:
                 # A `Cost` is the `work` interval with its name as the message.
                 named = f"work.{message}" if key[2] == "work" and message else key[2]
-                begun[key] = (seconds(event), named)
+                begun[key] = (seconds(event), phase, named)
             elif event.get("signpostType") == "end" and key in begun:
-                start, named = begun.pop(key)
-                intervals.setdefault(phase, {}).setdefault((category, named), []).append((seconds(event) - start) * 1000)
+                start, began, named = begun.pop(key)
+                intervals.setdefault(began, {}).setdefault((category, named), []).append((seconds(event) - start) * 1000)
+        elif phase is None:
+            continue
         elif kind == "logEvent":
             if category == "launch" and message.startswith("launch since process start:"):
                 for name, ms in MILESTONE.findall(message):
