@@ -489,6 +489,15 @@ test('a loaded note reports its first frame once, and not when another load has 
     drawFrame()
     drawFrame()
     expect(painted).toEqual([1, 3])
+    // A reload in the two frames after a load gives the page another generation, so the load reports nothing.
+    editor.load('Fourth\n', 5)
+    await Promise.resolve()
+    drawFrame()
+    editor.reload('Fourth, edited\n', 6)
+    await Promise.resolve()
+    drawFrame()
+    drawFrame()
+    expect(painted).toEqual([1, 3])
   } finally {
     await editor.destroy()
     root.remove()

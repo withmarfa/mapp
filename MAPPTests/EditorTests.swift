@@ -267,6 +267,36 @@ struct EditorTests {
         try await page.wait { page.editor.opening == nil }
     }
 
+    /// The page reports a load's first frame only while that load's generation is on the page, so an open must not
+    /// outlast it: one left waiting would be ended by the next open's frame, as one very long false sample.
+    @Test func anOpenWhoseFirstFrameCanNoLongerBeReportedIsDropped() async throws {
+        let library = FakeItemLibrary()
+        let note = library.add("Drawn\n")
+        let page = try await Page(library: library)
+        page.editor.select(try #require(library.item(note.id)))
+        let reloaded = try #require(page.editor.opening)
+        library.updateBody(of: note.id, to: "Drawn, then edited elsewhere\n")
+        page.editor.noteChanged(try #require(library.item(note.id)))
+        #expect(page.editor.generation > reloaded.generation, "outside text reloads the note")
+        #expect(page.editor.opening == nil, "a reload drops the open")
+
+        let other = library.add("Another\n")
+        page.editor.select(try #require(library.item(other.id)))
+        try await page.wait { page.editor.noteID == other.id && page.editor.opening != nil }
+        let restarted = try #require(page.editor.opening)
+        // What a page whose process ended and started again says first.
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'ready' })")
+        try await page.wait { page.editor.generation > restarted.generation }
+        #expect(page.editor.opening == nil, "the page starting again drops the open")
+        try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'painted', generation: \(restarted.generation) })")
+        #expect(page.editor.opening == nil)
+
+        page.editor.select(try #require(library.item(note.id)))
+        try await page.wait { page.editor.noteID == note.id && page.editor.opening != nil }
+        page.editor.close()
+        #expect(page.editor.opening == nil, "leaving the note drops the open")
+    }
+
     @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Original\n")

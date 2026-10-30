@@ -109,7 +109,11 @@ final class EditorController: NSObject {
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
     /// note still reaches that note rather than the one now showing, and an edit typed before the page took in
     /// newer text says it was typed on the older text.
-    @ObservationIgnored var generation = 0
+    @ObservationIgnored var generation = 0 {
+        // Any other generation on the page (a newer open, a reload, an emptied page, a page process that started
+        // again) means the frame an open waits for will never be reported, so the open is dropped with no sample.
+        didSet { if opening?.generation != generation { opening = nil } }
+    }
     @ObservationIgnored private var shown: [Int: Shown] = [:]
 
     private struct Shown {
@@ -245,29 +249,26 @@ final class EditorController: NSObject {
         loadRequest += 1
         let request = loadRequest
         // `item.open` runs from the request to the page's first frame (`EditorMessage.painted`), `item.handoff` to the
-        // host having handed the note to the page.
+        // host having handed the note to the page. An open that never reaches its first frame is dropped unended,
+        // so it leaves no sample.
         let interval = Telemetry.begin(.navigation, "item.open")
         let handoff = Telemetry.begin(.navigation, "item.handoff")
         loading = item.id
         let present = { [self] in
             defer { handoff.end() }
-            guard request == loadRequest else {
-                interval.end()
-                return
-            }
+            guard request == loadRequest else { return }
             loading = nil
             // What changed while the last note was handed over is read now, so it is not loaded a second time.
             let item = library?.item(item.id) ?? item
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
             show(item, as: "load")
-            if isReady, isPresented, noteID == item.id { awaitPaint(of: generation, interval) } else { interval.end() }
+            if isReady, isPresented, noteID == item.id { opening = (generation, interval) }
         }
         if noteID != nil, noteID != item.id {
             flush { [self] kept in
                 if kept { return present() }
                 if request == loadRequest { loading = nil }
-                interval.end()
                 handoff.end()
             }
         } else { present() }
@@ -277,18 +278,9 @@ final class EditorController: NSObject {
     /// reads the note as it is then, instead of starting another and handing the last note over twice.
     @ObservationIgnored private var loading: ItemID?
 
-    /// The open waiting for its note's first frame. A newer open, or the page leaving the note, ends it.
+    /// The open waiting for its note's first frame, which only the page's `painted` for its generation ends. Leaving
+    /// the note, or another generation on the page, drops it unended.
     @ObservationIgnored private(set) var opening: (generation: Int, interval: Telemetry.Interval)?
-
-    private func awaitPaint(of generation: Int, _ interval: Telemetry.Interval) {
-        opening?.interval.end()
-        opening = (generation, interval)
-    }
-
-    private func finishOpening() {
-        opening?.interval.end()
-        opening = nil
-    }
 
     @ObservationIgnored private var headerSource: () -> PageHeader? = { nil }
     /// Only the latest reading of the header follows changes, so readings never pile up.
@@ -405,7 +397,7 @@ final class EditorController: NSObject {
 
     private func hide() {
         loading = nil
-        finishOpening()
+        opening = nil
         cancelLinkRequest()
         wantsFocus = nil
         pendingHeading = nil
@@ -595,7 +587,9 @@ final class EditorController: NSObject {
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
         case .painted(let generation):
-            if opening?.generation == generation { finishOpening() }
+            guard let open = opening, open.generation == generation else { return }
+            open.interval.end()
+            opening = nil
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }
