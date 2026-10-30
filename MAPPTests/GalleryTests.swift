@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 @Suite(.hangLimit)
@@ -59,5 +60,18 @@ struct GalleryTests {
         #expect(browser.showsCollection)
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.showsCollection)
+    }
+
+    @Test func aCardsFactsFollowItsShapeAndNotItsTitle() {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        let facts = GalleryCardFacts(of: newer, in: library)
+        #expect(facts.kind == .note)
+        var renamed = newer
+        renamed.title = "Renamed"
+        #expect(GalleryCardFacts(of: renamed, in: library) == facts, "a title does not decide the picture, so the card keeps its facts")
+        var file = newer
+        file.content = .file(.png, byteCount: 10)
+        #expect(GalleryCardFacts(of: file, in: library).kind == .file(.png))
+        #expect(GalleryCardFacts(of: file, in: library) != facts)
     }
 }
