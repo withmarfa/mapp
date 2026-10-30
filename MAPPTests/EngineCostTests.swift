@@ -445,6 +445,52 @@ struct EngineCostTests {
 
     // MARK: 6
 
+    /// The step a catch-up's `.refreshed(.caughtUp)` costs the engine after one change on the server, which the
+    /// follow has already shown: what a catch-up costs when there is little to catch up on.
+    @Test(.timeLimit(.minutes(10)))
+    func catchUpAfterOneRemoteChange() async throws {
+        try await withBench { bench in
+            let opened = try await openWhole(bench)
+            let library = opened.library, source = opened.source
+            var steps: [Double] = []
+            for round in 0..<5 {
+                // A tag of its own each round, since a note's source id is its tag and its place in the call.
+                let tag = "mapptest-catchup-\(UUID().uuidString.prefix(8).lowercased())"
+                bench.tags.append(tag)
+                let made = try await EngineServer.createNotes(count: 1, tag: tag)
+                try #require(await eventually(within: .seconds(60)) { made.allSatisfy { library.item($0) != nil } }, "round \(round)")
+                await source.engineTook()
+                let start = ContinuousClock.now
+                source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+                await source.engineTook()
+                steps.append(Self.ms(ContinuousClock.now - start))
+            }
+            line("catch_up_one_change_median", median(steps))
+            line("catch_up_one_change_max", steps.max() ?? 0)
+        }
+    }
+
+    /// Reading what every row's text links and embeds, as a whole read does when nothing is known yet.
+    @Test(.timeLimit(.minutes(10)))
+    func linkReadsOfEveryRow() async throws {
+        try await withBench { bench in
+            let opened = try await openWhole(bench)
+            var reads: [Double] = []
+            var asked = 0
+            for _ in 0..<3 {
+                await opened.source.engineTook()
+                let start = ContinuousClock.now
+                asked = await opened.source.engine.readLinksOfEveryRow()
+                reads.append(Self.ms(ContinuousClock.now - start))
+            }
+            line("links_rows_asked", Double(asked), "count")
+            line("links_every_row_median", median(reads))
+            line("links_every_row_max", reads.max() ?? 0)
+        }
+    }
+
+    // MARK: 7
+
     @Test(.timeLimit(.minutes(30)))
     func floodOfCreatesThenDeletes() async throws {
         let flood = Int(ProcessInfo.processInfo.environment["MAPP_ENGINE_FLOOD"] ?? "") ?? 2000

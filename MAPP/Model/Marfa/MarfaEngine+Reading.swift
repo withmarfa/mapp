@@ -355,6 +355,15 @@ extension MarfaEngine {
         }
     }
 
+    #if DEBUG
+    /// Reads every row's links afresh, for `EngineCostTests`; answers how many rows could name a link.
+    func readLinksOfEveryRow() async -> Int {
+        let rows = Array(rows.values)
+        await readLinks(of: rows)
+        return rows.filter { Self.mayName($0, catalogue: catalogue) }.count
+    }
+    #endif
+
     /// Asks the package what the item's text names, from the copy alone.
     private func readLinks(of row: Marfa.Item) async {
         guard Self.mayName(row, catalogue: catalogue) else {
