@@ -30,7 +30,9 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
         guard previous?.windowShouldClose?(sender) != false else { return false }
         // A title typed in this window and refused would be lost with it.
         guard editor?.saveTitles(tellingRefusal: true) != false else { return false }
-        guard let editor, editor.hasNote else { return true }
+        // A hand-over still under way, as just after the note was left, holds the last edit of a note no longer
+        // on the page; once the window goes, a quit no longer waits on its editor.
+        guard let editor, editor.hasNote || editor.isFlushing else { return true }
         guard !awaiting else { return false }
         awaiting = true
         editor.flush { [weak self, weak sender] kept in

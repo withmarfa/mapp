@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import os
 
 /// Handing over the page's last edit before a note, a window or the library goes.
 extension EditorController {
@@ -8,7 +9,9 @@ extension EditorController {
     ///
     /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told, and the next
     /// flush goes ahead without it, so a stuck page never holds the window or the app for good. What the page
-    /// last reported is already saved; only what it never reported is lost.
+    /// last reported is already saved; only what it never reported is lost. Until then it is asked again only while
+    /// it is composing or importing a picture. Any other failure in the page, an exception or another refusal, is
+    /// logged and told at once with its own message, and the page is given up on the same way.
     ///
     /// Outside text reloading the note mid-flush leaves the note the one being flushed, so the flush goes ahead. A
     /// flush whose note was replaced on the page stops, and the person is told why.
@@ -55,28 +58,42 @@ extension EditorController {
             // Asked for the generation the flush began on even after outside text reloaded the note: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
             // has moved past it reported that text as it moved, and answers nil.
-            // Caught in the page, since an uncaught throw also reaches the page's error listener, which would tell the
-            // person that the editor failed each time a busy page is asked again.
+            // An exception is caught here and answered as a refusal, since the page's error listener hears one thrown
+            // into a script the app runs only as "Script error.", and would tell the person that.
             let script = """
                 (() => {
-                  try { return { text: window.editor.flush(\(generation)) } } catch { return { busy: true } }
+                  try { return window.editor.flush(\(generation)) }
+                  catch (error) { return { commandError: 'exception', message: String(error) } }
                 })()
                 """
             webView.evaluateJavaScript(script) { [self] result, error in
-                let answer = result as? [String: Any]
                 // A reply that comes after the page was given up on still holds the person's latest text.
-                if let markdown = answer?["text"] as? String { report(markdown, of: generation) }
+                if error == nil, let markdown = result as? String { report(markdown, of: generation) }
                 guard !finished else { return }
-                guard error == nil, answer?["busy"] == nil else {
+                let refusal = result as? [String: Any]
+                let code = refusal?["commandError"] as? String
+                // A page composing or importing a picture hands its edit over once it is done. A call that did not
+                // run in the page, as when its process ended, is asked again too, and then finds the page not ready.
+                if code.map(Self.passingFlushRefusals.contains) == true || error.map(Self.ranInPage) == false {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
                 }
+                if let error { return failed(error.localizedDescription) }
+                if let code { return failed(refusal?["message"] as? String ?? code) }
                 guard self.noteID == noteID else { return replaced() }
                 finish(true)
             }
         }
         func replaced() {
             tellNotSaved(noteID, reason: Self.replacedReason)
+            finish(false)
+        }
+        // The page answered, so it is not stuck, but asking again would only fail again. It is given up on as a page
+        // that stopped answering is, so trying again goes ahead without it.
+        func failed(_ message: String) {
+            abandonedGeneration = self.generation
+            Telemetry.logger(.editor).error("flush failed: \(message)")
+            tellNotSaved(noteID, reason: String(localized: "The editor couldn’t hand over your most recent typing (“\(message)”). Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
@@ -102,6 +119,16 @@ extension EditorController {
     private func tellNotSaved(_ noteID: ItemID, reason: String) {
         let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
         library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
+    }
+
+    /// The page's refusals to hand over its edit that pass: a composition, and a picture still being imported.
+    private static let passingFlushRefusals: Set<String> = ["composition", "operation-pending"]
+
+    /// Whether the script ran in the page and failed there, rather than never reaching it.
+    private static func ranInPage(_ error: any Error) -> Bool {
+        let error = error as NSError
+        return error.domain == WKError.errorDomain
+            && [WKError.javaScriptExceptionOccurred.rawValue, WKError.javaScriptResultTypeIsUnsupported.rawValue].contains(error.code)
     }
 
     private static var replacedReason: String {

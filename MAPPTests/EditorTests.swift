@@ -331,7 +331,7 @@ struct EditorTests {
         page.editor.onChange = { id, text, read in captured.append(text); library.updateBody(of: id, to: text, readAt: read) }
         try await page.run("""
             window.flushes = 0
-            window.editor.flush = () => { if (window.flushes++ === 0) throw new Error('composition'); return 'Composed\\n' }
+            window.editor.flush = () => window.flushes++ === 0 ? { commandError: 'composition', message: 'Composing' } : 'Composed\\n'
             """)
         let kept = await withCheckedContinuation { continuation in
             page.editor.flush { continuation.resume(returning: $0) }
@@ -346,7 +346,7 @@ struct EditorTests {
     @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
         let page = try await Page()
         try await page.load("Original\n")
-        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
         let originalID = page.editor.noteID
         let replacement = page.library.add("Replacement\n")
         let kept = await withCheckedContinuation { continuation in
@@ -403,7 +403,7 @@ struct EditorTests {
         let generation = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         let replacement = page.library.add("Replacement\n")
         let replacementItem = try #require(page.library.item(replacement.id))
-        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
         page.editor.select(replacementItem)
         try await page.wait { !page.library.notices.waiting.isEmpty }
         #expect(page.editor.noteID == originalID)
@@ -426,7 +426,7 @@ struct EditorTests {
         let page = try await Page()
         try await page.load("Original\n")
         let id = page.editor.noteID
-        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new Error('composition') }")
+        try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
         page.editor.close()
         #expect(!page.editor.hasNote)
         try await page.wait { !page.library.notices.waiting.isEmpty }
@@ -494,7 +494,7 @@ struct EditorTests {
         try await page.wait { !proxy.awaiting }
         try await page.run("0")
         host.permitsClose = true
-        try await page.run("window.editor.flush = () => { throw new Error('composition') }")
+        try await page.run("window.editor.flush = () => { throw new TypeError('flush failed') }")
         let laterRejected = proxy.windowShouldClose(window)
         #expect(!laterRejected)
         #expect(await eventually { !page.library.notices.waiting.isEmpty })

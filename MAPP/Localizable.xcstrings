@@ -686,6 +686,9 @@
     "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
+    "The editor couldn’t hand over your most recent typing (“%@”). Everything before it is saved. To go ahead without it, try again." : {
+
+    },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
 
     },
