@@ -590,7 +590,7 @@ extension MarfaEngine {
         publishReport(copies)
     }
 
-    /// What mapping a row reads of the engine, copied out so the rows can be mapped off the engine's own thread.
+    /// What mapping a row reads of the engine, copied out so several threads can map rows at once.
     nonisolated struct Mapping: Sendable {
         let rows: [String: Marfa.Item]
         let edges: MarfaEdgeTable

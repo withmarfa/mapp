@@ -226,7 +226,7 @@ nonisolated enum NoteText {
     /// character still answers true, which only runs the pattern, as it would run with no check. A native string's
     /// bytes are read in one block, so the search costs the same in an unoptimized build.
     static func holds(_ text: some StringProtocol, _ character: Unicode.Scalar) -> Bool {
-        let byte = UInt8(character.value)
+        let byte = UInt8(ascii: character)
         let found = text.utf8.withContiguousStorageIfAvailable { bytes in
             guard let start = bytes.baseAddress else { return false }
             return memchr(start, Int32(byte), bytes.count) != nil
