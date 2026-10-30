@@ -514,6 +514,20 @@ final class Browser {
         selection = ids
     }
 
+    /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
+    /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
+    /// timeline's in the list's order. The table's come from its own content, so a move between its places sorts no list.
+    func collectionItemIDs(in library: any ItemLibrary, order: NoteOrder) -> [ItemID] {
+        guard usesCollection else { return [] }
+        guard viewMode == .table else {
+            return sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
+        }
+        let content = tableContent(in: library)
+        let shown = content.rows.map(\.id)
+        let isShown = Set(shown)
+        return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
+    }
+
     /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
     func keepSelection(from old: [ItemID], to new: [ItemID]) {
         let kept = Self.selection(selection, keptFrom: old, in: new)
