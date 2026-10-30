@@ -12,6 +12,8 @@ nonisolated protocol MarfaReading: Sendable {
     /// The views still in use, as the sidebar lists them; `.partial` while a hydration is still bringing them.
     func views() async throws -> Rows<LibraryView>
     func items(inView id: String) async throws -> [Marfa.Item]
+    /// What the item's text names, from the copy alone.
+    func links(in id: String) async throws -> BodyLinks
 }
 
 nonisolated struct MarfaRead: MarfaReading {
@@ -31,4 +33,5 @@ nonisolated struct MarfaRead: MarfaReading {
         return Rows(views.rows.compactMap(MarfaMapping.view), completeness: views.completeness)
     }
     func items(inView id: String) async throws -> [Marfa.Item] { try await copy.items.list(inView: id).rows }
+    func links(in id: String) async throws -> BodyLinks { try await copy.items.links(in: id) }
 }

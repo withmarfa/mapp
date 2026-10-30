@@ -234,12 +234,13 @@ extension MarfaEngine {
         }
 
         let linking = Telemetry.begin(.engine, "reload.links")
-        var linkReads = 0
-        for (id, row) in rows where Self.mayName(row, catalogue: catalogue) {
-            if !everything, !touched.contains(id), let links = previousLinks[id], Self.allBound(links) { continue }
-            linkReads += 1
-            await readLinks(of: row)
+        let linked = rows.values.filter { row in
+            guard Self.mayName(row, catalogue: catalogue) else { return false }
+            if !everything, !touched.contains(row.id), let links = previousLinks[row.id], Self.allBound(links) { return false }
+            return true
         }
+        let linkReads = linked.count
+        await readLinks(of: linked)
         for id in Set(bodyLinks.keys).subtracting(rows.keys) { bodyLinks[id] = nil }
         for (id, row) in rows where bodyLinks[id] != nil && !Self.mayName(row, catalogue: catalogue) { bodyLinks[id] = nil }
         linking.end(("read", linkReads), ("kept", bodyLinks.count))
@@ -311,7 +312,47 @@ extension MarfaEngine {
     /// body from the copy one at a time, so the items that cannot are not asked.
     static func mayName(_ row: Marfa.Item, catalogue: Catalogue) -> Bool {
         guard let body = MarfaMapping.body(of: row, catalogue: catalogue) else { return false }
-        return body.contains("[[") || body.contains("![")
+        // Read from the bytes, since a first paint asks this of every row: `[[` or `![` is a `[` after `[` or `!`.
+        var previous: UInt8 = 0
+        for byte in body.utf8 {
+            if byte == UInt8(ascii: "["), previous == UInt8(ascii: "[") || previous == UInt8(ascii: "!") { return true }
+            previous = byte
+        }
+        return false
+    }
+
+    /// Below this many rows, reading links one at a time costs less than spreading the reads.
+    nonisolated static let serialLinkReads = 16
+
+    /// Asks the package what each row's text names, as `readLinks(of:)` does for one, several at a time: each read is
+    /// a hop to the package's own thread and back, which at a launch's thousands of rows is most of their cost.
+    private func readLinks(of rows: [Marfa.Item]) async {
+        var named: [Marfa.Item] = []
+        for row in rows {
+            if Self.mayName(row, catalogue: catalogue) { named.append(row) } else { bodyLinks[row.id] = nil }
+        }
+        guard named.count >= Self.serialLinkReads else {
+            for row in named { await readLinks(of: row) }
+            return
+        }
+        let (hub, reading) = (hub, reading)
+        let width = ProcessInfo.processInfo.activeProcessorCount
+        await withTaskGroup(of: (String, BodyLinks?).self) { group in
+            var next = named.makeIterator()
+            func add() -> Bool {
+                guard let row = next.next() else { return false }
+                group.addTask {
+                    // An item the copy cannot name links for shows the edges it holds, and no more.
+                    (row.id, try? await Self.asking(hub) { try await reading.links(in: row.id) })
+                }
+                return true
+            }
+            for _ in 0..<width { guard add() else { break } }
+            for await (id, links) in group {
+                bodyLinks[id] = links
+                _ = add()
+            }
+        }
     }
 
     /// Asks the package what the item's text names, from the copy alone.
@@ -321,7 +362,7 @@ extension MarfaEngine {
             return
         }
         do {
-            bodyLinks[row.id] = try await Self.asking(hub) { try await copy.items.links(in: row.id) }
+            bodyLinks[row.id] = try await Self.asking(hub) { try await reading.links(in: row.id) }
         } catch {
             // An item the copy cannot name links for shows the edges it holds, and no more.
             bodyLinks[row.id] = nil
@@ -331,13 +372,9 @@ extension MarfaEngine {
     /// The items whose links named nothing, or nothing yet, which a drain, a catch-up or a new item may have
     /// settled: those whose links now read differently.
     func settledLinks() async -> Set<String> {
-        var changed: Set<String> = []
-        for (id, links) in bodyLinks where (links.links + links.embeds).contains(where: { !$0.target.isItem }) {
-            guard let row = rows[id] else { continue }
-            await readLinks(of: row)
-            if bodyLinks[id] != links { changed.insert(id) }
-        }
-        return changed
+        let unsettled = bodyLinks.filter { _, links in (links.links + links.embeds).contains { !$0.target.isItem } }
+        await readLinks(of: unsettled.keys.compactMap { rows[$0] })
+        return Set(unsettled.filter { bodyLinks[$0.key] != $0.value }.keys)
     }
 
     /// Reads again the rows named, with every edge they hold or are held by. All are read before any is taken in, and
@@ -519,18 +556,19 @@ extension MarfaEngine {
         changedSync = []
         if catalogueChanged, painted, hub.catalogue != catalogue { hub.publish(.catalogue(catalogue)) }
         var changes = ItemChanges()
+        var present: [(id: ItemID, row: Marfa.Item)] = []
         for id in ids {
             guard let row = rows[id.rawValue] ?? binned[id.rawValue] else {
                 if items.removeValue(forKey: id) != nil { changes.removed.append(id) }
                 bodies[id] = nil
                 continue
             }
-            let held = edges.edges(touching: row.id).sorted { $0.createdAt < $1.createdAt }
-            let item = MarfaMapping.item(
-                row, edges: held, catalogue: catalogue, sync: syncStates[id] ?? .settled, bodyLinks: bodyLinks[row.id],
-                isHeld: { self.rows[$0] != nil })
-            let text = MarfaMapping.body(of: row, catalogue: catalogue)
-            let hash = text?.hashValue ?? 0
+            present.append((id, row))
+        }
+        let mapped = Self.mapped(present, reading: Mapping(
+            rows: rows, edges: edges, catalogue: catalogue, syncStates: syncStates, bodyLinks: bodyLinks))
+        for (item, text, hash) in mapped {
+            let id = item.id
             let previous = items[id]
             if let text, previous?.version != item.version || bodies[id] != hash {
                 changes.bodies.append(ItemBody(id: id, text: text, version: item.version))
@@ -552,6 +590,45 @@ extension MarfaEngine {
         for failure in failures { hub.publish(.unavailable(failure)) }
         failures = []
         publishReport(copies)
+    }
+
+    /// What mapping a row reads of the engine, copied out so several threads can map rows at once.
+    nonisolated struct Mapping: Sendable {
+        let rows: [String: Marfa.Item]
+        let edges: MarfaEdgeTable
+        let catalogue: Catalogue
+        let syncStates: [ItemID: SyncState]
+        let bodyLinks: [String: BodyLinks]
+    }
+
+    /// Below this many rows, spreading the work costs more than it saves.
+    nonisolated static let serialMapping = 256
+
+    /// Each row as the library shows it, with its text and the text's hash, in the order given. A whole read maps
+    /// every row, which is most of a launch's paint, and each row maps alone, so a large batch is spread over the
+    /// processor's cores.
+    nonisolated static func mapped(
+        _ present: [(id: ItemID, row: Marfa.Item)], reading state: Mapping
+    ) -> [(item: Item, text: String?, hash: Int)] {
+        func map(_ row: Marfa.Item, id: ItemID) -> (item: Item, text: String?, hash: Int) {
+            let held = state.edges.edges(touching: row.id).sorted { $0.createdAt < $1.createdAt }
+            let item = MarfaMapping.item(
+                row, edges: held, catalogue: state.catalogue, sync: state.syncStates[id] ?? .settled,
+                bodyLinks: state.bodyLinks[row.id], isHeld: { state.rows[$0] != nil })
+            let text = MarfaMapping.body(of: row, catalogue: state.catalogue)
+            return (item, text, text?.hashValue ?? 0)
+        }
+        guard present.count >= serialMapping else { return present.map { map($0.row, id: $0.id) } }
+        let chunks = min(present.count / (serialMapping / 4), ProcessInfo.processInfo.activeProcessorCount * 4)
+        // Each chunk fills its own slots, and the chunks together cover every slot once.
+        return Array<(item: Item, text: String?, hash: Int)>(unsafeUninitializedCapacity: present.count) { buffer, count in
+            nonisolated(unsafe) let slots = buffer
+            DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
+                let start = present.count * chunk / chunks, end = present.count * (chunk + 1) / chunks
+                for index in start..<end { slots.initializeElement(at: index, to: map(present[index].row, id: present[index].id)) }
+            }
+            count = present.count
+        }
     }
 
     /// A drain that stops on an error has recorded the answers it got and tells none of them. They are read from the

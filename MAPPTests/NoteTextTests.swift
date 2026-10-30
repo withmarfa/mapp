@@ -103,4 +103,33 @@ struct NoteTextTests {
     @Test func aPreviewReadsAsWrittenWhateverTheEditorEscaped() {
         #expect(preview("R\\&D: plan\n\nsnake\\_case", title: "R&D: plan") == "snake_case")
     }
+
+    @Test func linesSplitWhereEveryNewlineDoes() {
+        let texts = [
+            "one\ntwo\r\nthree\rfour", "\n\nlead and trail\n\n", "vertical\u{0B}tab\u{0C}feed",
+            "next\u{85}line\u{2028}separator\u{2029}paragraph", "café\u{301}\n👩‍👩‍👧 family",
+            "quotes “like” these — and – dashes … ‘too’", "Â non-break\u{A0}space ©", "", "\r\n", "no break",
+        ]
+        for text in texts {
+            #expect(Array(NoteText.Lines(text)) == text.split(whereSeparator: \.isNewline), "\(text.debugDescription)")
+        }
+    }
+
+    /// A native string is searched in one block of bytes; a string bridged from Foundation, byte by byte.
+    @Test func holdsFindsACharacterInEveryKindOfString() {
+        let native = "plain <tag> text"
+        #expect(NoteText.holds(native, "<"))
+        #expect(!NoteText.holds(native, "["))
+        #expect(NoteText.holds(native.dropFirst(6), "<"))
+        #expect(!NoteText.holds(native.dropFirst(7), "<"))
+        let bridged = NSString(string: "bridged café <tag>") as String
+        #expect(NoteText.holds(bridged, "<"))
+        #expect(!NoteText.holds(bridged, "["))
+        #expect(!NoteText.holds("", "<"))
+    }
+
+    @Test func aControlCharacterReadsAsASpace() {
+        #expect(NoteText.plainText(of: "one\u{01}two\u{7F}three\u{85}four\u{9F}five") == "one two three four five")
+        #expect(NoteText.plainText(of: "café ½ © non-break\u{A0}space") == "café ½ © non-break\u{A0}space")
+    }
 }

@@ -13,29 +13,80 @@ nonisolated struct ItemDate: Equatable, Sendable {
     /// Reads a value as Marfa writes it, or nil where it is not one of the contract's forms or names a day or time
     /// the calendar does not have.
     static func parse(_ text: String, calendar: Calendar = .current) -> ItemDate? {
-        guard let match = text.wholeMatch(of: pattern) else { return nil }
-        let (_, year, month, dayOfMonth, hour, minute, second, fraction, zone) = match.output
-        guard hour != nil else {
-            return startOfDay(Int(year)!, Int(month)!, Int(dayOfMonth)!, in: calendar.timeZone)
-                .map { ItemDate(date: $0, hasTime: false) }
+        // Read from the bytes rather than with a pattern, which is far slower: every item's created and modified
+        // dates are read each time a library loads.
+        var reader = Reader(text)
+        guard let year = reader.digits(4), reader.take("-"), let month = reader.digits(2), reader.take("-"),
+              let dayOfMonth = reader.digits(2) else { return nil }
+        if reader.atEnd {
+            return startOfDay(year, month, dayOfMonth, in: calendar.timeZone).map { ItemDate(date: $0, hasTime: false) }
         }
-        guard let start = utcMidnight(Int(year)!, Int(month)!, Int(dayOfMonth)!),
-              let hour = hour.flatMap({ Int($0) }), let minute = minute.flatMap({ Int($0) }),
-              hour <= 23, minute <= 59 else { return nil }
-        let seconds = second.flatMap { Int($0) } ?? 0
-        guard seconds <= 59 else { return nil }
+        guard reader.take("T"), let hour = reader.digits(2), reader.take(":"), let minute = reader.digits(2) else { return nil }
+        var seconds = 0
+        var fractional = 0.0
+        if reader.take(":") {
+            guard let second = reader.digits(2) else { return nil }
+            seconds = second
+            if reader.take(".") {
+                guard let fraction = reader.digitRun(), let value = Double("0." + fraction) else { return nil }
+                fractional = value
+            }
+        }
         let offset: Int
-        if let zone, zone != "Z" {
-            let sign = zone.first == "-" ? -1 : 1
-            let parts = zone.dropFirst().split(separator: ":").compactMap { Int($0) }
-            guard parts.count == 2, parts[0] <= 23, parts[1] <= 59 else { return nil }
-            offset = sign * (parts[0] * 3600 + parts[1] * 60)
-        } else {
+        if reader.take("Z") {
             offset = 0
+        } else {
+            let sign = reader.take("-") ? -1 : reader.take("+") ? 1 : 0
+            guard sign != 0, let hours = reader.digits(2), reader.take(":"), let minutes = reader.digits(2),
+                  hours <= 23, minutes <= 59 else { return nil }
+            offset = sign * (hours * 3600 + minutes * 60)
         }
-        let fractional = fraction.flatMap { Double("0." + $0) } ?? 0
+        guard reader.atEnd, let start = utcMidnight(year, month, dayOfMonth), hour <= 23, minute <= 59, seconds <= 59
+        else { return nil }
         let interval = TimeInterval(hour * 3600 + minute * 60 + seconds - offset) + fractional
         return ItemDate(date: start.addingTimeInterval(interval), hasTime: true)
+    }
+
+    /// Reads a value's ASCII parts in order.
+    private struct Reader {
+        private let bytes: String.UTF8View
+        private var index: String.Index
+
+        init(_ text: String) {
+            bytes = text.utf8
+            index = bytes.startIndex
+        }
+
+        var atEnd: Bool { index == bytes.endIndex }
+
+        private var digit: UInt8? {
+            guard index < bytes.endIndex, (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(bytes[index]) else { return nil }
+            return bytes[index] - UInt8(ascii: "0")
+        }
+
+        mutating func take(_ character: Unicode.Scalar) -> Bool {
+            guard index < bytes.endIndex, bytes[index] == UInt8(ascii: character) else { return false }
+            bytes.formIndex(after: &index)
+            return true
+        }
+
+        /// Exactly `count` digits, as a number.
+        mutating func digits(_ count: Int) -> Int? {
+            var value = 0
+            for _ in 0..<count {
+                guard let digit else { return nil }
+                value = value * 10 + Int(digit)
+                bytes.formIndex(after: &index)
+            }
+            return value
+        }
+
+        /// One or more digits, as written.
+        mutating func digitRun() -> String? {
+            let start = index
+            while digit != nil { bytes.formIndex(after: &index) }
+            return index > start ? String(Substring(bytes[start..<index])) : nil
+        }
     }
 
     /// The value for the day a picked date falls on in the person's calendar.
@@ -55,8 +106,6 @@ nonisolated struct ItemDate: Equatable, Sendable {
                                      locale: locale, calendar: calendar, timeZone: calendar.timeZone)
         return date.formatted(style)
     }
-
-    nonisolated(unsafe) private static let pattern = #/([0-9]{4})-([0-9]{2})-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.([0-9]+))?)?(Z|[+-][0-9]{2}:[0-9]{2}))?/#
 
     /// The contract's days are the proleptic Gregorian calendar of years 0000 to 9999, which Foundation's Gregorian
     /// calendar is not (it counts the Julian calendar before 1582), so the day is checked and placed by arithmetic.

@@ -21,7 +21,7 @@ nonisolated enum ItemPreview {
 
     private static func plain(_ body: String, title: String) -> String {
         var text = String(body.prefix(reach))
-        if text.contains("<!--") {
+        if NoteText.holds(text, "<"), text.contains("<!--") {
             text.replace(comment, with: " ")
             text.replace(unfinishedComment, with: " ")
         }
@@ -29,7 +29,7 @@ nonisolated enum ItemPreview {
         if let first = lines.first, first.localizedCaseInsensitiveCompare(title) == .orderedSame {
             lines.removeFirst()
         }
-        let words = sentences(lines).split(whereSeparator: \.isWhitespace)
+        let words = sentences(lines).split(whereSeparator: { $0.isWhitespace })
         return String(words.joined(separator: " ").prefix(limit))
     }
 
@@ -59,7 +59,7 @@ nonisolated enum ItemPreview {
     private static func capitalized(_ line: String) -> String {
         guard let first = line.first, first.isLowercase else { return line }
         let word = line.prefix { $0.isLetter }
-        guard word.allSatisfy(\.isLowercase) else { return line }
+        guard word.allSatisfy({ $0.isLowercase }) else { return line }
         return first.uppercased() + line.dropFirst()
     }
 
