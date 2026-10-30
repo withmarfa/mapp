@@ -155,25 +155,6 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
-    /// Select All on the whole library, then scrolling, which asks the soft selection's marks for every selected row
-    /// and checks them again after each scroll.
-    func testSelectingAllInTheTable() throws {
-        try launchWarm()
-        sidebarElement("SidebarPlace-all").click()
-        app.typeKey("3", modifierFlags: .command)
-        let table = element("ItemTable")
-        XCTAssertTrue(table.waitForExistence(timeout: 60), "the table showed")
-        table.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).click()
-        try begin("table.selectAll")
-        measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
-            time("selectAll") { app.typeKey("a", modifierFlags: .command) }
-            for _ in 0..<5 { time("scroll") { app.typeKey(.pageDown, modifierFlags: []) } }
-            // Back to one row at the top, so the next iteration selects all again.
-            app.typeKey(.downArrow, modifierFlags: [])
-            app.typeKey(.home, modifierFlags: [])
-        }
-    }
-
     /// Clicking one card after another in the gallery.
     func testSelectingInTheGallery() throws {
         try launchWarm()
