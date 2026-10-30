@@ -523,7 +523,8 @@ final class Browser {
             return sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
         }
         let content = tableContent(in: library)
-        let shown = content.rows.map(\.id)
+        // A grouped table shows its rows group by group, not in the sort's order across groups.
+        let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
         let isShown = Set(shown)
         return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
     }

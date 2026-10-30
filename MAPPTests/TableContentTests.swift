@@ -95,6 +95,18 @@ import Testing
         #expect(browser.collectionItemIDs(in: library, order: NoteOrder()).isEmpty)
     }
 
+    /// A place with statuses is grouped by status, so the selection follows the rows group by group, as they show.
+    @Test func theSelectionFollowsAGroupedTableGroupByGroup() async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let browser = browser(showing: tasks)
+        browser.tableOptions[tasks] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .forward)])
+        let content = browser.tableContent(in: library)
+        try #require(content.grouping != nil && content.groups.count > 1)
+        let grouped = content.groups.flatMap(\.rows).map(\.id)
+        #expect(grouped != content.rows.map(\.id), "the sort's order across groups differs from the order shown")
+        #expect(Array(browser.collectionItemIDs(in: library, order: NoteOrder()).prefix(grouped.count)) == grouped)
+    }
+
     @Test func aPlaceWithNoItemsHasEmptyContent() async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = browser(showing: .itemType("aic.nothing"))

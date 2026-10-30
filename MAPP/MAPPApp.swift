@@ -121,6 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Select All in a long list is routed by `MAPPApplication`; under another application object it would build
+        // every selected row's view again, with every test still passing.
+        assert(NSApp is MAPPApplication, "MAPP runs under MAPPApplication")
         separators.start()
         #if DEBUG
         let sampled = SampleLibrary.isRequested
