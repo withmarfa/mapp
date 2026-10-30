@@ -63,7 +63,12 @@ import Testing
             return try await read.items()
         }
 
+        func items(_ ids: [String]) async throws -> Rows<Marfa.Item> { try await read.items(ids) }
         func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
+        func edges(_ ids: [String]) async throws -> [Marfa.Edge] { try await read.edges(ids) }
+        func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+            try await read.changes(since: cursor, most: most)
+        }
 
         func edges(touching id: String) async throws -> [Marfa.Edge] {
             rowReads.withLock { $0 += 1 }
@@ -82,6 +87,17 @@ import Testing
             linkReads.withLock { $0 += 1 }
             if let answer = answers.withLock({ $0 })?(id) { return answer }
             return try await read.links(in: id)
+        }
+
+        /// Counts a row for each row asked about, as a read of one row at a time would.
+        func links(in ids: [String]) async throws -> [String: BodyLinks] {
+            linkReads.withLock { $0 += ids.count }
+            let answers = answers.withLock { $0 }
+            var links: [String: BodyLinks] = [:]
+            for id in ids {
+                if let answer = answers?(id) { links[id] = answer } else { links[id] = try? await read.links(in: id) }
+            }
+            return links
         }
 
         /// A copy still filling, as the sync lane reads it, so the lane never drains the fake itself.
@@ -284,12 +300,12 @@ import Testing
         await scene.close()
     }
 
-    /// A paint of many rows that name links reads them several at a time (`MarfaEngine.serialLinkReads`); each row
-    /// must still show what the copy answers for its own text, whether a link names a held row, nothing, or an
-    /// embed names nothing, and a row that names nothing must show none. The fake copy cannot answer a links read,
-    /// so the test gives the answers.
+    /// A paint of many rows that name links reads them many at a time, in more than one read
+    /// (`MarfaEngine.linkReadSize`); each row must still show what the copy answers for its own text, whether a link
+    /// names a held row, nothing, or an embed names nothing, and a row that names nothing must show none. The fake
+    /// copy cannot answer a links read, so the test gives the answers.
     @Test func aPaintOfManyLinkingRowsShowsEachRowsOwnLinks() async throws {
-        let linking = MarfaEngine.serialLinkReads * 4 - 4
+        let linking = MarfaEngine.linkReadSize + 60
         let total = linking + 30
         var answers: [String: BodyLinks] = [:]
         var rows: [Marfa.Item] = []

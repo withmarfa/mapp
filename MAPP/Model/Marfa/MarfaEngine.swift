@@ -175,6 +175,9 @@ actor MarfaEngine {
     var sentAsRead: Set<String> = []
     var following: Task<Void, Never>?
     var painted = false
+    /// Where the copy's changes are next read from (`readChanged`). The rows and edges held agree with the copy at
+    /// this point for every row and edge the copy has not named as changed since; nil until a whole read takes one.
+    var cursor: ChangeCursor?
     /// When a hydration's progress may next read the copy whole (`takeFillProgress`).
     var fillReadAllowed = ContinuousClock.now
     private var closed = false

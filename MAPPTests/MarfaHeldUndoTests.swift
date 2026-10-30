@@ -44,8 +44,23 @@ import Testing
             return try await read.edges(touching: id)
         }
 
+        func items(_ ids: [String]) async throws -> Rows<Marfa.Item> {
+            Rows(try await read.items(ids).rows, completeness: whole.withLock { $0 } ? .complete : .partial)
+        }
+
+        func edges(_ ids: [String]) async throws -> [Marfa.Edge] {
+            try refuseUntilWhole()
+            return try await read.edges(ids)
+        }
+
+        func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+            try refuseUntilWhole()
+            return try await read.changes(since: cursor, most: most)
+        }
+
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
+        func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 
         func refuseUntilWhole() throws {
@@ -213,6 +228,20 @@ import Testing
         scene.becomeWhole()
         try #require(try await eventuallyAsking { try await scene.links() == 0 })
         #expect(await scene.held() == 0)
+        await finish(scene)
+    }
+
+    @Test func aReadOfWhatChangedOnceTheCopyIsWholeMakesTheUndoWithoutAWholeRead() async throws {
+        let scene = try await makeScene()
+        scene.unlink(as: UndoGroup())
+        try #require(try await eventuallyAsking { await scene.held() == 1 })
+        let reads = scene.reads.fullReads.withLock { $0 }
+
+        // The copy names what changed since the engine's last whole read, so the rows it holds are the copy's.
+        scene.becomeWhole()
+        try #require(try await eventuallyAsking { try await scene.links() == 0 })
+        #expect(await scene.held() == 0)
+        #expect(scene.reads.fullReads.withLock { $0 } == reads, "no whole read")
         await finish(scene)
     }
 

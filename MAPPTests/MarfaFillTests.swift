@@ -162,9 +162,20 @@ private nonisolated final class FillingReads: MarfaReading {
         edgeReads.withLock { $0 += 1 }
         throw MarfaError.hydrationIncomplete(message: "Edges are not ready")
     }
+    func items(_ ids: [String]) async throws -> Rows<Marfa.Item> {
+        Rows(try await copy.items.get(ids, includingBin: true).rows, completeness: completeness)
+    }
+    func edges(_ ids: [String]) async throws -> [Marfa.Edge] {
+        edgeReads.withLock { $0 += 1 }
+        throw MarfaError.hydrationIncomplete(message: "Edges are not ready")
+    }
+    func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+        throw MarfaError.hydrationIncomplete(message: "The copy is not whole")
+    }
     func views() async throws -> Rows<LibraryView> { Rows([]) }
     func items(inView id: String) async throws -> [Marfa.Item] { [] }
     func links(in id: String) async throws -> BodyLinks { try await copy.items.links(in: id) }
+    func links(in ids: [String]) async throws -> [String: BodyLinks] { try await copy.items.links(in: ids) }
 }
 
 /// Reads the copy as it is, except while `hydrating`, when it refuses edge reads as a copy hydrating again does.
@@ -188,7 +199,17 @@ private nonisolated final class HydratingReads: MarfaReading {
         try refuseWhileHydrating()
         return try await read.edges(touching: id)
     }
+    func items(_ ids: [String]) async throws -> Rows<Marfa.Item> { try await read.items(ids) }
+    func edges(_ ids: [String]) async throws -> [Marfa.Edge] {
+        try refuseWhileHydrating()
+        return try await read.edges(ids)
+    }
+    func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+        try refuseWhileHydrating()
+        return try await read.changes(since: cursor, most: most)
+    }
     func views() async throws -> Rows<LibraryView> { try await read.views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
     func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
+    func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
 }
