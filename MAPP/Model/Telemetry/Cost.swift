@@ -14,6 +14,12 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case tableContent
     case tableRows
     case tableGroups
+    /// One run of the gallery's own body, which lists every item the place holds.
+    case galleryBody
+    /// What one gallery card derives from its item, the catalogue and the files it embeds (`GalleryCardFacts`).
+    case galleryCard
+    /// One placing of the soft selection's marks on a list or table.
+    case softSelection
     case boardFields
     case timelineFields
     /// One build of the item page's header, from the library and the window's drafts.
@@ -39,7 +45,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
 
     @discardableResult
     static func measure<Result>(_ cost: Cost, _ work: () -> Result) -> Result {
-        let state = signposter.beginInterval("work", id: signposter.makeSignpostID(), "\(cost.rawValue)")
+        let state = signposter.beginInterval("work", id: signposter.makeSignpostID(), "\(cost.rawValue, privacy: .public)")
         #if DEBUG
         let start = ContinuousClock.now
         defer {

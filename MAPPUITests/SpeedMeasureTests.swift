@@ -113,6 +113,59 @@ final class SpeedMeasureTests: XCTestCase {
         }
     }
 
+    /// The table on each place the sidebar offers, which is where a person feels the table rebuild its columns.
+    func testMovingBetweenTablePlaces() throws {
+        try launchWarm()
+        let types = typeRows().prefix(2)
+        try XCTSkipIf(types.count < 2, "The instance shows fewer than two types in the sidebar")
+        let items = sidebarElement("SidebarPlace-all")
+        let places = [items] + types.map(sidebarElement) + [items]
+        let titles = places.map(\.placeName)
+        let spots = places.map(spot)
+        items.click()
+        app.typeKey("3", modifierFlags: .command)
+        XCTAssertTrue(element("ItemTable").waitForExistence(timeout: 60), "the table showed")
+        try begin("table.places")
+        measure(metrics: [signpost("table.place"), signpost("place.choose"), XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for (spot, title) in zip(spots, titles) {
+                time("choose") { spot.click() }
+                XCTAssertTrue(waitUntil { self.window.title.hasPrefix(title) }, "the window shows \(title)")
+            }
+        }
+    }
+
+    /// Moving the selection down the table one row at a time, which moves the soft selection's marks.
+    func testSelectingInTheTable() throws {
+        try launchWarm()
+        sidebarElement("SidebarPlace-all").click()
+        app.typeKey("3", modifierFlags: .command)
+        let table = element("ItemTable")
+        XCTAssertTrue(table.waitForExistence(timeout: 60), "the table showed")
+        // Keys go to the table once it is the focused pane; a click on its empty space would also do that.
+        spot(table).click()
+        try begin("table.select")
+        measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for _ in 0..<5 { time("select") { app.typeKey(.downArrow, modifierFlags: []) } }
+            for _ in 0..<5 { time("select") { app.typeKey(.upArrow, modifierFlags: []) } }
+        }
+    }
+
+    /// Clicking one card after another in the gallery.
+    func testSelectingInTheGallery() throws {
+        try launchWarm()
+        sidebarElement("SidebarPlace-all").click()
+        app.typeKey("2", modifierFlags: .command)
+        let gallery = element("ItemGallery")
+        XCTAssertTrue(gallery.waitForExistence(timeout: 60), "the gallery showed")
+        let cards = window.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'GalleryItem-'"))
+        XCTAssertTrue(cards.element(boundBy: 5).waitForExistence(timeout: 60), "the gallery holds cards")
+        let spots = (0...5).map { spot(cards.element(boundBy: $0)) }
+        try begin("gallery.select")
+        measure(metrics: [XCTClockMetric(), XCTHitchMetric(application: app)], options: options) {
+            for spot in spots { time("select") { spot.click() } }
+        }
+    }
+
     func testOpeningItems() throws {
         try launchWarm()
         let place = try XCTUnwrap(typeRows().first, "The instance shows a type in the sidebar")

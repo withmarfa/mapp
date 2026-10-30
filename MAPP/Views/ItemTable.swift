@@ -16,9 +16,11 @@ struct ItemTable: View {
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
+    @State private var placeTrace = TablePlaceTrace()
 
     var body: some View {
         let _ = daysSeen
+        let _ = placeTrace.bodyRan(for: browser.item)
         let content = browser.tableContent(in: library)
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
@@ -175,6 +177,26 @@ struct ItemTable: View {
             ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
         } set: {
             storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+        }
+    }
+}
+
+/// Times what a table costs when it shows another place: from the first pass that builds it for the place until the
+/// main queue is free again, which is the pause a person feels. The signpost is `table.place`, in `navigation`.
+@MainActor
+private final class TablePlaceTrace {
+    private var place: SidebarItem?
+    private var interval: Telemetry.Interval?
+
+    func bodyRan(for place: SidebarItem) {
+        guard place != self.place else { return }
+        self.place = place
+        interval?.end()
+        interval = Telemetry.begin(.navigation, "table.place")
+        // The pass that updates the table runs when the runloop is about to wait, so this block comes after it.
+        DispatchQueue.main.async { [weak self] in
+            self?.interval?.end()
+            self?.interval = nil
         }
     }
 }

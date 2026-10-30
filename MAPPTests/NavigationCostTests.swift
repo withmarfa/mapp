@@ -260,6 +260,35 @@ struct NavigationCostTests {
         }
     }
 
+    /// The gallery, then a selection that moves from card to card, which must not make a card's derived values again.
+    @Test func aHostedWindowOnTheGallery() async throws {
+        try await hosted { browser, library, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("gallery") { browser.viewMode = .gallery }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select card \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (gallery)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (gallery)") { browser.sidebarItem = .allNotes }
+        }
+    }
+
+    /// The table, then a selection that moves from row to row, and the move between places that stays on the table.
+    @Test func aHostedWindowOnTheTable() async throws {
+        try await hosted { browser, library, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("table") { browser.viewMode = .table }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select row \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (table)") { browser.sidebarItem = .allNotes }
+            try await step("decisions (table) again") { browser.sidebarItem = .itemType("aic.decision") }
+        }
+    }
+
     /// An editor whose page has loaded, showing the header of `id` as the item page does, and the drafts it reads.
     private func openPage(_ id: ItemID, in library: MarfaLibrary) async throws -> (EditorController, DetailsPresentation) {
         let editor = EditorController(library: library)
