@@ -85,6 +85,7 @@ struct ItemTable: View {
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .focused(pane, equals: .list)
+        .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityIdentifier("ItemTable")
         .contextMenu(forSelectionType: ItemID.self) { ids in
             if !ids.isEmpty {

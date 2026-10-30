@@ -55,12 +55,17 @@ struct NoteList: View, Equatable {
         .accessibilityIdentifier("NoteList")
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
+        .takesKeyboardOnClick { browser.focusRequest = .list }
         .onDeleteCommand(perform: deleteSelection)
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
         .onKeyPress(.delete, phases: .down) { press in
             guard press.modifiers.contains(.command), !browser.selection.isEmpty else { return .ignored }
             deleteSelection()
             return .handled
+        }
+        // AppKit maps Command-Backspace to this text-system command before keyDown reaches SwiftUI.
+        .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:))) {
+            if !browser.selection.isEmpty { deleteSelection() }
         }
         // Return opens the note for writing; a deleted note or a file cannot be written in, so it stays in the list.
         .onKeyPress(.return, phases: .down) { press in
