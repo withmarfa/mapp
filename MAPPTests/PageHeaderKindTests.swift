@@ -106,6 +106,13 @@ struct PageHeaderKindTests {
         let body = "# Title\n\nSome **words** and a [link](https://example.com/a/very/long/address) and ![alt](img.png) <b>bold</b> --- 42"
         // Title, Some, words, and, a, link, and, bold, 42 (the rule and the addresses are not words).
         #expect(ReadingHeader.words(in: body) == 10 - 1)
+        // Markup is read as it is written: an image's label can run over lines, a link's text stays, and what never
+        // closes is text.
+        #expect(ReadingHeader.words(in: "![a label\nover lines](img.png)") == 0)
+        #expect(ReadingHeader.words(in: "[one](a)two [three](b)") == 3)
+        #expect(ReadingHeader.words(in: "<p class=\"x\">text</p>") == 1)
+        #expect(ReadingHeader.words(in: "unclosed <tag and ](x and ![y](z") == 6)
+        #expect(ReadingHeader.words(in: "Caf\u{E9} \u{1F600} 42") == 2)
     }
 
     @Test func aShortClippingHasNoReadingTime() {

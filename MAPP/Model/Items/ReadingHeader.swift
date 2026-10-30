@@ -45,11 +45,46 @@ nonisolated struct ReadingHeader: Equatable, Sendable {
 
     /// The words a person reads in some Markdown: not the addresses of its links and images, nor the tags of any
     /// HTML in it.
+    ///
+    /// The header is read again on every edit of the text, so this scans the UTF-8 once per kind of markup instead
+    /// of running regular expressions over a long article. Each scan matches what its pattern would: `![...](...)`,
+    /// then `](...)`, then `<...>`, each replaced by a space.
     static func words(in markdown: String) -> Int {
-        var text = markdown
-        text.replace(#/!\[[^\]]*\]\([^)]*\)/#, with: " ")
-        text.replace(#/\]\([^)]*\)/#, with: " ")
-        text.replace(#/<[^>]*>/#, with: " ")
-        return text.split(whereSeparator: \.isWhitespace).filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }.count
+        var bytes = Array(markdown.utf8)
+        bytes = replacingMatches(in: bytes) { bytes, start in
+            guard bytes[start] == UInt8(ascii: "!"), start + 1 < bytes.count, bytes[start + 1] == UInt8(ascii: "["),
+                  let label = bytes[(start + 2)...].firstIndex(of: UInt8(ascii: "]")),
+                  label + 1 < bytes.count, bytes[label + 1] == UInt8(ascii: "("),
+                  let end = bytes[(label + 2)...].firstIndex(of: UInt8(ascii: ")")) else { return nil }
+            return end + 1
+        }
+        bytes = replacingMatches(in: bytes) { bytes, start in
+            guard bytes[start] == UInt8(ascii: "]"), start + 1 < bytes.count, bytes[start + 1] == UInt8(ascii: "("),
+                  let end = bytes[(start + 2)...].firstIndex(of: UInt8(ascii: ")")) else { return nil }
+            return end + 1
+        }
+        bytes = replacingMatches(in: bytes) { bytes, start in
+            guard bytes[start] == UInt8(ascii: "<"), let end = bytes[(start + 1)...].firstIndex(of: UInt8(ascii: ">")) else { return nil }
+            return end + 1
+        }
+        return String(decoding: bytes, as: UTF8.self).split(whereSeparator: \.isWhitespace)
+            .filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }.count
+    }
+
+    /// `bytes` with each match replaced by a space. `match` gives the end of the match starting at an index, if one does.
+    private static func replacingMatches(in bytes: [UInt8], _ match: ([UInt8], Int) -> Int?) -> [UInt8] {
+        var result = [UInt8]()
+        result.reserveCapacity(bytes.count)
+        var index = 0
+        while index < bytes.count {
+            if let end = match(bytes, index) {
+                result.append(UInt8(ascii: " "))
+                index = end
+            } else {
+                result.append(bytes[index])
+                index += 1
+            }
+        }
+        return result
     }
 }
