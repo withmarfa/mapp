@@ -55,6 +55,22 @@ extension View {
         modifier(BandsToolbar())
     }
 
+    /// Reports whether this scroll view's content has scrolled beneath the toolbar, and hides the system's own top
+    /// edge for it, so the band the caller draws is the only one. Attach it to the scroll view itself.
+    func reportsContentUnderToolbar(_ isUnder: Binding<Bool>) -> some View {
+        // At rest the content starts exactly below the toolbar, which the scroll geometry reports as an inset.
+        onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in
+            isUnder.wrappedValue = new
+        }
+        .scrollEdgeEffectHidden(true, for: .top)
+    }
+
+    /// Draws the toolbar's band over the full width of this view once `isUnderToolbar`, for content that is narrower
+    /// than the column it scrolls in and reports through `reportsContentUnderToolbar`.
+    func toolbarBand(isUnderToolbar: Bool) -> some View {
+        overlay(alignment: .top) { ToolbarBandOverlay(isUnderToolbar: isUnderToolbar) }
+    }
+
     /// Gives a sidebar list a foot that draws as the toolbar's band does, mirrored, only while rows pass under it:
     /// the content's end lies below the top of the foot. Otherwise the foot sits on
     /// the plain sidebar, with no fill and no line. The list's own background is not content, so it never counts.
@@ -67,21 +83,24 @@ extension View {
 }
 
 private struct BandsToolbar: ViewModifier {
-    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
     @State private var isUnderToolbar = false
 
     func body(content: Content) -> some View {
         content
-            // At rest the content starts exactly below the toolbar, which the scroll geometry reports as an inset.
-            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 0.5 } action: { _, new in
-                isUnderToolbar = new
-            }
-            .scrollEdgeEffectHidden(true, for: .top)
-            .overlay(alignment: .top) {
-                GeometryReader { proxy in
-                    ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: showsBackground && isUnderToolbar)
-                }
-            }
+            .reportsContentUnderToolbar($isUnderToolbar)
+            .toolbarBand(isUnderToolbar: isUnderToolbar)
+    }
+}
+
+/// The band over the toolbar, with Show Toolbar Background When Scrolling applied.
+private struct ToolbarBandOverlay: View {
+    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
+    let isUnderToolbar: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: showsBackground && isUnderToolbar)
+        }
     }
 }
 

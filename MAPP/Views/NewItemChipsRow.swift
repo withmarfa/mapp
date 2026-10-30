@@ -4,9 +4,11 @@ import SwiftUI
 extension View {
     /// A row of chips to make something new, above a page the app already has. The page is the ordinary gallery,
     /// table, board, timeline or index, with its own toolbar, layout switcher and view options; the row shows only
-    /// where `Browser.offersNewItemChips`.
+    /// where `Browser.offersNewItemChips`. It is an inset and not a `safeAreaBar`, which draws a material of its own
+    /// behind the row at the width of the scroll view, lighter than the window while the window is not in front;
+    /// the page draws its band (`bandsToolbar`) once content is under the row.
     func newItemChips(_ browser: Browser) -> some View {
-        safeAreaBar(edge: .top, spacing: 0) {
+        safeAreaInset(edge: .top, spacing: 0) {
             if browser.offersNewItemChips {
                 MakeSomethingNew(browser: browser)
             }
