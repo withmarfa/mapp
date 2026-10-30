@@ -318,6 +318,19 @@ struct NavigationCostTests {
         }
     }
 
+    /// The moves between places that stay on the table, on about ten thousand items, as a test instance holds.
+    @Test func aHostedWindowMovingBetweenTablePlacesOnALargeLibrary() async throws {
+        try await hosted(scale: 15) { browser, _, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("all items (table)") { browser.viewMode = .table }
+            for round in 1...3 {
+                try await step("decisions (table) \(round)") { browser.sidebarItem = .itemType("aic.decision") }
+                try await step("tasks (table) \(round)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+                try await step("all items (table) \(round)") { browser.sidebarItem = .allNotes }
+            }
+        }
+    }
+
     /// An editor whose page has loaded, showing the header of `id` as the item page does, and the drafts it reads.
     private func openPage(_ id: ItemID, in library: MarfaLibrary) async throws -> (EditorController, DetailsPresentation) {
         let editor = EditorController(library: library)
