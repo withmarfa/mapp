@@ -196,11 +196,33 @@ extension EditorTests {
         #expect(!page.editor.windowIsGone)
     }
 
-    /// A page whose flush fails for any reason but a composition or an import is not asked again for the flush's limit:
+    /// A page that puts off a reload while the person composes refuses a flush for the reload's generation as stale until
+    /// the reload applies, then hands over what it holds.
+    @Test func aFlushRefusedAsStaleWhileTheReloadWaitsIsAskedAgainAndKept() async throws {
+        let library = FakeItemLibrary()
+        let note = library.add("Note\n")
+        let page = try await Page(library: library)
+        try await page.show(note.id)
+        page.editor.flushLimit = waitLimit
+        try await page.run("""
+            window.asked = 0
+            window.editor.flush = () => {
+              window.asked++
+              return window.asked === 1 ? { commandError: 'stale-document', message: 'Document changed' } : null
+            }
+            """)
+        let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
+        #expect(kept)
+        #expect(try await page.editor.webView.evaluateJavaScript("window.asked") as? Int == 2)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    /// A page whose flush fails for any reason but a composition, an import or a reload held back by either is not
+    /// asked again for the flush's limit:
     /// the person is told once, at once and with the page's own message, and trying again goes ahead without the page.
     @Test(arguments: [
         "throw new TypeError('the flush broke')",
-        "return { commandError: 'stale-document', message: 'the flush broke' }",
+        "return { commandError: 'internal', message: 'the flush broke' }",
     ])
     func aFlushThatFailsInThePageIsToldWithItsOwnMessageNotAskedAgain(failure: String) async throws {
         let library = FakeItemLibrary()

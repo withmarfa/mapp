@@ -72,7 +72,8 @@ extension EditorController {
                 guard !finished else { return }
                 let refusal = result as? [String: Any]
                 let code = refusal?["commandError"] as? String
-                // A page composing or importing a picture hands its edit over once it is done. A call that did not
+                // A page composing or importing a picture, or holding back a reload until then, hands its edit over
+                // once it is done. A call that did not
                 // run in the page, as when its process ended, is asked again too, and then finds the page not ready.
                 if code.map(Self.passingFlushRefusals.contains) == true || error.map(Self.ranInPage) == false {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
@@ -121,8 +122,9 @@ extension EditorController {
         library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
     }
 
-    /// The page's refusals to hand over its edit that pass: a composition, and a picture still being imported.
-    private static let passingFlushRefusals: Set<String> = ["composition", "operation-pending"]
+    /// The page's refusals to hand over its edit that pass: a composition, a picture still being imported, and a load or
+    /// reload the page puts off until either ends (`stale-document`, as the flush asks for the generation last sent).
+    private static let passingFlushRefusals: Set<String> = ["composition", "operation-pending", "stale-document"]
 
     /// Whether the script ran in the page and failed there, rather than never reaching it.
     private static func ranInPage(_ error: any Error) -> Bool {
