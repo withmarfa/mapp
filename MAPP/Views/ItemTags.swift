@@ -258,7 +258,9 @@ struct TagFlowLayout: Layout {
         var row = Row()
         var y: CGFloat = 0
         for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
+            // Measured at its own ideal size, not offered the row, so a view that grows to fill what it is offered
+            // (a chip with a maximum width) takes its content's width, not a slot of the maximum.
+            let size = subviews[index].sizeThatFits(.unspecified)
             let itemWidth = min(size.width, width)
             if !row.items.isEmpty && row.width + spacing + itemWidth > width {
                 rows.append(row)

@@ -20,7 +20,7 @@ struct CollectionActions: View {
             if holding.count > 1 {
                 Menu("Remove from Collection", systemImage: "rectangle.stack.badge.minus") {
                     ForEach(holding) { collection in
-                        Button(collection.title) { library.removeFromCollection(selection, collection.id, undoManager: undoManager) }
+                        Button(collection.displayTitle) { library.removeFromCollection(selection, collection.id, undoManager: undoManager) }
                     }
                 }
             } else if let collection = holding.first {
@@ -66,7 +66,7 @@ struct CollectionPickerSheet: View {
                 .accessibilityIdentifier("CollectionPickerFilter")
             List(collections, selection: $selected) { collection in
                 HStack {
-                    Label { Text(collection.title) } icon: { TypeIcon(name: library.catalogue.icon(for: collection.type)) }
+                    Label { Text(collection.displayTitle) } icon: { TypeIcon(name: library.catalogue.icon(for: collection.type)) }
                     Spacer()
                     if holdsAll(collection.id) { Image(systemName: "checkmark").foregroundStyle(.secondary) }
                 }
@@ -122,7 +122,7 @@ struct CollectionPickerSheet: View {
 
     private var subtitle: String {
         if request.ids.count == 1, let item = request.ids.first.flatMap({ library.item($0) }) {
-            String(localized: "Choose a collection for “\(item.title)”.")
+            String(localized: "Choose a collection for “\(item.displayTitle)”.")
         } else {
             String(localized: "Choose a collection for \(request.ids.count) items.")
         }

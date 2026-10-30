@@ -145,7 +145,7 @@ struct ItemRow: View {
                     if let titleExcerpt {
                         Text(titleExcerpt.attributed())
                     } else {
-                        Text(item.title.isEmpty ? String(localized: "Untitled") : item.title)
+                        Text(item.displayTitle)
                     }
                 }
                 .interfaceFont(.body.weight(.semibold))

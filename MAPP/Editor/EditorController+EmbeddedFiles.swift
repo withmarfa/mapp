@@ -116,8 +116,7 @@ extension EditorController {
     func notInText(_ embeds: [Embed], of id: ItemID) {
         guard let library, !embeds.isEmpty else { return }
         let names = embeds.map { "“\($0.name)”" }.formatted(.list(type: .and))
-        let title = library.item(id)?.title ?? ""
-        let item = title.isEmpty ? String(localized: "Untitled") : title
+        let item = library.item(id)?.displayTitle ?? String(localized: "Untitled")
         if embeds.count == 1 {
             library.notices.tell(
                 String(localized: "File Not in the Text"),

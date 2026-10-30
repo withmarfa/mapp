@@ -78,6 +78,23 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(list.exists, "the window stays where it was")
     }
 
+    /// A click near the sidebar's trailing edge, level with `row`, past the end of its words.
+    private func clickBeyondTheWords(of row: XCUIElement) {
+        let edge = sidebar.frame
+        sidebar.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: edge.width - 28, dy: row.frame.midY - edge.minY)).click()
+    }
+
+    func testTheNewAndSearchRowsTakeAClickAnywhereAlongTheirWidth() {
+        clickBeyondTheWords(of: element("SidebarNew"))
+        XCTAssertTrue(element("QuickAddTitle").waitForExistence(timeout: 3), "New opens from the end of its row")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(element("QuickAddTitle").waitForNonExistence(timeout: 2))
+        clickBeyondTheWords(of: element("SidebarSearch"))
+        XCTAssertTrue(element("CommandPaletteField").waitForExistence(timeout: 3), "Search opens from the end of its row")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     func testChoosingItemsFromAnotherPlaceOpensTheGalleryUnderTheMakeSomethingNewRow() {
         sidebarText("Inbox").click()
         sidebarText("Items").click()
@@ -155,7 +172,7 @@ final class SidebarNavigationTests: XCTestCase {
     func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
-        XCTAssertLessThan(sidebarText("Favorites").frame.maxY, sidebarText("Sources").frame.minY)
+        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the top block, above Views")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         sidebarText("Collections").click()
         let index = element("SidebarIndex")

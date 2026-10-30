@@ -167,6 +167,34 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft?.title == "Half a thought")
     }
 
+    @Test func anEmptyPanelGoesWhenItsWindowIsLeftButNotForItsOwnSurfaces() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+
+        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: true, keyWindowIsOwn: false), "its file importer or a popover is open")
+        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: true), "a window it opened took the key")
+        #expect(browser.quickAdd.isPresented)
+
+        #expect(browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: false))
+        #expect(!browser.quickAdd.isPresented)
+        #expect(browser.quickAdd.draft == nil, "nothing was typed, so nothing waits")
+    }
+
+    @Test func aPanelWithAnythingInItStaysWhenItsWindowIsLeft() throws {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.note", in: library)
+        browser.quickAdd.draft?.files = [try disk.file("kept.png")]
+        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: false))
+        #expect(browser.quickAdd.isPresented)
+
+        browser.quickAdd.draft?.files = []
+        browser.quickAdd.draft?.title = "Half a thought"
+        #expect(!browser.putAwayQuickAddLeftEmpty(usesOwnSurface: false, keyWindowIsOwn: false))
+        #expect(browser.quickAdd.isPresented)
+    }
+
     @Test func aDraftLeftAsTheWindowClosesGoesToTheClipboard() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()

@@ -81,7 +81,7 @@ struct NoteLinkPicker: View {
             Image(systemName: "note.text")
                 .frame(width: 20)
                 .foregroundStyle(isHighlighted ? .white : .secondary)
-            Text(item.title).lineLimit(1)
+            Text(item.displayTitle).lineLimit(1)
             Spacer(minLength: 8)
             Text(library.placeLabel(of: item))
                 .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)

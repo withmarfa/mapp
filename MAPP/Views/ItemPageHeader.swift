@@ -176,7 +176,7 @@ struct ItemPageHeader: ViewModifier {
                 }
                 let menu = NSMenu()
                 menu.autoenablesItems = false
-                let open = actionItem(String(localized: "Open \(target.title)")) { [weak editor] in
+                let open = actionItem(String(localized: "Open \(target.displayTitle)")) { [weak editor] in
                     if let id = target.itemID { editor?.onOpenNote(id) }
                 }
                 open.isEnabled = target.itemID.map { library.item($0) != nil } ?? false

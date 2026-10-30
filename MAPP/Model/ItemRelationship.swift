@@ -7,6 +7,8 @@ nonisolated struct ItemRelationshipTarget: Identifiable, Sendable {
     /// The item is in Recently Deleted. It still opens, there.
     var isDeleted = false
     var id: String { itemID?.rawValue ?? title }
+    /// The title to show, as `Item.displayTitle`.
+    var displayTitle: String { title.isEmpty ? String(localized: "Untitled") : title }
 
     /// Whether the row can open an item: a link whose item the library does not hold has an ID to remove it by and
     /// nothing to open.

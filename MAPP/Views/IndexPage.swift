@@ -22,18 +22,24 @@ struct IndexPage: View {
     /// Whether a card names `secondary` under its title; false where the key under the bar already says it.
     var showsSecondaryOnCards = true
     let open: (IndexRow) -> Void
+    @State private var isUnderToolbar = false
 
     var body: some View {
         Group {
             switch layout {
-            case .list: IndexList(rows: rows, open: open)
-            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, open: open)
+            case .list: IndexList(rows: rows, isUnderToolbar: $isUnderToolbar, open: open)
+            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, isUnderToolbar: $isUnderToolbar, open: open)
             case .table: IndexTable(rows: rows, typesTitle: typesTitle, open: open)
             }
         }
         .contentMargins(.top, IndexMetrics.top, for: .scrollContent)
         .frame(maxWidth: width.points.map { CGFloat($0) } ?? .infinity)
         .frame(maxWidth: .infinity)
+        // The content is narrower than its column, so the band is drawn at the column's width, here, and not by the
+        // scroll view at the content's.
+        .toolbarBand(isUnderToolbar: isUnderToolbar)
+        // A new layout's scroll view starts at the top and reports only a change, and the table reports nothing.
+        .onChange(of: layout) { isUnderToolbar = false }
         .accessibilityIdentifier("IndexPage")
     }
 }
@@ -69,6 +75,7 @@ struct IndexLatest: View {
 
 private struct IndexList: View {
     let rows: [IndexRow]
+    @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
     @State private var hovered: IndexRow.ID?
     private let inset = IndexMetrics.side
@@ -114,6 +121,7 @@ private struct IndexList: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .reportsContentUnderToolbar($isUnderToolbar)
     }
 }
 
@@ -121,6 +129,7 @@ private struct IndexCards: View {
     let rows: [IndexRow]
     let palette: IndexPalette
     let showsSecondary: Bool
+    @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
 
     var body: some View {
@@ -133,6 +142,7 @@ private struct IndexCards: View {
             .padding(.horizontal, IndexMetrics.side)
             .padding(.bottom, IndexMetrics.side)
         }
+        .reportsContentUnderToolbar($isUnderToolbar)
     }
 }
 

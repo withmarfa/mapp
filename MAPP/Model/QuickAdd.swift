@@ -391,6 +391,18 @@ extension Browser {
         if quickAdd.draft?.hasContent == false { quickAdd.draft = nil }
     }
 
+    /// Puts an empty quick add away once its window has stopped being the one in front, as a menu closes when the
+    /// person moves on. A draft with anything in it stays, since the person meant to come back to it. Nothing the
+    /// panel opens itself counts as leaving: its file importer and popovers (`usesOwnSurface`), and any other
+    /// window it opened, such as a sheet or a popover's window (`keyWindowIsOwn`), take the key for a moment.
+    /// Returns whether it put the panel away.
+    @discardableResult
+    func putAwayQuickAddLeftEmpty(usesOwnSurface: Bool, keyWindowIsOwn: Bool) -> Bool {
+        guard quickAdd.isPresented, quickAdd.draft?.hasContent == false, !usesOwnSurface, !keyWindowIsOwn else { return false }
+        putAwayQuickAdd()
+        return true
+    }
+
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
     /// panel closes and the window opens the item, adds it to the collection being shown, and attaches the draft's
     /// files to it (`finishNewItem`). Where

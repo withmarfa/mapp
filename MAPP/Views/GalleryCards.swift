@@ -89,7 +89,7 @@ struct GalleryCard: View, Equatable {
         VStack(alignment: .leading, spacing: 10) {
             GalleryThumbnail(item: item, browser: browser, facts: facts, width: width)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
+                Text(item.displayTitle)
                     .interfaceFont(.subheadline.weight(.semibold))
                     // Two lines held for every title, so the cards of a row are the same height.
                     .lineLimit(2, reservesSpace: true)
@@ -184,7 +184,7 @@ private struct PageMiniature: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5 * unit) {
             GalleryAccessory(kind: kind, unit: unit, onPicture: false)
-            Text(item.title)
+            Text(item.displayTitle)
                 .font(.system(size: 11 * unit, weight: .semibold))
                 .lineLimit(2)
             if !item.preview.isEmpty {
