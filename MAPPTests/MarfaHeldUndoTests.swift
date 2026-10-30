@@ -128,6 +128,15 @@ import Testing
         }
 
         func held() async -> Int { await source.engine.held.count }
+
+        /// Returns once the engine has finished holding, which it does after it counts the write as held: it asks the
+        /// copy to catch up, then tells itself to read the copy. That read is a whole one if the copy is whole by then,
+        /// which would make the write. The engine takes events in order, so the first call returns once it has gone on
+        /// to the next event, by which time it has told the read, and the second returns once the read is taken.
+        func engineSettled() async {
+            await source.engineTook()
+            await source.engineTook()
+        }
     }
 
     private func makeScene() async throws -> Scene {
@@ -185,6 +194,7 @@ import Testing
         let scene = try await makeScene()
         scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
+        await scene.engineSettled()
 
         // The copy is whole again, but a server change reads only the item: what the step touches may still be
         // arriving elsewhere, so only a read of the whole copy may make it.
