@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 @Suite(.hangLimit)
@@ -59,5 +60,31 @@ struct GalleryTests {
         #expect(browser.showsCollection)
         browser.show(.allNotes, in: library, order: NoteOrder())
         #expect(browser.showsCollection)
+    }
+
+    @Test func aCardsFactsFollowItsShape() {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        #expect(GalleryCardFacts(of: newer, in: library).kind == .note)
+        var file = newer
+        file.content = .file(.png, byteCount: 10)
+        #expect(GalleryCardFacts(of: file, in: library).kind == .file(.png))
+    }
+
+    @Test func aCardIsRedrawnForItsOwnItemAndNotForTheSelection() {
+        let (library, _, newer, other) = BrowserTests().makeFakeLibrary()
+        let browser = Browser()
+        func card(_ item: Item, width: CGFloat = 200) -> GalleryCard {
+            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, width: width)
+        }
+        let before = card(newer)
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.selection = [newer.id]
+        #expect(before == card(newer), "a selection that moves leaves the card alone")
+        browser.selection = [other.id]
+        #expect(before == card(newer), "so does another card's selection")
+        var renamed = newer
+        renamed.title = "Renamed"
+        #expect(before != card(renamed), "its own item changing redraws it")
+        #expect(before != card(newer, width: 240), "so does its width")
     }
 }

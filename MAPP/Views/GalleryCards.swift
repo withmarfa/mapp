@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 /// What shape an item's card takes in the gallery. A file shows its own picture, an item whose type has a status
 /// shows it as the page header's pin does, an item with a start date leads with a date block, and the rest are a
 /// miniature of the page.
-enum GalleryKind {
+enum GalleryKind: Equatable {
     case note
     case file(UTType)
     case task(GalleryStatus)
@@ -40,6 +40,21 @@ enum GalleryKind {
     }
 }
 
+/// What a card derives from its item, the catalogue and the files its text embeds: its shape, what decides its
+/// picture and its type's icon. It is read when the card's own inputs change, never for another card's selection.
+struct GalleryCardFacts {
+    let kind: GalleryKind
+    let basis: GalleryArtworkCache.Basis
+    let icon: String?
+
+    init(of item: Item, in library: any ItemLibrary) {
+        let made = Cost.measure(.galleryCard) {
+            (GalleryKind.of(item, in: library), GalleryArtworkCache.basis(of: item, in: library), library.catalogue.icon(for: item.type))
+        }
+        (kind, basis, icon) = made
+    }
+}
+
 struct GalleryStatus: Equatable {
     let label: String
     let mark: PageHeader.Mark
@@ -52,19 +67,27 @@ struct GalleryEventDate: Equatable {
 }
 
 /// One item in the gallery: a thumbnail, then its title and a line about it below, as Finder's icon view and the
-/// Notes gallery lay it out.
-struct GalleryCard: View {
+/// Notes gallery lay it out. It takes only its own inputs and compares by them, so a selection that moves, or
+/// another card's change, leaves its body alone; the selection ring (`GalleryRing`) reads the selection itself.
+struct GalleryCard: View, Equatable {
     @CurrentLibrary private var library
-    @Environment(\.interfaceTextSize) private var textSize
     let item: Item
-    let selected: Bool
-    let date: String
+    /// Read only by the selection ring, which follows the selection on its own.
+    let browser: Browser
+    let order: NoteOrder
+    /// Changes when the day does, since the line about the item reads as Today or Yesterday.
+    let day: Int
     /// The thumbnail's width in points, which sets the scale of the miniature page.
     let width: CGFloat
 
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.order == rhs.order && lhs.day == rhs.day && lhs.width == rhs.width
+    }
+
     var body: some View {
+        let facts = GalleryCardFacts(of: item, in: library)
         VStack(alignment: .leading, spacing: 10) {
-            GalleryThumbnail(item: item, kind: GalleryKind.of(item, in: library), selected: selected, width: width)
+            GalleryThumbnail(item: item, browser: browser, facts: facts, width: width)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .interfaceFont(.subheadline.weight(.semibold))
@@ -72,8 +95,8 @@ struct GalleryCard: View {
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
-                    TypeIcon(name: library.catalogue.icon(for: item.type))
-                    Text(date).lineLimit(1)
+                    TypeIcon(name: facts.icon)
+                    Text(NoteDate.listLabel(for: order.sort.date(of: item), now: library.now())).lineLimit(1)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }
                 .interfaceFont(.caption)
@@ -92,8 +115,8 @@ private struct GalleryThumbnail: View {
     @CurrentLibrary private var library
     @Environment(\.displayScale) private var displayScale
     let item: Item
-    let kind: GalleryKind
-    let selected: Bool
+    let browser: Browser
+    let facts: GalleryCardFacts
     let width: CGFloat
     @State private var artwork: GalleryArtwork?
 
@@ -101,7 +124,7 @@ private struct GalleryThumbnail: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        let basis = GalleryArtworkCache.basis(of: item, in: library)
+        let basis = facts.basis
         let shown = artwork ?? GalleryArtworkCache.peek(basis, width: width)
         Color(nsColor: .textBackgroundColor)
             .aspectRatio(4 / 3, contentMode: .fit)
@@ -109,13 +132,7 @@ private struct GalleryThumbnail: View {
             .clipShape(shape)
             .overlay { shape.strokeBorder(.separator, lineWidth: 1) }
             .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
-            .overlay {
-                if selected {
-                    RoundedRectangle(cornerRadius: Self.radius + 3, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.18), lineWidth: 3)
-                        .padding(-3)
-                }
-            }
+            .overlay { GalleryRing(browser: browser, id: item.id, radius: Self.radius + 3) }
             .task(id: basis) {
                 artwork = nil
                 let made = await GalleryArtworkCache.artwork(for: item, width: width, scale: displayScale, in: library)
@@ -124,6 +141,7 @@ private struct GalleryThumbnail: View {
     }
 
     @ViewBuilder private func content(_ shown: GalleryArtwork?) -> some View {
+        let kind = facts.kind
         let unit = min(1.6, max(0.85, width / 220))
         ZStack(alignment: .topLeading) {
             if let shown {
@@ -137,6 +155,22 @@ private struct GalleryThumbnail: View {
                 PageMiniature(item: item, kind: kind, unit: unit)
             }
             if shown != nil { GalleryAccessory(kind: kind, unit: unit, onPicture: true).padding(10 * unit) }
+        }
+    }
+}
+
+/// The ring around a selected card's picture. It reads the selection itself, so a selection that moves redraws the
+/// rings and no card.
+private struct GalleryRing: View {
+    let browser: Browser
+    let id: ItemID
+    let radius: CGFloat
+
+    var body: some View {
+        if browser.selection.contains(id) {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.18), lineWidth: 3)
+                .padding(-3)
         }
     }
 }

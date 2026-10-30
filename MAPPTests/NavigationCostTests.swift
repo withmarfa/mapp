@@ -70,7 +70,8 @@ nonisolated enum BigLibrary {
         (session, 90), (decision, 175), (task, 180), (feature, 40), (spike, 20), (epic, 30), (log, 60), (note, 40), (project, 15),
     ]
 
-    static func items() -> [Item] {
+    /// `scale` repeats the mix, for a test of what a library ten thousand items long costs.
+    static func items(scale: Int = 1) -> [Item] {
         var rng = Rng(state: 137)
         func pick<T>(_ values: [T]) -> T { values[Int(rng.next() % UInt64(values.count))] }
         func day(_ offset: Int) -> String {
@@ -83,7 +84,7 @@ nonisolated enum BigLibrary {
         var made: [Item] = []
         var parents: [ItemID] = []
         for (type, count) in counts {
-            for index in 0..<count {
+            for index in 0..<(count * scale) {
                 let id = ItemID("\(type.rawValue)-\(index)")
                 var properties = [Property(key: "title", value: .string("\(pick(["Fix", "Plan", "Review", "Ship", "Decide", "Move", "Trim"])) \(pick(["sidebar", "table", "sync", "search", "layout", "keys", "docs"])) number \(index)"))]
                 func add(_ key: String, _ value: PropertyValue) { properties.append(Property(key: key, value: value)) }
@@ -124,10 +125,10 @@ nonisolated enum BigLibrary {
     }
 
     @MainActor
-    static func loaded() async throws -> (MarfaLibrary, FakeItemSource) {
+    static func loaded(scale: Int = 1) async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source, notices: Notices())
-        source.send(.loaded(SourceSnapshot(items: items(), catalogue: catalogue)))
+        source.send(.loaded(SourceSnapshot(items: items(scale: scale), catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
     }
@@ -245,6 +246,16 @@ struct NavigationCostTests {
         }
     }
 
+    /// Select All on about ten thousand items in the list, which the table does by itself, then the list scrolled: the soft selection's marks
+    /// should follow the rows in view, not all of those selected.
+    @Test func aHostedWindowSelectingEveryItemInTheList() async throws {
+        try await hosted(scale: 15) { browser, _, _, step in
+            try await step("all items (list)") { browser.sidebarItem = .allNotes }
+            try await step("select every item") { Self.longestTable()?.selectAll(nil) }
+            for index in 1...3 { try await step("scroll \(index)") { Self.scrollList(by: 1500) } }
+        }
+    }
+
     /// The table of every item with no grouping, then the move between two places that stays on the table.
     @Test func aHostedWindowOnAnUngroupedTable() async throws {
         try await hosted { browser, _, _, step in
@@ -257,6 +268,35 @@ struct NavigationCostTests {
             try await step("tasks (ungrouped table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
             try await step("all items (ungrouped table) again") { browser.sidebarItem = .allNotes }
             try await step("list") { browser.viewMode = .list }
+        }
+    }
+
+    /// The gallery, then a selection that moves from card to card, which should make no card's derived values again.
+    @Test func aHostedWindowOnTheGallery() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("gallery") { browser.viewMode = .gallery }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select card \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (gallery)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (gallery)") { browser.sidebarItem = .allNotes }
+        }
+    }
+
+    /// The table, then a selection that moves from row to row, and the move between places that stays on the table.
+    @Test func aHostedWindowOnTheTable() async throws {
+        try await hosted { browser, library, _, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("table") { browser.viewMode = .table }
+            let ids = library.items(in: .itemType("aic.decision")).prefix(6).map(\.id)
+            for (index, id) in ids.enumerated() {
+                try await step("select row \(index + 1)") { browser.selection = [id] }
+            }
+            try await step("tasks (table)") { browser.sidebarItem = .itemType("aic.ticket.task") }
+            try await step("all items (table)") { browser.sidebarItem = .allNotes }
+            try await step("decisions (table) again") { browser.sidebarItem = .itemType("aic.decision") }
         }
     }
 
@@ -340,13 +380,14 @@ struct NavigationCostTests {
         }
     }
 
-    /// Hosts the real window on 650 items and hands `script` the browser, the library and `step`, which runs one move
+    /// Hosts the real window on 650 items (or `scale` times that) and hands `script` the browser, the library and `step`, which runs one move
     /// and prints what it cost.
     private func hosted(
+        scale: Int = 1,
         _ script: (Browser, MarfaLibrary, FakeItemSource, (String, () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
-        let (library, source) = try await BigLibrary.loaded()
+        let (library, source) = try await BigLibrary.loaded(scale: scale)
         let browser = Browser()
         let libraries = ItemPreviewFixtures.libraries(named: "MAPP.NavigationCost")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1280, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -377,9 +418,10 @@ struct NavigationCostTests {
                 last = now
             }
             let rows = window.contentView.map { Self.tableRows(in: $0) } ?? []
+            let marks = window.contentView.map { Self.marks(in: $0) } ?? []
             let counts = Cost.tallies.sorted { $0.key.rawValue < $1.key.rawValue }
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
-            print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)")
+            print("HOSTED|\(name)|\(counts)|longest main-actor stall=\(String(format: "%.1f", stall))ms|table rows=\(rows)|soft selection marks=\(marks)")
         }
 
         try await script(browser, library, source, step)
@@ -419,6 +461,27 @@ struct NavigationCostTests {
                 source.send(.upserted([item]))
             }
         }
+    }
+
+    /// How many marks each soft selection in the window holds.
+    private static func marks(in view: NSView) -> [Int] {
+        (view as? SoftSelection.Marks).map { [$0.layer?.sublayers?.count ?? 0] } ?? view.subviews.flatMap { marks(in: $0) }
+    }
+
+    /// The window's longest table, which is the list.
+    private static func longestTable() -> NSTableView? {
+        func tables(in view: NSView) -> [NSTableView] {
+            (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap { tables(in: $0) }
+        }
+        guard let content = NSApp.windows.first(where: { $0 is TestWindow })?.contentView else { return nil }
+        return tables(in: content).max(by: { $0.numberOfRows < $1.numberOfRows })
+    }
+
+    private static func scrollList(by points: CGFloat) {
+        guard let table = longestTable(), let scroll = table.enclosingScrollView else { return }
+        let clip = scroll.contentView
+        clip.scroll(to: NSPoint(x: 0, y: clip.bounds.origin.y + points))
+        scroll.reflectScrolledClipView(clip)
     }
 
     /// The row counts of every table the window holds, found in its view tree.

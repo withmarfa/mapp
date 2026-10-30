@@ -30,7 +30,7 @@ struct ItemGallery: View {
     var body: some View {
         let _ = daysSeen
         let sections = browser.sections(in: library, order: order, now: library.now())
-        let ids = sections.flatMap { $0.items.map(\.id) }
+        let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         keyboardCollection(sections, ids: ids)
         .searchStatus(browser)
@@ -59,7 +59,7 @@ struct ItemGallery: View {
         .dragContainer(for: NoteReference.self) { ids in
             ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
         }
-        .dragContainerSelection(Array(browser.selection))
+        .modifier(GalleryDragSelection(browser: browser))
     }
 
     private func collection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
@@ -159,15 +159,57 @@ struct ItemGallery: View {
     }
 
     private func card(_ item: Item, ids: [ItemID]) -> some View {
+        GalleryCell(
+            item: item, browser: browser, order: order, day: daysSeen, width: thumbnailWidth, pane: pane,
+            select: { id, extending, toggling in select(id, ids: ids, extending: extending, toggling: toggling) })
+    }
+
+    private func select(_ id: ItemID, ids: [ItemID], extending: Bool, toggling: Bool) {
+        if anchor == nil { anchor = ids.first(where: browser.selection.contains) }
+        browser.selection = GallerySelection.selecting(id, among: ids, current: browser.selection, anchor: anchor, extending: extending, toggling: toggling)
+        if !extending { anchor = id }
+        cursor = id
+    }
+
+    private func deleteSelection() {
+        let ids = browser.selection
+        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
+    }
+}
+
+/// Lets the selected cards be dragged together. It reads the selection in its own body, so the gallery's does not.
+private struct GalleryDragSelection: ViewModifier {
+    let browser: Browser
+
+    func body(content: Content) -> some View {
+        content.dragContainerSelection(Array(browser.selection))
+    }
+}
+
+/// One card of the gallery as a control: it answers a click, a double click, the context menu and a drag, and
+/// reads the selection itself, so a selection that moves runs the bodies of the cells and of no card.
+private struct GalleryCell: View {
+    @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    let item: Item
+    let browser: Browser
+    let order: NoteOrder
+    let day: Int
+    let width: CGFloat
+    var pane: FocusState<Browser.Pane?>.Binding
+    let select: (ItemID, _ extending: Bool, _ toggling: Bool) -> Void
+
+    var body: some View {
+        let isSelected = browser.selection.contains(item.id)
         Button {
             // SwiftUI Button actions do not expose the click's modifiers; AppKit supplies just that event.
             let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-            select(item.id, ids: ids, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command))
+            select(item.id, modifiers.contains(.shift), modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(
-                item: item, selected: browser.selection.contains(item.id),
-                date: NoteDate.listLabel(for: order.sort.date(of: item), now: library.now()), width: thumbnailWidth)
+            GalleryCard(item: item, browser: browser, order: order, day: day, width: width)
+                .equatable()
         }
         .buttonStyle(.plain)
         .focusable(false)
@@ -178,12 +220,12 @@ struct ItemGallery: View {
         })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title)
-        .accessibilityValue(browser.selection.contains(item.id) ? Text("Selected") : Text(""))
+        .accessibilityValue(isSelected ? Text("Selected") : Text(""))
         .accessibilityAddTraits(.isButton)
-        .accessibilityAddTraits(browser.selection.contains(item.id) ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("GalleryItem-\(item.id.rawValue)")
         .accessibilityAction {
-            select(item.id, ids: ids, extending: false, toggling: false)
+            select(item.id, false, false)
             pane.wrappedValue = .list
         }
         .accessibilityAction(named: Text("Open")) {
@@ -200,17 +242,5 @@ struct ItemGallery: View {
             NoteActions(ids: selected, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
-    }
-
-    private func select(_ id: ItemID, ids: [ItemID], extending: Bool, toggling: Bool) {
-        if anchor == nil { anchor = ids.first(where: browser.selection.contains) }
-        browser.selection = GallerySelection.selecting(id, among: ids, current: browser.selection, anchor: anchor, extending: extending, toggling: toggling)
-        if !extending { anchor = id }
-        cursor = id
-    }
-
-    private func deleteSelection() {
-        let ids = browser.selection
-        library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }

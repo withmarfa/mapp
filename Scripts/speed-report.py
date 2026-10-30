@@ -59,10 +59,12 @@ def main(path):
         if kind == "signpostEvent":
             key = (event.get("processID"), category, event.get("signpostName"), event.get("signpostID"))
             if event.get("signpostType") == "begin":
-                begun[key] = seconds(event)
+                # A `Cost` is the `work` interval with its name as the message.
+                named = f"work.{message}" if key[2] == "work" and message else key[2]
+                begun[key] = (seconds(event), named)
             elif event.get("signpostType") == "end" and key in begun:
-                ms = (seconds(event) - begun.pop(key)) * 1000
-                intervals.setdefault(phase, {}).setdefault((category, key[2]), []).append(ms)
+                start, named = begun.pop(key)
+                intervals.setdefault(phase, {}).setdefault((category, named), []).append((seconds(event) - start) * 1000)
         elif kind == "logEvent":
             if category == "launch" and message.startswith("launch since process start:"):
                 for name, ms in MILESTONE.findall(message):
@@ -73,7 +75,7 @@ def main(path):
         found = intervals.get(phase, {})
         for (category, name), values in sorted(found.items()):
             print(line(f"{phase}.signpost.{category}.{name}", values))
-            if category == "navigation" and name != "work":
+            if category == "navigation":
                 print(f"UI|{phase}.signpost.{category}.{name}.count|{len(values)}|{len(values)}|intervals")
         for name, values in sorted(milestones.get(phase, {}).items()):
             print(line(f"{phase}.launch.{name}", values))

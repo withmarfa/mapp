@@ -16,9 +16,11 @@ struct ItemTable: View {
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
+    @State private var placeTrace = TablePlaceTrace()
 
     var body: some View {
         let _ = daysSeen
+        let _ = placeTrace.bodyRan(for: browser.item)
         let content = browser.tableContent(in: library)
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
@@ -175,6 +177,36 @@ struct ItemTable: View {
             ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
         } set: {
             storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+        }
+    }
+}
+
+/// Times what a table costs when it shows another place: from the first pass that builds it for the place until the
+/// main queue is free again, which is the pause a person feels. The signpost is `table.place`, in `navigation`. The
+/// table's first pass only notes the place: a table that has just been mounted, by switching from the list or the
+/// gallery or by launching, is a layout change, which is not a place change.
+@MainActor
+private final class TablePlaceTrace {
+    private var place: SidebarItem?
+    private var current: (id: Int, interval: Telemetry.Interval)?
+    private var counter = 0
+
+    func bodyRan(for place: SidebarItem) {
+        guard place != self.place else { return }
+        let isMount = self.place == nil
+        self.place = place
+        current?.interval.end()
+        current = nil
+        guard !isMount else { return }
+        counter += 1
+        let id = counter
+        current = (id, Telemetry.begin(.navigation, "table.place"))
+        // The pass that updates the table runs when the runloop is about to wait, so this block comes after it. It
+        // ends only the interval it began, not one a later change has begun since.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, current?.id == id else { return }
+            current?.interval.end()
+            current = nil
         }
     }
 }

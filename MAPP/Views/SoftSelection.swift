@@ -18,7 +18,7 @@ struct SoftSelection: NSViewRepresentable {
     let selection: Int
 
     func makeNSView(context: Context) -> Probe { Probe() }
-    func updateNSView(_ probe: Probe, context: Context) { probe.refresh() }
+    func updateNSView(_ probe: Probe, context: Context) { probe.refresh(rows: rows, selection: selection) }
     static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.dismantle() }
 
     final class Probe: NSView {
@@ -26,6 +26,14 @@ struct SoftSelection: NSViewRepresentable {
         private weak var marks: Marks?
         private var originalHighlightStyle: NSTableView.SelectionHighlightStyle?
         private var isDismantled = false
+        /// The rows and selection the marks were last asked to follow, so an update SwiftUI makes for any other
+        /// reason leaves them alone.
+        private var seen: Followed?
+
+        private struct Followed: Equatable {
+            let rows: Int
+            let selection: Int
+        }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -45,14 +53,21 @@ struct SoftSelection: NSViewRepresentable {
             if !isDismantled, window != nil, table == nil { attach() }
         }
 
-        func refresh() {
+        func refresh(rows: Int? = nil, selection: Int? = nil) {
             guard !isDismantled, window != nil else { return }
-            if table == nil || table?.window !== window { attach() }
+            if table == nil || table?.window !== window {
+                attach()
+                seen = nil
+            }
             // SwiftUI may set the highlight again as it updates the table.
             if let table, table.selectionHighlightStyle != .none { table.selectionHighlightStyle = .none }
-            marks?.update()
-            // SwiftUI hands the table its new selection after this update, so the marks look again once it has.
-            DispatchQueue.main.async { [weak self] in self?.marks?.update() }
+            if let rows, let selection {
+                let followed = Followed(rows: rows, selection: selection)
+                guard followed != seen else { return }
+                seen = followed
+            }
+            // SwiftUI hands the table its new selection after this update, and its notification then asks again.
+            marks?.setNeedsUpdate()
         }
 
         private func attach() {
@@ -88,6 +103,18 @@ struct SoftSelection: NSViewRepresentable {
     final class Marks: NSView {
         private weak var table: NSTableView?
         private var observers: [NSObjectProtocol] = []
+        /// The selected rows' views, which post when their own frames change (see `follow`).
+        private var followed: [ObjectIdentifier: (view: Weak<NSTableRowView>, observer: NSObjectProtocol)] = [:]
+        private var isUpdatePending = false
+        /// Where the marks are and in what color, so a pass that finds them already there places nothing.
+        private var placed: (frames: [NSRect], color: CGColor)?
+        /// How many rows beyond the visible ones are marked.
+        private static let overscan = 10
+
+        final class Weak<Object: AnyObject> {
+            weak var object: Object?
+            init(_ object: Object) { self.object = object }
+        }
 
         init(table: NSTableView) {
             self.table = table
@@ -103,30 +130,19 @@ struct SoftSelection: NSViewRepresentable {
             for name in Set(changes) {
                 observers.append(center.addObserver(forName: name, object: table, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated {
+                        // The mark is in place before the next frame; whatever the pass settles after it is caught
+                        // by the one deferred look.
                         self?.update()
-                        // Outline disclosure can finish moving its row views after the notification.
-                        DispatchQueue.main.async { [weak self] in self?.update() }
+                        self?.setNeedsUpdate()
                     }
                 })
             }
             table.postsFrameChangedNotifications = true
-            // A selected row that grows or shrinks, or moves under one that does, changes no frame but its own row
-            // view's: the table's frame stays put while it has room, and no selection or row identifier changes.
-            observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: nil, queue: .main) { [weak self] note in
-                // Every view in the app posts this, a filled table's cells by the hundred, so the test is a plain
-                // class check; a Swift cast from `Any` looks up protocol conformances each time.
-                guard let object = note.object as AnyObject?, object.isKind(of: NSTableRowView.self) else { return }
-                nonisolated(unsafe) let view = unsafeDowncast(object, to: NSTableRowView.self)
-                MainActor.assumeIsolated {
-                    guard let self, view.superview === self.table else { return }
-                    self.update()
-                }
-            })
             // Rows scrolled into view get row views of their own, which the marks are placed by.
             if let clip = table.enclosingScrollView?.contentView {
                 clip.postsBoundsChangedNotifications = true
                 observers.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.update() }
+                    MainActor.assumeIsolated { self?.setNeedsUpdate() }
                 })
             }
         }
@@ -135,12 +151,29 @@ struct SoftSelection: NSViewRepresentable {
 
         isolated deinit {
             observers.forEach(NotificationCenter.default.removeObserver)
+            followed.values.forEach { NotificationCenter.default.removeObserver($0.observer) }
         }
 
         func detach() {
             observers.forEach(NotificationCenter.default.removeObserver)
             observers.removeAll()
+            followed.values.forEach { NotificationCenter.default.removeObserver($0.observer) }
+            followed.removeAll()
             table = nil
+        }
+
+        /// Asks for the marks to be placed once the current pass is done, however many things ask before it: a
+        /// click, SwiftUI's update and the table's own notification all land in one pass and make one placing. The
+        /// table's selection and its row views settle after the first of them, and an outline's disclosure moves
+        /// its row views after its notification.
+        func setNeedsUpdate() {
+            guard !isUpdatePending else { return }
+            isUpdatePending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                isUpdatePending = false
+                update()
+            }
         }
 
         override var isFlipped: Bool { true }
@@ -162,19 +195,60 @@ struct SoftSelection: NSViewRepresentable {
             table.enumerateAvailableRowViews { view, row in
                 if view.isSelected { rows.insert(row) }
             }
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+            // Only the rows in view get a mark, with a few either side so a scroll never shows a bare row: Select All
+            // on a long list selects every row, and a layer for each would be made again after every scroll, which
+            // also updates the marks.
+            let shown = table.rows(in: table.visibleRect)
+            let last = min(table.numberOfRows, shown.location + shown.length + Self.overscan)
+            let nearby = IndexSet(integersIn: min(max(0, shown.location - Self.overscan), last)..<last)
+            rows = rows.intersection(nearby)
+            var views: [NSTableRowView] = []
+            var frames: [NSRect] = []
             for row in rows where row < table.numberOfRows {
-                table.rowView(atRow: row, makeIfNecessary: false)?.postsFrameChangedNotifications = true
-                let mark = CALayer()
-                mark.frame = Self.rect(ofRow: row, in: table)
-                mark.backgroundColor = color
-                mark.cornerRadius = 8
-                mark.cornerCurve = .continuous
-                layer.addSublayer(mark)
+                if let view = table.rowView(atRow: row, makeIfNecessary: false) { views.append(view) }
+                frames.append(Self.rect(ofRow: row, in: table))
             }
-            CATransaction.commit()
+            follow(views)
+            if let placed, placed.frames == frames, placed.color == color { return }
+            placed = (frames, color)
+            Cost.measure(.softSelection) {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+                for frame in frames {
+                    let mark = CALayer()
+                    mark.frame = frame
+                    mark.backgroundColor = color
+                    mark.cornerRadius = 8
+                    mark.cornerCurve = .continuous
+                    layer.addSublayer(mark)
+                }
+                CATransaction.commit()
+            }
+        }
+
+        /// A selected row that grows or shrinks, or moves under one that does, changes no frame but its own row
+        /// view's: the table's frame stays put while it has room, and no selection or row identifier changes. So
+        /// the marks listen to the selected rows' views alone, never to every view in the app.
+        private func follow(_ views: [NSTableRowView]) {
+            let center = NotificationCenter.default
+            let ids = Set(views.map(ObjectIdentifier.init))
+            for (id, entry) in followed where !ids.contains(id) || entry.view.object == nil {
+                center.removeObserver(entry.observer)
+                followed[id] = nil
+            }
+            for view in views {
+                let id = ObjectIdentifier(view)
+                if let entry = followed[id] {
+                    if entry.view.object === view { continue }
+                    center.removeObserver(entry.observer)
+                }
+                view.postsFrameChangedNotifications = true
+                let observer = center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.setNeedsUpdate() }
+                }
+                followed[id] = (Weak(view), observer)
+            }
         }
 
         /// Where the system draws a selection: a shape inset from both edges, as Finder's sidebar has it. A source
@@ -207,7 +281,7 @@ extension NSView {
         return nil
     }
 
-    private static func tables(in view: NSView) -> [NSTableView] {
+    static func tables(in view: NSView) -> [NSTableView] {
         view.subviews.flatMap { subview in
             (subview as? NSTableView).map { [$0] } ?? tables(in: subview)
         }
