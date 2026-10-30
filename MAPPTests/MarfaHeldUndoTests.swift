@@ -235,6 +235,7 @@ import Testing
         let scene = try await makeScene()
         scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
+        await scene.engineSettled()
         let reads = scene.reads.fullReads.withLock { $0 }
 
         // The copy names what changed since the engine's last whole read, so the rows it holds are the copy's.
