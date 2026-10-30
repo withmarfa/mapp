@@ -45,16 +45,21 @@ struct ScrollMemory: NSViewRepresentable {
 
         override func layout() {
             super.layout()
-            restore()
+            // Once the offset is reached, or there is none to reach, the list's own scrolling counts, so a later layout
+            // never scrolls it back over the person's.
+            if restore() { watch() }
         }
 
-        private func restore() {
-            guard let offset = memory.scrollOffset, offset > 0, !isWatching, window != nil,
-                  let scroll = nearestTable()?.enclosingScrollView else { return }
+        /// Whether the list now shows the remembered offset, or has none to show.
+        @discardableResult
+        private func restore() -> Bool {
+            guard !isWatching, window != nil, let scroll = nearestTable()?.enclosingScrollView else { return false }
+            guard let offset = memory.scrollOffset, offset > 0 else { return true }
             let clip = scroll.contentView
             let room = (scroll.documentView?.frame.height ?? 0) - clip.bounds.height
             clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: min(offset, max(room, 0))))
             scroll.reflectScrolledClipView(clip)
+            return room >= offset
         }
 
         private func watch() {
@@ -63,7 +68,8 @@ struct ScrollMemory: NSViewRepresentable {
             clip.postsBoundsChangedNotifications = true
             observer = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    guard let self else { return }
+                    // A list being taken down can reset its clip view to the top; that is no scroll of the person's.
+                    guard let self, self.window != nil else { return }
                     self.memory.scrollOffset = clip.bounds.origin.y
                 }
             }

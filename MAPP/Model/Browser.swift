@@ -532,6 +532,10 @@ final class Browser {
         pagingState = nil
         tableMemo = nil
         sectionsMemo = nil
+        viewModesMemo = nil
+        fieldsMemo = nil
+        stackableMemo = nil
+        paletteMemo = nil
         guard !isFirst else { return }
         undoManager?.removeAllActions()
         tableOptions = [:]
