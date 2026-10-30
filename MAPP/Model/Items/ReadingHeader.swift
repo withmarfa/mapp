@@ -47,8 +47,8 @@ nonisolated struct ReadingHeader: Equatable, Sendable {
     /// HTML in it.
     ///
     /// The header is read again on every edit of the text, so this scans the UTF-8 once per kind of markup instead
-    /// of running regular expressions over a long article. Each scan matches what its pattern would: `![...](...)`,
-    /// then `](...)`, then `<...>`, each replaced by a space.
+    /// of running regular expressions over a long article. Each scan matches what its pattern would, read by Unicode
+    /// scalar rather than by character: `![...](...)`, then `](...)`, then `<...>`, each replaced by a space.
     static func words(in markdown: String) -> Int {
         var bytes = Array(markdown.utf8)
         bytes = replacingMatches(in: bytes) { bytes, start in
