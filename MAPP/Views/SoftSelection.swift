@@ -108,6 +108,8 @@ struct SoftSelection: NSViewRepresentable {
         private var isUpdatePending = false
         /// Where the marks are and in what color, so a pass that finds them already there places nothing.
         private var placed: (frames: [NSRect], color: CGColor)?
+        /// How many rows beyond the visible ones are marked.
+        private static let overscan = 10
 
         final class Weak<Object: AnyObject> {
             weak var object: Object?
@@ -193,6 +195,13 @@ struct SoftSelection: NSViewRepresentable {
             table.enumerateAvailableRowViews { view, row in
                 if view.isSelected { rows.insert(row) }
             }
+            // Only the rows in view get a mark, with a few either side so a scroll never shows a bare row: Select All
+            // on a long list selects every row, and a layer for each would be made again after every scroll, which
+            // also updates the marks.
+            let shown = table.rows(in: table.visibleRect)
+            let last = min(table.numberOfRows, shown.location + shown.length + Self.overscan)
+            let nearby = IndexSet(integersIn: min(max(0, shown.location - Self.overscan), last)..<last)
+            rows = rows.intersection(nearby)
             var views: [NSTableRowView] = []
             var frames: [NSRect] = []
             for row in rows where row < table.numberOfRows {
