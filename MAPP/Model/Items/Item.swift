@@ -133,8 +133,7 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
 
     var isFavorite: Bool { tags.contains(ItemTag.favorite) }
 
-    /// The title as a person reads it: "Untitled" for an item with no title. Every view that names an item uses this,
-    /// so none draws a blank.
+    /// The title as a person reads it: "Untitled" for an item with no title. Only shown, never written into the item.
     var displayTitle: String { title.isEmpty ? String(localized: "Untitled") : title }
 
     /// Whether the item has no title of its own, so its row can set the placeholder apart.
