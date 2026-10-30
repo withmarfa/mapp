@@ -132,7 +132,7 @@ struct TypeChangeButton: View {
         Button("Change Type…", systemImage: "square.on.square") {
             details?.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
         }
-        .disabled(details == nil || library.typeChangeOptions(for: ids).isEmpty)
+        .disabled(details == nil || !library.offersTypeChange(for: ids))
     }
 }
 

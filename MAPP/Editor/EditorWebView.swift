@@ -194,7 +194,7 @@ final class EditorWebView: WKWebView {
     /// Change Type, for the note on the page, from the window the editor belongs to.
     private var changeTypeItem: NSMenuItem? {
         guard let controller, let id = controller.noteID, controller.titleDrafts != nil, let library = controller.library,
-              !library.typeChangeOptions(for: [id]).isEmpty
+              library.offersTypeChange(for: [id])
         else { return nil }
         let item = NSMenuItem(title: String(localized: "Change Type…"), action: #selector(changeType(_:)), keyEquivalent: "")
         item.target = self

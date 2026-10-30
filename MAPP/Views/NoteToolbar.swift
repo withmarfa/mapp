@@ -14,11 +14,8 @@ struct NoteToolbar: CustomizableToolbarContent {
     var fileURL: URL?
     var showsCreation = false
 
-    private var tools: ItemToolbarActions {
-        ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
-    }
-
     var body: some CustomizableToolbarContent {
+        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         ToolbarItem(id: "detailNewItem") {
             NewItemButton(browser: browser)
         }
@@ -185,9 +182,22 @@ private struct ItemToolbarActions {
     let items: [Item]
     let editor: EditorController
     let details: DetailsPresentation
-    var fileURL: URL?
+    let fileURL: URL?
+    /// The selected items that are not files, sorted out once, since a selection can hold every item in the library.
+    let notes: [Item]
 
-    var notes: [Item] { items.filter { !$0.isFile } }
+    init(
+        library: any ItemLibrary, browser: Browser?, items: [Item], editor: EditorController, details: DetailsPresentation,
+        fileURL: URL? = nil
+    ) {
+        self.library = library
+        self.browser = browser
+        self.items = items
+        self.editor = editor
+        self.details = details
+        self.fileURL = fileURL
+        notes = items.filter { !$0.isFile }
+    }
     var showsInspector: Bool { details.isPresented }
 
     var visibleNote: Item? {

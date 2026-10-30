@@ -173,6 +173,15 @@ extension ItemLibrary {
         }
     }
 
+    /// Whether `typeChangeOptions(for:)` has anything to offer, which stops at the first item that can become another
+    /// type, so a selection of every item in the library costs little to ask.
+    func offersTypeChange(for ids: Set<ItemID>) -> Bool {
+        let options = creatableTypes
+        return ids.contains { id in
+            canChangeType(id) && options.contains { option in item(id)?.type != option.id && typeChange(of: id, to: option.id) != nil }
+        }
+    }
+
     /// What changing `ids` to `type` writes for each item that can become it, and the items it leaves out with the
     /// reason. An item already of `type` is neither. `missing` is the required fields some item still lacks, once
     /// each: the change is not made until they are given.
