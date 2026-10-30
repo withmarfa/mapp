@@ -45,6 +45,7 @@ import Testing
         }
 
         func views() async throws -> Rows<LibraryView> { try await read.views() }
+        func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 
         func refuseUntilWhole() throws {

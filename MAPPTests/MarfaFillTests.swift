@@ -164,6 +164,7 @@ private nonisolated final class FillingReads: MarfaReading {
     }
     func views() async throws -> Rows<LibraryView> { Rows([]) }
     func items(inView id: String) async throws -> [Marfa.Item] { [] }
+    func links(in id: String) async throws -> BodyLinks { try await copy.items.links(in: id) }
 }
 
 /// Reads the copy as it is, except while `hydrating`, when it refuses edge reads as a copy hydrating again does.
@@ -189,4 +190,5 @@ private nonisolated final class HydratingReads: MarfaReading {
     }
     func views() async throws -> Rows<LibraryView> { try await read.views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+    func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
 }

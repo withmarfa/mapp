@@ -247,6 +247,7 @@ private nonisolated struct ViewReads: MarfaReading, MarfaRefreshing {
     func items() async throws -> Rows<Marfa.Item> { try await read.items() }
     func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await read.edges(touching: id) }
+    func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
     func views() async throws -> Rows<LibraryView> {
         Rows(views.list.withLock { $0 }, completeness: views.completeness.withLock { $0 })
     }

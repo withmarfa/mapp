@@ -74,6 +74,16 @@ import Testing
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 
+        /// What the copy would answer for a row's links, which the fake copy cannot: set by a test, else the copy's.
+        let answers = Mutex<(@Sendable (String) -> BodyLinks?)?>(nil)
+        let linkReads = Mutex(0)
+
+        func links(in id: String) async throws -> BodyLinks {
+            linkReads.withLock { $0 += 1 }
+            if let answer = answers.withLock({ $0 })?(id) { return answer }
+            return try await read.links(in: id)
+        }
+
         /// A copy still filling, as the sync lane reads it, so the lane never drains the fake itself.
         func readStatus() async throws -> Status {
             Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .inProgress)
@@ -157,8 +167,9 @@ import Testing
         WorkingCopy.fake(items: rows, itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
     }
 
-    private static func open(_ fake: FakeCopy) async throws -> Scene {
+    private static func open(_ fake: FakeCopy, readingWith set: (Reads) -> Void = { _ in }) async throws -> Scene {
         let reads = Reads(copy: fake.copy)
+        set(reads)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: reads, refreshing: reads)
         let log = ChangeLog(source)
         source.events.yield(.paint)
@@ -270,6 +281,53 @@ import Testing
             #expect(shown.bodies[item.id]?.text == "Body *\(index)*")
             #expect((item.sync == .settled) == (index != 5), "\(id) is \(item.sync)")
         }
+        await scene.close()
+    }
+
+    /// A paint of many rows that name links reads them several at a time (`MarfaEngine.serialLinkReads`); each row
+    /// must still show what the copy answers for its own text, whether a link names a held row, nothing, or an
+    /// embed names nothing, and a row that names nothing must show none. The fake copy cannot answer a links read,
+    /// so the test gives the answers.
+    @Test func aPaintOfManyLinkingRowsShowsEachRowsOwnLinks() async throws {
+        let linking = MarfaEngine.serialLinkReads * 4 - 4
+        let total = linking + 30
+        var answers: [String: BodyLinks] = [:]
+        var rows: [Marfa.Item] = []
+        for index in 0..<total {
+            let id = "kept-\(index)"
+            guard index < linking else {
+                rows.append(Self.row(id, title: "Kept \(index)", body: "Plain \(index)"))
+                continue
+            }
+            let target = (index * 7 + 3) % total
+            let nowhere = BodyName(text: "[[Nowhere \(index)]]", name: "Nowhere \(index)", target: .missing)
+            if index.isMultiple(of: 3) {
+                rows.append(Self.row(id, title: "Kept \(index)", body: "See [[Nowhere \(index)]] and ![[Missing \(index).png]]"))
+                answers[id] = BodyLinks(
+                    links: [nowhere],
+                    embeds: [BodyName(text: "![[Missing \(index).png]]", name: "Missing \(index).png", target: .missing)])
+            } else {
+                rows.append(Self.row(id, title: "Kept \(index)", body: "See [[Kept \(target)]] and [[Nowhere \(index)]]"))
+                answers[id] = BodyLinks(
+                    links: [BodyName(text: "[[Kept \(target)]]", name: "Kept \(target)", target: .item(id: "kept-\(target)")), nowhere])
+            }
+        }
+        let given = answers
+        let scene = try await Self.open(Self.fake(rows)) { $0.answers.withLock { $0 = { given[$0] } } }
+        #expect(scene.shown?.items.count == total)
+
+        for index in 0..<total {
+            let id = "kept-\(index)"
+            let item = try #require(scene.item(id), "\(id) was not shown")
+            let answer = answers[id] ?? BodyLinks()
+            let links = answer.links.map {
+                BoundLink(link: NoteLink(reading: MarfaMapping.inside(brackets: $0.text)), resolution: MarfaMapping.resolution(of: $0.target))
+            }
+            let embeds = answer.embeds.map { BoundEmbed(text: $0.text, resolution: MarfaMapping.resolution(of: $0.target)) }
+            #expect(item.boundLinks == links, "\(id) shows links \(item.boundLinks), the copy answered \(links)")
+            #expect(item.boundEmbeds == embeds, "\(id) shows embeds \(item.boundEmbeds), the copy answered \(embeds)")
+        }
+        #expect(scene.reads.linkReads.withLock { $0 } == linking, "each linking row, and no other, was asked once")
         await scene.close()
     }
 

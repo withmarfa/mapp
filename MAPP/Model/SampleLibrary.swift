@@ -274,6 +274,7 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(touching: id) }
     func views() async throws -> Rows<LibraryView> { try await MarfaRead(copy: copy).views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(inView: id) }
+    func links(in id: String) async throws -> BodyLinks { try await MarfaRead(copy: copy).links(in: id) }
 
     func readStatus() async throws -> Status { whole }
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {

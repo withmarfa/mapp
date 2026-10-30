@@ -327,13 +327,15 @@ extension MarfaEngine {
     /// Asks the package what each row's text names, as `readLinks(of:)` does for one, several at a time: each read is
     /// a hop to the package's own thread and back, which at a launch's thousands of rows is most of their cost.
     private func readLinks(of rows: [Marfa.Item]) async {
-        let named = rows.filter { Self.mayName($0, catalogue: catalogue) }
-        for row in rows where !Self.mayName(row, catalogue: catalogue) { bodyLinks[row.id] = nil }
+        var named: [Marfa.Item] = []
+        for row in rows {
+            if Self.mayName(row, catalogue: catalogue) { named.append(row) } else { bodyLinks[row.id] = nil }
+        }
         guard named.count >= Self.serialLinkReads else {
             for row in named { await readLinks(of: row) }
             return
         }
-        let (hub, copy) = (hub, copy)
+        let (hub, reading) = (hub, reading)
         let width = ProcessInfo.processInfo.activeProcessorCount
         await withTaskGroup(of: (String, BodyLinks?).self) { group in
             var next = named.makeIterator()
@@ -341,11 +343,11 @@ extension MarfaEngine {
                 guard let row = next.next() else { return false }
                 group.addTask {
                     // An item the copy cannot name links for shows the edges it holds, and no more.
-                    (row.id, try? await Self.asking(hub) { try await copy.items.links(in: row.id) })
+                    (row.id, try? await Self.asking(hub) { try await reading.links(in: row.id) })
                 }
                 return true
             }
-            for _ in 0..<width where !add() { break }
+            for _ in 0..<width { guard add() else { break } }
             for await (id, links) in group {
                 bodyLinks[id] = links
                 _ = add()
@@ -360,7 +362,7 @@ extension MarfaEngine {
             return
         }
         do {
-            bodyLinks[row.id] = try await Self.asking(hub) { try await copy.items.links(in: row.id) }
+            bodyLinks[row.id] = try await Self.asking(hub) { try await reading.links(in: row.id) }
         } catch {
             // An item the copy cannot name links for shows the edges it holds, and no more.
             bodyLinks[row.id] = nil
@@ -618,16 +620,15 @@ extension MarfaEngine {
         }
         guard present.count >= serialMapping else { return present.map { map($0.row, id: $0.id) } }
         let chunks = min(present.count / (serialMapping / 4), ProcessInfo.processInfo.activeProcessorCount * 4)
-        let results = Array<(item: Item, text: String?, hash: Int)?>(unsafeUninitializedCapacity: present.count) { buffer, count in
-            buffer.initialize(repeating: nil)
+        // Each chunk fills its own slots, and the chunks together cover every slot once.
+        return Array<(item: Item, text: String?, hash: Int)>(unsafeUninitializedCapacity: present.count) { buffer, count in
             nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
                 let start = present.count * chunk / chunks, end = present.count * (chunk + 1) / chunks
-                for index in start..<end { slots[index] = map(present[index].row, id: present[index].id) }
+                for index in start..<end { slots.initializeElement(at: index, to: map(present[index].row, id: present[index].id)) }
             }
             count = present.count
         }
-        return results.map { $0! }
     }
 
     /// A drain that stops on an error has recorded the answers it got and tells none of them. They are read from the
