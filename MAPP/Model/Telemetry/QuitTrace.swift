@@ -33,6 +33,7 @@ nonisolated final class QuitTrace: Sendable {
     }
 
     private let stages = Mutex<[Stage: Entry]>([:])
+    private let editorsWaitingTheirTurn = Mutex(0)
     private let purpose: Purpose
     private let log = Telemetry.logger(.quit)
 
@@ -76,6 +77,12 @@ nonisolated final class QuitTrace: Sendable {
         log.info("\(self.purpose.label) stage \(stage.rawValue, privacy: .public) skipped: \(reason.description, privacy: .public)")
     }
 
+    /// An editor whose flush waits its turn behind a hand-over already under way, as when the note was left just
+    /// before, so the editors stage can take more than one editor's limit.
+    func editorWaitsItsTurn() {
+        editorsWaitingTheirTurn.withLock { $0 += 1 }
+    }
+
     /// The stages begun and not finished, in the order a flush runs them.
     var unfinished: [Stage] {
         stages.withLock { entries in
@@ -92,6 +99,7 @@ nonisolated final class QuitTrace: Sendable {
     func diagnosis(at now: ContinuousClock.Instant = .now) -> String {
         let stalled = unfinished
         let activities = stages.withLock { $0.mapValues(\.activity) }
+        let waitingTheirTurn = editorsWaitingTheirTurn.withLock { $0 }
         guard !stalled.isEmpty else {
             return "no stage is unfinished; the flush stopped between stages"
         }
@@ -100,7 +108,9 @@ nonisolated final class QuitTrace: Sendable {
             case .queue:
                 let engine = activities[.queue].flatMap { $0 }?.snapshot(at: now).summary ?? "engine unknown"
                 return "queue did not finish (\(engine))"
-            case .editors: return "editors did not finish handing over their last edit"
+            case .editors:
+                let turns = waitingTheirTurn == 0 ? "" : " (\(waitingTheirTurn) waiting behind a hand-over already under way)"
+                return "editors did not finish handing over their last edit" + turns
             case .titles: return "window titles did not finish saving"
             }
         }.joined(separator: "; ")

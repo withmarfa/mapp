@@ -152,6 +152,7 @@ extension EditorController {
                 gate.arrive(false)
                 continue
             }
+            if editor.isFlushing { trace?.editorWaitsItsTurn() }
             editor.flush(then: gate.arrive)
         }
     }

@@ -134,9 +134,11 @@ import os
                 try? await Task.sleep(for: limit)
                 guard first.resume(continuation, with: false) else { return }
                 trace.logTimeout(after: limit)
-                host.notices.tell(
-                    String(localized: "Couldn’t Quit"),
-                    String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment."))
+                // A page's hand-over can wait its turn behind another, each for up to the editor's own limit.
+                let message = trace.unfinished.first == .editors
+                    ? String(localized: "MAPP is still saving what you last typed. Try again in a moment.")
+                    : String(localized: "MAPP is still saving your changes on this Mac. Try again in a moment.")
+                host.notices.tell(String(localized: "Couldn’t Quit"), message)
             }
         }
     }

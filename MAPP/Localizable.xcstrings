@@ -641,6 +641,9 @@
     "MAPP is still saving your changes on this Mac. Try again in a moment." : {
 
     },
+    "MAPP is still saving what you last typed. Try again in a moment." : {
+
+    },
     "MAPP kept the copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },

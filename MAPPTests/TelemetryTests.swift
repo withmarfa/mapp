@@ -33,6 +33,15 @@ struct TelemetryTests {
     }
 
     @Test
+    func aQuitStuckInTheEditorsSaysHowManyWaitedTheirTurn() {
+        let trace = QuitTrace(purpose: .quit)
+        trace.begin(.editors)
+        trace.editorWaitsItsTurn()
+
+        #expect(trace.diagnosis().contains("editors did not finish handing over their last edit (1 waiting behind a hand-over already under way)"))
+    }
+
+    @Test
     func anEngineThatTookNoEventStillSaysItIsIdleWithEventsWaiting() {
         let activity = EngineActivity()
         activity.tell()
