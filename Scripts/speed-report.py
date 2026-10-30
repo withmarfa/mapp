@@ -75,7 +75,7 @@ def main(path):
         found = intervals.get(phase, {})
         for (category, name), values in sorted(found.items()):
             print(line(f"{phase}.signpost.{category}.{name}", values))
-            if category == "navigation" and name != "work":
+            if category == "navigation":
                 print(f"UI|{phase}.signpost.{category}.{name}.count|{len(values)}|{len(values)}|intervals")
         for name, values in sorted(milestones.get(phase, {}).items()):
             print(line(f"{phase}.launch.{name}", values))

@@ -182,21 +182,31 @@ struct ItemTable: View {
 }
 
 /// Times what a table costs when it shows another place: from the first pass that builds it for the place until the
-/// main queue is free again, which is the pause a person feels. The signpost is `table.place`, in `navigation`.
+/// main queue is free again, which is the pause a person feels. The signpost is `table.place`, in `navigation`. The
+/// table's first pass only notes the place: a table that has just been mounted, by switching from the list or the
+/// gallery or by launching, is a layout change, which is not a place change.
 @MainActor
 private final class TablePlaceTrace {
     private var place: SidebarItem?
-    private var interval: Telemetry.Interval?
+    private var current: (id: Int, interval: Telemetry.Interval)?
+    private var counter = 0
 
     func bodyRan(for place: SidebarItem) {
         guard place != self.place else { return }
+        let isMount = self.place == nil
         self.place = place
-        interval?.end()
-        interval = Telemetry.begin(.navigation, "table.place")
-        // The pass that updates the table runs when the runloop is about to wait, so this block comes after it.
+        current?.interval.end()
+        current = nil
+        guard !isMount else { return }
+        counter += 1
+        let id = counter
+        current = (id, Telemetry.begin(.navigation, "table.place"))
+        // The pass that updates the table runs when the runloop is about to wait, so this block comes after it. It
+        // ends only the interval it began, not one a later change has begun since.
         DispatchQueue.main.async { [weak self] in
-            self?.interval?.end()
-            self?.interval = nil
+            guard let self, current?.id == id else { return }
+            current?.interval.end()
+            current = nil
         }
     }
 }
