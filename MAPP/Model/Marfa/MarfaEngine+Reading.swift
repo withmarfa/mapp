@@ -164,7 +164,8 @@ extension MarfaEngine {
     /// again only where the item or its edges changed, a name in it was not yet bound to an item, its links could
     /// not be read before, or a change to another row may change what it names (`linkers`). A read that finds the
     /// copy whole takes a new `cursor`, taken before the rows are read, so a change made meanwhile is named again
-    /// rather than missed. A row whose links cannot be read shows the edges it holds, and is asked again next time.
+    /// rather than missed. A row whose links cannot be read shows the edges it holds; the read then leaves no cursor,
+    /// so the next read is whole and asks again.
     func reload(purged: Purged = Purged()) async {
         let reloading = Telemetry.begin(.engine, "reload")
         var published = 0
@@ -278,7 +279,7 @@ extension MarfaEngine {
             return true
         }
         let linkReads = linked.count
-        await readLinks(of: linked)
+        let links = await readLinks(of: linked)
         for id in Set(bodyLinks.keys).subtracting(rows.keys) { bodyLinks[id] = nil }
         for (id, row) in rows where bodyLinks[id] != nil && !Self.mayName(row, catalogue: catalogue) { bodyLinks[id] = nil }
         linking.end(("read", linkReads), ("kept", bodyLinks.count))
@@ -301,7 +302,8 @@ extension MarfaEngine {
         publishing.end(("ids", published))
         // Held undos are judged on what this read found, so they wait until it found the copy whole.
         guard whole else { return }
-        if let mark { cursor = mark }
+        // A read of what changed asks no row for links it could not read, so the next read is whole until they are.
+        if links == .failed { cursor = nil } else if let mark { cursor = mark }
         await releaseHeld()
     }
 
@@ -320,9 +322,9 @@ extension MarfaEngine {
     /// since what it names has not been read. Once applied, the rows and edges held are what a whole read would
     /// find, so held undos are judged on them.
     ///
-    /// A row whose links cannot be read, even alone, shows only the edges it holds: links read before may name
-    /// what its text no longer does, so they are not kept. The copy is then read whole, from the cursor kept, which
-    /// asks again for the links of every row that has none. A hydration begun since refuses every link read; the
+    /// A row whose links cannot be read shows only the edges it holds: links read before may name what its text
+    /// no longer does, so they are not kept. The copy is then read whole, from the cursor kept, which asks again for
+    /// the links of every row that has none. A hydration begun since refuses every link read; the
     /// cursor is kept, and the hydration reads the copy whole once it ends.
     func readChanged(purged: Purged = Purged()) async {
         guard painted, let since = cursor else { return await reload(purged: purged) }
@@ -597,15 +599,15 @@ extension MarfaEngine {
         case read
         /// A hydration under way refused it; the hydration reads the copy whole once it ends.
         case filling
-        /// A row's links could not be read for another reason, even alone.
+        /// A read of rows' links failed for another reason, so the copy cannot be used as it stands.
         case failed
     }
 
     /// Asks the package what each row's text names, many rows at a time. A row in the bin is left out of such a
     /// read, so it is asked for alone. Such a read also leaves out a row the copy does not hold or whose stored
-    /// properties it cannot read, so it fails only as a whole; one that fails other than for a hydration is asked
-    /// again row by row. A row whose links cannot be read shows the edges it holds, and no more: links read before
-    /// may name what its text no longer does.
+    /// properties it cannot read, so it fails only as a whole, where the copy cannot be used: asking its rows one
+    /// by one would fail again for each. A row whose links cannot be read shows the edges it holds, and no more:
+    /// links read before may name what its text no longer does.
     @discardableResult
     private func readLinks(of rows: [Marfa.Item]) async -> LinksRead {
         var named: [Marfa.Item] = []
@@ -625,10 +627,11 @@ extension MarfaEngine {
             } catch {
                 read = nil
             }
+            if read == nil, !filling { failed = true }
             for row in chunk {
                 if let links = read?[row.id] {
                     bodyLinks[row.id] = links
-                } else if (read == nil || row.state == .trashed) && !filling {
+                } else if read != nil, row.state == .trashed, !filling {
                     let (links, ended) = await readLinks(of: row.id)
                     bodyLinks[row.id] = links
                     if ended == .filling { filling = true }
@@ -714,7 +717,7 @@ extension MarfaEngine {
         // A purged row went, even where a hydration under way left it unread. The engine let it go on hearing the
         // purge, so the row it held is taken from `purged`.
         var moved = purged.ids
-        var came = false
+        var arrived = false
         var files = purged.rows.values.contains { isFile($0) }
         for (row, id, held) in read {
             let previous = rows[id] ?? purged.rows[id]
@@ -722,7 +725,7 @@ extension MarfaEngine {
                 != Self.placements(of: id, in: held)
             guard placed || Self.movesNames(previous, row, catalogue: catalogue) else { continue }
             moved.insert(id)
-            if previous == nil, row != nil { came = true }
+            if Self.arrives(previous, row) { arrived = true }
             if isFile(previous) || isFile(row) { files = true }
         }
         var hosts = Self.hosts(of: moved, in: edges)

@@ -29,6 +29,8 @@ import Testing
         let failures = Mutex(0)
         /// Each row whose links were asked for.
         let linksAsked = Mutex<[String]>([])
+        /// Each row whose links were asked for alone.
+        let linksAskedAlone = Mutex<[String]>([])
         /// How many reads of links fail, of many rows or of one, before one succeeds.
         let linkFailures = Mutex(0)
         /// Edges answered as though the copy held them, such as a placement, which only a folder writes.
@@ -121,6 +123,7 @@ import Testing
 
         func links(in id: String) async throws -> BodyLinks {
             linksAsked.withLock { $0.append(id) }
+            linksAskedAlone.withLock { $0.append(id) }
             try failLinkRead()
             return try await read.links(in: id)
         }
@@ -574,9 +577,9 @@ import Testing
         await finish(scene)
     }
 
-    /// A read of many rows' links that fails is asked again row by row, so a read that fails once does not leave
-    /// every row showing only its edges.
-    @Test func aLinkReadThatFailsIsAskedRowByRow() async throws {
+    /// A read of many rows' links fails only where the copy cannot be used at all, so it is not asked again row by
+    /// row: the read of what changed keeps its cursor and the copy is read whole.
+    @Test func aLinkReadThatFailsIsReadWholeNotRowByRow() async throws {
         let scene = try await makeScene()
         let whole = scene.reads.whole
         scene.reads.linkFailures.withLock { $0 = 1 }
@@ -584,23 +587,31 @@ import Testing
         scene.caughtUp()
         try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         await scene.source.engineTook()
-        #expect(scene.reads.whole == whole, "no whole read")
+        #expect(scene.reads.linksAskedAlone.withLock { $0 }.isEmpty, "no row asked alone")
+        #expect(scene.reads.whole == whole + 1)
+        #expect(await scene.source.engine.cursor != nil)
         await finish(scene)
     }
 
-    /// A row whose links still cannot be read shows only the edges it holds, never links read before, and the copy
-    /// is read whole from the cursor kept.
-    @Test func aRowWhoseLinksCannotBeReadIsReadWhole() async throws {
+    /// A row whose links cannot be read shows only the edges it holds, never links read before. A whole read that
+    /// cannot read them takes no cursor, so the next read is whole and asks for them again.
+    @Test func aRowWhoseLinksCannotBeReadIsReadWholeUntilTheyAre() async throws {
         let scene = try await makeScene()
         let whole = scene.reads.whole
-        let cursor = await scene.source.engine.cursor
         scene.reads.linkFailures.withLock { $0 = 2 }
         _ = try await scene.note("Host", body: "See [[Nowhere]]")
         scene.caughtUp()
-        try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.wait("the host") { $0.item(titled: "Host") != nil }
         await scene.source.engineTook()
         #expect(scene.reads.whole == whole + 1)
-        #expect(await scene.source.engine.cursor != cursor, "the whole read took a cursor of its own")
+        #expect(scene.shown("Host")?.boundLinks.isEmpty == true, "no links read")
+        #expect(await scene.source.engine.cursor == nil, "the whole read took no cursor")
+
+        scene.caughtUp()
+        try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        await scene.source.engineTook()
+        #expect(scene.reads.whole == whole + 2)
+        #expect(await scene.source.engine.cursor != nil)
         await finish(scene)
     }
 
