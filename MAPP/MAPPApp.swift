@@ -4,6 +4,8 @@ import SwiftUI
 enum Launch {
     static func main() {
         LaunchTrace.shared.mark(.appInit)
+        // Made first, so it is the shared application whatever asks for one next.
+        _ = MAPPApplication.shared
         #if DEBUG
         if TestHost.isRequested {
             TestHost.run()
@@ -29,7 +31,7 @@ enum TestHost {
     }
 
     static func run() {
-        NSApplication.shared.run()
+        NSApp.run()
     }
 }
 #endif
