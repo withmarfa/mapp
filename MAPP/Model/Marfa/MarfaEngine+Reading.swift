@@ -236,13 +236,13 @@ extension MarfaEngine {
         var touched = purged.ids.union(gone)
         // The rows that may change what another item's text names, as `take` finds them.
         var moved = purged.ids.union(gone)
-        var came = false
+        var arrived = false
         var files = purged.rows.values.contains { isFile($0) } || gone.contains { isFile(previousRows[$0]) }
         for (id, row) in rows where previousRows[id] != row {
             touched.insert(id)
             guard Self.movesNames(previousRows[id], row, catalogue: catalogue) else { continue }
             moved.insert(id)
-            if previousRows[id] == nil { came = true }
+            if Self.arrives(previousRows[id], row) { arrived = true }
             if isFile(previousRows[id]) || isFile(row) { files = true }
         }
         var changedEdges: [(before: Marfa.Edge?, after: Marfa.Edge?)] = []
@@ -267,7 +267,7 @@ extension MarfaEngine {
             }
         }
         let relinked = everything ? [] : linkers(
-            of: moved, came: came, files: files,
+            of: moved, arrived: arrived, files: files,
             hosts: Self.hosts(of: moved, in: previousEdges).union(Self.hosts(of: moved, in: self.edges)))
 
         let linking = Telemetry.begin(.engine, "reload.links")
@@ -376,6 +376,7 @@ extension MarfaEngine {
         // A purged row went. The engine let it go on hearing the purge, so `gone` below finds it no longer held.
         var moved = purged.ids
         var came: Set<String> = []
+        var arrived = false
         var files = purged.rows.values.contains { isFile($0) }
         var gone = Set(named.removedItems)
         let foundIDs = Set(found.map(\.id))
@@ -389,6 +390,7 @@ extension MarfaEngine {
             }
             let previous = rows[row.id]
             if previous == nil { came.insert(row.id) }
+            if Self.arrives(previous, row) { arrived = true }
             if Self.movesNames(previous, row, catalogue: catalogue) {
                 moved.insert(row.id)
                 if isFile(previous) || isFile(row) { files = true }
@@ -442,7 +444,7 @@ extension MarfaEngine {
 
         await sync.unreadable(Set(present.filter { $0.unreadableProperties != nil }.map(\.id)))
         if binChanged { await sync.binChanged() }
-        let linking = linkers(of: moved, came: !came.isEmpty, files: files, hosts: hosts).subtracting(present.map(\.id))
+        let linking = linkers(of: moved, arrived: arrived, files: files, hosts: hosts).subtracting(present.map(\.id))
         let before = linking.reduce(into: [String: BodyLinks]()) { before, id in before[id] = bodyLinks[id] }
         let links = await readLinks(of: present + linking.compactMap { rows[$0] })
         affected.formUnion(linking.filter { before[$0] != bodyLinks[$0] })
@@ -497,12 +499,12 @@ extension MarfaEngine {
 
     /// The rows held whose links may read differently because the rows `moved` came, went or changed how they are
     /// named, which the copy names no change to (`WorkingCopy.changes(since:most:)`). The package reads a link from
-    /// the link edges at its host, which put the host among the `hosts`, or from an ID the copy holds, so a link that
-    /// names no item yet may name one only once a row `came`; and it reads an embed from its host's attachments,
-    /// which put the host among the `hosts` too, or from every file held, so an embed that names no item may read
-    /// differently once a file moved (`files`). So: the `hosts`, the rows whose links or embeds name one of the rows
-    /// moved, and those rows with a link or embed that names no item.
-    private func linkers(of moved: Set<String>, came: Bool, files: Bool, hosts: Set<String>) -> Set<String> {
+    /// the link edges at its host, which put the host among the `hosts`, or from an ID the copy holds outside the
+    /// bin, so a link that names no item yet may name one only once a row `arrived` (`arrives`); and it reads an embed
+    /// from its host's attachments, which put the host among the `hosts` too, or from every file held, so an embed
+    /// it lists with no item may read differently once a file moved (`files`). So: the `hosts`, the rows whose links
+    /// or embeds name one of the rows moved, and those rows with a link or embed that names no item.
+    private func linkers(of moved: Set<String>, arrived: Bool, files: Bool, hosts: Set<String>) -> Set<String> {
         guard !moved.isEmpty else { return [] }
         func reads(_ names: [Marfa.BodyName], unbound: Bool) -> Bool {
             names.contains { name in
@@ -510,10 +512,18 @@ extension MarfaEngine {
             }
         }
         var found = hosts
-        for (id, links) in bodyLinks where reads(links.links, unbound: came) || reads(links.embeds, unbound: files) {
+        for (id, links) in bodyLinks where reads(links.links, unbound: arrived) || reads(links.embeds, unbound: files) {
             found.insert(id)
         }
         return found.filter { rows[$0] != nil }
+    }
+
+    /// Whether a row arrived where the package can bind a link to it by ID: into the copy, or out of the bin, since
+    /// the package binds an ID only to an item the copy holds outside the bin.
+    nonisolated static func arrives(_ previous: Marfa.Item?, _ now: Marfa.Item?) -> Bool {
+        guard let now else { return false }
+        guard let previous else { return true }
+        return previous.state == .trashed && now.state != .trashed
     }
 
     /// Whether a row is a file, which an embed may name by its title wherever it is held.
@@ -739,7 +749,7 @@ extension MarfaEngine {
         }
         hosts.formUnion(Self.hosts(of: moved, in: edges))
         let present = read.compactMap(\.row)
-        let linking = linkers(of: moved, came: came, files: files, hosts: hosts).subtracting(present.map(\.id))
+        let linking = linkers(of: moved, arrived: arrived, files: files, hosts: hosts).subtracting(present.map(\.id))
         let before = linking.reduce(into: [String: BodyLinks]()) { before, id in before[id] = bodyLinks[id] }
         let links = await readLinks(of: present + linking.compactMap { rows[$0] })
         affected.formUnion(linking.filter { before[$0] != bodyLinks[$0] })

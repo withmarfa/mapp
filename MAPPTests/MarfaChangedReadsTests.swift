@@ -603,4 +603,38 @@ import Testing
         #expect(await scene.source.engine.cursor != cursor, "the whole read took a cursor of its own")
         await finish(scene)
     }
+
+    /// How a test has the engine take a change: by a read of what changed, a reread of the row a server change
+    /// names, or a whole read.
+    enum ReadPath: CaseIterable, Sendable { case changed, named, whole }
+
+    /// The package binds a link by ID only to an item the copy holds outside the bin, so an item restored from the
+    /// bin is taken as one arriving: a link that names it by ID, with no edge to it, reads again whichever read
+    /// takes the restore.
+    @Test(arguments: ReadPath.allCases)
+    func aRestoredItemIsTheTargetOfALinkAgain(_ path: ReadPath) async throws {
+        let scene = try await makeScene()
+        let target = try await scene.note("Target")
+        _ = try await scene.host(naming: target)
+        if path == .whole { scene.reads.rewrite.withLock { $0 = { .everything(next: $0.next) } } }
+        func take(_ step: String) {
+            switch path {
+            case .changed, .whole: scene.caughtUp()
+            case .named:
+                scene.source.hear(Change(origin: .server(event: "item.updated", cursor: step), itemId: target, edgeId: nil))
+            }
+        }
+
+        _ = try await scene.copy.items.delete(target)
+        take("binned")
+        try await scene.wait("the link pending") {
+            $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
+        }
+        _ = try await scene.copy.items.restore(target)
+        take("restored")
+        try await scene.wait("the link bound again") {
+            $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
+        }
+        await finish(scene)
+    }
 }
