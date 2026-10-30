@@ -164,7 +164,7 @@ struct InspectorItemRow: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         TypeIcon(name: typeIcon(id))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(target.title)
+                            Text(target.displayTitle)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                             if target.isDeleted {
@@ -245,7 +245,7 @@ struct ItemRelationshipPicker: View {
                         Image(systemName: selection.contains(candidate.id) ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selection.contains(candidate.id) ? Color.accentColor : .secondary)
                         VStack(alignment: .leading) {
-                            Text(candidate.title)
+                            Text(candidate.displayTitle)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))

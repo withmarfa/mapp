@@ -459,7 +459,7 @@ struct QuickAddPanel: View {
                         editing = nil
                     } label: {
                         HStack {
-                            Label { Text(candidate.title) } icon: { TypeIcon(name: library.catalogue.icon(for: candidate.type)) }
+                            Label { Text(candidate.displayTitle) } icon: { TypeIcon(name: library.catalogue.icon(for: candidate.type)) }
                                 .lineLimit(1)
                             Spacer(minLength: 8)
                             if candidate.id == draft.parentID {
