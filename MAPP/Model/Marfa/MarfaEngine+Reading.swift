@@ -594,8 +594,8 @@ extension MarfaEngine {
     /// Asks the package what each row's text names, many rows at a time. A row in the bin is left out of such a
     /// read, so it is asked for alone. Such a read also leaves out a row the copy does not hold or whose stored
     /// properties it cannot read, so it fails only as a whole; one that fails other than for a hydration is asked
-    /// again row by row. A row whose links cannot be read
-    /// shows the edges it holds, and no more: links read before may name what its text no longer does.
+    /// again row by row. A row whose links cannot be read shows the edges it holds, and no more: links read before
+    /// may name what its text no longer does.
     @discardableResult
     private func readLinks(of rows: [Marfa.Item]) async -> LinksRead {
         var named: [Marfa.Item] = []
