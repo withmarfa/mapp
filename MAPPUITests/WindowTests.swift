@@ -191,6 +191,22 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Milk"), "Return moves from the title into the page")
     }
 
+    /// Select All in the list goes through the list's selection rather than its table (`SelectAllRoute`), from the
+    /// key and from the Edit menu.
+    func testSelectAllInTheListSelectsEveryItem() {
+        sidebarItem("Items").click()
+        let total = count(of: "Items")
+        XCTAssertGreaterThan(total, 1)
+        row(titled: "Bike service").click()
+        let prompt = window.staticTexts["\(total) items selected"]
+        app.typeKey("a", modifierFlags: .command)
+        XCTAssertTrue(prompt.waitForExistence(timeout: 3), "Command-A selects every item in the list")
+        row(titled: "Bike service").click()
+        XCTAssertTrue(prompt.waitForNonExistence(timeout: 3), "a click chooses one item again")
+        app.menuBars.menuBarItems["Edit"].menuItems["Select All"].click()
+        XCTAssertTrue(prompt.waitForExistence(timeout: 3), "the Edit menu's Select All selects every item in the list")
+    }
+
     func testCommandDeleteDeletesTheSelectedNote() {
         row(titled: "Bike service").click()
         app.typeKey(.delete, modifierFlags: .command)
