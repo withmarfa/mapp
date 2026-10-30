@@ -93,7 +93,7 @@ extension EditorController {
         func failed(_ message: String) {
             abandonedGeneration = self.generation
             Telemetry.logger(.editor).error("flush failed: \(message)")
-            tellNotSaved(noteID, reason: String(localized: "The editor couldn’t hand over your most recent typing (“\(message)”). Everything before it is saved. To go ahead without it, try again."))
+            tellNotSaved(noteID, reason: String(localized: "The editor ran into a problem (“\(message)”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
