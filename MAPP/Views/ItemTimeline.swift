@@ -62,7 +62,7 @@ struct ItemTimeline: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: browser.selection)
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, selection: { browser.selection })
         .focused(pane, equals: .list)
         .accessibilityLabel("Timeline")
         .accessibilityIdentifier("ItemTimeline")

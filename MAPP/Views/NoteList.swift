@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct NoteList: View {
+struct NoteList: View, Equatable {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -12,6 +12,8 @@ struct NoteList: View {
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
+
+    static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
 
     var body: some View {
         // Reading the counter ties the dates and sections to the day changing, so "Today" moves at midnight.
@@ -26,37 +28,27 @@ struct NoteList: View {
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
         List(selection: $browser.selection) {
+            // The list reads every line's traits (whether it can be selected, its separators, its drag) each time
+            // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
+            // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(ListLine.lines(of: sections)) { line in
-                switch line {
-                case .heading(let group, let isFirst):
-                    Text(group.title())
-                        .interfaceFont(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, isFirst ? 0 : 10)
-                        .accessibilityAddTraits(.isHeader)
-                        .selectionDisabled()
-                        .listRowSeparator(.hidden, edges: .top)
-                case .item(let item, let endsSection):
-                    let row = ItemRow(
-                        item: item,
-                        dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
-                        meta: ItemMeta.make(for: item, in: library, context: context),
-                        previewLines: previewLines,
-                        excerpt: excerpts[item.id]
-                    )
-                    .listRowSeparator(endsSection ? .hidden : .automatic, edges: .bottom)
-                    // A file has no markdown to carry, so only a note is dragged.
-                    if item.isFile {
-                        row
-                    } else {
-                        row.draggable(containerItemID: item.id)
-                    }
+                let row = ListLineRow(
+                    line: line, order: order, now: now, context: context, previewLines: previewLines,
+                    excerpt: excerpts[line.id])
+                .selectionDisabled(line.isHeading)
+                .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
+                .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
+                if line.carriesMarkdown {
+                    row.draggable(containerItemID: line.id)
+                } else {
+                    row
                 }
             }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: ids, selection: browser.selection)
+        .softSelection(rows: ids) { browser.selection }
+        .selectsAll { browser.selection = Set(ids) }
         // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 >= 280 { width = $0 } }
         .accessibilityIdentifier("NoteList")
@@ -196,6 +188,36 @@ struct ItemMetaLine: View {
     }
 }
 
+/// A line of the list as a row: a section's heading, or an item.
+private struct ListLineRow: View {
+    @CurrentLibrary private var library
+    let line: ListLine
+    let order: NoteOrder
+    let now: Date
+    let context: ItemMeta.Context
+    let previewLines: Int
+    let excerpt: SearchExcerpt?
+
+    var body: some View {
+        switch line {
+        case .heading(let group, let isFirst):
+            Text(group.title())
+                .interfaceFont(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, isFirst ? 0 : 10)
+                .accessibilityAddTraits(.isHeader)
+        case .item(let item, _):
+            ItemRow(
+                item: item,
+                dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
+                meta: ItemMeta.make(for: item, in: library, context: context),
+                previewLines: previewLines,
+                excerpt: excerpt
+            )
+        }
+    }
+}
+
 /// A line of the list: a section's heading, or an item, with where it falls in its section.
 private enum ListLine: Identifiable {
     case heading(NoteGroup, isFirst: Bool)
@@ -208,6 +230,19 @@ private enum ListLine: Identifiable {
         case .heading(let group, _): ItemID("heading:\(group)")
         case .item(let item, _): item.id
         }
+    }
+
+    var isHeading: Bool {
+        if case .heading = self { true } else { false }
+    }
+
+    var endsSection: Bool {
+        if case .item(_, let endsSection) = self { endsSection } else { false }
+    }
+
+    /// Whether the line can be dragged: a file has no markdown to carry, and a heading is not an item.
+    var carriesMarkdown: Bool {
+        if case .item(let item, _) = self { !item.isFile } else { false }
     }
 
     static func lines(of sections: [NoteSection]) -> [ListLine] {

@@ -104,7 +104,7 @@ private struct SidebarList: View {
         .bandsFoot(memory: browser.sidebarMemory) { SidebarFoot(browser: browser) }
         // The window mounts this list afresh when its presentation changes, so it starts where the last one was.
         .remembersScroll(in: browser.sidebarMemory)
-        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: browser.sidebarItem)
+        .softSelection(rows: [content.marksSignature, browser.sidebarShowsAllTypes ? 1 : 0], selection: { browser.sidebarItem })
         .accessibilityIdentifier("Sidebar")
         // The right and left arrows open and close the selected type, as the system's outline does for its own rows.
         .onKeyPress(.rightArrow, phases: [.down, .repeat]) { folding.press(.right, $0) }

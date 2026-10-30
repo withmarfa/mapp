@@ -85,7 +85,7 @@ struct MainView: View {
                 if browser.showsSettings {
                     SettingsPageList(browser: browser)
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane)
+                    NoteList(browser: browser, order: order, pane: $pane).equatable()
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
