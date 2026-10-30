@@ -272,9 +272,15 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
         try await MarfaRead(copy: copy).edges(ofTypes: types)
     }
     func edges(touching id: String) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(touching: id) }
+    func items(_ ids: [String]) async throws -> Rows<Marfa.Item> { try await MarfaRead(copy: copy).items(ids) }
+    func edges(_ ids: [String]) async throws -> [Marfa.Edge] { try await MarfaRead(copy: copy).edges(ids) }
+    func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+        try await MarfaRead(copy: copy).changes(since: cursor, most: most)
+    }
     func views() async throws -> Rows<LibraryView> { try await MarfaRead(copy: copy).views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(inView: id) }
     func links(in id: String) async throws -> BodyLinks { try await MarfaRead(copy: copy).links(in: id) }
+    func links(in ids: [String]) async throws -> [String: BodyLinks] { try await MarfaRead(copy: copy).links(in: ids) }
 
     func readStatus() async throws -> Status { whole }
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
