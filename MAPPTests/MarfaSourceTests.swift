@@ -1381,8 +1381,15 @@ nonisolated enum LiveMarfa {
     /// and an id left over from another server does not match.
     static func address() throws -> String {
         let address = try setting("MARFA_API_URL")
-        try refuseUnlessTestInstance(at: address, acknowledging: ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])
+        try confirmedTestInstance.get()
         return address
+    }
+
+    /// Asked once a run, since the environment does not change during one and each ask can hold a thread for the
+    /// request's whole timeout.
+    private static let confirmedTestInstance = Result<Void, any Error> {
+        let address = ProcessInfo.processInfo.environment["MARFA_API_URL"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        try refuseUnlessTestInstance(at: address, acknowledging: ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])
     }
 
     struct NotATestInstance: Error, CustomStringConvertible {
