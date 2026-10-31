@@ -9,7 +9,8 @@ struct NoteToolbar: CustomizableToolbarContent {
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     let browser: Browser?
     let items: [Item]
-    let editor: EditorController
+    /// Nil for a file in a window of its own, which has no editor.
+    let editor: EditorController?
     let details: DetailsPresentation
     var fileURL: URL?
     var showsCreation = false
@@ -26,9 +27,11 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!showsScrolledTitle || !editor.isHeaderScrolledAway || tools.notes.count != 1 || browser?.showsCollection == true)
+        .hidden(!showsScrolledTitle || editor?.isHeaderScrolledAway != true || tools.notes.count != 1 || browser?.showsCollection == true)
         ToolbarSpacer(.flexible)
-        ToolbarItem(id: "format") { FormatMenu(editor: editor, note: tools.editableNote) }
+        ToolbarItem(id: "format") {
+            if let editor { FormatMenu(editor: editor, note: tools.editableNote) }
+        }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true)
         ToolbarItem(id: "viewMode") {
@@ -77,7 +80,7 @@ struct InspectorToolbar: ToolbarContent {
     @CurrentLibrary private var library
     let browser: Browser?
     let items: [Item]
-    let editor: EditorController
+    let editor: EditorController?
     let details: DetailsPresentation
     var fileURL: URL?
 
@@ -180,14 +183,14 @@ private struct ItemToolbarActions {
     let library: any ItemLibrary
     let browser: Browser?
     let items: [Item]
-    let editor: EditorController
+    let editor: EditorController?
     let details: DetailsPresentation
     let fileURL: URL?
     /// The selected items that are not files, sorted out once, since a selection can hold every item in the library.
     let notes: [Item]
 
     init(
-        library: any ItemLibrary, browser: Browser?, items: [Item], editor: EditorController, details: DetailsPresentation,
+        library: any ItemLibrary, browser: Browser?, items: [Item], editor: EditorController?, details: DetailsPresentation,
         fileURL: URL? = nil
     ) {
         self.library = library
@@ -203,7 +206,7 @@ private struct ItemToolbarActions {
     var visibleNote: Item? {
         guard browser?.showsPage != false,
               (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
-              let note = notes.first, editor.hasNote, editor.noteID == note.id else { return nil }
+              let note = notes.first, let editor, editor.hasNote, editor.noteID == note.id else { return nil }
         return note
     }
 
@@ -279,7 +282,7 @@ private struct MoreMenu: View {
     let notes: [Item]
     let fileURL: URL?
     let browser: Browser?
-    let editor: EditorController
+    let editor: EditorController?
 
     private func command(_ command: ItemCommand) -> some View {
         ItemCommandButton(

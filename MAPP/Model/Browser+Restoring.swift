@@ -10,8 +10,16 @@ extension Browser {
         var viewMode: ItemViewMode = .list
     }
 
+    /// The most items of a selection a window keeps for the next launch. A person who selected everything in a
+    /// long list gets back a handful of those items, not the whole selection: saving every id on each change
+    /// of selection held the main thread for a selection of thousands, and a restored selection that large
+    /// means nothing, since the list opens at its first rows.
+    static let restoredSelectionLimit = 200
+
     func snapshot() -> Snapshot {
-        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
+        // Past the limit, any members will do, so nothing is sorted: a selection that big is sorted for nothing.
+        let kept = selection.count > Self.restoredSelectionLimit ? Array(selection.prefix(Self.restoredSelectionLimit)) : Array(selection)
+        return Snapshot(place: item, selection: kept.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
     }
 
     /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may

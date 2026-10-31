@@ -17,9 +17,19 @@ struct NoteWindow: View {
         _id = id
     }
 
-    /// The window's editor, holding the window's title drafts.
-    private var editor: EditorController {
-        editorSlot.editor { Self.makeEditor(library: library, details: details, showing: $id) }
+    /// The window's editor, holding the window's title drafts. Made when a note is shown, never for a file, which
+    /// the editor's web view would never show.
+    private var editor: EditorController? {
+        guard let item else { return nil }
+        return Self.pageEditor(for: library.pageLayout(of: item), in: editorSlot) {
+            Self.makeEditor(library: library, details: details, showing: $id)
+        }
+    }
+
+    /// The editor for an item of this page layout, or nil where the item is not shown in the editor, in which case
+    /// none is made.
+    static func pageEditor(for layout: ItemPageLayout, in slot: EditorSlot, make: () -> EditorController) -> EditorController? {
+        layout == .text ? slot.editor(make) : nil
     }
 
     /// An editor for a window of its own: a link followed in the page shows the note it names in this window, by
@@ -49,7 +59,7 @@ struct NoteWindow: View {
 
     var body: some View {
         Group {
-            if let item, library.pageLayout(of: item) == .text {
+            if let item, let editor {
                 NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .navigationTitle(item.title)
                     .toolbar(removing: .title)
@@ -63,7 +73,7 @@ struct NoteWindow: View {
                     .navigationTitle(item.title)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
-                        NoteToolbar(browser: nil, items: [item], editor: editor, details: details, fileURL: fileURL)
+                        NoteToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)
                     }
             }
         }

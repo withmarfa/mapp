@@ -48,3 +48,27 @@ struct PaletteMatchTests {
         }
     }
 }
+
+struct PalettePicksTests {
+    @Test func withNothingTypedEveryFixedTitleIsListedAndNoItem() {
+        let picks = PaletteMatch.Titles().picks(fixed: ["b", "a"], items: ["note"], " ")
+        #expect(picks == [.fixed(0), .fixed(1)])
+    }
+
+    @Test func aTypedQueryListsAtMostFiftyOfTenThousandTitles() {
+        let items = (0..<10_000).map { "Note \($0)" }
+        let picks = PaletteMatch.Titles().picks(fixed: ["New Note", "Search Notes"], items: items, "note")
+        #expect(picks.count == PaletteMatch.listLimit)
+        #expect(picks.first == .item(0))
+    }
+
+    @Test func theBestMatchesComeFirstAcrossBothLists() {
+        let picks = PaletteMatch.Titles().picks(fixed: ["Show Details", "Inbox"], items: ["Tax inbox", "Inbox rules", "Other"], "inbox")
+        #expect(picks == [.fixed(1), .item(1), .item(0)])
+    }
+
+    @Test func aRankingIsAsWideAsTheLimit() {
+        let picks = PaletteMatch.Titles().picks(fixed: [], items: ["a1", "a2", "a3"], "a", limit: 2)
+        #expect(picks == [.item(0), .item(1)])
+    }
+}
