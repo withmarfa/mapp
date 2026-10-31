@@ -100,7 +100,11 @@ extension MarfaLibrary {
     private func editProperty(_ id: ItemID, key: String, to value: PropertyValue?, undoManager: UndoManager?) -> Bool {
         guard let item = item(id) else { return false }
         let old = item.value(of: key)
-        if old != value { editProperty(id, key: key, from: old, to: value, undoManager: undoManager) }
+        // A value equal to the stored one still goes while an edit of the item is on its way, since it reverses that
+        // edit: skipping it would leave the edit in flight as the value stored.
+        if old != value || isWritingProperties(of: id) {
+            editProperty(id, key: key, from: old, to: value, undoManager: undoManager)
+        }
         return true
     }
 

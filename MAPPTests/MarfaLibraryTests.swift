@@ -1208,6 +1208,53 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { !library.isWritingProperties(of: LibraryFixture.en1) })
     }
 
+    /// A value set back while the edit it reverses is still on its way is sent too, though it equals the stored value,
+    /// so the edit in flight does not land as the value kept.
+    @Test func aPropertySetBackBeforeItsEditIsTakenIsSent() async throws {
+        let (library, source) = try await loaded()
+        let id = LibraryFixture.en1
+        let original = try #require(library.item(id)?.value(of: "name"))
+        #expect(library.setItemProperty(id, key: "name", value: .string("Ada L"), undoManager: nil))
+        #expect(library.setItemProperty(id, key: "name", value: original, undoManager: nil))
+
+        let edits = source.writes.compactMap { write -> PropertyValue?? in
+            guard case .editProperties(let item, let changes, _, _) = write, item == id else { return nil }
+            return changes["name"]
+        }
+        #expect(edits == [.string("Ada L"), original])
+
+        // The copy applies the two in order, so it ends holding the value set back.
+        var item = try #require(library.item(id))
+        for (write, value) in zip(source.submitted.suffix(2), [PropertyValue.string("Ada L"), original]) {
+            item.properties = [Property(key: "name", value: value)]
+            source.send(.upserted([item]))
+            source.send(.taken(write.id))
+        }
+        #expect(await eventually { !library.isWritingProperties(of: id) })
+        #expect(library.item(id)?.value(of: "name") == original)
+        let count = source.writes.count
+        #expect(library.setItemProperty(id, key: "name", value: original, undoManager: nil))
+        #expect(source.writes.count == count, "with nothing on its way, the stored value is not sent again")
+    }
+
+    /// Each property edit carries a mark, which says once the copy took it, and never for one refused.
+    @Test func aPropertyEditsMarkSaysWhetherTheCopyTookIt() async throws {
+        let (library, source) = try await loaded()
+        #expect(library.setItemProperty(LibraryFixture.en1, key: "name", value: .string("Ada L"), undoManager: nil))
+        let taken = try #require(library.lastPropertyWrite)
+        #expect(!library.tookPropertyWrite(taken))
+        source.send(.taken(try #require(source.submitted.last?.id)))
+        #expect(await eventually { library.tookPropertyWrite(taken) })
+
+        #expect(library.setItemProperty(LibraryFixture.en1, key: "name", value: .string("Ada K"), undoManager: nil))
+        let refused = try #require(library.lastPropertyWrite)
+        #expect(refused != taken)
+        let problem = SyncProblem(code: "hydration_incomplete", message: "Try again in a moment.", notQueued: true)
+        source.send(.answered(try #require(source.submitted.last?.id), .refused(problem)))
+        #expect(await eventually { !library.isWritingProperties(of: LibraryFixture.en1) })
+        #expect(!library.tookPropertyWrite(refused))
+    }
+
     /// A text save the server refused stays listed in Settings, but the page goes back to the server's text,
     /// so the typed text is also given back, with the reason and where the change is listed.
     @Test func textTheServerRefusedIsGivenBackAndPointsToLibrarySettings() async throws {
