@@ -77,6 +77,13 @@ struct ItemDateTests {
         #expect(reformGap.date.timeIntervalSince1970 == -12_219_292_800 - 5 * 86_400)
     }
 
+    @Test func aStatusFieldTakesAWordAndNothingElse() {
+        let status = ItemTypeInfo.Field.Kind.status([StatusWord(value: "pending", group: .notStarted)])
+        #expect(status.accepts(.string("pending")))
+        #expect(status.accepts(.string("blocked")), "a status can hold a word its type does not declare")
+        #expect(!status.accepts(.bool(true)))
+    }
+
     @Test func aDayFieldTakesNoTime() {
         let day = ItemTypeInfo.Field.Kind.date(includesTime: false)
         let moment = ItemTypeInfo.Field.Kind.date(includesTime: true)
