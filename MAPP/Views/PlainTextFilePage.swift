@@ -36,7 +36,7 @@ struct PlainTextFilePage: View {
                 }
                 .padding(.horizontal, inset)
                 .padding(.top, 16)
-                LargeTextView(text: text, textSize: CGFloat(style.textSize), inset: inset)
+                LargeTextView(text: text, title: title, textSize: CGFloat(style.textSize), inset: inset)
                     .accessibilityIdentifier("PlainTextFileBody")
             }
         }
@@ -74,8 +74,17 @@ struct PlainTextFilePage: View {
 /// A read-only, selectable text view for text too long for SwiftUI's `Text`.
 private struct LargeTextView: NSViewRepresentable {
     let text: String
+    let title: String
     let textSize: CGFloat
     let inset: CGFloat
+
+    /// What the view shows now, so an update with the same text compares nothing against the text storage.
+    final class Coordinator {
+        var text: String?
+        var textSize: CGFloat?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
@@ -84,22 +93,27 @@ private struct LargeTextView: NSViewRepresentable {
         view.isEditable = false
         view.isSelectable = true
         view.drawsBackground = false
-        apply(to: view)
+        view.setAccessibilityLabel(title)
+        apply(to: view, context.coordinator)
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        apply(to: scroll.documentView as! NSTextView)
+        let view = scroll.documentView as! NSTextView
+        view.setAccessibilityLabel(title)
+        apply(to: view, context.coordinator)
     }
 
-    private func apply(to view: NSTextView) {
+    private func apply(to view: NSTextView, _ shown: Coordinator) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = textSize * 0.35
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: textSize), .foregroundColor: NSColor.textColor, .paragraphStyle: paragraph,
         ]
-        // Setting the same text again would lay it out again and lose the person's place and selection.
-        if view.string != text || view.font?.pointSize != textSize {
+        // Setting the same text again would lay it out again and lose the person's place and selection. The last
+        // text applied is kept here, since reading the text view's own string copies all of it.
+        if shown.text != text || shown.textSize != textSize {
+            (shown.text, shown.textSize) = (text, textSize)
             view.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: attributes))
         }
         view.textContainerInset = NSSize(width: inset, height: 8)

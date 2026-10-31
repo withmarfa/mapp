@@ -14,17 +14,22 @@ struct WindowRestorationTests {
         #expect(Set(browser.snapshot().selection) == browser.selection)
     }
 
-    @Test func aSelectionOfEverythingKeepsOnlyUpToTheLimit() {
-        let notes = items(3_000)
+    @Test func aSelectionAtTheLimitIsKeptWhole() {
+        let notes = items(Browser.restoredSelectionLimit)
         let browser = Browser()
         browser.selection = Set(notes.map(\.id))
         let kept = browser.snapshot().selection
-        #expect(kept.count == Browser.restoredSelectionLimit)
-        #expect(Set(kept).isSubset(of: browser.selection))
+        #expect(Set(kept) == browser.selection)
         #expect(kept == kept.sorted { $0.rawValue < $1.rawValue })
     }
 
-    @Test func aRestoredWindowFromABoundedSelectionStillSelectsItsItems() {
+    @Test func aSelectionPastTheLimitIsKeptAsNone() {
+        let browser = Browser()
+        browser.selection = Set(items(3_000).map(\.id))
+        #expect(browser.snapshot().selection.isEmpty)
+    }
+
+    @Test func aRestoredWindowFromASelectionPastTheLimitOpensAtItsFirstRows() {
         let notes = items(1_000)
         let library = FakeItemLibrary(items: notes)
         let saved = Browser()
@@ -32,7 +37,8 @@ struct WindowRestorationTests {
         saved.selection = Set(notes.map(\.id))
         let restored = Browser()
         restored.restore(saved.snapshot(), in: library, order: NoteOrder())
-        #expect(restored.selection.count == Browser.restoredSelectionLimit)
+        #expect(restored.selection.count == 1)
+        #expect(restored.selection.isSubset(of: saved.selection))
     }
 }
 

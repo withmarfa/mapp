@@ -55,13 +55,18 @@ struct CommandPalette: View {
         let selection: Set<ItemID>
     }
 
-    /// The list shown, held until the query or its basis changes, so an arrow key reads it and builds nothing.
+    /// What is held across runs of the body: the items' titles for a basis, and how the titles ranked for a query.
+    /// The commands are never held, since they read the editor, the browser and the host, which change while the
+    /// palette is open and are not part of the basis.
     private final class Listing {
-        var key: (basis: Basis, query: String)?
-        var entries: [Entry] = []
-        /// The commands and places, held for a basis; the query then ranks them with the items' titles.
-        var fixed: (basis: Basis, entries: [Entry], titles: [String])?
         var itemTitles: (basis: Basis, titles: [String])?
+        var ranking: (key: Ranking, picks: [PaletteMatch.Pick])?
+    }
+
+    private struct Ranking: Equatable {
+        let basis: Basis
+        let query: String
+        let fixedTitles: [String]
     }
 
     private var basis: Basis {
@@ -69,13 +74,10 @@ struct CommandPalette: View {
               mode: mode, returnFocus: returnFocus, selection: browser.selection)
     }
 
+    /// A search is never held: its answer arrives later, through the library's own observed state, which the body
+    /// must read each time to run again.
     private func shown() -> [Entry] {
-        let basis = basis
-        if let key = listing.key, key.basis == basis, key.query == query { return listing.entries }
-        let entries = mode == .search ? found : matching(basis)
-        listing.key = (basis, query)
-        listing.entries = entries
-        return entries
+        mode == .search ? found : matching(basis)
     }
 
     var body: some View {
@@ -196,18 +198,11 @@ struct CommandPalette: View {
     // MARK: What it offers
 
     /// The commands and places that answer the query, then the notes, in the order in which equally good matches are
-    /// listed. The titles are ranked first and an entry is built only for each of the best `PaletteMatch.listLimit`
+    /// listed. The commands are built each time, since what they offer changes under an open palette. The titles are ranked first and an entry is built only for each of the best `PaletteMatch.listLimit`
     /// notes, never for every item in the library.
     private func matching(_ basis: Basis) -> [Entry] {
-        let fixed: [Entry]
-        let fixedTitles: [String]
-        if let held = listing.fixed, held.basis == basis {
-            (fixed, fixedTitles) = (held.entries, held.titles)
-        } else {
-            fixed = commands + places
-            fixedTitles = fixed.map(\.title)
-            listing.fixed = (basis, fixed, fixedTitles)
-        }
+        let fixed = commands + places
+        let fixedTitles = fixed.map(\.title)
         let recent = browser.paletteIndex(in: library).recent
         let itemTitles: [String]
         if let held = listing.itemTitles, held.basis == basis {
@@ -217,7 +212,15 @@ struct CommandPalette: View {
             listing.itemTitles = (basis, itemTitles)
         }
         let typed = !query.trimmingCharacters(in: .whitespaces).isEmpty
-        return titles.picks(fixed: fixedTitles, items: typed ? itemTitles : [], query).map { pick in
+        let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
+        let picks: [PaletteMatch.Pick]
+        if let held = listing.ranking, held.key == key {
+            picks = held.picks
+        } else {
+            picks = titles.picks(fixed: fixedTitles, items: typed ? itemTitles : [], query)
+            listing.ranking = (key, picks)
+        }
+        return picks.map { pick in
             switch pick {
             case .fixed(let index): fixed[index]
             case .item(let index): note(recent[index])

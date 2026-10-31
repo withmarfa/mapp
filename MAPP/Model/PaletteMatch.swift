@@ -33,10 +33,16 @@ nonisolated enum PaletteMatch {
         }
 
         /// What the palette lists for a query, by title alone: with nothing typed, every fixed title and no item;
-        /// otherwise the best `limit` of the fixed titles and the items together, equal matches with the fixed ones first.
+        /// otherwise every fixed title that answers it and the best `limit` items, in rank order, equal matches with the fixed ones first.
         func picks(fixed: [String], items: [String], _ query: String, limit: Int = PaletteMatch.listLimit) -> [Pick] {
             guard !PaletteMatch.Query(query).isEmpty else { return fixed.indices.map(Pick.fixed) }
-            return ranked(fixed + items, query).prefix(limit).map { $0 < fixed.count ? .fixed($0) : .item($0 - fixed.count) }
+            var itemsLeft = limit
+            return ranked(fixed + items, query).compactMap { index in
+                if index < fixed.count { return .fixed(index) }
+                guard itemsLeft > 0 else { return nil }
+                itemsLeft -= 1
+                return .item(index - fixed.count)
+            }
         }
     }
 
@@ -46,7 +52,7 @@ nonisolated enum PaletteMatch {
         case item(Int)
     }
 
-    /// The most a typed query lists. Entries are built for these only, never for every item in the library.
+    /// The most items a typed query lists. Entries are built for these only, never for every item in the library.
     static let listLimit = 50
 
     /// Lower is better; nil when the title does not answer the query at all. An empty query matches everything
