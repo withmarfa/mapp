@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import MAPP
@@ -38,6 +39,20 @@ struct SettingsRequestTests {
         request.show(nil, in: nil) { opened += 1 }
 
         #expect(opened == 1)
+    }
+
+    @Test func aMainWindowThatWasClosedIsNotUsed() {
+        let request = SettingsRequest()
+        let browser = Browser()
+        // A window that is not on screen stands for one that was closed while its browser lives on.
+        let closed = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+        request.register(browser, in: closed)
+        var opened = 0
+        request.show(nil, in: nil) { opened += 1 }
+
+        #expect(opened == 1)
+        #expect(request.isPending)
+        #expect(!browser.showsSettings)
     }
 
     @Test func aWindowWithABrowserShowsSettingsInItself() {

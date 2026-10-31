@@ -24,7 +24,8 @@ final class SettingsRequest {
     private var frontMainWindow: MainWindow? {
         // A window that was closed is no main window to show Settings in, whether or not its browser lives on.
         mainWindows.removeAll { main in
-            guard main.browser != nil, let window = main.window else { return true }
+            guard main.browser != nil else { return true }
+            guard let window = main.window else { return false }
             return !window.isVisible && !window.isMiniaturized
         }
         let ordered = NSApp?.orderedWindows ?? []
