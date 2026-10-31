@@ -31,7 +31,8 @@ extension Browser {
         let generation = quickLookGeneration
         let selected = Dictionary(selectedItems(in: library).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var seen: Set<ItemID> = []
-        let chosen = onScreenOrder(in: library).compactMap { id in seen.insert(id).inserted ? selected[id] : nil }.prefix(Self.quickLookLimit)
+        let chosen = (onScreenOrder(in: library) + selection).compactMap { id in seen.insert(id).inserted ? selected[id] : nil }
+            .prefix(Self.quickLookLimit)
         var made: [QuickLookFile] = []
         var failure: String?
         func isCurrent() -> Bool { generation == quickLookGeneration && isShowing(library) }

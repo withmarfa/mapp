@@ -256,6 +256,24 @@ struct FileDropTests {
         #expect(library.notices.waiting.isEmpty)
     }
 
+    @Test func aQuickLookClosesWhenTheWindowChangesLibraryMidFetch() async throws {
+        let library = FakeItemLibrary()
+        let note = library.add("# Plans")
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        library.files[fileID] = disk.url("kept", "file contents")
+        library.fetchDelay[fileID] = .milliseconds(300)
+        let browser = Browser()
+        browser.adopt(library)
+        browser.selection = [note.id, fileID]
+        let pending = Task { await browser.quickLookSelection(in: library) }
+        #expect(await eventually { browser.quickLook?.urls.count == 1 })
+        let shown = try #require(browser.quickLook?.urls.first)
+        browser.adopt(FakeItemLibrary())
+        await pending.value
+        #expect(browser.quickLook == nil)
+        #expect(!FileManager.default.fileExists(atPath: shown.path))
+    }
+
     @Test func quickLookTellsThePersonWhenTheFileCannotBeFetched() async throws {
         let library = FakeItemLibrary()
         let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))

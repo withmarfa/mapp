@@ -542,6 +542,7 @@ final class Browser {
         stackableMemo = nil
         paletteMemo = nil
         guard !isFirst else { return }
+        dismissQuickLook()
         undoManager?.removeAllActions()
         tableOptions = [:]
         viewSeeds = [:]
