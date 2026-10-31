@@ -298,9 +298,9 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
         sortBy("Date Edited")
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
-        toggleGroupByDate()
+        groupBy("None")
         XCTAssertTrue(list.staticTexts["Today"].waitForNonExistence(timeout: 2))
-        toggleGroupByDate()
+        groupBy("Date")
         XCTAssertTrue(list.staticTexts["Today"].waitForExistence(timeout: 2))
     }
 
@@ -329,16 +329,19 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 3))
     }
 
-    private func toggleGroupByDate() {
-        app.menuBars.menuBarItems["View"].click()
-        app.menuBars.menuItems["Group by Date"].click()
+    private func groupBy(_ choice: String) {
+        chooseInViewOptions("Group by", choice)
     }
 
     private func sortBy(_ order: String) {
+        chooseInViewOptions("Sort by", order)
+    }
+
+    private func chooseInViewOptions(_ submenu: String, _ choice: String) {
         app.menuBars.menuBarItems["View"].click()
-        let sortBy = app.menuBars.menuItems["Sort By"]
-        sortBy.hover()
-        sortBy.menuItems[order].click()
+        let row = app.menuBars.menuItems[submenu]
+        row.hover()
+        row.menuItems[choice].click()
     }
 
     func testCommandFOpensTheSystemFindBarInThePage() {

@@ -1675,7 +1675,7 @@
     "Getting the latest changes from the server." : {
       "extractionState" : "manual"
     },
-    "Group By" : {
+    "Group by" : {
 
     },
     "Group by Date" : {
@@ -2346,7 +2346,7 @@
     "Someday" : {
       "extractionState" : "manual"
     },
-    "Sort By" : {
+    "Sort by" : {
 
     },
     "Sort by %@" : {

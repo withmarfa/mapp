@@ -72,18 +72,19 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("ShareToolbar"), 1)
     }
 
-    func testViewOptionsOffersSortByAndGroupByDate() {
+    func testViewOptionsOffersSortByAndGroupBy() {
         control("ViewOptionsToolbar").click()
-        let sortBy = window.menuItems["Sort By"].firstMatch
-        let groupByDate = window.menuItems["Group by Date"].firstMatch
+        let sortBy = window.menuItems["Sort by"].firstMatch
+        let groupBy = window.menuItems["Group by"].firstMatch
         XCTAssertTrue(sortBy.waitForExistence(timeout: 3))
-        XCTAssertTrue(groupByDate.exists)
-        XCTAssertLessThan(sortBy.frame.minY, groupByDate.frame.minY)
+        XCTAssertTrue(groupBy.exists)
+        XCTAssertLessThan(sortBy.frame.minY, groupBy.frame.minY)
+        XCTAssertFalse(control("IncludeSubtypesToolbar").exists, "Include Subtypes is in the menu, not on the toolbar")
         XCTAssertFalse(window.menuItems["Gallery"].exists, "View As has the views now")
         XCTAssertFalse(window.menuItems["View As"].exists)
         sortBy.hover()
         for title in ["Date Edited", "Date Created", "Title"] {
-            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the Sort By submenu")
+            XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), "\(title) is in the Sort by submenu")
         }
         capture("View Options menu")
         app.typeKey(.escape, modifierFlags: [])
@@ -192,10 +193,9 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertLessThan(filter.frame.maxX, control("ViewOptionsToolbar").frame.minX, "Filter sits with Search, before View Options")
         XCTAssertLessThan(control("ViewOptionsToolbar").frame.maxX, control("ViewModeMenu").frame.minX)
         control("ViewOptionsToolbar").click()
-        for title in ["Sort By", "Group By", "Columns"] {
+        for title in ["Sort by", "Group by", "Columns"] {
             XCTAssertTrue(window.menuItems[title].firstMatch.waitForExistence(timeout: 3), title)
         }
-        XCTAssertFalse(window.menuItems["Group by Date"].exists, "the table groups by its columns")
         capture("Table View Options menu")
         app.typeKey(.escape, modifierFlags: [])
         show("as Gallery")

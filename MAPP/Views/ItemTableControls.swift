@@ -106,7 +106,7 @@ private struct Controls {
     var sortPicker: some View {
         let first = sort.first
         return Group {
-            Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: Binding { first?.column.id ?? "" } set: { id in
+            Picker("Sort by", systemImage: "arrow.up.arrow.down", selection: Binding { first?.column.id ?? "" } set: { id in
                 guard let column = columns.first(where: { $0.id == id }) else {
                     // Relevance has no column, so its tag is empty.
                     if id.isEmpty { relevance?.wrappedValue = true }
@@ -138,7 +138,7 @@ private struct Controls {
     // MARK: Group
 
     var groupPicker: some View {
-        Picker("Group By", systemImage: "rectangle.grid.1x2", selection: Binding { grouping?.id ?? "" } set: { id in
+        Picker("Group by", systemImage: "rectangle.grid.1x2", selection: Binding { grouping?.id ?? "" } set: { id in
             options.grouping = id.isEmpty ? .none : .column(id)
             options.collapsed = nil
         }) {

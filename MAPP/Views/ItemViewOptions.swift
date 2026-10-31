@@ -93,7 +93,12 @@ struct CurrentViewOptions: View {
         case .board: if let browser { ItemBoardOptions(browser: browser) }
         case .timeline: if let browser { ItemTimelineOptions(browser: browser) }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
-        case .list, .gallery, nil: OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
+        case .list, .gallery, nil:
+            OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
+            if let browser {
+                Divider()
+                IncludeSubtypesOption(browser: browser)
+            }
         }
     }
 }
@@ -106,7 +111,7 @@ struct ItemBoardOptions: View {
     var body: some View {
         let fields = browser.boardFieldChoices(in: library)
         let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
-        Picker("Group By", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
+        Picker("Group by", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
             browser.boardFields[browser.item] = $0
         }) {
             ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
@@ -122,6 +127,8 @@ struct ItemBoardOptions: View {
         }
         .pickerStyle(.menu)
         .accessibilityIdentifier("BoardCardDensity")
+        Divider()
+        IncludeSubtypesOption(browser: browser)
     }
 }
 

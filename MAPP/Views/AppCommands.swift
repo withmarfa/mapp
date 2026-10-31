@@ -89,7 +89,6 @@ struct AppCommands: Commands {
             } else {
                 ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
             }
-            IncludeSubtypesCommand(browser: browser, library: library)
             Divider()
             SavedViewMenu(browser: browser, library: library)
             Divider()

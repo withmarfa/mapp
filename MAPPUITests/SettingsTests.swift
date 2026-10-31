@@ -52,7 +52,7 @@ final class SettingsTests: XCTestCase {
         attachScreenshot("SettingsAppearance")
         XCTAssertTrue(element("SettingsDetail").exists)
         XCTAssertTrue(window.popUpButtons["NoteSort"].exists, "the real list preferences are available")
-        XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort By")
+        XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort by")
 
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
