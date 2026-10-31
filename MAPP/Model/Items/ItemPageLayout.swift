@@ -23,9 +23,10 @@ extension ItemLibrary {
     ///   title's extension.
     /// - Any other file opens in its preview.
     /// - An item to read (`PageHeaderKind.reading`: a bookmark or media) that is not a file, but has a file attached
-    ///   that is not in the bin and is HTML by its content type (or, where that is unknown, its extension), opens to that document
-    ///   under the item's own title and byline, as an article saved with its source does. Of several, the oldest is
-    ///   shown. Any other item keeps its text, even with an HTML file attached, so a note is never hidden by one.
+    ///   that is not in the bin and is HTML by its content type (or, where that is unknown, its extension), opens to
+    ///   that document under the item's own title and byline, as an article saved with its source does. Of several,
+    ///   the oldest is shown. Any other item keeps its text, even with an HTML file attached, so a note is never
+    ///   hidden by one.
     /// - Every other item opens to its text.
     func pageLayout(of item: Item) -> ItemPageLayout {
         if item.isFile {
