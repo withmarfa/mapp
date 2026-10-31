@@ -105,6 +105,9 @@ struct NotePage: View {
         }) { request in
             NoteLinkPicker(editor: editor, note: request.note)
         }
+        .sheet(item: $editor.webLinkRequest, onDismiss: { editor.focus(item.id) }) { request in
+            WebLinkSheet(editor: editor, request: request)
+        }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             editor.focus(item.id)

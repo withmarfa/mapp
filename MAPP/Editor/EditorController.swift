@@ -95,7 +95,14 @@ final class EditorController: NSObject {
         let note: ItemID
     }
     var linkRequest: LinkRequest?
+    /// The Link command, until the person has given an address or declined.
+    var webLinkRequest: WebLinkRequest?
     @ObservationIgnored var linking: CheckedContinuation<String?, Never>?
+    /// Whether Writing Tools has a session open on the page. A test sets it, since a session needs Apple Intelligence.
+    @ObservationIgnored var isWritingToolsActive: () -> Bool = { false }
+    /// The page's latest edit while a Writing Tools session is open, saved once it ends (`holdsEdits`).
+    @ObservationIgnored var heldEdit: (markdown: String, generation: Int)?
+    @ObservationIgnored var heldEditWatch: Task<Void, Never>?
     @ObservationIgnored var windowIsGone = false
 
     @ObservationIgnored let webView: EditorWebView
@@ -150,6 +157,9 @@ final class EditorController: NSObject {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         configuration.websiteDataStore = .nonPersistent()
+        // The full Writing Tools experience: its panel, and rewrites shown in place. `holdsEdits` keeps the note from
+        // being saved while a rewrite is not yet accepted.
+        configuration.writingToolsBehavior = .complete
         configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)
         webView = EditorWebView(frame: .zero, configuration: configuration)
         container = EditorContainer(webView: webView)
@@ -161,6 +171,7 @@ final class EditorController: NSObject {
         }
         Self.open.add(self)
         webView.controller = self
+        isWritingToolsActive = { [weak webView] in webView?.isWritingToolsActive ?? false }
         embeds.open = { [weak self] reference, item in
             await self?.library?.openEmbeddedFile(reference, in: item, waiting: Self.embedWait) ?? .missing
         }
@@ -495,6 +506,7 @@ final class EditorController: NSObject {
 
     func format(_ format: Format) {
         guard canApply(format) else { return }
+        if format == .link { return askForWebLink() }
         let (name, argument) = format.command
         if let argument {
             call("format", json(name), json(argument), String(generation))
@@ -550,6 +562,7 @@ final class EditorController: NSObject {
     /// takes in the answer to the person's own save. An edit typed before the page took in newer text keeps the
     /// older version, so the library never lays it over text the person did not see.
     func report(_ markdown: String, of generation: Int) {
+        if heldEdit?.generation == generation { heldEdit = nil }
         guard var page = shown[generation] else { return }
         let isCurrent = page.id == noteID && generation == self.generation
         if isCurrent, let body = library?.body(of: page.id), body.text == self.markdown {
@@ -596,6 +609,7 @@ final class EditorController: NSObject {
         case .changed(let markdown, let generation):
             // A page that reports again is answering, so the next flush waits for it as before.
             if generation == abandonedGeneration { abandonedGeneration = nil }
+            if isWritingToolsActive() { return holdEdit(markdown, of: generation) }
             report(markdown, of: generation)
         case .state(let state):
             guard state.generation == generation else { return }

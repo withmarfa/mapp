@@ -7,9 +7,11 @@ struct FormatCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Format") {
-            section([.title, .heading, .subheading, .body])
+            section([.title, .heading, .subheading, .heading4, .heading5, .heading6, .body])
             Divider()
-            section([.bold, .italic, .strikethrough, .code])
+            section([.bold, .italic, .strikethrough, .highlight, .code])
+            Divider()
+            item(.link)
             Divider()
             section([.codeBlock, .quote, .bulletList, .orderedList, .checklist])
             Divider()

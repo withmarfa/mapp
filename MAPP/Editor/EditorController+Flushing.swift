@@ -22,6 +22,7 @@ extension EditorController {
     /// finding its note replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
     /// were waiting on the edit it could not keep, and the person has been told once.
     func flush(then done: @escaping (Bool) -> Void = { _ in }) {
+        releaseHeldEdit()
         guard !isFlushing else { return waitingFlushes.append(done) }
         isFlushing = true
         handOver { [self] kept in

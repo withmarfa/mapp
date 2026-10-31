@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 nonisolated enum Mark: String, Sendable {
-    case bold, italic, strikethrough, code, link
+    case bold, italic, strikethrough, highlight, code, link
 }
 
 nonisolated enum Block: Equatable, Sendable {
