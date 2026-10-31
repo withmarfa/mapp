@@ -48,11 +48,15 @@ struct CommandPaletteTests {
             return labels(of: host).contains { $0.contains("Settings") }
         }, "the palette lists its commands: \(labels(of: host))")
         #expect(!labels(of: host).contains { $0.hasPrefix("Bold") }, "no note is on the page yet")
+        #expect(labels(of: host).contains { $0.hasPrefix("New Window") }, "New Window is a command of the palette")
 
         try await page.show(note.id)
         #expect(try await eventuallyAsking {
             host.layoutSubtreeIfNeeded()
             return labels(of: host).contains { $0.hasPrefix("Bold") }
         }, "the formatting commands arrive once the page holds the note")
+        for title in ["Heading 4", "Heading 5", "Heading 6", "Highlight", "Link…"] {
+            #expect(labels(of: host).contains { $0.hasPrefix(title) }, "\(title) is offered with the other formats")
+        }
     }
 }

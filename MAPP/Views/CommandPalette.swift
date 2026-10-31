@@ -328,6 +328,7 @@ struct CommandPalette: View {
                 add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-") { zoom.apply(.smaller) }
             }
             add(String(localized: "Actual Size"), "textformat.size", "⌘0") { zoom.apply(.actual) }
+            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N") { openWindow(id: "main") }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
@@ -354,8 +355,8 @@ struct CommandPalette: View {
 
         if let one, one.isWritable {
             if hasVisibleEditor {
-                for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
-                               .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
+                for format in [Format.title, .heading, .subheading, .heading4, .heading5, .heading6, .body, .bold, .italic,
+                               .strikethrough, .highlight, .code, .link, .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
                     let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
                     add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
