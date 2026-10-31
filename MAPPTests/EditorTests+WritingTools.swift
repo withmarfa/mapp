@@ -47,6 +47,20 @@ extension EditorTests {
         #expect(page.changes.count == saved, "the held edit is not saved a second time")
     }
 
+    /// The page counts an edit as reported once it posts it, so one held while the flush waits for the page's answer
+    /// is not in that answer.
+    @Test func anEditHeldDuringAFlushIsSavedBeforeItEnds() async throws {
+        let page = try await Page()
+        try await page.load("Draft\n")
+        page.editor.isWritingToolsActive = { true }
+        await withCheckedContinuation { continuation in
+            page.editor.flush { _ in continuation.resume() }
+            page.editor.holdEdit("Draft in flight\n", of: page.editor.generation)
+        }
+        #expect(page.changes.last == "Draft in flight\n", "closing or quitting keeps an edit that came in meanwhile")
+        #expect(page.editor.heldEdit == nil)
+    }
+
     @Test func typingOutsideASessionIsSavedAtOnce() async throws {
         let page = try await Page()
         try await page.load("Draft\n")

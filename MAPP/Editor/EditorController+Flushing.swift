@@ -26,6 +26,9 @@ extension EditorController {
         guard !isFlushing else { return waitingFlushes.append(done) }
         isFlushing = true
         handOver { [self] kept in
+            // An edit the page reported before the hand-over but that arrived during it was held, and the page's
+            // answer leaves it out, since the page counts it as reported.
+            releaseHeldEdit()
             isFlushing = false
             let waiting = waitingFlushes
             waitingFlushes = []
