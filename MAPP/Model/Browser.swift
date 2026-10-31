@@ -5,7 +5,10 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allNotes
+    var sidebarItem: SidebarItem? = .allNotes {
+        // A scroll position belongs to the place and layout it was made in.
+        didSet { if sidebarItem != oldValue { listMemory.scrollOffset = nil } }
+    }
     /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
     /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
     /// this is kept here, where Show More stays open through that.
@@ -29,6 +32,7 @@ final class Browser {
     @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
+            if viewMode != oldValue { listMemory.scrollOffset = nil }
             isCollectionItemPresented = false
             if viewMode.spansWindow { focusRequest = .list }
         }

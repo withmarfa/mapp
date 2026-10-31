@@ -93,6 +93,31 @@ struct WindowBringBackTests {
         #expect(rearmed == 1)
     }
 
+    @Test func theScrollPositionIsForgottenWhenThePlaceOrTheLayoutChanges() {
+        let browser = Browser()
+        browser.listMemory.scrollOffset = 300
+        browser.sidebarItem = .allNotes
+        browser.viewMode = .list
+        #expect(browser.listMemory.scrollOffset == 300, "setting what is already set keeps the position")
+        browser.sidebarItem = .favorites
+        #expect(browser.listMemory.scrollOffset == nil)
+        browser.listMemory.scrollOffset = 300
+        browser.viewMode = .table
+        #expect(browser.listMemory.scrollOffset == nil)
+    }
+
+    @Test func aRestoredPositionSurvivesRestoringThePlaceAndLayoutItBelongsTo() throws {
+        let (library, _, _, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.sidebarItem = .favorites
+        saved.viewMode = .table
+        saved.listMemory.scrollOffset = 420
+        let data = try JSONEncoder().encode(saved.snapshot())
+        let back = Browser()
+        back.restore(from: data, in: library, order: NoteOrder())
+        #expect(back.listMemory.scrollOffset == 420)
+    }
+
     @Test func aWindowKeptBeforeTheseThingsWereKeptStillOpens() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         var snapshot = Browser.Snapshot(place: .allNotes, selection: [newer.id])
