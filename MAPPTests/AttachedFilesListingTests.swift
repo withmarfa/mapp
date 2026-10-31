@@ -150,7 +150,7 @@ import UniformTypeIdentifiers
         let counted = try #require(library.sourceCounts.first { $0.name == "reader" })
         #expect(counted.count == library.items(in: place).count)
         #expect(counted.count == library.count(in: place))
-        #expect(ids(place, in: library).isDisjoint(with: Self.attached.subtracting([Self.onBinned])))
+        #expect(ids(place, in: library).isDisjoint(with: Self.attached))
         #expect(ids(place, in: library).contains(Self.alone))
         // The files stay in Files, and a favorite is never filtered.
         #expect(ids(.files, in: library).isSuperset(of: Self.attached))
