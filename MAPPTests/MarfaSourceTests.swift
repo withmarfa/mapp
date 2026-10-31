@@ -1239,7 +1239,7 @@ extension LiveMarfaTests {
                 _ = try #require(await log.wait { $0.answer(to: created) != nil && $0.item(titled: title)?.sync == .settled })
 
                 let holding = LiveMarfa.Flag()
-                await source.engine.whenAnswering {
+                source.engine.hooks.answering.set {
                     holding.set()
                     // Holds the answers for longer than the check below waits, as a slow engine would.
                     try? await Task.sleep(for: .seconds(2))
@@ -1253,7 +1253,7 @@ extension LiveMarfaTests {
                 // so the answers are still held and the count must not have moved.
                 try await Task.sleep(for: .milliseconds(800))
                 #expect(await source.engine.sync.drains == before + 1)
-                await source.engine.whenAnswering(nil)
+                source.engine.hooks.answering.set(nil)
                 _ = try #require(await log.wait { $0.answer(to: tagged) != nil })
                 #expect(await LiveMarfa.until { await source.engine.sync.drains == before + 2 })
                 source.submit(.transition(id, .trashed), as: WriteID())

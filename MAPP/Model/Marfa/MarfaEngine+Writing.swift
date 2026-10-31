@@ -20,7 +20,7 @@ extension MarfaEngine {
         }
         do {
             #if DEBUG
-            if let error = refusing?(write) { throw error }
+            if let error = hooks.refusing.current?(write) { throw error }
             #endif
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
@@ -115,8 +115,7 @@ extension MarfaEngine {
     /// A write that needed nothing queued, such as a move to the end the edge already holds, is taken at once.
     private func record(_ id: WriteID, _ queued: [Marfa.QueuedWrite]) {
         guard !queued.isEmpty else { return hub.publish(.answered(id, .accepted)) }
-        outstanding[id] = Set(queued.map(\.id))
-        for written in queued { submitted[written.id] = id }
+        writes.record(id, queued: queued.map(\.id))
     }
 
     private func queue(_ write: ItemWrite) async throws -> [Marfa.QueuedWrite] {

@@ -80,7 +80,7 @@ import Testing
         let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
         let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
         defer { releaseContinuation.finish() }
-        await files.whenRemoving {
+        files.hooks.removing.set {
             enteredContinuation.finish()
             for await _ in release { }
         }

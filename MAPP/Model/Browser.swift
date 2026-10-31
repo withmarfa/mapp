@@ -113,7 +113,7 @@ final class Browser {
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
-    private var pagingState: (key: TablePagingKey, paging: TablePaging)?
+    var pagingState: (key: TablePagingKey, paging: TablePaging)?
     @ObservationIgnored private var tableMemo: (key: TableKey, content: ItemTableContent)?
     @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [NoteSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
@@ -379,57 +379,6 @@ final class Browser {
         return content
     }
 
-    // MARK: Pages of the table
-
-    private var pagingKey: TablePagingKey {
-        TablePagingKey(place: item, search: searchText, byRelevance: ordersByRelevance, options: tableOptions[item] ?? ItemTableOptions())
-    }
-
-    /// The pages loaded for what the table shows now: one again whenever the place, the search, the order, the
-    /// filters, the grouping or the page size has changed since they were asked for.
-    var tablePaging: TablePaging {
-        guard let held = pagingState, held.key == pagingKey else { return TablePaging() }
-        return held.paging
-    }
-
-    var tablePageSize: TablePageSize { tableOptions[item]?.pageSize ?? .standard }
-
-    /// Adds a page to the whole table, or to one group of it.
-    func loadMoreTableRows(group: String? = nil) {
-        var paging = tablePaging
-        paging.loadMore(group: group)
-        pagingState = (pagingKey, paging)
-    }
-
-    /// How many rows the table holds that are not loaded yet, counting the groups the person has not folded away.
-    func tableRowsNotLoaded(in content: ItemTableContent) -> Int {
-        let (paging, size) = (tablePaging, tablePageSize)
-        guard content.grouping != nil else { return paging.slice(content.rows, size: size).remaining }
-        return content.groups.filter { !content.collapsed.contains($0.id) }
-            .reduce(0) { $0 + paging.slice($1.rows, size: size, group: $1.id).remaining }
-    }
-
-    /// Loads the next page of the whole table, or of every group that has rows left.
-    func loadMoreTableRows(in content: ItemTableContent) {
-        guard content.grouping != nil else { return loadMoreTableRows() }
-        var paging = tablePaging
-        for group in content.groups where !content.collapsed.contains(group.id)
-            && paging.slice(group.rows, size: tablePageSize, group: group.id).remaining > 0 {
-            paging.loadMore(group: group.id)
-        }
-        pagingState = (pagingKey, paging)
-    }
-
-    /// Loads enough pages to show the selected items the table holds, such as one reached by Back, a link or a new
-    /// item. Nothing changes when they are all shown already.
-    func revealSelectionInTable(_ content: ItemTableContent) {
-        var paging = tablePaging
-        paging.reveal(
-            selection, rows: content.rows, groups: content.grouping == nil ? nil : content.groups,
-            collapsed: content.collapsed, size: tablePageSize)
-        if paging != tablePaging { pagingState = (pagingKey, paging) }
-    }
-
     /// What everything worked out from a place's items depends on: which library and how often it changed, the
     /// place and how the window orders them. The items themselves are listed only where they can change without the
     /// library's revisions doing so, which is a search answering and a saved view's list arriving, and are handed
@@ -511,7 +460,7 @@ final class Browser {
     }
 
     /// Moves the selection as the app does, not as the person chose, so Back does not stop there.
-    private func selectAutomatically(_ ids: Set<ItemID>) {
+    func selectAutomatically(_ ids: Set<ItemID>) {
         isSelectingAutomatically = true
         defer { isSelectingAutomatically = false }
         selection = ids
@@ -641,87 +590,14 @@ final class Browser {
 
     // MARK: Saved views
 
-    /// A saved view the window is about to save, rename, update or delete, which asks the person first.
-    nonisolated enum ViewEditing: Hashable, Identifiable {
-        case new
-        case rename(ItemID)
-        case update(ItemID)
-        case delete(ItemID)
-        var id: Self { self }
-    }
-
     var viewEditing: ViewEditing?
 
     /// The title the view sheet holds until the server takes it, kept here so a window that closes or changes
     /// library can give it back.
     var viewTitleForm: ViewTitleForm?
 
-    /// The order and grouping a view opened with, and the version of the view they came from, which an update of
-    /// them is based on.
-    struct ViewSeed: Hashable {
-        let version: Int64
-        let options: ItemTableOptions
-    }
-
-    private(set) var viewSeeds: [ItemID: ViewSeed] = [:]
-
-    /// Shows a view's own order and grouping the first time the window opens it, and again when the view changes,
-    /// unless the person has changed them since: those stay, and an update of them is based on what they changed.
-    func followView(in library: any ItemLibrary) {
-        guard case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) else { return }
-        if let seed = viewSeeds[id] {
-            guard seed.version != view.version, !ViewDraft.differs(tableOptions[item], from: seed.options) else { return }
-        }
-        seed(view)
-    }
-
-    private func seed(_ view: LibraryView) {
-        let place = SidebarItem.view(view.id)
-        var options = ViewDraft.options(for: view)
-        let collapsed = tableOptions[place]?.collapsed
-        viewSeeds[view.id] = ViewSeed(version: view.version, options: options)
-        options.collapsed = collapsed
-        tableOptions[place] = options
-    }
-
-    /// Whether the window's order, grouping or filters differ from those of the view it shows.
-    var hasViewChanges: Bool {
-        guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
-        // Only the table shows a view's order, grouping and filters, so only the table offers to update it.
-        return viewMode == .table && ViewDraft.differs(tableOptions[item], from: seed.options)
-    }
-
-    /// The change that saves the window's choices to the view it shows, the version it is based on, and what of
-    /// the window it leaves out.
-    func viewUpdate(_ window: ViewDraft.Window, in library: any ItemLibrary) -> ViewUpdate? {
-        guard case .view(let id) = item, let seed = viewSeeds[id], let view = library.views.first(where: { $0.id == id }) else {
-            return nil
-        }
-        let update = ViewDraft.change(window, options: tableOptions[item], seed: seed.options, view: view)
-        return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept, unchanged: update.unchanged)
-    }
-
-    struct ViewUpdate {
-        let view: LibraryView
-        let change: LibraryViewChange
-        let baseVersion: Int64
-        /// What of the window the view will not keep.
-        let unkept: [ViewDraft.Unkept]
-        /// The conditions of the view's filter the window cannot show, which the update leaves as they are.
-        let unchanged: [String]
-    }
-
-    /// After an update the view holds the window's choices, so its filters are the view's own.
-    func viewUpdated(_ view: LibraryView) {
-        seed(view)
-    }
-
-    /// An update refused because the view changed elsewhere puts the window back to the view as the library holds
-    /// it, and to its next version when that arrives.
-    func viewRefused(_ id: ItemID, in library: any ItemLibrary) {
-        viewSeeds[id] = nil
-        followView(in: library)
-    }
+    /// The order and grouping each view opened with (`Browser+SavedViews`).
+    var viewSeeds: [ItemID: ViewSeed] = [:]
 
     // MARK: Keeping the selection in the list
 
@@ -734,97 +610,5 @@ final class Browser {
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }
         let candidates = old[first...].dropFirst() + old[..<first].reversed()
         return candidates.first { visible.contains($0) && !selection.contains($0) }.map { [$0] } ?? []
-    }
-
-    // MARK: Restoring a window
-
-    /// What a window brings back when the app opens again, by the identifiers of what it showed, which last from
-    /// one launch to the next. A snapshot in any other form reads as none.
-    struct Snapshot: Codable, Equatable {
-        var place: SidebarItem
-        var selection: [ItemID]
-        var viewMode: ItemViewMode = .list
-    }
-
-    func snapshot() -> Snapshot {
-        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
-    }
-
-    /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may
-    /// hold every item.
-    struct SnapshotParts: Equatable {
-        var place: SidebarItem
-        var selection: Set<ItemID>
-        var viewMode: ItemViewMode
-    }
-
-    var snapshotParts: SnapshotParts { SnapshotParts(place: item, selection: selection, viewMode: viewMode) }
-
-    /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
-    /// leaves the window at its default.
-    func restore(from data: Data?, in library: any ItemLibrary, order: NoteOrder) {
-        if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
-            restore(snapshot, in: library, order: order)
-        } else {
-            selectFirstNote(in: library, order: order)
-        }
-    }
-
-    /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
-    /// items no longer in the list are dropped, leaving the top row selected if none remain.
-    func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
-        viewMode = snapshot.viewMode
-        sidebarItem = switch snapshot.place {
-        case .favoriteItem(let id):
-            library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
-        case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
-        case .itemType(let type):
-            library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
-        case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allNotes
-        case .inbox, .recents, .allNotes, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
-        }
-        let ids = Set(snapshot.selection)
-        selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
-        if selection.isEmpty { selectFirstNote(in: library, order: order) }
-    }
-}
-
-/// The single items a window has shown, oldest first, and which of them it shows now.
-struct SelectionHistory {
-    struct Entry: Equatable {
-        let place: SidebarItem
-        let id: ItemID
-    }
-
-    nonisolated enum Direction { case back, forward }
-
-    private static let limit = 100
-    private(set) var entries: [Entry] = []
-    private var position = -1
-
-    /// Notes the selection after a change. Only one item shown is an entry; showing it again leaves the history as
-    /// it is, and showing another drops whatever lay ahead.
-    mutating func record(_ selection: Set<ItemID>, in place: SidebarItem) {
-        guard selection.count == 1, let id = selection.first else { return }
-        if entries.indices.contains(position), entries[position].id == id { return }
-        entries.removeSubrange((position + 1)...)
-        entries.append(Entry(place: place, id: id))
-        if entries.count > Self.limit { entries.removeFirst(entries.count - Self.limit) }
-        position = entries.count - 1
-    }
-
-    mutating func move(to index: Int) {
-        guard entries.indices.contains(index) else { return }
-        position = index
-    }
-
-    /// The nearest entry in a direction whose item still exists and is not the one shown now (the app can move the
-    /// selection off the entry the history is at). A deleted item is not shown, since no place lists it.
-    func target(_ direction: Direction, in library: any ItemLibrary, shown: Set<ItemID>) -> (index: Int, entry: Entry)? {
-        let candidates = direction == .back ? Array(entries.indices.prefix(max(position, 0)).reversed()) : Array(entries.indices.dropFirst(position + 1))
-        return candidates.lazy.map { ($0, entries[$0]) }.first { _, entry in
-            guard shown != [entry.id], let item = library.item(entry.id) else { return false }
-            return item.state != .trashed
-        }
     }
 }
