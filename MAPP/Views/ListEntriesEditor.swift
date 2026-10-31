@@ -2,80 +2,128 @@ import SwiftUI
 
 /// A list of entries in the inspector (a person's emails, an event's attendees): each entry is a block of its members,
 /// edited by kind and format, with its place in the list. The first entry is the main one. Every change writes the
-/// whole list back through `ListEntries`, so the entries that were not touched stay as they were, and a list the
-/// server refuses is kept in the field with the refusal told, through the row's own refused-write path.
+/// whole list back through `ListEntries`, so the entries that were not touched stay as they were. What the person is
+/// doing to the list, and the text not yet written, live in `editing` (`ListEditing`), so an entry keeps its text
+/// while the list changes, and nothing typed is dropped when a row leaves the screen.
 struct ListEntriesEditor: View {
     let shape: ListShape
     let label: String
     let key: String
     let value: PropertyValue?
     let isEditable: Bool
+    let editing: ListEditing
     /// Writes the list (nil unsets it); false where the library refused it.
     let onChange: (PropertyValue?) -> Bool
-    /// The entry being added, kept until it holds what the list requires.
-    @State private var pending: ListEntries.Entry?
-    @State private var notice: String?
-
-    private var entries: [PropertyValue] { ListEntries.entries(of: value) }
+    @Environment(\.library) private var library
 
     var body: some View {
+        let rows = editing.rows(of: value)
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
-                entryBlock(index: index, entry: entry)
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                entryBlock(row, index: index, count: rows.count)
             }
-            if let pending {
-                block(members: pending, index: nil, isMain: entries.isEmpty)
+            if let pending = editing.pending {
+                block(fields: pending, id: editing.pendingID, index: nil, count: rows.count)
             }
-            if isEditable, pending == nil {
-                Button { pending = [:]; notice = nil } label: { Label("Add \(label)", systemImage: "plus") }
+            if isEditable, editing.pending == nil {
+                Button { editing.startEntry() } label: { Label("Add \(label)", systemImage: "plus") }
                     .buttonStyle(.borderless)
                     .accessibilityIdentifier("ItemListAdd.\(key)")
             }
-            if let notice {
+            if let notice = editing.notice {
                 Text(notice).interfaceFont(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("ItemListNotice.\(key)")
             }
         }
-    }
-
-    @ViewBuilder private func entryBlock(index: Int, entry: PropertyValue) -> some View {
-        if let fields = ListEntries.object(entry) {
-            block(members: fields, index: index, isMain: index == 0)
-        } else {
-            // An entry the app cannot read is shown as it is and kept.
-            InspectorText(text: ItemValueText.string(entry))
+        // Text typed into an entry that went from the list elsewhere goes back to the person.
+        .onChange(of: value, initial: true) {
+            if let notices = library?.notices { editing.handBackOrphans(label: label, to: notices) }
         }
     }
 
-    private func block(members fields: ListEntries.Entry, index: Int?, isMain: Bool) -> some View {
+    @ViewBuilder private func entryBlock(_ row: ListEditing.Row, index: Int, count: Int) -> some View {
+        if let fields = ListEntries.object(row.entry) {
+            block(fields: fields, id: row.id, index: index, count: count)
+        } else {
+            // An entry the app cannot read is shown as it is, and can be moved or removed.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    InspectorText(text: ItemValueText.string(row.entry))
+                    Spacer()
+                    if isEditable { entryMenu(row.id, index: index, count: count) }
+                }
+                fault(of: row.entry, index: index)
+            }
+        }
+    }
+
+    private func block(fields: ListEntries.Entry, id: UUID, index: Int?, count: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             if isEditable {
                 HStack(spacing: 6) {
-                    if isMain { Text("Main").interfaceFont(.caption).foregroundStyle(.secondary) }
+                    if index ?? count == 0 { Text("Main").interfaceFont(.caption).foregroundStyle(.secondary) }
                     Spacer()
-                    if let index { entryMenu(index) } else {
-                        Button("Cancel") { pending = nil; notice = nil }.buttonStyle(.borderless).interfaceFont(.caption)
+                    if let index { entryMenu(id, index: index, count: count) } else {
+                        Button("Cancel") { editing.cancelEntry() }.buttonStyle(.borderless).interfaceFont(.caption)
                     }
                 }
                 ForEach(shape.members) { member in
-                    MemberField(member: member, value: fields[member.key], key: "\(key).\(index.map(String.init) ?? "new").\(member.key)") {
-                        commit(member: member.key, to: $0, at: index)
-                    }
+                    memberField(member, of: id, holding: fields[member.key], index: index)
+                }
+                ForEach(fields.keys.filter { shape.member($0) == nil }.sorted(), id: \.self) { undeclared in
+                    undeclaredMember(undeclared, holding: fields[undeclared], of: id)
                 }
             } else {
                 InspectorText(text: shape.summary(of: fields))
                     .accessibilityIdentifier("ItemListEntry.\(key).\(index ?? 0)")
             }
+            if let index { fault(of: .object(fields), index: index) }
         }
         .padding(.vertical, 2)
     }
 
-    private func entryMenu(_ index: Int) -> some View {
+    private func memberField(_ member: ListShape.Member, of id: UUID, holding stored: PropertyValue?, index: Int?) -> some View {
+        let slot = ListEditing.Slot(entry: id, member: member.key)
+        return MemberField(
+            member: member, value: stored, key: "\(key).\(index.map(String.init) ?? "new").\(member.key)",
+            text: Binding { editing.text(slot, in: value) } set: { editing.type($0, into: slot, in: value) },
+            isConflict: isEditable && editing.conflicts(slot, in: value),
+            set: { editing.set(member.key, to: $0, of: id, in: shape, value: value, write: onChange) },
+            commit: { overwriting in editing.commit(member, of: id, in: shape, value: value, overwriting: overwriting, write: onChange) },
+            discard: { editing.discard(slot, in: value) })
+    }
+
+    /// A member the list does not declare, which Marfa refuses the list for: shown as it is, with Remove.
+    private func undeclaredMember(_ name: String, holding stored: PropertyValue?, of id: UUID) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(verbatim: name).foregroundStyle(.secondary).interfaceFont(.caption)
+                .frame(width: 84, alignment: .leading).lineLimit(1)
+            InspectorText(text: stored.map(ItemValueText.string) ?? "")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Remove", systemImage: "minus.circle") {
+                editing.set(name, to: nil, of: id, in: shape, value: value, write: onChange)
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .help("Remove")
+            .accessibilityIdentifier("ItemListRemoveMember.\(key).\(name)")
+        }
+    }
+
+    /// Why a stored entry cannot be written as it is, under it.
+    @ViewBuilder private func fault(of entry: PropertyValue, index: Int) -> some View {
+        if let fault = shape.fault(of: entry) {
+            Text(fault).interfaceFont(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("ItemListEntryFault.\(key).\(index)")
+        }
+    }
+
+    private func entryMenu(_ id: UUID, index: Int, count: Int) -> some View {
         Menu {
-            if index > 0 { Button("Make Main") { write(ListEntries.makingMain(index, in: value)) } }
-            if index > 0 { Button("Move Up") { write(ListEntries.moving(from: index, to: index - 1, in: value)) } }
-            if index < entries.count - 1 { Button("Move Down") { write(ListEntries.moving(from: index, to: index + 1, in: value)) } }
-            Button("Remove", role: .destructive) { write(ListEntries.removing(at: index, from: value)) }
+            if index > 0 { Button("Make Main") { editing.move(id, to: 0, in: shape, value: value, write: onChange) } }
+            if index > 0 { Button("Move Up") { editing.move(id, to: index - 1, in: shape, value: value, write: onChange) } }
+            if index < count - 1 { Button("Move Down") { editing.move(id, to: index + 1, in: shape, value: value, write: onChange) } }
+            Button("Remove", role: .destructive) { editing.remove(id, in: shape, value: value, write: onChange) }
         } label: {
             Image(systemName: "ellipsis.circle")
         }
@@ -85,62 +133,33 @@ struct ListEntriesEditor: View {
         .accessibilityLabel("Entry Actions")
         .accessibilityIdentifier("ItemListEntryMenu.\(key).\(index)")
     }
-
-    private func write(_ new: PropertyValue?) {
-        notice = nil
-        if !onChange(new) { notice = String(localized: "The list could not be saved.") }
-    }
-
-    /// Sets one member of an entry, or of the entry being added. Returns whether the member's text is settled: false keeps
-    /// the field as typed, with `notice` saying why.
-    private func commit(member: String, to new: PropertyValue?, at index: Int?) -> Bool {
-        notice = nil
-        guard let index else {
-            var entry = pending ?? [:]
-            entry[member] = new
-            if shape.refusal(of: entry) == nil {
-                pending = nil
-                return onChange(ListEntries.appending(entry, to: value))
-            }
-            pending = entry
-            return true
-        }
-        guard let fields = ListEntries.object(entries[index]) else { return false }
-        var changed = fields
-        changed[member] = new
-        if let refusal = shape.refusal(of: changed) {
-            notice = refusal
-            return false
-        }
-        guard let updated = ListEntries.setting(member, to: new, at: index, in: value) else { return false }
-        if !onChange(updated) {
-            notice = String(localized: "The list could not be saved.")
-            return false
-        }
-        return true
-    }
 }
 
 /// One member of an entry, edited by its kind: a menu for a choice, a checkbox for a yes or no, a text field for the
-/// rest, committed on return or when it loses focus.
+/// rest, committed on return or when it loses focus. The field shows what was typed until it is written, whatever
+/// the list does meanwhile, and what the entry holds otherwise.
 private struct MemberField: View {
     let member: ListShape.Member
     let value: PropertyValue?
     let key: String
-    /// Writes the member (nil removes it); false keeps the text as typed.
-    let commit: (PropertyValue?) -> Bool
-    @State private var text = ""
-    @State private var typing = false
+    @Binding var text: String
+    let isConflict: Bool
+    /// Sets a choice or a yes or no (nil removes it).
+    let set: (PropertyValue?) -> Bool
+    /// Writes the typed text, over a change made elsewhere where `overwriting`.
+    let commit: (_ overwriting: Bool) -> Bool
+    let discard: () -> Void
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(LocalizedStringKey(member.label)).foregroundStyle(.secondary).interfaceFont(.caption)
-                .frame(width: 84, alignment: .leading).lineLimit(1)
-            control.frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(LocalizedStringKey(member.label)).foregroundStyle(.secondary).interfaceFont(.caption)
+                    .frame(width: 84, alignment: .leading).lineLimit(1)
+                control.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if isConflict { conflictNotice }
         }
-        .onAppear { text = ListShape.editing(value) }
-        .onChange(of: value) { _, new in if !focused { text = ListShape.editing(new); typing = false } }
     }
 
     @ViewBuilder private var control: some View {
@@ -149,7 +168,7 @@ private struct MemberField: View {
             let current = value?.string
             Picker(LocalizedStringKey(member.label), selection: Binding {
                 current ?? ""
-            } set: { _ = commit($0.isEmpty ? nil : .string($0)) }) {
+            } set: { _ = set($0.isEmpty ? nil : .string($0)) }) {
                 Text("Not Set").tag("")
                 ForEach(choices, id: \.self) { Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)).tag($0) }
                 if let current, !choices.contains(current) { Text(verbatim: current).tag(current) }
@@ -159,7 +178,7 @@ private struct MemberField: View {
         case .boolean:
             Toggle(LocalizedStringKey(member.label), isOn: Binding {
                 InspectorFields.isYes(value)
-            } set: { _ = commit(.bool($0)) })
+            } set: { _ = set(.bool($0)) })
             .labelsHidden().toggleStyle(.checkbox)
             .accessibilityIdentifier("ItemListMember.\(key)")
         case .text, .number, .date:
@@ -167,26 +186,26 @@ private struct MemberField: View {
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .focused($focused)
-                .onSubmit(settle)
-                .onChange(of: focused) { if !focused { settle() } }
+                .onSubmit { _ = commit(false) }
+                .onChange(of: focused) { if !focused { _ = commit(false) } }
+                .onExitCommand { discard(); focused = false }
                 .accessibilityIdentifier("ItemListMember.\(key)")
         }
     }
 
-    /// Writes the text as the member's value, or leaves it as typed where it is not one.
-    private func settle() {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed != ListShape.editing(value) else { return }
-        guard !trimmed.isEmpty else { _ = commit(nil); return }
-        let parsed: PropertyValue?
-        switch member.kind {
-        case .number(let rule): parsed = PropertyNumber.parse(trimmed, rule: rule).map(PropertyValue.number)
-        default: parsed = .string(trimmed)
+    private var conflictNotice: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("This value changed while you were editing. Your edit hasn’t been saved.")
+                .interfaceFont(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button("Keep My Edit") { _ = commit(true) }
+                    .accessibilityIdentifier("ItemListKeepEdit.\(key)")
+                Button("Use Current Value") { discard() }
+                    .accessibilityIdentifier("ItemListUseCurrent.\(key)")
+            }
+            .buttonStyle(.borderless)
+            .interfaceFont(.caption)
         }
-        guard let parsed, member.accepts(parsed) else {
-            _ = commit(.string(trimmed))
-            return
-        }
-        _ = commit(parsed)
     }
 }

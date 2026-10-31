@@ -80,7 +80,7 @@ final class DetailsPresentation {
         drafts.filter { itemID == nil || $0.key == itemID }
             .sorted { $0.key.rawValue < $1.key.rawValue }
             .flatMap { item, keyed in
-                keyed.filter { $0.value.isDirty && $0.value.field != nil }
+                keyed.filter { ($0.value.isDirty || $0.value.holdsUnsavedList) && $0.value.field != nil }
                     .sorted { $0.key < $1.key }
                     .map { (item, $0.key, $0.value) }
             }
@@ -133,4 +133,16 @@ final class ItemPropertyDraft {
     /// The property the draft is for, set by its row, so a draft left behind can be written or handed back without
     /// the row.
     var field: ItemTypeInfo.Field?
+    @ObservationIgnored private var listStorage: ListEditing?
+
+    /// The work on a list of entries, for a list property; made on first use.
+    var list: ListEditing {
+        if let listStorage { return listStorage }
+        let list = ListEditing()
+        listStorage = list
+        return list
+    }
+
+    /// Whether the draft is for a list that holds text not yet written.
+    var holdsUnsavedList: Bool { listStorage?.holdsUnsavedWork == true }
 }

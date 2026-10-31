@@ -42,7 +42,7 @@ struct ItemPropertyRow: View {
                     Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
                 if isEditable && input.conflicts(with: currentText) { conflictNotice }
-                if input.rejected { rejectedNotice }
+                if input.rejected, !isList { rejectedNotice }
                 if lostEdit { lostEditNotice }
             }
         }
@@ -66,9 +66,10 @@ struct ItemPropertyRow: View {
 
     @ViewBuilder private var core: some View {
         if case .list(let shape) = definition.kind {
+            // The list tells its own refusals, beside the entry they are about.
             ListEntriesEditor(
                 shape: shape, label: definition.displayLabel, key: definition.key, value: value, isEditable: isEditable,
-                onChange: { input.rejected = !onChange($0); return !input.rejected })
+                editing: input.list, onChange: onChange)
         } else if definition.kind == .boolean {
             checkbox
         } else if isEditable {
@@ -120,6 +121,8 @@ struct ItemPropertyRow: View {
     }
 
     private var currentText: String { value.map(ItemValueText.editing) ?? "" }
+
+    private var isList: Bool { definition.kind.isList }
 
     /// What the row reads at rest: the draft while there is one the item can take, else the stored value. An item that
     /// can no longer be edited shows what it holds, not what was typed for it.
@@ -192,6 +195,10 @@ struct ItemPropertyRow: View {
     }
 
     private func clear() {
+        if isList {
+            if !onChange(nil) { input.list.notice = String(localized: "The list could not be saved.") }
+            return
+        }
         input.rejected = !onChange(nil)
         if !input.rejected { input.discard(toMatch: "") ; editing = false }
     }
@@ -417,7 +424,7 @@ struct ItemPropertyRow: View {
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
         case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
-        case (.list, .array): valid = true
+        case (.list, _): valid = definition.accepts(value)
         default: valid = false
         }
         return valid ? nil : String(localized: "Unrecognized value: \(ItemValueText.string(value)). It is preserved until you replace it.")
@@ -435,6 +442,10 @@ struct ItemPropertyRow: View {
     private func leave() {
         guard handsOffOnLeave, let library else {
             commit()
+            return
+        }
+        if case .list(let shape) = definition.kind {
+            input.list.leave(shape, label: definition.displayLabel, value: value, isEditable: isEditable, write: onChange, to: library.notices)
             return
         }
         input.handOff(

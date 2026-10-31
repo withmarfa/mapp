@@ -53,6 +53,12 @@ struct QuickAddPanel: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddFilesNotKept")
                 }
+                if let list = quickAdd.unfinishedLists.first {
+                    Text("\(list.displayLabel) has an entry that isn’t finished. Finish it, or cancel it, to add the item.")
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddListUnfinished")
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -138,7 +144,7 @@ struct QuickAddPanel: View {
     /// Tab and Shift-Tab move through the kinds while nothing is typed; once something is, they move between the
     /// fields as usual.
     private func cycleType(backward: Bool) -> KeyPress.Result {
-        guard let draft = quickAdd.draft, !draft.hasContent else { return .ignored }
+        guard let draft = quickAdd.draft, !quickAdd.holdsContent else { return .ignored }
         let types = QuickAdd.types(in: library)
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
         let chips = QuickAdd.kindMenu(types, shown: shown, chosen: draft.typeID).first
@@ -380,6 +386,7 @@ struct QuickAddPanel: View {
         let remove: () -> Void = {
             if editing == field.key { editing = nil }
             quickAdd.draft?.remove(.field(field.key), in: library.catalogue)
+            quickAdd.listDrafts[field.key] = nil
         }
         return chipShell(remove: isRemovable ? (String(localized: "Remove \(name)"), "QuickAddRemove.\(field.key)", remove) : nil) {
             Button {
@@ -396,10 +403,12 @@ struct QuickAddPanel: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: Binding { editing == field.key } set: { if !$0, editing == field.key { editing = nil } }, arrowEdge: .top) {
+                // A list's entry being added outlives the popover, in the window's quick add.
+                let listDraft = field.kind.isList ? quickAdd.listDraft(for: field.key) : nil
                 ItemPropertyRow(definition: field, value: value, isEditable: true, onChange: { newValue in
                     quickAdd.draft?.properties[field.key] = newValue
                     return true
-                }, startsEditing: true)
+                }, retainedDraft: listDraft, startsEditing: true, handsOffOnLeave: listDraft == nil)
                 .padding(14)
                 .frame(width: 340)
             }
@@ -502,7 +511,7 @@ struct QuickAddPanel: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!QuickAdd.canSave(draft, in: library) || quickAdd.isSaving)
+            .disabled(!QuickAdd.canSave(draft, in: library) || quickAdd.isSaving || !quickAdd.unfinishedLists.isEmpty)
             .accessibilityIdentifier("QuickAddAdd")
         }
         .controlSize(.large)

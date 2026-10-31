@@ -139,6 +139,39 @@ final class QuickAdd {
 
     var draft: Draft?
     var isPresented = false
+    /// The work on each list field's entries, by key: an entry being added, or a member's text not yet in the draft.
+    /// Kept here, not by the popover that edits it, so closing the popover keeps it.
+    @ObservationIgnored var listDrafts: [String: ItemPropertyDraft] = [:]
+
+    /// The work on the entries of list field `key`, made on first use.
+    func listDraft(for key: String) -> ItemPropertyDraft {
+        if let draft = listDrafts[key] { return draft }
+        let draft = ItemPropertyDraft()
+        listDrafts[key] = draft
+        return draft
+    }
+
+    /// The list fields holding text not yet in the draft, which holds the draft back until it is finished or removed.
+    var unfinishedLists: [ItemTypeInfo.Field] {
+        listDrafts.sorted { $0.key < $1.key }.compactMap { $0.value.holdsUnsavedList ? $0.value.field : nil }
+    }
+
+    /// The text of each list field not yet in the draft, named, for the clipboard.
+    private var unfinishedListText: [String] {
+        listDrafts.sorted { $0.key < $1.key }.compactMap { _, draft in
+            guard let field = draft.field, case .list(let shape) = field.kind, let text = draft.list.unsavedText(in: shape) else { return nil }
+            return "\(field.displayLabel): \(text)"
+        }
+    }
+
+    /// Ends the draft once it is added or given up.
+    func clearDraft() {
+        draft = nil
+        listDrafts = [:]
+    }
+
+    /// Whether the draft, or a list field's entries, hold anything worth keeping.
+    var holdsContent: Bool { draft?.hasContent == true || !unfinishedLists.isEmpty }
     /// The draft as it was when its file was sent, while the file is being added, so the panel does not add it
     /// twice and a closing window does not hand off what is already on its way.
     private var sending: Draft?
@@ -168,8 +201,9 @@ final class QuickAdd {
     /// file being added, and the title sent with it, are on their way already, so only what was typed or given
     /// besides them is handed off. `library` is the one the draft was made in, which names its values and parent.
     func handOff(to notices: Notices, because departure: Departure, in library: (any ItemLibrary)?) {
+        let lists = unfinishedListText
         defer {
-            draft = nil
+            clearDraft()
             isPresented = false
         }
         guard var draft else { return }
@@ -180,13 +214,14 @@ final class QuickAdd {
             draft.properties = draft.properties.filter { sending.properties[$0.key] != $0.value }
             draft.chips.removeAll { sending.chips.contains($0) }
         }
-        guard draft.hasContent else { return }
+        guard draft.hasContent || !lists.isEmpty else { return }
         var reason = switch departure {
         case .closed: String(localized: "Quick add closed before the item was added.")
         case .libraryChanged: String(localized: "The window changed to another library before the item was added.")
         }
         if !draft.files.isEmpty { reason += " " + File.notAdded(draft.files) }
-        let text = draft.text(in: library)
+        let typed = [draft.text(in: library), lists.isEmpty ? nil : lists.joined(separator: "\n")].compactMap { $0 }
+        let text = typed.isEmpty ? nil : typed.joined(separator: "\n\n")
         notices.notKept(
             String(localized: "Item Not Added"), text: text,
             reason: text == nil ? String(localized: "\(reason) Add it again.") : reason)
@@ -383,13 +418,22 @@ extension Browser {
             case .field(let key): keys.contains(key)
             }
         }
+        // A list field the new kind lacks gives back any entry still being typed into it.
+        for (key, list) in quickAdd.listDrafts where !keys.contains(key) {
+            if let field = list.field, case .list(let shape) = field.kind, let text = list.list.unsavedText(in: shape) {
+                library.notices.notKept(
+                    String(localized: "Property Not Saved"), text: "\(field.displayLabel): \(text)",
+                    reason: String(localized: "The new kind of item doesn’t have this property."))
+            }
+            quickAdd.listDrafts[key] = nil
+        }
         quickAdd.draft = draft
     }
 
     /// Puts quick add away without adding anything; the draft waits for the panel to come back.
     func putAwayQuickAdd() {
         quickAdd.isPresented = false
-        if quickAdd.draft?.hasContent == false { quickAdd.draft = nil }
+        if quickAdd.draft != nil, !quickAdd.holdsContent { quickAdd.clearDraft() }
     }
 
     /// Puts an empty quick add away once its window has stopped being the one in front, as a menu closes when the
@@ -399,7 +443,7 @@ extension Browser {
     /// Returns whether it put the panel away.
     @discardableResult
     func putAwayQuickAddLeftEmpty(usesOwnSurface: Bool, keyWindowIsOwn: Bool) -> Bool {
-        guard quickAdd.isPresented, quickAdd.draft?.hasContent == false, !usesOwnSurface, !keyWindowIsOwn else { return false }
+        guard quickAdd.isPresented, quickAdd.draft != nil, !quickAdd.holdsContent, !usesOwnSurface, !keyWindowIsOwn else { return false }
         putAwayQuickAdd()
         return true
     }
@@ -412,7 +456,8 @@ extension Browser {
     /// that. Nothing empty is ever written.
     @discardableResult
     func saveQuickAdd(in library: any ItemLibrary, undoManager: UndoManager?) async -> ItemID? {
-        guard let draft = quickAdd.draft, !quickAdd.isSaving, QuickAdd.canSave(draft, in: library) else { return nil }
+        guard let draft = quickAdd.draft, !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty
+        else { return nil }
         let missing = draft.files.filter { !$0.isOnDisk }
         guard missing.isEmpty else {
             quickAdd.draft?.files.removeAll { missing.contains($0) }
@@ -453,7 +498,7 @@ extension Browser {
         }
         guard let id else { return nil }
         quickAdd.isPresented = false
-        quickAdd.draft = nil
+        quickAdd.clearDraft()
         let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
         var collection: ItemID?
         if case .collection(let id) = item { collection = id }

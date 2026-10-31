@@ -131,6 +131,12 @@ extension DetailsPresentation {
         for (id, key, draft) in drafts {
             guard let field = draft.field else { continue }
             let item = library.item(id)
+            if case .list(let shape) = field.kind {
+                draft.list.leave(
+                    shape, label: field.displayLabel, value: item?.value(of: key), isEditable: item?.isEditable ?? false,
+                    write: { library.setItemProperty(id, key: key, value: $0, undoManager: undoManager) }, to: library.notices)
+                continue
+            }
             draft.handOff(
                 label: field.displayLabel, as: field.kind, rule: field.numberRule,
                 current: item?.value(of: key).map(ItemValueText.editing) ?? "",
