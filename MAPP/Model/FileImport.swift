@@ -22,16 +22,17 @@ extension Browser {
     /// on a collection, or taken from a nearby device. Each file is added as an item of its own, of the type its kind
     /// calls for (as quick add's file is), in the place the window showed when they were dropped (`destination`,
     /// which is that place when none is given). Where that was a collection, or the drop was on one, the items join
-    /// it. A file that cannot be read, and one the library refuses, are told, and the rest are still added. When the
-    /// window changes library meanwhile nothing more is written, and when the person moves to another place their
-    /// selection is left alone. Returns the items made.
+    /// it. A file that cannot be read, and one the library refuses, are told, and the rest are still added. The files
+    /// are written to `library` whatever the window does meanwhile, since a write there is safe and a drop cut short
+    /// would lose the rest; only the window's own steps (selecting what was added, revealing it) stop once the window
+    /// has changed library, and once the person has moved to another place their selection is left alone. Returns the
+    /// items made.
     @discardableResult
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, into collection: ItemID? = nil, destination: ImportDestination? = nil,
         in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?
     ) async -> [ItemID] {
         let destination = destination ?? importDestination(into: collection)
-        guard isShowing(library) else { return [] }
         var files: [QuickAdd.File] = []
         var notRead: [String] = []
         for url in urls {
@@ -41,16 +42,14 @@ extension Browser {
         var added: [ItemID] = []
         for file in files {
             if let id = await library.addFile(file.url, title: nil, parentID: nil, in: destination.place) { added.append(id) }
-            guard isShowing(library) else { return added }
         }
         guard !added.isEmpty else { return [] }
         var joined = false
         if let target = destination.collection {
             await library.waitUntilHolding(added)
-            guard isShowing(library) else { return added }
             joined = library.addToCollection(Set(added.filter { library.item($0) != nil }), target, undoManager: undoManager)
         }
-        guard item == destination.place else { return added }
+        guard isShowing(library), item == destination.place else { return added }
         let shown = Set(placeItems(in: library).map(\.id))
         if (joined && destination.collection == shownCollection) || added.allSatisfy(shown.contains) {
             selection = Set(added)

@@ -16,15 +16,16 @@ extension Notification.Name {
 }
 
 extension Browser {
-    /// How many of the selected items Quick Look is given, in the order they are on screen. Each file is fetched
-    /// before it is shown, so a large selection is not fetched whole.
+    /// How many items Quick Look is given, in the order they are on screen. Each file is fetched before it is
+    /// shown, so a large selection is not fetched whole.
     static let quickLookLimit = 10
 
     /// Shows the selected items in Quick Look, in the order they are on screen: a file item as its file, fetched
     /// first, and any other item as its text in a markdown file. Quick Look picks a previewer from the file's name,
     /// so each is shown a copy named after the item. The first is shown as soon as it is ready and the rest join
-    /// it as they are fetched, up to `quickLookLimit`. An item that has neither, or whose file cannot be fetched, is
-    /// left out and the person is told when that leaves nothing to show. A request that is replaced or closed
+    /// it as they are fetched, up to `quickLookLimit` items shown. An item that has neither, or whose file cannot be
+    /// fetched, is left out and does not count; the person is told when that leaves nothing to show, and once when
+    /// the selection has more than were shown. A request that is replaced or closed
     /// meanwhile stops and removes what it made.
     func quickLookSelection(in library: any ItemLibrary) async {
         dismissQuickLook()
@@ -32,11 +33,12 @@ extension Browser {
         let selected = Dictionary(selectedItems(in: library).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var seen: Set<ItemID> = []
         let chosen = (onScreenOrder(in: library) + selection).compactMap { id in seen.insert(id).inserted ? selected[id] : nil }
-            .prefix(Self.quickLookLimit)
         var made: [QuickLookFile] = []
+        var shown = 0
         var failure: String?
         func isCurrent() -> Bool { generation == quickLookGeneration && isShowing(library) }
         func show(_ url: URL, staged file: QuickLookFile?) {
+            shown += 1
             file.map { made.append($0) }
             if quickLook == nil {
                 quickLook = QuickLookRequest(urls: [url], current: url, staged: made)
@@ -46,7 +48,12 @@ extension Browser {
                 quickLook?.staged = made
             }
         }
+        var cutOff = false
         for item in chosen {
+            if shown == Self.quickLookLimit {
+                cutOff = true
+                break
+            }
             if item.isFile {
                 do {
                     let fetched = try await library.fileURL(of: item.id)
@@ -62,6 +69,11 @@ extension Browser {
                       let file = QuickLookFile.write(body.text, titled: item.title, as: .markdown) {
                 show(file.url, staged: file)
             }
+        }
+        if cutOff {
+            library.notices.tell(
+                String(localized: "Quick Look"),
+                String(localized: "Showing the first \(Self.quickLookLimit) of ^[\(chosen.count) item](inflect: true)."))
         }
         if quickLook == nil, !chosen.isEmpty {
             library.notices.tell(

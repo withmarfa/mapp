@@ -84,27 +84,39 @@ struct FileDropTests {
         #expect(library.addedPlaces == [.inbox, .inbox])
     }
 
-    @Test func nothingIsWrittenOnceTheWindowHasChangedLibrary() async throws {
+    @Test func aDropCutOffByALibraryChangeStillAddsEveryFileToTheLibraryItWasDroppedOn() async throws {
         let library = FakeItemLibrary()
         let other = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
         library.sendingFile = { browser.adopt(other) }
         let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
-        #expect(library.addedFiles.count == 1)
+        #expect(library.addedFiles.map(\.name) == ["a.txt", "b.txt"])
         #expect(other.addedFiles.isEmpty)
-        #expect(ids.count == 1)
+        #expect(ids.count == 2)
         #expect(browser.selection.isEmpty)
     }
 
-    @Test func filesAreNotImportedIntoALibraryTheWindowHasLeft() async throws {
+    @Test func aFileThatFailsAfterALibraryChangeIsStillToldAndTheRestAreAdded() async throws {
+        let library = FakeItemLibrary()
+        let browser = Browser()
+        browser.adopt(library)
+        library.sendingFile = { browser.adopt(FakeItemLibrary()) }
+        let missing = disk.directory.appending(path: "gone.txt")
+        let ids = await browser.importFiles([disk.url("a.txt"), missing, disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        #expect(ids.count == 2)
+        #expect(library.notices.waiting.count == 1)
+    }
+
+    @Test func filesDroppedBeforeALibraryChangeAreStillAddedToTheirLibraryAndNothingIsSelected() async throws {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
         browser.adopt(FakeItemLibrary())
         let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: NoteOrder(), undoManager: nil)
-        #expect(ids.isEmpty)
-        #expect(library.addedFiles.isEmpty)
+        #expect(ids.count == 1)
+        #expect(library.addedFiles.count == 1)
+        #expect(browser.selection.isEmpty)
     }
 
     @Test func aLongTitleIsShortenedToFitAFileNameWithoutSplittingACharacter() {
@@ -215,7 +227,93 @@ struct FileDropTests {
         await browser.quickLookSelection(in: library)
         let request = try #require(browser.quickLook)
         #expect(request.urls.count == Browser.quickLookLimit)
+        let notice = try #require(library.notices.waiting.first)
+        #expect(library.notices.waiting.count == 1)
+        #expect(notice.message.contains("10") && notice.message.contains("15"))
         browser.dismissQuickLook()
+    }
+
+    @Test func quickLookCountsOnlyTheItemsItShowsAgainstItsLimit() async throws {
+        let library = FakeItemLibrary()
+        var empty: [ItemID] = []
+        for index in 0..<12 {
+            empty.append(try #require(await library.addFile(disk.url("empty\(index).txt"), title: nil, parentID: nil, in: .allNotes)))
+        }
+        let notes = (0..<12).map { library.add("# Note \($0)") }
+        let browser = Browser()
+        browser.adopt(library)
+        browser.selection = Set(empty + notes.map(\.id))
+        await browser.quickLookSelection(in: library)
+        let request = try #require(browser.quickLook)
+        #expect(request.urls.count == Browser.quickLookLimit)
+        #expect(library.notices.waiting.count == 1)
+        browser.dismissQuickLook()
+    }
+
+    @Test func quickLookSaysNothingAboutTheLimitWhenEverythingFits() async throws {
+        let library = FakeItemLibrary()
+        let notes = (0..<Browser.quickLookLimit).map { library.add("# Note \($0)") }
+        let browser = Browser()
+        browser.adopt(library)
+        browser.selection = Set(notes.map(\.id))
+        await browser.quickLookSelection(in: library)
+        #expect(browser.quickLook?.urls.count == Browser.quickLookLimit)
+        #expect(library.notices.waiting.isEmpty)
+        browser.dismissQuickLook()
+    }
+
+    @Test func copiesAreMadeInAFolderOfTheRunningProcess() throws {
+        let file = try #require(QuickLookFile.write("text", titled: "Plans", as: .plainText, in: "Process-test"))
+        defer { file.remove() }
+        #expect(file.folder.deletingLastPathComponent().lastPathComponent == String(ProcessInfo.processInfo.processIdentifier))
+    }
+
+    @Test func leftoversOfProcessesNoLongerRunningGoAndThoseOfRunningOnesStay() throws {
+        let root = disk.directory
+        let manager = FileManager.default
+        for name in QuickLookFile.folderNames {
+            for process in ["111", "222", "old-layout"] {
+                let folder = root.appending(path: name).appending(path: process)
+                try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+                try Data("x".utf8).write(to: folder.appending(path: "file.txt"))
+            }
+        }
+        QuickLookFile.removeLeftovers(in: root, isRunning: { $0 == 111 })
+        for name in QuickLookFile.folderNames {
+            let base = root.appending(path: name)
+            #expect(manager.fileExists(atPath: base.appending(path: "111/file.txt").path))
+            #expect(!manager.fileExists(atPath: base.appending(path: "222").path))
+            #expect(!manager.fileExists(atPath: base.appending(path: "old-layout").path))
+        }
+    }
+
+    @Test func thisProcessIsARunningCopyOfTheAppAndAnUnusedOneIsNot() {
+        #expect(QuickLookFile.isRunningCopy(ProcessInfo.processInfo.processIdentifier))
+        #expect(!QuickLookFile.isRunningCopy(Int32.max))
+    }
+
+    @Test func twoDevicePhotosWithTheSameNameAreBothKept() async throws {
+        let first = try photoProvider(named: "IMG", bytes: "one")
+        let second = try photoProvider(named: "IMG", bytes: "two")
+        let gathered = await FileIntake.files(from: [first, second])
+        defer { gathered.remove() }
+        #expect(gathered.unreadable == 0)
+        #expect(gathered.urls.count == 2)
+        #expect(Set(gathered.urls).count == 2)
+        #expect(gathered.urls.allSatisfy { $0.lastPathComponent == "IMG.png" })
+        let texts = try gathered.urls.map { try String(contentsOf: $0, encoding: .utf8) }
+        #expect(Set(texts) == ["one", "two"])
+    }
+
+    private func photoProvider(named name: String, bytes: String) throws -> NSItemProvider {
+        let source = disk.url("\(name)-\(bytes).png", bytes)
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(for: .png, visibility: .all) { completion in
+            completion(source, false, nil)
+            return nil
+        }
+        return provider
     }
 
     @Test func aQuickLookReplacedWhileFetchingStopsAndLeavesNoCopies() async throws {

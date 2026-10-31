@@ -29,8 +29,7 @@ enum FileIntake {
             if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                 if let url = await fileURL(of: provider), url.isFileURL { urls.append(url) } else { unreadable += 1 }
             } else if let type = provider.registeredContentTypes.first(where: { $0.conforms(to: .data) }) {
-                let staging = folder ?? URL.temporaryDirectory.appending(path: "Device Import", directoryHint: .isDirectory)
-                    .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+                let staging = folder ?? QuickLookFile.processFolder("Device Import").appending(path: UUID().uuidString, directoryHint: .isDirectory)
                 folder = staging
                 if let url = await stage(provider, as: type, in: staging) { urls.append(url) } else { unreadable += 1 }
             } else {
@@ -47,8 +46,10 @@ enum FileIntake {
         }
     }
 
-    /// Copies the content, which the system removes once its handler returns, to a file named after it.
+    /// Copies the content, which the system removes once its handler returns, to a file named after it, in a folder of
+    /// its own inside `folder`, since several photos of one device share a name.
     private static func stage(_ provider: NSItemProvider, as type: UTType, in folder: URL) async -> URL? {
+        let folder = folder.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let name = QuickLookFile.name(for: provider.suggestedName ?? String(localized: "Photo"), type: type)
         return await withCheckedContinuation { continuation in
             _ = provider.loadFileRepresentation(for: type, openInPlace: false) { url, _, _ in
