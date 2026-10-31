@@ -23,7 +23,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether the server can be reached now, which is what every write that is never queued needs: deleting items
     /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon.
     var reachesServer: Bool { get }
-    /// How many days an item stays in Recently Deleted, where the library sets it.
+    /// How many days an item stays in Recently Deleted, where the server says; nil where it does not.
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
     var syncReport: SyncReport { get }

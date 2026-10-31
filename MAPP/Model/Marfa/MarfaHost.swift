@@ -484,6 +484,7 @@ import Observation
         detach()
         let library = MarfaLibrary(
             source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys),
+            config: configurer(connection, keys),
             didSync: { [weak self] date in self?.recordSync(date, for: connection) },
             // Each return to the server may find it renamed. A library the host has left may still be told once more.
             cameOnline: { [weak self] in
@@ -504,10 +505,12 @@ import Observation
         return InstanceSettingsModel.Target(id: connection.address.absoluteString, source: source)
     }
 
-    /// Reads the server's name again, as after the person renamed it in This Marfa.
-    func refreshName() {
-        guard let connection else { return }
-        readName(of: connection)
+    /// Takes a save made in This Marfa: reads the server's name again where it changed, and gives the open library
+    /// the server's answer, for the server the windows show.
+    func instanceSaved(_ answer: InstanceConfig, changing settings: Set<InstanceSetting>) {
+        guard let connection, connection == configuredConnection else { return }
+        if settings.contains(.name) { readName(of: connection) }
+        library?.take(answer)
     }
 
     /// Asks the server for its name and keeps it; a failed read changes nothing.

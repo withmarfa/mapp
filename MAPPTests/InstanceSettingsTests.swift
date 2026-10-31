@@ -59,7 +59,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     @Test func aSaveSendsOnlyTheFieldsThatChangedAndShowsTheAnswer() async {
         let (model, source) = await loaded([.name: .text("Library"), .trashRetentionDays: .number(30)])
         var renamed = 0
-        model.onRenamed = { renamed += 1 }
+        model.onSaved = { _, settings in if settings.contains(.name) { renamed += 1 } }
         #expect(model.draft[.name] == "Library")
 
         model.draft[.name] = "  Home  "
