@@ -22,7 +22,7 @@ struct OrderOptions: View {
     }
 
     private var picker: some View {
-        Picker("Sort By", systemImage: "arrow.up.arrow.down", selection: Binding<NoteSort?> {
+        Picker("Sort by", systemImage: "arrow.up.arrow.down", selection: Binding<NoteSort?> {
             browser?.ordersByRelevance == true ? nil : sort
         } set: { choice in
             if let choice { sort = choice }
@@ -38,16 +38,19 @@ struct OrderOptions: View {
                 Text(sort.title).tag(Optional(sort))
             }
         }
-        .accessibilityLabel("Sort By")
+        .accessibilityLabel("Sort by")
         .accessibilityIdentifier("NoteSort")
     }
 
     private var group: some View {
         // Title order has no dates to group by, and relevance lists one section.
-        Toggle("Group by Date", systemImage: "calendar", isOn: $groupsByDate)
-            .accessibilityLabel("Group by Date")
-            .accessibilityIdentifier("GroupByDate")
-            .disabled(sort == .title || browser?.ordersByRelevance == true)
+        Picker("Group by", systemImage: "calendar", selection: $groupsByDate) {
+            Text("None").tag(false)
+            Text("Date").tag(true)
+        }
+        .accessibilityLabel("Group by")
+        .accessibilityIdentifier("GroupBy")
+        .disabled(sort == .title || browser?.ordersByRelevance == true)
     }
 }
 

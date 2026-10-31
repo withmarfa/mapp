@@ -77,8 +77,6 @@ struct ColumnSearch<Controls: View>: ToolbarContent {
 enum ColumnSearchMetrics {
     /// What a column's toolbar keeps beside an open field: its margins, the options item and the gap before it.
     static let columnChrome: CGFloat = 54
-    /// What one more toolbar button in the column takes of it.
-    static let buttonChrome: CGFloat = 36
     /// What the field takes of the room it could fill. One factor for every layout, so they narrow together.
     static let share: CGFloat = 0.85
     /// The room a field could fill as an item of its own, before `share` narrows it.

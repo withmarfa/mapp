@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The switch between a type's own items and its items with its subtypes' (`Browser.placeItems`), as Obsidian's stack
-/// button does for a folder. The list's toolbar, the View menu and the palette all offer it, for a type that has
+/// button does for a folder. View Options (and so the View menu) and the palette offer it, for a type that has
 /// subtypes holding items.
 enum IncludeSubtypes {
     static let symbol = "square.3.layers.3d"
@@ -25,33 +25,17 @@ extension Browser {
     }
 }
 
-/// The list toolbar's button.
-struct IncludeSubtypesButton: View {
+/// The option in View Options, for a type that has subtypes holding items. It keeps a checkmark, being the one
+/// on/off choice in the menu.
+struct IncludeSubtypesOption: View {
     @CurrentLibrary private var library
     let browser: Browser
 
     var body: some View {
-        let isOn = browser.stacksSubtypes(in: library)
-        Toggle(isOn: browser.stacksSubtypesBinding(in: library)) {
-            Label("Include Subtypes", systemImage: IncludeSubtypes.symbol)
-        }
-        .toggleStyle(.button)
-        .labelStyle(.iconOnly)
-        .help(isOn ? Text("Show only this type’s own items") : Text("Include the items of its subtypes in this list"))
-        .accessibilityIdentifier("IncludeSubtypesToolbar")
-    }
-}
-
-/// The View menu's command.
-struct IncludeSubtypesCommand: View {
-    let browser: Browser?
-    let library: (any ItemLibrary)?
-
-    var body: some View {
-        if let browser, let library, browser.stackableType(in: library) != nil {
-            Toggle("Include Subtypes", systemImage: IncludeSubtypes.symbol, isOn: browser.stacksSubtypesBinding(in: library))
-        } else {
-            Toggle("Include Subtypes", systemImage: IncludeSubtypes.symbol, isOn: .constant(false)).disabled(true)
+        if browser.stackableType(in: library) != nil {
+            Toggle("Include Subtypes", isOn: browser.stacksSubtypesBinding(in: library))
+                .help(browser.stacksSubtypes(in: library) ? Text("Show only this type’s own items") : Text("Include the items of its subtypes in this list"))
+                .accessibilityIdentifier("IncludeSubtypes")
         }
     }
 }

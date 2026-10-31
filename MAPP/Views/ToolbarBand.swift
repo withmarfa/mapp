@@ -13,6 +13,10 @@ struct ToolbarBand: View {
     let isShown: Bool
     /// The edge the band sits on. The hairline runs along the side facing the content.
     var edge: VerticalEdge = .top
+    /// Whether the hairline shows. The foot draws it only under the pointer.
+    var showsLine = true
+    /// How much of the blur shows.
+    var strength = Self.strength
 
     /// How much of the blur shows, so the content behind reads only as a faint ghost.
     static let strength: Double = 0.9
@@ -28,17 +32,19 @@ struct ToolbarBand: View {
     var body: some View {
         Rectangle()
             .fill(.bar)
-            .opacity(Self.strength)
+            .opacity(strength)
             .overlay(alignment: edge == .top ? .bottom : .top) {
                 // One physical pixel, whatever the display's scale.
                 Rectangle()
                     .fill(.separator)
                     .frame(height: 1 / displayScale)
+                    .opacity(showsLine ? 1 : 0)
             }
             .frame(height: toolbarHeight)
             // With no toolbar over the page, as in full screen while the toolbar is hidden, there is nothing to back.
             .opacity(isShown && toolbarHeight > 0 ? 1 : 0)
             .animation(.easeOut(duration: 0.2), value: isShown)
+            .animation(.easeOut(duration: 0.2), value: showsLine)
             // Clicks, the window's drag area and the toolbar's buttons all work as if it were not there.
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -71,8 +77,9 @@ extension View {
         overlay(alignment: .top) { ToolbarBandOverlay(isUnderToolbar: isUnderToolbar) }
     }
 
-    /// Gives a sidebar list a foot that draws as the toolbar's band does, mirrored, only while rows pass under it:
-    /// the content's end lies below the top of the foot. Otherwise the foot sits on
+    /// Gives a sidebar list a foot that draws as the toolbar's band does, mirrored, while rows pass under it (the
+    /// content's end lies below the top of the foot) or the pointer is over it. Rows under the foot get a more
+    /// translucent fill and no line; the pointer brings the full band and its line. Otherwise the foot sits on
     /// the plain sidebar, with no fill and no line. The list's own background is not content, so it never counts.
     ///
     /// The foot's measures are read from `memory` and written back to it, where a list is mounted afresh with the same
@@ -109,6 +116,7 @@ private struct BandsFoot<Foot: View>: ViewModifier {
     let memory: ColumnMemory?
     @State private var footHeight: CGFloat
     @State private var hiddenBelow: CGFloat
+    @State private var isHovering = false
 
     init(foot: Foot, memory: ColumnMemory?) {
         self.foot = foot
@@ -116,6 +124,9 @@ private struct BandsFoot<Foot: View>: ViewModifier {
         _footHeight = State(initialValue: memory?.footHeight ?? 0)
         _hiddenBelow = State(initialValue: memory?.hiddenBelow ?? 0)
     }
+
+    /// How much of the blur shows while rows pass under the foot and the pointer is elsewhere.
+    private static var underFootStrength: Double { 0.6 }
 
     /// Rows are under the foot once the content's end lies below the top of the foot, that is, when it reaches more
     /// than the foot's height above the scroll view's bottom edge. Content that ends just above the foot is not under it.
@@ -132,8 +143,11 @@ private struct BandsFoot<Foot: View>: ViewModifier {
             .safeAreaBar(edge: .bottom, spacing: 0) {
                 foot
                     .background(alignment: .bottom) {
-                        ToolbarBand(toolbarHeight: footHeight, isShown: isUnderFoot, edge: .bottom)
+                        ToolbarBand(
+                            toolbarHeight: footHeight, isShown: isUnderFoot || isHovering, edge: .bottom,
+                            showsLine: isHovering, strength: isHovering ? ToolbarBand.strength : Self.underFootStrength)
                     }
+                    .onHover { isHovering = $0 }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                         footHeight = $0
                         memory?.footHeight = $0

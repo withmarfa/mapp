@@ -52,7 +52,7 @@ final class SettingsTests: XCTestCase {
         attachScreenshot("SettingsAppearance")
         XCTAssertTrue(element("SettingsDetail").exists)
         XCTAssertTrue(window.popUpButtons["NoteSort"].exists, "the real list preferences are available")
-        XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort By")
+        XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort by")
 
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -212,7 +212,7 @@ final class SettingsTests: XCTestCase {
         let typeText = sidebar.staticTexts["SidebarType-core.note"]
         XCTAssertTrue(typeText.waitForExistence(timeout: 3))
         let originalTypeHeight = typeText.frame.height
-        XCTAssertEqual(list.frame.width, 350, accuracy: 2, "a fresh window starts with a 350-point list")
+        XCTAssertEqual(list.frame.width, 330, accuracy: 2, "a fresh window starts with a 330-point list")
         XCTAssertTrue(instanceMenu.exists)
         XCTAssertLessThan(instanceMenu.frame.maxX, list.frame.minX, "the foot belongs to the sidebar")
         instanceMenu.click()
