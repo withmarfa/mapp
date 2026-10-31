@@ -72,7 +72,9 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
 }
 
 extension UTType {
-    nonisolated static let mappItem = UTType(exportedAs: "com.withmarfa.mapp.item")
+    /// Named for the bundle identifier, as `MAPP/Info.plist` declares it, so the Debug build and the installed app
+    /// each own their type and an item never drags from one into the other.
+    nonisolated static let mappItem = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").item")
 }
 
 extension ItemLibrary {

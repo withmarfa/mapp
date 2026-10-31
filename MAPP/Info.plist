@@ -10,7 +10,7 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.withmarfa.mapp.item</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).item</string>
 			<key>UTTypeDescription</key>
 			<string>MAPP Item</string>
 			<key>UTTypeConformsTo</key>
