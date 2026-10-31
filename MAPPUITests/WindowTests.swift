@@ -456,7 +456,11 @@ final class WindowTests: XCTestCase {
                 }
                 let isListTitle = element.frame.minY < listFrame.minY
                     && element.frame.minX >= listFrame.minX && element.frame.maxX <= listFrame.maxX
-                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle
+                // The sidebar's foot sits below its list, and its name takes the secondary colour whenever the
+                // window does not look active, which another app's panel can cause at any moment.
+                let isSidebarFoot = element.frame.minY >= sidebarFrame.maxY
+                    && element.frame.minX >= sidebarFrame.minX && element.frame.maxX <= sidebarFrame.maxX
+                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle || isSidebarFoot
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }
