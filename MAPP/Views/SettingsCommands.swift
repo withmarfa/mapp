@@ -11,13 +11,15 @@ final class SettingsRequest {
     private struct MainWindow {
         weak var browser: Browser?
         weak var window: NSWindow?
+        /// Whether a window was given, so one that has since gone is told from one never given.
+        let hadWindow: Bool
     }
     @ObservationIgnored private var mainWindows: [MainWindow] = []
 
     /// Notes that `browser` is shown in `window`, a main window.
     func register(_ browser: Browser, in window: NSWindow?) {
         mainWindows.removeAll { $0.browser == nil || $0.browser === browser }
-        mainWindows.append(MainWindow(browser: browser, window: window))
+        mainWindows.append(MainWindow(browser: browser, window: window, hadWindow: window != nil))
     }
 
     /// The browser of the main window in front of the others, if any is open.
@@ -25,7 +27,7 @@ final class SettingsRequest {
         // A window that was closed is no main window to show Settings in, whether or not its browser lives on.
         mainWindows.removeAll { main in
             guard main.browser != nil else { return true }
-            guard let window = main.window else { return false }
+            guard let window = main.window else { return main.hadWindow }
             return !window.isVisible && !window.isMiniaturized
         }
         let ordered = NSApp?.orderedWindows ?? []
