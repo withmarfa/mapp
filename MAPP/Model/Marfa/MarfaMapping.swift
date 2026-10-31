@@ -457,15 +457,21 @@ nonisolated enum MarfaMapping {
         case .null: .null
         case .bool(let bool): .bool(bool)
         case .number(let number):
-            if let integer = Int64(exactly: NSDecimalNumber(decimal: number).doubleValue), Decimal(integer) == number {
-                .integer(integer)
-            } else {
-                .number(NSDecimalNumber(decimal: number).doubleValue)
-            }
+            // Through its text, not a Double, so an integer above 2^53 goes back exactly as it came.
+            if let integer = integer(number) { .integer(integer) } else { .number(NSDecimalNumber(decimal: number).doubleValue) }
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(json))
         case .object(let object): .object(JSONObject(object.sorted { $0.key < $1.key }.map { ($0.key, json($0.value)) }))
         }
+    }
+
+    /// The number as an Int64 where it is a whole number in Int64's range.
+    private static func integer(_ number: Decimal) -> Int64? {
+        var rounded = Decimal()
+        var source = number
+        NSDecimalRound(&rounded, &source, 0, .plain)
+        guard rounded == number else { return nil }
+        return Int64(NSDecimalNumber(decimal: number).stringValue)
     }
 
     private static func content(of row: Marfa.Item, catalogue: Catalogue) -> Item.Content {
