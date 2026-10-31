@@ -324,9 +324,11 @@ import Observation
     /// it (its default then applies, which a key cannot read), keeps items without limit (zero), or the key may not
     /// read its settings; a failed read keeps what was read before.
     private(set) var trashDays: Int?
-    /// Counts the reads and saves of the settings, so a read that answers after a later one, or after a save in This
-    /// Marfa, does not put back what it found before.
+    /// Counts the reads and saves of the settings as they start.
     @ObservationIgnored private var settingsTurn = 0
+    /// The turn of the answer the retention was last taken from, so a read that answers after a later read or a save
+    /// does not put back what it found before, and a later read that fails does not drop an earlier one's answer.
+    @ObservationIgnored private var appliedTurn = 0
 
     /// Reads the bin's retention from the server's settings, where the host gave the library a way to.
     func readTrashDays() {
@@ -334,7 +336,8 @@ import Observation
         settingsTurn += 1
         let turn = settingsTurn
         Task { [weak self] in
-            guard let answer = try? await config.read(), let self, turn == settingsTurn else { return }
+            guard let answer = try? await config.read(), let self, turn > appliedTurn else { return }
+            appliedTurn = turn
             keep(answer)
         }
     }
@@ -342,6 +345,7 @@ import Observation
     /// Takes a save made in This Marfa: the server's settings as it gave them.
     func take(_ answer: InstanceConfig) {
         settingsTurn += 1
+        appliedTurn = settingsTurn
         keep(answer)
     }
 

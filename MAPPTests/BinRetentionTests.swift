@@ -88,4 +88,19 @@ import Testing
         try await Task.sleep(for: .milliseconds(200))
         #expect(library.trashDays == 7, "an older read put back the retention it found")
     }
+
+    @Test func aNewerReadThatFailsLeavesTheOlderReadsAnswer() async throws {
+        let config = FakeInstanceConfig([.trashRetentionDays: .number(30)])
+        let (library, _) = library(config)
+        try #require(await eventually { library.trashDays == 30 })
+        config.config.withLock { $0.values[.trashRetentionDays] = .number(14) }
+        config.holdNextRead()
+        library.readTrashDays()
+        try #require(await eventually { config.holdsARead })
+        config.readFailure.withLock { $0 = .unreachable }
+        library.readTrashDays()
+
+        config.answerHeldReads()
+        #expect(await eventually { library.trashDays == 14 }, "a newer read that failed dropped the older read's answer")
+    }
 }
