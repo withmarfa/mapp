@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 /// The copy reads a file it takes, which for a large one takes a while, so it does that beside the lane, as a purge
 /// is made: the lane checks the item and chooses the title, a task asks the copy, and its answer comes back to the
 /// lane as an event (`attached`, `addedFile`), which reads the items again. The person's saves go on meanwhile. The
-/// write counts as taken (`EngineActivity`) once its answer is, so a quit still waits for it.
+/// write is set aside (`EngineActivity`) until its answer is taken, so a quit still waits for it.
 extension MarfaEngine {
     /// The package queues the upload, the file's item and its edge to this one, and says what to write in the text
     /// to embed it. The title is the file's name unless another attachment of the item has it, or one being attached,
@@ -22,7 +22,7 @@ extension MarfaEngine {
         attachingTitles[id.rawValue, default: []].insert(title.lowercased())
         let attachment = Attachment(mimeType: Self.mimeType(of: file), title: title)
         let token = UUID()
-        takesWriteLater = true
+        hub.activity.setAside()
         #if DEBUG
         let replacement = hooks.attaching.current
         #endif
@@ -48,7 +48,7 @@ extension MarfaEngine {
         attached result: Result<Marfa.Attached, SourceFailure>, to id: ItemID, title: String, token: UUID
     ) async -> Result<Embed, SourceFailure> {
         settled(token, attaching: title, to: id)
-        defer { hub.activity.tookWrite() }
+        defer { hub.activity.answeredAside() }
         guard case .success(let attached) = result else { return result.map { Self.embed(of: $0, title: title) } }
         await reread(Set([id.rawValue] + [attached.item.itemId].compactMap(\.self)))
         await sync.drain()
@@ -71,7 +71,7 @@ extension MarfaEngine {
         let attachment = Attachment(
             mimeType: Self.mimeType(of: file), title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier))
         let token = UUID()
-        takesWriteLater = true
+        hub.activity.setAside()
         besideTheLane[token] = Task { [copy, hub, tell] in
             let result: Result<Marfa.Added, SourceFailure>
             do {
@@ -87,7 +87,7 @@ extension MarfaEngine {
 
     func take(added result: Result<Marfa.Added, SourceFailure>, under parent: ItemID?, token: UUID) async -> Result<ItemID, SourceFailure> {
         settled(token)
-        defer { hub.activity.tookWrite() }
+        defer { hub.activity.answeredAside() }
         let id: ItemID
         switch result.flatMap(Self.addedID) {
         case .success(let added): id = added

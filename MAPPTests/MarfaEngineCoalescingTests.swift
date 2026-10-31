@@ -658,6 +658,42 @@ import Testing
         await scene.close()
     }
 
+    /// An attach counts as taken only once the copy answers it, after saves told later. A wait for the queue that
+    /// began while the copy reads the file must not end on a later save, or a quit would end without the file.
+    @Test @MainActor func waitingForTheQueueWaitsForAnAttachTheCopyIsReading() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let library = MarfaLibrary(source: scene.source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let id = ItemID("note")
+        let reading = Hold()
+        Self.attachHeld(by: reading, in: scene)
+        let file = FileManager.default.temporaryDirectory.appending(path: "map \(UUID().uuidString).png")
+        try Data("map".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let attaching = Task { try await scene.source.embeds.attach(file, to: id) }
+        try #require(await eventually { reading.isHeld }, "the attach never reached the copy")
+        let submitted = Mutex(false)
+        let waiting = Task {
+            await scene.source.queueSubmitted()
+            submitted.withLock { $0 = true }
+        }
+        // The wait runs on the main actor up to its first suspension, which counts the writes told so far: the attach.
+        await Task.yield()
+        library.saveText("Mine", of: id, readAt: ItemVersion(1), failing: "Note")
+        let saved = try await eventuallyAsking {
+            try await scene.copy.queue.all().contains { $0.itemId == "note" && $0.kind == .updateItem }
+        }
+        try #require(saved, "the save was not taken")
+        try await Task.sleep(for: .milliseconds(100)) // Time for a wait that ended on the save to return.
+        #expect(!submitted.withLock { $0 }, "the wait ended while the copy was still taking the file")
+        reading.letGo()
+
+        await waiting.value
+        _ = try await attaching.value
+        await scene.close()
+    }
+
     @Test @MainActor func twoFilesOfOneNameAttachedAtOnceAreNamedApart() async throws {
         let scene = try await Self.open(Self.fake([Self.row("note", title: "Note")]))
         let reading = Hold()

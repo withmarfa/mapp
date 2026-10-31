@@ -159,8 +159,6 @@ actor MarfaEngine {
     var besideTheLane: [UUID: Task<Void, Never>] = [:]
     /// The titles, lowercased, of the files being attached to each item, so two attached at once get different names.
     var attachingTitles: [String: Set<String>] = [:]
-    /// Set while taking a write that the copy finishes beside the lane: it counts as taken when its answer is.
-    var takesWriteLater = false
     var failures: [SourceFailure] = []
     /// The person's latest edit of each item's text, which their next edit of it follows.
     var ownText: [ItemID: OwnText] = [:]
@@ -231,7 +229,7 @@ actor MarfaEngine {
         await apply(event)
         let elapsed = interval.end()
         if event.isWrite {
-            if takesWriteLater { takesWriteLater = false } else { hub.activity.tookWrite() }
+            hub.activity.tookWrite()
         }
         hub.activity.end()
         Telemetry.engineEventTook(kind, elapsed)
@@ -263,12 +261,12 @@ actor MarfaEngine {
             if case .attached(let result, let item, let title, let token, let done) = event {
                 settled(token, attaching: title, to: item)
                 done.resume(returning: result.map { Self.embed(of: $0, title: title) })
-                hub.activity.tookWrite()
+                hub.activity.answeredAside()
             }
             if case .addedFile(let result, _, let token, let done) = event {
                 settled(token)
                 done.resume(returning: result.flatMap(Self.addedID))
-                hub.activity.tookWrite()
+                hub.activity.answeredAside()
             }
             return
         }
