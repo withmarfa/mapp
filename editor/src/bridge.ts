@@ -2,7 +2,8 @@ import type { CaretState, FindState } from './editor'
 import type { HeaderMenu } from './header'
 
 /** An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a.png)`, which the app
- *  matches against the embeds Marfa bound for the note. */
+ *  matches against the embeds Marfa bound for the note. The text is exactly as written (`FileReference.raw`: alias,
+ *  size suffix, escapes, a table cell's `\|`), and the page applies no rule of its own for what an embed names. */
 export type EmbedRequest = { item: string; text: string; export?: boolean }
 
 /** A file an embed names, as the app serves it: `url` and `icon` load through the app's own scheme, and
@@ -17,7 +18,9 @@ export interface EmbeddedFile {
   opens: boolean
 }
 
-/** Why an embed's file can't be shown now, such as a file not yet downloaded while the server can't be reached. */
+/** Why an embed's file can't be shown now, such as a file not yet downloaded while the server can't be reached or
+ *  more than one file having the name. The page shows an error card with the reason; a file that does not exist is
+ *  Inkkit's File Not Found card instead. Neither is ever a broken image. */
 export interface UnavailableFile {
   unavailable: string
 }
@@ -27,6 +30,8 @@ export type EditorMessage =
   | { type: 'error' | 'diagnostic'; message: string }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
+  /** Said once for each `load`, after the browser has drawn the document. The app ends its `item.open` signpost
+   *  there, and drops it with no sample when the page takes another generation first. */
   | { type: 'painted'; generation: number }
   | { type: 'headerScrolledAway'; away: boolean; generation: number }
   | { type: 'contentUnderToolbar'; under: boolean; generation: number }
@@ -52,7 +57,9 @@ export type EditorMessage =
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 
-/** The authored spelling identifies the binding; decoded parts serve navigation and display. */
+/** The authored spelling identifies the binding; decoded parts serve navigation and display. Forward `raw` unchanged
+ *  through opening, resolution and cache identity: Marfa binds each spelling separately, including an alias that
+ *  repeats the name and escaped separators. The page never guesses which note a name means. */
 export interface LinkRef {
   raw: string
   target: string

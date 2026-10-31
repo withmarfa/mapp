@@ -115,7 +115,8 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     /// Each embed in this item's text, in order, with the file item the library bound it to or why it has none.
     var boundEmbeds: [BoundEmbed] = []
     /// What made the item, as the library names it: for a Marfa item, the source of the key that wrote it. Nil
-    /// where the library does not know.
+    /// where the library does not know. An item written in MAPP has one too, so this does not separate captured
+    /// items from the person's own.
     var source: String?
 
     /// The items the links in this item's text were already bound to, by the name each link is spelled with (read

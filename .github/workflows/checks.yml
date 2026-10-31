@@ -5,6 +5,10 @@ name: Checks
 # - A change that touches only views, the String Catalog, assets or UI tests compiles everything
 #   but does not run the unit tests, which cover logic, not styling.
 # - The release build runs beside the unit tests, not after them.
+# - The unit tests run one at a time with a 12 minute limit; a run that reaches it uploads samples of its test host
+#   as the `unit-test-diagnostics` artifact and fails. A failed test fails the check, and nothing is retried.
+# - The UI tests are only built here; they take over the keyboard and mouse, so they run locally before a merge.
+# - Xcode Cloud archives tagged releases only.
 # The final job, "Checks", always runs; make it the one required check.
 on:
   pull_request:

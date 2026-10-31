@@ -139,9 +139,12 @@ nonisolated enum BigLibrary {
     }
 }
 
-/// What moving around the window costs, timed on 650 items (`BigLibrary`). It prints one line per action for
-/// each place, `COST|<place>|<action>|<milliseconds>|<runs>`, and checks only that the data is the size it claims.
-/// Run it with the Measure test plan; the numbers are for a person to read, never a gate.
+/// What moving around the window costs, timed on 650 items (`BigLibrary`), and for Select All in the list and moving
+/// between the table's places on about ten thousand. It prints one line per action for each place,
+/// `COST|<place>|<action>|<milliseconds>|<runs>`, how often each kind of work ran as `COUNT|` lines, and what a
+/// hosted window did as `HOSTED|` lines. It checks only that the data is the size it claims. Run it with the Measure
+/// test plan, which sets `MAPP_MEASURE`; the other plans leave it out. The numbers are for a person to read, never a
+/// gate.
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MAPP_MEASURE"] != nil), .serialized)
 struct NavigationCostTests {

@@ -9,6 +9,7 @@
   --inkkit-rule-color: color-mix(in srgb, CanvasText 14%, transparent);
   --inkkit-code-background: color-mix(in srgb, CanvasText 7%, transparent);
   --inkkit-monospace-font: ui-monospace, 'SF Mono', Menlo, monospace;
+  /* No diagram variable is set here: diagrams draw with Pele and Inkkit's own tokens. */
   /* The header's system colors: the label levels and the separator a pin is drawn in, the placeholder text color,
      red, and the status marks. */
   --label-primary: rgb(0 0 0 / 0.85);
@@ -176,7 +177,9 @@ body {
   background: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
 }
 
-/* A page with no text to write draws no editor, rather than an empty one that takes typing. */
+/* A page with no text to write draws no editor, rather than an empty one that takes typing. An empty one would invite
+   typing that a connector holding the item puts back, and MAPP cannot tell a connector's item from the person's until
+   Marfa marks them read only (marfa issue 2415). */
 body[data-text='none'] #editor {
   display: none;
 }
@@ -253,7 +256,9 @@ body[data-text='none'] #editor {
 }
 
 /* One shape for every pin: a quiet fill with no edge, so a pin and an item chip read as one family, and a symbol
-   in the secondary color. An empty pin has no fill to show, only a dashed edge asking to be filled. */
+   in the secondary color. An empty pin has no fill to show, only a dashed edge asking to be filled. The transparent
+   1 point border keeps the size the same with and without the dashed edge. Every size is on the 4 point grid
+   (`--step`) and scales with the interface text size. */
 .item-pin {
   box-sizing: border-box;
   display: inline-flex;

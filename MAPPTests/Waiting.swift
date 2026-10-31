@@ -10,7 +10,9 @@ nonisolated let waitLimit: Duration = .seconds(60)
 /// The time limit of a suite whose tests await something that may never arrive, such as a WebKit call, an answer from
 /// another process or a task. A hang then fails the test that hangs, by name, and the run goes on, where it would
 /// otherwise hold the whole job to its own limit. It is above `waitLimit`, so that a wait that gives up reports its own
-/// expectation first, and well above the slowest test on a hosted runner.
+/// expectation first, and well above the slowest test on a hosted runner. A test sets no limit of its own. Two kinds
+/// of suite do not carry it: a `Live` suite, whose tests each set a limit that allows for a real server, and
+/// `NavigationCostTests`, which only the Measure plan runs and a person reads.
 extension Trait where Self == TimeLimitTrait {
     nonisolated static var hangLimit: Self { .timeLimit(.minutes(2)) }
 }
