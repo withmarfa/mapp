@@ -87,28 +87,18 @@ struct ReportingTests {
 
         #expect(sink.errors.map(\.operation) == ["quit_between_stages"])
     }
-}
 
-private final class RecordingSink: ReportSink {
-    struct Error: Equatable {
-        var type: String
-        var sentence: String
-        var operation: String
-    }
+    @Test func anUnreadableTimestampSortsAsTheOldestAndIsReportedOnceARun() {
+        let sink = RecordingSink()
+        let reporting = Reporting(sink: sink)
 
-    private let recorded = Mutex<(errors: [Error], logs: [String])>(([], []))
-    var errors: [Error] { recorded.withLock { $0.errors } }
-    var logs: [String] { recorded.withLock { $0.logs } }
+        #expect(MarfaMapping.date("2026-10-06T09:00:00Z", reporting: reporting) > .distantPast)
+        #expect(sink.errors.isEmpty)
+        #expect(MarfaMapping.date("not a time", reporting: reporting) == .distantPast)
+        #expect(MarfaMapping.date("", reporting: reporting) == .distantPast)
 
-    func report(_ error: MarfaError, during operation: StaticString) {
-        recorded.withLock { $0.errors.append(Error(type: error.fixedText.type, sentence: error.fixedText.sentence, operation: "\(operation)")) }
-    }
-
-    func report(type: StaticString, sentence: StaticString, during operation: StaticString) {
-        recorded.withLock { $0.errors.append(Error(type: "\(type)", sentence: "\(sentence)", operation: "\(operation)")) }
-    }
-
-    func log(_ name: StaticString, level: ReportLevel, attributes: KeyValuePairs<StaticString, ReportAttribute>) {
-        recorded.withLock { $0.logs.append("\(name)") }
+        #expect(sink.errors == [
+            .init(type: "timestamp_unreadable", sentence: "A timestamp could not be read, so its item sorts as the oldest.", operation: "map")
+        ])
     }
 }

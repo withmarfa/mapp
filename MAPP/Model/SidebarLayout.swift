@@ -307,18 +307,31 @@ struct SidebarPlan {
 }
 
 /// The layouts a person has made, one for each library, kept in the defaults. A library is named by its server's
-/// address, so each keeps its own.
+/// address, so each keeps its own. Saved layouts that cannot be read, such as ones a later version of the app wrote,
+/// are kept as they are: the sidebar starts from the default, and changes hold only while the app runs.
 @Observable @MainActor
 final class SidebarLayouts {
     private static let defaultsKey = "sidebarLayouts"
 
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let keepsChanges: Bool
     private var layouts: [String: SidebarLayout]
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, reporting: Reporting = .shared) {
         self.defaults = defaults
-        layouts = defaults.data(forKey: Self.defaultsKey)
-            .flatMap { try? JSONDecoder().decode([String: SidebarLayout].self, from: $0) } ?? [:]
+        guard let saved = defaults.data(forKey: Self.defaultsKey) else {
+            layouts = [:]
+            keepsChanges = true
+            return
+        }
+        do {
+            layouts = try JSONDecoder().decode([String: SidebarLayout].self, from: saved)
+            keepsChanges = true
+        } catch {
+            layouts = [:]
+            keepsChanges = false
+            Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
+        }
     }
 
     func layout(for library: String) -> SidebarLayout { layouts[library] ?? SidebarLayout() }
@@ -328,6 +341,7 @@ final class SidebarLayouts {
         change(&layout)
         guard layout != self.layout(for: library) else { return }
         layouts[library] = layout
-        defaults.set(try? JSONEncoder().encode(layouts), forKey: Self.defaultsKey)
+        guard keepsChanges, let data = try? JSONEncoder().encode(layouts) else { return }
+        defaults.set(data, forKey: Self.defaultsKey)
     }
 }

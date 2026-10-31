@@ -503,4 +503,20 @@ struct SidebarTests {
         defaults.set(Data("not json".utf8), forKey: "sidebarLayouts")
         #expect(SidebarLayouts(defaults: defaults).layout(for: "any") == SidebarLayout())
     }
+
+    @Test func aChangeNeverWritesOverAStoredLayoutThatCannotBeRead() {
+        let defaults = UserDefaults(suiteName: "SidebarTests.unreadableKept")!
+        defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept")
+        defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept") }
+        let stored = Data(#"{"marfa:one":{"hidden":7}}"#.utf8)
+        defaults.set(stored, forKey: "sidebarLayouts")
+        let sink = RecordingSink()
+
+        let layouts = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: sink))
+        layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
+
+        #expect(layouts.layout(for: "marfa:one").isCollapsed(.types), "the change holds while the app runs")
+        #expect(defaults.data(forKey: "sidebarLayouts") == stored, "what could not be read is kept as it was")
+        #expect(sink.errors.map(\.type) == ["sidebar_layouts_unreadable"])
+    }
 }
