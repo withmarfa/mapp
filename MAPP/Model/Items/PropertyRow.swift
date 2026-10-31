@@ -52,9 +52,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     let id: String
     let label: String
     let value: Value
-    /// Whether the row shows the main entry of a list (`ListShape`), which is why a plain text value in it may be a
-    /// number to call.
-    var fromList = false
+    /// The number to call the main entry of a list holds, where its list can hold one (`ListShape.numberToCall`).
+    var numberToCall: String?
 
     /// How many rows show before "Show N more".
     static let foldAfter = 6
@@ -87,7 +86,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: .status)) }
                 if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
             } else if placement.showsOnPage(field.key), let value = value(of: field, in: item) {
-                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value, fromList: field.kind.isList))
+                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value, numberToCall: numberToCall(of: field, in: item)))
             }
         }
         if parent, placement.showsOnPage(parentField), !rows.contains(where: { $0.value == .parent }) {
@@ -112,6 +111,12 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     private static func parentRow(_ relationships: [ItemRelationship], _ field: String) -> PropertyRow {
         let label = relationships.first { $0.field == field }?.label ?? String(localized: "Parent")
         return PropertyRow(id: field, label: ItemTypeInfo.Field.displayLabel(label), value: .parent)
+    }
+
+    /// The number to call a list field's main entry holds, or nil.
+    static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
+        guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
+        return shape.numberToCall(in: main)
     }
 
     /// The value a field's row draws, or nil where the field has none or holds something a row does not show.

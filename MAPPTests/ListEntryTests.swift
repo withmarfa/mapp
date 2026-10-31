@@ -118,6 +118,39 @@ struct ListEntryTests {
         #expect(shape.accepts(Self.entry(["value": .string("a@example.com")])))
         #expect(!shape.accepts(Self.entry(["nope": .string("a")])))
         #expect(!shape.accepts(.string("a")))
+        // Marfa refuses a stored entry that lacks a required member, so the app does not take it either.
+        #expect(!shape.accepts(Self.entry(["label": .string("work")])))
+    }
+
+    @Test func aMemberTheListDoesNotDeclareIsRefusedByName() throws {
+        let shape = try Self.shape(Self.emails)
+        let refusal = try #require(shape.refusal(of: ["value": .string("a@example.com"), "kind": .string("x")]))
+        #expect(refusal.contains("kind"))
+    }
+
+    @Test func anEntryBeingAddedIsRefusedForABadValueButNotForWhatIsNotYetFilledIn() throws {
+        let scores = try Self.shape(Self.scores)
+        #expect(scores.refusal(of: [:], ignoringMissingRequired: true) == nil)
+        #expect(scores.refusal(of: ["points": .number(9)], ignoringMissingRequired: true) == "Enter a whole number from 1 to 5.")
+        let emails = try Self.shape(Self.emails)
+        #expect(emails.refusal(of: ["label": .string("work")], ignoringMissingRequired: true) == nil)
+        #expect(emails.refusal(of: ["label": .string("work")]) != nil)
+    }
+
+    @Test func aStoredListMarfaRefusesIsCountedAndFlagged() throws {
+        let shape = try Self.shape(Self.emails)
+        let good = Self.entry(["value": .string("a@example.com")])
+        #expect(shape.faults(in: [good]) == 0)
+        #expect(shape.faults(in: [good, .string("b@example.com")]) == 1)
+        #expect(shape.faults(in: [Self.entry(["value": .string("a@example.com"), "kind": .string("x"), "extra": .bool(true)])]) == 2)
+        #expect(shape.faults(in: [Self.entry(["label": .string("work")])]) == 1)
+        #expect(shape.fault(of: .string("b@example.com")) != nil)
+        #expect(shape.fault(of: good) == nil)
+        // The row's "Unrecognized value" check reads the field's acceptance.
+        let field = try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [Self.emails])).fields.first)
+        #expect(field.accepts(.array([good])))
+        #expect(!field.accepts(.array([good, .string("b@example.com")])))
+        #expect(!field.accepts(.array([Self.entry(["value": .string("a@example.com"), "kind": .string("x")])])))
     }
 
     @Test func aNumberMemberRefusesWhatIsOutOfRange() throws {
@@ -158,16 +191,17 @@ struct ListEntryTests {
 
     // MARK: Reading
 
-    @Test func anEntryIsSummarisedByItsContentThenItsQualifiers() throws {
+    @Test func anEntryIsSummarisedByItsMembersInDeclaredOrder() throws {
         let emails = try Self.shape(Self.emails)
-        #expect(emails.summary(of: ["value": .string("a@example.com"), "label": .string("work")]) == "a@example.com (work)")
+        #expect(emails.summary(of: ["value": .string("a@example.com"), "label": .string("work")]) == "a@example.com, work")
         let attendees = try Self.shape(Self.attendees)
-        // A name, or the email where there is none; the response follows.
-        #expect(attendees.summary(of: ["name": .string("Ruth"), "email": .string("r@example.com"), "response": .string("accepted")]) == "Ruth (Accepted)")
+        // A choice reads by its label; no member is set apart by its name.
+        #expect(attendees.summary(of: ["name": .string("Ruth"), "email": .string("r@example.com"), "response": .string("accepted")])
+                == "Ruth, r@example.com, Accepted")
         #expect(attendees.summary(of: ["email": .string("r@example.com")]) == "r@example.com")
         let addresses = try Self.shape(Self.addresses)
         #expect(addresses.summary(of: ["label": .string("home"), "street_address": .string("1 High Street"), "locality": .string("London")])
-                == "1 High Street, London (home)")
+                == "home, 1 High Street, London")
     }
 
     @Test func aTableCellShowsTheMainEntryAndHowManyMore() throws {
@@ -198,7 +232,30 @@ struct ListEntryTests {
         let rows = lead.refine(PropertyRow.rows(
             of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
         #expect(rows.map(\.id) == ["emails", "phones", "addresses"])
-        #expect(rows.map(\.value) == [.email("main@example.com"), .phone("+44 20 7946 0000"), .text("1 High Street, London (home)")])
+        #expect(rows.map(\.value) == [.email("main@example.com"), .phone("+44 20 7946 0000"), .text("home, 1 High Street, London")])
+    }
+
+    @Test func aLabelledNumberIsStillANumberToCall() {
+        let item = Self.personItem(["phones": .array([Self.entry(["value": .string("+44 20 7946 0000"), "label": .string("work")])])])
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
+        let rows = lead.refine(PropertyRow.rows(
+            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
+        #expect(rows.map(\.value) == [.phone("+44 20 7946 0000")])
+    }
+
+    @Test func anAddressOfOnlyAPostcodeIsNeverANumberToCall() throws {
+        let postcodes = Self.listField("addresses", ["label": ["type": "string"], "postal_code": ["type": "string"]])
+        let person = MarfaMapping.itemType(ItemType(
+            id: "core.entity.person", label: "Person", fields: [TypeField(name: "title", type: "string", declaredBy: "core.entity"), postcodes],
+            titleField: "title"))
+        let item = Self.personItem(["addresses": .array([Self.entry(["postal_code": .string("90210 12345")])])])
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
+        let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
+        #expect(rows.map(\.value) == [.text("90210 12345")])
+        // Only a list whose first member is required plain text holds a number to call, and only in that member.
+        #expect(try Self.shape(postcodes).numberToCall(in: ["postal_code": .string("90210 12345")]) == nil)
+        #expect(try Self.shape(Self.phones).numberToCall(in: ["value": .string("Reception"), "label": .string("0207 946 0000")]) == nil)
+        #expect(try Self.shape(Self.emails).numberToCall(in: ["value": .string("12345@example.com")]) == nil)
     }
 
     @Test func aPersonWithNoEntriesHasNoRows() {
@@ -208,8 +265,8 @@ struct ListEntryTests {
     }
 
     @Test func aDialableNumberIsToldFromOtherText() {
-        for text in ["+44 20 7946 0000", "(555) 010-0199", "020.7946.0000"] { #expect(PageHeaderLead.isDialable(text), "\(text)") }
-        for text in ["1 High Street", "a@example.com", "12", "Room 4B 12345", "https://example.com/12345"] { #expect(!PageHeaderLead.isDialable(text), "\(text)") }
+        for text in ["+44 20 7946 0000", "(555) 010-0199", "020.7946.0000"] { #expect(ListShape.isDialable(text), "\(text)") }
+        for text in ["1 High Street", "a@example.com", "12", "Room 4B 12345", "https://example.com/12345"] { #expect(!ListShape.isDialable(text), "\(text)") }
     }
 
     // MARK: Media

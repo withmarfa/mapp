@@ -82,22 +82,14 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
     private init() {}
 
     /// The rows of the property block with the kind's own readings of them: a person's number to call is a link, not
-    /// text. Marfa declares no phone format, so a list entry's text reads as a number to call by what it holds, never by
-    /// the name of the field that holds it.
+    /// text. Which list entry holds a number to call is read from the list's definition (`ListShape.numberToCall`),
+    /// never from the name of the field that holds it.
     func refine(_ rows: [PropertyRow]) -> [PropertyRow] {
         guard kind == .person else { return rows }
         return rows.map { row in
-            guard row.fromList, case .text(let text) = row.value, Self.isDialable(text) else { return row }
-            return PropertyRow(id: row.id, label: row.label, value: .phone(text), fromList: true)
+            guard let number = row.numberToCall else { return row }
+            return PropertyRow(id: row.id, label: row.label, value: .phone(number), numberToCall: number)
         }
-    }
-
-    /// Whether the text is a telephone number as people write one: digits, with a leading plus, spaces, brackets,
-    /// dots and dashes between them, and at least five digits.
-    static func isDialable(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard trimmed.filter(\.isNumber).count >= 5, let first = trimmed.first, first == "+" || first == "(" || first.isNumber else { return false }
-        return trimmed.allSatisfy { $0.isNumber || " +()-.".contains($0) }
     }
 }
 

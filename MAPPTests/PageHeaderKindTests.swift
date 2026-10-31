@@ -86,18 +86,16 @@ struct PageHeaderKindTests {
         #expect(named.subtitle == "Okonjo Press")
     }
 
-    @Test func aNumberInAListEntryIsANumberToCallWhateverTheFieldIsCalled() {
+    @Test func aPersonsNumberToCallIsALinkWhateverTheFieldIsCalled() {
         let item = Self.item("core.entity.person", title: "Ruth Okonjo", [:])
         let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
         let rows = [
-            PropertyRow(id: "mobiles", label: "Mobiles", value: .text("+44 20 7946 0000"), fromList: true),
-            PropertyRow(id: "mail", label: "Mail", value: .email("a@example.com"), fromList: true),
-            PropertyRow(id: "address", label: "Address", value: .text("1 High Street, London"), fromList: true),
-            // Not from a list: a key called "phone" is no longer taken for a number.
+            PropertyRow(id: "mobiles", label: "Mobiles", value: .text("+44 20 7946 0000, work"), numberToCall: "+44 20 7946 0000"),
+            PropertyRow(id: "mail", label: "Mail", value: .email("a@example.com")),
+            // A key called "phone" is not taken for a number: only what the list's definition allows is.
             PropertyRow(id: "phone", label: "Phone", value: .text("+44 20 7946 0000")),
         ]
-        #expect(lead.refine(rows).map(\.value) == [
-            .phone("+44 20 7946 0000"), .email("a@example.com"), .text("1 High Street, London"), .text("+44 20 7946 0000")])
+        #expect(lead.refine(rows).map(\.value) == [.phone("+44 20 7946 0000"), .email("a@example.com"), .text("+44 20 7946 0000")])
         let general = PageHeaderLead(for: item, kind: .general, body: nil, now: .now)
         #expect(general.refine(rows) == rows)
     }

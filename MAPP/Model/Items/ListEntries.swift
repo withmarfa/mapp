@@ -50,12 +50,6 @@ nonisolated struct ListShape: Hashable, Sendable {
         var id: String { key }
         var label: String { ItemTypeInfo.Field.displayLabel(MarfaMapping.label(forField: key)) }
 
-        /// A member that tells entries apart rather than being their content, such as a label or a response.
-        var isQualifier: Bool {
-            if case .choice = kind { return true }
-            return key == ListShape.labelKey
-        }
-
         /// Whether the value is a value of this member.
         func accepts(_ value: PropertyValue) -> Bool {
             switch (kind, value) {
@@ -69,28 +63,27 @@ nonisolated struct ListShape: Hashable, Sendable {
         }
     }
 
-    /// The member Marfa's own lists use for a name an entry goes by ("work", "home").
-    static let labelKey = "label"
-
     /// The members, in the order the type declares them.
     let members: [Member]
 
     func member(_ key: String) -> Member? { members.first { $0.key == key } }
 
-    /// Whether `entry` is an entry of this list: an object with at least one member, only members the list declares,
-    /// and a value each member takes.
-    func accepts(_ entry: PropertyValue) -> Bool {
-        guard case .object(let fields) = entry, !fields.isEmpty else { return false }
-        return fields.allSatisfy { key, value in member(key)?.accepts(value) == true }
-    }
+    /// Whether `entry` is an entry Marfa takes for this list: an object with at least one member, only members the
+    /// list declares, a value each member takes, and every required member.
+    func accepts(_ entry: PropertyValue) -> Bool { faults(in: [entry]) == 0 }
 
-    /// Why `entry` cannot be written, or nil where it can: a required member is missing, a member is out of range, or
-    /// the entry has no member at all.
-    func refusal(of entry: [String: PropertyValue]) -> String? {
-        if entry.isEmpty { return String(localized: "An entry needs at least one value.") }
+    /// Why `entry` cannot be written, or nil where it can: it has no member at all, holds a member the list does not
+    /// declare, lacks a required member, or holds a value its member does not take. `ignoringMissingRequired` passes
+    /// an entry whose only fault is a required member not yet filled in, as an entry being added is while the person
+    /// works through it.
+    func refusal(of entry: [String: PropertyValue], ignoringMissingRequired: Bool = false) -> String? {
+        if entry.isEmpty { return ignoringMissingRequired ? nil : String(localized: "An entry needs at least one value.") }
+        if let undeclared = entry.keys.sorted().first(where: { member($0) == nil }) {
+            return String(localized: "“\(undeclared)” isn’t part of this list. Remove it to save the list.")
+        }
         for member in members {
             guard let value = entry[member.key] else {
-                if member.required { return String(localized: "\(member.label) is required.") }
+                if member.required, !ignoringMissingRequired { return String(localized: "\(member.label) is required.") }
                 continue
             }
             if !member.accepts(value) {
@@ -101,33 +94,45 @@ nonisolated struct ListShape: Hashable, Sendable {
         return nil
     }
 
-    /// The words that stand for an entry in a row or a table cell: its descriptive members joined, or its identifying
-    /// ones (an address that names no one) where it has none, then its qualifiers in brackets.
-    func summary(of entry: [String: PropertyValue]) -> String {
-        func text(_ member: Member) -> String? {
-            guard let value = entry[member.key] else { return nil }
-            let shown: String
-            switch value {
-            case .string(let string):
-                if case .choice = member.kind { shown = ItemTypeInfo.Field.label(ofOption: string) } else { shown = string }
-            case .number(let number): shown = PropertyNumber.editing(number)
-            case .bool(let flag): shown = flag ? String(localized: "Yes") : String(localized: "No")
-            default: return nil
+    /// How many faults the entries hold that Marfa refuses the whole list for (`types/array-entries-refused`): an
+    /// entry that is not an object or is empty, a member the list does not declare, a value its member does not take,
+    /// and a required member missing. Zero for a list Marfa takes.
+    func faults(in entries: [PropertyValue]) -> Int {
+        entries.reduce(0) { count, entry in
+            guard let fields = ListEntries.object(entry) else { return count + 1 }
+            var faults = (fields.isEmpty ? 1 : 0) + fields.keys.filter { member($0) == nil }.count
+            for member in members {
+                if let value = fields[member.key] { faults += member.accepts(value) ? 0 : 1 } else if member.required { faults += 1 }
             }
-            let trimmed = shown.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
+            return count + faults
         }
-        let content = members.filter { !$0.isQualifier }
-        let isIdentifier: (Member) -> Bool = {
-            if case .text(let format) = $0.kind { format != nil } else { false }
+    }
+
+    /// Why one stored entry cannot be written as it is, or nil where it can.
+    func fault(of entry: PropertyValue) -> String? {
+        guard let fields = ListEntries.object(entry) else { return String(localized: "This entry isn’t in a form this list takes. Remove it to save the list.") }
+        return refusal(of: fields)
+    }
+
+    /// A member's value as an entry's summary shows it, or nil where it shows nothing.
+    func text(of member: Member, in entry: [String: PropertyValue]) -> String? {
+        guard let value = entry[member.key] else { return nil }
+        let shown: String
+        switch value {
+        case .string(let string):
+            if case .choice = member.kind { shown = ItemTypeInfo.Field.label(ofOption: string) } else { shown = string }
+        case .number(let number): shown = PropertyNumber.editing(number)
+        case .bool(let flag): shown = flag ? String(localized: "Yes") : String(localized: "No")
+        default: return nil
         }
-        let descriptive = content.filter { !isIdentifier($0) }.compactMap(text)
-        let main = descriptive.isEmpty ? content.compactMap(text) : descriptive
-        let qualifiers = members.filter(\.isQualifier).compactMap(text)
-        let head = main.joined(separator: ", ")
-        guard !qualifiers.isEmpty else { return head }
-        let tail = "(" + qualifiers.joined(separator: ", ") + ")"
-        return head.isEmpty ? tail : head + " " + tail
+        let trimmed = shown.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The words that stand for an entry in a row or a table cell: its members' values in the order the type declares
+    /// them. No member is treated apart by its name.
+    func summary(of entry: [String: PropertyValue]) -> String {
+        members.compactMap { text(of: $0, in: entry) }.joined(separator: ", ")
     }
 
     /// What a table cell holds: the main entry's summary, and how many more the list has ("ann@x.com +2").
@@ -138,16 +143,35 @@ nonisolated struct ListShape: Hashable, Sendable {
         return entries.count > 1 ? head + " +\(entries.count - 1)" : head
     }
 
-    /// How a page row shows an entry: its first identifying member as a link where that is an address, else the whole
-    /// summary as text. Nil where the entry has nothing to show.
+    /// How a page row shows an entry: its first member that holds a value, as a link where that member is an email
+    /// or web address, else the whole summary as text. Nil where the entry has nothing to show.
     func rowValue(of entry: [String: PropertyValue]) -> PropertyRow.Value? {
         let summary = summary(of: entry)
         guard !summary.isEmpty else { return nil }
-        let first = members.first { !$0.isQualifier && entry[$0.key]?.string?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
-        if let first, case .text(let format?) = first.kind, let text = entry[first.key]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        if let first = members.first(where: { text(of: $0, in: entry) != nil }), case .text(let format?) = first.kind,
+           let text = text(of: first, in: entry) {
             return format == .email ? .email(text) : .url(text)
         }
         return .text(summary)
+    }
+
+    /// The number to call an entry holds, or nil. Marfa declares no phone format, so this reads the definition: only
+    /// a list whose first declared member is required plain text (an entry is that value first, labelled after) can
+    /// hold one, and only that member's own text is read. A list whose members are all optional, such as an address,
+    /// never does, whatever its postcode looks like. A `phone` format in Marfa would settle this.
+    func numberToCall(in entry: [String: PropertyValue]) -> String? {
+        guard let first = members.first, first.required, case .text(nil) = first.kind,
+              let text = entry[first.key]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              Self.isDialable(text) else { return nil }
+        return text
+    }
+
+    /// Whether the text is a telephone number as people write one: digits, with a leading plus, spaces, brackets,
+    /// dots and dashes between them, and at least five digits.
+    static func isDialable(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard trimmed.filter(\.isNumber).count >= 5, let first = trimmed.first, first == "+" || first == "(" || first.isNumber else { return false }
+        return trimmed.allSatisfy { $0.isNumber || " +()-.".contains($0) }
     }
 
     /// The text a member of an entry is edited as.
