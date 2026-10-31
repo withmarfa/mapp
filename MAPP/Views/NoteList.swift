@@ -89,7 +89,7 @@ struct NoteList: View, Equatable {
         }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
-            browser.keepSelection(from: old, to: new)
+            browser.keepSelection(from: old, to: new, isPending: browser.searchResults(in: library)?.isPending == true)
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             NoteActions(ids: ids, undoManager: undoManager)

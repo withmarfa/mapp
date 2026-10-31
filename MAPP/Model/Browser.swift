@@ -480,10 +480,22 @@ final class Browser {
     }
 
     /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
-    func keepSelection(from old: [ItemID], to new: [ItemID]) {
-        let kept = Self.selection(selection, keptFrom: old, in: new)
+    ///
+    /// A search not yet answered shows nothing, which says nothing about the selection: it is held, and the answer is
+    /// compared with the list as it stood before the search.
+    func keepSelection(from old: [ItemID], to new: [ItemID], isPending: Bool = false) {
+        if isPending {
+            listBeforePendingSearch = listBeforePendingSearch ?? old
+            return
+        }
+        let before = listBeforePendingSearch ?? old
+        listBeforePendingSearch = nil
+        let kept = Self.selection(selection, keptFrom: before, in: new)
         if kept != selection { selectAutomatically(kept) }
     }
+
+    /// The list a search that has not yet answered replaced, for the answer to be compared with.
+    @ObservationIgnored private var listBeforePendingSearch: [ItemID]?
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
     /// it selected or searched named items the new library may not have, and the window's undo
