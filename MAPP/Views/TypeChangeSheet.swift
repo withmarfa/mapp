@@ -98,7 +98,7 @@ struct TypeChangeSheet: View {
             let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let field = selected.flatMap({ library.catalogue.itemTypes[$0] })?.fields.first(where: { $0.key == key }) else { continue }
             let value: PropertyValue? = switch field.kind {
-            case .number: Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")).map(PropertyValue.number)
+            case .number: PropertyNumber.parse(text, integer: field.isInteger).map(PropertyValue.number)
             default: text.isEmpty ? nil : .string(text)
             }
             filling[key] = value

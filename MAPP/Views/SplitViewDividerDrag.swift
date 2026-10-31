@@ -46,7 +46,7 @@ final class DividerDragView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        observation = nil
+        stopObserving()
         guard window != nil, let split = enclosingSplitView else { return }
         isPlacementPending = true
         // Next turn of the run loop: the split view has had its first layout by then.
@@ -65,6 +65,14 @@ final class DividerDragView: NSView {
             }
         }
     }
+
+    /// A block observer stays registered until it is removed; letting go of its token does not remove it.
+    private func stopObserving() {
+        if let observation { NotificationCenter.default.removeObserver(observation) }
+        observation = nil
+    }
+
+    isolated deinit { stopObserving() }
 
     /// Sets the dividers to the wanted widths, once per split view. It waits for a layout with room to place them in,
     /// and never moves a divider the person is dragging.

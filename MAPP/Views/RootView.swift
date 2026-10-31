@@ -19,6 +19,7 @@ struct RootView: View {
         // Settings reads the library too, so it is given to both.
         .environment(\.library, libraries.current)
         .focusedSceneValue(\.browser, browser)
+        .registersMainWindow(browser, with: settingsRequest)
         .onAppear {
             LaunchTrace.shared.mark(.windowShown)
             if settingsRequest.isPending {

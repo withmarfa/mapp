@@ -9,13 +9,12 @@ import UniformTypeIdentifiers
 
     @discardableResult
     private func file(
-        _ title: String, type: UTType?, kind: String? = nil, attachedTo host: ItemID? = nil, state: ItemState = .active,
+        _ title: String, type: UTType?, attachedTo host: ItemID? = nil, state: ItemState = .active,
         typeID: String = "core.file", created: Date = .now
     ) -> Item {
         let id = ItemID.mint()
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
-            properties: kind.map { [Property(key: ItemPageLayout.resourceKindField, value: .string($0))] } ?? [],
             content: type.map { .file($0, byteCount: 10) } ?? .file(.data, byteCount: 10), state: state,
             version: ItemVersion(1), created: created, modified: created,
             edgesOut: host.map {
@@ -45,31 +44,46 @@ import UniformTypeIdentifiers
         #expect(library.pageLayout(of: page) == .webPage(document: page.id, runsScripts: true))
     }
 
-    @Test func anItemWithAnHTMLDocumentAttachedOpensToIt() {
-        let article = library.add("An article\n")
-        file("cover.png", type: .png, kind: "image", attachedTo: article.id)
-        let older = file("article.html", type: .html, kind: "html", attachedTo: article.id, created: .now - 60)
-        file("again.html", type: .html, kind: "html", attachedTo: article.id)
+    /// An item to read: a type under `core.media`, which the page treats as something to read.
+    private func article(_ title: String = "An article") -> Item {
+        let media = TypeID("core.media")
+        library.catalogue.itemTypes[media] = ItemTypeInfo(id: media, label: "Media", fields: [], titleField: nil, bodyField: nil, parent: nil)
+        let id = ItemID.mint()
+        let item = Item(
+            id: id, type: media, title: title, titleRule: .property("title"), version: ItemVersion(1), created: .now, modified: .now)
+        library.items.append(item)
+        return item
+    }
+
+    @Test func anItemToReadWithAnHTMLDocumentAttachedOpensToIt() {
+        let article = article()
+        file("cover.png", type: .png, attachedTo: article.id)
+        let older = file("article.html", type: .html, attachedTo: article.id, created: .now - 60)
+        file("again.html", type: .html, attachedTo: article.id)
 
         #expect(library.pageLayout(of: article) == .webPage(document: older.id, runsScripts: false))
     }
 
-    @Test func anItemWithoutOneOpensToItsText() {
-        let plain = library.add("A note\n")
-        let binned = library.add("Binned document\n")
-        file("article.html", type: .html, kind: "html", attachedTo: binned.id, state: .trashed)
-        let unmarked = library.add("Unmarked document\n")
-        file("article.html", type: .html, attachedTo: unmarked.id)
+    @Test func aDocumentIsFoundByItsContentTypeNotByAnyConnectorsField() {
+        let article = article()
+        let untyped = file("saved.htm", type: nil, attachedTo: article.id)
 
-        #expect(library.pageLayout(of: plain) == .text)
-        #expect(library.pageLayout(of: binned) == .text, "a document in the bin does not count")
-        #expect(library.pageLayout(of: unmarked) == .text, "only a resource kind of html counts")
+        #expect(library.pageLayout(of: article) == .webPage(document: untyped.id, runsScripts: false))
     }
 
-    @Test func aDocumentMarkedHTMLThatIsNotHTMLIsNotShown() {
-        let article = library.add("An article\n")
-        file("article.pdf", type: .pdf, kind: "html", attachedTo: article.id)
+    @Test func anyOtherItemKeepsItsTextWhateverIsAttached() {
+        let note = library.add("A note\n")
+        file("page.html", type: .html, attachedTo: note.id)
+        let binned = article("Binned document")
+        file("article.html", type: .html, attachedTo: binned.id, state: .trashed)
+        let pictured = article("Pictured")
+        file("cover.png", type: .png, attachedTo: pictured.id)
+        let unknown = article("Unknown file")
+        file("blob", type: nil, attachedTo: unknown.id)
 
-        #expect(library.pageLayout(of: article) == .text, "the page would only say the file isn't an HTML page")
+        #expect(library.pageLayout(of: note) == .text, "an attachment never hides a note's text")
+        #expect(library.pageLayout(of: binned) == .text, "a document in the bin does not count")
+        #expect(library.pageLayout(of: pictured) == .text)
+        #expect(library.pageLayout(of: unknown) == .text, "a file of unknown type is not taken for HTML")
     }
 }

@@ -202,7 +202,7 @@ struct CommandPalette: View {
         let everything = browser.selectedItems(in: library)
         let selected = everything.filter { !$0.isFile }
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
-        let hasVisibleEditor = !browser.showsCollection && !browser.showsSidebarIndex && one?.id == editor.noteID && editor.hasNote
+        let hasVisibleEditor = browser.showsPage && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, action: action))
@@ -360,7 +360,7 @@ struct CommandPalette: View {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
-            add(String(localized: "Delete Note"), "trash") {
+            add(String(localized: "Delete"), "trash") {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
         }

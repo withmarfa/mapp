@@ -512,7 +512,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let undo = UndoManager()
         library.delete([F.n1, F.n3], undoManager: undo)
         #expect(source.writes == [.transition(F.n1, .trashed)])
-        #expect(undo.undoActionName == String(localized: "Delete Note"))
+        #expect(undo.undoActionName == String(localized: "Delete Item"))
         undo.undo()
         #expect(source.writes.last == .transition(F.n1, .active))
         source.clearWrites()

@@ -11,9 +11,9 @@ nonisolated enum Format: CaseIterable, Hashable {
 
     var title: LocalizedStringResource {
         switch self {
-        case .title: "Title"
-        case .heading: "Heading"
-        case .subheading: "Subheading"
+        case .title: "Heading 1"
+        case .heading: "Heading 2"
+        case .subheading: "Heading 3"
         case .body: "Body"
         case .bold: "Bold"
         case .italic: "Italic"

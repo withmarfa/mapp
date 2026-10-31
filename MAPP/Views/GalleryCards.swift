@@ -17,7 +17,7 @@ enum GalleryKind: Equatable {
         let info = library.catalogue.itemTypes[item.type]
         if let field = info?.statusField, let value = ItemPageHeader.statusValue(of: item, in: field) {
             return .task(GalleryStatus(
-                label: ItemPageHeader.localized(ItemTypeInfo.Field.label(ofOption: value)), mark: PageHeader.Mark(status: value)))
+                label: ItemTypeInfo.Field.label(ofOption: value), mark: PageHeader.Mark(status: value)))
         }
         if let date = startDate(of: item, info: info, in: library) { return .event(GalleryEventDate(date: date)) }
         return .note

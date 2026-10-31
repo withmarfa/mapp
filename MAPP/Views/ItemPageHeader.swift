@@ -103,7 +103,7 @@ struct ItemPageHeader: ViewModifier {
             status: status.map { field in
                 let value = Self.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
-                return PageHeader.Pin(label: value.map { Self.localized(ItemTypeInfo.Field.label(ofOption: $0)) } ?? String(localized: "Status"),
+                return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? String(localized: "Status"),
                                       enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(status: value))
             },
             parent: parent.map {
@@ -158,7 +158,7 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 let menu = NSMenu()
                 for choice in Self.statusChoices(of: item, in: status) {
-                    let entry = actionItem(Self.localized(ItemTypeInfo.Field.label(ofOption: choice))) {
+                    let entry = actionItem(ItemTypeInfo.Field.label(ofOption: choice)) {
                         drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
                     }
                     entry.state = Self.statusValue(of: item, in: status) == choice ? .on : .off

@@ -184,6 +184,9 @@ final class Browser {
     var item: SidebarItem { sidebarItem ?? .allNotes }
     var showsSidebarIndex: Bool { !showsSettings && (item == .sources || item == .collections) }
     var canSearchList: Bool { !showsSettings }
+    /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
+    /// stays mounted behind the others, so every command that acts on the page asks this first.
+    var showsPage: Bool { !showsCollection && !showsSidebarIndex && !showsSettings }
 
     /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
     func showSettings(_ page: SettingsPage? = nil) {

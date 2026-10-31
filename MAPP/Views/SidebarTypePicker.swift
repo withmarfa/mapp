@@ -12,7 +12,7 @@ struct SidebarTypePicker: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(SidebarPlan(library, layout: libraries.sidebarLayout).types) { node in
-                        typeToggle(node)
+                        TypeToggleRow(node: node)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -28,9 +28,16 @@ struct SidebarTypePicker: View {
         .padding(16)
         .frame(width: 280)
     }
+}
 
-    private func typeToggle(_ node: TypeNode, parentHidden: Bool = false) -> AnyView {
-        AnyView(VStack(alignment: .leading, spacing: 10) {
+/// A type's switch and, indented under it, its subtypes'. A hidden type dims the switches below it.
+private struct TypeToggleRow: View {
+    @Environment(Libraries.self) private var libraries
+    let node: TypeNode
+    var parentHidden = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Toggle(isOn: Binding {
                 !libraries.sidebarLayout.isHidden(.type(node.id))
             } set: { shown in
@@ -41,9 +48,9 @@ struct SidebarTypePicker: View {
             .toggleStyle(.checkbox)
             .disabled(parentHidden)
             ForEach(node.children) { child in
-                typeToggle(child, parentHidden: parentHidden || libraries.sidebarLayout.isHidden(.type(node.id)))
+                TypeToggleRow(node: child, parentHidden: parentHidden || libraries.sidebarLayout.isHidden(.type(node.id)))
                     .padding(.leading, 16)
             }
-        })
+        }
     }
 }

@@ -151,7 +151,7 @@ nonisolated enum MarfaMapping {
         ItemTypeInfo.Field(
             key: field.name, label: label(forField: field.name), kind: kind(of: field),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
-            format: format(of: field))
+            format: format(of: field), isInteger: field.type == "integer")
     }
 
     /// A field is a web or mail address when its kind says so or, as a text field's `format` refines it, when its

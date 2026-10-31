@@ -6,13 +6,6 @@ struct FormatCommands: Commands {
     @FocusedValue(\.editor) private var editor
 
     var body: some Commands {
-        // Where Notes keeps Attach File, after the pasteboard's commands.
-        CommandGroup(after: .pasteboard) {
-            Button("Add Attachment…", systemImage: "paperclip") { editor?.isChoosingImages = true }
-                .keyboardShortcut("a", modifiers: [.command, .shift])
-                .disabled(editor?.hasNote != true || editor?.isEditable != true)
-        }
-
         CommandMenu("Format") {
             section([.title, .heading, .subheading, .body])
             Divider()

@@ -42,15 +42,15 @@ extension ItemPropertyDraft {
 
     /// What committing the draft does for a field of this kind, given the text the item holds now. A draft over a
     /// value that changed since it began is held back unless the person chose to overwrite it.
-    func commit(as kind: ItemTypeInfo.Field.Kind, current: String, overwriting: Bool = false) -> PropertyCommit {
+    func commit(
+        as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, overwriting: Bool = false, locale: Locale = .current
+    ) -> PropertyCommit {
         guard isDirty else { return .unchanged }
         if text == current || text == base { return .alreadyCurrent }
         if !overwriting, conflicts(with: current) { return .conflict }
         if text.isEmpty { return .write(nil) }
         if case .number = kind {
-            let scanner = Scanner(string: text)
-            scanner.locale = Locale(identifier: "en_US_POSIX")
-            guard let number = scanner.scanDecimal(), scanner.isAtEnd, !number.isNaN else { return .invalid }
+            guard let number = PropertyNumber.parse(text, integer: integer, locale: locale) else { return .invalid }
             return .write(.number(number))
         }
         return .write(.string(text))
@@ -59,10 +59,12 @@ extension ItemPropertyDraft {
     /// What the person typed that a row leaving the screen would lose: a draft that cannot be written, and that nothing
     /// else keeps. Nil where leaving loses nothing, because the text is written, is already the item's, or was never
     /// typed.
-    func loss(as kind: ItemTypeInfo.Field.Kind, current: String, isEditable: Bool) -> PropertyLoss? {
+    func loss(
+        as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, isEditable: Bool, locale: Locale = .current
+    ) -> PropertyLoss? {
         guard isDirty, text != current, text != base else { return nil }
         guard isEditable else { return .notEditable }
-        switch commit(as: kind, current: current) {
+        switch commit(as: kind, integer: integer, current: current, locale: locale) {
         case .conflict: return .conflict
         case .invalid: return .notANumber
         case .unchanged, .alreadyCurrent, .write: return nil
@@ -73,18 +75,18 @@ extension ItemPropertyDraft {
     /// the person through `notices`, which puts it on the clipboard, and is dropped so it is told once. Nothing is
     /// told for a draft the item already holds, or that is back at what it began from.
     func handOff(
-        label: String, as kind: ItemTypeInfo.Field.Kind, current: String, isEditable: Bool,
-        write: (PropertyValue?) -> Bool, to notices: Notices
+        label: String, as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, isEditable: Bool,
+        locale: Locale = .current, write: (PropertyValue?) -> Bool, to notices: Notices
     ) {
         guard isDirty else { return }
-        if isEditable, case .write(let value) = commit(as: kind, current: current) {
+        if isEditable, case .write(let value) = commit(as: kind, integer: integer, current: current, locale: locale) {
             rejected = !write(value)
             if !rejected {
                 isDirty = false
                 return
             }
         }
-        guard let loss = loss(as: kind, current: current, isEditable: isEditable) ?? (rejected && text != current && text != base ? .notSaved : nil) else {
+        guard let loss = loss(as: kind, integer: integer, current: current, isEditable: isEditable, locale: locale) ?? (rejected && text != current && text != base ? .notSaved : nil) else {
             discard(toMatch: current)
             return
         }
@@ -123,9 +125,47 @@ extension DetailsPresentation {
             guard let field = draft.field else { continue }
             let item = library.item(id)
             draft.handOff(
-                label: field.displayLabel, as: field.kind, current: item?.value(of: key).map(ItemValueText.string) ?? "",
+                label: field.displayLabel, as: field.kind, integer: field.isInteger,
+                current: item?.value(of: key).map(ItemValueText.editing) ?? "",
                 isEditable: item?.isEditable ?? false,
                 write: { library.setItemProperty(id, key: key, value: $0, undoManager: undoManager) }, to: library.notices)
         }
+    }
+}
+
+/// Whole and decimal numbers as a person types them: in their own locale's way, with no grouping and no exponent.
+nonisolated enum PropertyNumber {
+    /// The number the text names, or nil where it is not one. The locale's decimal separator is the only one accepted
+    /// ("1,5" in German, "1.5" in English), so a grouping separator is never mistaken for a decimal point. An integer
+    /// field takes no decimal part, and neither takes an exponent.
+    static func parse(_ text: String, integer: Bool, locale: Locale = .current) -> Decimal? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separator = Character(locale.decimalSeparator ?? ".")
+        var digits = 0
+        var sawSeparator = false
+        var normalized = ""
+        for (index, character) in trimmed.enumerated() {
+            if character.isASCII, character.isNumber {
+                digits += 1
+            } else if (character == "-" || character == "+") && index == 0 {
+            } else if character == separator && !integer && !sawSeparator {
+                sawSeparator = true
+                normalized.append(".")
+                continue
+            } else {
+                return nil
+            }
+            normalized.append(character)
+        }
+        guard digits > 0 else { return nil }
+        return Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX"))
+    }
+
+    /// The text that edits `value`: exact, with the locale's decimal separator and no grouping, so it reads back as the
+    /// same number through `parse`.
+    static func editing(_ value: Decimal, locale: Locale = .current) -> String {
+        let text = NSDecimalNumber(decimal: value).stringValue
+        guard let separator = locale.decimalSeparator, separator != "." else { return text }
+        return text.replacingOccurrences(of: ".", with: separator)
     }
 }

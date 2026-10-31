@@ -7,16 +7,79 @@ final class SettingsRequest {
     /// The page the request asked for; nil keeps the page shown last.
     var page: SettingsPage?
 
-    /// Shows Settings in `browser`'s window, or in a main window opened for it where the window in front has no
-    /// browser, as an item's window has none.
+    /// A main window that is open, so Settings asked for from an item's window goes to it, not to another window.
+    private struct MainWindow {
+        weak var browser: Browser?
+        weak var window: NSWindow?
+    }
+    @ObservationIgnored private var mainWindows: [MainWindow] = []
+
+    /// Notes that `browser` is shown in `window`, a main window.
+    func register(_ browser: Browser, in window: NSWindow?) {
+        mainWindows.removeAll { $0.browser == nil || $0.browser === browser }
+        mainWindows.append(MainWindow(browser: browser, window: window))
+    }
+
+    /// The browser of the main window in front of the others, if any is open.
+    private var frontMainWindow: MainWindow? {
+        mainWindows.removeAll { $0.browser == nil }
+        let ordered = NSApp?.orderedWindows ?? []
+        return ordered.lazy.compactMap { window in self.mainWindows.first { $0.window === window } }.first ?? mainWindows.last
+    }
+
+    /// Shows Settings in `browser`'s window. Where the window in front has no browser, as an item's window has none,
+    /// it shows Settings in a main window that is already open and brings it forward, and opens one only when none is.
     func show(_ page: SettingsPage? = nil, in browser: Browser?, openWindow: OpenWindowAction) {
+        show(page, in: browser) { openWindow(id: "main") }
+    }
+
+    func show(_ page: SettingsPage?, in browser: Browser?, opening open: () -> Void) {
         if let browser {
             browser.showSettings(page)
+        } else if let existing = frontMainWindow, let target = existing.browser {
+            target.showSettings(page)
+            if let window = existing.window {
+                if window.isMiniaturized { window.deminiaturize(nil) }
+                window.makeKeyAndOrderFront(nil)
+            }
         } else {
             self.page = page
             isPending = true
-            openWindow(id: "main")
+            open()
         }
+    }
+}
+
+extension View {
+    /// Tells `request` that this view is a main window showing `browser`.
+    func registersMainWindow(_ browser: Browser, with request: SettingsRequest) -> some View {
+        background(WindowHandle { request.register(browser, in: $0) })
+    }
+}
+
+/// Reports the window its view is in.
+private struct WindowHandle: NSViewRepresentable {
+    let found: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> Probe { Probe(found: found) }
+    func updateNSView(_ probe: Probe, context: Context) { probe.found = found }
+
+    final class Probe: NSView {
+        var found: (NSWindow?) -> Void
+
+        init(found: @escaping (NSWindow?) -> Void) {
+            self.found = found
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let window { found(window) }
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 
