@@ -554,6 +554,7 @@
 "Quick Look" : { "extractionState" : "manual" },
 "Can’t Quick Look" : { "extractionState" : "manual" },
 "Nothing selected has a file or text to show." : { "extractionState" : "manual" },
+"Photo" : { "extractionState" : "manual" },
 "Remove “%@”" : { "extractionState" : "manual" },
 "The file couldn’t be added." : { "extractionState" : "manual" },
 "The file couldn’t be attached." : { "extractionState" : "manual" },
