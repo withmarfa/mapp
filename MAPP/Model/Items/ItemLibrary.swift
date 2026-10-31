@@ -184,10 +184,10 @@ protocol ItemLibrary: AnyObject, Observable {
     // MARK: Views
 
     // Each tells the person why a write failed, in the server's reason, and nothing else changes.
-    /// The view as the server saved it, or nil.
     /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
     /// once. Nil on success; otherwise why not, in words for the person.
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
+    /// The view as the server saved it, or nil.
     func createView(_ settings: LibraryViewSettings) async -> LibraryView?
     /// Sent at `baseVersion`, the version of the view the window read.
     func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure>
