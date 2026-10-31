@@ -62,6 +62,7 @@ struct MAPPApp: App {
             AppCommands(library: libraries.current, host: libraries.host)
             PlaceCommands(library: libraries.current)
             FindCommands()
+            ImportFromDevicesCommands()
             FormatCommands()
             ToolbarCommands()
             SettingsCommands(request: settingsRequest)

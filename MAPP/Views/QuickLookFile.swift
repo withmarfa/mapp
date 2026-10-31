@@ -38,6 +38,22 @@ nonisolated struct QuickLookFile {
         }
     }
 
+    /// A file holding `text`, named after the item as `copy` names its own, or nil where it cannot be made.
+    static func write(_ text: String, titled title: String, as type: UTType, in folderName: String = "Quick Look", key: String? = nil) -> QuickLookFile? {
+        let folder = URL.temporaryDirectory.appending(path: folderName, directoryHint: .isDirectory)
+            .appending(path: key.map { name(for: $0, type: .data) } ?? UUID().uuidString, directoryHint: .isDirectory)
+        let url = folder.appending(path: name(for: title, type: type), directoryHint: .notDirectory)
+        do {
+            if key != nil { try? FileManager.default.removeItem(at: folder) }
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: url)
+            return QuickLookFile(folder: folder, url: url)
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            return nil
+        }
+    }
+
     func remove() {
         try? FileManager.default.removeItem(at: folder)
     }

@@ -1,4 +1,5 @@
 import AppKit
+import Quartz
 import WebKit
 
 /// What the page tells the find bar: its text as the find bar searches it, the selection and the visible
@@ -44,7 +45,7 @@ final class PageFinder: NSObject, NSTextFinderClient {
 
     var string: String { state.text }
 
-    var isSelectable: Bool { true }
+    nonisolated override var isSelectable: Bool { true }
     var isEditable: Bool { controller?.isEditable ?? false }
     var allowsMultipleSelection: Bool { false }
 

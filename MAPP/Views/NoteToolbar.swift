@@ -293,6 +293,7 @@ private struct MoreMenu: View {
     var body: some View {
         let note = notes.count == 1 ? notes.first : nil
         Menu("More", systemImage: "ellipsis") {
+            command(.quickLook)
             command(.openInNewWindow)
             command(.openOriginal)
             command(.openInBrowser)

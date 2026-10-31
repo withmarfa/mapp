@@ -309,6 +309,7 @@ struct MainView: View {
     private var dialogsWindow: some View {
         presentedWindow
         .libraryDialogs()
+        .handlesFiles(in: browser, order: order)
         .deleteConfirmation(for: details)
         .savedViewDialogs(browser: browser, order: order)
     }

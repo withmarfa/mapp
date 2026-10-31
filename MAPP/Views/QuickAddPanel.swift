@@ -264,17 +264,11 @@ struct QuickAddPanel: View {
         Task {
             var urls: [URL] = []
             for provider in providers {
-                if let url = await Self.url(from: provider) { urls.append(url) }
+                if let url = await FileIntake.fileURL(of: provider) { urls.append(url) }
             }
             take(urls)
         }
         return true
-    }
-
-    private static func url(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { continuation in
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
-        }
     }
 
     /// Takes files given to the panel: the file of a file item, replacing the one it had, or attachments of any
@@ -286,11 +280,7 @@ struct QuickAddPanel: View {
         for url in urls {
             if let file = QuickAdd.File(url) { taken.append(file) } else { unreadable.append("“\(url.lastPathComponent)”") }
         }
-        if !unreadable.isEmpty {
-            library.notices.tell(
-                String(localized: "Can’t Add File"),
-                String(localized: "MAPP can’t read \(unreadable.formatted(.list(type: .and))) as a file."))
-        }
+        QuickAdd.File.tellUnreadable(unreadable, to: library.notices)
         guard !taken.isEmpty else { return }
         if QuickAdd.isFile(draft.typeID, in: library.catalogue) {
             quickAdd.draft?.files = taken

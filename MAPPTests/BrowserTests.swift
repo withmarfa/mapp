@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 struct BrowserTests {
@@ -354,14 +355,15 @@ struct BrowserTests {
         #expect(browser.selection == [favorite.id])
     }
 
-    @Test func aDraggedNoteCarriesItsIdentifierAsAString() throws {
+    @Test func aDraggedItemCarriesOnlyItsIdentifierAsAString() throws {
         let id = ItemID("0198f2c4-7d1e-7a00-8000-000000000003")
-        let data = try JSONEncoder().encode(NoteReference(id: id, markdown: "# Plan"))
+        let data = try JSONEncoder().encode(ItemReference(id: id, title: "Plan", type: .markdown, content: .text("# Plan")))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(json["id"] as? String == id.rawValue)
-        let decoded = try JSONDecoder().decode(NoteReference.self, from: data)
+        #expect(json.count == 1)
+        let decoded = try JSONDecoder().decode(ItemReference.self, from: data)
         #expect(decoded.id == id)
-        #expect(decoded.markdown == "# Plan")
+        #expect(decoded.content == nil)
     }
 
     @Test func turningOffDateGroupingListsNotesUnderOneHeadingAfterTheFavorites() {

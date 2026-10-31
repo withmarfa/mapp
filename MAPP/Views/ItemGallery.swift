@@ -56,9 +56,7 @@ struct ItemGallery: View {
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
         }
-        .dragContainer(for: NoteReference.self) { ids in
-            ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
-        }
+        .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
     }
 
@@ -135,6 +133,7 @@ struct ItemGallery: View {
             select(next, ids: ids, extending: key.modifiers.contains(.shift), toggling: false)
             return .handled
         }
+        .quickLooksOnSpace(browser)
         .onKeyPress(.return) {
             guard browser.selection.count == 1 else { return .ignored }
             browser.openCollectionSelection()
@@ -234,5 +233,6 @@ private struct GalleryCell: View {
             NoteActions(ids: selected, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
+        .dropsInto(collection: library.catalogue.isCollection(item.type) ? item.id : nil, browser: browser, order: order)
     }
 }

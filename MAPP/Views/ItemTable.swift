@@ -101,6 +101,7 @@ struct ItemTable: View {
         } primaryAction: { ids in
             open(ids)
         }
+        .quickLooksOnSpace(browser)
         .onKeyPress(.return) {
             guard browser.selection.count == 1 else { return .ignored }
             browser.openCollectionSelection()

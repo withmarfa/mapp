@@ -40,6 +40,7 @@ struct AppCommands: Commands {
             // Sharing a note reads one note; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
+            command(.quickLook)
             command(.openInNewWindow)
             command(.openOriginal)
             command(.openInBrowser)

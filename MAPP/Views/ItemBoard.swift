@@ -75,9 +75,7 @@ struct ItemBoard: View {
             }
             .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
-        .dragContainer(for: BoardItemReference.self) { ids in
-            ids.map { BoardItemReference(id: $0) }
-        }
+        .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragContainerSelection(Array(browser.selection))
     }
 
@@ -116,7 +114,7 @@ struct ItemBoard: View {
         .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(lane.title)
-        .dropDestination(for: BoardItemReference.self, isEnabled: isDestination(lane.id)) { references, _ in
+        .dropDestination(for: ItemReference.self, isEnabled: isDestination(lane.id)) { references, _ in
             move(references.map(\.id), to: lane.id, key: key)
         }
     }

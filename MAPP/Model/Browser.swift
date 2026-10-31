@@ -165,6 +165,8 @@ final class Browser {
     var searchFocusRequests = 0
     /// The item quick add made that the window opens once its library holds it (see `NewItem`).
     var newItem: NewItem?
+    /// What Quick Look shows for the window, while it is open.
+    var quickLook: QuickLookRequest?
     /// Where the page puts the caret when it next takes the keyboard for a new item.
     var focusCaret: PageCaret?
     /// What the page writes for the files quick add attached to a new item, which it puts at the end of the text

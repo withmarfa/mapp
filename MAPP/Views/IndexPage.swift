@@ -9,6 +9,24 @@ private enum IndexMetrics {
     static let radius: CGFloat = 12
 }
 
+/// What a page needs to take drops on its rows: the window's browser, and the order it lists in.
+struct IndexDrop {
+    let browser: Browser
+    let order: NoteOrder
+}
+
+private extension View {
+    /// Makes a row that is a collection take items and files dropped on it.
+    @ViewBuilder
+    func takingDrops(_ drop: IndexDrop?, on row: IndexRow) -> some View {
+        if let drop, case .collection(let id) = row.place {
+            dropsInto(collection: id, browser: drop.browser, order: drop.order)
+        } else {
+            self
+        }
+    }
+}
+
 /// A page of rows that each lead to a place, shown as a list, as cards or as a table, within a width. Sources and
 /// Collections are two of them.
 struct IndexPage: View {
@@ -21,14 +39,16 @@ struct IndexPage: View {
     let typesTitle: LocalizedStringKey
     /// Whether a card names `secondary` under its title; false where the key under the bar already says it.
     var showsSecondaryOnCards = true
+    /// Set where the rows are items' places, so a collection's row takes drops. The table does not take them.
+    var drop: IndexDrop?
     let open: (IndexRow) -> Void
     @State private var isUnderToolbar = false
 
     var body: some View {
         Group {
             switch layout {
-            case .list: IndexList(rows: rows, isUnderToolbar: $isUnderToolbar, open: open)
-            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, isUnderToolbar: $isUnderToolbar, open: open)
+            case .list: IndexList(rows: rows, drop: drop, isUnderToolbar: $isUnderToolbar, open: open)
+            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, drop: drop, isUnderToolbar: $isUnderToolbar, open: open)
             case .table: IndexTable(rows: rows, typesTitle: typesTitle, open: open)
             }
         }
@@ -75,6 +95,7 @@ struct IndexLatest: View {
 
 private struct IndexList: View {
     let rows: [IndexRow]
+    let drop: IndexDrop?
     @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
     @State private var hovered: IndexRow.ID?
@@ -117,6 +138,7 @@ private struct IndexList: View {
                     .fill(hovered == row.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
                     .padding(.horizontal, 8)
             )
+            .takingDrops(drop, on: row)
             .accessibilityIdentifier("IndexRow")
         }
         .listStyle(.plain)
@@ -129,6 +151,7 @@ private struct IndexCards: View {
     let rows: [IndexRow]
     let palette: IndexPalette
     let showsSecondary: Bool
+    let drop: IndexDrop?
     @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
 
@@ -137,6 +160,7 @@ private struct IndexCards: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 480), spacing: 16, alignment: .top)], spacing: 16) {
                 ForEach(rows) { row in
                     IndexCard(row: row, palette: palette, showsSecondary: showsSecondary, open: open)
+                        .takingDrops(drop, on: row)
                 }
             }
             .padding(.horizontal, IndexMetrics.side)

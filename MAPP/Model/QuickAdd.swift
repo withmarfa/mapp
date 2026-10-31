@@ -37,6 +37,19 @@ final class QuickAdd {
             files.map { "“\($0.name)”" }.formatted(.list(type: .and))
         }
 
+        /// Tells the person which files could not be read as a file, such as a folder, and how many things given
+        /// were not files at all. Says nothing where there are none.
+        static func tellUnreadable(_ names: [String], unreadable: Int = 0, to notices: Notices) {
+            if !names.isEmpty {
+                notices.tell(
+                    String(localized: "Can’t Add File"),
+                    String(localized: "MAPP can’t read \(names.formatted(.list(type: .and))) as a file."))
+            }
+            if unreadable > 0 {
+                notices.tell(String(localized: "Can’t Add File"), String(localized: "^[\(unreadable) item](inflect: true) can’t be added as a file."))
+            }
+        }
+
         /// The sentence that tells the person these files were not added.
         static func notAdded(_ files: [File]) -> String {
             files.count == 1
