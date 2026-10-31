@@ -15,7 +15,7 @@ nonisolated final class EngineActivity: Sendable {
         var waiting: Int
         /// Writes told and not yet taken, the one being taken among them.
         var writes: Int = 0
-        /// Attaches and added files the copy has not answered yet.
+        /// Attaches and added files whose answer the engine has not taken yet.
         var aside: Int = 0
 
         /// For logs: kinds, durations and counts only.
@@ -32,7 +32,8 @@ nonisolated final class EngineActivity: Sendable {
         var taken = 0
         var writesTold = 0
         var writesTaken = 0
-        /// Writes taken whose answer the copy has not given yet: attaches and added files it takes beside the lane.
+        /// Writes taken whose answer the engine has not taken yet: attaches and added files the copy takes beside the
+        /// lane.
         var aside = 0
         /// Each waits until the writes taken reach the count told when it began waiting and nothing is aside.
         var waiters: [(mark: Int, done: CheckedContinuation<Void, Never>)] = []

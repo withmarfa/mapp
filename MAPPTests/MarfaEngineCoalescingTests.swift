@@ -658,8 +658,8 @@ import Testing
         await scene.close()
     }
 
-    /// An attach counts as taken only once the copy answers it, after saves told later. A wait for the queue that
-    /// began while the copy reads the file must not end on a later save, or a quit would end without the file.
+    /// A wait for the queue that begins while the copy reads an attached file must not end on a save taken later, or
+    /// a quit would end without the file.
     @Test @MainActor func waitingForTheQueueWaitsForAnAttachTheCopyIsReading() async throws {
         let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
         let library = MarfaLibrary(source: scene.source, notices: Notices())
