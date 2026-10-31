@@ -184,6 +184,7 @@ nonisolated extension ItemTableColumn {
                 if case .bool(let flag) = value { return .rank(flag ? 0 : 1, "") }
                 return nil
             default:
+                if case .list(let shape) = field.kind { return .text(shape.display(of: value)) }
                 return .text(ItemValueText.string(value))
             }
         }
@@ -260,7 +261,7 @@ nonisolated enum ItemTableLayout {
     /// wherever a type has them.
     private static let leading = ["starts_at", "ends_at", "completed_at", "occurred_at"]
     /// Fields that read as a paragraph or as bookkeeping, shown only when the person asks.
-    private static let quiet: Set<String> = ["notes", "url", "place", "precision"]
+    private static let quiet: Set<String> = ["notes", "url", "precision"]
 
     /// The table's columns for these rows: the name, then the type where the rows mix types, then status, priority
     /// and due date, then where each item is filed, then the other fields their types have, and when it was edited.
@@ -363,7 +364,7 @@ nonisolated enum ItemTableLayout {
         case .choice: return catalogue.isPriority(field, of: type) ? .priority : .choice
         case .text:
             return field.key == "description" || field.key == "notes" ? .longText : .text
-        case .other: return .text
+        case .other, .list: return .text
         }
     }
 

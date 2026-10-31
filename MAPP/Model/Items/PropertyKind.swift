@@ -10,8 +10,13 @@ nonisolated extension ItemTypeInfo.Field.Kind {
         case (.date(let includesTime), .string(let string)):
             string.isEmpty || ItemDate.parse(string).map { includesTime || !$0.hasTime } == true
         case (.boolean, .bool), (.number, .number): true
+        case (.list, .array): true
         default: false
         }
+    }
+
+    var isList: Bool {
+        if case .list = self { true } else { false }
     }
 
     var isDate: Bool {

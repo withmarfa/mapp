@@ -48,10 +48,10 @@ struct PropertyNumberTests {
         draft.base = "5"
         draft.text = "1.5"
         draft.isDirty = true
-        #expect(draft.commit(as: .number, integer: true, current: "5", locale: english) == .invalid)
+        #expect(draft.commit(as: .number, rule: NumberRule(integer: true), current: "5", locale: english) == .invalid)
         #expect(draft.commit(as: .number, current: "5", locale: english) == .write(.number(Decimal(string: "1.5")!)))
         draft.text = "1e3"
-        #expect(draft.commit(as: .number, integer: true, current: "5", locale: english) == .invalid)
+        #expect(draft.commit(as: .number, rule: NumberRule(integer: true), current: "5", locale: english) == .invalid)
     }
 
     @Test func aDraftReadsGermanDecimals() {

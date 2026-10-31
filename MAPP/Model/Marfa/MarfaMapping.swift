@@ -159,7 +159,44 @@ nonisolated enum MarfaMapping {
         ItemTypeInfo.Field(
             key: field.name, label: label(forField: field.name), kind: kind(of: field, statusWords: statusWords),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
-            format: format(of: field), isInteger: field.type == "integer")
+            format: format(of: field), isInteger: field.type == "integer",
+            minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition))
+    }
+
+    /// A number a definition names, such as a `minimum`.
+    static func bound(_ name: String, in definition: JSONObject) -> Decimal? {
+        switch definition[name] {
+        case .integer(let value)?: Decimal(value)
+        case .number(let value)?: Decimal(string: "\(value)", locale: Locale(identifier: "en_US_POSIX"))
+        default: nil
+        }
+    }
+
+    /// The members of a list of entries (`items_fields`), in the order the type declares them; nil where the field is
+    /// not one.
+    static func listShape(of field: Marfa.TypeField) -> ListShape? {
+        guard field.type == "array", field.definition["items_type"]?.string == "object",
+              let declared = field.definition["items_fields"]?.object, !declared.keys.isEmpty else { return nil }
+        let members = declared.keys.compactMap { key -> ListShape.Member? in
+            guard let definition = declared[key]?.object, let type = definition["type"]?.string else { return nil }
+            let kind: ListShape.Member.Kind
+            switch type {
+            case "string": kind = .text(definition["format"]?.string == "url" ? .url : definition["format"]?.string == "email" ? .email : nil)
+            case "url": kind = .text(.url)
+            case "email": kind = .text(.email)
+            case "enum": kind = .choice(definition["enum_values"]?.array?.compactMap(\.string) ?? [])
+            case "number", "integer":
+                kind = .number(NumberRule(
+                    integer: type == "integer", minimum: bound("minimum", in: definition), maximum: bound("maximum", in: definition)))
+            case "boolean": kind = .boolean
+            case "date": kind = .date(includesTime: false)
+            case "datetime": kind = .date(includesTime: true)
+            default: return nil
+            }
+            return ListShape.Member(key: key, kind: kind, required: definition["required"]?.bool == true)
+        }
+        // A member the app cannot read would be dropped from an entry it edits, so such a list is shown but not edited.
+        return members.count == declared.keys.count ? ListShape(members: members) : nil
     }
 
     /// A field is a web or mail address when its kind says so or, as a text field's `format` refines it, when its
@@ -222,6 +259,8 @@ nonisolated enum MarfaMapping {
             } else {
                 .other
             }
+        case "array":
+            listShape(of: field).map { .list($0) } ?? .other
         default: .other
         }
     }

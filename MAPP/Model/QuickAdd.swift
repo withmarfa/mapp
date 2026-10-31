@@ -317,6 +317,7 @@ final class QuickAdd {
     /// A value as its chip shows it: a choice by its label, a Boolean as Yes or No, anything else as written.
     static func valueText(_ value: PropertyValue, in field: ItemTypeInfo.Field) -> String {
         if field.kind == .boolean, case .bool(let flag) = value { return flag ? String(localized: "Yes") : String(localized: "No") }
+        if case .list(let shape) = field.kind { return shape.display(of: value) }
         if field.isPicked, let option = value.string { return ItemTypeInfo.Field.label(ofOption: option) }
         return ItemValueText.string(value)
     }

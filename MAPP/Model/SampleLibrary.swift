@@ -69,6 +69,11 @@ nonisolated enum SampleLibrary {
                     name: "priority", type: "enum", declaredBy: "core.task",
                     definition: ["enum_values": ["low", "medium", "high"]]),
                 TypeField(name: "due_at", type: "datetime", declaredBy: "core.task"),
+                TypeField(
+                    name: "assignees", type: "array", declaredBy: "core.task",
+                    definition: ["items_type": "object", "items_fields": [
+                        "name": ["type": "string"], "email": ["type": "email"],
+                    ]]),
             ], titleField: "title", bodyField: "body"),
         ItemType(
             id: "core.event", label: "Event", description: "Something that happens at a time.",
@@ -76,7 +81,47 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.event"),
                 TypeField(name: "body", type: "string", declaredBy: "core.event"),
                 TypeField(name: "starts_at", type: "datetime", declaredBy: "core.event"),
+                TypeField(
+                    name: "attendees", type: "array", declaredBy: "core.event",
+                    definition: ["items_type": "object", "items_fields": [
+                        "name": ["type": "string"], "email": ["type": "email"],
+                        "response": ["type": "enum", "enum_values": ["needs_action", "accepted", "declined", "tentative"]],
+                    ]]),
             ], titleField: "title", bodyField: "body"),
+        ItemType(
+            id: "core.entity.person", label: "Person", description: "Someone you know.",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
+                TypeField(name: "job_title", type: "string", declaredBy: "core.entity.person"),
+                TypeField(
+                    name: "emails", type: "array", declaredBy: "core.entity",
+                    definition: ["items_type": "object", "items_fields": [
+                        "value": ["type": "email", "required": true], "label": ["type": "string"],
+                    ]]),
+                TypeField(
+                    name: "phones", type: "array", declaredBy: "core.entity",
+                    definition: ["items_type": "object", "items_fields": [
+                        "value": ["type": "string", "required": true], "label": ["type": "string"],
+                    ]]),
+                TypeField(
+                    name: "addresses", type: "array", declaredBy: "core.entity",
+                    definition: ["items_type": "object", "items_fields": [
+                        "label": ["type": "string"], "street_address": ["type": "string"], "locality": ["type": "string"],
+                        "region": ["type": "string"], "postal_code": ["type": "string"], "country": ["type": "string"],
+                    ]]),
+            ], titleField: "title"),
+        ItemType(
+            id: "core.media", label: "Media", description: "Something to read, watch or play.",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, declaredBy: "core.media"),
+                TypeField(
+                    name: "progress", type: "status", declaredBy: "core.media",
+                    definition: ["status_values": [
+                        ["value": "wishlist", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
+                        ["value": "finished", "group": "completed"], ["value": "abandoned", "group": "canceled"],
+                    ]]),
+                TypeField(name: "rating", type: "integer", declaredBy: "core.media", definition: ["minimum": 1, "maximum": 5]),
+            ], titleField: "title"),
         ItemType(
             id: "sample.project", label: "Project", description: "Work with an outcome.", parent: "core.note",
             fields: [
@@ -201,6 +246,7 @@ nonisolated enum SampleLibrary {
                 "title": .string(task.title), "body": .string(task.body), "priority": .string(task.priority),
             ]
             if !task.status.isEmpty { properties["status"] = .string(task.status) }
+            if index == 0 { properties["assignees"] = [["name": "Ruth Okonjo", "email": "ruth@example.com"], ["email": "sam@example.com"]] }
             let created = date(daysAgo: index + 1, hour: 10)
             rows.append(row("task-\(index + 1)", type: "core.task", properties: properties, created: created, edited: created))
         }
@@ -211,9 +257,25 @@ nonisolated enum SampleLibrary {
                 let start = calendar.date(bySettingHour: session.hour, minute: 0, second: 0, of: day) ?? day
                 properties["starts_at"] = .string(stamp(start))
             }
+            if index == 0 {
+                properties["attendees"] = [
+                    ["name": "Ruth Okonjo", "email": "ruth@example.com", "response": "accepted"],
+                    ["email": "sam@example.com", "response": "needs_action"],
+                ]
+            }
             let created = date(daysAgo: 7, hour: 9)
             rows.append(row("event-\(index + 1)", type: "core.event", properties: properties, created: created, edited: created))
         }
+        let met = date(daysAgo: 20, hour: 9)
+        rows.append(row("person-1", type: "core.entity.person", properties: [
+            "title": "Ruth Okonjo", "job_title": "Editor",
+            "emails": [["value": "ruth@example.com", "label": "work"], ["value": "ruth@home.example", "label": "home"]],
+            "phones": [["value": "+44 20 7946 0000"]],
+            "addresses": [["label": "work", "street_address": "1 High Street", "locality": "London", "country": "GB"]],
+        ], created: met, edited: met))
+        rows.append(row("media-1", type: "core.media", properties: [
+            "title": "The Design of Everyday Things", "progress": "in_progress", "rating": 5,
+        ], created: met, edited: met))
         return rows
     }
 

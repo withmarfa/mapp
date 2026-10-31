@@ -45,11 +45,11 @@ extension LiveMarfaTests {
         private static func sample(for field: ItemTypeInfo.Field) -> PropertyValue? {
             switch field.kind {
             case .text: .string("MAPPTEST value")
-            case .number: .number(1)
+            case .number: .number(field.minimum ?? 1)
             case .boolean: .bool(true)
             case .date: .string(ItemDate.day(Date()))
             case .choice, .status: field.options.first.map(PropertyValue.string)
-            case .other: nil
+            case .other, .list: nil
             }
         }
 
