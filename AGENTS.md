@@ -23,7 +23,7 @@ Keep each file under 200 lines and each chain from this file to a nested one und
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - GitHub-hosted checks (`.github/workflows/checks.yml`) run on pull requests, each only when its files changed; `Checks` is the one job to require, and nothing is retried. A draft pull request runs no Swift job: open as a draft, run the tests locally, and mark it ready once reviewed, so CI runs once. The workflow's comments say which change runs what. Run the `Unit` and `UI` plans locally before you merge.
 - While working, run only the tests a change touches (`-only-testing:MAPPTests/<Suite>`), and every test once before merging.
-- A test waits with `eventually` or `eventuallyAsking` (`MAPPTests/Waiting.swift`), never a loop of short sleeps. A suite with an `async` test carries `.hangLimit`, except a `Live` suite and `NavigationCostTests`; a test sets no limit of its own. A fixed sleep is only for checking that something did not happen, with a comment saying what it gives time for.
+- A test waits with `eventually` or `eventuallyAsking` (`MAPPTests/Waiting.swift`), never a loop of short sleeps. A suite with an `async` test carries `.hangLimit`, except a `Live` suite and `NavigationCostTests`; a test sets no limit of its own. A fixed sleep is only for checking that something did not happen, or for letting an animation or scroll settle in a UI test, with a comment saying what it gives time for.
 - A comment says only why, never what the code already says.
 - Put no absolute paths, machine names, account names, or credentials in any file.
 - Keep no legacy: no compatibility shims, deprecation aliases, or migration paths. Removed means gone.
@@ -61,7 +61,7 @@ These hold across the app. The nested files say how the library keeps them.
 - `MAPP/Tuning/`: the Debug-only tuning panel (`#if DEBUG` throughout). When August wants to compare design values, add a knob there instead of building variants (`Tuning.swift` says how), and remove it in the change that settles the value.
 - `MAPPTests/`: Swift Testing unit tests, hosted in the app's background-only `Debug Tests` build, which starts with no scene (`TestHost`). `FakeItemLibrary` holds items in memory for view models and the editor; `FakeItemSource` is a source the test drives, for `MarfaLibrary`.
 - `MAPPUITests/`: XCTest UI tests that drive the running app through its accessibility tree.
-- `TestPlans/`: `Unit` (the `MAPP` scheme's default) runs every unit test not tagged `live`; `Live` runs only those; `UI` (the `MAPP UI Tests` scheme's) runs the UI tests. `Measure` and `Measure UI` time the app and print lines for a person to read, never a gate; each suite's doc comment says what it measures. A plan given a server creates and deletes items there, so give it a test instance only.
+- `TestPlans/`: `Unit` (the `MAPP` scheme's default) runs every unit test not tagged `live`; `Live` runs only those; `UI` (the `MAPP UI Tests` scheme's) runs the UI tests. `Measure` and `Measure UI` time the app and print lines for a person to read, never a gate; each suite's doc comment says what it measures. A plan given a server creates and deletes items there, so give it a test instance only, and name it with the `instance_id` that `GET <address>/` reports (`TEST_RUNNER_MARFA_TEST_INSTANCE_ID`): a run refuses an address that reports another.
 
 ## Commands
 
@@ -70,8 +70,8 @@ These hold across the app. The nested files say how the library keeps them.
 xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
 # UI tests: take control of the keyboard and mouse.
 xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS' -derivedDataPath build test
-# Before a release: the Live plan, against a Marfa test instance only. Without the address and key, each live test fails.
-TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> \
+# Before a release: the Live plan, against a Marfa test instance only. Without the address, key and instance id, each live test fails.
+TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_MARFA_TEST_INSTANCE_ID=<instance_id> \
   xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
 ```
 

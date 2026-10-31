@@ -1365,7 +1365,7 @@ extension LiveMarfaTests {
 
 /// Every suite that writes to the test instance, one after another, since each reads what the server holds and
 /// another's writes would arrive in the middle. Only the Live test plan runs it, with the instance's address and key
-/// in `MARFA_API_URL` and `MARFA_API_KEY`; without them each test fails rather than skips.
+/// in `MARFA_API_URL` and `MARFA_API_KEY`, with `MARFA_TEST_INSTANCE_ID` as the acknowledgement that the server is a test instance (see `LiveMarfa.address()`); without them each test fails rather than skips.
 @Suite(.serialized, .tags(.live))
 struct LiveMarfaTests {}
 
@@ -1375,8 +1375,46 @@ extension Tag {
 }
 
 nonisolated enum LiveMarfa {
-    /// The test instance's address, from the Live test plan's environment.
-    static func address() throws -> String { try setting("MARFA_API_URL") }
+    /// The test instance's address, from the Live test plan's environment. A run writes to this server, so the address
+    /// is used only when `MARFA_TEST_INSTANCE_ID` holds the `instance_id` the server itself reports at its root
+    /// (`GET /`). Reading that id from the server and typing it is the acknowledgement that this is a test instance,
+    /// and an id left over from another server does not match.
+    static func address() throws -> String {
+        let address = try setting("MARFA_API_URL")
+        try refuseUnlessTestInstance(at: address, acknowledging: ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])
+        return address
+    }
+
+    struct NotATestInstance: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    static func refuseUnlessTestInstance(at address: String, acknowledging acknowledged: String?) throws {
+        let given = acknowledged?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !given.isEmpty else {
+            throw NotATestInstance(description: "Live and Measure runs write to the server at MARFA_API_URL. Set MARFA_TEST_INSTANCE_ID to the instance_id that \(address) reports at its root, to say it is a test instance and holds no one's data.")
+        }
+        guard let url = URL(string: address), let reported = reportedInstanceID(of: url) else {
+            throw NotATestInstance(description: "The server at \(address) did not report an instance_id at its root, so it can not be confirmed as a test instance.")
+        }
+        guard reported == given else {
+            throw NotATestInstance(description: "MARFA_TEST_INSTANCE_ID does not match the instance_id the server at \(address) reports, so this run will not write to it.")
+        }
+    }
+
+    private static func reportedInstanceID(of address: URL) -> String? {
+        var request = URLRequest(url: address, timeoutInterval: 10)
+        request.httpMethod = "GET"
+        let reply = Mutex<Data?>(nil)
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            reply.withLock { $0 = data }
+            done.signal()
+        }.resume()
+        done.wait()
+        guard let data = reply.withLock({ $0 }), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return object["instance_id"] as? String
+    }
 
     /// A key for the test instance, from the Live test plan's environment.
     static func key() throws -> String { try setting("MARFA_API_KEY") }
