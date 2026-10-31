@@ -333,7 +333,7 @@ import Testing
     @Test func theLockTheEmptyingTakesIsFreeWhileTheCacheTrims() async throws {
         let free = Mutex<Bool?>(nil)
         let cache = PictureCache(folder: folder.url.appending(path: "Cache"))
-        cache.hooks.trimming.set { free.withLock { $0 = PictureCache.isUnlocked } }
+        cache.hooks.trimming.set { lockIsFree in free.withLock { $0 = lockIsFree } }
 
         _ = try await cache.store(fetched(in: folder), for: URL(string: "https://example.com/a.png")!, generation: cache.generation)
 

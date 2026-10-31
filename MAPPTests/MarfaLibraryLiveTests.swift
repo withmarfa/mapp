@@ -185,13 +185,13 @@ extension LiveMarfaTests {
                 // a moment later.
                 @MainActor func rehydrated(after before: Int) async throws -> Bool {
                     try await eventuallyAsking {
-                        guard await source.engine.sync.hydrations > before else { return false }
+                        guard await source.engine.sync.hooks.hydrations > before else { return false }
                         return LiveMarfa.isWhole(source.syncReport)
                     }
                 }
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
                 // holds none, and a refusal would leave it where it was.
-                let moving = await source.engine.sync.hydrations
+                let moving = await source.engine.sync.hooks.hydrations
                 step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
@@ -211,7 +211,7 @@ extension LiveMarfaTests {
                 // The copy refuses a relationship written while it hydrates again, so the engine holds the Undo and makes
                 // it once, when the copy is whole.
                 try #require(try await rehydrated(after: moving))
-                let undoing = await source.engine.sync.hydrations
+                let undoing = await source.engine.sync.hooks.hydrations
                 undo.undo()
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent]

@@ -122,7 +122,7 @@ import Testing
         var copy: WorkingCopy { fake.copy }
         var wholeReads: Int { reads.wholeReads.withLock { $0 } }
         var rowReads: Int { reads.rowReads.withLock { $0 } }
-        var binReads: Int { get async { await source.engine.sync.binReads } }
+        var binReads: Int { get async { await source.engine.sync.hooks.binReads } }
         var shown: SourceSnapshot? { log.current.snapshot }
 
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.

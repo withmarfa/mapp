@@ -508,17 +508,17 @@ struct MarfaSourceOfflineTests {
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
         let sync = await source.engine.sync
-        #expect(await sync.hydrations == 0)
+        #expect(sync.hooks.hydrations == 0)
 
         await sync.unreadable(["a"])
-        #expect(try await eventuallyAsking { await sync.hydrations > 0 })
-        #expect(await sync.hydrations == 1)
+        #expect(try await eventuallyAsking { sync.hooks.hydrations > 0 })
+        #expect(sync.hooks.hydrations == 1)
 
         // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
         await sync.unreadable(["a"])
         // Time for a second hydration, which nothing signals when none is asked for.
         try await Task.sleep(for: .milliseconds(500))
-        #expect(await sync.hydrations == 1)
+        #expect(sync.hooks.hydrations == 1)
         await source.close()
     }
 
@@ -1244,7 +1244,7 @@ extension LiveMarfaTests {
                     // Holds the answers for longer than the check below waits, as a slow engine would.
                     try? await Task.sleep(for: .seconds(2))
                 }
-                let before = await source.engine.sync.drains
+                let before = await source.engine.sync.hooks.drains
                 let tagged = WriteID()
                 source.submit(.tag(id, ItemTag.favorite, on: true), as: tagged)
                 #expect(await LiveMarfa.until { holding.isSet })
@@ -1252,10 +1252,10 @@ extension LiveMarfaTests {
                 // Time for a second drain, which nothing signals when none is sent. It is shorter than the hold above,
                 // so the answers are still held and the count must not have moved.
                 try await Task.sleep(for: .milliseconds(800))
-                #expect(await source.engine.sync.drains == before + 1)
+                #expect(await source.engine.sync.hooks.drains == before + 1)
                 source.engine.hooks.answering.set(nil)
                 _ = try #require(await log.wait { $0.answer(to: tagged) != nil })
-                #expect(await LiveMarfa.until { await source.engine.sync.drains == before + 2 })
+                #expect(await LiveMarfa.until { await source.engine.sync.hooks.drains == before + 2 })
                 source.submit(.transition(id, .trashed), as: WriteID())
                 await source.flush()
             }

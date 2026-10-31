@@ -164,8 +164,6 @@ final class Browser {
     /// What the page writes for the files quick add attached to a new item, which it puts at the end of the text
     /// once it shows that item.
     var newEmbeds: NewEmbeds?
-    /// The files of a new item being attached, kept so a test can wait for them.
-    @ObservationIgnored var attachingNewItem: Task<Void, Never>?
     /// A file the library had to fetch to show, so the commands that share it have its location too.
     private(set) var fetchedFile: (id: ItemID, url: URL)?
     /// The library this window was last shown, so a different one starts the window afresh.

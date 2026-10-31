@@ -12,7 +12,6 @@ private let log = Telemetry.logger(.editor)
 final class EditorController: NSObject {
     private(set) var caret = CaretState()
     private(set) var isReady = false
-    @ObservationIgnored private var hasLoadedPage = false
     /// The load whose page stopped answering a flush and was given up on, so the next flush goes ahead without it.
     @ObservationIgnored var abandonedGeneration: Int?
     /// How long a flush waits for the page before giving it up (`flush`). Only a test changes it.
@@ -570,7 +569,6 @@ final class EditorController: NSObject {
         case .ready:
             isReady = true
             sendHostActivation()
-            hasLoadedPage = true
             applyAccent()
             applyKeymap()
             applyStyle()

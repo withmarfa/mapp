@@ -35,9 +35,6 @@ actor PictureCache {
         self.limit = limit
     }
 
-    /// Whether the lock `removeAll` and `store` share is free to take now.
-    nonisolated static var isUnlocked: Bool { emptied.withLockIfAvailable { _ in true } ?? false }
-
     /// Where a fetch writes before the cache takes the file.
     nonisolated var incoming: URL { folder.appending(path: ".incoming", directoryHint: .isDirectory) }
 
@@ -100,7 +97,7 @@ actor PictureCache {
     /// Removes the least recently used pictures until the rest fit.
     func trim() {
         #if DEBUG
-        hooks.trimming.current?()
+        hooks.trimming.current?(Self.emptied.withLockIfAvailable { _ in true } ?? false)
         #endif
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: folder.path) else { return }

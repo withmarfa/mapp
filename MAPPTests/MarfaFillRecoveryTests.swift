@@ -127,7 +127,7 @@ private actor FillServer: MarfaRefreshing {
             try await sync.refreshNow()
             try await wait { await server.calls.count == 4 }
             #expect(await server.calls == ["fill", "attachments", "catchUp", "attachments"])
-            #expect(await sync.hydrations == 1)
+            #expect(sync.hooks.hydrations == 1)
         }
     }
 
@@ -142,8 +142,8 @@ private actor FillServer: MarfaRefreshing {
         try await withSync(server) { reopened in
             try await reopened.refreshNow()
             try await wait { await server.calls.count == 3 }
-            #expect(await reopened.lastHydration?.resumed == true)
-            #expect(await reopened.lastHydration?.pagesTotal == 2)
+            #expect(reopened.hooks.lastHydration?.resumed == true)
+            #expect(reopened.hooks.lastHydration?.pagesTotal == 2)
             #expect(await server.calls == ["fill", "fill", "attachments"])
         }
     }
@@ -155,7 +155,7 @@ private actor FillServer: MarfaRefreshing {
             await #expect(throws: MarfaError.self) { try await sync.refreshNow() }
             try await sync.refreshNow()
             try await wait { await server.calls.count == 3 }
-            #expect(await sync.lastHydration?.inPlace == true)
+            #expect(sync.hooks.lastHydration?.inPlace == true)
             #expect(await server.calls == ["catchUp", "fill", "attachments"])
         }
     }
@@ -165,8 +165,8 @@ private actor FillServer: MarfaRefreshing {
         await server.configure(restarted: "head_aged_out")
         try await withSync(server) { sync in
             try await sync.refreshNow()
-            #expect(await sync.lastHydration?.restarted == "head_aged_out")
-            #expect(await sync.hydrations == 1)
+            #expect(sync.hooks.lastHydration?.restarted == "head_aged_out")
+            #expect(sync.hooks.hydrations == 1)
         }
     }
 
@@ -184,8 +184,8 @@ private actor FillServer: MarfaRefreshing {
             }
             defer { flush.cancel() }
             try await wait { flushed.withLock { $0 } }
-            #expect(await sync.drains > 0)
-            #expect(await sync.lastKeptFetch == nil)
+            #expect(sync.hooks.drains > 0)
+            #expect(sync.hooks.lastKeptFetch == nil)
             #expect(await server.canceledFetches == 0)
             await sync.stop()
             try await wait { await server.canceledFetches == 1 }
@@ -203,22 +203,22 @@ private actor FillServer: MarfaRefreshing {
             await sync.refresh()
             await sync.start()
             await sync.flush()
-            try await wait { await sync.lastKeptFetch == incomplete }
-            let drains = await sync.drains
+            try await wait { sync.hooks.lastKeptFetch == incomplete }
+            let drains = sync.hooks.drains
             #expect(drains > 0)
             await sync.unreachable("offline")
             await server.report(complete)
             await server.holdFetch()
             await sync.reachable()
             try await wait { await server.calls.count == 3 }
-            #expect(await sync.lastKeptFetch == incomplete)
+            #expect(sync.hooks.lastKeptFetch == incomplete)
             // The SDK reports its own reconnect drain while the attachment retry is still waiting.
             await sync.drainedByFollow(DrainReport(answered: 0, verdicts: []))
             await server.release()
-            try await wait { await sync.lastKeptFetch == complete }
-            #expect(await sync.drains == drains)
+            try await wait { sync.hooks.lastKeptFetch == complete }
+            #expect(sync.hooks.drains == drains)
             #expect(await server.calls == ["fill", "attachments", "attachments"])
-            #expect(await sync.hydrations == 1)
+            #expect(sync.hooks.hydrations == 1)
         }
     }
 
@@ -230,14 +230,14 @@ private actor FillServer: MarfaRefreshing {
             await sync.refresh()
             await sync.start()
             await sync.flush()
-            try await wait { await sync.lastKeptFetch == report }
+            try await wait { sync.hooks.lastKeptFetch == report }
             await server.report(report, error: .network(message: "offline"))
             await sync.reachable()
             try await wait { await server.calls.count == 3 }
-            #expect(await sync.lastKeptFetch == report)
+            #expect(sync.hooks.lastKeptFetch == report)
             await server.report(KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil))
             await sync.reachable()
-            try await wait { await sync.lastKeptFetch?.fetched == 0 }
+            try await wait { sync.hooks.lastKeptFetch?.fetched == 0 }
             #expect(await server.calls == ["fill", "attachments", "attachments", "attachments"])
         }
     }
@@ -273,7 +273,7 @@ private actor FillServer: MarfaRefreshing {
         await source.engine.sync.refresh()
         await source.engine.sync.flush()
         try await wait { await server.calls.count == 2 }
-        let drains = await source.engine.sync.drains
+        let drains = await source.engine.sync.hooks.drains
 
         let earlyFetch = KeptFetch(fetched: 0, fetchedBytes: 0, attachments: Attachments(
             held: 0, heldBytes: 0, partialBytes: 0, notHeld: 0, notHeldBytes: 0, notHeldByReason: []))
@@ -281,7 +281,7 @@ private actor FillServer: MarfaRefreshing {
         source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
         source.hear(Change(origin: .serverReachable, itemId: nil, edgeId: nil))
         await source.engineTook()
-        try await wait { await source.engine.sync.lastKeptFetch == earlyFetch }
+        try await wait { await source.engine.sync.hooks.lastKeptFetch == earlyFetch }
         #expect(await server.fetchedAttachments.isEmpty)
 
         // The early retry has finished. Replay now adds a file and its relationship to the held note.
@@ -294,7 +294,7 @@ private actor FillServer: MarfaRefreshing {
                            itemId: nil, edgeId: edgeID))
         await source.engineTook()
         try await wait { await server.fetchedAttachments == [fileID] }
-        #expect(await source.engine.sync.drains == drains)
+        #expect(await source.engine.sync.hooks.drains == drains)
         #expect(await server.calls == ["catchUp", "attachments", "attachments", "attachments"])
         await source.close()
     }

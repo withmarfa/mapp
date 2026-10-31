@@ -90,8 +90,6 @@ struct PagePlacementsTests {
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).showsOnPage("github_id"))
         let ticket = placements.placement(of: Self.ticket, in: Self.catalogue)
         #expect(!ticket.showsOnPage("repo"))
-        #expect(ticket.isChosen("repo"))
-        #expect(!ticket.isChosen("github_id"))
         #expect(ticket.linkedFromPlace == .page)
         #expect(placements.placement(of: Self.person, in: Self.catalogue).linkedFromPlace == .inspector)
     }

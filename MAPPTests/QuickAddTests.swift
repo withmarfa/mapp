@@ -232,7 +232,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.body = "Plans"
         browser.quickAdd.draft?.files = [try disk.file("map 1.png", "map"), try disk.file("tickets.pdf", "pdf")]
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
-        await browser.attachingNewItem?.value
+        try #require(await eventually { browser.newEmbeds != nil })
 
         #expect(library.attachedFiles.map(\.name) == ["map 1.png", "tickets.pdf"])
         #expect(library.attachedFiles.map(\.item) == [id, id])
@@ -254,7 +254,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.title = "Lisbon"
         browser.quickAdd.draft?.files = [try disk.file("brief.pdf")]
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
-        await browser.attachingNewItem?.value
+        try #require(await eventually { library.attachedFiles.count == 1 })
         #expect(library.attachedFiles.map(\.item) == [id])
         #expect(browser.newEmbeds == nil)
     }
@@ -268,7 +268,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.body = "Plans"
         browser.quickAdd.draft?.files = [try disk.file("a.png"), try disk.file("b.png"), try disk.file("c.png")]
         let id = try #require(await browser.saveQuickAdd(in: library, undoManager: nil))
-        await browser.attachingNewItem?.value
+        try #require(await eventually { !library.notices.waiting.isEmpty })
 
         #expect(library.attachedFiles.map(\.name) == ["a.png", "c.png"])
         #expect(library.item(id)?.title == "Trip")
@@ -313,7 +313,7 @@ struct QuickAddTests {
         try FileManager.default.removeItem(at: gone.url)
         library.deliverCreated()
         browser.finishNewItem(in: library)
-        await browser.attachingNewItem?.value
+        try #require(await eventually { !library.notices.waiting.isEmpty })
         #expect(library.attachedFiles.isEmpty)
         #expect(library.notices.waiting.first?.message.contains("“gone.png” wasn’t added.") == true)
     }

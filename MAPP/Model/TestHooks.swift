@@ -17,6 +17,21 @@ nonisolated final class TestHook<Value: Sendable>: Sendable {
     }
 }
 
+/// What a model type saw, counted for a test as it happens. Debug builds only, like `TestHook`.
+nonisolated final class TestTally<Value: Sendable>: Sendable {
+    private let value: Mutex<Value>
+
+    init(_ initial: Value) {
+        value = Mutex(initial)
+    }
+
+    var current: Value { value.withLock { $0 } }
+
+    func update(_ change: (inout Value) -> Void) {
+        value.withLock { change(&$0) }
+    }
+}
+
 extension MarfaEngine {
     nonisolated struct TestHooks: Sendable {
         /// Runs before each drain's answers are taken.
@@ -34,6 +49,27 @@ extension MarfaSync {
     nonisolated struct TestHooks: Sendable {
         /// Replaces how long the bin's changes settle before it is read, and the longest a read waits for them.
         let binWait = TestHook<BinWait>()
+        /// What the lane has done.
+        let seen = TestTally(Seen())
+
+        nonisolated struct Seen: Sendable {
+            /// The drains sent.
+            var drains = 0
+            /// The hydrations begun.
+            var hydrations = 0
+            /// The reads of the bin begun.
+            var binReads = 0
+            /// The report of the last fetch of kept files that succeeded.
+            var lastKeptFetch: KeptFetch?
+            /// The report of the last hydration that finished.
+            var lastHydration: HydrateReport?
+        }
+
+        var drains: Int { seen.current.drains }
+        var hydrations: Int { seen.current.hydrations }
+        var binReads: Int { seen.current.binReads }
+        var lastKeptFetch: KeptFetch? { seen.current.lastKeptFetch }
+        var lastHydration: HydrateReport? { seen.current.lastHydration }
     }
 }
 
@@ -46,8 +82,8 @@ extension MarfaDownloads {
 
 extension PictureCache {
     nonisolated struct TestHooks: Sendable {
-        /// Runs as a trim begins, so a test can look at what is held then.
-        let trimming = TestHook<@Sendable () -> Void>()
+        /// Runs as a trim begins, given whether the lock `removeAll` and `store` share is free then.
+        let trimming = TestHook<@Sendable (_ lockIsFree: Bool) -> Void>()
     }
 }
 #endif
