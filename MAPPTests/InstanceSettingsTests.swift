@@ -16,6 +16,8 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     let expectations = Mutex<[String?]>([])
     /// Run as a change arrives, to let a test move the server under it.
     let beforeUpdate = Mutex<(@Sendable () -> Void)?>(nil)
+    /// Whether the next read holds its answer, and the reads holding theirs until `answerHeldReads`.
+    private let heldReads = Mutex((holdsNext: false, waiting: [CheckedContinuation<Void, Never>]()))
 
     init(_ values: [InstanceSetting: InstanceValue] = [:], instanceID: String = "instance-1") {
         config = Mutex(InstanceConfig(values: values, instanceID: instanceID))
@@ -23,7 +25,32 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
     func read() async throws(InstanceConfigFailure) -> InstanceConfig {
         if let failure = readFailure.withLock({ $0 }) { throw failure }
-        return config.withLock { $0 }
+        let answer = config.withLock { $0 }
+        await withCheckedContinuation { waiter in
+            let holds = heldReads.withLock { reads in
+                guard reads.holdsNext else { return false }
+                reads.holdsNext = false
+                reads.waiting.append(waiter)
+                return true
+            }
+            if !holds { waiter.resume() }
+        }
+        return answer
+    }
+
+    /// The next read takes the settings as they are and holds its answer until `answerHeldReads`.
+    func holdNextRead() {
+        heldReads.withLock { $0.holdsNext = true }
+    }
+
+    var holdsARead: Bool { heldReads.withLock { !$0.waiting.isEmpty } }
+
+    func answerHeldReads() {
+        let waiting = heldReads.withLock { reads in
+            defer { reads.waiting = [] }
+            return reads.waiting
+        }
+        for waiter in waiting { waiter.resume() }
     }
 
     func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig {

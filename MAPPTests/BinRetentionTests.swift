@@ -55,4 +55,37 @@ import Testing
         library.take(InstanceConfig(values: [.trashRetentionDays: .number(90)]))
         #expect(library.trashDays == 90)
     }
+
+    @Test func aReadThatAnswersAfterASaveInThisMarfaLeavesTheSave() async throws {
+        let config = FakeInstanceConfig([.trashRetentionDays: .number(30)])
+        let (library, _) = library(config)
+        try #require(await eventually { library.trashDays == 30 })
+        config.holdNextRead()
+        library.readTrashDays()
+        try #require(await eventually { config.holdsARead })
+
+        library.take(InstanceConfig(values: [.trashRetentionDays: .number(90)]))
+        config.answerHeldReads()
+        // Gives the held read time to answer, to see that it leaves the save's retention.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(library.trashDays == 90, "a read made before the save put back the older retention")
+    }
+
+    @Test func anOlderReadThatAnswersLastLeavesTheNewerOne() async throws {
+        let config = FakeInstanceConfig([.trashRetentionDays: .number(30)])
+        let (library, _) = library(config)
+        try #require(await eventually { library.trashDays == 30 })
+        config.config.withLock { $0.values[.trashRetentionDays] = .number(14) }
+        config.holdNextRead()
+        library.readTrashDays()
+        try #require(await eventually { config.holdsARead })
+        config.config.withLock { $0.values[.trashRetentionDays] = .number(7) }
+        library.readTrashDays()
+        try #require(await eventually { library.trashDays == 7 })
+
+        config.answerHeldReads()
+        // Gives the held read time to answer, to see that it leaves the newer read's retention.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(library.trashDays == 7, "an older read put back the retention it found")
+    }
 }
