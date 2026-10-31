@@ -267,13 +267,13 @@ struct BrowserTests {
 
     @Test func aLibraryThatCannotPurgeIsNeverAskedToEraseWhatIsDeleted() {
         let (library, older, newer, _) = makeFakeLibrary()
-        library.canPurge = false
+        library.reachesServer = false
         library.delete([older.id], undoManager: nil)
         Browser.delete([older.id, newer.id], in: library, undoManager: nil)
         #expect(library.item(newer.id)?.state == .trashed, "what is live still goes to Recently Deleted")
         #expect(library.item(older.id)?.state == .trashed)
         #expect(library.notesToPurge.isEmpty)
-        library.canPurge = true
+        library.reachesServer = true
         Browser.delete([older.id], in: library, undoManager: nil)
         #expect(library.notesToPurge == [older.id])
     }

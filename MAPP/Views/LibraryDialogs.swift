@@ -115,7 +115,7 @@ private struct LibraryDialogs: ViewModifier {
         guard appearsActive else { return }
         if !library.notesToPurge.isEmpty {
             // The server may have gone out of reach since the person asked.
-            if library.canPurge { purging = library.notesToPurge } else { library.tellCannotPurge() }
+            if library.reachesServer { purging = library.notesToPurge } else { library.tellCannotPurge() }
             library.notesToPurge = []
         }
     }

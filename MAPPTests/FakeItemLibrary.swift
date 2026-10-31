@@ -18,9 +18,7 @@ final class FakeItemLibrary: ItemLibrary {
     var views: [LibraryView] = []
     /// What each view lists, by view.
     var viewMembers: [ItemID: [ItemID]] = [:]
-    var canPurge = false
-    var canEditViews = true
-    var canChooseTypeIcons = true
+    var reachesServer = true
     /// What the next icon choice answers: nil keeps it, a failure refuses it.
     var iconFailure: TypeIconFailure?
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []

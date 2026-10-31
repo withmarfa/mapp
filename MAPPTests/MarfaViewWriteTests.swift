@@ -17,7 +17,7 @@ struct MarfaViewWriteTests {
         source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         source.state.set(.online)
-        try #require(await eventually { library.canEditViews })
+        try #require(await eventually { library.reachesServer })
         return (library, source)
     }
 
@@ -80,10 +80,10 @@ struct MarfaViewWriteTests {
     @Test func viewWritesWaitForTheServer() async throws {
         let (library, source) = try await Self.loaded()
         source.state.set(.offline(reason: "network"))
-        #expect(await eventually { !library.canEditViews })
+        #expect(await eventually { !library.reachesServer })
         source.state.set(.connecting)
         #expect(await eventually { library.connection == .connecting })
-        #expect(!library.canEditViews)
+        #expect(!library.reachesServer)
     }
 
     @Test func aDeletedViewGoesAtOnce() async throws {
@@ -113,7 +113,7 @@ extension LiveMarfaTests {
             let library = MarfaLibrary(source: source, notices: Notices())
             defer { try? FileManager.default.removeItem(at: root) }
             source.refresh()
-            try #require(await eventually { library.isLoaded && library.canEditViews })
+            try #require(await eventually { library.isLoaded && library.reachesServer })
 
             let settings = LibraryViewSettings(
                 title: "MAPPTEST view \(UUID().uuidString.prefix(8))",

@@ -11,13 +11,13 @@ import Testing
         let first: Item, second: Item, binned: Item, alsoBinned: Item
     }
 
-    private func fixture(canPurge: Bool = true) -> Fixture {
+    private func fixture(reachesServer: Bool = true) -> Fixture {
         let first = FakeItemLibrary.note("First", modified: .now)
         let second = FakeItemLibrary.note("Second", modified: .now)
         let binned = FakeItemLibrary.note("Binned", modified: .now, state: .trashed)
         let alsoBinned = FakeItemLibrary.note("Also binned", modified: .now, state: .trashed)
         let library = FakeItemLibrary(items: [first, second, binned, alsoBinned])
-        library.canPurge = canPurge
+        library.reachesServer = reachesServer
         return Fixture(library: library, first: first, second: second, binned: binned, alsoBinned: alsoBinned)
     }
 
@@ -26,8 +26,8 @@ import Testing
     }
 
     @Test(arguments: [true, false])
-    func aMixedSelectionAsksOnceToMoveOnlyTheLiveItems(canPurge: Bool) {
-        let f = fixture(canPurge: canPurge)
+    func aMixedSelectionAsksOnceToMoveOnlyTheLiveItems(reachesServer: Bool) {
+        let f = fixture(reachesServer: reachesServer)
         let before = states(f.library)
         var asked: [Set<ItemID>] = []
         Browser.delete([f.first.id, f.second.id, f.binned.id], in: f.library, undoManager: nil, asking: { asked.append($0) })
@@ -81,7 +81,7 @@ import Testing
     }
 
     @Test func aSelectionOfOnlyBinnedItemsTellsWhyWhenTheLibraryCannotEraseThem() {
-        let f = fixture(canPurge: false)
+        let f = fixture(reachesServer: false)
         let before = states(f.library)
         Browser.delete([f.binned.id, f.alsoBinned.id], in: f.library, undoManager: nil)
         #expect(f.library.notesToPurge.isEmpty)

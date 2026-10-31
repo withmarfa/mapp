@@ -30,7 +30,7 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
     /// A sync is the copy finishing a pull from the server without an error (`lastSynced`), as against any contact.
     /// A server that cannot be reached, or one that refuses a key, leaves it where it was.
     init?(
-        state: MarfaHost.State, report: SyncReport, lastSynced: Date?, now: Date, locale: Locale = .current
+        state: MarfaConnectionState, report: SyncReport, lastSynced: Date?, now: Date, locale: Locale = .current
     ) {
         let status = SyncStatus(state: state, report: report, now: now)
         switch state {
@@ -65,7 +65,7 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
         self.help = help
     }
 
-    private static func reason(of state: MarfaHost.State, _ status: SyncStatus) -> String? {
+    private static func reason(of state: MarfaConnectionState, _ status: SyncStatus) -> String? {
         if case .unavailable(let message) = state, !message.isEmpty { return message }
         if case .inUse = state { return Words.inUse }
         return status.primary?.detail

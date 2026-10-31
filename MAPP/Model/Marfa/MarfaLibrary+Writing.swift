@@ -370,10 +370,10 @@ extension MarfaLibrary {
     }
 
     /// Destroys items in the bin at the server, which only a server that can be reached does, so it is only where
-    /// `canPurge`. It is sent at the version the person was shown.
+    /// `reachesServer`. It is sent at the version the person was shown.
     func deletePermanently(_ ids: Set<ItemID>) {
         notesToPurge.subtract(ids)
-        guard canPurge else {
+        guard reachesServer else {
             notices.tell(
                 String(localized: "Can’t Delete Immediately"),
                 String(localized: "The Marfa server can’t be reached. The items are still in Recently Deleted."))

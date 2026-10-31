@@ -51,7 +51,7 @@ final class ViewTitleForm {
 
     var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    var canSubmit: Bool { !isSaving && !isFinished && !trimmedTitle.isEmpty && library.canEditViews }
+    var canSubmit: Bool { !isSaving && !isFinished && !trimmedTitle.isEmpty && library.reachesServer }
 
     /// Sends the title to the server, and keeps it for another try if the server refuses it.
     func submit() async -> Outcome {

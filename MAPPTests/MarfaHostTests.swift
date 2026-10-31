@@ -34,8 +34,34 @@ import Testing
         #expect(await eventually { host.state == .online })
         source.state.set(.offline(reason: "network: refused"))
         #expect(await eventually { host.state == .offline(reason: "network: refused") })
-        source.state.set(.stopped(code: "store", message: "The store is damaged."))
+        source.state.set(.unavailable(message: "The store is damaged."))
         #expect(await eventually { host.state == .unavailable(message: "The store is damaged.") })
+    }
+
+    /// The library is the one subscriber to the copy's connection states, so each change reaches it once; the host
+    /// reads the state from the library, and reads the server's name again once for each return to the server.
+    @Test func aConnectionChangeIsDeliveredOnceAndTheHostReadsItFromTheLibrary() async throws {
+        let bench = try HostBench()
+        bench.servers.names.withLock { $0[first] = "Home Marfa" }
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        let source = try #require(bench.servers.last)
+        let library = try #require(host.library)
+        func reads() -> Int { bench.servers.reads.withLock { $0 } }
+        #expect(source.stateSubscriptions.withLock { $0 } == 1)
+        #expect(await eventually { reads() == 1 }, "attaching the copy reads the name")
+
+        source.state.set(.online)
+        #expect(await eventually { library.connection == .online && host.state == .online })
+        #expect(await eventually { reads() == 2 })
+        source.state.set(.offline(reason: nil))
+        #expect(await eventually { host.state == .offline(reason: nil) })
+        source.state.set(.online)
+        #expect(await eventually { reads() == 3 })
+        // Gives a second delivery of the same change time to arrive and read the name again.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(reads() == 3)
+        #expect(source.stateSubscriptions.withLock { $0 } == 1)
     }
 
     /// A key sent over plain http to another machine can be read on the way, so the person is told, once in a run

@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// Saving what a window shows as a view on the Marfa server, and updating, renaming and deleting the view it shows.
-/// Each needs the server, so each is offered only while the library can reach it (`ItemLibrary.canEditViews`).
+/// Each needs the server, so each is offered only while the library can reach it (`ItemLibrary.reachesServer`).
 enum SavedViews {
     /// Whether the window's place can be saved as a view: Recents, Recently Deleted, the indexes, a single favorite
     /// and a collection cannot.
     static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && library.canEditViews && !browser.showsSettings && !browser.showsSidebarIndex
+        library.isLoaded && library.reachesServer && !browser.showsSettings && !browser.showsSidebarIndex
             && ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil
     }
 
@@ -94,7 +94,7 @@ struct SavedViewCommand {
     let action: () -> Void
 
     static func commands(for browser: Browser, in library: any ItemLibrary) -> [SavedViewCommand] {
-        guard library.canEditViews else { return [] }
+        guard library.reachesServer else { return [] }
         var commands: [SavedViewCommand] = []
         if SavedViews.canSave(browser, in: library) {
             commands.append(SavedViewCommand(title: String(localized: "New View…"), systemImage: "plus.rectangle.on.rectangle") {
@@ -125,7 +125,7 @@ struct SavedViewMenu: View {
 
     var body: some View {
         let shown = browser.flatMap { browser in library.flatMap { SavedViews.shown(browser, in: $0) } }
-        let canEdit = library?.canEditViews == true
+        let canEdit = library?.reachesServer == true
         Button("New View…", systemImage: "plus.rectangle.on.rectangle") { browser?.viewEditing = .new }
             .disabled(!(browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false))
         Button("Update View", systemImage: "arrow.trianglehead.2.clockwise") {
@@ -176,9 +176,9 @@ struct SavedViewRowMenu: View {
 
     var body: some View {
         Button("Rename View…") { browser.viewEditing = .rename(view) }
-            .disabled(!library.canEditViews)
+            .disabled(!library.reachesServer)
         Button("Delete View…") { browser.viewEditing = .delete(view) }
-            .disabled(!library.canEditViews)
+            .disabled(!library.reachesServer)
     }
 }
 
@@ -347,7 +347,7 @@ private struct SavedViewSheet: View {
     private var canSave: Bool {
         switch editing {
         case .new, .rename: browser.viewTitleForm?.canSubmit == true
-        case .update, .delete: library.canEditViews
+        case .update, .delete: library.reachesServer
         }
     }
 

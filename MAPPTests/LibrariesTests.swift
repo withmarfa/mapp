@@ -15,7 +15,7 @@ import Testing
     }
 
     @Test func withNoServerSetTheWindowsAskForOne() {
-        for state in [MarfaHost.State.disconnected, .online, .keyRefused] {
+        for state in [MarfaConnectionState.disconnected, .online, .keyRefused] {
             for flag in [false, true] {
                 #expect(Libraries.mode(hasSource: false, isConfigured: false, state: state, isLaunching: flag, isBusy: flag) == .unconfigured)
             }
@@ -23,7 +23,7 @@ import Testing
     }
 
     @Test func anOpenCopyIsTheLibraryWhateverTheServerSays() {
-        for state in [MarfaHost.State.connecting, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
+        for state in [MarfaConnectionState.connecting, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: true, isConfigured: true, state: state, isLaunching: false, isBusy: false) == .marfa)
         }
     }
@@ -42,7 +42,7 @@ import Testing
     /// A copy closed to open again, as when a key is replaced, is waited for: the windows never say the library
     /// can't open in between. Leaving a server forgets its address first, so the welcome follows at once.
     @Test func aCopyBeingReopenedIsWaitedFor() {
-        for state in [MarfaHost.State.disconnected, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
+        for state in [MarfaConnectionState.disconnected, .online, .offline(reason: nil), .keyRefused, .unavailable(message: "x")] {
             #expect(Libraries.mode(hasSource: false, isConfigured: true, state: state, isLaunching: false, isBusy: true) == .opening)
         }
     }
