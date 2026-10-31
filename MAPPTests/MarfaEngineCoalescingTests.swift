@@ -122,7 +122,7 @@ import Testing
         var copy: WorkingCopy { fake.copy }
         var wholeReads: Int { reads.wholeReads.withLock { $0 } }
         var rowReads: Int { reads.rowReads.withLock { $0 } }
-        var binReads: Int { get async { await source.engine.sync.binReads } }
+        var binReads: Int { get async { await source.engine.sync.hooks.binReads } }
         var shown: SourceSnapshot? { log.current.snapshot }
 
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.
@@ -627,6 +627,137 @@ import Testing
         await scene.close()
     }
 
+    /// Attaching a large file takes as long as the copy takes to read it. A save of the item's text made meanwhile
+    /// is kept at once, and the attach's answer leaves it as it is.
+    @Test @MainActor func aTextSaveIsKeptWhileALargeFileIsAttached() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let library = MarfaLibrary(source: scene.source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let id = ItemID("note")
+        let reading = Hold()
+        Self.attachHeld(by: reading, in: scene)
+        let file = FileManager.default.temporaryDirectory.appending(path: "map \(UUID().uuidString).png")
+        try Data("large".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let attaching = Task { try await scene.source.embeds.attach(file, to: id) }
+        try #require(await eventually { reading.isHeld }, "the attach never reached the copy")
+        library.saveText("Mine", of: id, readAt: ItemVersion(1), failing: "Note")
+        let kept = try await eventuallyAsking {
+            try await scene.copy.queue.all().contains { $0.itemId == "note" && $0.kind == .updateItem }
+        }
+        #expect(kept, "the save waited behind the attach")
+        reading.letGo()
+
+        let embed = try await attaching.value
+        #expect(embed.name == file.lastPathComponent)
+        await scene.source.queueSubmitted()
+        #expect(library.body(of: id)?.text == "Mine", "the attach's answer put back older text")
+        let saved = try await scene.copy.items.get("note")
+        #expect(saved?.properties["body"] == .string("Mine"))
+        await scene.close()
+    }
+
+    /// A wait for the queue that begins while the copy reads an attached file must not end on a save taken later, or
+    /// a quit would end without the file.
+    @Test @MainActor func waitingForTheQueueWaitsForAnAttachTheCopyIsReading() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note", body: "Base")]))
+        let library = MarfaLibrary(source: scene.source, notices: Notices())
+        try #require(await eventually { library.isLoaded })
+        let id = ItemID("note")
+        let reading = Hold()
+        Self.attachHeld(by: reading, in: scene)
+        let file = FileManager.default.temporaryDirectory.appending(path: "map \(UUID().uuidString).png")
+        try Data("map".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let attaching = Task { try await scene.source.embeds.attach(file, to: id) }
+        try #require(await eventually { reading.isHeld }, "the attach never reached the copy")
+        let submitted = Mutex(false)
+        let waiting = Task {
+            await scene.source.queueSubmitted()
+            submitted.withLock { $0 = true }
+        }
+        // The wait runs on the main actor up to its first suspension, which counts the writes told so far: the attach.
+        await Task.yield()
+        library.saveText("Mine", of: id, readAt: ItemVersion(1), failing: "Note")
+        let saved = try await eventuallyAsking {
+            try await scene.copy.queue.all().contains { $0.itemId == "note" && $0.kind == .updateItem }
+        }
+        try #require(saved, "the save was not taken")
+        try await Task.sleep(for: .milliseconds(100)) // Time for a wait that ended on the save to return.
+        #expect(!submitted.withLock { $0 }, "the wait ended while the copy was still taking the file")
+        reading.letGo()
+
+        await waiting.value
+        _ = try await attaching.value
+        await scene.close()
+    }
+
+    @Test @MainActor func twoFilesOfOneNameAttachedAtOnceAreNamedApart() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note")]))
+        let reading = Hold()
+        Self.attachHeld(by: reading, in: scene)
+        let folders = [UUID(), UUID()].map { FileManager.default.temporaryDirectory.appending(path: $0.uuidString) }
+        defer { for folder in folders { try? FileManager.default.removeItem(at: folder) } }
+        var files: [URL] = []
+        for folder in folders {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let file = folder.appending(path: "map.png")
+            try Data("map".utf8).write(to: file)
+            files.append(file)
+        }
+
+        let first = Task { try await scene.source.embeds.attach(files[0], to: ItemID("note")) }
+        let second = Task { try await scene.source.embeds.attach(files[1], to: ItemID("note")) }
+        try #require(await eventually { reading.held == 2 })
+        reading.letGo()
+
+        let names = try await Set([first.value.name, second.value.name])
+        #expect(names == ["map.png", "map 2.png"])
+        await scene.close()
+    }
+
+    @Test @MainActor func aCloseWaitsForAnAttachTheCopyIsReading() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("note", title: "Note")]))
+        let reading = Hold()
+        Self.attachHeld(by: reading, in: scene)
+        let file = FileManager.default.temporaryDirectory.appending(path: "map \(UUID().uuidString).png")
+        try Data("map".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let attaching = Task { try await scene.source.embeds.attach(file, to: ItemID("note")) }
+        try #require(await eventually { reading.isHeld })
+        let closed = Mutex(false)
+        let closing = Task {
+            await scene.source.close()
+            closed.withLock { $0 = true }
+        }
+        try await Task.sleep(for: .milliseconds(100)) // Time for a close that did not wait to finish.
+        #expect(!closed.withLock { $0 }, "the library closed while the copy was still taking the file")
+        reading.letGo()
+
+        await closing.value
+        let embed = try await attaching.value
+        #expect(embed.name == file.lastPathComponent, "the file the copy took was told as not attached")
+    }
+
+    /// Replaces the copy's attach, which the fake refuses, with one that waits on `reading` and answers as the
+    /// package does.
+    private static func attachHeld(by reading: Hold, in scene: Scene) {
+        let stamp = stamp
+        scene.source.engine.hooks.attaching.set { item, title in
+            await reading.wait()
+            func write(_ id: String, _ kind: WriteKind, item: String? = nil, target: String? = nil) -> Marfa.QueuedWrite {
+                Marfa.QueuedWrite(id: id, kind: kind, itemId: item, targetId: target, idempotencyKey: id, queuedAt: stamp)
+            }
+            let file = "file-\(UUID().uuidString)"
+            return Marfa.Attached(
+                upload: write("\(file)-upload", .uploadBlob), item: write("\(file)-item", .createItem, item: file),
+                edge: write("\(file)-edge", .createEdge, item: file, target: item), embed: "![[\(title)]]")
+        }
+    }
+
     @Test func aCopyClosingMidBatchAnswersTheWritesAfterItAsClosed() async throws {
         let scene = try await Self.open(Self.fake([Self.row("one", title: "One")]))
         let activity = try #require(scene.source.engineActivity)
@@ -648,5 +779,33 @@ import Testing
         } else {
             Issue.record("the write told after the close was answered \(String(describing: answered.answer(to: after)))")
         }
+    }
+}
+
+/// Holds whoever waits on it until `letGo`.
+private nonisolated final class Hold: Sendable {
+    private let state = Mutex((open: false, waiting: [CheckedContinuation<Void, Never>]()))
+
+    var isHeld: Bool { held > 0 }
+    var held: Int { state.withLock { $0.waiting.count } }
+
+    func wait() async {
+        await withCheckedContinuation { waiter in
+            let waits = state.withLock { state in
+                guard !state.open else { return false }
+                state.waiting.append(waiter)
+                return true
+            }
+            if !waits { waiter.resume() }
+        }
+    }
+
+    func letGo() {
+        let waiting = state.withLock { state in
+            state.open = true
+            defer { state.waiting = [] }
+            return state.waiting
+        }
+        for waiter in waiting { waiter.resume() }
     }
 }

@@ -70,7 +70,7 @@ extension Browser {
         newItem = nil
         let joined = join(entry, in: library)
         if !entry.attachments.isEmpty {
-            attachingNewItem = Task { await attachFiles(of: entry, in: library) }
+            Task { await attachFiles(of: entry, in: library) }
         }
         leaveSettings()
         isCollectionItemPresented = usesCollection

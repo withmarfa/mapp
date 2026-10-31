@@ -4,7 +4,8 @@ import Synchronization
 /// What the engine is doing, readable from anywhere without awaiting the engine: the kind of event it is in and
 /// since when, and how many events were told and not yet taken. A quit that times out reads this to name the step
 /// it is stuck behind, which the engine's own actor could not answer while it is busy. It also counts the person's
-/// writes told and taken, so a quit waits for those alone and not for what was told after them.
+/// writes told and taken, so a quit waits for those alone and not for what was told after them, and the attaches
+/// and added files the copy is still taking beside the engine's lane, which count as taken before their answer.
 nonisolated final class EngineActivity: Sendable {
     nonisolated struct Snapshot: Sendable, Equatable {
         /// The kind of the event being taken; nil when the engine is between events.
@@ -14,10 +15,12 @@ nonisolated final class EngineActivity: Sendable {
         var waiting: Int
         /// Writes told and not yet taken, the one being taken among them.
         var writes: Int = 0
+        /// Attaches and added files whose answer the engine has not taken yet.
+        var aside: Int = 0
 
         /// For logs: kinds, durations and counts only.
         var summary: String {
-            let waiting = "\(waiting) waiting, \(writes) writes not taken"
+            let waiting = "\(waiting) waiting, \(writes) writes not taken, \(aside) files being taken"
             guard let step, let elapsed else { return "engine idle, \(waiting)" }
             return "engine busy with \(step) for \(elapsed.inMilliseconds) ms, \(waiting)"
         }
@@ -29,14 +32,19 @@ nonisolated final class EngineActivity: Sendable {
         var taken = 0
         var writesTold = 0
         var writesTaken = 0
-        /// Each waits until the writes taken reach the count told when it began waiting.
+        /// Writes taken whose answer the engine has not taken yet: attaches and added files the copy takes beside the
+        /// lane.
+        var aside = 0
+        /// Each waits until the writes taken reach the count told when it began waiting and nothing is aside.
         var waiters: [(mark: Int, done: CheckedContinuation<Void, Never>)] = []
         /// Set once the engine takes nothing more, after which no one waits.
         var finished = false
 
-        /// Takes out the waiters whose writes are all taken. A write told and then refused lowers the count told,
-        /// so a mark above it is met once the writes taken reach the count told.
+        /// Takes out the waiters whose writes are all taken and answered. A write told and then refused lowers the
+        /// count told, so a mark above it is met once the writes taken reach the count told. Writes aside are counted
+        /// as taken, so no later write can stand in for one; a waiter also waits for those told after it began.
         mutating func ready() -> [CheckedContinuation<Void, Never>] {
+            guard aside == 0 else { return [] }
             let met = waiters.filter { writesTaken >= min($0.mark, writesTold) }
             waiters.removeAll { writesTaken >= min($0.mark, writesTold) }
             return met.map(\.done)
@@ -72,11 +80,27 @@ nonisolated final class EngineActivity: Sendable {
         for done in ready { done.resume() }
     }
 
-    /// Returns once every write told before the call is taken, at once where none waits or the engine has ended.
+    /// The engine is taking a write the copy answers beside the lane. Told before the engine counts the write as
+    /// taken, so no wait ends between the two.
+    func setAside() {
+        state.withLock { $0.aside += 1 }
+    }
+
+    /// The copy answered a write set aside, and the engine has taken the answer.
+    func answeredAside() {
+        let ready = state.withLock { state in
+            state.aside -= 1
+            return state.ready()
+        }
+        for done in ready { done.resume() }
+    }
+
+    /// Returns once every write told before the call is taken and no write is aside, at once where none waits or
+    /// the engine has ended.
     func writesTaken() async {
         await withCheckedContinuation { continuation in
             let waits = state.withLock { state in
-                guard !state.finished, state.writesTaken < state.writesTold else { return false }
+                guard !state.finished, state.writesTaken < state.writesTold || state.aside > 0 else { return false }
                 state.waiters.append((state.writesTold, continuation))
                 return true
             }
@@ -112,7 +136,8 @@ nonisolated final class EngineActivity: Sendable {
                 step: state.step.map { "\($0.kind)" },
                 elapsed: state.step.map { now - $0.began },
                 waiting: max(0, state.told - state.taken),
-                writes: max(0, state.writesTold - state.writesTaken))
+                writes: max(0, state.writesTold - state.writesTaken),
+                aside: state.aside)
         }
     }
 }

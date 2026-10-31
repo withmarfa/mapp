@@ -48,6 +48,35 @@ nonisolated extension Telemetry {
             type: "rows_unreadable", sentence: "The copy held rows it could not read.", during: "read")
     }
 
+    /// The copy could not say which item a conflicted copy was made from, or which copies an original has, so those
+    /// items show the links last read. Logged each time, and reported once a run, since one cause fails every read.
+    static func conflictLinksUnread(count: Int, reporting: Reporting = .shared) {
+        logger(.engine).error("\(count, privacy: .public) conflicted copy links could not be read")
+        guard reporting.isFirst("conflict_links_unread") else { return }
+        reporting.sink.report(
+            type: "conflict_links_unread", sentence: "The copy could not say which item a conflicted copy was made from.",
+            during: "read")
+    }
+
+    /// A timestamp could not be read, so its item sorts as the oldest. Reported once a run, since every row has
+    /// timestamps and one cause would otherwise report for each.
+    static func timestampUnreadable(reporting: Reporting = .shared) {
+        guard reporting.isFirst("timestamp_unreadable") else { return }
+        logger(.library).error("a timestamp could not be read; its item sorts as the oldest")
+        reporting.sink.report(
+            type: "timestamp_unreadable", sentence: "A timestamp could not be read, so its item sorts as the oldest.",
+            during: "map")
+    }
+
+    /// Sidebar layouts saved in the defaults could not be read. They are moved aside and kept, and layouts are saved
+    /// afresh.
+    static func sidebarLayoutsUnreadable(reporting: Reporting = .shared) {
+        logger(.navigation).error("saved sidebar layouts could not be read; they are kept aside and layouts are saved afresh")
+        reporting.sink.report(
+            type: "sidebar_layouts_unreadable", sentence: "The saved sidebar layouts could not be read.",
+            during: "read_sidebar_layouts")
+    }
+
     /// The editor's web process ended; `wasReady` says whether the page had loaded first.
     static func editorProcessEnded(wasReady: Bool, reporting: Reporting = .shared) {
         if wasReady {

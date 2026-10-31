@@ -1,6 +1,7 @@
 import Foundation
 import Marfa
 import MarfaTelemetry
+import Synchronization
 
 /// The SDK's reporter and what it takes, named here because the app's own `Telemetry` hides the SDK's type of that
 /// name. Only the files in `MAPP/Model/Telemetry/` import `MarfaTelemetry`.
@@ -37,9 +38,15 @@ nonisolated final class Reporting: Sendable {
     static let switchKey = "sendErrorReports"
 
     let sink: any ReportSink
+    private let reportedOnce = Mutex<Set<String>>([])
 
     init(sink: any ReportSink) {
         self.sink = sink
+    }
+
+    /// Whether this is the first time in the run that `name` is reported, for a fault that can recur on every row.
+    func isFirst(_ name: StaticString) -> Bool {
+        reportedOnce.withLock { $0.insert("\(name)").inserted }
     }
 
     /// Where reports go, from a bundle's `Info.plist`; nil when the build carries none, or carries one the SDK

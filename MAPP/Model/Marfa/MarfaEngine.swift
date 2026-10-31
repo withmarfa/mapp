@@ -45,6 +45,14 @@ actor MarfaEngine {
         case attach(URL, ItemID, CheckedContinuation<Result<Embed, SourceFailure>, Never>)
         /// Adds a file as an item of its own, which the package queues as an upload and a file item.
         case addFile(URL, title: String?, tier: Tier?, parent: ItemID?, CheckedContinuation<Result<ItemID, SourceFailure>, Never>)
+        /// What the copy answered an attach it made beside the lane (`token`), with the title the lane chose.
+        case attached(
+            Result<Marfa.Attached, SourceFailure>, ItemID, title: String, token: UUID,
+            CheckedContinuation<Result<Embed, SourceFailure>, Never>)
+        /// What the copy answered a file it added beside the lane (`token`), and the item to put it under.
+        case addedFile(
+            Result<Marfa.Added, SourceFailure>, parent: ItemID?, token: UUID,
+            CheckedContinuation<Result<ItemID, SourceFailure>, Never>)
     }
 
     /// A write the type cannot take.
@@ -146,6 +154,11 @@ actor MarfaEngine {
     var movedEnds: [String: Set<String>] = [:]
     /// The app's writes queued and not yet answered.
     var writes = MarfaWriteRecord()
+    /// The attaches and added files the copy is reading beside the lane, so a large file never holds the person's
+    /// saves (`MarfaEngine+Attachments`). A close, and a read of what is unsent, wait for them first.
+    var besideTheLane: [UUID: Task<Void, Never>] = [:]
+    /// The titles, lowercased, of the files being attached to each item, so two attached at once get different names.
+    var attachingTitles: [String: Set<String>] = [:]
     var failures: [SourceFailure] = []
     /// The person's latest edit of each item's text, which their next edit of it follows.
     var ownText: [ItemID: OwnText] = [:]
@@ -215,7 +228,9 @@ actor MarfaEngine {
         let interval = Telemetry.begin(.engine, kind)
         await apply(event)
         let elapsed = interval.end()
-        if event.isWrite { hub.activity.tookWrite() }
+        if event.isWrite {
+            hub.activity.tookWrite()
+        }
         hub.activity.end()
         Telemetry.engineEventTook(kind, elapsed)
     }
@@ -242,6 +257,17 @@ actor MarfaEngine {
             if case .addFile(_, _, _, _, let done) = event {
                 done.resume(returning: .failure(SourceFailure(kind: .missing, message: Self.closedLibrary)))
             }
+            // The copy took the file before it closed, so the answer says so, and nothing is read again.
+            if case .attached(let result, let item, let title, let token, let done) = event {
+                settled(token, attaching: title, to: item)
+                done.resume(returning: result.map { Self.embed(of: $0, title: title) })
+                hub.activity.answeredAside()
+            }
+            if case .addedFile(let result, _, let token, let done) = event {
+                settled(token)
+                done.resume(returning: result.flatMap(Self.addedID))
+                hub.activity.answeredAside()
+            }
             return
         }
         switch event {
@@ -255,9 +281,13 @@ actor MarfaEngine {
         case .heard: await takeHeard()
         case .binned(let found, let complete): take(bin: found, complete: complete)
         case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
-        case .attach(let file, let item, let done): done.resume(returning: await attach(file, to: item))
+        case .attach(let file, let item, let done): attach(file, to: item, answering: done)
         case .addFile(let file, let title, let tier, let parent, let done):
-            done.resume(returning: await addFile(file, title: title, tier: tier, under: parent))
+            addFile(file, title: title, tier: tier, under: parent, answering: done)
+        case .attached(let result, let item, let title, let token, let done):
+            done.resume(returning: await take(attached: result, to: item, title: title, token: token))
+        case .addedFile(let result, let parent, let token, let done):
+            done.resume(returning: await take(added: result, under: parent, token: token))
         case .drained(let report, let taken):
             await answer(report)
             taken.resume()
@@ -290,6 +320,7 @@ actor MarfaEngine {
 
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
     private func unsentWrites() async -> UnsentWrites? {
+        await besideTheLaneQueued()
         guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
         let named = Set(queue.compactMap(\.itemId))
         let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
@@ -298,6 +329,7 @@ actor MarfaEngine {
     }
 
     private func shutDown() async {
+        await besideTheLaneQueued()
         closed = true
         for entry in held {
             hub.publish(.answered(entry.id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))

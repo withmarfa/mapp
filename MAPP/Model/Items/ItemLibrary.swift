@@ -23,7 +23,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether the server can be reached now, which is what every write that is never queued needs: deleting items
     /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon.
     var reachesServer: Bool { get }
-    /// How many days an item stays in Recently Deleted, where the library sets it.
+    /// How many days an item stays in Recently Deleted, where the server says; nil where it does not.
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
     var syncReport: SyncReport { get }
@@ -184,10 +184,10 @@ protocol ItemLibrary: AnyObject, Observable {
     // MARK: Views
 
     // Each tells the person why a write failed, in the server's reason, and nothing else changes.
-    /// The view as the server saved it, or nil.
     /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
     /// once. Nil on success; otherwise why not, in words for the person.
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
+    /// The view as the server saved it, or nil.
     func createView(_ settings: LibraryViewSettings) async -> LibraryView?
     /// Sent at `baseVersion`, the version of the view the window read.
     func changeView(_ view: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure>

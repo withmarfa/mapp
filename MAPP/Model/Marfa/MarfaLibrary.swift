@@ -52,6 +52,8 @@ import Observation
     @ObservationIgnored let history: (any ItemHistorySource)?
     /// Keeps the owner's choice of a type's icon on the server. Nil where there is no server to ask.
     @ObservationIgnored let typeIcons: (any TypeIconSource)?
+    /// Reads the server's own settings, for the bin's retention; nil where there is no server to ask, as in the sample.
+    @ObservationIgnored let config: (any InstanceConfigSource)?
     /// The icon each type last showed after the person chose one, until the working copy's own catalogue shows the type
     /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
     /// reopens. `before` is the icon the copy showed then.
@@ -174,11 +176,13 @@ import Observation
 
     init(
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
-        typeIcons: (any TypeIconSource)? = nil, now: @escaping () -> Date = Date.init,
+        typeIcons: (any TypeIconSource)? = nil, config: (any InstanceConfigSource)? = nil,
+        now: @escaping () -> Date = Date.init,
         didSync: @escaping (Date) -> Void = { _ in }, cameOnline: @escaping () -> Void = {}) {
         self.source = source
         self.history = history
         self.typeIcons = typeIcons
+        self.config = config
         self.notices = notices
         self.now = now
         syncReport = source.syncReport
@@ -207,10 +211,14 @@ import Observation
                     guard let self else { return }
                     let wasOnline = connection == .online
                     connection = state
-                    if state == .online, !wasOnline { cameOnline() }
+                    if state == .online, !wasOnline {
+                        cameOnline()
+                        readTrashDays()
+                    }
                 }
             }
         ]
+        readTrashDays()
     }
 
     isolated deinit {
@@ -311,8 +319,39 @@ import Observation
         }
     }
 
-    /// The server keeps the bin, and its own rules for how long.
-    var trashDays: Int? { nil }
+    /// How long the server keeps an item in the bin, from This Marfa's `trash_retention_days`, read when the library
+    /// opens, each time the server is reached again, and after a save in This Marfa. Nil where the server has not set
+    /// it (its default then applies, which a key cannot read), keeps items without limit (zero), or the key may not
+    /// read its settings; a failed read keeps what was read before.
+    private(set) var trashDays: Int?
+    /// Counts the reads and saves of the settings as they start.
+    @ObservationIgnored private var settingsTurn = 0
+    /// The turn of the answer the retention was last taken from, so a read that answers after a later read or a save
+    /// does not put back what it found before, and a later read that fails does not drop an earlier one's answer.
+    @ObservationIgnored private var appliedTurn = 0
+
+    /// Reads the bin's retention from the server's settings, where the host gave the library a way to.
+    func readTrashDays() {
+        guard let config else { return }
+        settingsTurn += 1
+        let turn = settingsTurn
+        Task { [weak self] in
+            guard let answer = try? await config.read(), let self, turn > appliedTurn else { return }
+            appliedTurn = turn
+            keep(answer)
+        }
+    }
+
+    /// Takes a save made in This Marfa: the server's settings as it gave them.
+    func take(_ answer: InstanceConfig) {
+        settingsTurn += 1
+        appliedTurn = settingsTurn
+        keep(answer)
+    }
+
+    private func keep(_ answer: InstanceConfig) {
+        trashDays = answer.number(.trashRetentionDays).flatMap { $0 > 0 ? $0 : nil }
+    }
 
     /// The favorite tag, which the Favorite command owns, and the tag the server puts on a conflicted copy, which
     /// stays until the person keeps or bins the copy.

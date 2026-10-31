@@ -137,9 +137,6 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     func showsOnPage(_ row: String) -> Bool { choice.rows[row] ?? defaultShows(row) }
 
-    /// Whether the person chose this row, rather than it following the default.
-    func isChosen(_ row: String) -> Bool { choice.rows[row] != nil }
-
     var linkedFromPlace: LinkedFromPlace { choice.linkedFrom ?? defaultLinkedFrom }
 
     private func defaultShows(_ row: String) -> Bool { row != linkField && !bookkeeping.contains(row) }

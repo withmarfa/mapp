@@ -439,8 +439,12 @@ nonisolated enum MarfaMapping {
         return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: size ?? 0)
     }
 
-    static func date(_ text: String) -> Date {
-        ItemDate.parse(text)?.date ?? .distantPast
+    static func date(_ text: String, reporting: Reporting = .shared) -> Date {
+        guard let date = ItemDate.parse(text)?.date else {
+            Telemetry.timestampUnreadable(reporting: reporting)
+            return .distantPast
+        }
+        return date
     }
 
     // MARK: Verdicts and sync

@@ -37,8 +37,9 @@ import Observation
     typealias Provider = @MainActor () -> Target?
 
     private let provider: Provider
-    /// Run after a name change is taken, so the rest of the app reads the new name.
-    @ObservationIgnored var onRenamed: @MainActor () -> Void = {}
+    /// Run after a save is taken, with the server's answer and the settings it changed, so the rest of the app reads
+    /// the new name and the bin's new retention.
+    @ObservationIgnored var onSaved: @MainActor (InstanceConfig, Set<InstanceSetting>) -> Void = { _, _ in }
 
     /// The configuration as the server last gave it; nil until one has been read.
     private(set) var loaded: InstanceConfig?
@@ -236,7 +237,7 @@ import Observation
             saved = InstanceSetting.allCases.filter(patch.settings.contains).map {
                 "\($0.title): \(InstanceWording.value(answer, $0))"
             }
-            if patch.settings.contains(.name) { onRenamed() }
+            onSaved(answer, patch.settings)
         } catch {
             guard generation == self.generation else { return }
             if error == .instanceChanged { await instanceChanged() } else { fail(error) }

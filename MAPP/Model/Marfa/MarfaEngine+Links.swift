@@ -91,6 +91,7 @@ extension MarfaEngine {
     /// of those originals has. A copy kept or binned, or one that left the copy, no longer links its original.
     func readConflictLinks(_ ids: Set<String>) async {
         var originalsToRead: Set<String> = []
+        var unread = 0
         for id in ids {
             guard let row = rows[id], row.state == .active, row.tags.contains(MarfaProblems.conflictedCopyTag) else {
                 if let previous = linkedOriginals.removeValue(forKey: id) { originalsToRead.insert(previous) }
@@ -103,6 +104,7 @@ extension MarfaEngine {
                 if let original { originalsToRead.insert(original) }
             } catch {
                 // What was read before stands.
+                if !(error is CancellationError) { unread += 1 }
                 continue
             }
         }
@@ -111,9 +113,11 @@ extension MarfaEngine {
                 let copies = try await Self.asking(hub) { try await copy.items.conflictedCopies(of: original) }.map(\.id)
                 linkedCopies[original] = copies.isEmpty ? nil : copies
             } catch {
+                if !(error is CancellationError) { unread += 1 }
                 continue
             }
         }
+        if unread > 0 { Telemetry.conflictLinksUnread(count: unread) }
         if !originalsToRead.isEmpty { restate() }
     }
 

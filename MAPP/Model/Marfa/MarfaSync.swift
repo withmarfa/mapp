@@ -59,18 +59,10 @@ actor MarfaSync {
     private var working: Task<Void, Never>?
     private var fetching: Task<Void, Never>?
     private var wantsFetch = false
-    private(set) var lastKeptFetch: KeptFetch?
     private var retry: Task<Void, Never>?
     private var failures = 0
     private var flushers: [CheckedContinuation<Void, Never>] = []
     private var draining: [CheckedContinuation<Void, Never>] = []
-    /// How many drains this lane has sent, for the tests.
-    private(set) var drains = 0
-    /// How many times it has hydrated, for the tests.
-    private(set) var hydrations = 0
-    /// How many times it has read the bin, for the tests.
-    private(set) var binReads = 0
-    private(set) var lastHydration: HydrateReport?
     /// Rows the copy could not read, which only a hydration replaces.
     private var rehydration = Rehydration()
     /// Whether the person has been told of a stop since something last succeeded, so a fault the core ends a stream
@@ -403,10 +395,15 @@ actor MarfaSync {
             do {
                 let report = try await refreshing.fetchKept()
                 try Task.checkCancellation()
-                // A successful call can still leave missing bytes. Keep its counts and reasons until the next fetch.
-                lastKeptFetch = report
+                #if DEBUG
+                hooks.seen.update { $0.lastKeptFetch = report }
+                #else
+                _ = report
+                #endif
+            } catch is CancellationError {
             } catch {
                 // Refresh and reconnection retry downloads without changing the queue's retry or connection state.
+                Self.log.notice("fetching kept files failed; a refresh or reconnection fetches them again")
             }
         }
         fetching = nil
@@ -417,7 +414,9 @@ actor MarfaSync {
     /// for the first hydration.
     private func runDrain() async {
         guard (try? await refreshing.readStatus())?.hydration == .complete else { return }
-        drains += 1
+        #if DEBUG
+        hooks.seen.update { $0.drains += 1 }
+        #endif
         do {
             let report = try await copy.queue.drain()
             // The drain ends once the engine has taken these answers, so a flush returns with them taken.
@@ -480,7 +479,9 @@ actor MarfaSync {
     /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
     /// reached leaves the bin as it was, shown from what the engine last held, and is asked again when it can.
     private func runBin() async {
-        binReads += 1
+        #if DEBUG
+        hooks.seen.update { $0.binReads += 1 }
+        #endif
         var found: [Marfa.Item] = []
         var cursor: String?
         var complete = false
@@ -517,7 +518,9 @@ actor MarfaSync {
     private func hydrate() async throws {
         hub.report.update { $0.phase = .catchingUp }
         defer { hub.report.update { $0.phase = .current } }
-        hydrations += 1
+        #if DEBUG
+        hooks.seen.update { $0.hydrations += 1 }
+        #endif
         // Hydration announces only its end. One acknowledged read at a time shows pages as they arrive,
         // without letting a slow engine accumulate progress events ahead of a person's writes.
         let progress = Task { [tell] in
@@ -529,7 +532,12 @@ actor MarfaSync {
             }
         }
         defer { progress.cancel() }
-        lastHydration = try await refreshing.hydrate(types: Self.slice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
+        let hydrated = try await refreshing.hydrate(types: Self.slice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
+        #if DEBUG
+        hooks.seen.update { $0.lastHydration = hydrated }
+        #else
+        _ = hydrated
+        #endif
         rehydration.finished()
     }
 
