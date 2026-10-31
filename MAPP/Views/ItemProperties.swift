@@ -22,6 +22,8 @@ struct ItemPropertyRow: View {
     /// Whether the page shows this property too, and what changes it; nil offers no choice.
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
+    /// Whether the library still has a write of the item's properties on its way, which a list of entries waits for.
+    var isWriting = false
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.openURL) private var openURL
     @Environment(\.library) private var library
@@ -69,7 +71,7 @@ struct ItemPropertyRow: View {
             // The list tells its own refusals, beside the entry they are about.
             ListEntriesEditor(
                 shape: shape, label: definition.displayLabel, key: definition.key, value: value, isEditable: isEditable,
-                editing: input.list, onChange: onChange)
+                editing: input.list, isWriting: isWriting, onChange: onChange)
         } else if definition.kind == .boolean {
             checkbox
         } else if isEditable {

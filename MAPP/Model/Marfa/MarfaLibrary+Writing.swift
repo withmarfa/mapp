@@ -109,7 +109,7 @@ extension MarfaLibrary {
         _ id: ItemID, key: String, from old: PropertyValue?, to value: PropertyValue?, undoManager: UndoManager?
     ) {
         guard let version = item(id)?.version else { return }
-        submit(.editProperties(id, [key: value], base: version, undoing: nil), failing: String(localized: "Can’t Edit This Property"))
+        submitPropertyEdit(.editProperties(id, [key: value], base: version, undoing: nil), of: id, failing: String(localized: "Can’t Edit This Property"))
         let name = String(localized: "Edit Property")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.editProperty(id, key: key, from: value, to: old, undoManager: undoManager)

@@ -31,18 +31,29 @@ import Testing
 
     private static func member(_ shape: ListShape, _ key: String) throws -> ListShape.Member { try #require(shape.member(key)) }
 
-    /// Stands in for the library: holds the list and records each write.
+    /// Stands in for the library: holds the list and records each write. A store that `delays` takes a write as
+    /// `MarfaLibrary` does, later: the list shows it only once it `land`s, and never where it is `refuse`d.
     final class Store {
         var value: PropertyValue?
         var writes: [PropertyValue?] = []
         var refuses = false
+        var delays = false
+        private var queued: [PropertyValue?] = []
         init(_ value: PropertyValue?) { self.value = value }
+        var isWriting: Bool { !queued.isEmpty }
         func write(_ new: PropertyValue?) -> Bool {
             guard !refuses else { return false }
             writes.append(new)
-            value = new
+            if delays { queued.append(new) } else { value = new }
             return true
         }
+        func land() { value = queued.removeFirst() }
+        func refuse() { queued.removeFirst() }
+    }
+
+    /// The identities the editor draws for the store's list as it stands.
+    private static func drawn(_ editing: ListEditing, _ store: Store) -> [UUID] {
+        editing.rows(of: store.value, writing: store.isWriting).map(\.id)
     }
 
     // MARK: The entry being added
@@ -136,6 +147,157 @@ import Testing
         #expect(editing.text(slot, in: store.value) == "home")
         editing.commit(try Self.member(shape, "label"), of: ids[2], in: shape, value: store.value, write: store.write)
         #expect(store.value == .array([Self.email("c@example.com", "home"), b]))
+    }
+
+    @Test func identicalEntriesStayInPlaceWhenOneIsInsertedBefore() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com"), b = Self.email("b@example.com")
+        let store = Store(.array([a, a]))
+        let editing = ListEditing()
+        let ids = editing.rows(of: store.value).map(\.id)
+        let slot = ListEditing.Slot(entry: ids[0], member: "label")
+        editing.type("home", into: slot, in: store.value)
+
+        store.value = .array([b, a, a])
+        #expect(Array(editing.rows(of: store.value).map(\.id).dropFirst()) == ids)
+        #expect(editing.commit(try Self.member(shape, "label"), of: ids[0], in: shape, value: store.value, write: store.write))
+        #expect(store.value == .array([b, Self.email("a@example.com", "home"), a]))
+    }
+
+    // MARK: Writes the library takes later
+
+    @Test func newEntryKeepsIdentityWhenTheWriteLands() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com")
+        let store = Store(.array([a]))
+        store.delays = true
+        let editing = ListEditing()
+        let first = try #require(Self.drawn(editing, store).first)
+        editing.startEntry()
+        let added = editing.pendingID
+        editing.type("b@example.com", into: ListEditing.Slot(entry: added, member: "value"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "value"), of: added, in: shape, value: store.value, write: store.write))
+
+        // Before the write lands, the entry is drawn under the identity it was typed under, so the next field stays.
+        #expect(Self.drawn(editing, store) == [first, added])
+        let label = ListEditing.Slot(entry: added, member: "label")
+        editing.type("home", into: label, in: store.value)
+        #expect(Self.drawn(editing, store) == [first, added])
+        #expect(editing.text(label, in: store.value) == "home")
+
+        store.land()
+        #expect(Self.drawn(editing, store) == [first, added])
+        #expect(editing.text(label, in: store.value) == "home")
+        #expect(editing.commit(try Self.member(shape, "label"), of: added, in: shape, value: store.value, write: store.write))
+        store.land()
+        #expect(store.value == .array([a, Self.email("b@example.com", "home")]))
+        #expect(Self.drawn(editing, store) == [first, added])
+        #expect(editing.notice == nil)
+        #expect(!editing.holdsUnsavedWork)
+    }
+
+    @Test func memberEditKeepsIdentityWhenTheWriteLands() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(.array([Self.email("a@example.com"), Self.email("b@example.com")]))
+        store.delays = true
+        let editing = ListEditing()
+        let ids = Self.drawn(editing, store)
+        editing.type("c@example.com", into: ListEditing.Slot(entry: ids[0], member: "value"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "value"), of: ids[0], in: shape, value: store.value, write: store.write))
+
+        #expect(Self.drawn(editing, store) == ids)
+        let label = ListEditing.Slot(entry: ids[0], member: "label")
+        #expect(editing.text(ListEditing.Slot(entry: ids[0], member: "value"), in: store.value) == "c@example.com")
+        editing.type("work", into: label, in: store.value)
+        store.land()
+        #expect(Self.drawn(editing, store) == ids)
+        #expect(editing.text(label, in: store.value) == "work")
+        #expect(!editing.conflicts(label, in: store.value))
+    }
+
+    @Test func twoQuickMemberSavesAreBothKept() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(.array([Self.email("a@example.com")]))
+        store.delays = true
+        let editing = ListEditing()
+        let id = try #require(Self.drawn(editing, store).first)
+        editing.type("c@example.com", into: ListEditing.Slot(entry: id, member: "value"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "value"), of: id, in: shape, value: store.value, write: store.write))
+        _ = Self.drawn(editing, store)
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "label"), of: id, in: shape, value: store.value, write: store.write))
+
+        // The second save is built on the first, not on the list the store still shows.
+        #expect(store.writes.last == .array([Self.email("c@example.com", "work")]))
+        store.land()
+        #expect(Self.drawn(editing, store) == [id])
+        store.land()
+        #expect(Self.drawn(editing, store) == [id])
+        #expect(store.value == .array([Self.email("c@example.com", "work")]))
+        #expect(!editing.holdsUnsavedWork)
+    }
+
+    @Test func aRefusedDelayedWriteKeepsTheText() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com"), b = Self.email("b@example.com")
+        let store = Store(.array([a, b]))
+        store.delays = true
+        let editing = ListEditing()
+        let ids = Self.drawn(editing, store)
+        let slot = ListEditing.Slot(entry: ids[1], member: "label")
+        editing.type("home", into: slot, in: store.value)
+        #expect(editing.commit(try Self.member(shape, "label"), of: ids[1], in: shape, value: store.value, write: store.write))
+        #expect(Self.drawn(editing, store) == ids)
+        #expect(!editing.holdsUnsavedWork)
+
+        store.refuse()
+        #expect(Self.drawn(editing, store) == ids)
+        #expect(editing.text(slot, in: store.value) == "home")
+        #expect(editing.notice == "The list could not be saved.")
+        #expect(editing.holdsUnsavedWork)
+
+        // Once the library takes it, it is written over the stored list.
+        store.delays = false
+        #expect(editing.commit(try Self.member(shape, "label"), of: ids[1], in: shape, value: store.value, write: store.write))
+        #expect(store.value == .array([a, Self.email("b@example.com", "home")]))
+    }
+
+    @Test func aRefusedDelayedNewEntryComesBackToBeFinished() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let store = Store(nil)
+        store.delays = true
+        let editing = ListEditing()
+        editing.startEntry()
+        let added = editing.pendingID
+        editing.type("a@example.com", into: ListEditing.Slot(entry: added, member: "value"), in: store.value)
+        editing.commit(try Self.member(shape, "value"), of: added, in: shape, value: store.value, write: store.write)
+        #expect(Self.drawn(editing, store) == [added])
+        #expect(editing.pending == nil)
+
+        store.refuse()
+        #expect(Self.drawn(editing, store).isEmpty)
+        #expect(editing.pendingID == added)
+        #expect(editing.pending == ["value": .string("a@example.com")])
+        #expect(editing.notice == "The list could not be saved.")
+        #expect(editing.holdsUnsavedWork)
+    }
+
+    @Test func aWriteOvertakenElsewhereKeepsEachEntrysIdentity() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com"), c = Self.email("c@example.com")
+        let store = Store(.array([a]))
+        store.delays = true
+        let editing = ListEditing()
+        let id = try #require(Self.drawn(editing, store).first)
+        editing.type("work", into: ListEditing.Slot(entry: id, member: "label"), in: store.value)
+        editing.commit(try Self.member(shape, "label"), of: id, in: shape, value: store.value, write: store.write)
+
+        // Another device adds an entry before this write reaches the list.
+        store.value = .array([a, c])
+        let drawn = Self.drawn(editing, store)
+        #expect(drawn.first == id)
+        #expect(drawn.count == 2)
+        #expect(editing.notice == nil)
     }
 
     // MARK: Changes made elsewhere

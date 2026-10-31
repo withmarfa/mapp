@@ -390,6 +390,7 @@ struct QuickAddPanel: View {
         }
         return chipShell(remove: isRemovable ? (String(localized: "Remove \(name)"), "QuickAddRemove.\(field.key)", remove) : nil) {
             Button {
+                if field.kind.isList { _ = quickAdd.listDraft(for: field.key) }
                 editing = field.key
             } label: {
                 chipFace(hasRemove: isRemovable) {
@@ -537,6 +538,7 @@ struct QuickAddPanel: View {
                     if let field = fields.first(where: { $0.key == key }) {
                         Button(field.displayLabel) {
                             quickAdd.draft?.add(.field(key))
+                            if field.kind.isList { _ = quickAdd.listDraft(for: key) }
                             open(key)
                         }
                         .accessibilityIdentifier("QuickAddMore.\(key)")

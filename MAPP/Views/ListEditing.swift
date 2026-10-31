@@ -10,6 +10,11 @@ import Observation
 /// the entry it began from: where that entry changed elsewhere meanwhile, the text is kept and the person chooses, as
 /// a single property's row does. Text that can be neither written nor kept on screen goes back to the person through
 /// `Notices.notKept`, which puts it on the clipboard.
+///
+/// A library may take a write later than it is made (`MarfaLibrary` queues it), so the editor shows the list it last
+/// wrote, with the identities it gave, until the stored list shows it, and builds the next change on it. A write the
+/// library refuses puts the stored list back on screen and what the person gave it back in its fields; a change made
+/// elsewhere meanwhile is matched by content against the list the editor wrote.
 @Observable
 final class ListEditing {
     typealias Entry = ListEntries.Entry
@@ -26,15 +31,35 @@ final class ListEditing {
         let entry: PropertyValue
     }
 
+    /// A list the editor wrote that the stored list may not show yet.
+    private struct Flight {
+        let entries: [PropertyValue]
+        let ids: [UUID]
+        /// What the person gave the write, which goes back to them if it is refused.
+        let given: Given?
+    }
+
+    private enum Given {
+        case text(Slot, base: String?, text: String)
+        case entry(UUID, Entry)
+    }
+
     /// The identity of each entry of `known`, in order. Matched to the stored list as the view draws, so neither is
     /// observed.
     @ObservationIgnored private var ids: [UUID] = []
-    /// The entries as the editor last saw them.
+    /// The entries as the editor last saw them, or last wrote them while a write is in flight.
     @ObservationIgnored private var known: [PropertyValue] = []
-    /// Typed text whose entry went from the list elsewhere, waiting to go back to the person.
-    @ObservationIgnored private var orphans: [String] = []
+    /// The writes the stored list does not show yet, oldest first; `known` is the last one's list.
+    @ObservationIgnored private var flights: [Flight] = []
+    /// The stored list, and its identities, from before the oldest write in flight.
+    @ObservationIgnored private var settled: (entries: [PropertyValue], ids: [UUID]) = ([], [])
+    /// Whether the library still had a write of the item on its way when the view last drew.
+    @ObservationIgnored private var writing = false
+    /// Typed text whose entry went from the list elsewhere, waiting to go back to the person. Observed, as `drafts`
+    /// is, so a view that tells of unsaved work follows it.
+    private var orphans: [String] = []
     /// The text typed into each member and not yet written.
-    @ObservationIgnored private var drafts: [Slot: ItemPropertyDraft] = [:]
+    private var drafts: [Slot: ItemPropertyDraft] = [:]
     /// The entry each member's text began from, to tell whether the entry changed under it.
     @ObservationIgnored private var entryBases: [Slot: Entry] = [:]
     /// The identity the entry being added takes once it is added, so its text stays with it.
@@ -46,28 +71,60 @@ final class ListEditing {
 
     // MARK: Identity
 
-    /// The entries of `value`, each with its identity in this editor.
-    func rows(of value: PropertyValue?) -> [Row] {
+    /// The entries of `value`, each with its identity in this editor. `writing` says whether the library still has a
+    /// write of the item on its way (`ItemLibrary.isWritingProperties(of:)`), so a stored list that does not yet show
+    /// the editor's last write is waited for while it is true and taken as a refusal once it is false.
+    func rows(of value: PropertyValue?, writing: Bool = false) -> [Row] {
+        self.writing = writing
         sync(ListEntries.entries(of: value))
         return zip(ids, known).map { Row(id: $0, entry: $1) }
     }
 
-    /// Matches identities to `entries` after a change the editor did not make: the same entry where it was, then the
-    /// same entry anywhere, then, where as many entries changed as were left, each changed entry to the one in its
-    /// place that shares a member value with it. An entry matched no other way is new, and the text typed into an
-    /// entry that is gone waits in `orphans`.
+    /// Follows the stored list. While writes are in flight: a stored list that shows one of them settles it and those
+    /// before it; one that still shows the list from before them, or an earlier write, waits while the library is
+    /// writing and is a refusal of the rest once it is not; any other list was changed elsewhere and is matched
+    /// against the list the editor wrote, then the one from before its writes.
     private func sync(_ entries: [PropertyValue]) {
-        guard entries != known || ids.count != entries.count else { return }
-        var unused = Array(known.indices)
-        var matched = [Int?](repeating: nil, count: entries.count)
-        for (index, entry) in entries.enumerated() where known.indices.contains(index) && known[index] == entry {
-            matched[index] = index
-            unused.removeAll { $0 == index }
+        if !flights.isEmpty {
+            if let landed = flights.lastIndex(where: { $0.entries == entries }) {
+                settled = (flights[landed].entries, flights[landed].ids)
+                flights.removeFirst(landed + 1)
+                if !flights.isEmpty, !writing { fallBack() }
+                return
+            }
+            if entries == settled.entries {
+                if !writing { fallBack() }
+                return
+            }
+            flights = []
+            return match(entries, before: settled)
         }
+        match(entries)
+    }
+
+    /// Matches identities to `entries` after a change the editor did not make: the entries that stayed, in order (the
+    /// longest run common to both lists, so an entry inserted before identical ones does not shift their identities),
+    /// then the same entry anywhere, nearest its old place first, then, where as many entries changed as were left,
+    /// each changed entry to the one in its place that shares a member value with it. An entry matched no other way
+    /// is new, and the text typed into an entry that is gone waits in `orphans`.
+    private func match(_ entries: [PropertyValue], before: (entries: [PropertyValue], ids: [UUID])? = nil) {
+        guard entries != known || ids.count != entries.count else { return }
+        var matched = Self.commonRun(known, entries)
+        var unused = Set(known.indices).subtracting(matched.compactMap { $0 }).sorted()
         for (index, entry) in entries.enumerated() where matched[index] == nil {
-            guard let old = unused.first(where: { known[$0] == entry }) else { continue }
+            guard let old = unused.filter({ known[$0] == entry }).min(by: { abs($0 - index) < abs($1 - index) }) else { continue }
             matched[index] = old
             unused.removeAll { $0 == old }
+        }
+        // An entry the editor changed in a write that a change elsewhere overtook is still the entry it was before.
+        if let before {
+            for (index, entry) in entries.enumerated() where matched[index] == nil {
+                guard let old = unused.first(where: { candidate in
+                    zip(before.entries, before.ids).contains { $0.0 == entry && $0.1 == ids[candidate] }
+                }) else { continue }
+                matched[index] = old
+                unused.removeAll { $0 == old }
+            }
         }
         let changed = entries.indices.filter { matched[$0] == nil }
         if changed.count == unused.count {
@@ -82,11 +139,87 @@ final class ListEditing {
         known = entries
         for slot in drafts.keys.sorted(by: { $0.member < $1.member }) where gone.contains(slot.entry) {
             if let draft = drafts[slot], draft.isDirty, draft.text != draft.base {
-                orphans.append("\(ItemTypeInfo.Field.displayLabel(MarfaMapping.label(forField: slot.member))): \(draft.text)")
+                orphans.append("\(Self.label(of: slot.member)): \(draft.text)")
             }
             drafts[slot] = nil
             entryBases[slot] = nil
         }
+    }
+
+    /// For each entry of `new`, the place in `old` of the same entry where both lists keep it in the same order: the
+    /// longest common subsequence, which keeps the earlier of equal choices so identical entries keep their order.
+    private static func commonRun(_ old: [PropertyValue], _ new: [PropertyValue]) -> [Int?] {
+        var lengths = [[Int]](repeating: [Int](repeating: 0, count: new.count + 1), count: old.count + 1)
+        for i in stride(from: old.count - 1, through: 0, by: -1) {
+            for j in stride(from: new.count - 1, through: 0, by: -1) {
+                lengths[i][j] = old[i] == new[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
+            }
+        }
+        var matched = [Int?](repeating: nil, count: new.count)
+        var i = 0, j = 0
+        while i < old.count, j < new.count {
+            if old[i] == new[j] {
+                matched[j] = i
+                i += 1
+                j += 1
+            } else if lengths[i + 1][j] >= lengths[i][j + 1] {
+                i += 1
+            } else {
+                j += 1
+            }
+        }
+        return matched
+    }
+
+    /// The writes in flight were refused: the stored list is shown again with the identities it had, and what the
+    /// person gave the writes goes back where they gave it, or back to them through `orphans` where that place is
+    /// gone. Text typed again since is kept over what was given.
+    private func fallBack() {
+        let refused = flights
+        flights = []
+        known = settled.entries
+        ids = settled.ids
+        for flight in refused {
+            switch flight.given {
+            case .entry(let id, let entry):
+                if pending?.isEmpty != false, !drafts.contains(where: { $0.key.entry == pendingID && $0.value.isDirty }) {
+                    for slot in drafts.keys where slot.entry == pendingID { drafts[slot] = nil }
+                    pendingID = id
+                    pending = entry
+                } else {
+                    orphans.append(String(localized: "New entry: \(Self.text(of: entry))"))
+                }
+            case .text(let slot, let base, let text):
+                if let draft = drafts[slot], draft.isDirty { continue }
+                guard slot.entry == pendingID || ids.contains(slot.entry) else {
+                    orphans.append("\(Self.label(of: slot.member)): \(text)")
+                    continue
+                }
+                let draft = draft(slot)
+                draft.base = base
+                draft.text = text
+                draft.isDirty = true
+                draft.rejected = true
+                if let index = ids.firstIndex(of: slot.entry) { entryBases[slot] = ListEntries.object(known[index]) }
+            case nil:
+                break
+            }
+        }
+        // Text typed into an entry that only a refused write held has no field to show it in.
+        for slot in drafts.keys.sorted(by: { $0.member < $1.member }) where slot.entry != pendingID && !ids.contains(slot.entry) {
+            if let draft = drafts[slot], draft.isDirty, draft.text != draft.base { orphans.append("\(Self.label(of: slot.member)): \(draft.text)") }
+            drafts[slot] = nil
+            entryBases[slot] = nil
+        }
+        notice = String(localized: "The list could not be saved.")
+    }
+
+    private static func label(of member: String) -> String {
+        ItemTypeInfo.Field.displayLabel(MarfaMapping.label(forField: member))
+    }
+
+    private static func text(of entry: Entry) -> String {
+        entry.sorted { $0.key < $1.key }.map { "\(label(of: $0.key)): \(ListShape.editing($0.value))" }.joined(separator: ", ")
     }
 
     private static func sharesAValue(_ old: PropertyValue, _ new: PropertyValue) -> Bool {
@@ -181,7 +314,8 @@ final class ListEditing {
         } else {
             new = .string(typed)
         }
-        guard set(member.key, to: new, of: id, in: shape, value: value, write: write) else {
+        let given = Given.text(slot, base: draft.base, text: draft.text)
+        guard apply(member.key, to: new, of: id, in: shape, value: value, giving: given, write: write) else {
             draft.rejected = true
             return false
         }
@@ -204,6 +338,13 @@ final class ListEditing {
         _ member: String, to new: PropertyValue?, of id: UUID, in shape: ListShape, value: PropertyValue?,
         write: (PropertyValue?) -> Bool
     ) -> Bool {
+        apply(member, to: new, of: id, in: shape, value: value, giving: nil, write: write)
+    }
+
+    private func apply(
+        _ member: String, to new: PropertyValue?, of id: UUID, in shape: ListShape, value: PropertyValue?, giving given: Given?,
+        write: (PropertyValue?) -> Bool
+    ) -> Bool {
         notice = nil
         if id == pendingID {
             var entry = pending ?? [:]
@@ -213,9 +354,10 @@ final class ListEditing {
                 return false
             }
             pending = entry
-            if shape.refusal(of: entry) == nil, send(ListEntries.appending(entry, to: value), over: value, in: shape, write: write) {
-                // The entry keeps the identity it was typed under, so text still being typed into it stays with it.
-                ids.append(pendingID)
+            guard shape.refusal(of: entry) == nil else { return true }
+            let base = base(value)
+            // The entry keeps the identity it was typed under, so text still being typed into it stays with it.
+            if send(ListEntries.appending(entry, to: base), over: base, ids: ids + [pendingID], giving: .entry(pendingID, entry), in: shape, write: write) {
                 pending = nil
                 pendingID = UUID()
             }
@@ -230,16 +372,28 @@ final class ListEditing {
             notice = refusal
             return false
         }
-        guard send(ListEntries.setting(member, to: new, at: current.index, in: value), over: value, in: shape, write: write) else { return false }
+        let base = base(value)
+        guard send(ListEntries.setting(member, to: new, at: current.index, in: base), over: base, ids: ids, giving: given, in: shape, write: write)
+        else { return false }
         // Text still typed into the entry's other members began before this change, which was the person's own.
         for slot in entryBases.keys where slot.entry == id { entryBases[slot] = fields }
         return true
     }
 
-    /// Writes `new` in place of `current`, unless it holds faults Marfa refuses the whole list for and is no nearer a
-    /// list Marfa takes: a repair (removing an entry or a member the list does not take) is written, a change beside a
-    /// fault is not.
-    private func send(_ new: PropertyValue?, over current: PropertyValue?, in shape: ListShape, write: (PropertyValue?) -> Bool) -> Bool {
+    /// The list a change builds on: the one the editor last wrote while that is in flight, else the stored one.
+    private func base(_ value: PropertyValue?) -> PropertyValue? {
+        sync(ListEntries.entries(of: value))
+        return flights.isEmpty ? value : .array(known)
+    }
+
+    /// Writes `new`, whose entries have identities `newIDs`, in place of `current`, unless it holds faults Marfa
+    /// refuses the whole list for and is no nearer a list Marfa takes: a repair (removing an entry or a member the
+    /// list does not take) is written, a change beside a fault is not. The editor shows `new` from here on, until the
+    /// stored list settles it.
+    private func send(
+        _ new: PropertyValue?, over current: PropertyValue?, ids newIDs: [UUID], giving given: Given?, in shape: ListShape,
+        write: (PropertyValue?) -> Bool
+    ) -> Bool {
         let faults = shape.faults(in: ListEntries.entries(of: new))
         if faults > 0, faults >= shape.faults(in: ListEntries.entries(of: current)) {
             notice = String(localized: "The list can’t be saved while it holds an entry it doesn’t take. Correct or remove the entries marked in this list.")
@@ -249,7 +403,12 @@ final class ListEditing {
             notice = String(localized: "The list could not be saved.")
             return false
         }
+        if flights.isEmpty { settled = (known, ids) }
         known = ListEntries.entries(of: new)
+        ids = newIDs
+        flights.append(Flight(entries: known, ids: newIDs, given: given))
+        // Until the view draws again with the library's own word, a stored list without the write is not a refusal.
+        writing = true
         return true
     }
 
@@ -269,9 +428,11 @@ final class ListEditing {
     /// Removes entry `id`, at the person's word, with anything typed into it.
     func remove(_ id: UUID, in shape: ListShape, value: PropertyValue?, write: (PropertyValue?) -> Bool) {
         notice = nil
-        guard let index = entry(id, in: value)?.index,
-              send(ListEntries.removing(at: index, from: value), over: value, in: shape, write: write) else { return }
-        ids.remove(at: index)
+        guard let index = entry(id, in: value)?.index else { return }
+        let base = base(value)
+        var newIDs = ids
+        newIDs.remove(at: index)
+        guard send(ListEntries.removing(at: index, from: base), over: base, ids: newIDs, giving: nil, in: shape, write: write) else { return }
         for slot in drafts.keys where slot.entry == id {
             drafts[slot] = nil
             entryBases[slot] = nil
@@ -281,9 +442,11 @@ final class ListEditing {
     /// Moves entry `id` to `destination`, its place in the list after the move.
     func move(_ id: UUID, to destination: Int, in shape: ListShape, value: PropertyValue?, write: (PropertyValue?) -> Bool) {
         notice = nil
-        guard let index = entry(id, in: value)?.index, ids.indices.contains(destination),
-              send(ListEntries.moving(from: index, to: destination, in: value), over: value, in: shape, write: write) else { return }
-        ids.insert(ids.remove(at: index), at: destination)
+        guard let index = entry(id, in: value)?.index, ids.indices.contains(destination), index != destination else { return }
+        let base = base(value)
+        var newIDs = ids
+        newIDs.insert(newIDs.remove(at: index), at: destination)
+        _ = send(ListEntries.moving(from: index, to: destination, in: base), over: base, ids: newIDs, giving: nil, in: shape, write: write)
     }
 
     // MARK: Leaving
@@ -326,7 +489,7 @@ final class ListEditing {
 
     /// Leaves nothing the person typed behind, since the list's editor is gone for good: what can be written is
     /// written, and the rest goes back through `notices`, which puts it on the clipboard. The editor starts again from
-    /// the stored list.
+    /// the stored list; a write still in flight is the library's to keep or give back from here.
     func leave(
         _ shape: ListShape, label: String, value: PropertyValue?, isEditable: Bool, write: (PropertyValue?) -> Bool,
         to notices: Notices
@@ -356,6 +519,7 @@ final class ListEditing {
         drafts = [:]
         entryBases = [:]
         orphans = []
+        flights = []
         pending = nil
         notice = nil
     }

@@ -140,10 +140,12 @@ final class QuickAdd {
     var draft: Draft?
     var isPresented = false
     /// The work on each list field's entries, by key: an entry being added, or a member's text not yet in the draft.
-    /// Kept here, not by the popover that edits it, so closing the popover keeps it.
-    @ObservationIgnored var listDrafts: [String: ItemPropertyDraft] = [:]
+    /// Kept here, not by the popover that edits it, so closing the popover keeps it. Observed, so the panel's word on
+    /// an unfinished entry and its Add button follow it.
+    var listDrafts: [String: ItemPropertyDraft] = [:]
 
-    /// The work on the entries of list field `key`, made on first use.
+    /// The work on the entries of list field `key`, made on first use. Make it before a view reads it, as the popover
+    /// opens, since making it changes what the panel observes.
     func listDraft(for key: String) -> ItemPropertyDraft {
         if let draft = listDrafts[key] { return draft }
         let draft = ItemPropertyDraft()

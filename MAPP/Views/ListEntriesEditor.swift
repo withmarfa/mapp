@@ -12,12 +12,14 @@ struct ListEntriesEditor: View {
     let value: PropertyValue?
     let isEditable: Bool
     let editing: ListEditing
+    /// Whether the library still has a write of the item on its way (`ItemLibrary.isWritingProperties(of:)`).
+    var isWriting = false
     /// Writes the list (nil unsets it); false where the library refused it.
     let onChange: (PropertyValue?) -> Bool
     @Environment(\.library) private var library
 
     var body: some View {
-        let rows = editing.rows(of: value)
+        let rows = editing.rows(of: value, writing: isWriting)
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 entryBlock(row, index: index, count: rows.count)
@@ -35,10 +37,14 @@ struct ListEntriesEditor: View {
                     .accessibilityIdentifier("ItemListNotice.\(key)")
             }
         }
-        // Text typed into an entry that went from the list elsewhere goes back to the person.
-        .onChange(of: value, initial: true) {
-            if let notices = library?.notices { editing.handBackOrphans(label: label, to: notices) }
-        }
+        // Text typed into an entry that went from the list elsewhere, or given to a refused write whose place is
+        // gone, goes back to the person.
+        .onChange(of: value, initial: true) { handBackOrphans() }
+        .onChange(of: isWriting) { handBackOrphans() }
+    }
+
+    private func handBackOrphans() {
+        if let notices = library?.notices { editing.handBackOrphans(label: label, to: notices) }
     }
 
     @ViewBuilder private func entryBlock(_ row: ListEditing.Row, index: Int, count: Int) -> some View {
