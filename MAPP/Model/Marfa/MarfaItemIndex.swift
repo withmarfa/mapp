@@ -30,11 +30,8 @@ nonisolated struct MarfaItemIndex {
 
     func ids(in state: ItemState) -> Set<ItemID> { byState[state] ?? [] }
 
-    /// Whether the item is attached to another, whatever state that item or this one is in. A binned parent keeps
-    /// its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`).
-    func isAttachment(_ id: ItemID) -> Bool { attachments[id] != nil }
-
-    /// `ids` without the files that are attached to another item.
+    /// `ids` without the files that are attached to another item, whatever state that item is in: a binned parent
+    /// keeps its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`).
     func standalone(_ ids: Set<ItemID>) -> Set<ItemID> {
         attachments.isEmpty ? ids : ids.filter { attachments[$0] == nil }
     }
