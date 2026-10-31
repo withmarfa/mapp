@@ -13,8 +13,8 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
     var defaultWidth: CGFloat {
         switch self {
         case .sidebar: 230
-        case .list: 350
-        case .settings: 290
+        case .list: 330
+        case .settings: 280
         }
     }
 

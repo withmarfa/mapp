@@ -6,8 +6,8 @@ import Testing
 struct ColumnWidthTests {
     @Test func builtInDefaultsAreTheAgreedWidths() {
         #expect(ColumnWidth.sidebar.defaultWidth == 230)
-        #expect(ColumnWidth.list.defaultWidth == 350)
-        #expect(ColumnWidth.settings.defaultWidth == 290)
+        #expect(ColumnWidth.list.defaultWidth == 330)
+        #expect(ColumnWidth.settings.defaultWidth == 280)
     }
 
     @Test func everyDefaultLiesInsideItsColumnsLimits() {
@@ -46,7 +46,7 @@ struct ColumnWidthTests {
         defaults.set("wide", forKey: ColumnWidth.settings.key)
         #expect(ColumnWidth.sidebar.stored(in: defaults) == 300)
         #expect(ColumnWidth.list.stored(in: defaults) == 480)
-        #expect(ColumnWidth.settings.stored(in: defaults) == 290)
+        #expect(ColumnWidth.settings.stored(in: defaults) == 280)
     }
 
     @Test func eachColumnHasItsOwnKeyAndResetClearsThemWithTheInterfaceKeys() {
@@ -82,7 +82,7 @@ struct ColumnWidthTrackerTests {
         let tracker = tracker()
         tracker.record(300, for: .settings)
         #expect(tracker.width(of: .settings) == 300)
-        #expect(tracker.width(of: .list) == 350)
+        #expect(tracker.width(of: .list) == 330)
         #expect(tracker.width(of: .sidebar) == 230)
     }
 
