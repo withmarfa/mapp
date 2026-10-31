@@ -28,8 +28,10 @@ struct ListEntriesEditor: View {
                 block(fields: pending, id: editing.pendingID, index: nil, count: rows.count)
             }
             if isEditable, editing.pending == nil {
-                Button { editing.startEntry() } label: { Label("Add \(label)", systemImage: "plus") }
+                Button { editing.startEntry() } label: { Label("Add Entry", systemImage: "plus") }
                     .buttonStyle(.borderless)
+                    // The row's own label names the list beside the button; a spoken one needs it said.
+                    .accessibilityLabel("Add Entry to \(label)")
                     .accessibilityIdentifier("ItemListAdd.\(key)")
             }
             if let notice = editing.notice {

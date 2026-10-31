@@ -90,6 +90,7 @@ final class ItemLayoutTests: XCTestCase {
         let controlFrames = otherColumnControls.map(\.frame)
         let controlColors = otherColumnControls.map { averageColor(of: $0.screenshot()) }
         header.scroll(byDeltaX: 0, deltaY: -40)
+        // Gives the scroll's momentum time to settle before the header's frame is read.
         Thread.sleep(forTimeInterval: 0.3)
         XCTAssertLessThan(header.frame.minY, before - 20, "The header scrolls with the page.")
         for _ in 0..<8 { page.scroll(byDeltaX: 0, deltaY: -100) }

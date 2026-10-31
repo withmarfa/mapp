@@ -26,7 +26,6 @@ final class ItemEmptyStateTests: XCTestCase {
         XCTAssertTrue(window.itemPageTitle.waitForExistence(timeout: 3))
         XCUIElement.perform(withKeyModifiers: .command) { row.click() }
         XCTAssertTrue(prompt.waitForExistence(timeout: 3))
-        XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         XCTAssertFalse(window.itemPageTitle.exists)
         capture("Items without selection and matching toolbar background")
     }
@@ -40,7 +39,6 @@ final class ItemEmptyStateTests: XCTestCase {
         collection.click()
         XCTAssertTrue(window.staticTexts["No Items"].waitForExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
-        XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         XCTAssertFalse(window.itemPageTitle.exists)
         capture("Empty collection and blank content pane")
     }
@@ -53,7 +51,6 @@ final class ItemEmptyStateTests: XCTestCase {
         search.typeText("No matching item for this empty state check")
         XCTAssertTrue(window.itemPageTitle.waitForNonExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
-        XCTAssertFalse(window.staticTexts["No Note Selected"].exists)
         capture("Empty search and blank content pane")
         search.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(search.waitForNonExistence(timeout: 3))

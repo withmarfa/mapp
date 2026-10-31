@@ -86,6 +86,7 @@ extension EditorTests {
         }
         container.setFrameSize(full)
         let measured = try #require(try await settle(page.editor, Self.rowGaps, as: [Int].self) { $0 != nil })
+        // Gives a late relayout time to run, which would show as rows still out of place in the second reading.
         try await Task.sleep(for: .milliseconds(300))
         let later = try #require(try await page.editor.webView.evaluateJavaScript(Self.rowGaps) as? [Int])
         for found in [measured, later] {

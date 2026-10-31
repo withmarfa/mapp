@@ -2,12 +2,14 @@ name: Checks
 
 # Each job runs only when its files changed, so a docs-only change finishes in seconds.
 # - A draft pull request runs no Swift job; marking it ready runs them once. Builders test locally first.
-# - A change that touches only views, the String Catalog, assets or UI tests compiles everything
-#   but does not run the unit tests, which cover logic, not styling.
-# - The release build runs beside the unit tests, not after them.
+# - A change that touches only the String Catalog, assets or UI tests compiles everything but does not run the
+#   unit tests. Views are not left out, since several unit tests host views.
+# - The release build runs beside the unit tests, not after them, and only for a change to the app's own code,
+#   since it compiles none of the tests.
 # - The unit tests run one at a time with a 12 minute limit; a run that reaches it uploads samples of its test host
 #   as the `unit-test-diagnostics` artifact and fails. A failed test fails the check, and nothing is retried.
 # - The UI tests are only built here; they take over the keyboard and mouse, so they run locally before a merge.
+# - A change to a workflow is checked by actionlint.
 # - Xcode Cloud archives tagged releases only.
 # The final job, "Checks", always runs; make it the one required check.
 on:
@@ -30,6 +32,8 @@ jobs:
       editor: ${{ steps.filter.outputs.editor }}
       swift: ${{ steps.filter.outputs.swift }}
       logic: ${{ steps.filter.outputs.logic }}
+      release: ${{ steps.filter.outputs.release }}
+      workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,10 +51,19 @@ jobs:
           if [ -n "$app" ]; then
             echo "swift=true" >> "$GITHUB_OUTPUT"
           fi
-          # Anything outside views, the String Catalog, assets and UI tests may change logic.
-          logic=$(echo "$app" | grep -vE '^(MAPP/Views/|MAPP/Localizable\.xcstrings$|MAPP/Assets\.xcassets/|MAPPUITests/)' || true)
+          # Anything outside the String Catalog, assets and UI tests may change logic. Views count: several unit
+          # tests host them.
+          logic=$(echo "$app" | grep -vE '^(MAPP/Localizable\.xcstrings$|MAPP/Assets\.xcassets/|MAPPUITests/)' || true)
           if [ -n "$logic" ]; then
             echo "logic=true" >> "$GITHUB_OUTPUT"
+          fi
+          # The release build compiles the app, not the tests, so tests, test plans and the test scripts do not need it.
+          release=$(echo "$app" | grep -E '^(MAPP/|MAPP\.xcodeproj/|Config/|\.github/workflows/checks\.yml$)' || true)
+          if [ -n "$release" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$files" | grep -qE '^\.github/(workflows/|actionlint\.ya?ml$)'; then
+            echo "workflows=true" >> "$GITHUB_OUTPUT"
           fi
 
   editor:
@@ -82,6 +95,25 @@ jobs:
         run: |
           pnpm build
           git diff --exit-code -- ../MAPP/Editor/Page/
+
+  actionlint:
+    name: Workflow lint
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The release archive, checked against the digest that its release publishes, so the tool is the one reviewed.
+      - name: Install actionlint
+        run: |
+          version=1.7.12
+          curl -fsSL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum --check
+          tar -xzf actionlint.tar.gz actionlint
+      - run: ./actionlint -color
 
   swift:
     name: Unit tests
@@ -137,7 +169,7 @@ jobs:
   release:
     name: Release build
     needs: changes
-    if: needs.changes.outputs.swift == 'true' && github.event.pull_request.draft == false
+    if: needs.changes.outputs.release == 'true' && github.event.pull_request.draft == false
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -153,7 +185,7 @@ jobs:
 
   checks:
     name: Checks
-    needs: [changes, editor, swift, release]
+    needs: [changes, editor, actionlint, swift, release]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

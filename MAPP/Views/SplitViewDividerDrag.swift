@@ -32,9 +32,12 @@ final class DividerDragView: NSView {
     private var observation: NSObjectProtocol?
     private var isPlacementPending = false
 
-    /// Whether a divider is being dragged at this moment: the left button is down and the event being handled is its drag.
-    /// A resize that layout causes happens with the button up.
-    var isDragging: () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 && NSApp.currentEvent?.type == .leftMouseDragged }
+    /// Whether a divider is being dragged: the event being handled is a drag, and not one that resizes the window. A
+    /// resize that layout causes happens on another event. The button's state now is no guide: drag events are handled
+    /// after they were sent, so the last of a quick drag arrive once the button is already up, and with them its end.
+    private var isDragging: Bool {
+        NSApp.currentEvent?.type == .leftMouseDragged && window?.inLiveResize != true
+    }
 
     init(widths: @escaping () -> [CGFloat], action: @escaping ([CGFloat]) -> Void) {
         self.widths = widths
@@ -60,7 +63,7 @@ final class DividerDragView: NSView {
             MainActor.assumeIsolated {
                 guard let self, let split else { return }
                 self.placeColumns(in: split)
-                guard self.isDragging() else { return }
+                guard self.isDragging else { return }
                 self.action(ColumnWidthTracker.columnWidths(rightEdges: split.arrangedSubviews.map(\.frame.maxX)))
             }
         }
@@ -77,7 +80,7 @@ final class DividerDragView: NSView {
     /// Sets the dividers to the wanted widths, once per split view. It waits for a layout with room to place them in,
     /// and never moves a divider the person is dragging.
     private func placeColumns(in split: NSSplitView) {
-        guard isPlacementPending, split.bounds.width > 0, !isDragging() else { return }
+        guard isPlacementPending, split.bounds.width > 0, !isDragging else { return }
         let items = split.arrangedSubviews
         let hidden = items.map { split.isSubviewCollapsed($0) || $0.isHidden || $0.frame.width == 0 }
         isPlacementPending = false

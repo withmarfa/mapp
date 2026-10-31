@@ -493,6 +493,8 @@
 "%@ doesn’t use %@. They stay on the item, and show again if you change it back." : { "extractionState" : "manual" },
 "No Other Types" : { "extractionState" : "manual" },
 "Add %@" : { "extractionState" : "manual" },
+"Add Entry" : { "extractionState" : "manual" },
+"Add Entry to %@" : { "extractionState" : "manual" },
 "Add Text" : { "extractionState" : "manual" },
 "Add File or Property" : { "extractionState" : "manual" },
 "Set %@" : { "extractionState" : "manual" },

@@ -15,6 +15,7 @@ import Testing
         watching = Task { [weak self] in
             while !Task.isCancelled {
                 self?.seen.append(libraries.mode)
+                // Samples the mode often enough to see a brief change.
                 try? await Task.sleep(for: .milliseconds(5))
             }
         }

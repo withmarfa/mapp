@@ -41,15 +41,18 @@ import Testing
 
     @Test func anEmbedIsWaitedOnOnlyWhileItsTextIsNotYetRead() async throws {
         let url = try file("kept", Data("png".utf8))
+        let checked = library.unreadChecks
         let opening = Task { await open("![[Pasted.png]]", waiting: .seconds(5)) }
-        try await Task.sleep(for: .milliseconds(200))
+        // The embed is not in the text yet when the task asks, which is what makes it wait.
+        #expect(await eventually { library.unreadChecks > checked })
         library.bindEmbed("![[Pasted.png]]", in: note, file: url)
         #expect(await opening.value.file?.length == 3, "an embed not yet in the text the copy read is waited on")
 
         library.bindEmbed("![[Gone.png]]", in: note, bound: false)
         library.unreadSaves = [note]
+        let asked = library.unreadChecks
         let saving = Task { await open("![[Gone.png]]", waiting: .seconds(5)) }
-        try await Task.sleep(for: .milliseconds(200))
+        #expect(await eventually { library.unreadChecks > asked })
         library.bindEmbed("![[Gone.png]]", in: note, file: url)
         #expect(await saving.value.file?.length == 3, "a save the copy has not read yet is waited on")
         library.unreadSaves = []

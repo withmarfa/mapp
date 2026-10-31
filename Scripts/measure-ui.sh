@@ -2,7 +2,11 @@
 # Runs the `Measure UI` plan and prints, besides the test's own `UI|` lines, the app's own: its signposts, launch
 # milestones and slow events from the unified log, which a sandboxed UI test cannot read.
 #
-#   TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> Scripts/measure-ui.sh <derived data> [xcodebuild arguments]
+#   TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_MARFA_TEST_INSTANCE_ID=<instance_id> \
+#     Scripts/measure-ui.sh <derived data> [xcodebuild arguments]
+#
+# The run writes to the server, so it starts only when the instance_id the server reports at its root (`GET <address>/`)
+# is the one given: reading it from the server and passing it is the acknowledgement that this is a test instance.
 #
 # Further arguments go to xcodebuild, such as `-only-testing:MAPPUITests/SpeedMeasureTests/testLaunchWarm` or build
 # settings. Add `SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule` for numbers close to a release's.
@@ -14,6 +18,18 @@ set -u
 derived=${1:?usage: measure-ui.sh <derived data path> [xcodebuild arguments]}
 shift
 dir=$(cd "$(dirname "$0")" && pwd)
+
+if [[ -z ${TEST_RUNNER_MARFA_API_URL:-} || -z ${TEST_RUNNER_MARFA_API_KEY:-} ]]; then
+  echo "measure-ui.sh needs TEST_RUNNER_MARFA_API_URL and TEST_RUNNER_MARFA_API_KEY for a test instance." >&2
+  exit 2
+fi
+reported=$(curl -fsS --max-time 10 "${TEST_RUNNER_MARFA_API_URL%/}/" 2>/dev/null \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin).get("instance_id", ""))' 2>/dev/null)
+if [[ -z ${TEST_RUNNER_MARFA_TEST_INSTANCE_ID:-} || -z $reported || $reported != "$TEST_RUNNER_MARFA_TEST_INSTANCE_ID" ]]; then
+  echo "Refusing to run: TEST_RUNNER_MARFA_TEST_INSTANCE_ID must be the instance_id that $TEST_RUNNER_MARFA_API_URL reports at its root, to say it is a test instance." >&2
+  exit 2
+fi
+
 log=$(mktemp -t mapp-measure-log)
 out=$(mktemp -t mapp-measure-out)
 
@@ -48,10 +64,10 @@ python3 "$dir/speed-report.py" "$log"
 # line, which reaches only what the key reaches.
 if command -v marfa > /dev/null && [[ -n ${TEST_RUNNER_MARFA_API_URL:-} && -n ${TEST_RUNNER_MARFA_API_KEY:-} ]]; then
   export MARFA_API_URL=$TEST_RUNNER_MARFA_API_URL MARFA_API_KEY=$TEST_RUNNER_MARFA_API_KEY MARFA_NO_KEYCHAIN=1
-  for id in ${(f)"$(marfa search 'Speed measure' --type core.note --state any --tier all 2>/dev/null \
-      | awk '$3 == "core.note" && $0 ~ /Speed measure [0-9A-F]+$/ { print $2 }')"} \
-      ${(f)"$(marfa search 'Speed open' --type core.media.article --state any --tier all 2>/dev/null \
-      | awk '$3 == "core.media.article" && $0 ~ /Speed open (short|long|pictures|long field)$/ { print $2 }')"}; do
+  # Chosen by type and exact title in the answers' data and removed by id, so no other item is touched.
+  for id in ${(f)"$(for query in 'Speed measure' 'Speed open'; do
+      marfa search "$query" --state any --tier all --limit 100 --json 2>/dev/null
+    done | python3 "$dir/measure-ids.py")"}; do
     marfa items delete "$id" > /dev/null 2>&1
     marfa items purge "$id" > /dev/null 2>&1 || echo "could not remove the measuring note $id" >&2
   done

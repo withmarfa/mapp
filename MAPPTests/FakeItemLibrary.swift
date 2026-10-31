@@ -194,7 +194,14 @@ final class FakeItemLibrary: ItemLibrary {
     /// Notes whose saved text the copy has not read yet.
     var unreadSaves: Set<ItemID> = []
 
-    func hasUnreadSave(_ id: ItemID) -> Bool { unreadSaves.contains(id) }
+    /// How many times the library asked whether a save is unread, which a test waits on to know a task has begun
+    /// waiting for one.
+    @ObservationIgnored private(set) var unreadChecks = 0
+
+    func hasUnreadSave(_ id: ItemID) -> Bool {
+        unreadChecks += 1
+        return unreadSaves.contains(id)
+    }
 
     /// Puts the embed `text` in the text of `note`, unless it is there already, and binds it as Marfa's core does
     /// when the text is saved: to a new file item fetched as `file`, where one is given, or else to `resolution`.

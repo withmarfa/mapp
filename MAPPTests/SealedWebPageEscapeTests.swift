@@ -89,7 +89,7 @@ import WebKit
             """.utf8)
     }
 
-    private func run(_ escape: Escape, sealed: Bool) async throws -> (outcome: String, datagrams: Int) {
+    private func run(_ escape: Escape, sealed: Bool) async throws -> (outcome: String, probe: DatagramProbe) {
         let probe = try await DatagramProbe()
         let html = try document(for: escape, udpPort: probe.port)
         let page: WebPage
@@ -106,18 +106,23 @@ import WebKit
         }
         try #require(finished)
         let outcome = try await page.callJavaScript("return String(window.results.outcome)") as? String ?? "?"
-        // A fixed wait, to give a datagram that was wrongly sent time to arrive.
-        try await Task.sleep(for: .seconds(2))
-        return (outcome, probe.count)
+        return (outcome, probe)
     }
 
     @Test(arguments: Escape.allCases) func noEscapeSendsADatagram(_ escape: Escape) async throws {
-        let (outcome, datagrams) = try await run(escape, sealed: true)
+        let (outcome, probe) = try await run(escape, sealed: true)
+        // The page ran its escape 2.5 s before it reported done; this gives a datagram that was wrongly sent the
+        // last of its travel to the probe.
+        try await Task.sleep(for: .milliseconds(300))
+        let datagrams = probe.count
         #expect(datagrams == 0, "\(escape.rawValue) sent \(datagrams) datagrams (\(outcome))")
     }
 
     @Test(arguments: Escape.allCases) func theSameEscapeSendsWithoutTheSeal(_ escape: Escape) async throws {
-        let (outcome, datagrams) = try await run(escape, sealed: false)
-        if escape.sendsWhenUnsealed { #expect(datagrams > 0, "the control for \(escape.rawValue) sent nothing (\(outcome))") }
+        let (outcome, probe) = try await run(escape, sealed: false)
+        if escape.sendsWhenUnsealed {
+            let sent = await eventually(within: .seconds(20)) { probe.count > 0 }
+            #expect(sent, "the control for \(escape.rawValue) sent nothing (\(outcome))")
+        }
     }
 }

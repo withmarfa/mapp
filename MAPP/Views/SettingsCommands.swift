@@ -11,18 +11,34 @@ final class SettingsRequest {
     private struct MainWindow {
         weak var browser: Browser?
         weak var window: NSWindow?
+        var closing: (any NSObjectProtocol)?
     }
     @ObservationIgnored private var mainWindows: [MainWindow] = []
 
-    /// Notes that `browser` is shown in `window`, a main window.
+    /// Notes that `browser` is shown in `window`, a main window, until the window closes. A window that is only
+    /// hidden, as the app's windows are while it is hidden, stays one to show Settings in.
     func register(_ browser: Browser, in window: NSWindow?) {
-        mainWindows.removeAll { $0.browser == nil || $0.browser === browser }
-        mainWindows.append(MainWindow(browser: browser, window: window))
+        forget { $0.browser == nil || $0.browser === browser }
+        let closing = window.map { window in
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self, weak window] _ in
+                MainActor.assumeIsolated { self?.forget { $0.window === window } }
+            }
+        }
+        mainWindows.append(MainWindow(browser: browser, window: window, closing: closing))
+    }
+
+    private func forget(where gone: (MainWindow) -> Bool) {
+        for main in mainWindows where gone(main) {
+            if let closing = main.closing { NotificationCenter.default.removeObserver(closing) }
+        }
+        mainWindows.removeAll(where: gone)
     }
 
     /// The browser of the main window in front of the others, if any is open.
     private var frontMainWindow: MainWindow? {
-        mainWindows.removeAll { $0.browser == nil }
+        forget { $0.browser == nil }
         let ordered = NSApp?.orderedWindows ?? []
         return ordered.lazy.compactMap { window in self.mainWindows.first { $0.window === window } }.first ?? mainWindows.last
     }

@@ -7,6 +7,8 @@ nonisolated extension ItemTypeInfo.Field.Kind {
         switch (self, value) {
         case (.text, .string): true
         case (.choice(let choices), .string(let string)): choices.contains(string)
+        // A status can hold a word its type does not declare (`Field.options(including:)`), so any word is taken.
+        case (.status, .string): true
         case (.date(let includesTime), .string(let string)):
             string.isEmpty || ItemDate.parse(string).map { includesTime || !$0.hasTime } == true
         case (.boolean, .bool), (.number, .number): true

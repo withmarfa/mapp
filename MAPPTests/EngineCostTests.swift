@@ -163,6 +163,7 @@ nonisolated enum EngineServer {
             let state = status.object?["status"] as? String
             if state == "completed" { return (status.object?["matched"] as? NSNumber)?.intValue ?? 0 }
             try #require(state != "failed" && state != "canceled", "the bulk job ended \(state ?? "?"): \(status.text)")
+            // Paces the poll of the bulk job on the server.
             try await Task.sleep(for: .milliseconds(200))
         }
         throw SourceFailure(kind: .failed, message: "the bulk job did not finish")
@@ -417,6 +418,7 @@ struct EngineCostTests {
                 let start = ContinuousClock.now
                 await source.engineTook()
                 rest.append(Self.ms(ContinuousClock.now - start))
+                // Spaces the samples of the loop at rest.
                 try await Task.sleep(for: .milliseconds(50))
             }
             line("loop_at_rest_median", median(rest))
@@ -431,6 +433,7 @@ struct EngineCostTests {
             try #require(await eventually { library.item(id)?.sync == .settled })
             let answered = ContinuousClock.now - start
             line("save_round_trip", answered)
+            // Keeps probing for ten seconds in all after the save, to see what the engine does once it is settled.
             try await Task.sleep(for: .seconds(10) - answered)
             let samples = await probe.stop()
             line("loop_after_save_probes", Double(samples.count), "count")

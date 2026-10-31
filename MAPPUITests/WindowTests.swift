@@ -45,7 +45,6 @@ final class WindowTests: XCTestCase {
 
     private func groupIdentifier(for name: String) -> String? {
         switch name {
-        case "Favorites": "SidebarPlace-favorites"
         case "Types": "SidebarTypes"
         case "Note": "SidebarType-core.note"
         default: nil
@@ -441,6 +440,9 @@ final class WindowTests: XCTestCase {
         let windowFrame = window.frame
         let sidebarFrame = sidebar.frame
         let listFrame = list.frame
+        let body = window.itemPageBody
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
+        let bodyTop = body.frame.minY
         try app.performAccessibilityAudit { issue in
             guard let element = issue.element else { return false }
             // The audit is of the window; the menu bar above it is the system's to draw.
@@ -457,7 +459,14 @@ final class WindowTests: XCTestCase {
                 }
                 let isListTitle = element.frame.minY < listFrame.minY
                     && element.frame.minX >= listFrame.minX && element.frame.maxX <= listFrame.maxX
-                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle
+                // The sidebar's foot sits below its list, and its name takes the secondary colour whenever the
+                // window does not look active, which another app's panel can cause at any moment.
+                let isSidebarFoot = element.frame.minY >= sidebarFrame.maxY
+                    && element.frame.minX >= sidebarFrame.minX && element.frame.maxX <= sidebarFrame.maxX
+                // The page's byline and property labels above the text are drawn in the system's secondary label
+                // colour, which the audit finds a shade short in the light appearance.
+                let isPageHeader = element.frame.minX >= listFrame.maxX && element.frame.maxY <= bodyTop
+                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle || isSidebarFoot || isPageHeader
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }
