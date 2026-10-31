@@ -77,7 +77,7 @@ extension View {
     ///
     /// The foot's measures are read from `memory` and written back to it, where a list is mounted afresh with the same
     /// foot, so the first frame already draws the band or not as the last one did.
-    func bandsFoot<Foot: View>(memory: SidebarMemory? = nil, @ViewBuilder _ foot: () -> Foot) -> some View {
+    func bandsFoot<Foot: View>(memory: ColumnMemory? = nil, @ViewBuilder _ foot: () -> Foot) -> some View {
         modifier(BandsFoot(foot: foot(), memory: memory))
     }
 }
@@ -106,11 +106,11 @@ private struct ToolbarBandOverlay: View {
 
 private struct BandsFoot<Foot: View>: ViewModifier {
     let foot: Foot
-    let memory: SidebarMemory?
+    let memory: ColumnMemory?
     @State private var footHeight: CGFloat
     @State private var hiddenBelow: CGFloat
 
-    init(foot: Foot, memory: SidebarMemory?) {
+    init(foot: Foot, memory: ColumnMemory?) {
         self.foot = foot
         self.memory = memory
         _footHeight = State(initialValue: memory?.footHeight ?? 0)

@@ -18,7 +18,7 @@ struct WebLinkSheet: View {
                 .onSubmit(add)
                 .accessibilityIdentifier("WebLinkField")
             if refused {
-                Text("Enter a web, email or phone address.")
+                Text("Enter a web, email, or phone address.")
                     .interfaceFont(.callout).foregroundStyle(.red)
             }
             HStack {

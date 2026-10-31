@@ -5,24 +5,24 @@ extension View {
     /// Starts the list this is applied to where the last one was scrolled, and keeps `memory` current as it scrolls.
     /// SwiftUI's own scroll position does not move a `List` on macOS, so this finds the table behind it, as
     /// `softSelection` does.
-    func remembersScroll(in memory: SidebarMemory) -> some View {
+    func remembersScroll(in memory: ColumnMemory) -> some View {
         background(ScrollMemory(memory: memory))
     }
 }
 
 struct ScrollMemory: NSViewRepresentable {
-    let memory: SidebarMemory
+    let memory: ColumnMemory
 
     func makeNSView(context: Context) -> Probe { Probe(memory: memory) }
     func updateNSView(_ probe: Probe, context: Context) {}
     static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.stop() }
 
     final class Probe: NSView {
-        private let memory: SidebarMemory
+        private let memory: ColumnMemory
         private var observer: NSObjectProtocol?
         private var isWatching = false
 
-        init(memory: SidebarMemory) {
+        init(memory: ColumnMemory) {
             self.memory = memory
             super.init(frame: .zero)
             memory.rearm = { [weak self] in self?.rearm() }

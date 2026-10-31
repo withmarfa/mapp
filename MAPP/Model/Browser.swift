@@ -11,9 +11,9 @@ final class Browser {
     /// this is kept here, where Show More stays open through that.
     var sidebarShowsAllTypes = false
     /// The rest of what the sidebar keeps through that: its scroll position and its foot's measures.
-    @ObservationIgnored let sidebarMemory = SidebarMemory()
+    @ObservationIgnored let sidebarMemory = ColumnMemory()
     /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
-    @ObservationIgnored let listMemory = SidebarMemory()
+    @ObservationIgnored let listMemory = ColumnMemory()
     var selection: Set<ItemID> = [] {
         didSet {
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }

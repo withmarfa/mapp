@@ -100,7 +100,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var linking: CheckedContinuation<String?, Never>?
     /// Whether Writing Tools has a session open on the page. A test sets it, since a session needs Apple Intelligence.
     @ObservationIgnored var isWritingToolsActive: () -> Bool = { false }
-    /// The page's latest edit while a Writing Tools session is open, saved once it ends (`holdsEdits`).
+    /// The page's latest edit while a Writing Tools session is open, saved once it ends (`holdEdit`).
     @ObservationIgnored var heldEdit: (markdown: String, generation: Int)?
     @ObservationIgnored var heldEditWatch: Task<Void, Never>?
     @ObservationIgnored var windowIsGone = false
@@ -157,7 +157,7 @@ final class EditorController: NSObject {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         configuration.websiteDataStore = .nonPersistent()
-        // The full Writing Tools experience: its panel, and rewrites shown in place. `holdsEdits` keeps the note from
+        // The full Writing Tools experience: its panel, and rewrites shown in place. `holdEdit` keeps the note from
         // being saved while a rewrite is not yet accepted.
         configuration.writingToolsBehavior = .complete
         configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)

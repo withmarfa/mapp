@@ -4,7 +4,7 @@ import CoreGraphics
 /// sidebar's, and the list's, table's or gallery's. It is kept by the window's `Browser`, above that boundary, and the
 /// new column starts from it so its first frame is the last one's. It is not observed: reading it never draws
 /// anything again.
-final class SidebarMemory {
+final class ColumnMemory {
     /// How far the list was scrolled, in the scroll view's own offset; nil until it has been.
     var scrollOffset: CGFloat?
     /// Said after the person scrolls, so a window can keep the position for the next launch.
