@@ -42,6 +42,8 @@ extension MarfaEngine {
         let refusing = TestHook<@Sendable (ItemWrite) -> MarfaError?>()
         /// Replaces how long a held undo waits for a copy that is not catching up.
         let holdLimit = TestHook<Duration>()
+        /// Replaces the copy's attach, which the fake copy refuses, so a test can hold it as a large file's would be.
+        let attaching = TestHook<@Sendable (_ item: String, _ title: String) async throws -> Marfa.Attached>()
     }
 }
 

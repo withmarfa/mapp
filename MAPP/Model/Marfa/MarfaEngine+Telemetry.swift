@@ -59,6 +59,8 @@ extension MarfaEngine.Event {
         case .answer: "answer"
         case .attach: "attach"
         case .addFile: "addFile"
+        case .attached: "attached"
+        case .addedFile: "addedFile"
         }
     }
 }
