@@ -216,7 +216,7 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.browser, browser)
-        .focusedSceneValue(\.editor, browser.showsCollection || browser.showsSidebarIndex ? nil : editor)
+        .focusedSceneValue(\.editor, browser.showsPage ? editor : nil)
         .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
         .environment(details)

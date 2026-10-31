@@ -1367,13 +1367,10 @@
     "Delete Immediately…" : {
 
     },
-    "Delete Note" : {
+    "Delete Item" : {
 
     },
-    "Delete Note Immediately…" : {
-
-    },
-    "Delete Notes" : {
+    "Delete Items" : {
 
     },
     "Delete Row" : {
@@ -1557,9 +1554,6 @@
 
     },
     "Group by Date" : {
-
-    },
-    "Heading" : {
 
     },
     "Heading 1" : {
@@ -2252,9 +2246,6 @@
       "extractionState" : "manual"
     },
     "Strikethrough" : {
-
-    },
-    "Subheading" : {
 
     },
     "Suggestions" : {

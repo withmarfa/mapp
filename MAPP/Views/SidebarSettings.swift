@@ -71,12 +71,18 @@ struct SidebarSettings: View {
     }
 
     /// The rows under a type, indented, each with its switch; they keep the order of their items.
-    private func typeChildren(_ node: TypeNode, in library: any ItemLibrary, plan: SidebarPlan, depth: Int) -> AnyView {
-        AnyView(ForEach(node.children) { child in
-            row(.type(child.id), in: library, plan: plan, among: [], depth: depth)
-                .disabled(plan.layout.isHidden(.types) || plan.layout.isHidden(.type(node.id)))
-            typeChildren(child, in: library, plan: plan, depth: depth + 1)
-        })
+    private func typeChildren(_ node: TypeNode, in library: any ItemLibrary, plan: SidebarPlan, depth: Int) -> some View {
+        ForEach(Self.descendants(of: node, depth: depth), id: \.node.id) { entry in
+            row(.type(entry.node.id), in: library, plan: plan, among: [], depth: entry.depth)
+                .disabled(plan.layout.isHidden(.types) || plan.layout.isHidden(.type(entry.parent.id)))
+        }
+    }
+
+    /// Every type below `node`, each after its parent, with its parent and its depth.
+    private static func descendants(of node: TypeNode, depth: Int) -> [(node: TypeNode, parent: TypeNode, depth: Int)] {
+        node.children.flatMap { child in
+            [(node: child, parent: node, depth: depth)] + descendants(of: child, depth: depth + 1)
+        }
     }
 
     /// The rows of one group, which move among themselves.

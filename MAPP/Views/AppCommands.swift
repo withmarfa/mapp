@@ -40,22 +40,9 @@ struct AppCommands: Commands {
             // Sharing a note reads one note; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
-            Button("Open in New Window", systemImage: "macwindow") {
-                ItemWindows.open(library?.idsForWindows(ids) ?? []) { openWindow(value: $0) }
-            }
-            .keyboardShortcut("o")
-            .disabled(browser == nil || ids.isEmpty)
-            let original = ids.count == 1 ? ids.first.flatMap { library?.item($0) }.flatMap { library?.originalAddress(of: $0) } : nil
-            Button("Open Original", systemImage: "safari") { if let original { NSWorkspace.shared.open(original) } }
-                .disabled(original == nil)
-            let page = ids.count == 1 ? ids.first.flatMap { library?.item($0) } : nil
-            let target = page.flatMap { page in
-                library?.browserTarget(of: page, fetchedFile: ids.first.flatMap { browser?.fileURL(of: $0) })
-            }
-            Button("Open in Browser", systemImage: "safari") {
-                if let page, let target { BrowserOpening.open(target, for: page) }
-            }
-            .disabled(target == nil)
+            command(.openInNewWindow)
+            command(.openOriginal)
+            command(.openInBrowser)
             Divider()
             NoteShareLink(share: library.map { library in
                 NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
@@ -68,12 +55,14 @@ struct AppCommands: Commands {
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
+        // Where Notes keeps Attach File, after the pasteboard's commands.
+        CommandGroup(after: .pasteboard) {
+            command(.addAttachment)
+        }
+
         CommandGroup(replacing: .printItem) {
-            Button("Export as PDF…", systemImage: "doc.richtext") { editor?.exportPDF() }
-                .disabled(browser?.showsCollection == true || editor?.hasNote != true)
-            Button("Print…", systemImage: "printer") { editor?.printNote() }
-                .keyboardShortcut("p")
-                .disabled(browser?.showsCollection == true || editor?.hasNote != true)
+            command(.exportPDF)
+            command(.print)
         }
 
         CommandGroup(after: .textEditing) {
@@ -92,10 +81,7 @@ struct AppCommands: Commands {
             }
             .disabled(browser == nil || library == nil)
             Divider()
-            Button(editor?.caret.sourceMode == true ? "Show Formatted Text" : "Show Markdown Source") {
-                if let editor { editor.setSourceMode(!editor.caret.sourceMode) }
-            }
-            .disabled(editor?.hasNote != true)
+            command(.toggleSource)
             Divider()
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, bindsKeys: true)
@@ -153,6 +139,14 @@ struct AppCommands: Commands {
 }
 
 extension AppCommands {
+    /// A command of the page or the selection, which answers as the toolbar's More menu does.
+    private func command(_ command: ItemCommand) -> some View {
+        ItemCommandButton(
+            command: command,
+            context: ItemCommandContext(library: library, ids: notes?.ids ?? [], browser: browser, editor: editor),
+            editor: editor, bindsShortcut: true)
+    }
+
     private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
 
     private var canGoBack: Bool {

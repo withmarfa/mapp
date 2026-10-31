@@ -88,12 +88,12 @@ struct NoteRemoveActions: View {
         if context.isEmpty {
             EmptyView()
         } else if context.allDeleted {
-            Button(inMenuBar ? "Delete Note Immediately…" : "Delete Immediately…", systemImage: "trash", role: .destructive) {
+            Button("Delete Immediately…", systemImage: "trash", role: .destructive) {
                 library.notesToPurge = ids
             }
             .disabled(!library.canPurge)
         } else {
-            Button(inMenuBar ? "Delete Note" : "Delete", systemImage: "trash", role: .destructive) {
+            Button("Delete", systemImage: "trash", role: .destructive) {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
             .disabled(context.items.isEmpty)

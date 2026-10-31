@@ -201,7 +201,7 @@ private struct ItemToolbarActions {
     var showsInspector: Bool { details.isPresented }
 
     var visibleNote: Item? {
-        guard browser?.showsCollection != true,
+        guard browser?.showsPage != false,
               (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
               let note = notes.first, editor.hasNote, editor.noteID == note.id else { return nil }
         return note
@@ -236,7 +236,7 @@ private struct ItemToolbarActions {
         return MoreMenu(
             ids: browser.map(\.selection) ?? Set(items.map(\.id)),
             notes: isShowingSelection ? notes : [],
-            fileURL: selectedFileURL, browser: browser, editor: editor, visibleNote: visibleNote, editableNote: editableNote)
+            fileURL: selectedFileURL, browser: browser, editor: editor)
     }
 }
 
@@ -273,7 +273,6 @@ private struct FormatMenu: View {
 private struct MoreMenu: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.openWindow) private var openWindow
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     /// Everything selected, files too; the windows it opens, the share it makes and the collection actions take them all.
     let ids: Set<ItemID>
@@ -281,57 +280,33 @@ private struct MoreMenu: View {
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController
-    /// The note on the page, which Print, Export and the source view act on.
-    let visibleNote: Item?
-    let editableNote: Item?
 
-    /// The Web Page on the page and where "Open in Browser" takes it.
-    private var pageInBrowser: (item: Item, target: BrowserTarget?)? {
-        guard ids.count == 1, let item = ids.first.flatMap({ library.item($0) }), library.isWebPage(item) else { return nil }
-        return (item, library.browserTarget(of: item, fetchedFile: fileURL))
+    private func command(_ command: ItemCommand) -> some View {
+        ItemCommandButton(
+            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, fileURL: fileURL),
+            editor: editor)
     }
 
     var body: some View {
         let note = notes.count == 1 ? notes.first : nil
         Menu("More", systemImage: "ellipsis") {
-            if browser != nil {
-                Button("Open in New Window", systemImage: "macwindow") {
-                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
-                }
-                .keyboardShortcut("o")
-                .disabled(ids.isEmpty)
-            }
-            if let original = (visibleNote ?? note).flatMap({ library.originalAddress(of: $0) }) {
-                Button("Open Original", systemImage: "safari") { NSWorkspace.shared.open(original) }
-            }
-            if let page = pageInBrowser {
-                Button("Open in Browser", systemImage: "safari") {
-                    if let target = page.target { BrowserOpening.open(target, for: page.item) }
-                }
-                .disabled(page.target == nil)
-            }
+            command(.openInNewWindow)
+            command(.openOriginal)
+            command(.openInBrowser)
             NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
             NoteOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             CollectionActions(selection: ids, details: details, undoManager: undoManager)
             Divider()
-            Button("Add Attachment…", systemImage: "paperclip") { editor.isChoosingImages = true }
-                .keyboardShortcut("a", modifiers: [.command, .shift])
-                .disabled(editableNote == nil)
+            command(.addAttachment)
             Divider()
             Menu("Page Width", systemImage: "arrow.left.and.right") {
                 PageWidthOptions().pickerStyle(.inline).labelsHidden()
             }
-            Button(editor.caret.sourceMode ? "Show Formatted Text" : "Show Markdown Source", systemImage: "doc.plaintext") {
-                editor.setSourceMode(!editor.caret.sourceMode)
-            }
-            .disabled(visibleNote == nil)
+            command(.toggleSource)
             Divider()
-            Button("Print…", systemImage: "printer") { editor.printNote() }
-                .keyboardShortcut("p")
-                .disabled(visibleNote == nil)
-            Button("Export as PDF…", systemImage: "doc.richtext") { editor.exportPDF() }
-                .disabled(visibleNote == nil)
+            command(.print)
+            command(.exportPDF)
             Divider()
             NoteRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
         }

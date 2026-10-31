@@ -12,11 +12,6 @@ nonisolated enum ItemPageLayout: Equatable, Sendable {
     /// `runsScripts` is true only for a Web Page, whose saved page may need its scripts to draw; any other document
     /// is shown as written, with none of its scripts run.
     case webPage(document: ItemID, runsScripts: Bool)
-
-    /// The `core.file` field that says what a file attached to an item holds for it.
-    static let resourceKindField = "resource_kind"
-    /// The resource kind of a file that holds its item's document as HTML, as Readwise Reader keeps an article.
-    static let htmlResource = "html"
 }
 
 extension ItemLibrary {
@@ -27,20 +22,24 @@ extension ItemLibrary {
     ///   picture the HTML points to without asking. A file the library does not know the type of is judged by its
     ///   title's extension.
     /// - Any other file opens in its preview.
-    /// - An item that is not a file, but has a file attached that is not in the bin, whose `resource_kind` is `html`
-    ///   and whose type the web page can show (`WebPageFile.isHTML`), opens to that document under the item's own
-    ///   title and byline. Of several, the oldest is shown.
+    /// - An item to read (`PageHeaderKind.reading`: a bookmark or media) that is not a file, but has a file attached
+    ///   that is not in the bin and is HTML by its content type (or, where that is unknown, its extension), opens to
+    ///   that document under the item's own title and byline, as an article saved with its source does. Of several,
+    ///   the oldest is shown, but only while the item's own text is empty or blank (a body not yet held counts as
+    ///   empty, and the layout is read again once it is). An item with text keeps the editor, and so does any other
+    ///   item, even with an HTML file attached, so a person's text is never hidden by one.
     /// - Every other item opens to its text.
     func pageLayout(of item: Item) -> ItemPageLayout {
         if item.isFile {
             if isWebPage(item) { return .webPage(document: item.id, runsScripts: true) }
             return Self.isHTMLFile(item) ? .webPage(document: item.id, runsScripts: false) : .file
         }
+        guard PageHeaderKind.of(item.type, in: catalogue) == .reading else { return .text }
+        let ownText = body(of: item.id)?.text ?? ""
+        guard ownText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .text }
         let documents = attachments(of: item.id).compactMap { self.item($0) }
             .filter { file in
-                file.isFile && file.state != .trashed
-                    && file.value(of: ItemPageLayout.resourceKindField)?.string == ItemPageLayout.htmlResource
-                    && WebPageFile.isHTML(file.fileType)
+                file.isFile && file.state != .trashed && Self.isHTMLFile(file)
             }
             .sorted { ($0.created, $0.id.rawValue) < ($1.created, $1.id.rawValue) }
         if let document = documents.first { return .webPage(document: document.id, runsScripts: false) }

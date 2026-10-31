@@ -22,6 +22,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         var description: String?
         /// What a text field holds beyond plain text, where the contract names it: a `url` or an `email`.
         var format: TextFormat?
+        /// Whether a number field holds whole numbers only, as a Marfa `integer` does.
+        var isInteger = false
         var id: String { key }
     }
 
@@ -105,10 +107,12 @@ nonisolated extension ItemTypeInfo.Field {
         return values
     }
 
-    /// An option written for reading: the catalogue holds no labels for them, so `in_progress` reads as "In
-    /// Progress".
+    /// An option written for reading, in the person's language: the catalogue holds no labels for them, so
+    /// `in_progress` reads as "In Progress" or its translation. Every place that shows an option goes through this.
     static func label(ofOption option: String) -> String {
-        option.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        let words = option.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+        return Bundle.main.localizedString(forKey: words, value: words, table: nil)
     }
 
     /// A label the catalogue wrote for people, set in title case for the interface: "Completed at" reads as

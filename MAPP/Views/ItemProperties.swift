@@ -111,7 +111,7 @@ struct ItemPropertyRow: View {
         if definition.kind.isDate, let dateText {
             InspectorText(text: dateText, keepsOneLine: true).accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if isStatus, let text = value?.string {
-            statusLabel(Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: text))))
+            statusLabel(Text(verbatim: ItemTypeInfo.Field.label(ofOption: text)))
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if case .choice = definition.kind, let text = value?.string {
             InspectorText(text: ItemTypeInfo.Field.label(ofOption: text)).accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -120,7 +120,7 @@ struct ItemPropertyRow: View {
         }
     }
 
-    private var currentText: String { value.map(ItemValueText.string) ?? "" }
+    private var currentText: String { value.map(ItemValueText.editing) ?? "" }
 
     /// What the row reads at rest: the draft while there is one the item can take, else the stored value. An item that
     /// can no longer be edited shows what it holds, not what was typed for it.
@@ -276,7 +276,7 @@ struct ItemPropertyRow: View {
     /// is cut inside the value column.
     private func choiceMenu(allowsOther: Bool = false) -> some View {
         let current = value?.string
-        let text = current.map { Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))) }
+        let text = current.map { Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)) }
         return Menu {
             Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
                 current ?? ""
@@ -285,7 +285,7 @@ struct ItemPropertyRow: View {
             }) {
                 Text("Not Set").tag("")
                 ForEach(definition.options(including: current), id: \.self) {
-                    Text(LocalizedStringKey(ItemTypeInfo.Field.label(ofOption: $0))).tag($0)
+                    Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)).tag($0)
                 }
             }
             .pickerStyle(.inline)
@@ -427,7 +427,7 @@ struct ItemPropertyRow: View {
     }
 
     private func seed(_ value: PropertyValue?) {
-        input.text = value.map(ItemValueText.string) ?? ""
+        input.text = value.map(ItemValueText.editing) ?? ""
         input.base = input.text
         input.rejected = false
     }
@@ -441,15 +441,15 @@ struct ItemPropertyRow: View {
             return
         }
         input.handOff(
-            label: definition.displayLabel, as: definition.kind, current: currentText, isEditable: isEditable,
-            write: onChange, to: library.notices)
+            label: definition.displayLabel, as: definition.kind, integer: definition.isInteger, current: currentText,
+            isEditable: isEditable, write: onChange, to: library.notices)
         editing = false
         typingOwnValue = false
     }
 
     private func commit(overwriting: Bool = false) {
         guard isEditable else { return }
-        switch input.commit(as: definition.kind, current: currentText, overwriting: overwriting) {
+        switch input.commit(as: definition.kind, integer: definition.isInteger, current: currentText, overwriting: overwriting) {
         case .unchanged, .conflict:
             break
         case .alreadyCurrent:
@@ -475,6 +475,12 @@ nonisolated enum ItemValueText {
         case .array(let values): values.map(string).joined(separator: ", ")
         case .object(let fields): fields.keys.sorted().map { "\($0): \(string(fields[$0]!))" }.joined(separator: ", ")
         }
+    }
+
+    /// A value as the text field that edits it holds it: a number in the person's locale, as `PropertyNumber` reads it.
+    static func editing(_ value: PropertyValue) -> String {
+        if case .number(let number) = value { return PropertyNumber.editing(number) }
+        return string(value)
     }
 }
 
