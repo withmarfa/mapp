@@ -598,6 +598,13 @@ export class NoteEditor {
           ]
         : tables[command]
     if (table) return this.engine.table(table, undefined, expected)
+    // Link takes the address to set, and with none takes the link off.
+    if (command === 'link')
+      return this.engine.format(
+        'link',
+        typeof arg === 'string' ? { destination: arg } : undefined,
+        expected,
+      )
     return this.engine.format(
       (command === 'heading' ? 'heading' + arg : command) as InkFormat,
       undefined,

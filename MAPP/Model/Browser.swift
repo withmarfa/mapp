@@ -5,13 +5,18 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allNotes
+    var sidebarItem: SidebarItem? = .allNotes {
+        // A scroll position belongs to the place and layout it was made in.
+        didSet { if sidebarItem != oldValue { listMemory.scrollOffset = nil } }
+    }
     /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
     /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
     /// this is kept here, where Show More stays open through that.
     var sidebarShowsAllTypes = false
     /// The rest of what the sidebar keeps through that: its scroll position and its foot's measures.
-    @ObservationIgnored let sidebarMemory = SidebarMemory()
+    @ObservationIgnored let sidebarMemory = ColumnMemory()
+    /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
+    @ObservationIgnored let listMemory = ColumnMemory()
     var selection: Set<ItemID> = [] {
         didSet {
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
@@ -27,6 +32,7 @@ final class Browser {
     @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
+            if viewMode != oldValue { listMemory.scrollOffset = nil }
             isCollectionItemPresented = false
             if viewMode.spansWindow { focusRequest = .list }
         }
@@ -536,6 +542,7 @@ final class Browser {
         sidebarItem = .allNotes
         sidebarShowsAllTypes = false
         sidebarMemory.forget()
+        listMemory.forget()
         searchText = ""
         searchesPlace = false
         isSearchExpanded = false

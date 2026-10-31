@@ -42,6 +42,94 @@ struct WindowRestorationTests {
     }
 }
 
+struct WindowBringBackTests {
+    private func restored(_ saved: Browser, in library: FakeItemLibrary) throws -> Browser {
+        let data = try JSONEncoder().encode(saved.snapshot())
+        let restored = Browser()
+        restored.restore(from: data, in: library, order: NoteOrder())
+        return restored
+    }
+
+    @Test func anItemOpenFromTheGalleryComesBackOpen() throws {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.viewMode = .gallery
+        saved.selection = [newer.id]
+        saved.openCollectionSelection()
+        #expect(!saved.showsCollection)
+        let back = try restored(saved, in: library)
+        #expect(!back.showsCollection, "the item is open, not the grid behind it")
+        #expect(back.selection == [newer.id])
+    }
+
+    @Test func aGridThatWasShowingComesBackShowingItself() throws {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.viewMode = .table
+        saved.selection = [newer.id]
+        #expect(try restored(saved, in: library).showsCollection)
+    }
+
+    @Test func anOpenItemThatIsGoneIsNotOpened() throws {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.viewMode = .gallery
+        saved.selection = [newer.id]
+        saved.openCollectionSelection()
+        library.items.removeAll { $0.id == newer.id }
+        #expect(try restored(saved, in: library).showsCollection, "another item is chosen in its stead")
+    }
+
+    @Test func theScrollPositionIsKeptAndTheListShownIsToldToScroll() throws {
+        let (library, _, _, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.listMemory.scrollOffset = 640
+        let data = try JSONEncoder().encode(saved.snapshot())
+        let back = Browser()
+        var rearmed = 0
+        back.listMemory.rearm = { rearmed += 1 }
+        back.restore(from: data, in: library, order: NoteOrder())
+        #expect(back.listMemory.scrollOffset == 640)
+        #expect(rearmed == 1)
+    }
+
+    @Test func theScrollPositionIsForgottenWhenThePlaceOrTheLayoutChanges() {
+        let browser = Browser()
+        browser.listMemory.scrollOffset = 300
+        browser.sidebarItem = .allNotes
+        browser.viewMode = .list
+        #expect(browser.listMemory.scrollOffset == 300, "setting what is already set keeps the position")
+        browser.sidebarItem = .favorites
+        #expect(browser.listMemory.scrollOffset == nil)
+        browser.listMemory.scrollOffset = 300
+        browser.viewMode = .table
+        #expect(browser.listMemory.scrollOffset == nil)
+    }
+
+    @Test func aRestoredPositionSurvivesRestoringThePlaceAndLayoutItBelongsTo() throws {
+        let (library, _, _, _) = BrowserTests().makeFakeLibrary()
+        let saved = Browser()
+        saved.sidebarItem = .favorites
+        saved.viewMode = .table
+        saved.listMemory.scrollOffset = 420
+        let data = try JSONEncoder().encode(saved.snapshot())
+        let back = Browser()
+        back.restore(from: data, in: library, order: NoteOrder())
+        #expect(back.listMemory.scrollOffset == 420)
+    }
+
+    @Test func aWindowKeptBeforeTheseThingsWereKeptStillOpens() throws {
+        let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
+        var snapshot = Browser.Snapshot(place: .allNotes, selection: [newer.id])
+        snapshot.opensItem = nil
+        let data = try JSONEncoder().encode(snapshot)
+        let back = Browser()
+        back.restore(from: data, in: library, order: NoteOrder())
+        #expect(back.selection == [newer.id])
+        #expect(back.listMemory.scrollOffset == nil)
+    }
+}
+
 struct FileWindowEditorTests {
     @Test func aFileWindowMakesNoEditor() {
         let slot = EditorSlot()

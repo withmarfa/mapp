@@ -8,6 +8,10 @@ extension Browser {
         var place: SidebarItem
         var selection: [ItemID]
         var viewMode: ItemViewMode = .list
+        /// An item was open from the table or the gallery, not the table or gallery itself.
+        var opensItem: Bool?
+        /// How far the list, table or gallery was scrolled.
+        var scrollOffset: Double?
     }
 
     /// The most items of a selection a window keeps for the next launch. A selection larger than this is kept as
@@ -17,7 +21,9 @@ extension Browser {
 
     func snapshot() -> Snapshot {
         let kept = selection.count > Self.restoredSelectionLimit ? [] : selection.sorted { $0.rawValue < $1.rawValue }
-        return Snapshot(place: item, selection: kept, viewMode: viewMode)
+        return Snapshot(
+            place: item, selection: kept, viewMode: viewMode, opensItem: isCollectionItemPresented,
+            scrollOffset: listMemory.scrollOffset.map(Double.init))
     }
 
     /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may
@@ -26,9 +32,12 @@ extension Browser {
         var place: SidebarItem
         var selection: Set<ItemID>
         var viewMode: ItemViewMode
+        var opensItem: Bool
     }
 
-    var snapshotParts: SnapshotParts { SnapshotParts(place: item, selection: selection, viewMode: viewMode) }
+    var snapshotParts: SnapshotParts {
+        SnapshotParts(place: item, selection: selection, viewMode: viewMode, opensItem: isCollectionItemPresented)
+    }
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
     /// leaves the window at its default.
@@ -44,6 +53,7 @@ extension Browser {
     /// items no longer in the list are dropped, leaving the top row selected if none remain.
     func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
         viewMode = snapshot.viewMode
+        let place = snapshot.place
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
@@ -55,6 +65,13 @@ extension Browser {
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
+        let keptSelection = !selection.isEmpty
         if selection.isEmpty { selectFirstNote(in: library, order: order) }
+        // Only where the window is back in the place it was left, and not with another item chosen in its stead.
+        guard item == place else { return }
+        if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection {
+            isCollectionItemPresented = true
+        }
+        if let offset = snapshot.scrollOffset, offset > 0 { listMemory.restore(to: CGFloat(offset)) }
     }
 }

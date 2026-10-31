@@ -71,6 +71,7 @@ struct ItemGallery: View {
                     }
                 }
                 .padding(Self.inset)
+                .remembersScroll(in: browser.listMemory)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Items")
                 // Space between and below the cards clears the selection, as a click on a Finder window's does.

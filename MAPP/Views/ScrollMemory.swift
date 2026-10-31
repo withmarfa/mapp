@@ -5,27 +5,39 @@ extension View {
     /// Starts the list this is applied to where the last one was scrolled, and keeps `memory` current as it scrolls.
     /// SwiftUI's own scroll position does not move a `List` on macOS, so this finds the table behind it, as
     /// `softSelection` does.
-    func remembersScroll(in memory: SidebarMemory) -> some View {
+    func remembersScroll(in memory: ColumnMemory) -> some View {
         background(ScrollMemory(memory: memory))
     }
 }
 
 struct ScrollMemory: NSViewRepresentable {
-    let memory: SidebarMemory
+    let memory: ColumnMemory
 
     func makeNSView(context: Context) -> Probe { Probe(memory: memory) }
     func updateNSView(_ probe: Probe, context: Context) {}
     static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.stop() }
 
     final class Probe: NSView {
-        private let memory: SidebarMemory
+        private let memory: ColumnMemory
         private var observer: NSObjectProtocol?
         private var isWatching = false
 
-        init(memory: SidebarMemory) {
+        init(memory: ColumnMemory) {
             self.memory = memory
             super.init(frame: .zero)
+            memory.rearm = { [weak self] in self?.rearm() }
+            memory.rearmOwner = ObjectIdentifier(self)
         }
+
+        private func rearm() {
+            observer.map(NotificationCenter.default.removeObserver)
+            observer = nil
+            isWatching = false
+            if restore() { watch() }
+        }
+
+        /// The list's scroll view, or the one the probe sits inside for a column that is not a list.
+        private func scrollView() -> NSScrollView? { nearestTable()?.enclosingScrollView ?? enclosingScrollView }
 
         required init?(coder: NSCoder) { nil }
 
@@ -53,7 +65,7 @@ struct ScrollMemory: NSViewRepresentable {
         /// Whether the list now shows the remembered offset, or has none to show.
         @discardableResult
         private func restore() -> Bool {
-            guard !isWatching, window != nil, let scroll = nearestTable()?.enclosingScrollView else { return false }
+            guard !isWatching, window != nil, let scroll = scrollView() else { return false }
             guard let offset = memory.scrollOffset, offset > 0 else { return true }
             let clip = scroll.contentView
             let room = (scroll.documentView?.frame.height ?? 0) - clip.bounds.height
@@ -63,7 +75,7 @@ struct ScrollMemory: NSViewRepresentable {
         }
 
         private func watch() {
-            guard !isWatching, let clip = nearestTable()?.enclosingScrollView?.contentView else { return }
+            guard !isWatching, let clip = scrollView()?.contentView else { return }
             isWatching = true
             clip.postsBoundsChangedNotifications = true
             observer = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
@@ -71,6 +83,7 @@ struct ScrollMemory: NSViewRepresentable {
                     // A list being taken down can reset its clip view to the top; that is no scroll of the person's.
                     guard let self, self.window != nil else { return }
                     self.memory.scrollOffset = clip.bounds.origin.y
+                    self.memory.scrolled?()
                 }
             }
         }
@@ -78,6 +91,10 @@ struct ScrollMemory: NSViewRepresentable {
         func stop() {
             observer.map(NotificationCenter.default.removeObserver)
             observer = nil
+            if memory.rearmOwner == ObjectIdentifier(self) {
+                memory.rearm = nil
+                memory.rearmOwner = nil
+            }
         }
     }
 }

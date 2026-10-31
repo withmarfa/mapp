@@ -11,6 +11,7 @@ import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { InkKitError } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
+import { linkAddressAtSelection } from './linkAddress'
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ declare global {
       focusText(prefix: string | null): void
       blurText(expected: number): void
       setHostActive(active: boolean): void
+      linkAddress(): string | null
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
       redo(expected?: number): void
@@ -245,6 +247,7 @@ window.editor = {
   },
   focusTitle: (item) => header.focusTitle(item),
   setHostActive: (active) => editor.setHostActive(active),
+  linkAddress: () => linkAddressAtSelection(root),
   focusText: (prefix) => {
     header.cancelTitleFocus()
     guardedCommand(() => editor.focusText(prefix))

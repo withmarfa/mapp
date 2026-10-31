@@ -16,11 +16,38 @@
     "An entry needs at least one value." : {
       "extractionState" : "manual"
     },
+    "Edit Link" : {
+
+    },
+    "Enter a web, email, or phone address." : {
+
+    },
+    "Heading 4" : {
+
+    },
+    "Heading 5" : {
+
+    },
+    "Heading 6" : {
+
+    },
+    "Highlight" : {
+
+    },
+    "Link" : {
+
+    },
+    "Link…" : {
+
+    },
     "Main" : {
       "extractionState" : "manual"
     },
     "Make Main" : {
       "extractionState" : "manual"
+    },
+    "Remove Link" : {
+
     },
     "Required" : {
       "extractionState" : "manual"
@@ -123,6 +150,9 @@
     },
     "Expands the section" : {
       "extractionState" : "manual"
+    },
+    "Web Address" : {
+
     },
     "Writes to this address" : {
       "extractionState" : "manual"
