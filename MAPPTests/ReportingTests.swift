@@ -101,4 +101,14 @@ struct ReportingTests {
             .init(type: "timestamp_unreadable", sentence: "A timestamp could not be read, so its item sorts as the oldest.", operation: "map")
         ])
     }
+
+    @Test func unreadConflictLinksAreReportedOnceARun() {
+        let sink = RecordingSink()
+        let reporting = Reporting(sink: sink)
+
+        Telemetry.conflictLinksUnread(count: 2, reporting: reporting)
+        Telemetry.conflictLinksUnread(count: 3, reporting: reporting)
+
+        #expect(sink.errors.map(\.type) == ["conflict_links_unread"])
+    }
 }

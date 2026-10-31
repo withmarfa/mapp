@@ -49,9 +49,10 @@ nonisolated extension Telemetry {
     }
 
     /// The copy could not say which item a conflicted copy was made from, or which copies an original has, so those
-    /// items show the links last read.
+    /// items show the links last read. Logged each time, and reported once a run, since one cause fails every read.
     static func conflictLinksUnread(count: Int, reporting: Reporting = .shared) {
         logger(.engine).error("\(count, privacy: .public) conflicted copy links could not be read")
+        guard reporting.isFirst("conflict_links_unread") else { return }
         reporting.sink.report(
             type: "conflict_links_unread", sentence: "The copy could not say which item a conflicted copy was made from.",
             during: "read")
