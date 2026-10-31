@@ -83,7 +83,7 @@ TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> \
 ## Signing and releases
 
 - Never commit a team identifier, a report destination (`MARFA_POSTHOG_HOST`, `MARFA_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`, and `MARKETING_VERSION` stays `0.0.0`. A build from this source signs to run locally and sends no reports.
-- A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`). Tag soon after any merge to `main` that changes what a person sees or does; merges that change only tests, CI, docs or notes are not tagged. The README's Signing and Releasing sections say how to sign, tag and check a release.
+- A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`). Tag soon after any merge to `main` that changes what a person sees or does; merges that change only tests, CI, docs or notes are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections: they hold the steps (candidates first, then the release, then App Store Connect to confirm).
 
 ## Code Review Rules
 

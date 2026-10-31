@@ -134,6 +134,9 @@ extension EditorController {
     /// address, and has the page ask again about the pictures at those addresses when a file arrives, is changed or goes
     /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and text is saved, so the page hears
     /// once they pause. Never rewrites the note.
+    ///
+    /// Known limit: it follows the library's own state, so a connection that returns after an offline spell does not
+    /// redraw an embed that showed an error card. The card's retry does, and so does any later change.
     func watchEmbeds() {
         embedWatch += 1
         guard let library, let note = noteID else {
