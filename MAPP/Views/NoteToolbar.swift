@@ -22,12 +22,17 @@ struct NoteToolbar: CustomizableToolbarContent {
         }
         .customizationBehavior(.disabled)
         .hidden(!showsCreation)
+        // The item stays in the toolbar while the page's title is in view and only its text goes, rather than the item
+        // being hidden and shown as the page scrolls. A hidden item keeps no place at the detail column's leading edge,
+        // so the first time it was shown it could be laid out from the list column's side, under that column's buttons.
+        // Only the editor's page scrolls its header away; any other page keeps its title in view, so a stale flag from
+        // the note shown before it must not show the title.
         ToolbarItem(id: "scrolledTitle") {
-            ScrolledItemTitle(title: tools.notes.first?.title ?? "")
+            ScrolledItemTitle(title: editor?.isHeaderScrolledAway == true && tools.visibleNote != nil ? tools.notes.first?.title ?? "" : "")
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(!showsScrolledTitle || editor?.isHeaderScrolledAway != true || tools.notes.count != 1 || browser?.showsCollection == true)
+        .hidden(!showsScrolledTitle || tools.notes.count != 1 || browser?.showsCollection == true)
         ToolbarSpacer(.flexible)
         ToolbarItem(id: "format") {
             if let editor { FormatMenu(editor: editor, note: tools.editableNote) }
@@ -69,6 +74,7 @@ struct ScrolledItemTitle: View {
             // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
             .fixedSize(horizontal: true, vertical: false)
             .accessibilityIdentifier("ScrolledItemTitle")
+            .accessibilityHidden(title.isEmpty)
     }
 }
 
@@ -138,7 +144,7 @@ struct GalleryToolbar: ToolbarContent {
                 Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
                     .accessibilityIdentifier("BackToGallery")
             }
-            if showsScrolledTitle, editor.isHeaderScrolledAway, tools.notes.count == 1 {
+            if showsScrolledTitle, editor.isHeaderScrolledAway, tools.visibleNote != nil {
                 ToolbarItem(placement: .navigation) {
                     ScrolledItemTitle(title: tools.notes.first?.title ?? "")
                 }
