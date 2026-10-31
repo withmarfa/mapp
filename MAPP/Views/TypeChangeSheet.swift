@@ -39,7 +39,7 @@ struct TypeChangeSheet: View {
                                 return true
                             }, retainedDraft: draft(for: field.key), handsOffOnLeave: false)
                             if field.kind == .number, isNotANumber(field) {
-                                Text((PropertyNumber.parse(draft(for: field.key).text, integer: field.isInteger) == nil ? PropertyLoss.notANumber : .outOfRange).reason)
+                                Text(numberRefusal(field))
                                     .interfaceFont(.caption).foregroundStyle(.orange)
                                     .accessibilityIdentifier("TypeChangeNotANumber.\(field.key)")
                             }
@@ -117,6 +117,14 @@ struct TypeChangeSheet: View {
         guard draft.isDirty else { return false }
         let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         return !text.isEmpty && PropertyNumber.parse(text, rule: field.numberRule) == nil
+    }
+
+    /// Why the number typed in `field` is refused: not a number at all, or outside what the field takes, in the
+    /// field's own words where it declares a range.
+    private func numberRefusal(_ field: ItemTypeInfo.Field) -> String {
+        let text = draft(for: field.key).text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PropertyNumber.parse(text, integer: field.isInteger) != nil else { return PropertyLoss.notANumber.reason }
+        return field.numberRule.requirement ?? PropertyLoss.outOfRange.reason
     }
 
     private func canChange(_ preview: TypeChangePreview?) -> Bool {
