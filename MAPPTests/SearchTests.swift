@@ -163,6 +163,7 @@ import Testing
         let asked = source.searches.withLock { $0 }
         for _ in 0..<5 {
             _ = library.search("body", in: .everywhere)
+            // Gives the search a chance to be asked again, which it must not.
             try await Task.sleep(for: .milliseconds(20))
         }
         #expect(source.searches.withLock { $0 } == asked, "gives the running search time to be asked again")

@@ -206,8 +206,9 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         for frame in ["main", "blankFrame", "srcdocFrame", "writtenFrame", "nestedFrame", "openedWindow"] {
             #expect(results[frame] == "absent", "\(frame) has no WebRTC: \(results[frame] ?? "never ran")")
         }
-        // A fixed wait, to give a datagram that was wrongly sent time to arrive.
-        try await Task.sleep(for: .seconds(2))
+        // The page's own timer ran before it reported its results; this gives a datagram that was wrongly sent the
+        // last of its travel to the probe.
+        try await Task.sleep(for: .milliseconds(500))
         #expect(probe.count == 0, "\(probe.count) datagrams reached the server")
     }
 

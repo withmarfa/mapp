@@ -279,6 +279,7 @@ import Testing
         try #require(try await eventuallyAsking { try await scene.title() == "First" })
         try #require(try await eventuallyAsking { try await scene.links() == 0 })
         scene.becomeWhole()
+        // Time for a second reading to make the writes again, which it must not.
         try await Task.sleep(for: .milliseconds(300))
         let attempts = scene.reads.attempts.withLock { $0 }
         #expect(attempts.count == 3, "each made once: \(attempts)")
@@ -356,6 +357,7 @@ import Testing
         let group = UndoGroup()
         for _ in 0..<200 { scene.unlink(as: group) }
         try #require(try await eventuallyAsking { await scene.held() == 200 })
+        // Time for a second try of the held writes, which it must not make.
         try await Task.sleep(for: .milliseconds(300))
         #expect(scene.reads.attempts.withLock { $0.count } == 1, "only the first is tried")
         let made = scene.reads.fullReads.withLock { $0 } - reads

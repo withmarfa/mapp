@@ -360,10 +360,12 @@ struct NavigationCostTests {
     /// Runs `work`, then lets the editor's pending header readings run, and reports the cost.
     private func measurePage(_ what: String, _ work: () -> Void) async throws {
         #if DEBUG
+        // Lets earlier work finish, so it is not counted in the measure.
         try await Task.sleep(for: .milliseconds(300))
         Cost.resetTallies()
         let start = ContinuousClock.now
         work()
+        // The readings the work queues run in this time, and the measure subtracts it.
         try await Task.sleep(for: .milliseconds(100))
         let elapsed = ContinuousClock.now - start - .milliseconds(100)
         report(what, wallMilliseconds: Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15)
@@ -439,6 +441,7 @@ struct NavigationCostTests {
 
         /// Runs `move`, waits until nothing more is made for a moment, and prints what ran.
         func step(_ name: String, _ move: () -> Void) async throws {
+            // Lets earlier work finish, so it is not counted in the measure.
             try await Task.sleep(for: .milliseconds(400))
             Cost.resetTallies()
             move()

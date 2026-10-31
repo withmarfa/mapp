@@ -43,6 +43,7 @@ struct SidebarFramesTests {
             window.contentView?.layoutSubtreeIfNeeded()
         }
         func settle() async throws {
+            // Gives the window's animations time to finish before the frames are read.
             try await Task.sleep(for: .milliseconds(600))
             for _ in 0..<5 { turn() }
         }

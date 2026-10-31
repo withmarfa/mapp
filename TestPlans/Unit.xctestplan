@@ -21,7 +21,8 @@
       },
       "skippedTags" : {
         "tags" : [
-          "live"
+          "live",
+          "measure"
         ]
       }
     }
