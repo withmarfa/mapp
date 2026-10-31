@@ -65,25 +65,28 @@ nonisolated enum ItemBoardLayout {
         guard let value = item.value(of: key), value != .null else { return .missing }
         guard case .string(let text) = value else { return .invalid }
         guard !text.isEmpty else { return .missing }
-        if field.isClosed, !field.options.contains(text) { return .invalid }
+        if !field.options.contains(text) { return .invalid }
         return .option(text)
     }
 
+    /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
+    /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
+    /// item needs them. A board's fields are closed, so a word no type declares is an invalid value.
     static func lanes(items: [Item], key: String, catalogue: Catalogue) -> [ItemBoardLane] {
-        var values: [String] = []
+        var values: [(word: String, bucket: StatusBucket)] = []
         var seen: Set<String> = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) where field.key == key {
-                values += field.options.filter { !$0.isEmpty && seen.insert($0).inserted }
+                for word in field.options where !word.isEmpty && seen.insert(word).inserted {
+                    values.append((word, field.isStatus ? field.statusBucket(of: word) : .other))
+                }
             }
         }
+        // Words in one group, and the words of a choice, which has no groups, stay in declared order.
+        values = values.enumerated().sorted { ($0.element.bucket.rank, $0.offset) < ($1.element.bucket.rank, $1.offset) }.map(\.element)
         let groups = Dictionary(grouping: items) { lane(for: $0, key: key, catalogue: catalogue) }
-        let extra = groups.keys.compactMap { lane -> String? in
-            if case .option(let value) = lane, !seen.contains(value) { return value }
-            return nil
-        }.sorted()
-        var lanes = (values + extra).map { value in
-            ItemBoardLane(id: .option(value), title: ItemTypeInfo.Field.label(ofOption: value), items: [])
+        var lanes = values.map { entry in
+            ItemBoardLane(id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word), items: [])
         }
         lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Value"), items: []))
         if groups[.invalid] != nil {
@@ -113,7 +116,7 @@ nonisolated enum ItemBoardLayout {
         switch destination {
         case .option(let option):
             guard !option.isEmpty else { return .refused }
-            if field.isClosed, !field.options.contains(option) { return .refused }
+            if !field.options.contains(option) { return .refused }
             value = .string(option)
         case .missing:
             guard !field.required else { return .refused }

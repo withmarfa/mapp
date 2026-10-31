@@ -53,8 +53,8 @@ struct ItemTableCell: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-        // A mixed table's column holds one type's field; each cell offers its own type's, whose values may differ.
-        case .field(let field): value(of: library.catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key } ?? field)
+        // A mixed table's column holds the words of every type; each cell offers its own row's type's.
+        case .field(let field): value(of: column.field(for: row, catalogue: library.catalogue) ?? field)
         }
     }
 
@@ -133,8 +133,6 @@ struct ItemTableCell: View {
             }
         case .number:
             if let current { Text(current).monospacedDigit() }
-        case .person:
-            if let current { ItemTableCategory(column: column, value: current, title: column.label(ofCategory: current, in: [row])) }
         case .longText:
             if let current { Text(current).foregroundStyle(.secondary).truncationMode(.tail) }
         default:
@@ -241,13 +239,6 @@ struct ItemTableCategory: View {
                 PriorityBars(rank: value.map(column.rank(of:)), count: column.field?.options.count ?? 4)
             }
             .labelStyle(ItemTableLabelStyle())
-        case .person:
-            Label {
-                Text(title)
-            } icon: {
-                if let value { Avatar(name: value) } else { Image(systemName: "person.crop.circle.dashed").foregroundStyle(.tertiary) }
-            }
-            .labelStyle(ItemTableLabelStyle())
         default:
             Text(title)
         }
@@ -290,22 +281,6 @@ private struct PriorityBars: View {
         let level = rank.map { Double($0 + 1) / Double(max(count, 1)) } ?? 0
         Image(systemName: "cellularbars", variableValue: level)
             .foregroundStyle(level >= 1 ? AnyShapeStyle(.red) : level >= 0.75 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-            .accessibilityHidden(true)
-    }
-}
-
-/// A person's initial in a circle, its color steady for the name.
-private struct Avatar: View {
-    let name: String
-    private static let colors: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .brown]
-
-    var body: some View {
-        let color = Self.colors[Int(name.unicodeScalars.reduce(0) { ($0 &* 31 &+ $1.value) % 9973 }) % Self.colors.count]
-        Text(name.prefix(1).uppercased())
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 16, height: 16)
-            .background(color.gradient, in: .circle)
             .accessibilityHidden(true)
     }
 }

@@ -23,20 +23,11 @@ enum GalleryKind: Equatable {
         return .note
     }
 
-    /// The first start-like date field the type declares. A type the catalogue does not describe, as a folder's
-    /// events are, is known as an event by the type it builds on, and the usual names.
-    private static func startDate(of item: Item, info: ItemTypeInfo?, in library: any ItemLibrary) -> Date? {
-        var keys = (info?.fields ?? []).filter { field in
-            guard case .date = field.kind else { return false }
-            return field.key == "start" || field.key.hasPrefix("start_") || field.key.hasPrefix("starts")
-        }.map(\.key)
-        if keys.isEmpty, PageHeaderKind.of(item.type, in: library.catalogue) == .event {
-            keys = ["start", "starts_at", "start_at", "start_date", "date"]
-        }
-        for key in keys {
-            if let string = item.value(of: key)?.string, let date = ItemDate.parse(string)?.date { return date }
-        }
-        return nil
+    /// The start of an event or a task: its declared `starts_at`, read only on a type that inherits it.
+    static func startDate(of item: Item, info: ItemTypeInfo?, in library: any ItemLibrary) -> Date? {
+        guard let field = info?.fields.first(where: { library.catalogue.isStartDate($0, of: item.type) }),
+              let string = item.value(of: field.key)?.string else { return nil }
+        return ItemDate.parse(string)?.date
     }
 }
 

@@ -98,14 +98,6 @@ nonisolated extension ItemTypeInfo.Field {
         if case .status = kind { true } else { false }
     }
 
-    /// Whether the field holds only the values it lists, so a value outside them is invalid.
-    var isClosed: Bool {
-        switch kind {
-        case .choice, .status: true
-        case .text, .number, .boolean, .date, .other: false
-        }
-    }
-
     /// The group a status field puts `word` in; nil for any other field and for a word it does not declare.
     func statusGroup(of word: String) -> StatusGroup? {
         guard case .status(let words) = kind else { return nil }
@@ -291,6 +283,11 @@ nonisolated struct Catalogue: Hashable, Sendable {
     /// Whether `field` is a task's due date: the `due_at` field of a type that is a task.
     func isDueDate(_ field: ItemTypeInfo.Field, of type: TypeID) -> Bool {
         field.key == MarfaMapping.dueField && isTask(type)
+    }
+
+    /// Whether `field` is a start date: the `starts_at` field of a type that is an event or a task, or below one.
+    func isStartDate(_ field: ItemTypeInfo.Field, of type: TypeID) -> Bool {
+        field.key == MarfaMapping.startField && [MarfaMapping.eventType, MarfaMapping.taskType].contains { type == $0 || isSubtype(type, ofAnyOf: [$0]) }
     }
 
     /// The group of the word `item` holds in its type's status field; nil where the type has none, the item holds

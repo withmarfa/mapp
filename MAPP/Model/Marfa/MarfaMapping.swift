@@ -33,6 +33,9 @@ nonisolated enum MarfaMapping {
     static let taskType = TypeID("core.task")
     static let priorityField = "priority"
     static let dueField = "due_at"
+    /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
+    static let eventType = TypeID("core.event")
+    static let startField = "starts_at"
     /// The `in-collection` property that orders a collection's members.
     static let positionProperty = "position"
 

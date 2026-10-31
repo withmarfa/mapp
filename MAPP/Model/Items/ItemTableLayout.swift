@@ -41,7 +41,17 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     }
 
     enum Style: Hashable, Sendable {
-        case title, status, priority, person, choice, date, number, boolean, link, text, longText, duration
+        case title, status, priority, choice, date, number, boolean, link, text, longText, duration
+
+        /// How much a style says about its column, where types give one key different styles: a status, then a
+        /// priority, then the rest.
+        var specificity: Int {
+            switch self {
+            case .status: 2
+            case .priority: 1
+            default: 0
+            }
+        }
     }
 
     let id: String
@@ -58,7 +68,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     /// Whether the cells hold a few values a person picks from, which the table can group and filter by.
     var isCategorical: Bool {
         switch style {
-        case .status, .priority, .person, .choice, .boolean, .link: true
+        case .status, .priority, .choice, .boolean, .link: true
         case .title, .date, .number, .text, .longText, .duration: content == .type
         }
     }
@@ -119,6 +129,14 @@ nonisolated extension ItemTableColumn {
     /// Where a status column lists `value`: the group its type declares for the word, else Other.
     func statusBucket(of value: String) -> StatusBucket {
         field?.statusBucket(of: value) ?? .other
+    }
+
+    /// The field as the row's own type declares it, which a cell offers its values from: a merged column holds the
+    /// words of every type, and a row must not be set to one its type does not declare. Nil where the column is no
+    /// field or the type does not declare it.
+    func field(for row: ItemTableRow, catalogue: Catalogue) -> ItemTypeInfo.Field? {
+        guard let field else { return nil }
+        return catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key }
     }
 
     /// What the cell holds for grouping and filtering: a value from the item, or nil for an empty cell.
@@ -238,14 +256,14 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
-    /// After the status, the priority, the person and the due date (by their roles), the dates a table leads with, in
-    /// this order, wherever a type has them.
+    /// After the status, the priority and the due date (by their roles), the dates a table leads with, in this order,
+    /// wherever a type has them.
     private static let leading = ["starts_at", "ends_at", "completed_at", "occurred_at"]
     /// Fields that read as a paragraph or as bookkeeping, shown only when the person asks.
     private static let quiet: Set<String> = ["notes", "url", "place", "precision"]
 
     /// The table's columns for these rows: the name, then the type where the rows mix types, then status, priority
-    /// and assignee, then where each item is filed, then the other fields their types have, and when it was edited.
+    /// and due date, then where each item is filed, then the other fields their types have, and when it was edited.
     /// A field few of the rows fill starts hidden, as do the quiet ones; the person can show any of them.
     static func columns(for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>) -> [ItemTableColumn] {
         var columns: [ItemTableColumn] = [.title]
@@ -262,14 +280,21 @@ nonisolated enum ItemTableLayout {
             for field in info?.fields ?? [] {
                 if hidden.contains(field.key) || page.contains(field.key) || ["title", "body"].contains(field.key) { continue }
                 if case .other = field.kind { continue }
+                let fieldStyle = style(of: field, in: type, catalogue: catalogue)
+                if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
                 if let known = fields[field.key] {
-                    // Types that share a status field may each add words of their own.
-                    fields[field.key] = known.addingStatusWords(of: field)
+                    if fieldStyle.specificity > styles[field.key]!.specificity {
+                        // A status or priority in one type outranks the plain field another type calls the same.
+                        fields[field.key] = field
+                        styles[field.key] = fieldStyle
+                    } else {
+                        // Types that share a status field may each add words of their own.
+                        fields[field.key] = known.addingStatusWords(of: field)
+                    }
                     continue
                 }
                 fields[field.key] = field
-                styles[field.key] = style(of: field, in: type, catalogue: catalogue)
-                if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
+                styles[field.key] = fieldStyle
                 order.append(field.key)
             }
         }
@@ -282,8 +307,7 @@ nonisolated enum ItemTableLayout {
             switch styles[key] {
             case .status: return 0
             case .priority: return 1
-            case .person: return 2
-            default: return dueDates.contains(key) ? 3 : (leading.firstIndex(of: key).map { $0 + 4 } ?? Int.max)
+            default: return dueDates.contains(key) ? 2 : (leading.firstIndex(of: key).map { $0 + 3 } ?? Int.max)
             }
         }
         let sorted = order.sorted { a, b in
@@ -292,8 +316,8 @@ nonisolated enum ItemTableLayout {
             if (a == "description") != (b == "description") { return b == "description" }
             return order.firstIndex(of: a)! < order.firstIndex(of: b)!
         }
-        // Who and what state come first, then where the item is filed, then its dates and its prose.
-        let firstStyles: Set<ItemTableColumn.Style> = [.status, .priority, .person]
+        // What state comes first, then where the item is filed, then its dates and its prose.
+        let firstStyles: Set<ItemTableColumn.Style> = [.status, .priority]
         let isFirst = { (key: String) in styles[key].map(firstStyles.contains) ?? false }
         let (people, rest) = (sorted.filter(isFirst), sorted.filter { !isFirst($0) })
         for key in people {
@@ -328,7 +352,8 @@ nonisolated enum ItemTableLayout {
     }
 
     /// How a column of `field`, as `type` declares it, reads. A status is the field's kind, whatever its name; a
-    /// priority belongs to a task, and is not guessed from the name on any other type.
+    /// priority belongs to a task, and is not guessed from the name on any other type. A column that types share
+    /// keeps the most specific style any of them gives it (`Style.specificity`).
     static func style(of field: ItemTypeInfo.Field, in type: TypeID, catalogue: Catalogue) -> ItemTableColumn.Style {
         switch field.kind {
         case .boolean: return .boolean
@@ -337,7 +362,6 @@ nonisolated enum ItemTableLayout {
         case .status: return .status
         case .choice: return catalogue.isPriority(field, of: type) ? .priority : .choice
         case .text:
-            if ["assignee", "owner", "person", "author"].contains(field.key) { return .person }
             return field.key == "description" || field.key == "notes" ? .longText : .text
         case .other: return .text
         }
