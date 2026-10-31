@@ -28,6 +28,14 @@ nonisolated enum MarfaMapping {
     static let collectionEdge = "in-collection"
     /// The role a type plays to be a collection, which `in-collection` names at its target.
     static let containerRole = "container"
+    /// The type a task is, or descends from: only such a type's `priority` and `due_at` are read as a priority and a
+    /// due date.
+    static let taskType = TypeID("core.task")
+    static let priorityField = "priority"
+    static let dueField = "due_at"
+    /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
+    static let eventType = TypeID("core.event")
+    static let startField = "starts_at"
     /// The `in-collection` property that orders a collection's members.
     static let positionProperty = "position"
 
@@ -141,15 +149,15 @@ nonisolated enum MarfaMapping {
     static func itemType(_ type: Marfa.ItemType) -> ItemTypeInfo {
         ItemTypeInfo(
             id: TypeID(type.id), label: type.label ?? type.id,
-            fields: type.fields.map(field),
+            fields: type.fields.map { field($0, statusWords: $0.name == type.statusField ? type.statusWords : []) },
             titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) }, icon: type.icon,
             description: type.description, version: type.version, roles: type.roles,
             compatibleWith: type.compatibleWith.map { TypeID($0) }, linkField: type.linkField)
     }
 
-    private static func field(_ field: Marfa.TypeField) -> ItemTypeInfo.Field {
+    private static func field(_ field: Marfa.TypeField, statusWords: [Marfa.StatusWord] = []) -> ItemTypeInfo.Field {
         ItemTypeInfo.Field(
-            key: field.name, label: label(forField: field.name), kind: kind(of: field),
+            key: field.name, label: label(forField: field.name), kind: kind(of: field, statusWords: statusWords),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
             format: format(of: field), isInteger: field.type == "integer")
     }
@@ -179,7 +187,7 @@ nonisolated enum MarfaMapping {
             sourceRoles: constraints(type.sourceTypeConstraints).roles,
             targetRoles: constraints(type.targetTypeConstraints).roles,
             description: type.description, reverseCardinality: other == "one" ? .one : .many,
-            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map(field))
+            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) })
     }
 
     private static func cascade(_ name: String) -> EdgeTypeInfo.CascadeOnDelete {
@@ -199,8 +207,10 @@ nonisolated enum MarfaMapping {
         return (Set(names.filter { !$0.hasPrefix(prefix) }.map { TypeID($0) }), Set(roles))
     }
 
-    private static func kind(of field: Marfa.TypeField) -> ItemTypeInfo.Field.Kind {
+    private static func kind(of field: Marfa.TypeField, statusWords: [Marfa.StatusWord]) -> ItemTypeInfo.Field.Kind {
         switch field.type {
+        case "status":
+            .status(statusWords.compactMap { word in StatusGroup(rawValue: word.group.rawValue).map { StatusWord(value: word.value, group: $0) } })
         case "string", "url", "email": .text
         case "number", "integer": .number
         case "boolean": .boolean

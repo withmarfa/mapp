@@ -4,7 +4,19 @@
     "A collection’s contents always stay on its page." : {
       "extractionState" : "manual"
     },
+    "Icon Set" : {
+      "extractionState" : "manual"
+    },
     "Keep My Edit" : {
+      "extractionState" : "manual"
+    },
+    "Lucide" : {
+      "extractionState" : "manual"
+    },
+    "Not Started" : {
+      "extractionState" : "manual"
+    },
+    "Simple Icons" : {
       "extractionState" : "manual"
     },
     "This item can no longer be edited. Your change wasn’t saved." : {

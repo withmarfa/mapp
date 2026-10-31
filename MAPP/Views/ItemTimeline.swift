@@ -133,7 +133,7 @@ private struct ItemTimelineEntry: View {
                 .interfaceFont(.body)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeIcon(name: catalogue.icon(for: row.item.type)) }
+                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeIcon(id: catalogue.icon(for: row.item.type)) }
                 if let source = row.item.source {
                     Text(verbatim: source)
                 }

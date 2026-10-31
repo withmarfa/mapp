@@ -12,7 +12,7 @@ struct PropertyRowTests {
         id: "aic.ticket", label: "Ticket",
         fields: [
             field("title"), field("body"),
-            field("status", description: "Recommended values: pending, in_progress"),
+            field("status", "status", definition: ["status_values": [["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"]]]),
             field("priority", "enum", definition: ["enum_values": ["low", "high"]]),
             field("due_at", "datetime"), field("done", "boolean"), field("estimate", "integer"),
             field("link", "url"), field("contact", "email"), field("summary"), field("empty")
@@ -130,9 +130,9 @@ struct PropertyRowTests {
         let blocks = Self.relationship("blocks", "blocks", [("Ship it", "a"), ("Test it", "b")])
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", tags: [],
-            icon: { $0 == ItemID("a") ? "rocket" : nil })
+            icon: { $0 == ItemID("a") ? "lucide:rocket" : nil })
         #expect(rows[1].value == .items([
-            PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "rocket"),
+            PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "lucide:rocket"),
             PropertyRow.Target(title: "Test it", item: ItemID("b"), icon: nil),
         ]))
     }
@@ -202,7 +202,7 @@ struct PropertyRowTests {
             return item
         }
         let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "file-text")
+            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "lucide:file-text")
         ])
         let items = [held("a", "Old", age: 100), held("b", "New", age: 0), held("c", "Binned", age: 0, state: .trashed)]
         let relationships = [
@@ -213,7 +213,7 @@ struct PropertyRowTests {
         let list = LinkedItem.list(
             pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, item: { id in items.first { $0.id == id } })
         #expect(list.map(\.title) == ["New", "Old"])
-        #expect(list.first?.icon == "file-text")
+        #expect(list.first?.icon == "lucide:file-text")
         #expect(list.first?.type == "Note")
     }
 
@@ -225,7 +225,7 @@ struct PropertyRowTests {
                 created: day, modified: day)
         }
         let catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "file-text")
+            ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "lucide:file-text")
         ])
         let items = [held("a", "File"), held("b", "Mention")]
         let relationships = [

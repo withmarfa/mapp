@@ -11,6 +11,7 @@
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 		331000093066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000A3066ED47005D07A2 /* MarfaAPI */; };
 		3310000D3066ED47005D07A2 /* MarfaTelemetry in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000E3066ED47005D07A2 /* MarfaTelemetry */; };
+		331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 331000103066ED47005D07A2 /* MarfaBrandIcons */; };
 		3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000C3066ED47005D07A2 /* MarfaIcons */; };
 /* End PBXBuildFile section */
 
@@ -81,6 +82,7 @@
 			files = (
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000093066ED47005D07A2 /* MarfaAPI in Frameworks */,
+				331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */,
 				3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */,
 				3310000D3066ED47005D07A2 /* MarfaTelemetry in Frameworks */,
 				331000073066ED47005D07A2 /* MarfaTesting in Frameworks */,
@@ -148,6 +150,7 @@
 			packageProductDependencies = (
 				331000053066ED47005D07A2 /* Marfa */,
 				3310000A3066ED47005D07A2 /* MarfaAPI */,
+				331000103066ED47005D07A2 /* MarfaBrandIcons */,
 				3310000C3066ED47005D07A2 /* MarfaIcons */,
 				3310000E3066ED47005D07A2 /* MarfaTelemetry */,
 				331000083066ED47005D07A2 /* MarfaTesting */,
@@ -719,7 +722,7 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.44;
+				minimumVersion = 0.0.45;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -734,6 +737,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = MarfaAPI;
+		};
+		331000103066ED47005D07A2 /* MarfaBrandIcons */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaBrandIcons;
 		};
 		3310000C3066ED47005D07A2 /* MarfaIcons */ = {
 			isa = XCSwiftPackageProductDependency;

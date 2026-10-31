@@ -103,7 +103,7 @@ struct TypeIconTests {
         let catalogue = Catalogue(itemTypes: [info("acme.thing", icon: nil)])
         #expect(catalogue.icon(for: TypeID("acme.thing")) == nil)
         #expect(catalogue.icon(for: TypeID("not.in.the.catalogue")) == nil)
-        #expect(TypeIconArtwork(name: catalogue.icon(for: TypeID("acme.thing"))) == .fallback)
+        #expect(TypeIconArtwork(id: catalogue.icon(for: TypeID("acme.thing"))) == .fallback)
     }
 
     @Test func theAppReadsNoMeaningIntoATypesName() {
@@ -111,10 +111,12 @@ struct TypeIconTests {
         #expect(Catalogue().icon(for: TypeID("core.note")) == nil)
     }
 
-    @Test func anUnknownNameIsDrawnAsTheFallbackAndAKnownOneIsNot() {
-        #expect(TypeIconArtwork(name: "no-such-lucide-icon") == .fallback)
-        #expect(TypeIconArtwork(name: "scale") != .fallback)
-        #expect(TypeIconArtwork(name: "file-text") != .fallback)
+    @Test func aBareOrUnknownNameIsDrawnAsTheFallbackAndAFullIDIsNot() {
+        #expect(TypeIconArtwork(id: "lucide:no-such-lucide-icon") == .fallback)
+        #expect(TypeIconArtwork(id: "scale") == .fallback, "a bare name is not an ID")
+        #expect(TypeIconArtwork(id: "file-text") == .fallback)
+        #expect(TypeIconArtwork(id: "lucide:scale") != .fallback)
+        #expect(TypeIconArtwork(id: "lucide:file-text") != .fallback)
     }
 
     @Test func theEditorPageFindsATypesIconByItsKey() throws {
@@ -154,7 +156,7 @@ struct ItemMetaTests {
         let library = FakeItemLibrary(items: [project, notes, task])
         let meta = ItemMeta.make(for: task, in: library, context: .init(mixesTypes: true))
         #expect(meta.pieces.map(\.label) == ["Task"])
-        #expect(meta.pieces.map(\.icon) == [.type("list-checks")])
+        #expect(meta.pieces.map(\.icon) == [.type("lucide:list-checks")])
     }
 
     @Test func aListOfOneTypeLeavesTheTypeOut() {

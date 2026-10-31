@@ -21,7 +21,7 @@ struct TypeChangeSheet: View {
             Text("Change Type").interfaceFont(.title2.bold())
             Text(subtitle).foregroundStyle(.secondary)
             List(options, selection: $selected) { option in
-                Label { Text(option.label) } icon: { TypeIcon(name: option.icon) }
+                Label { Text(option.label) } icon: { TypeIcon(id: option.icon) }
                     .tag(option.id)
                     .accessibilityIdentifier("TypeChangeOption.\(option.id.rawValue)")
             }

@@ -1,3 +1,4 @@
+import MarfaBrandIcons
 import SwiftUI
 
 @main
@@ -6,6 +7,8 @@ enum Launch {
         LaunchTrace.shared.mark(.appInit)
         // Made first, so it is the shared application whatever asks for one next.
         _ = MAPPApplication.shared
+        // Before any icon draws, so a `simple-icons:` type icon draws its mark and not the fallback.
+        MarfaBrandIcons.register()
         #if DEBUG
         if TestHost.isRequested {
             TestHost.run()

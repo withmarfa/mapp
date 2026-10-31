@@ -88,7 +88,7 @@ private struct Controls {
 
     /// A column's values with how many rows hold each, in its groups' order, then the empty cells.
     private func categories(of column: ItemTableColumn) -> [(value: String, title: String, count: Int)] {
-        ItemTableLayout.groups(of: rows, by: column).map { ($0.id, $0.title, $0.rows.count) }
+        ItemTableLayout.categories(of: rows, by: column).map { ($0.id, $0.title, $0.rows.count) }
     }
 
     private func filterBinding(_ column: ItemTableColumn, _ value: String) -> Binding<Bool> {

@@ -277,20 +277,20 @@ private struct TypeRowsPreview: View {
     }
 
     static let tree = [
-        node("core.note", "Note", "file-text", count: 412),
+        node("core.note", "Note", "lucide:file-text", count: 412),
         node(
-            "aic.ticket", "Ticket", "ticket", count: 36,
+            "aic.ticket", "Ticket", "lucide:ticket", count: 36,
             [
-                node("aic.ticket.bug", "Bug", "bug", count: 9),
+                node("aic.ticket.bug", "Bug", "lucide:bug", count: 9),
                 node(
-                    "aic.ticket.task", "Task", "list-checks", count: 21,
+                    "aic.ticket.task", "Task", "lucide:list-checks", count: 21,
                     [
-                        node("aic.ticket.task.chore", "Chore with a name long enough to run out of room", "wrench", count: 3),
-                        node("aic.ticket.task.review", "Review", "eye", count: 0),
+                        node("aic.ticket.task.chore", "Chore with a name long enough to run out of room", "lucide:wrench", count: 3),
+                        node("aic.ticket.task.review", "Review", "lucide:eye", count: 0),
                     ]),
-                node("aic.ticket.spike", "Spike", "zap", count: 2),
+                node("aic.ticket.spike", "Spike", "lucide:zap", count: 2),
             ]),
-        node("aic.project", "Project", "folder", count: 5),
+        node("aic.project", "Project", "lucide:folder", count: 5),
     ]
 }
 

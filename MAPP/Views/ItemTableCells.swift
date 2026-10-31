@@ -41,7 +41,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(name: row.typeIcon) }
+        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(id: row.typeIcon) }
             .labelStyle(ItemTableLabelStyle())
             .foregroundStyle(.secondary)
         case .parent: link(row.parent)
@@ -53,8 +53,8 @@ struct ItemTableCell: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-        // A mixed table's column holds one type's field; each cell offers its own type's, whose values may differ.
-        case .field(let field): value(of: library.catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key } ?? field)
+        // A mixed table's column holds the words of every type; each cell offers its own row's type's.
+        case .field(let field): value(of: column.field(for: row, catalogue: library.catalogue) ?? field)
         }
     }
 
@@ -62,7 +62,7 @@ struct ItemTableCell: View {
 
     private var title: some View {
         HStack(spacing: 8) {
-            TypeIcon(name: row.typeIcon)
+            TypeIcon(id: row.typeIcon)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -115,8 +115,6 @@ struct ItemTableCell: View {
         switch column.style {
         case .status, .priority, .choice:
             picked(field, current: current, editable: editable)
-        case .person where field.isPicked:
-            picked(field, current: current, editable: editable)
         case .boolean:
             let isOn: Bool = if case .bool(let flag)? = row.item.value(of: field.key) { flag } else { false }
             if declares {
@@ -128,15 +126,13 @@ struct ItemTableCell: View {
         case .date:
             if let current {
                 if let day = ItemDate.parse(current)?.date {
-                    date(day, isDue: field.key == "due_at")
+                    date(day, isDue: library.catalogue.isDueDate(field, of: row.item.type))
                 } else {
                     Text(current).foregroundStyle(.secondary)
                 }
             }
         case .number:
             if let current { Text(current).monospacedDigit() }
-        case .person:
-            if let current { ItemTableCategory(column: column, value: current, title: column.label(ofCategory: current, in: [row])) }
         case .longText:
             if let current { Text(current).foregroundStyle(.secondary).truncationMode(.tail) }
         default:
@@ -198,7 +194,7 @@ struct ItemTableCell: View {
             Button {
                 if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
             } label: {
-                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(name: link.icon) }
+                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(id: link.icon) }
                     .labelStyle(ItemTableLabelStyle())
             }
             .buttonStyle(.plain)
@@ -211,7 +207,7 @@ struct ItemTableCell: View {
     private func date(_ date: Date, isDue: Bool) -> some View {
         let now = library.now()
         let isLate = isDue && date < Calendar.current.startOfDay(for: now)
-            && !(row.item.value(of: "status")?.string.map { StatusTone($0).isFinished } ?? false)
+            && library.catalogue.statusGroup(of: row.item)?.isFinished != true
         return Text(ItemTableDate.label(for: date, now: now))
             .foregroundStyle(isLate ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             .monospacedDigit()
@@ -224,6 +220,8 @@ struct ItemTableCategory: View {
     let column: ItemTableColumn
     let value: String?
     let title: String
+    /// Whether `value` names a group of a status column, as a group's header does, and not a status word.
+    var isGroup = false
 
     var body: some View {
         switch column.style {
@@ -231,7 +229,7 @@ struct ItemTableCategory: View {
             Label {
                 Text(title)
             } icon: {
-                StatusMark(mark: PageHeader.Mark(status: value), size: 12)
+                StatusMark(mark: PageHeader.Mark(group: statusGroup), size: 12)
             }
             .labelStyle(ItemTableLabelStyle())
         case .priority:
@@ -241,16 +239,15 @@ struct ItemTableCategory: View {
                 PriorityBars(rank: value.map(column.rank(of:)), count: column.field?.options.count ?? 4)
             }
             .labelStyle(ItemTableLabelStyle())
-        case .person:
-            Label {
-                Text(title)
-            } icon: {
-                if let value { Avatar(name: value) } else { Image(systemName: "person.crop.circle.dashed").foregroundStyle(.tertiary) }
-            }
-            .labelStyle(ItemTableLabelStyle())
         default:
             Text(title)
         }
+    }
+
+    private var statusGroup: StatusGroup? {
+        guard let value else { return nil }
+        if isGroup { return StatusBucket(id: value).flatMap { if case .group(let group) = $0 { group } else { nil } } }
+        return column.field?.statusGroup(of: value)
     }
 }
 
@@ -262,14 +259,14 @@ struct ItemTableMenuLabel: View {
 
     var body: some View {
         if column.style == .status {
-            Label { Text(title) } icon: { Self.ring(for: value) }
+            Label { Text(title) } icon: { Self.ring(for: value.flatMap { column.field?.statusGroup(of: $0) }) }
         } else {
             ItemTableCategory(column: column, value: value, title: title)
         }
     }
 
-    private static func ring(for status: String?) -> Image {
-        let renderer = ImageRenderer(content: StatusMark(mark: PageHeader.Mark(status: status), size: 12).padding(1))
+    private static func ring(for group: StatusGroup?) -> Image {
+        let renderer = ImageRenderer(content: StatusMark(mark: PageHeader.Mark(group: group), size: 12).padding(1))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
         return renderer.nsImage.map { Image(nsImage: $0) } ?? Image(systemName: "circle")
     }
@@ -284,22 +281,6 @@ private struct PriorityBars: View {
         let level = rank.map { Double($0 + 1) / Double(max(count, 1)) } ?? 0
         Image(systemName: "cellularbars", variableValue: level)
             .foregroundStyle(level >= 1 ? AnyShapeStyle(.red) : level >= 0.75 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-            .accessibilityHidden(true)
-    }
-}
-
-/// A person's initial in a circle, its color steady for the name.
-private struct Avatar: View {
-    let name: String
-    private static let colors: [Color] = [.blue, .purple, .pink, .orange, .teal, .green, .indigo, .brown]
-
-    var body: some View {
-        let color = Self.colors[Int(name.unicodeScalars.reduce(0) { ($0 &* 31 &+ $1.value) % 9973 }) % Self.colors.count]
-        Text(name.prefix(1).uppercased())
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 16, height: 16)
-            .background(color.gradient, in: .circle)
             .accessibilityHidden(true)
     }
 }

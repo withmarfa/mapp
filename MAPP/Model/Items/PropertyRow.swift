@@ -8,7 +8,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     struct Target: Hashable, Sendable {
         let title: String
         let item: ItemID
-        /// The icon of the item's type, a Lucide name, which the page draws before the title.
+        /// The icon of the item's type, an Iconify ID, which the page draws before the title.
         var icon: String?
     }
 
@@ -158,7 +158,7 @@ nonisolated struct PageByline: Hashable, Sendable, Encodable {
 nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
     let item: ItemID
     let title: String
-    /// The icon of the item's type, a Lucide name.
+    /// The icon of the item's type, an Iconify ID.
     let icon: String?
     let type: String
     let date: String

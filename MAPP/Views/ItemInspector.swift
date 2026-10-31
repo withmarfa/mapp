@@ -183,7 +183,6 @@ struct ItemInspector: View {
                                     startsEditing: adding == field.key,
                                     // The window holds the draft, so folding this section does not give it back.
                                     handsOffOnLeave: drafts == nil,
-                                    isStatus: field.key == type?.statusField?.key,
                                     shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key))
                 }
             }
@@ -374,7 +373,7 @@ private struct LinkedItemRow: View {
     var body: some View {
         Button { onOpen(link.item) } label: {
             HStack(spacing: 6) {
-                TypeIcon(name: link.icon)
+                TypeIcon(id: link.icon)
                 Text(verbatim: link.title).lineLimit(1)
                 Spacer(minLength: 6)
                 Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1)

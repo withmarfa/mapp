@@ -21,7 +21,7 @@ struct PagePlacementsTests {
         MarfaMapping.itemType(ItemType(
             id: "aic.comment", label: "Comment", fields: [field("title", "aic.comment"), field("github_id", "aic.comment")],
             titleField: "title", linkField: "github_id")),
-        MarfaMapping.itemType(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "user")),
+        MarfaMapping.itemType(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user")),
         MarfaMapping.itemType(ItemType(id: "aic.folder", label: "Folder", fields: [], roles: [MarfaMapping.containerRole])),
     ])
 

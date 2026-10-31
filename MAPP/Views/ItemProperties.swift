@@ -19,8 +19,6 @@ struct ItemPropertyRow: View {
     /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a section folded, or a
     /// sheet closed, must not raise "Property Not Saved" or put text on the clipboard.
     var handsOffOnLeave = true
-    /// The type's status field: its value has the status's ring.
-    var isStatus = false
     /// Whether the page shows this property too, and what changes it; nil offers no choice.
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
@@ -31,9 +29,8 @@ struct ItemPropertyRow: View {
     @State private var choosingDate = false
     /// Whether a link's text is being edited, as opposed to followed.
     @State private var editing = false
-    /// A field that recommends values is a menu of them; Other… swaps it for a text field for a value of the
-    /// person's own, until the person is done typing it.
-    @State private var typingOwnValue = false
+    /// A status field's value has the status's ring.
+    private var isStatus: Bool { definition.isStatus }
     @FocusState private var isFocused: Bool
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
 
@@ -60,7 +57,6 @@ struct ItemPropertyRow: View {
         .onChange(of: isFocused) {
             guard !isFocused else { return }
             commit()
-            typingOwnValue = false
             if !input.isDirty { editing = false }
         }
         .onDisappear(perform: leave)
@@ -73,9 +69,8 @@ struct ItemPropertyRow: View {
             checkbox
         } else if isEditable {
             switch definition.kind {
-            case .choice: choiceMenu()
+            case .choice, .status: choiceMenu()
             case .date: dateButton
-            case .text where definition.isPicked && !typingOwnValue && !input.isDirty: choiceMenu(allowsOther: true)
             case .text, .number:
                 if link != nil, !editing, !input.isDirty { linkText } else { textField }
             case .other: plain
@@ -129,7 +124,7 @@ struct ItemPropertyRow: View {
         return input.isDirty && isEditable ? input.text : currentText
     }
 
-    private var statusMark: PageHeader.Mark { .init(status: value?.string) }
+    private var statusMark: PageHeader.Mark { .init(group: value?.string.flatMap(definition.statusGroup(of:))) }
 
     /// The status's ring, then its word.
     private func statusLabel(_ text: Text?) -> some View {
@@ -266,7 +261,6 @@ struct ItemPropertyRow: View {
         await Task.yield()
         switch definition.kind {
         case .date: choosingDate = true
-        case .text where definition.isPicked: break
         case .text, .number: isFocused = true
         default: break
         }
@@ -274,7 +268,7 @@ struct ItemPropertyRow: View {
 
     /// The options of a choice, in the system's pop-up menu: it takes typing to jump to an option, and a long option
     /// is cut inside the value column.
-    private func choiceMenu(allowsOther: Bool = false) -> some View {
+    private func choiceMenu() -> some View {
         let current = value?.string
         let text = current.map { Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)) }
         return Menu {
@@ -290,11 +284,6 @@ struct ItemPropertyRow: View {
             }
             .pickerStyle(.inline)
             .labelsHidden()
-            if allowsOther {
-                Divider()
-                Button("Other…") { typingOwnValue = true; Task { await focus() } }
-                    .accessibilityIdentifier("ItemPropertyOther.\(definition.key)")
-            }
         } label: {
             choiceLabel(text, placeholder: "Choose")
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -406,8 +395,8 @@ struct ItemPropertyRow: View {
         .lineLimit(isNumber ? 1...1 : isFocused ? 1...12 : token ? 1...1 : 1...3)
         .truncationMode(token ? .middle : .tail)
         .focused($isFocused)
-        .onSubmit { commit(); typingOwnValue = false }
-        .onExitCommand { input.discard(toMatch: currentText); editing = false; typingOwnValue = false; isFocused = false }
+        .onSubmit { commit() }
+        .onExitCommand { input.discard(toMatch: currentText); editing = false; isFocused = false }
         .frame(maxWidth: .infinity, alignment: .leading)
         .help(isFocused ? "" : String(text.prefix(600)))
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -444,7 +433,6 @@ struct ItemPropertyRow: View {
             label: definition.displayLabel, as: definition.kind, integer: definition.isInteger, current: currentText,
             isEditable: isEditable, write: onChange, to: library.notices)
         editing = false
-        typingOwnValue = false
     }
 
     private func commit(overwriting: Bool = false) {
@@ -489,7 +477,7 @@ nonisolated enum ItemValueText {
     ScrollView {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(SampleLibrary.catalogue.itemTypes[TypeID("core.task")]?.fields ?? []) { definition in
-                ItemPropertyRow(definition: definition, value: definition.key == "status" ? .string("in_progress") : nil,
+                ItemPropertyRow(definition: definition, value: definition.isStatus ? .string("in_progress") : nil,
                                 isEditable: true, onChange: { _ in true })
             }
             ItemPropertyRow(definition: .init(key: "occurred_at", label: "Decided", kind: .date(includesTime: false), declaredBy: TypeID("aic.decision")),

@@ -43,7 +43,7 @@ private struct TypeToggleRow: View {
             } set: { shown in
                 libraries.updateSidebarLayout { $0.setHidden(.type(node.id), !shown) }
             }) {
-                Label { Text(node.label) } icon: { TypeIcon(name: node.icon) }
+                Label { Text(node.label) } icon: { TypeIcon(id: node.icon) }
             }
             .toggleStyle(.checkbox)
             .disabled(parentHidden)

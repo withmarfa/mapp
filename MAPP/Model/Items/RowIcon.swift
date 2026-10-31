@@ -5,7 +5,7 @@ import Foundation
 nonisolated enum RowIcon: Hashable, Sendable {
     /// An SF Symbol for something that is not a type: a place, a command, a state.
     case symbol(String)
-    /// A type's icon, a Lucide name; nil for a type that has none.
+    /// A type's icon, an Iconify ID such as `lucide:folder`; nil for a type that has none.
     case type(String?)
 }
 

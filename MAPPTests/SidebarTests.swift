@@ -27,7 +27,7 @@ struct SidebarTests {
         #expect(counts.map(\.label) == ["Note", "Project", "Bug", "Entity", "Task"])
         #expect(counts.map(\.count) == [2, 2, 1, 1, 1])
         // Each type answers the icon the catalogue gives it; Entity has none.
-        #expect(counts.map(\.icon) == ["file-text", "folder", "bug", nil, "list-checks"])
+        #expect(counts.map(\.icon) == ["lucide:file-text", "lucide:folder", "lucide:bug", nil, "lucide:list-checks"])
     }
 
     @Test func aMarfaTypeCountsOnlyItsOwnItemsAndItsListAgrees() async throws {
@@ -169,7 +169,7 @@ struct SidebarTests {
         let library = try await marfaLibrary()
         let types = library.creatableTypes
         #expect(types.map(\.label) == ["Album", "Bug", "Entity", "Note", "Project", "Task", "Ticket"])
-        #expect(types.first { $0.id == LibraryFixture.project }?.icon == "folder")
+        #expect(types.first { $0.id == LibraryFixture.project }?.icon == "lucide:folder")
         #expect(types.first { $0.id == LibraryFixture.entity }?.icon == nil)
     }
 

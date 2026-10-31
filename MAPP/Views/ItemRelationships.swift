@@ -162,7 +162,7 @@ struct InspectorItemRow: View {
             if let id = target.itemID, target.isOpenable {
                 Button { onOpen(id) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        TypeIcon(name: typeIcon(id))
+                        TypeIcon(id: typeIcon(id))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(target.displayTitle)
                                 .lineLimit(2)

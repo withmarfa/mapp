@@ -9,7 +9,7 @@ struct RowIconImage: View {
     var body: some View {
         switch icon {
         case .symbol(let name): Image(systemName: name)
-        case .type(let name): TypeIcon(name: name)
+        case .type(let name): TypeIcon(id: name)
         }
     }
 }

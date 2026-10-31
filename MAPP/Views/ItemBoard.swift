@@ -237,7 +237,7 @@ private struct BoardCard: View {
                     .lineLimit(3)
             }
             HStack(spacing: 6) {
-                TypeIcon(name: catalogue.icon(for: item.type))
+                TypeIcon(id: catalogue.icon(for: item.type))
                 Text(verbatim: catalogue.label(for: item.type))
                     .lineLimit(1)
                 Spacer(minLength: 0)

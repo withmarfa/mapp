@@ -80,7 +80,7 @@ final class FakeItemLibrary: ItemLibrary {
         ]
         let types = [
             ItemTypeInfo(id: TypeID("core.note"), label: "Note", fields: [], titleField: "title", bodyField: "body", parent: nil),
-            ItemTypeInfo(id: task, label: "Task", fields: taskFields, titleField: "title", bodyField: "body", parent: nil, icon: "list-checks"),
+            ItemTypeInfo(id: task, label: "Task", fields: taskFields, titleField: "title", bodyField: "body", parent: nil, icon: "lucide:list-checks"),
             ItemTypeInfo(
                 id: project, label: "Project",
                 fields: [ItemTypeInfo.Field(key: "description", label: "Description", kind: .text, declaredBy: project)],

@@ -31,29 +31,6 @@ extension ItemTableRow {
     }
 }
 
-/// How a status reads, whatever word a type uses for it, so every type's statuses sort, group and colour alike.
-nonisolated enum StatusTone: Int, Hashable, Sendable, CaseIterable, Comparable {
-    case active, waiting, planned, later, done, canceled, other
-
-    init(_ value: String) {
-        let word = value.lowercased().replacingOccurrences(of: "-", with: "_")
-        switch word {
-        case "in_progress", "doing", "active", "started", "ongoing", "running", "current": self = .active
-        case "blocked", "waiting", "review", "in_review", "on_hold", "paused": self = .waiting
-        case "pending", "todo", "to_do", "open", "planned", "next", "ready", "new", "not_started": self = .planned
-        case "someday", "later", "backlog", "idea", "maybe", "deferred": self = .later
-        case "completed", "done", "closed", "resolved", "finished", "shipped", "accepted": self = .done
-        case "canceled", "cancelled", "wontfix", "won't_fix", "dropped", "abandoned", "rejected", "superseded": self = .canceled
-        default: self = .other
-        }
-    }
-
-    /// Whether the work is over, so its group starts folded away.
-    var isFinished: Bool { self == .done || self == .canceled }
-
-    static func < (lhs: StatusTone, rhs: StatusTone) -> Bool { lhs.rawValue < rhs.rawValue }
-}
-
 /// A column of the table: which part of an item it shows, and how.
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
@@ -64,7 +41,17 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     }
 
     enum Style: Hashable, Sendable {
-        case title, status, priority, person, choice, date, number, boolean, link, text, longText, duration
+        case title, status, priority, choice, date, number, boolean, link, text, longText, duration
+
+        /// How much a style says about its column, where types give one key different styles: a status, then a
+        /// priority, then the rest.
+        var specificity: Int {
+            switch self {
+            case .status: 2
+            case .priority: 1
+            default: 0
+            }
+        }
     }
 
     let id: String
@@ -81,7 +68,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     /// Whether the cells hold a few values a person picks from, which the table can group and filter by.
     var isCategorical: Bool {
         switch style {
-        case .status, .priority, .person, .choice, .boolean, .link: true
+        case .status, .priority, .choice, .boolean, .link: true
         case .title, .date, .number, .text, .longText, .duration: content == .type
         }
     }
@@ -133,10 +120,23 @@ nonisolated extension ItemTableColumn {
     /// The values a categorical column offers, in the order its groups and its sort take them.
     func rank(of value: String) -> Int {
         switch style {
-        case .status: return StatusTone(value).rawValue * 100 + (field?.options.firstIndex(of: value) ?? 99)
+        case .status: return statusBucket(of: value).rank * 100 + (field?.options.firstIndex(of: value) ?? 99)
         case .priority, .choice: return field?.options.firstIndex(of: value) ?? Int.max
         default: return 0
         }
+    }
+
+    /// Where a status column lists `value`: the group its type declares for the word, else Other.
+    func statusBucket(of value: String) -> StatusBucket {
+        field?.statusBucket(of: value) ?? .other
+    }
+
+    /// The field as the row's own type declares it, which a cell offers its values from: a merged column holds the
+    /// words of every type, and a row must not be set to one its type does not declare. Nil where the column is no
+    /// field or the type does not declare it.
+    func field(for row: ItemTableRow, catalogue: Catalogue) -> ItemTypeInfo.Field? {
+        guard let field else { return nil }
+        return catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key }
     }
 
     /// What the cell holds for grouping and filtering: a value from the item, or nil for an empty cell.
@@ -256,13 +256,14 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
-    /// The fields a table leads with, in this order, wherever a type has them.
-    private static let leading = ["status", "priority", "assignee", "due_at", "starts_at", "ends_at", "completed_at", "occurred_at"]
+    /// After the status, the priority and the due date (by their roles), the dates a table leads with, in this order,
+    /// wherever a type has them.
+    private static let leading = ["starts_at", "ends_at", "completed_at", "occurred_at"]
     /// Fields that read as a paragraph or as bookkeeping, shown only when the person asks.
     private static let quiet: Set<String> = ["notes", "url", "place", "precision"]
 
     /// The table's columns for these rows: the name, then the type where the rows mix types, then status, priority
-    /// and assignee, then where each item is filed, then the other fields their types have, and when it was edited.
+    /// and due date, then where each item is filed, then the other fields their types have, and when it was edited.
     /// A field few of the rows fill starts hidden, as do the quiet ones; the person can show any of them.
     static func columns(for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>) -> [ItemTableColumn] {
         var columns: [ItemTableColumn] = [.title]
@@ -270,14 +271,30 @@ nonisolated enum ItemTableLayout {
         if types.count > 1 { columns.append(.type) }
 
         var fields: [String: ItemTypeInfo.Field] = [:]
+        var styles: [String: ItemTableColumn.Style] = [:]
+        var dueDates: Set<String> = []
         var order: [String] = []
         for type in types.sorted(by: { $0.rawValue < $1.rawValue }) {
             let info = catalogue.itemTypes[type]
             let page: Set<String> = [info?.titleKey, info?.bodyKey].compactMap { $0 }.reduce(into: []) { $0.insert($1) }
-            for field in info?.fields ?? [] where fields[field.key] == nil {
+            for field in info?.fields ?? [] {
                 if hidden.contains(field.key) || page.contains(field.key) || ["title", "body"].contains(field.key) { continue }
                 if case .other = field.kind { continue }
+                let fieldStyle = style(of: field, in: type, catalogue: catalogue)
+                if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
+                if let known = fields[field.key] {
+                    if fieldStyle.specificity > styles[field.key]!.specificity {
+                        // A status or priority in one type outranks the plain field another type calls the same.
+                        fields[field.key] = field
+                        styles[field.key] = fieldStyle
+                    } else {
+                        // Types that share a status field may each add words of their own.
+                        fields[field.key] = known.addingStatusWords(of: field)
+                    }
+                    continue
+                }
                 fields[field.key] = field
+                styles[field.key] = fieldStyle
                 order.append(field.key)
             }
         }
@@ -286,15 +303,26 @@ nonisolated enum ItemTableLayout {
         })
         // Fields that only some types have, or few items fill, would make a mixed table wide and mostly empty.
         let threshold = max(1, rows.count / 10)
+        func lead(_ key: String) -> Int {
+            switch styles[key] {
+            case .status: return 0
+            case .priority: return 1
+            default: return dueDates.contains(key) ? 2 : (leading.firstIndex(of: key).map { $0 + 3 } ?? Int.max)
+            }
+        }
         let sorted = order.sorted { a, b in
-            let (x, y) = (leading.firstIndex(of: a) ?? Int.max, leading.firstIndex(of: b) ?? Int.max)
+            let (x, y) = (lead(a), lead(b))
             if x != y { return x < y }
             if (a == "description") != (b == "description") { return b == "description" }
             return order.firstIndex(of: a)! < order.firstIndex(of: b)!
         }
-        // Who and what state come first, then where the item is filed, then its dates and its prose.
-        let (people, rest) = (sorted.filter(Self.firstFields.contains), sorted.filter { !Self.firstFields.contains($0) })
-        for key in people { columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold)) }
+        // What state comes first, then where the item is filed, then its dates and its prose.
+        let firstStyles: Set<ItemTableColumn.Style> = [.status, .priority]
+        let isFirst = { (key: String) in styles[key].map(firstStyles.contains) ?? false }
+        let (people, rest) = (sorted.filter(isFirst), sorted.filter { !isFirst($0) })
+        for key in people {
+            columns.append(column(for: fields[key]!, style: styles[key]!, filled: filled[key, default: 0], threshold: threshold))
+        }
 
         // The parent is worth showing where enough rows have one, such as a ticket's epic.
         var parent = ItemTableColumn.parent
@@ -304,7 +332,7 @@ nonisolated enum ItemTableLayout {
         columns.append(parent)
 
         for key in rest {
-            columns.append(column(for: fields[key]!, filled: filled[key, default: 0], threshold: threshold))
+            columns.append(column(for: fields[key]!, style: styles[key]!, filled: filled[key, default: 0], threshold: threshold))
             if key == "starts_at", fields["ends_at"] != nil {
                 columns.append(ItemTableColumn(
                     id: "duration", label: String(localized: "Duration"),
@@ -317,26 +345,23 @@ nonisolated enum ItemTableLayout {
         return columns
     }
 
-    private static let firstFields: Set<String> = ["status", "priority", "assignee"]
-
-    private static func column(for field: ItemTypeInfo.Field, filled: Int, threshold: Int) -> ItemTableColumn {
-        var column = ItemTableColumn(id: "field." + field.key, label: field.displayLabel, content: .field(field), style: style(of: field))
+    private static func column(for field: ItemTypeInfo.Field, style: ItemTableColumn.Style, filled: Int, threshold: Int) -> ItemTableColumn {
+        var column = ItemTableColumn(id: "field." + field.key, label: field.displayLabel, content: .field(field), style: style)
         column.isShownByDefault = !quiet.contains(field.key) && filled >= threshold
         return column
     }
 
-    static func style(of field: ItemTypeInfo.Field) -> ItemTableColumn.Style {
+    /// How a column of `field`, as `type` declares it, reads. A status is the field's kind, whatever its name; a
+    /// priority belongs to a task, and is not guessed from the name on any other type. A column that types share
+    /// keeps the most specific style any of them gives it (`Style.specificity`).
+    static func style(of field: ItemTypeInfo.Field, in type: TypeID, catalogue: Catalogue) -> ItemTableColumn.Style {
         switch field.kind {
         case .boolean: return .boolean
         case .number: return .number
         case .date: return .date
-        case .choice:
-            return field.key == "status" ? .status : field.key == "priority" ? .priority : .choice
+        case .status: return .status
+        case .choice: return catalogue.isPriority(field, of: type) ? .priority : .choice
         case .text:
-            if field.key == "status" { return .status }
-            if field.key == "priority" { return .priority }
-            if ["assignee", "owner", "person", "author"].contains(field.key) { return .person }
-            if field.isPicked { return .choice }
             return field.key == "description" || field.key == "notes" ? .longText : .text
         case .other: return .text
         }
@@ -381,7 +406,7 @@ nonisolated enum ItemTableLayout {
     static func sorted(_ rows: [ItemTableRow], by sort: [ItemTableComparator]) -> [ItemTableRow] {
         guard !sort.isEmpty else { return rows }
         // Each row's values are read once, not at each of the roughly n log n comparisons: reading one parses a
-        // date or works out a status's tone. The row's place is the last tie-break, which keeps rows that compare
+        // date or works out a status's group. The row's place is the last tie-break, which keeps rows that compare
         // equal in the order given, as a stable sort does.
         let values = sort.map { comparator in rows.map { comparator.column.sortValue(of: $0) } }
         let titles = rows.map(\.item.title)
@@ -402,9 +427,24 @@ nonisolated enum ItemTableLayout {
         return order.map { rows[$0] }
     }
 
-    /// The rows in groups by `column`: a picked value's groups in the order its values are given, any other
-    /// column's largest first, and the rows with no value last.
+    /// The rows in groups by `column`: a status column's by the group each word is in, the four in their order and
+    /// then the words no group claims; any other column's as `categories` gives them.
     static func groups(of rows: [ItemTableRow], by column: ItemTableColumn) -> [ItemTableGroup] {
+        guard column.style == .status else { return categories(of: rows, by: column) }
+        var buckets: [StatusBucket: [ItemTableRow]] = [:]
+        var empty: [ItemTableRow] = []
+        for row in rows {
+            if let word = column.category(of: row) { buckets[column.statusBucket(of: word), default: []].append(row) } else { empty.append(row) }
+        }
+        var groups = buckets.keys.sorted { $0.rank < $1.rank }.map { ItemTableGroup(id: $0.id, title: $0.title, rows: buckets[$0]!) }
+        if !empty.isEmpty { groups.append(ItemTableGroup(id: "", title: String(localized: "No \(column.label)"), rows: empty)) }
+        return groups
+    }
+
+    /// The rows in groups by each value of `column`: a picked value's in the order its values are given, any other
+    /// column's largest first, and the rows with no value last. A filter offers these, so a status column's are its
+    /// words, ordered by their groups.
+    static func categories(of rows: [ItemTableRow], by column: ItemTableColumn) -> [ItemTableGroup] {
         var buckets: [String: [ItemTableRow]] = [:]
         for row in rows { buckets[column.category(of: row) ?? "", default: []].append(row) }
         let keys = buckets.keys.filter { !$0.isEmpty }.sorted { a, b in
@@ -430,6 +470,6 @@ nonisolated enum ItemTableLayout {
     static func collapsed(_ options: ItemTableOptions, groups: [ItemTableGroup], by column: ItemTableColumn) -> Set<String> {
         if let collapsed = options.collapsed { return collapsed }
         guard column.style == .status else { return [] }
-        return Set(groups.compactMap { $0.value.flatMap { StatusTone($0).isFinished ? $0 : nil } })
+        return Set(groups.compactMap { $0.value.flatMap { StatusBucket(id: $0)?.isFinished == true ? $0 : nil } })
     }
 }

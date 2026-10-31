@@ -5,7 +5,12 @@ import Testing
 struct ItemTimelineTests {
     private static let event = TypeID("example.event")
     private static let note = TypeID("example.note")
+    private static let task = TypeID("example.task")
     private static let catalogue = Catalogue(itemTypes: [
+        ItemTypeInfo(id: TypeID("core.task"), label: "Core Task", fields: [], titleField: nil, bodyField: nil, parent: nil),
+        ItemTypeInfo(id: task, label: "Task", fields: [
+            .init(key: "due_at", label: "Due at", kind: .date(includesTime: true), declaredBy: TypeID("core.task")),
+        ], titleField: nil, bodyField: nil, parent: TypeID("core.task")),
         ItemTypeInfo(id: event, label: "Event", fields: [
             .init(key: "starts_at", label: "Starts at", kind: .date(includesTime: true), declaredBy: event),
             .init(key: "due_at", label: "Due at", kind: .date(includesTime: true), declaredBy: event),
@@ -78,12 +83,17 @@ struct ItemTimelineTests {
     @Test func fieldsComeFromPresentTypesAndRespectKinds() {
         let notes = [Self.item("note", type: Self.note)]
         #expect(ItemTimelineLayout.fields(for: notes, catalogue: Self.catalogue).isEmpty)
-        let fields = ItemTimelineLayout.fields(for: notes + [Self.item("event")], catalogue: Self.catalogue)
+        let fields = ItemTimelineLayout.fields(for: notes + [Self.item("event"), Self.item("task", type: Self.task)], catalogue: Self.catalogue)
         #expect(Set(fields.map(\.key)) == ["due_at", "starts_at", "published_at"])
-        #expect(ItemTimelineLayout.selectedField(nil, fields: fields) == "due_at")
+        #expect(ItemTimelineLayout.selectedField(nil, fields: fields) == "due_at", "a task's due date leads")
         #expect(ItemTimelineLayout.selectedField("published_at", fields: fields) == "published_at")
         #expect(ItemTimelineLayout.selectedField("removed", fields: fields) == "due_at")
         #expect(ItemTimelineLayout.selectedField(nil, fields: fields.filter { $0.key != "due_at" }) == "starts_at")
+    }
+
+    @Test func aDueDateOutsideATaskDoesNotLead() {
+        let fields = ItemTimelineLayout.fields(for: [Self.item("event")], catalogue: Self.catalogue)
+        #expect(fields.map(\.key) == ["starts_at", "due_at", "published_at"], "a start leads, then by label, with no task present")
     }
 
     @Test func noAvailableFieldStillShowsEveryItem() {

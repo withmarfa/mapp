@@ -6,7 +6,7 @@ import SwiftUI
 /// properties. The page draws it above the note so the two scroll as one surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// A status's ring: its color and how much of it is filled. The catalogue holds neither, so they follow the
-    /// status's tone (`StatusTone`), and a status the app does not know gets the plain ring.
+    /// group the type puts it in, and a status no group claims gets the plain ring.
     struct Mark: Encodable, Equatable, Sendable {
         enum Tone: String, Encodable, Sendable { case neutral, orange, red, green, grey }
         enum Fill: String, Encodable, Sendable { case none, half, full }
@@ -18,13 +18,12 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
             self.fill = fill
         }
 
-        init(status: String?) {
-            switch status.map(StatusTone.init) {
-            case .active: self.init(tone: .orange, fill: .half)
-            case .waiting: self.init(tone: .red, fill: .half)
-            case .done: self.init(tone: .green, fill: .full)
+        init(group: StatusGroup?) {
+            switch group {
+            case .inProgress: self.init(tone: .orange, fill: .half)
+            case .completed: self.init(tone: .green, fill: .full)
             case .canceled: self.init(tone: .grey, fill: .full)
-            case .planned, .later, .other, nil: self.init(tone: .neutral, fill: .none)
+            case .notStarted, nil: self.init(tone: .neutral, fill: .none)
             }
         }
     }
@@ -39,7 +38,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         var mark: Mark?
     }
 
-    /// A type's icon as the page names it among the images the app sends (`TypeIconKey`), and the Lucide name the app
+    /// A type's icon as the page names it among the images the app sends (`TypeIconKey`), and the Iconify ID the app
     /// draws it from.
     struct TypeIconRef: Encodable, Equatable, Sendable {
         var name: String?
@@ -174,7 +173,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     static let pictureSymbol = "photo"
 
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
-    /// icons of `typeIcons` (Lucide names), which the Swift SDK draws.
+    /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
     init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
@@ -223,7 +222,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
 
     @MainActor
     private static func drawTypeIcon(_ name: String?, size: CGFloat) -> Icon? {
-        let renderer = ImageRenderer(content: TypeIcon(name: name).font(.system(size: size)).foregroundStyle(.black))
+        let renderer = ImageRenderer(content: TypeIcon(id: name).font(.system(size: size)).foregroundStyle(.black))
         // Three times its size, as the symbols are.
         renderer.scale = 3
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

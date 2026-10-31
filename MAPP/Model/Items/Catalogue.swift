@@ -7,6 +7,9 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             /// A Marfa `date`, a day, or a `datetime`, which may also name a time.
             case date(includesTime: Bool)
             case choice([String])
+            /// A status field: a word the type declares, each in one of the four groups. It is the field's kind, not its
+            /// name, that makes it a status (`core.media` calls it `progress`).
+            case status([StatusWord])
             /// A shape the app shows but does not edit, such as a list or an object.
             case other
         }
@@ -36,8 +39,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     let titleField: String?
     let bodyField: String?
     let parent: TypeID?
-    /// The Lucide name of the icon that stands for the type, as the server resolves it: the owner's choice, else the
-    /// nearest type's that sets one. Nil where none does.
+    /// The Iconify ID of the icon that stands for the type, such as `lucide:book-open` or `simple-icons:github`, as the
+    /// server resolves it: the owner's choice, else the nearest type's that sets one. Nil where none does.
     var icon: String?
     var description: String?
     var version: Int64?
@@ -58,53 +61,60 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     /// The property the item's text is kept in: the field the hints name, else `body` where the type declares it.
     var bodyKey: String? { bodyField ?? (declares("body") ? "body" : nil) }
 
-    /// The field an item's status is kept in, for any type that defines one a person can pick from: a choice, or
-    /// a text field that recommends values (Marfa's `core.task` does). A status the type gives some other shape
-    /// (a number, a date) is not a status the page can offer a menu for.
-    var statusField: Field? {
-        fields.first { field in
-            guard field.key == "status" else { return false }
-            switch field.kind {
-            case .choice, .text: return true
-            case .number, .boolean, .date, .other: return false
-            }
-        }
-    }
+    /// The field an item's status is kept in: the type's one field of the `status` kind, whatever its name.
+    var statusField: Field? { fields.first { $0.isStatus } }
+
+    /// The group this type puts `word` in; nil where it has no status field or does not declare the word.
+    func statusGroup(of word: String) -> StatusGroup? { statusField?.statusGroup(of: word) }
 }
 
 nonisolated extension ItemTypeInfo.Field {
-    /// The values the catalogue offers for the field, in its order: a choice's own, or the ones a text field's
-    /// description recommends, as `Recommended values: pending, in_progress`. Empty when it names none.
+    /// The values the catalogue offers for the field, in its order: a choice's own, or a status field's words.
     var options: [String] {
         switch kind {
         case .choice(let choices): return choices
-        case .text: return Self.recommendedValues(in: description)
-        case .number, .boolean, .date, .other: return []
+        case .status(let words): return words.map(\.value)
+        case .text, .number, .boolean, .date, .other: return []
         }
     }
 
     /// Whether the field is picked from a list of values rather than typed.
     var isPicked: Bool { !options.isEmpty }
 
+    /// The field with the words of `other`, a status field of another type that shares it, added after its own.
+    func addingStatusWords(of other: ItemTypeInfo.Field) -> ItemTypeInfo.Field {
+        guard case .status(let mine) = kind, case .status(let theirs) = other.kind else { return self }
+        let added = theirs.filter { word in !mine.contains { $0.value == word.value } }
+        guard !added.isEmpty else { return self }
+        var merged = ItemTypeInfo.Field(key: key, label: label, kind: .status(mine + added), declaredBy: declaredBy)
+        merged.required = required
+        merged.description = description
+        merged.format = format
+        return merged
+    }
+
+    /// Whether the field is a status field.
+    var isStatus: Bool {
+        if case .status = kind { true } else { false }
+    }
+
+    /// The group a status field puts `word` in; nil for any other field and for a word it does not declare.
+    func statusGroup(of word: String) -> StatusGroup? {
+        guard case .status(let words) = kind else { return nil }
+        return words.first { $0.value == word }?.group
+    }
+
+    /// Where a table lists `word` in a status field: its group, else Other.
+    func statusBucket(of word: String) -> StatusBucket {
+        statusGroup(of: word).map(StatusBucket.group) ?? .other
+    }
+
     /// The values to offer for an item that holds `current`: `options`, and `current` last where they do not list
-    /// it, since a menu always shows what is set. A text field only recommends its values, so it can hold any.
+    /// it, since a menu always shows what is set. A status can hold a word its type does not declare.
     func options(including current: String?) -> [String] {
         let options = options
         guard !options.isEmpty, let current, !current.isEmpty, !options.contains(current) else { return options }
         return options + [current]
-    }
-
-    private static let recommendation = "recommended values:"
-
-    private static func recommendedValues(in description: String?) -> [String] {
-        guard let description, let range = description.range(of: recommendation, options: [.caseInsensitive, .anchored]) else { return [] }
-        let values = description[range.upperBound...]
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "."))) }
-        // Prose that merely follows the phrase is no list: every value has to look like one.
-        guard !values.isEmpty, values.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" } })
-        else { return [] }
-        return values
     }
 
     /// An option written for reading, in the person's language: the catalogue holds no labels for them, so
@@ -196,7 +206,7 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return labels
     }
 
-    /// The icon of `type`, a Lucide name; nil where no type in its chain sets one, and for a type the catalogue does
+    /// The icon of `type`, an Iconify ID; nil where no type in its chain sets one, and for a type the catalogue does
     /// not hold.
     func icon(for type: TypeID) -> String? { itemTypes[type]?.icon }
 
@@ -255,6 +265,37 @@ nonisolated struct Catalogue: Hashable, Sendable {
     func admits(_ type: TypeID, types: Set<TypeID>, roles: Set<String>) -> Bool {
         (types.isEmpty && roles.isEmpty) || types.contains(type) || isSubtype(type, ofAnyOf: types)
             || !roles.isDisjoint(with: itemTypes[type]?.roles ?? [])
+    }
+
+    // MARK: Tasks and statuses
+
+    /// Whether `type` is `core.task` or below it. A task is what has a due date and a priority; no other type's field
+    /// of those names is read as one.
+    func isTask(_ type: TypeID) -> Bool {
+        type == MarfaMapping.taskType || isSubtype(type, ofAnyOf: [MarfaMapping.taskType])
+    }
+
+    /// Whether `field` is a task's priority: the `priority` field of a type that is a task.
+    func isPriority(_ field: ItemTypeInfo.Field, of type: TypeID) -> Bool {
+        field.key == MarfaMapping.priorityField && isTask(type)
+    }
+
+    /// Whether `field` is a task's due date: the `due_at` field of a type that is a task.
+    func isDueDate(_ field: ItemTypeInfo.Field, of type: TypeID) -> Bool {
+        field.key == MarfaMapping.dueField && isTask(type)
+    }
+
+    /// Whether `field` is a start date: the `starts_at` field of a type that is an event or a task, or below one.
+    func isStartDate(_ field: ItemTypeInfo.Field, of type: TypeID) -> Bool {
+        field.key == MarfaMapping.startField && [MarfaMapping.eventType, MarfaMapping.taskType].contains { type == $0 || isSubtype(type, ofAnyOf: [$0]) }
+    }
+
+    /// The group of the word `item` holds in its type's status field; nil where the type has none, the item holds
+    /// none, or the type does not declare it.
+    func statusGroup(of item: Item) -> StatusGroup? {
+        guard let type = itemTypes[item.type], let field = type.statusField,
+              let word = item.value(of: field.key)?.string else { return nil }
+        return field.statusGroup(of: word)
     }
 
     // MARK: Collections

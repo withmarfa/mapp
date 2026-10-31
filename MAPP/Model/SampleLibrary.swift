@@ -60,8 +60,11 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.task"),
                 TypeField(name: "body", type: "string", declaredBy: "core.task"),
                 TypeField(
-                    name: "status", type: "string",
-                    description: "Recommended values: pending, in_progress, completed, canceled", declaredBy: "core.task"),
+                    name: "status", type: "status", declaredBy: "core.task",
+                    definition: ["status_values": [
+                        ["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
+                        ["value": "completed", "group": "completed"], ["value": "canceled", "group": "canceled"],
+                    ]]),
                 TypeField(
                     name: "priority", type: "enum", declaredBy: "core.task",
                     definition: ["enum_values": ["low", "medium", "high"]]),
