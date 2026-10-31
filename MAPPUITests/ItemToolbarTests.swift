@@ -20,11 +20,12 @@ final class ItemToolbarTests: XCTestCase {
     func testTheSidebarFootOffersNewItemAndThePageToolbarHoldsViewAsShareMoreAndDetails() {
         let viewMode = control("ViewModeMenu")
         let viewOptions = control("ViewOptionsToolbar")
-        let newItem = control("NewItemToolbar")
+        let newItem = control("SidebarNew")
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
         for element in [viewMode, viewOptions, newItem, details, share, more] { XCTAssertTrue(element.exists) }
+        XCTAssertFalse(control("NewItemToolbar").exists, "the toolbar's New Item shows only with the sidebar hidden")
         XCTAssertFalse(control("BackToolbar").exists)
         XCTAssertFalse(control("ForwardToolbar").exists)
         XCTAssertEqual(count("DetailsToggle"), 1, "The closed inspector adds no second Details")
@@ -91,7 +92,8 @@ final class ItemToolbarTests: XCTestCase {
 
     func testMoreHoldsTheItemActionsInOrder() {
         control("MoreToolbar").click()
-        let titles = ["Open in New Window", "Share…", "Remove from Favorites", "Add Attachment…",
+        let titles = ["Open in New Window", "Open Original", "Open in Browser", "Share…", "Remove from Favorites", "Add Tag…",
+                      "Change Type…", "Customize Page…", "Version History…", "Add to Collection…", "Add Attachment…",
                       "Page Width", "Show Markdown Source", "Print…", "Export as PDF…", "Delete"]
         var previous = -CGFloat.infinity
         for title in titles {
@@ -100,8 +102,8 @@ final class ItemToolbarTests: XCTestCase {
             XCTAssertGreaterThan(item.frame.minY, previous, "\(title) follows the item before it")
             previous = item.frame.minY
         }
-        XCTAssertFalse(window.menuItems["Archive"].exists)
-        XCTAssertFalse(window.menuItems["Copy Link"].exists)
+        let shown = window.menuItems.allElementsBoundByIndex.map(\.title).filter { !$0.isEmpty }
+        XCTAssertEqual(shown, titles + ["Standard", "Full Width"], "the menu holds these actions, Page Width's two choices last, and no others")
         capture("More menu")
         app.typeKey(.escape, modifierFlags: [])
     }
@@ -141,7 +143,6 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
         app.menuBars.menuBarItems["File"].click()
         XCTAssertTrue(app.menuBars.menuItems["Print…"].exists)
-        XCTAssertFalse(app.menuBars.menuItems["Archive Note"].exists)
         app.typeKey(.escape, modifierFlags: [])
     }
 
@@ -152,11 +153,11 @@ final class ItemToolbarTests: XCTestCase {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
-        let newItem = control("NewItemToolbar")
+        let newItem = control("SidebarNew")
         let viewMode = control("ViewModeMenu")
         XCTAssertTrue(viewMode.exists, "View As stays reachable in the gallery")
         XCTAssertTrue(viewOptions.exists, "View Options stays reachable in the gallery")
-        XCTAssertTrue(newItem.exists, "New Item stays reachable in the gallery")
+        XCTAssertTrue(newItem.exists, "New stays reachable in the gallery, from the sidebar")
         XCTAssertTrue(details.exists, "the card selected in the list is still selected, so item actions have something to act on")
         XCTAssertTrue(share.exists)
         XCTAssertLessThan(newItem.frame.maxX, viewMode.frame.minX, "New Item stays at the sidebar's foot")

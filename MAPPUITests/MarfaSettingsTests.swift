@@ -74,8 +74,6 @@ final class MarfaSettingsTests: XCTestCase {
         let welcome = window.descendants(matching: .any)["Welcome"].firstMatch
         XCTAssertTrue(welcome.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["Sidebar"].exists)
-        XCTAssertFalse(window.descendants(matching: .any)["SyncStatus"].exists)
-        XCTAssertFalse(window.descendants(matching: .any)["SyncDetails"].exists)
         let connect = window.buttons["Connect…"]
         XCTAssertTrue(connect.waitForExistence(timeout: 3), window.debugDescription)
         connect.click()

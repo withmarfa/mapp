@@ -47,6 +47,26 @@ final class SpeedMeasureTests: XCTestCase {
         try XCTSkipUnless(environment["MAPP_MEASURE_UI"] != nil, "MAPP_MEASURE_UI is not set")
         address = try XCTUnwrap(environment["MARFA_API_URL"], "A test instance's address is needed (MARFA_API_URL)")
         key = try XCTUnwrap(environment["MARFA_API_KEY"], "A key for the test instance is needed (MARFA_API_KEY)")
+        try Self.refuseUnlessTestInstance(at: address, acknowledging: environment["MARFA_TEST_INSTANCE_ID"])
+    }
+
+    /// The run writes to this server, so it goes ahead only when `MARFA_TEST_INSTANCE_ID` holds the `instance_id` the
+    /// server reports at its root (`GET /`): reading it from the server and passing it is the acknowledgement that
+    /// this is a test instance.
+    private static func refuseUnlessTestInstance(at address: String, acknowledging acknowledged: String?) throws {
+        let given = acknowledged?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let missing = "Set MARFA_TEST_INSTANCE_ID to the instance_id that \(address) reports at its root, to say it is a test instance and holds no one's data."
+        XCTAssertFalse(given.isEmpty, missing)
+        guard !given.isEmpty else { throw XCTSkip("Refused: \(missing)") }
+        var reported: String?
+        if let url = URL(string: address), let data = try? Data(contentsOf: url),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            reported = object["instance_id"] as? String
+        }
+        guard reported == given else {
+            XCTFail("MARFA_TEST_INSTANCE_ID does not match the instance_id the server at \(address) reports, so this run will not write to it.")
+            throw XCTSkip("Refused: not confirmed as a test instance.")
+        }
     }
 
     override func tearDown() async throws {
