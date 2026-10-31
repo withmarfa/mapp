@@ -22,7 +22,11 @@ final class SettingsRequest {
 
     /// The browser of the main window in front of the others, if any is open.
     private var frontMainWindow: MainWindow? {
-        mainWindows.removeAll { $0.browser == nil }
+        // A window that was closed is no main window to show Settings in, whether or not its browser lives on.
+        mainWindows.removeAll { main in
+            guard main.browser != nil, let window = main.window else { return true }
+            return !window.isVisible && !window.isMiniaturized
+        }
         let ordered = NSApp?.orderedWindows ?? []
         return ordered.lazy.compactMap { window in self.mainWindows.first { $0.window === window } }.first ?? mainWindows.last
     }
