@@ -102,7 +102,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var isWritingToolsActive: () -> Bool = { false }
     /// The page's latest edit while a Writing Tools session is open, saved once it ends (`holdEdit`).
     @ObservationIgnored var heldEdit: (markdown: String, generation: Int)?
-    @ObservationIgnored var heldEditWatch: Task<Void, Never>?
+    @ObservationIgnored var writingToolsObservation: NSKeyValueObservation?
     @ObservationIgnored var windowIsGone = false
 
     @ObservationIgnored let webView: EditorWebView
@@ -172,6 +172,9 @@ final class EditorController: NSObject {
         Self.open.add(self)
         webView.controller = self
         isWritingToolsActive = { [weak webView] in webView?.isWritingToolsActive ?? false }
+        writingToolsObservation = webView.observe(\.isWritingToolsActive) { [weak self] _, _ in
+            Task { @MainActor in self?.writingToolsActivityChanged() }
+        }
         embeds.open = { [weak self] reference, item in
             await self?.library?.openEmbeddedFile(reference, in: item, waiting: Self.embedWait) ?? .missing
         }
@@ -383,6 +386,8 @@ final class EditorController: NSObject {
     private func show(_ item: Item, as function: String) {
         // The request was typed into the text now being replaced, which the page would refuse an answer for.
         cancelLinkRequest()
+        // A rewrite held for the text now on the page is saved against the version it was made on.
+        releaseHeldEdit()
         guard let body = library?.body(of: item.id) else { return hide() }
         if function == "load" { isPresented = true }
         noteID = item.id
@@ -435,6 +440,7 @@ final class EditorController: NSObject {
     /// is not shown under another item's header and nothing typed there is saved to any note.
     private func clearPage() {
         guard isReady else { return }
+        releaseHeldEdit()
         embeds.version += 1
         call("setItem", json(""))
         generation += 1
@@ -580,6 +586,7 @@ final class EditorController: NSObject {
     fileprivate func receive(_ message: EditorMessage) {
         switch message {
         case .ready:
+            releaseHeldEdit()
             isReady = true
             sendHostActivation()
             applyAccent()
@@ -633,7 +640,7 @@ final class EditorController: NSObject {
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
-            if let url = URL(string: href), let scheme = url.scheme, ["http", "https", "mailto", "tel"].contains(scheme) {
+            if let url = URL(string: href), let scheme = url.scheme?.lowercased(), ["http", "https", "mailto", "tel"].contains(scheme) {
                 NSWorkspace.shared.open(url)
             }
         case .openItem(let id):
@@ -710,6 +717,8 @@ extension EditorController: WKNavigationDelegate {
             return
         }
         Telemetry.editorProcessEnded(wasReady: true)
+        // The page's text is gone with its process; the reload brings back what was last reported.
+        releaseHeldEdit()
         cancelLinkRequest()
         isReady = false
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
