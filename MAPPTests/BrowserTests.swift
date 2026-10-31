@@ -195,6 +195,17 @@ struct BrowserTests {
         #expect(browser.selection == [c], "the answer is compared with the list before the search")
     }
 
+    @Test func aSearchAnsweredWithNothingClearsTheHeldSelection() {
+        let browser = Browser()
+        browser.selection = [b]
+        browser.keepSelection(from: [a, b, c], to: [], isPending: true)
+        browser.keepHeldSelection(in: [])
+        #expect(browser.selection.isEmpty, "an answer of nothing leaves nothing to select, though the list did not change")
+        browser.selection = [c]
+        browser.keepHeldSelection(in: [])
+        #expect(browser.selection == [c], "with no search waiting, there is nothing held to resolve")
+    }
+
     let a = ItemID.mint(), b = ItemID.mint(), c = ItemID.mint(), d = ItemID.mint()
 
     @Test func selectedNotesStillListedStaySelected() {

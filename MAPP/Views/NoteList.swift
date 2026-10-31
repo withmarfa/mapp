@@ -24,7 +24,9 @@ struct NoteList: View, Equatable {
         let sections = browser.sections(in: library, order: order, now: now)
         let ids = sections.flatMap { $0.items.map(\.id) }
         let context = browser.metaContext(for: sections.flatMap(\.items))
-        let excerpts = browser.searchResults(in: library)?.excerpts ?? [:]
+        let results = browser.searchResults(in: library)
+        let excerpts = results?.excerpts ?? [:]
+        let isPending = results?.isPending == true
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
@@ -89,7 +91,11 @@ struct NoteList: View, Equatable {
         }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
-            browser.keepSelection(from: old, to: new, isPending: browser.searchResults(in: library)?.isPending == true)
+            browser.keepSelection(from: old, to: new, isPending: isPending)
+        }
+        // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
+        .onChange(of: isPending) { _, isPending in
+            if !isPending { browser.keepHeldSelection(in: ids) }
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             NoteActions(ids: ids, undoManager: undoManager)

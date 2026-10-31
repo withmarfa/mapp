@@ -494,6 +494,13 @@ final class Browser {
         if kept != selection { selectAutomatically(kept) }
     }
 
+    /// Compares the answer of a search with the list before it, when the answer arrives without changing the list,
+    /// as one that finds nothing does after a list that showed nothing while it waited.
+    func keepHeldSelection(in list: [ItemID]) {
+        guard listBeforePendingSearch != nil else { return }
+        keepSelection(from: list, to: list)
+    }
+
     /// The list a search that has not yet answered replaced, for the answer to be compared with.
     @ObservationIgnored private var listBeforePendingSearch: [ItemID]?
 
