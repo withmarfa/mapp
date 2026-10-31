@@ -76,7 +76,8 @@ body {
   --inkkit-min-height: 100vh;
   --inkkit-reading-width: calc(var(--page-width) + 6rem);
   --inkkit-padding-top: 22px;
-  --inkkit-padding-inline: 3rem;
+  /* 3rem beside a wide page; a narrow one (the inspector open beside the list) gives the margin back to the text. */
+  --inkkit-padding-inline: clamp(1rem, 6vw, 3rem);
   --inkkit-padding-bottom: 3rem;
   /* The reading column's margins, which Inkkit's text uses and the header, outside its root, follows. */
   --inkkit-column-inset: max(
@@ -451,6 +452,8 @@ body[data-text='none'] #editor {
    that breaks after every character, with the same row hundreds of points tall once the page was wide again. */
 .item-prop {
   display: flex;
+  /* A value drops under its label when the column is too narrow for both, instead of breaking after every character. */
+  flex-wrap: wrap;
   column-gap: calc(var(--step) * 3);
   align-items: flex-start;
   min-height: calc(var(--step) * 7);
@@ -479,7 +482,7 @@ body[data-text='none'] #editor {
 }
 
 .item-prop-value {
-  flex: 1 1 0;
+  flex: 1 1 10rem;
   min-width: 0;
   flex-wrap: wrap;
   gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
@@ -690,8 +693,9 @@ body[data-text='none'] #editor {
 .item-lead {
   align-self: stretch;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: calc(var(--step) * 4);
+  gap: calc(var(--step) * 2) calc(var(--step) * 4);
 }
 
 .item-lead:has(.item-avatar[hidden]) {
@@ -699,7 +703,8 @@ body[data-text='none'] #editor {
 }
 
 .item-heading {
-  flex: 1;
+  /* Under the avatar, not squeezed beside it, once less than this is left for the name. */
+  flex: 1 1 10rem;
   min-width: 0;
   display: flex;
   flex-direction: column;
