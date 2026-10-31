@@ -17,10 +17,12 @@ struct ItemCommandContext {
     let showsSource: Bool
     /// Where the single selected item's file is, once known.
     let fileURL: URL?
+    /// The window's browser, which Quick Look acts through.
+    let browser: Browser?
 
     init(
         library: (any ItemLibrary)?, ids: Set<ItemID>, hasBrowser: Bool, pageItem: ItemID?, pageIsEditable: Bool = true,
-        showsSource: Bool = false, fileURL: URL? = nil
+        showsSource: Bool = false, fileURL: URL? = nil, browser: Browser? = nil
     ) {
         self.library = library
         self.ids = ids
@@ -29,6 +31,7 @@ struct ItemCommandContext {
         self.pageIsEditable = pageIsEditable
         self.showsSource = showsSource
         self.fileURL = fileURL
+        self.browser = browser
     }
 
     /// The context of a window: its selection, its browser if it has one, and the editor it hands to its menus.
@@ -39,7 +42,7 @@ struct ItemCommandContext {
             library: library, ids: ids, hasBrowser: browser != nil,
             pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasNote: editor?.hasNote == true, noteID: editor?.noteID),
             pageIsEditable: editor?.isEditable ?? false, showsSource: editor?.caret.sourceMode ?? false,
-            fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL)
+            fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser)
     }
 
     /// The item whose page is in front: the editor's, only while the page is what the window shows and the editor
@@ -69,10 +72,11 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, print, exportPDF
+    case quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, print, exportPDF
 
     func title(in context: ItemCommandContext) -> LocalizedStringResource {
         switch self {
+        case .quickLook: "Quick Look"
         case .openInNewWindow: "Open in New Window"
         case .openOriginal: "Open Original"
         case .openInBrowser: "Open in Browser"
@@ -85,6 +89,7 @@ enum ItemCommand: CaseIterable {
 
     var systemImage: String {
         switch self {
+        case .quickLook: "eye"
         case .openInNewWindow: "macwindow"
         case .openOriginal, .openInBrowser: "safari"
         case .addAttachment: "paperclip"
@@ -100,14 +105,14 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: KeyboardShortcut("o")
         case .addAttachment: KeyboardShortcut("a", modifiers: [.command, .shift])
         case .print: KeyboardShortcut("p")
-        case .openOriginal, .openInBrowser, .toggleSource, .exportPDF: nil
+        case .quickLook, .openOriginal, .openInBrowser, .toggleSource, .exportPDF: nil
         }
     }
 
     func isEnabled(in context: ItemCommandContext) -> Bool {
         guard context.library != nil else { return false }
         return switch self {
-        case .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
+        case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOriginal: context.originalAddress != nil
         case .openInBrowser: context.browserTarget != nil
         case .addAttachment: context.editableNote != nil
@@ -119,6 +124,7 @@ enum ItemCommand: CaseIterable {
     func perform(in context: ItemCommandContext, editor: EditorController?, openWindow: @escaping (ItemID) -> Void) {
         guard isEnabled(in: context), let library = context.library else { return }
         switch self {
+        case .quickLook: if let browser = context.browser { Task { await browser.quickLookSelection(in: library) } }
         case .openInNewWindow: ItemWindows.open(library.idsForWindows(context.ids), opening: openWindow)
         case .openOriginal: context.originalAddress.map { _ = NSWorkspace.shared.open($0) }
         case .openInBrowser:

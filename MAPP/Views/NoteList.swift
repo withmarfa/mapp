@@ -42,8 +42,9 @@ struct NoteList: View, Equatable {
                 .selectionDisabled(line.isHeading)
                 .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
-                if line.carriesMarkdown {
+                if !line.isHeading {
                     row.draggable(containerItemID: line.id)
+                        .dropsInto(collection: line.collectionID(in: library.catalogue), browser: browser, order: order)
                 } else {
                     row
                 }
@@ -61,6 +62,7 @@ struct NoteList: View, Equatable {
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .onDeleteCommand(perform: deleteSelection)
+        .quickLooksOnSpace(browser)
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
         .onKeyPress(.delete, phases: .down) { press in
             guard press.modifiers.contains(.command), !browser.selection.isEmpty else { return .ignored }
@@ -87,9 +89,7 @@ struct NoteList: View, Equatable {
                 daysSeen += 1
             }
         }
-        .dragContainer(for: NoteReference.self) { ids in
-            ids.compactMap { library.body(of: $0) }.map { NoteReference(id: $0.id, markdown: $0.text) }
-        }
+        .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
             browser.keepSelection(from: old, to: new, isPending: isPending)
@@ -262,13 +262,13 @@ private enum ListLine: Identifiable {
         if case .heading = self { true } else { false }
     }
 
-    var endsSection: Bool {
-        if case .item(_, let endsSection) = self { endsSection } else { false }
+    /// The item's identity where it is a collection, which items and files dropped on its row join.
+    func collectionID(in catalogue: Catalogue) -> ItemID? {
+        if case .item(let item, _) = self, catalogue.isCollection(item.type) { item.id } else { nil }
     }
 
-    /// Whether the line can be dragged: a file has no markdown to carry, and a heading is not an item.
-    var carriesMarkdown: Bool {
-        if case .item(let item, _) = self { !item.isFile } else { false }
+    var endsSection: Bool {
+        if case .item(_, let endsSection) = self { endsSection } else { false }
     }
 
     static func lines(of sections: [NoteSection]) -> [ListLine] {

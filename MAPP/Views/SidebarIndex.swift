@@ -12,7 +12,8 @@ struct SidebarIndex: View {
 
     var body: some View {
         IndexContent(
-            place: place, rows: model.rows(for: place), isBuilt: model.isBuilt(for: place), slots: model.slots, browser: browser) { row in
+            place: place, rows: model.rows(for: place), isBuilt: model.isBuilt(for: place), slots: model.slots, browser: browser,
+            order: order) { row in
             browser.show(row.place, in: library, order: order)
         }
         .task(id: Following(place: place, library: ObjectIdentifier(library))) { model.follow(place, in: library) }
@@ -58,18 +59,21 @@ private struct IndexContent: View {
     let isBuilt: Bool
     let slots: IndexSlots
     let browser: Browser
+    let order: NoteOrder
     let open: (IndexRow) -> Void
     @AppStorage private var layout: IndexLayout
     @AppStorage private var width: IndexWidth
 
     init(
-        place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, open: @escaping (IndexRow) -> Void
+        place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, order: NoteOrder,
+        open: @escaping (IndexRow) -> Void
     ) {
         self.place = place
         self.rows = rows
         self.isBuilt = isBuilt
         self.slots = slots
         self.browser = browser
+        self.order = order
         self.open = open
         _layout = AppStorage(wrappedValue: .default, place.layoutKey)
         _width = AppStorage(wrappedValue: .default, place.widthKey)
@@ -87,7 +91,8 @@ private struct IndexContent: View {
             } else {
                 IndexPage(
                     rows: shown, palette: IndexPalette(slots: slots), layout: layout, width: width, typesTitle: typesTitle,
-                    showsSecondaryOnCards: place != .sources, open: open)
+                    showsSecondaryOnCards: place != .sources,
+                    drop: place == .collections ? IndexDrop(browser: browser, order: order) : nil, open: open)
             }
         }
     }

@@ -26,13 +26,13 @@ struct ItemCommandTests {
 
     @Test func aNoteOnThePageEnablesThePageCommands() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id], page: note.id)) == [.openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
+        #expect(enabled(context([note.id], page: note.id)) == [.quickLook, .openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
     }
 
     @Test func aSelectedNoteNotOnThePageEnablesOnlyOpeningInAWindow() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id])) == [.openInNewWindow])
-        #expect(enabled(context([note.id], page: .mint())) == [.openInNewWindow])
+        #expect(enabled(context([note.id])) == [.quickLook, .openInNewWindow])
+        #expect(enabled(context([note.id], page: .mint())) == [.quickLook, .openInNewWindow])
     }
 
     @Test func settingsShowingLeavesNoPageForTheCommandsToAct() {
@@ -41,7 +41,7 @@ struct ItemCommandTests {
         browser.showSettings()
         let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasNote: true, noteID: note.id)
         #expect(page == nil)
-        #expect(enabled(context([note.id], page: page)) == [.openInNewWindow])
+        #expect(enabled(context([note.id], page: page)) == [.quickLook, .openInNewWindow])
 
         browser.leaveSettings()
         let back = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasNote: true, noteID: note.id)
@@ -57,13 +57,13 @@ struct ItemCommandTests {
         library.items.append(Item(
             id: id, type: TypeID("core.file"), title: "Report.pdf", titleRule: .property("title"), content: .file(.pdf, byteCount: 10),
             version: ItemVersion(1), created: .now, modified: .now))
-        #expect(enabled(context([id], page: id)) == [.openInNewWindow])
+        #expect(enabled(context([id], page: id)) == [.quickLook, .openInNewWindow])
     }
 
     @Test func severalNotesHaveNoSinglePage() {
         let one = library.add("One\n")
         let two = library.add("Two\n")
-        #expect(enabled(context([one.id, two.id], page: one.id)) == [.openInNewWindow])
+        #expect(enabled(context([one.id, two.id], page: one.id)) == [.quickLook, .openInNewWindow])
     }
 
     @Test func aReadOnlyPageCannotTakeAnAttachment() {

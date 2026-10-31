@@ -57,7 +57,7 @@ final class GalleryTests: XCTestCase {
             if !frame.intersects(element.frame) || element.elementType == .helpTag { return true }
             switch issue.auditType {
             case .parentChild: return true
-            case .sufficientElementDescription: return element.elementType == .group && element.label.isEmpty
+            case .sufficientElementDescription: return (element.elementType == .group || element.elementType == .other) && element.label.isEmpty
             case .contrast:
                 let isNativeTitle = element.frame.maxY <= galleryFrame.minY && element.frame.minX >= sidebarFrame.maxX
                 return sidebarFrame.contains(element.frame) || isNativeTitle

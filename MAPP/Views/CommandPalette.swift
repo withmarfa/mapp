@@ -328,7 +328,6 @@ struct CommandPalette: View {
                 add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-") { zoom.apply(.smaller) }
             }
             add(String(localized: "Actual Size"), "textformat.size", "⌘0") { zoom.apply(.actual) }
-            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N") { openWindow(id: "main") }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
@@ -339,6 +338,8 @@ struct CommandPalette: View {
                     browser.openQuickAdd(typeID: type.id.rawValue, in: library)
                 })
             }
+            // After New Item and the typed ones, so what "new" finds leads with New Item.
+            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N") { openWindow(id: "main") }
             if browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
             }

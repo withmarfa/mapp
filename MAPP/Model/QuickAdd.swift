@@ -14,9 +14,11 @@ final class QuickAdd {
         let contentType: UTType?
         private let access: FileAccess
 
-        /// Nil for a folder, a package or anything else that is not one file that can be read.
-        init?(_ url: URL) {
-            access = FileAccess(url)
+        /// Nil for a folder, a package or anything else that is not one file that can be read. A symbolic link is
+        /// taken as the file it points to.
+        init?(_ link: URL) {
+            access = FileAccess(link)
+            let url = link.resolvingSymlinksInPath()
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentTypeKey]),
                   values.isRegularFile == true, FileManager.default.isReadableFile(atPath: url.path(percentEncoded: false))
             else { return nil }
@@ -35,6 +37,19 @@ final class QuickAdd {
         /// The files' names in a sentence: “a.pdf” and “b.png”.
         static func names(_ files: [File]) -> String {
             files.map { "“\($0.name)”" }.formatted(.list(type: .and))
+        }
+
+        /// Tells the person which files could not be read as a file, such as a folder, and how many things given
+        /// were not files at all. Says nothing where there are none.
+        static func tellUnreadable(_ names: [String], unreadable: Int = 0, to notices: Notices) {
+            if !names.isEmpty {
+                notices.tell(
+                    String(localized: "Can’t Add File"),
+                    String(localized: "MAPP can’t read \(names.formatted(.list(type: .and))) as a file."))
+            }
+            if unreadable > 0 {
+                notices.tell(String(localized: "Can’t Add File"), String(localized: "^[\(unreadable) item](inflect: true) can’t be added as a file."))
+            }
         }
 
         /// The sentence that tells the person these files were not added.
