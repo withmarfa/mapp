@@ -106,8 +106,12 @@ export class WebPictures {
       default:
         // The card says what activating it does, and which picture it is: its description, or else its website.
         // A function replaces the placeholder, so a `$` in the text is not read as a replacement pattern.
+        // Only this card fills the column and is one button, so a click on it, or Return or Space, loads the
+        // pictures; the card's other states keep Inkkit's default card.
         return {
           kind: 'file',
+          layout: 'fill',
+          activation: 'card',
           label: alt
             ? (this.words.loadNamedPicture ?? 'Load Picture: %@').replace('%@', () => alt)
             : (this.words.pictureFrom ?? 'Load Picture from %@').replace('%@', () => host),

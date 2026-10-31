@@ -79,9 +79,13 @@ async function withNote(
 }
 
 const cards = () => [...document.querySelectorAll('.inkkit-file')]
-const labels = () => cards().map((card) => card.getAttribute('aria-label'))
-const open = (index = 0) =>
-  (document.querySelectorAll('.inkkit-file-open')[index] as HTMLButtonElement).click()
+// A waiting picture's card is itself the button (`activation: 'card'`) and names its caption in `.inkkit-file-label`;
+// any other card keeps its Open arrow.
+const labels = () => cards().map((card) => card.querySelector('.inkkit-file-label')?.textContent)
+const controls = () => [
+  ...document.querySelectorAll('.inkkit-file-open, .inkkit-file[role="button"]'),
+]
+const open = (index = 0) => (controls()[index] as HTMLElement).click()
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 const loaded: PictureAnswer = { state: 'loaded', url: 'mapp-embed://picture/?address=x&v=1' }
 const picture = '![A picture](https://example.com/a.png)\n'
@@ -117,6 +121,37 @@ test('choosing a waiting picture asks the app to load it, and the card becomes t
     expect(document.querySelector('.inkkit-file img')?.getAttribute('src')).toBe(loaded.url)
     expect(asked.map((request) => request.ask)).toEqual(['drawing', 'chosen'])
     expect(opened).toEqual([])
+  })
+})
+
+test('a waiting card fills the column and is one button that Return and Space also activate', async () => {
+  const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
+  await withNote(`${picture}\n![](https://example.org/b.png)\n`, async () => {
+    await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
+    await settled()
+    const waiting = cards() as HTMLElement[]
+    expect(waiting).toHaveLength(2)
+    for (const card of waiting) {
+      expect(card.dataset.inkkitFileLayout).toBe('fill')
+      expect(card.getAttribute('role')).toBe('button')
+      expect(card.tabIndex).toBe(0)
+    }
+    expect(document.querySelector('.inkkit-file-open')).toBeNull()
+    waiting[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await vi.waitFor(() => expect(document.querySelectorAll('.inkkit-file img')).toHaveLength(2))
+    expect(asked.filter((request) => request.ask === 'chosen')).toHaveLength(2)
+  })
+})
+
+test('a card that is not waiting keeps the default card, with its Open arrow', async () => {
+  app(() => ({ state: 'off' }))
+  await withNote(picture, async () => {
+    await vi.waitFor(() => expect(labels()).toHaveLength(1))
+    await settled()
+    const card = cards()[0] as HTMLElement
+    expect(card.dataset.inkkitFileLayout).toBeUndefined()
+    expect(card.getAttribute('role')).not.toBe('button')
+    expect(document.querySelector('.inkkit-file-open')).not.toBeNull()
   })
 })
 
