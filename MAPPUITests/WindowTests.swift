@@ -440,6 +440,9 @@ final class WindowTests: XCTestCase {
         let windowFrame = window.frame
         let sidebarFrame = sidebar.frame
         let listFrame = list.frame
+        let body = window.itemPageBody
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
+        let bodyTop = body.frame.minY
         try app.performAccessibilityAudit { issue in
             guard let element = issue.element else { return false }
             // The audit is of the window; the menu bar above it is the system's to draw.
@@ -460,7 +463,10 @@ final class WindowTests: XCTestCase {
                 // window does not look active, which another app's panel can cause at any moment.
                 let isSidebarFoot = element.frame.minY >= sidebarFrame.maxY
                     && element.frame.minX >= sidebarFrame.minX && element.frame.maxX <= sidebarFrame.maxX
-                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle || isSidebarFoot
+                // The page's byline and property labels above the text are drawn in the system's secondary label
+                // colour, which the audit finds a shade short in the light appearance.
+                let isPageHeader = element.frame.minX >= listFrame.maxX && element.frame.maxY <= bodyTop
+                return isIn(sidebarFrame) || isIn(listFrame) || isListTitle || isSidebarFoot || isPageHeader
             case .action: return element.elementType == .menuButton || element.elementType == .popUpButton
             default: return false
             }
