@@ -21,11 +21,23 @@ nonisolated struct MarfaItemIndex {
     /// Active items in the feed tier, which the Inbox shows.
     private(set) var feed: Set<ItemID> = []
     private(set) var links: [EdgeID: Link] = [:]
+    /// The `attached-to` edges each file holds. A file with any is a part of the item it points at, so the lists leave
+    /// it to that item's page; a file with none stands alone.
+    private var attachments: [ItemID: Set<EdgeID>] = [:]
     private var linksFrom: [ItemID: Set<EdgeID>] = [:]
     private var linksTo: [ItemID: Set<EdgeID>] = [:]
     private var held: [ItemID: [EdgeID]] = [:]
 
     func ids(in state: ItemState) -> Set<ItemID> { byState[state] ?? [] }
+
+    /// Whether the item is attached to another, whatever state that item or this one is in. A binned parent keeps
+    /// its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`).
+    func isAttachment(_ id: ItemID) -> Bool { attachments[id] != nil }
+
+    /// `ids` without the files that are attached to another item.
+    func standalone(_ ids: Set<ItemID>) -> Set<ItemID> {
+        attachments.isEmpty ? ids : ids.filter { attachments[$0] == nil }
+    }
 
     mutating func insert(_ item: Item, catalogue: Catalogue) {
         byState[item.state, default: []].insert(item.id)
@@ -41,6 +53,7 @@ nonisolated struct MarfaItemIndex {
             links[link.id] = link
             linksFrom[link.source, default: []].insert(link.id)
             linksTo[link.target, default: []].insert(link.id)
+            if link.type == MarfaMapping.attachmentEdge { attachments[link.source, default: []].insert(link.id) }
             holding.append(link.id)
         }
         held[item.id] = holding
@@ -60,6 +73,10 @@ nonisolated struct MarfaItemIndex {
             guard let link = links.removeValue(forKey: id) else { continue }
             linksFrom[link.source]?.remove(id)
             linksTo[link.target]?.remove(id)
+            if link.type == MarfaMapping.attachmentEdge {
+                attachments[link.source]?.remove(id)
+                if attachments[link.source]?.isEmpty == true { attachments[link.source] = nil }
+            }
         }
     }
 

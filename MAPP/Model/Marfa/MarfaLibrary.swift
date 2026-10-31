@@ -727,11 +727,14 @@ import Observation
         items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
     }
 
-    /// The Inbox is the feed tier. All Items is every active item in either tier, files among them. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
+    /// The Inbox is the feed tier. All Items is every active item in either tier. Both and a type's place leave out a
+    /// file attached to another item, which shows on that item's page instead; a file with no parent still shows,
+    /// whoever added it (Marfa holds no other mark of one the person added), and Files, Sources and search list every
+    /// file. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
-        case .inbox: return index.feed
-        case .allNotes: return index.ids(in: .active)
+        case .inbox: return index.standalone(index.feed)
+        case .allNotes: return index.standalone(index.ids(in: .active))
         case .sources, .collections: return []
         case .source(let name):
             return Set(index.ids(in: .active).filter { records[$0]?.item.source == name })
@@ -741,7 +744,7 @@ import Observation
         case .view: return []
         case .favorites: return index.favorites
         case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
-        case .itemType(let type): return index.activeByType[TypeID(type)] ?? []
+        case .itemType(let type): return index.standalone(index.activeByType[TypeID(type)] ?? [])
         case .files: return active(withSubtypesOf: MarfaMapping.fileType)
         // The active items filed in the collection through `in-collection`.
         case .collection(let id):
