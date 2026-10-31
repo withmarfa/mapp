@@ -25,7 +25,19 @@ struct ScrollMemory: NSViewRepresentable {
         init(memory: SidebarMemory) {
             self.memory = memory
             super.init(frame: .zero)
+            memory.rearm = { [weak self] in self?.rearm() }
+            memory.rearmOwner = ObjectIdentifier(self)
         }
+
+        private func rearm() {
+            observer.map(NotificationCenter.default.removeObserver)
+            observer = nil
+            isWatching = false
+            if restore() { watch() }
+        }
+
+        /// The list's scroll view, or the one the probe sits inside for a column that is not a list.
+        private func scrollView() -> NSScrollView? { nearestTable()?.enclosingScrollView ?? enclosingScrollView }
 
         required init?(coder: NSCoder) { nil }
 
@@ -53,7 +65,7 @@ struct ScrollMemory: NSViewRepresentable {
         /// Whether the list now shows the remembered offset, or has none to show.
         @discardableResult
         private func restore() -> Bool {
-            guard !isWatching, window != nil, let scroll = nearestTable()?.enclosingScrollView else { return false }
+            guard !isWatching, window != nil, let scroll = scrollView() else { return false }
             guard let offset = memory.scrollOffset, offset > 0 else { return true }
             let clip = scroll.contentView
             let room = (scroll.documentView?.frame.height ?? 0) - clip.bounds.height
@@ -63,7 +75,7 @@ struct ScrollMemory: NSViewRepresentable {
         }
 
         private func watch() {
-            guard !isWatching, let clip = nearestTable()?.enclosingScrollView?.contentView else { return }
+            guard !isWatching, let clip = scrollView()?.contentView else { return }
             isWatching = true
             clip.postsBoundsChangedNotifications = true
             observer = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
@@ -71,6 +83,7 @@ struct ScrollMemory: NSViewRepresentable {
                     // A list being taken down can reset its clip view to the top; that is no scroll of the person's.
                     guard let self, self.window != nil else { return }
                     self.memory.scrollOffset = clip.bounds.origin.y
+                    self.memory.scrolled?()
                 }
             }
         }
@@ -78,6 +91,10 @@ struct ScrollMemory: NSViewRepresentable {
         func stop() {
             observer.map(NotificationCenter.default.removeObserver)
             observer = nil
+            if memory.rearmOwner == ObjectIdentifier(self) {
+                memory.rearm = nil
+                memory.rearmOwner = nil
+            }
         }
     }
 }

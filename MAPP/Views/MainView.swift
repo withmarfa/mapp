@@ -13,7 +13,9 @@ struct MainView: View {
     @AppStorage(IncludedSubtypes.key) private var includedSubtypes = IncludedSubtypes()
     @SceneStorage("browser") private var storedBrowser: Data?
     @FocusState private var pane: Browser.Pane?
-    @State private var isSidebarVisible = true
+    /// Kept with the window for the next launch, as the selection and the details are.
+    @SceneStorage("sidebarHidden") private var isSidebarHidden = false
+    @State private var snapshotSaver = DelayedAction()
     @State private var measuredWidths = ColumnWidthTracker()
     @Environment(\.appearsActive) private var appearsActive
     private let restoresWindow: Bool
@@ -66,6 +68,11 @@ struct MainView: View {
                 pane = nil
             }
         }
+    }
+
+    private var isSidebarVisible: Bool {
+        get { !isSidebarHidden }
+        nonmutating set { isSidebarHidden = !newValue }
     }
 
     // Both native split shapes read the same sidebar preference before their first layout.
@@ -251,6 +258,13 @@ struct MainView: View {
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
             let editor = editor
+            if restoresWindow {
+                // The position is saved once the person stops scrolling, not for every line of it.
+                let stored = $storedBrowser
+                browser.listMemory.scrolled = { [snapshotSaver, browser] in
+                    snapshotSaver.schedule { stored.wrappedValue = try? JSONEncoder().encode(browser.snapshot()) }
+                }
+            }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onEscape = { [browser] in browser.focusRequest = .list }
             editor.onOpenNote = { [browser, library, order] id in

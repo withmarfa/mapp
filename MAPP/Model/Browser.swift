@@ -12,6 +12,8 @@ final class Browser {
     var sidebarShowsAllTypes = false
     /// The rest of what the sidebar keeps through that: its scroll position and its foot's measures.
     @ObservationIgnored let sidebarMemory = SidebarMemory()
+    /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
+    @ObservationIgnored let listMemory = SidebarMemory()
     var selection: Set<ItemID> = [] {
         didSet {
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
@@ -536,6 +538,7 @@ final class Browser {
         sidebarItem = .allNotes
         sidebarShowsAllTypes = false
         sidebarMemory.forget()
+        listMemory.forget()
         searchText = ""
         searchesPlace = false
         isSearchExpanded = false

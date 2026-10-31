@@ -82,6 +82,7 @@ struct ItemTable: View {
         }
         .tableStyle(.inset)
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), selection: { browser.selection })
+        .remembersScroll(in: browser.listMemory)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
         .focused(pane, equals: .list)

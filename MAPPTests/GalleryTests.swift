@@ -35,7 +35,6 @@ struct GalleryTests {
         let saved = Browser()
         saved.viewMode = .gallery
         saved.selection = [newer.id]
-        saved.openCollectionSelection()
         let data = try JSONEncoder().encode(saved.snapshot())
         let restored = Browser()
         restored.restore(from: data, in: library, order: NoteOrder())
