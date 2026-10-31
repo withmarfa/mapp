@@ -67,10 +67,10 @@ nonisolated extension Telemetry {
             during: "map")
     }
 
-    /// The sidebar layouts saved in the defaults could not be read. They are kept as they are, and nothing is saved
-    /// over them.
+    /// Sidebar layouts saved in the defaults could not be read. They are moved aside and kept, and layouts are saved
+    /// afresh.
     static func sidebarLayoutsUnreadable(reporting: Reporting = .shared) {
-        logger(.navigation).error("the saved sidebar layouts could not be read; they are kept and not written over")
+        logger(.navigation).error("saved sidebar layouts could not be read; they are kept aside and layouts are saved afresh")
         reporting.sink.report(
             type: "sidebar_layouts_unreadable", sentence: "The saved sidebar layouts could not be read.",
             during: "read_sidebar_layouts")

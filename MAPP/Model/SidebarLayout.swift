@@ -307,31 +307,49 @@ struct SidebarPlan {
 }
 
 /// The layouts a person has made, one for each library, kept in the defaults. A library is named by its server's
-/// address, so each keeps its own. Saved layouts that cannot be read, such as ones a later version of the app wrote,
-/// are kept as they are: the sidebar starts from the default, and changes hold only while the app runs.
+/// address, so each keeps its own. A saved layout that cannot be read, such as one a later version of the app wrote,
+/// is moved aside under a key of its own, kept and never removed, and reported; the other libraries keep theirs, that
+/// library's sidebar starts from the default, and changes are saved as before.
 @Observable @MainActor
 final class SidebarLayouts {
     private static let defaultsKey = "sidebarLayouts"
+    /// Each entry is stored data that could not be read, in the order it was found.
+    static let setAsideKey = "sidebarLayoutsSetAside"
 
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private let keepsChanges: Bool
     private var layouts: [String: SidebarLayout]
 
     init(defaults: UserDefaults = .standard, reporting: Reporting = .shared) {
         self.defaults = defaults
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             layouts = [:]
-            keepsChanges = true
             return
         }
-        do {
-            layouts = try JSONDecoder().decode([String: SidebarLayout].self, from: saved)
-            keepsChanges = true
-        } catch {
-            layouts = [:]
-            keepsChanges = false
-            Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
+        let (readable, unreadable) = Self.read(saved)
+        layouts = readable
+        guard let unreadable else { return }
+        defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
+        save()
+        Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
+    }
+
+    /// The layouts that can be read, and the stored data of those that cannot: the whole of it where it is not an
+    /// object of layouts at all, otherwise an object of the unreadable entries alone.
+    private static func read(_ saved: Data) -> (readable: [String: SidebarLayout], unreadable: Data?) {
+        if let layouts = try? JSONDecoder().decode([String: SidebarLayout].self, from: saved) { return (layouts, nil) }
+        guard let entries = (try? JSONSerialization.jsonObject(with: saved)) as? [String: Any] else { return ([:], saved) }
+        var readable: [String: SidebarLayout] = [:]
+        var unreadable: [String: Any] = [:]
+        for (library, entry) in entries {
+            if let data = try? JSONSerialization.data(withJSONObject: entry, options: .fragmentsAllowed),
+               let layout = try? JSONDecoder().decode(SidebarLayout.self, from: data) {
+                readable[library] = layout
+            } else {
+                unreadable[library] = entry
+            }
         }
+        let kept = (try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)) ?? saved
+        return (readable, kept)
     }
 
     func layout(for library: String) -> SidebarLayout { layouts[library] ?? SidebarLayout() }
@@ -341,7 +359,11 @@ final class SidebarLayouts {
         change(&layout)
         guard layout != self.layout(for: library) else { return }
         layouts[library] = layout
-        guard keepsChanges, let data = try? JSONEncoder().encode(layouts) else { return }
+        save()
+    }
+
+    private func save() {
+        guard let data = try? JSONEncoder().encode(layouts) else { return }
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

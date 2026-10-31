@@ -504,19 +504,46 @@ struct SidebarTests {
         #expect(SidebarLayouts(defaults: defaults).layout(for: "any") == SidebarLayout())
     }
 
-    @Test func aChangeNeverWritesOverAStoredLayoutThatCannotBeRead() {
+    @Test func aLayoutThatCannotBeReadIsKeptAsideAndLayoutsAreSavedAgain() throws {
         let defaults = UserDefaults(suiteName: "SidebarTests.unreadableKept")!
         defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept")
         defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadableKept") }
-        let stored = Data(#"{"marfa:one":{"hidden":7}}"#.utf8)
-        defaults.set(stored, forKey: "sidebarLayouts")
+        var two = SidebarLayout()
+        two.setHidden(.favorites, true)
+        let readable = try JSONEncoder().encode(["marfa:two": two])
+        var stored = try #require(JSONSerialization.jsonObject(with: readable) as? [String: Any])
+        stored["marfa:one"] = ["hidden": 7]
+        defaults.set(try JSONSerialization.data(withJSONObject: stored), forKey: "sidebarLayouts")
         let sink = RecordingSink()
 
         let layouts = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: sink))
+        #expect(layouts.layout(for: "marfa:two").isHidden(.favorites), "a readable layout went with the unreadable one")
+        #expect(layouts.layout(for: "marfa:one") == SidebarLayout())
         layouts.update("marfa:one") { $0.setCollapsed(.types, true) }
 
-        #expect(layouts.layout(for: "marfa:one").isCollapsed(.types), "the change holds while the app runs")
-        #expect(defaults.data(forKey: "sidebarLayouts") == stored, "what could not be read is kept as it was")
+        let again = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: RecordingSink()))
+        #expect(again.layout(for: "marfa:one").isCollapsed(.types), "the change was not saved")
+        #expect(again.layout(for: "marfa:two").isHidden(.favorites))
+        let aside = try #require(defaults.array(forKey: SidebarLayouts.setAsideKey) as? [Data])
+        #expect(aside.count == 1, "what could not be read was not kept aside once")
+        let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: [String: Int]])
+        #expect(kept == ["marfa:one": ["hidden": 7]])
         #expect(sink.errors.map(\.type) == ["sidebar_layouts_unreadable"])
+    }
+
+    @Test func storedLayoutsThatAreNotLayoutsAtAllAreKeptAsideWhole() throws {
+        let defaults = UserDefaults(suiteName: "SidebarTests.unreadableWhole")!
+        defaults.removePersistentDomain(forName: "SidebarTests.unreadableWhole")
+        defer { defaults.removePersistentDomain(forName: "SidebarTests.unreadableWhole") }
+        let earlier = Data("set aside before".utf8)
+        defaults.set([earlier], forKey: SidebarLayouts.setAsideKey)
+        let stored = Data("not json".utf8)
+        defaults.set(stored, forKey: "sidebarLayouts")
+
+        let layouts = SidebarLayouts(defaults: defaults, reporting: Reporting(sink: RecordingSink()))
+        layouts.update("marfa:one") { $0.setHidden(.favorites, true) }
+
+        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").isHidden(.favorites))
+        #expect(defaults.array(forKey: SidebarLayouts.setAsideKey) as? [Data] == [earlier, stored])
     }
 }
