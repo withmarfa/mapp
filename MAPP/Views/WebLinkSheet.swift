@@ -1,17 +1,23 @@
 import SwiftUI
 
-/// Asks for the address the Link command sets on the selection. Return adds it; Cancel or Escape leaves the text
+/// Asks for the address the Link command sets on the selection. Return adds or changes it; Cancel or Escape leaves the text
 /// as it was. When the caret is in a link, Remove Link takes it off.
 struct WebLinkSheet: View {
     let editor: EditorController
     let request: EditorController.WebLinkRequest
-    @State private var address = ""
+    @State private var address: String
     @State private var refused = false
     @FocusState private var isFieldFocused: Bool
 
+    init(editor: EditorController, request: EditorController.WebLinkRequest) {
+        self.editor = editor
+        self.request = request
+        _address = State(initialValue: request.address)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Link").interfaceFont(.title2.bold())
+            Text(request.removable ? "Edit Link" : "Link").interfaceFont(.title2.bold())
             TextField("Web Address", text: $address)
                 .textFieldStyle(.roundedBorder)
                 .focused($isFieldFocused)
@@ -29,7 +35,7 @@ struct WebLinkSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { editor.cancelWebLink() }
                     .keyboardShortcut(.cancelAction)
-                Button("Add", action: add)
+                Button(request.removable ? "Done" : "Add", action: add)
                     .keyboardShortcut(.defaultAction)
                     .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("WebLinkAdd")

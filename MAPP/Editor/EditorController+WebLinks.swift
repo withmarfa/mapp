@@ -1,17 +1,29 @@
 import Foundation
+import WebKit
 
 /// Format > Link: a web, mail or phone address set on the selection, or taken off the link the caret is in.
 extension EditorController {
     struct WebLinkRequest: Identifiable {
         let id = UUID()
         let note: ItemID
-        /// The caret is in a link, which the sheet can then also remove.
+        /// The caret is in a link, which the sheet can then also change or remove.
         let removable: Bool
+        /// The address of the link the caret is in, for the sheet to start from.
+        var address = ""
     }
 
     func askForWebLink() {
         guard hasNote, isEditable, isReady, let noteID else { return }
-        webLinkRequest = WebLinkRequest(note: noteID, removable: caret.marks.contains(.link))
+        guard caret.marks.contains(.link) else {
+            webLinkRequest = WebLinkRequest(note: noteID, removable: false)
+            return
+        }
+        let generation = generation
+        webView.evaluateJavaScript("window.editor.linkAddress()") { [self] result, _ in
+            // The page was replaced while it was asked, so the caret is no longer in that link.
+            guard self.noteID == noteID, self.generation == generation, webLinkRequest == nil else { return }
+            webLinkRequest = WebLinkRequest(note: noteID, removable: true, address: result as? String ?? "")
+        }
     }
 
     /// Sets the link on the selection, or takes it off with nil. Whether the address was acceptable; the request
@@ -45,10 +57,11 @@ nonisolated enum WebLinkAddress {
     static func normalized(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(where: \.isWhitespace) else { return nil }
-        let hasScheme = trimmed.range(of: #"^[A-Za-z][A-Za-z0-9+.-]*:"#, options: .regularExpression) != nil
+        // A colon only ends a scheme before `//` or after mailto and tel, so `example.com:8080` is a host and a port.
+        let schemePattern = #"^(?:[A-Za-z][A-Za-z0-9+.-]*://|(?:mailto|tel):)"#
         let candidate: String
-        if hasScheme {
-            candidate = trimmed
+        if let end = trimmed.range(of: schemePattern, options: [.regularExpression, .caseInsensitive]) {
+            candidate = trimmed[end].lowercased() + String(trimmed[end.upperBound...])
         } else if trimmed.contains("@"), !trimmed.contains("/") {
             candidate = "mailto:" + trimmed
         } else {
