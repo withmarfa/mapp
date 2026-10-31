@@ -26,6 +26,9 @@ struct CommandPalette: View {
     @State private var returnFocus: Browser.Pane = .list
     /// Every note's title folded once while the palette is open, so a keystroke folds only what was typed.
     @State private var titles = PaletteMatch.Titles()
+    /// What the palette lists for the query as it stands, kept across the arrow keys and anything else that runs the
+    /// body again. Nothing here is observed.
+    @State private var listing = Listing()
     @FocusState private var isFieldFocused: Bool
 
     private struct Entry: Identifiable {
@@ -42,8 +45,43 @@ struct CommandPalette: View {
         let action: () -> Void
     }
 
+    /// Everything that can change what the palette lists, other than the query.
+    private struct Basis: Equatable {
+        let library: ObjectIdentifier
+        let content: Int
+        let membership: Int
+        let mode: Browser.Palette
+        let returnFocus: Browser.Pane
+        let selection: Set<ItemID>
+    }
+
+    /// What is held across runs of the body: the items' titles for a basis, and how the titles ranked for a query.
+    /// The commands are never held, since they read the editor, the browser and the host, which change while the
+    /// palette is open and are not part of the basis.
+    private final class Listing {
+        var itemTitles: (basis: Basis, titles: [String])?
+        var ranking: (key: Ranking, picks: [PaletteMatch.Pick])?
+    }
+
+    private struct Ranking: Equatable {
+        let basis: Basis
+        let query: String
+        let fixedTitles: [String]
+    }
+
+    private var basis: Basis {
+        Basis(library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
+              mode: mode, returnFocus: returnFocus, selection: browser.selection)
+    }
+
+    /// A search is never held: its answer arrives later, through the library's own observed state, which the body
+    /// must read each time to run again.
+    private func shown() -> [Entry] {
+        mode == .search ? found : matching(basis)
+    }
+
     var body: some View {
-        let entries = matching(entries)
+        let entries = shown()
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -159,15 +197,35 @@ struct CommandPalette: View {
 
     // MARK: What it offers
 
-    private func matching(_ entries: [Entry]) -> [Entry] {
-        // A search's results are already what it found, most recently edited first.
-        mode == .search ? entries : titles.ranked(entries.map(\.title), query).map { entries[$0] }
-    }
-
-    /// The commands first, then the places, then the notes, the order in which equally good matches are listed.
-    private var entries: [Entry] {
-        if mode == .search { return found }
-        return commands + places + (query.trimmingCharacters(in: .whitespaces).isEmpty ? [] : notes)
+    /// The commands and places that answer the query, then the notes, in the order in which equally good matches are
+    /// listed. The commands are built each time, since what they offer changes under an open palette. The titles are ranked first and an entry is built only for each of the best `PaletteMatch.listLimit`
+    /// notes, never for every item in the library.
+    private func matching(_ basis: Basis) -> [Entry] {
+        let fixed = commands + places
+        let fixedTitles = fixed.map(\.title)
+        let recent = browser.paletteIndex(in: library).recent
+        let itemTitles: [String]
+        if let held = listing.itemTitles, held.basis == basis {
+            itemTitles = held.titles
+        } else {
+            itemTitles = recent.map(\.title)
+            listing.itemTitles = (basis, itemTitles)
+        }
+        let typed = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
+        let picks: [PaletteMatch.Pick]
+        if let held = listing.ranking, held.key == key {
+            picks = held.picks
+        } else {
+            picks = titles.picks(fixed: fixedTitles, items: typed ? itemTitles : [], query)
+            listing.ranking = (key, picks)
+        }
+        return picks.map { pick in
+            switch pick {
+            case .fixed(let index): fixed[index]
+            case .item(let index): note(recent[index])
+            }
+        }
     }
 
     /// The most a search lists.
@@ -405,12 +463,10 @@ struct CommandPalette: View {
         }
     }
 
-    /// Items by title, most recently edited first, each with its type, or the Inbox for one waiting there.
-    private var notes: [Entry] {
-        browser.paletteIndex(in: library).recent.map { item in
-            Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
-                reveal(item)
-            }
+    /// An item by title, with its type, or the Inbox for one waiting there.
+    private func note(_ item: Item) -> Entry {
+        Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
+            reveal(item)
         }
     }
 

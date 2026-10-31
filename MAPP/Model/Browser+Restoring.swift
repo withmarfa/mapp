@@ -10,8 +10,14 @@ extension Browser {
         var viewMode: ItemViewMode = .list
     }
 
+    /// The most items of a selection a window keeps for the next launch. A selection larger than this is kept as
+    /// none, and the list opens at its first rows: saving every id on each change of selection held the main thread
+    /// for a selection of thousands, and a restored selection of an arbitrary part of it would mean nothing.
+    static let restoredSelectionLimit = 200
+
     func snapshot() -> Snapshot {
-        Snapshot(place: item, selection: selection.sorted { $0.rawValue < $1.rawValue }, viewMode: viewMode)
+        let kept = selection.count > Self.restoredSelectionLimit ? [] : selection.sorted { $0.rawValue < $1.rawValue }
+        return Snapshot(place: item, selection: kept, viewMode: viewMode)
     }
 
     /// What a snapshot is made of, as it stands, so a window notices a change without sorting a selection that may

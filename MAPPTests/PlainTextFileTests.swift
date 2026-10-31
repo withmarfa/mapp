@@ -53,3 +53,11 @@ struct PlainTextFileTests {
         #expect(try Data(contentsOf: url) == large)
     }
 }
+
+struct PlainTextFilePageTests {
+    @Test func longTextLeavesSwiftUIsTextForAViewThatLaysOutOnlyWhatShows() {
+        #expect(!PlainTextFilePage.isLarge(String(repeating: "a", count: PlainTextFilePage.largeTextBytes)))
+        #expect(PlainTextFilePage.isLarge(String(repeating: "a", count: PlainTextFilePage.largeTextBytes + 1)))
+        #expect(PlainTextFilePage.isLarge(String(repeating: "é", count: PlainTextFilePage.largeTextBytes / 2 + 1)))
+    }
+}
