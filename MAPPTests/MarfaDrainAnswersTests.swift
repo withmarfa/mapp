@@ -84,7 +84,7 @@ struct MarfaDrainAnswersTests {
         try Self.recordAccepted(accepted.id, at: location.store(for: connection))
         let firstReport = MarfaSync.report(answeredIn: try await source.copy.queue.all())
         let holding = LiveMarfa.Flag()
-        await source.engine.whenAnswering {
+        source.engine.hooks.answering.set {
             holding.set()
             // Holds the engine while it takes the first report, as a slow one would be held.
             try? await Task.sleep(for: .milliseconds(500))
@@ -120,7 +120,7 @@ struct MarfaDrainAnswersTests {
         let holding = LiveMarfa.Flag()
         let (held, release) = AsyncStream<Void>.makeStream()
         defer { release.finish() }
-        await source.engine.whenAnswering {
+        source.engine.hooks.answering.set {
             holding.set()
             // Holds the engine in this event, as a slow one would be held, until the test has made its checks.
             for await _ in held {}
@@ -140,7 +140,7 @@ struct MarfaDrainAnswersTests {
         await behind
         #expect(activity.snapshot().writes == 0)
         #expect(try await source.copy.queue.all().contains { $0.itemId == second.rawValue }, "the write was not queued once the quit's wait ended")
-        await source.engine.whenAnswering(nil)
+        source.engine.hooks.answering.set(nil)
         #expect(await LiveMarfa.until { activity.snapshot().step == nil })
         await source.close()
     }
@@ -166,14 +166,14 @@ struct MarfaDrainAnswersTests {
         let report = MarfaSync.report(answeredIn: try await source.copy.queue.all())
 
         // The copy's next drain records an answer after the engine read the queue and before it forgets.
-        await source.engine.whenForgetting { try? Self.recordAccepted(remaining.id, at: location.store(for: connection)) }
+        source.engine.hooks.forgetting.set { try? Self.recordAccepted(remaining.id, at: location.store(for: connection)) }
         source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         await source.engineTook()
         let kept = try await source.copy.queue.all()
         #expect(kept.map(\.id) == [remaining.id], "the answer recorded after the read was forgotten with the others")
         #expect(kept.first?.verdict == .accepted)
-        await source.engine.whenForgetting(nil)
+        source.engine.hooks.forgetting.set(nil)
 
         // Its own report then takes it.
         source.hear(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil))
@@ -214,11 +214,11 @@ struct MarfaDrainAnswersTests {
         #expect(try await source.copy.queue.release(blocked.id))
         try Self.recordAccepted(remaining.id, at: store)
         let report = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == remaining.id })
-        await source.engine.whenForgetting { try? Self.recordAccepted(blocked.id, at: store) }
+        source.engine.hooks.forgetting.set { try? Self.recordAccepted(blocked.id, at: store) }
         source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         _ = try #require(await log.wait { $0.answer(to: other) == .accepted })
         await source.engineTook()
-        await source.engine.whenForgetting(nil)
+        source.engine.hooks.forgetting.set(nil)
         let kept = try await source.copy.queue.all()
         #expect(kept.map(\.id) == [blocked.id], "the released write's new answer was forgotten before it was taken")
         #expect(kept.first?.verdict == .accepted)

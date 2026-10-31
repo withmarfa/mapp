@@ -563,7 +563,7 @@ import Testing
         let scene = try await Self.open(fake)
         await scene.source.engineTook()
         let quiet = Duration.milliseconds(500)
-        await scene.source.engine.sync.setBinWait(quiet: quiet, longest: .seconds(30))
+        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: .seconds(30)))
         let before = await scene.binReads
 
         for id in doomed { try await scene.deleteElsewhere(id) }
@@ -582,7 +582,7 @@ import Testing
         await scene.source.engineTook()
         let quiet = Duration.milliseconds(400)
         let longest = Duration.milliseconds(1500)
-        await scene.source.engine.sync.setBinWait(quiet: quiet, longest: longest)
+        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: longest))
         let before = await scene.binReads
 
         // One deletion after another for twice the longest wait, so the changes never pause for `quiet`.

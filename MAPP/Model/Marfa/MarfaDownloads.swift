@@ -53,9 +53,7 @@ actor MarfaDownloads: DownloadedFiles {
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
     #if DEBUG
-    private var removing: (@Sendable () async -> Void)?
-
-    func whenRemoving(_ hook: (@Sendable () async -> Void)?) { removing = hook }
+    nonisolated let hooks = TestHooks()
     #endif
 
     init(copy: WorkingCopy) {
@@ -85,7 +83,7 @@ actor MarfaDownloads: DownloadedFiles {
         do {
             _ = try await copy.blobs.setBudget(.bytes(bytes: 0))
             #if DEBUG
-            await removing?()
+            await hooks.removing.current?()
             #endif
         } catch {
             _ = try await copy.blobs.setBudget(setting)

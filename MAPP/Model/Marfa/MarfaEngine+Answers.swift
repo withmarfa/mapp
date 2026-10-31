@@ -8,7 +8,7 @@ extension MarfaEngine {
     /// refused writes that carried content stay queued until discarded.
     func answer(_ report: DrainReport) async {
         #if DEBUG
-        await answering?()
+        await hooks.answering.current?()
         #endif
         var ids: Set<String> = []
         // The copy lets an item go once its delete is answered, which may be only as the answers are forgotten.
@@ -62,7 +62,7 @@ extension MarfaEngine {
             do {
                 let ids = Array(takenAnswers)
                 #if DEBUG
-                await forgetting?()
+                await hooks.forgetting.current?()
                 #endif
                 _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered(ids: ids) }
             } catch {
@@ -90,22 +90,10 @@ extension MarfaEngine {
         }
     }
 
-    /// A write the app made as several queued writes is answered once, with the first answer that was not taken.
+    /// A write the app made as several queued writes is answered once, when the last of them is (`MarfaWriteRecord`).
     func answered(_ queued: String, _ outcome: WriteOutcome) {
-        guard let id = submitted.removeValue(forKey: queued) else { return }
-        if Self.weight(outcome) > outcomes[id].map(Self.weight) ?? -1 { outcomes[id] = outcome }
-        outstanding[id]?.remove(queued)
-        guard outstanding[id]?.isEmpty ?? true else { return }
-        outstanding[id] = nil
-        if let outcome = outcomes.removeValue(forKey: id) { hub.publish(.answered(id, outcome)) }
-    }
-
-    private static func weight(_ outcome: WriteOutcome) -> Int {
-        switch outcome {
-        case .accepted: 0
-        case .merged: 1
-        default: 2
-        }
+        guard let (id, outcome) = writes.answer(queued, outcome) else { return }
+        hub.publish(.answered(id, outcome))
     }
 
     private func hasLeft(_ raw: String) async -> Bool {

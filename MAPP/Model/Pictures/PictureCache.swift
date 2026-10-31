@@ -24,17 +24,15 @@ actor PictureCache {
 
     nonisolated let folder: URL
     private let limit: Int
-    private let whenTrimming: @Sendable () -> Void
     private var sweptIncoming = false
 
-    /// `whenTrimming` is for tests, which look at what is held when a trim begins.
-    init(
-        folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit,
-        whenTrimming: @escaping @Sendable () -> Void = {}
-    ) {
+    #if DEBUG
+    nonisolated let hooks = TestHooks()
+    #endif
+
+    init(folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit) {
         self.folder = folder
         self.limit = limit
-        self.whenTrimming = whenTrimming
     }
 
     /// Whether the lock `removeAll` and `store` share is free to take now.
@@ -101,7 +99,9 @@ actor PictureCache {
 
     /// Removes the least recently used pictures until the rest fit.
     func trim() {
-        whenTrimming()
+        #if DEBUG
+        hooks.trimming.current?()
+        #endif
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: folder.path) else { return }
         var held: [(directory: URL, size: Int, used: Date)] = []

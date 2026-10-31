@@ -150,25 +150,32 @@ actor MarfaSync {
     }
 
     /// How long the bin's changes are let settle before it is read, and the longest a read waits for them to.
-    private(set) var binQuiet = Duration.seconds(1)
-    private(set) var binLongest = Duration.seconds(5)
+    nonisolated struct BinWait: Sendable {
+        var quiet: Duration
+        var longest: Duration
+    }
+
+    var binWait: BinWait {
+        #if DEBUG
+        if let wait = hooks.binWait.current { return wait }
+        #endif
+        return BinWait(quiet: .seconds(1), longest: .seconds(5))
+    }
 
     #if DEBUG
-    func setBinWait(quiet: Duration, longest: Duration) {
-        binQuiet = quiet
-        binLongest = longest
-    }
+    nonisolated let hooks = TestHooks()
     #endif
 
     /// An item may have gone to or left the server's bin, which the copy does not say. The bin is read from the
-    /// server whole, so a flood of server changes reads it once they pause, and at least every `binLongest`.
+    /// server whole, so a flood of server changes reads it once they pause, and at least every `binWait.longest`.
     func binChanged() {
         guard !stopped else { return }
         let now = ContinuousClock.now
         let first = binAsked ?? now
         binAsked = first
         binTimer?.cancel()
-        let due = min(now + binQuiet, first + binLongest)
+        let wait = binWait
+        let due = min(now + wait.quiet, first + wait.longest)
         binTimer = Task {
             try? await Task.sleep(until: due)
             guard !Task.isCancelled else { return }

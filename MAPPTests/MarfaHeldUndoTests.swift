@@ -169,7 +169,7 @@ import Testing
         let edge = try #require(await copy.edges.from(folderID).first)
         let reads = Catchup(copy: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
-        await source.engine.whenRefusing { reads.refusal($0) }
+        source.engine.hooks.refusing.set { reads.refusal($0) }
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Second") != nil && $0.item(titled: "Folder") != nil })
@@ -365,7 +365,7 @@ import Testing
 
     @Test func aCatchUpThatNeverEndsGivesTheUndoBack() async throws {
         let scene = try await makeScene()
-        await scene.source.engine.setHoldLimit(.milliseconds(200))
+        scene.source.engine.hooks.holdLimit.set(.milliseconds(200))
         let id = scene.unlink(as: UndoGroup())
         let state = try #require(await scene.log.wait { $0.answer(to: id) != nil })
         let problem = try #require(state.refusal(to: id))

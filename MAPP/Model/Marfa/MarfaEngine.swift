@@ -144,10 +144,8 @@ actor MarfaEngine {
     /// The items an edge move touched, read again once its answer is taken: the two ends it left and the one it went
     /// to, since a refusal puts the edge back and the answer names only its source.
     var movedEnds: [String: Set<String>] = [:]
-    /// The app's write for each queued write it made, until every one of them is answered.
-    var submitted: [String: WriteID] = [:]
-    var outstanding: [WriteID: Set<String>] = [:]
-    var outcomes: [WriteID: WriteOutcome] = [:]
+    /// The app's writes queued and not yet answered.
+    var writes = MarfaWriteRecord()
     var failures: [SourceFailure] = []
     /// The person's latest edit of each item's text, which their next edit of it follows.
     var ownText: [ItemID: OwnText] = [:]
@@ -161,7 +159,12 @@ actor MarfaEngine {
     /// made, until the copy is whole.
     var held: [Held] = []
     /// How long a held undo waits for a copy that is not catching up before it is given back.
-    var holdLimit = Duration.seconds(30)
+    var holdLimit: Duration {
+        #if DEBUG
+        if let limit = hooks.holdLimit.current { return limit }
+        #endif
+        return .seconds(30)
+    }
 
     nonisolated static func canForget(_ verdict: Marfa.Verdict) -> Bool {
         switch verdict {
@@ -182,30 +185,7 @@ actor MarfaEngine {
     private var closed = false
 
     #if DEBUG
-    /// Run before each drain's answers are taken, for the tests.
-    var answering: (@Sendable () async -> Void)?
-
-    func whenAnswering(_ hook: (@Sendable () async -> Void)?) {
-        answering = hook
-    }
-
-    /// Run after the queue was last read and before the answers are forgotten, for the tests.
-    var forgetting: (@Sendable () async -> Void)?
-
-    /// Chooses the error the copy refuses a write with, for the tests, since a copy made for them is never brought up to date.
-    var refusing: (@Sendable (ItemWrite) -> MarfaError?)?
-
-    func whenRefusing(_ hook: (@Sendable (ItemWrite) -> MarfaError?)?) {
-        refusing = hook
-    }
-
-    func setHoldLimit(_ limit: Duration) {
-        holdLimit = limit
-    }
-
-    func whenForgetting(_ hook: (@Sendable () async -> Void)?) {
-        forgetting = hook
-    }
+    nonisolated let hooks = TestHooks()
     #endif
 
     init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads, reading: (any MarfaReading)? = nil,
