@@ -11,6 +11,8 @@ nonisolated enum PropertyCommit: Equatable {
     case conflict
     /// The text is not a number.
     case invalid
+    /// The text is a number the field does not take: not whole, or outside its bounds.
+    case outOfRange
     case write(PropertyValue?)
 }
 
@@ -19,6 +21,8 @@ nonisolated enum PropertyLoss: Equatable {
     /// The item's value changed since the draft began.
     case conflict
     case notANumber
+    /// A number the field's range or whole-number rule refuses.
+    case outOfRange
     /// The item can no longer be edited.
     case notEditable
     /// The library refused the write: the item is gone, or no longer has the property.
@@ -28,6 +32,7 @@ nonisolated enum PropertyLoss: Equatable {
         switch self {
         case .conflict: String(localized: "The value changed while you were editing it.")
         case .notANumber: String(localized: "The value isn’t a number.")
+        case .outOfRange: String(localized: "The value is outside what the field takes.")
         case .notEditable: String(localized: "The item can no longer be edited.")
         case .notSaved: String(localized: "The value could not be saved.")
         }
@@ -43,14 +48,15 @@ extension ItemPropertyDraft {
     /// What committing the draft does for a field of this kind, given the text the item holds now. A draft over a
     /// value that changed since it began is held back unless the person chose to overwrite it.
     func commit(
-        as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, overwriting: Bool = false, locale: Locale = .current
+        as kind: ItemTypeInfo.Field.Kind, rule: NumberRule = NumberRule(), current: String, overwriting: Bool = false, locale: Locale = .current
     ) -> PropertyCommit {
         guard isDirty else { return .unchanged }
         if text == current || text == base { return .alreadyCurrent }
         if !overwriting, conflicts(with: current) { return .conflict }
         if text.isEmpty { return .write(nil) }
         if case .number = kind {
-            guard let number = PropertyNumber.parse(text, integer: integer, locale: locale) else { return .invalid }
+            guard let number = PropertyNumber.parse(text, integer: rule.integer, locale: locale) else { return .invalid }
+            guard rule.allows(number) else { return .outOfRange }
             return .write(.number(number))
         }
         return .write(.string(text))
@@ -60,13 +66,14 @@ extension ItemPropertyDraft {
     /// else keeps. Nil where leaving loses nothing, because the text is written, is already the item's, or was never
     /// typed.
     func loss(
-        as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, isEditable: Bool, locale: Locale = .current
+        as kind: ItemTypeInfo.Field.Kind, rule: NumberRule = NumberRule(), current: String, isEditable: Bool, locale: Locale = .current
     ) -> PropertyLoss? {
         guard isDirty, text != current, text != base else { return nil }
         guard isEditable else { return .notEditable }
-        switch commit(as: kind, integer: integer, current: current, locale: locale) {
+        switch commit(as: kind, rule: rule, current: current, locale: locale) {
         case .conflict: return .conflict
         case .invalid: return .notANumber
+        case .outOfRange: return .outOfRange
         case .unchanged, .alreadyCurrent, .write: return nil
         }
     }
@@ -75,18 +82,18 @@ extension ItemPropertyDraft {
     /// the person through `notices`, which puts it on the clipboard, and is dropped so it is told once. Nothing is
     /// told for a draft the item already holds, or that is back at what it began from.
     func handOff(
-        label: String, as kind: ItemTypeInfo.Field.Kind, integer: Bool = false, current: String, isEditable: Bool,
+        label: String, as kind: ItemTypeInfo.Field.Kind, rule: NumberRule = NumberRule(), current: String, isEditable: Bool,
         locale: Locale = .current, write: (PropertyValue?) -> Bool, to notices: Notices
     ) {
         guard isDirty else { return }
-        if isEditable, case .write(let value) = commit(as: kind, integer: integer, current: current, locale: locale) {
+        if isEditable, case .write(let value) = commit(as: kind, rule: rule, current: current, locale: locale) {
             rejected = !write(value)
             if !rejected {
                 isDirty = false
                 return
             }
         }
-        guard let loss = loss(as: kind, integer: integer, current: current, isEditable: isEditable, locale: locale) ?? (rejected && text != current && text != base ? .notSaved : nil) else {
+        guard let loss = loss(as: kind, rule: rule, current: current, isEditable: isEditable, locale: locale) ?? (rejected && text != current && text != base ? .notSaved : nil) else {
             discard(toMatch: current)
             return
         }
@@ -124,8 +131,14 @@ extension DetailsPresentation {
         for (id, key, draft) in drafts {
             guard let field = draft.field else { continue }
             let item = library.item(id)
+            if case .list(let shape) = field.kind {
+                draft.list.leave(
+                    shape, label: field.displayLabel, value: item?.value(of: key), isEditable: item?.isEditable ?? false,
+                    write: { library.setItemProperty(id, key: key, value: $0, undoManager: undoManager) }, to: library.notices)
+                continue
+            }
             draft.handOff(
-                label: field.displayLabel, as: field.kind, integer: field.isInteger,
+                label: field.displayLabel, as: field.kind, rule: field.numberRule,
                 current: item?.value(of: key).map(ItemValueText.editing) ?? "",
                 isEditable: item?.isEditable ?? false,
                 write: { library.setItemProperty(id, key: key, value: $0, undoManager: undoManager) }, to: library.notices)
@@ -159,6 +172,11 @@ nonisolated enum PropertyNumber {
         }
         guard digits > 0 else { return nil }
         return Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX"))
+    }
+
+    /// The number the text names if the rule takes it: whole, and within the bounds.
+    static func parse(_ text: String, rule: NumberRule, locale: Locale = .current) -> Decimal? {
+        parse(text, integer: rule.integer, locale: locale).flatMap { rule.allows($0) ? $0 : nil }
     }
 
     /// The text that edits `value`: exact, with the locale's decimal separator and no grouping, so it reads back as the

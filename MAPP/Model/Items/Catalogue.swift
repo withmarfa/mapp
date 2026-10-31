@@ -10,7 +10,9 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             /// A status field: a word the type declares, each in one of the four groups. It is the field's kind, not its
             /// name, that makes it a status (`core.media` calls it `progress`).
             case status([StatusWord])
-            /// A shape the app shows but does not edit, such as a list or an object.
+            /// A list of entries made of members (`ListShape`).
+            case list(ListShape)
+            /// A shape the app shows but does not edit, such as an object.
             case other
         }
 
@@ -27,6 +29,9 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         var format: TextFormat?
         /// Whether a number field holds whole numbers only, as a Marfa `integer` does.
         var isInteger = false
+        /// The bounds a number field declares, which a value must stay within.
+        var minimum: Decimal?
+        var maximum: Decimal?
         var id: String { key }
     }
 
@@ -74,7 +79,20 @@ nonisolated extension ItemTypeInfo.Field {
         switch kind {
         case .choice(let choices): return choices
         case .status(let words): return words.map(\.value)
-        case .text, .number, .boolean, .date, .other: return []
+        case .text, .number, .boolean, .date, .list, .other: return []
+        }
+    }
+
+    /// What a number field takes: whole or not, and within its bounds.
+    var numberRule: NumberRule { NumberRule(integer: isInteger, minimum: minimum, maximum: maximum) }
+
+    /// Whether a value of this shape can be written to the field. A number must also keep to the field's rule, and a
+    /// list takes an array whose every entry fits a member.
+    func accepts(_ value: PropertyValue) -> Bool {
+        switch (kind, value) {
+        case (.number, .number(let number)): return numberRule.allows(number)
+        case (.list(let shape), .array(let entries)): return entries.allSatisfy(shape.accepts)
+        default: return kind.accepts(value)
         }
     }
 
@@ -90,6 +108,9 @@ nonisolated extension ItemTypeInfo.Field {
         merged.required = required
         merged.description = description
         merged.format = format
+        merged.isInteger = isInteger
+        merged.minimum = minimum
+        merged.maximum = maximum
         return merged
     }
 

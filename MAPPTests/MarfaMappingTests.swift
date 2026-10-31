@@ -376,6 +376,16 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.value(MarfaMapping.json(nested)) == nested)
     }
 
+    @Test func aLargeIntegerGoesBackAsTheSameInteger() {
+        // 2^53 + 1 is the first integer a Double cannot hold, so a list edit that rewrote it through one would change it.
+        for integer in [Int64(9_007_199_254_740_993), .max, .min, -9_007_199_254_740_993] {
+            #expect(MarfaMapping.json(MarfaMapping.value(.integer(integer))) == .integer(integer), "\(integer)")
+        }
+        let entry: JSONValue = .array([.object(JSONObject([("count", .integer(9_007_199_254_740_993))]))])
+        #expect(MarfaMapping.json(MarfaMapping.value(entry)) == entry)
+        #expect(MarfaMapping.json(.number(Decimal(string: "9223372036854775808")!)) != .integer(.max))
+    }
+
     // MARK: Verdicts and sync
 
     @Test func aRefusalIsReadIntoItsParts() {

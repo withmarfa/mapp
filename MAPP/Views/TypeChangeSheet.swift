@@ -39,7 +39,7 @@ struct TypeChangeSheet: View {
                                 return true
                             }, retainedDraft: draft(for: field.key), handsOffOnLeave: false)
                             if field.kind == .number, isNotANumber(field) {
-                                Text(PropertyLoss.notANumber.reason)
+                                Text(numberRefusal(field))
                                     .interfaceFont(.caption).foregroundStyle(.orange)
                                     .accessibilityIdentifier("TypeChangeNotANumber.\(field.key)")
                             }
@@ -103,7 +103,7 @@ struct TypeChangeSheet: View {
             let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let field = selected.flatMap({ library.catalogue.itemTypes[$0] })?.fields.first(where: { $0.key == key }) else { continue }
             let value: PropertyValue? = switch field.kind {
-            case .number: PropertyNumber.parse(text, integer: field.isInteger).map(PropertyValue.number)
+            case .number: PropertyNumber.parse(text, rule: field.numberRule).map(PropertyValue.number)
             default: text.isEmpty ? nil : .string(text)
             }
             filling[key] = value
@@ -116,7 +116,15 @@ struct TypeChangeSheet: View {
         let draft = draft(for: field.key)
         guard draft.isDirty else { return false }
         let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !text.isEmpty && PropertyNumber.parse(text, integer: field.isInteger) == nil
+        return !text.isEmpty && PropertyNumber.parse(text, rule: field.numberRule) == nil
+    }
+
+    /// Why the number typed in `field` is refused: not a number at all, or outside what the field takes, in the
+    /// field's own words where it declares a range.
+    private func numberRefusal(_ field: ItemTypeInfo.Field) -> String {
+        let text = draft(for: field.key).text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PropertyNumber.parse(text, integer: field.isInteger) != nil else { return PropertyLoss.notANumber.reason }
+        return field.numberRule.requirement ?? PropertyLoss.outOfRange.reason
     }
 
     private func canChange(_ preview: TypeChangePreview?) -> Bool {

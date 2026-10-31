@@ -1,6 +1,81 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
+      "extractionState" : "manual"
+    },
+    "%@ is required." : {
+      "extractionState" : "manual"
+    },
+    "%@ isn’t a valid value." : {
+      "extractionState" : "manual"
+    },
+    "“%@” isn’t part of this list. Remove it to save the list." : {
+      "extractionState" : "manual"
+    },
+    "An entry needs at least one value." : {
+      "extractionState" : "manual"
+    },
+    "Main" : {
+      "extractionState" : "manual"
+    },
+    "Make Main" : {
+      "extractionState" : "manual"
+    },
+    "Required" : {
+      "extractionState" : "manual"
+    },
+    "Entry Actions" : {
+      "extractionState" : "manual"
+    },
+    "Enter a number from %@ to %@." : {
+      "extractionState" : "manual"
+    },
+    "Enter a number of %@ or less." : {
+      "extractionState" : "manual"
+    },
+    "Enter a number of %@ or more." : {
+      "extractionState" : "manual"
+    },
+    "Enter a whole number from %@ to %@." : {
+      "extractionState" : "manual"
+    },
+    "Enter a whole number of %@ or less." : {
+      "extractionState" : "manual"
+    },
+    "Enter a whole number of %@ or more." : {
+      "extractionState" : "manual"
+    },
+    "Enter a whole number." : {
+      "extractionState" : "manual"
+    },
+    "The list could not be saved." : {
+      "extractionState" : "manual"
+    },
+    "The new kind of item doesn’t have this property." : {
+      "extractionState" : "manual"
+    },
+    "The value is outside what the field takes." : {
+      "extractionState" : "manual"
+    },
+    "This entry isn’t in a form this list takes. Remove it to save the list." : {
+      "extractionState" : "manual"
+    },
+    "The entry was removed while you were editing it." : {
+      "extractionState" : "manual"
+    },
+    "The list can’t be saved while it holds an entry it doesn’t take. Correct or remove the entries marked in this list." : {
+      "extractionState" : "manual"
+    },
+    "New entry: %@" : {
+      "extractionState" : "manual"
+    },
+    "The entry changed or was removed while you were editing it." : {
+      "extractionState" : "manual"
+    },
+    "The new entry wasn’t finished, so it wasn’t added." : {
+      "extractionState" : "manual"
+    },
     "A collection’s contents always stay on its page." : {
       "extractionState" : "manual"
     },

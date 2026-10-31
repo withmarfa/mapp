@@ -97,7 +97,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
                 result[field.key] = .string("")
             } else if case .other = field.kind {
                 return .failure(.cannotFill(field))
-            } else if let value = filling[field.key], field.kind.accepts(value),
+            } else if let value = filling[field.key], field.accepts(value),
                       field.key != new.titleKey || !NoteName.trimmed(value.string ?? "").isEmpty {
                 set[field.key] = value
                 result[field.key] = value
@@ -110,9 +110,9 @@ nonisolated struct TypeChange: Hashable, Sendable {
         for field in new.fields {
             guard let value = result[field.key], value != .null else { continue }
             if case .other = field.kind { continue }
-            if let before = old?.fields.first(where: { $0.key == field.key }), before.kind == field.kind,
+            if let before = old?.fields.first(where: { $0.key == field.key }), before.kind == field.kind, before.numberRule == field.numberRule,
                set[field.key] == nil { continue }
-            if !field.kind.accepts(value) { return .failure(.valueDoesNotFit(field)) }
+            if !field.accepts(value) { return .failure(.valueDoesNotFit(field)) }
         }
 
         var changes: [String: PropertyValue?] = [:]

@@ -22,6 +22,8 @@ struct ItemPropertyRow: View {
     /// Whether the page shows this property too, and what changes it; nil offers no choice.
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
+    /// Whether the library still has a write of the item's properties on its way, which a list of entries waits for.
+    var isWriting = false
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.openURL) private var openURL
     @Environment(\.library) private var library
@@ -42,7 +44,7 @@ struct ItemPropertyRow: View {
                     Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
                 if isEditable && input.conflicts(with: currentText) { conflictNotice }
-                if input.rejected { rejectedNotice }
+                if input.rejected, !isList { rejectedNotice }
                 if lostEdit { lostEditNotice }
             }
         }
@@ -65,7 +67,12 @@ struct ItemPropertyRow: View {
     // MARK: Value
 
     @ViewBuilder private var core: some View {
-        if definition.kind == .boolean {
+        if case .list(let shape) = definition.kind {
+            // The list tells its own refusals, beside the entry they are about.
+            ListEntriesEditor(
+                shape: shape, label: definition.displayLabel, key: definition.key, value: value, isEditable: isEditable,
+                editing: input.list, isWriting: isWriting, onChange: onChange)
+        } else if definition.kind == .boolean {
             checkbox
         } else if isEditable {
             switch definition.kind {
@@ -73,7 +80,7 @@ struct ItemPropertyRow: View {
             case .date: dateButton
             case .text, .number:
                 if link != nil, !editing, !input.isDirty { linkText } else { textField }
-            case .other: plain
+            case .other, .list: plain
             case .boolean: EmptyView()
             }
         } else if link != nil {
@@ -116,6 +123,8 @@ struct ItemPropertyRow: View {
     }
 
     private var currentText: String { value.map(ItemValueText.editing) ?? "" }
+
+    private var isList: Bool { definition.kind.isList }
 
     /// What the row reads at rest: the draft while there is one the item can take, else the stored value. An item that
     /// can no longer be edited shows what it holds, not what was typed for it.
@@ -188,6 +197,10 @@ struct ItemPropertyRow: View {
     }
 
     private func clear() {
+        if isList {
+            if !onChange(nil) { input.list.notice = String(localized: "The list could not be saved.") }
+            return
+        }
         input.rejected = !onChange(nil)
         if !input.rejected { input.discard(toMatch: "") ; editing = false }
     }
@@ -229,6 +242,9 @@ struct ItemPropertyRow: View {
             Group {
                 if definition.kind.isDate {
                     Text("The date couldn’t be saved.")
+                } else if definition.kind == .number, let requirement = definition.numberRule.requirement,
+                          PropertyNumber.parse(input.text, rule: definition.numberRule) == nil {
+                    Text(requirement)
                 } else {
                     Text("The value could not be saved. Your input has been kept.")
                 }
@@ -410,6 +426,7 @@ struct ItemPropertyRow: View {
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
         case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
+        case (.list, _): valid = definition.accepts(value)
         default: valid = false
         }
         return valid ? nil : String(localized: "Unrecognized value: \(ItemValueText.string(value)). It is preserved until you replace it.")
@@ -429,21 +446,25 @@ struct ItemPropertyRow: View {
             commit()
             return
         }
+        if case .list(let shape) = definition.kind {
+            input.list.leave(shape, label: definition.displayLabel, value: value, isEditable: isEditable, write: onChange, to: library.notices)
+            return
+        }
         input.handOff(
-            label: definition.displayLabel, as: definition.kind, integer: definition.isInteger, current: currentText,
+            label: definition.displayLabel, as: definition.kind, rule: definition.numberRule, current: currentText,
             isEditable: isEditable, write: onChange, to: library.notices)
         editing = false
     }
 
     private func commit(overwriting: Bool = false) {
         guard isEditable else { return }
-        switch input.commit(as: definition.kind, integer: definition.isInteger, current: currentText, overwriting: overwriting) {
+        switch input.commit(as: definition.kind, rule: definition.numberRule, current: currentText, overwriting: overwriting) {
         case .unchanged, .conflict:
             break
         case .alreadyCurrent:
             // The edit was undone by hand, or the item already holds it; the item's own text stands.
             input.discard(toMatch: currentText)
-        case .invalid:
+        case .invalid, .outOfRange:
             input.rejected = true
         case .write(let written):
             input.rejected = !onChange(written)

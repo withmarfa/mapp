@@ -81,13 +81,14 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
 
     private init() {}
 
-    /// The rows of the property block with the kind's own readings of them: a person's phone number is a number to
-    /// call, not text.
+    /// The rows of the property block with the kind's own readings of them: a person's number to call is a link, not
+    /// text. Which list entry holds a number to call is read from the list's definition (`ListShape.numberToCall`),
+    /// never from the name of the field that holds it.
     func refine(_ rows: [PropertyRow]) -> [PropertyRow] {
         guard kind == .person else { return rows }
         return rows.map { row in
-            guard row.id == "phone", case .text(let number) = row.value else { return row }
-            return PropertyRow(id: row.id, label: row.label, value: .phone(number))
+            guard let number = row.numberToCall else { return row }
+            return PropertyRow(id: row.id, label: row.label, value: .phone(number), numberToCall: number)
         }
     }
 }

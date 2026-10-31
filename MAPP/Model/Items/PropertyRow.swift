@@ -52,6 +52,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     let id: String
     let label: String
     let value: Value
+    /// The number to call the main entry of a list holds, where its list can hold one (`ListShape.numberToCall`).
+    var numberToCall: String?
 
     /// How many rows show before "Show N more".
     static let foldAfter = 6
@@ -84,7 +86,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: .status)) }
                 if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
             } else if placement.showsOnPage(field.key), let value = value(of: field, in: item) {
-                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value))
+                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value, numberToCall: numberToCall(of: field, in: item)))
             }
         }
         if parent, placement.showsOnPage(parentField), !rows.contains(where: { $0.value == .parent }) {
@@ -111,10 +113,20 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         return PropertyRow(id: field, label: ItemTypeInfo.Field.displayLabel(label), value: .parent)
     }
 
+    /// The number to call a list field's main entry holds, or nil.
+    static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
+        guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
+        return shape.numberToCall(in: main)
+    }
+
     /// The value a field's row draws, or nil where the field has none or holds something a row does not show.
     static func value(of field: ItemTypeInfo.Field, in item: Item) -> Value? {
         guard let stored = item.value(of: field.key), InspectorFields.hasValue(stored) else { return nil }
         switch (field.kind, stored) {
+        case (.list(let shape), .array(let entries)):
+            // Only the main entry shows on the page; the inspector lists them all.
+            guard let main = entries.first.flatMap(ListEntries.object) else { return nil }
+            return shape.rowValue(of: main)
         case (.boolean, .bool(let flag)): return .boolean(flag)
         case (.number, .number(let number)): return .text(number.formatted())
         case (.date, .string(let text)): return .date(ItemDate.parse(text)?.text() ?? text)

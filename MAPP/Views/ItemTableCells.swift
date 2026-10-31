@@ -136,7 +136,11 @@ struct ItemTableCell: View {
         case .longText:
             if let current { Text(current).foregroundStyle(.secondary).truncationMode(.tail) }
         default:
-            if let current { Text(current).truncationMode(.tail) }
+            if case .list(let shape) = field.kind, let stored = row.item.value(of: field.key), InspectorFields.hasValue(stored) {
+                Text(shape.display(of: stored)).truncationMode(.tail)
+            } else if let current {
+                Text(current).truncationMode(.tail)
+            }
         }
     }
 

@@ -31,6 +31,7 @@ struct ItemInspectorHost: View {
                     relationships: relationships,
                     mentions: library.bodyMentions(for: id),
                     onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
+                    isWritingProperties: { library.isWritingProperties(of: id) },
                     onOpen: open,
                     onEdit: { editing = $0 },
                     onRemove: { relationship, target in
@@ -103,6 +104,9 @@ struct ItemInspector: View {
     let relationships: [ItemRelationship]
     let mentions: [ItemRelationshipTarget]
     let onProperty: (String, PropertyValue?) -> Bool
+    /// Whether an edit of the item's properties is still on its way into the library, read only for a list of
+    /// entries, which waits for it.
+    var isWritingProperties: () -> Bool = { false }
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) -> Bool
@@ -183,7 +187,8 @@ struct ItemInspector: View {
                                     startsEditing: adding == field.key,
                                     // The window holds the draft, so folding this section does not give it back.
                                     handsOffOnLeave: drafts == nil,
-                                    shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key))
+                                    shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key),
+                                    isWriting: field.kind.isList && isWritingProperties())
                 }
             }
         }

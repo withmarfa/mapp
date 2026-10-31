@@ -102,6 +102,15 @@ import Observation
     @ObservationIgnored private var following: [Task<Void, Never>] = []
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
+    /// The item each property edit is for, until the copy takes or refuses it. Observed, so an editor holding a list it
+    /// wrote can tell a write still on its way from one refused (`isWritingProperties(of:)`).
+    private var propertyWrites: [WriteID: ItemID] = [:]
+    /// The mark of each property edit (`lastPropertyWrite`) until the copy takes or refuses it, and the marks of the
+    /// edits it took lately, so an editor can tell a write that landed and was changed again before it drew from one
+    /// refused (`tookPropertyWrite(_:)`).
+    @ObservationIgnored private var propertyMarks: [WriteID: Int] = [:]
+    @ObservationIgnored private(set) var lastPropertyWrite: Int? = 0
+    @ObservationIgnored private var takenMarks: Set<Int> = []
     /// Creates the source refused before it held the item, such as one made while the copy is brought up to date,
     /// so the window has no item to open and gives the New up.
     private(set) var refusedCreations: Set<ItemID> = []
@@ -379,10 +388,14 @@ import Observation
             take(changes)
         case .answered(let id, let outcome):
             textSaves.removeValue(forKey: id)?.end()
+            propertyWrites[id] = nil
+            propertyMarks[id] = nil
             read(id)
             answered(id, outcome)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
+            propertyWrites[id] = nil
+            if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             took(id)
             read(id)
         case .catalogue(let catalogue):
@@ -590,12 +603,22 @@ import Observation
         case .create:
             return createdText(write)
         case .editProperties(_, let changes, _, _), .retype(_, _, let changes, _):
-            let texts = changes.sorted { $0.key < $1.key }.compactMap { $0.value?.string }
+            let texts = changes.sorted { $0.key < $1.key }.flatMap { $0.value.map(texts(in:)) ?? [] }
             return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
         case .tag(_, let tag, on: true) where tag != ItemTag.favorite:
             return tag
         default:
             return nil
+        }
+    }
+
+    /// The text values a property holds, those inside a list of entries among them.
+    private static func texts(in value: PropertyValue) -> [String] {
+        switch value {
+        case .string(let text): [text]
+        case .array(let values): values.flatMap(texts(in:))
+        case .object(let fields): fields.sorted { $0.key < $1.key }.flatMap { texts(in: $0.value) }
+        case .null, .bool, .number: []
         }
     }
 
@@ -606,6 +629,30 @@ import Observation
         let values = draft.properties.sorted { $0.key < $1.key }.compactMap { $0.value.string }
         return ([draft.title, draft.body] + values).filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
+
+    /// A property edit is followed until the copy takes or refuses it.
+    func submitPropertyEdit(_ write: ItemWrite, of item: ItemID, failing title: String) {
+        let mark = (lastPropertyWrite ?? 0) + 1
+        lastPropertyWrite = mark
+        let id = submit(write, failing: title)
+        if refusals[id] != nil {
+            propertyWrites[id] = item
+            propertyMarks[id] = mark
+        }
+    }
+
+    func isWritingProperties(of id: ItemID) -> Bool { propertyWrites.values.contains(id) }
+
+    func tookPropertyWrite(_ mark: Int) -> Bool { takenMarks.contains(mark) }
+
+    /// An editor asks about its writes as it next draws, so only the latest marks are kept.
+    private func remember(taken mark: Int) {
+        takenMarks.insert(mark)
+        guard takenMarks.count > Self.takenMarkLimit, let last = lastPropertyWrite else { return }
+        takenMarks = takenMarks.filter { $0 > last - Self.takenMarkLimit }
+    }
+
+    private static let takenMarkLimit = 256
 
     /// A create is followed to its answer, so one refused before the source holds the item is told to the window that made it.
     func submitCreate(_ id: ItemID, _ draft: ItemDraft, failing title: String) {

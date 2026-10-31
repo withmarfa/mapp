@@ -136,6 +136,14 @@ protocol ItemLibrary: AnyObject, Observable {
     func wasRefused(creating id: ItemID) -> Bool
     @discardableResult
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
+    /// Whether an edit of the properties of `id` is still on its way into the library, so the item does not show it
+    /// yet. False once the library holds the edit or has refused it. A library that writes at once is never writing.
+    func isWritingProperties(of id: ItemID) -> Bool
+    /// A mark for the last property edit the library made, of any item, read right after making one: nil for a
+    /// library that writes at once. `tookPropertyWrite(_:)` says later whether the library took that edit, so an
+    /// editor can tell a write that landed and was changed again before it drew, as by Undo, from one refused.
+    var lastPropertyWrite: Int? { get }
+    func tookPropertyWrite(_ mark: Int) -> Bool
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool
     /// Moves each item to `type`, its title and text to the new type's keys in the same edit, with `filling` for
@@ -197,6 +205,9 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
+    func isWritingProperties(of id: ItemID) -> Bool { false }
+    var lastPropertyWrite: Int? { nil }
+    func tookPropertyWrite(_ mark: Int) -> Bool { false }
     var history: (any ItemHistorySource)? { nil }
 
     func createItem(
